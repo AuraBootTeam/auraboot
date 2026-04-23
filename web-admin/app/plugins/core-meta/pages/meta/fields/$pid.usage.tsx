@@ -11,12 +11,10 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { useLoaderData, useNavigate, useParams } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
+import { useLoaderData, useNavigate, useParams, type LoaderFunctionArgs } from 'react-router';
 import { fieldLibraryService } from '~/shared/services/fieldLibraryService';
 import { fieldService } from '~/shared/services/fieldService';
 import { useToastContext } from '~/contexts/ToastContext';
-import type { FieldUsageInfo, BindingConfiguration, MetaFieldDTO } from '~/types/fieldLibrary';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { ErrorAlert } from '~/ui/ErrorAlert';
 

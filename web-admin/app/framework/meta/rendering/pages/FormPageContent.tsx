@@ -19,11 +19,11 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { useComputedFields } from '~/framework/meta/hooks/useComputedFields';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
-import { ErrorAlert } from '~/ui/ErrorAlert';
-import { LoadingSpinner } from '~/ui/LoadingSpinner';
+import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
@@ -37,6 +37,7 @@ import { evaluateAssert as crossFieldEvalAssert } from '~/framework/meta/validat
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
 import { checkKindCompatibility } from '~/shared/utils/kindCapability';
+import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
 
 /**
  * Map field dataType to Smart component name.
@@ -92,6 +93,38 @@ interface NormalizedValidationRule {
   pattern?: string;
 }
 
+interface FormValidationResult {
+  fieldErrors: Record<string, string>;
+  summaryErrors: string[];
+}
+
+function pushUniqueMessage(target: string[], message?: string) {
+  const normalized = String(message || '').trim();
+  if (!normalized || target.includes(normalized)) return;
+  target.push(normalized);
+}
+
+export function parseValidationSummaryMessages(message?: string | null): string[] {
+  if (!message) return [];
+  return message
+    .split(';')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, arr) => arr.indexOf(item) === index);
+}
+
+export function normalizeCommandPayloadValue(rawValue: any, dataType?: string): any {
+  const normalized = normalizePayloadValue(rawValue, dataType);
+  if (
+    String(dataType || '').toLowerCase() === 'json' &&
+    normalized != null &&
+    typeof normalized === 'object'
+  ) {
+    return JSON.stringify(normalized);
+  }
+  return normalized;
+}
+
 function resolveComponentByFieldMeta(
   dataType?: string,
   extension?: Record<string, any>,
@@ -126,14 +159,48 @@ function resolveComponentByFieldMeta(
   return DATA_TYPE_TO_COMPONENT[String(dataType).toLowerCase()];
 }
 
-function normalizePayloadValue(rawValue: any, dataType?: string) {
+export function normalizePayloadValue(rawValue: any, dataType?: string) {
+  if (String(dataType || '').toLowerCase() === 'file') {
+    if (rawValue == null || rawValue === '') {
+      return null;
+    }
+    if (typeof rawValue === 'string') {
+      return rawValue;
+    }
+    if (Array.isArray(rawValue)) {
+      const normalizedFiles = rawValue
+        .filter((item) => item && typeof item === 'object')
+        .filter((item) => !('status' in item) || item.status === 'done')
+        .map((item) => {
+          const response = item.response && typeof item.response === 'object' ? item.response : {};
+          const url =
+            item.url ||
+            item.thumbUrl ||
+            (response as any).url ||
+            (response as any).downloadUrl ||
+            ((response as any).fileId || (response as any).pid
+              ? `/api/file/download/${(response as any).fileId || (response as any).pid}`
+              : undefined);
+          return {
+            name: item.name,
+            url,
+            size: item.size,
+            type: item.type,
+            fileId: (response as any).fileId || (response as any).pid,
+          };
+        })
+        .filter((item) => item.name && item.url);
+
+      return normalizedFiles.length > 0 ? JSON.stringify(normalizedFiles) : null;
+    }
+  }
   if (
     rawValue === '' &&
     ['date', 'datetime', 'decimal', 'integer'].includes(String(dataType || '').toLowerCase())
   ) {
     return null;
   }
-  if (typeof rawValue === 'string') {
+  if (String(dataType || '').toLowerCase() === 'json' && typeof rawValue === 'string') {
     const trimmed = rawValue.trim();
     if (
       (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
@@ -226,6 +293,7 @@ function mergeFieldValidationRules(
   rawField: any,
   meta?: FieldMetaInfo,
   t?: (key: string) => string,
+  locale?: string,
 ): NormalizedValidationRule[] {
   const existingRules: NormalizedValidationRule[] = Array.isArray(rawField?.validation)
     ? [...rawField.validation]
@@ -236,14 +304,15 @@ function mergeFieldValidationRules(
   // Enforcing them as user-entered required inputs blocks valid submissions before command execution.
   const required = !rawField?.readOnly && Boolean(rawField?.required ?? meta?.required);
   if (required && !byType.has('required')) {
-    const requiredMsg = t?.('common.validation.required');
     const label = rawField?.label || meta?.displayName || rawField?.field;
     existingRules.push({
       type: 'required',
-      message:
-        requiredMsg && requiredMsg !== 'common.validation.required'
-          ? `${label} ${requiredMsg}`
-          : `${label} is required`,
+      message: buildRequiredFieldMessage(label, {
+        dataType: meta?.dataType,
+        component: rawField?.component ?? meta?.component,
+        locale,
+        t,
+      }),
     });
     byType.add('required');
   }
@@ -315,6 +384,8 @@ export function FormPageContent(props: PageContentProps) {
   // State management
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [initialFormData, setInitialFormData] = useState<Record<string, any> | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [summaryErrors, setSummaryErrors] = useState<string[]>([]);
 
   // Read URL params:
   // - commandCode: explicit submit command provided by navigation actions
@@ -483,6 +554,17 @@ export function FormPageContent(props: PageContentProps) {
     showToast,
   });
 
+  const clearFieldError = useCallback((fieldCode: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[fieldCode]) return prev;
+      const next = { ...prev };
+      delete next[fieldCode];
+      return next;
+    });
+    setSummaryErrors([]);
+    setError(null);
+  }, [setError]);
+
   // Fetch model field metadata for component resolution (must be before early returns)
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
   useEffect(() => {
@@ -570,9 +652,71 @@ export function FormPageContent(props: PageContentProps) {
       .catch(() => {});
   }, [tableName, schema?.modelCode, token, locale]);
 
-  const validateFormBeforeSubmit = useCallback((): string[] => {
-    if (!schema?.blocks) return [];
-    const errors: string[] = [];
+  const computedFieldDefs = useMemo<ComputedFieldDef[]>(() => {
+    const defs: ComputedFieldDef[] = [];
+    const blocks = Array.isArray(schema?.blocks) ? schema.blocks : [];
+
+    for (const block of blocks) {
+      if (block?.blockType !== 'form-section' || !Array.isArray(block.fields)) continue;
+      for (const rawField of block.fields) {
+        if (!rawField?.field) continue;
+        const meta = modelFields[rawField.field];
+        const extensionProps = meta?.extensionProps;
+        const formula =
+          typeof extensionProps?.formula === 'string' ? extensionProps.formula.trim() : '';
+        const computed = extensionProps?.computed === true && formula.length > 0;
+        if (!computed) continue;
+
+        const dependencyConfig =
+          extensionProps?.computeDependencies ?? extensionProps?.dependencies ?? [];
+        const dependencies = Array.isArray(dependencyConfig)
+          ? dependencyConfig.map((dep) => String(dep)).filter(Boolean)
+          : typeof dependencyConfig === 'string'
+            ? dependencyConfig
+                .split(',')
+                .map((dep) => dep.trim())
+                .filter(Boolean)
+            : [];
+
+        defs.push({
+          fieldCode: rawField.field,
+          label: meta?.displayName || rawField.label,
+          expression: formula,
+          dependencies,
+          type: extensionProps?.materialize === false ? 'computed_temp' : 'computed_materialized',
+          dataType: meta?.dataType,
+          fallbackValue: extensionProps?.computeFallbackValue ?? '',
+        });
+      }
+    }
+
+    return defs;
+  }, [schema?.blocks, modelFields]);
+
+  useComputedFields({
+    fields: computedFieldDefs,
+    formData,
+    enabled: computedFieldDefs.length > 0,
+    onChange: (fieldCode, value) => {
+      setFormData((prev) => {
+        if (prev[fieldCode] === value) return prev;
+        return {
+          ...prev,
+          [fieldCode]: value,
+        };
+      });
+    },
+    onError: (fieldCode, error) => {
+      console.warn(`Failed to evaluate computed field "${fieldCode}":`, error);
+    },
+  });
+
+  const validateFormBeforeSubmit = useCallback((): FormValidationResult => {
+    if (!schema?.blocks) {
+      return { fieldErrors: {}, summaryErrors: [] };
+    }
+    const nextFieldErrors: Record<string, string> = {};
+    const nextSummaryErrors: string[] = [];
     const submissionData = recordId ? { ...(initialFormData || {}), ...formData } : formData;
     const blocks = schema.blocks;
     const formSectionBlocks = blocks.filter((b: any) => b.blockType === 'form-section');
@@ -584,7 +728,7 @@ export function FormPageContent(props: PageContentProps) {
       const fields = Array.isArray(block.fields) ? block.fields : [];
       for (const rawField of fields) {
         const meta = modelFields[rawField.field];
-        const rules = mergeFieldValidationRules(rawField, meta, t);
+        const rules = mergeFieldValidationRules(rawField, meta, t, locale);
         const label = rawField.label || meta?.displayName || rawField.field;
 
         if (rawField.visibleWhen && !evaluateCondition(rawField.visibleWhen, pageContext)) {
@@ -601,7 +745,14 @@ export function FormPageContent(props: PageContentProps) {
               value === '' ||
               (Array.isArray(value) && value.length === 0);
             if (empty) {
-              errors.push(rule.message || `${label} is required`);
+              nextFieldErrors[rawField.field] =
+                rule.message ||
+                buildRequiredFieldMessage(label, {
+                  dataType: meta?.dataType,
+                  component: field.component,
+                  locale,
+                  t,
+                });
               break;
             }
           }
@@ -611,7 +762,7 @@ export function FormPageContent(props: PageContentProps) {
             Number.isFinite(rule.maxLength)
           ) {
             if (value.length > Number(rule.maxLength)) {
-              errors.push(`${label} exceeds max length ${rule.maxLength}`);
+              nextFieldErrors[rawField.field] = `${label} exceeds max length ${rule.maxLength}`;
               break;
             }
           }
@@ -621,7 +772,7 @@ export function FormPageContent(props: PageContentProps) {
             Number.isFinite(rule.minLength)
           ) {
             if (value.length < Number(rule.minLength)) {
-              errors.push(`${label} is shorter than min length ${rule.minLength}`);
+              nextFieldErrors[rawField.field] = `${label} is shorter than min length ${rule.minLength}`;
               break;
             }
           }
@@ -629,7 +780,7 @@ export function FormPageContent(props: PageContentProps) {
             try {
               const regex = new RegExp(rule.pattern);
               if (!regex.test(value)) {
-                errors.push(`${label} format is invalid`);
+                nextFieldErrors[rawField.field] = `${label} format is invalid`;
                 break;
               }
             } catch {
@@ -639,14 +790,14 @@ export function FormPageContent(props: PageContentProps) {
           if (rule.type === 'minValue' && Number.isFinite(rule.minValue)) {
             const num = Number(value);
             if (Number.isFinite(num) && num < rule.minValue!) {
-              errors.push(`${label} must be at least ${rule.minValue}`);
+              nextFieldErrors[rawField.field] = `${label} must be at least ${rule.minValue}`;
               break;
             }
           }
           if (rule.type === 'maxValue' && Number.isFinite(rule.maxValue)) {
             const num = Number(value);
             if (Number.isFinite(num) && num > rule.maxValue!) {
-              errors.push(`${label} must be at most ${rule.maxValue}`);
+              nextFieldErrors[rawField.field] = `${label} must be at most ${rule.maxValue}`;
               break;
             }
           }
@@ -665,7 +816,8 @@ export function FormPageContent(props: PageContentProps) {
       if (selectedKind && selectedModelCode && kindCapabilities) {
         const compat = checkKindCompatibility(selectedKind, kindCapabilities);
         if (!compat.compatible) {
-          errors.push(
+          pushUniqueMessage(
+            nextSummaryErrors,
             compat.reason
               ? `Kind "${selectedKind}" is not supported by model "${selectedModelCode}": ${compat.reason}`
               : `Kind "${selectedKind}" is not supported by model "${selectedModelCode}"`,
@@ -687,18 +839,23 @@ export function FormPageContent(props: PageContentProps) {
             const msg = rule.message?.replace(/\{(\w+)\}/g, (_, k: string) =>
               String(submissionData[k] ?? k),
             );
-            errors.push(msg || `Validation failed: ${rule.id}`);
+            const finalMessage = msg || `Validation failed: ${rule.id}`;
+            if (rule.targetField && !nextFieldErrors[rule.targetField]) {
+              nextFieldErrors[rule.targetField] = finalMessage;
+            }
+            pushUniqueMessage(nextSummaryErrors, finalMessage);
           }
         }
       }
     }
 
-    return errors;
+    return { fieldErrors: nextFieldErrors, summaryErrors: nextSummaryErrors };
   }, [
     schema,
     pageContext,
     modelFields,
     t,
+    locale,
     formData,
     initialFormData,
     recordId,
@@ -718,14 +875,19 @@ export function FormPageContent(props: PageContentProps) {
             actionType.toLowerCase(),
           ) || !actionType;
         if (shouldValidate) {
-          const validationErrors = validateFormBeforeSubmit();
-          if (validationErrors.length > 0) {
-            const firstError = validationErrors[0];
-            setError(firstError);
-            showErrorToast(firstError);
+          const validationResult = validateFormBeforeSubmit();
+          if (
+            Object.keys(validationResult.fieldErrors).length > 0 ||
+            validationResult.summaryErrors.length > 0
+          ) {
+            setFieldErrors(validationResult.fieldErrors);
+            setSummaryErrors(validationResult.summaryErrors);
+            setError(null);
             return;
           }
         }
+        setFieldErrors({});
+        setSummaryErrors([]);
         onSubmitOverride(formData).catch((err) => {
           const errorMessage = err instanceof Error ? err.message : 'Submit failed';
           setError(errorMessage);
@@ -765,21 +927,26 @@ export function FormPageContent(props: PageContentProps) {
           effectiveActionType.toLowerCase(),
         ) || !effectiveActionType;
       if (shouldValidate) {
-        const validationErrors = validateFormBeforeSubmit();
-        if (validationErrors.length > 0) {
-          const firstError = validationErrors[0];
-          setError(firstError);
-          showErrorToast(firstError);
+        const validationResult = validateFormBeforeSubmit();
+        if (
+          Object.keys(validationResult.fieldErrors).length > 0 ||
+          validationResult.summaryErrors.length > 0
+        ) {
+          setFieldErrors(validationResult.fieldErrors);
+          setSummaryErrors(validationResult.summaryErrors);
+          setError(null);
           return;
         }
       }
+      setFieldErrors({});
+      setSummaryErrors([]);
       const modelFieldEntries = Object.entries(modelFields);
       const commandPayload =
         modelFieldEntries.length > 0
           ? Object.fromEntries(
               Object.entries(actionRecord).flatMap(([key, rawValue]) => {
                 if (!modelFields[key]) return [];
-                const value = normalizePayloadValue(rawValue, modelFields[key].dataType);
+                const value = normalizeCommandPayloadValue(rawValue, modelFields[key].dataType);
                 if (Array.isArray(value) && value.length === 0) return [];
                 if (
                   value &&
@@ -847,10 +1014,15 @@ export function FormPageContent(props: PageContentProps) {
           .then((result) => {
             if (!ResultHelper.isSuccess(result)) {
               const contextError = (result as any).context?.error;
-              throw new Error(
-                contextError || result.desc || result.message || 'Command execution failed',
-              );
+              if (contextError) {
+                setError(null);
+                setSummaryErrors(parseValidationSummaryMessages(contextError));
+                return;
+              }
+              throw new Error(result.desc || result.message || 'Command execution failed');
             }
+            setFieldErrors({});
+            setSummaryErrors([]);
             navigate(resolveAfterSubmitRedirect(schema, tableName, result.data, recordId));
           })
           .catch((err) => {
@@ -1147,8 +1319,8 @@ export function FormPageContent(props: PageContentProps) {
 
   // Render smart field using utility
   const renderSmartField = useMemo(
-    () => createFieldRenderer(formData, setFormData, pageContext),
-    [formData, pageContext],
+    () => createFieldRenderer(formData, setFormData, pageContext, fieldErrors, clearFieldError),
+    [formData, pageContext, fieldErrors, clearFieldError],
   );
 
   // Null schema guard
@@ -1191,12 +1363,28 @@ export function FormPageContent(props: PageContentProps) {
             </div>
           </div>
 
-          {/* Error Alert */}
-          {error && (
+          {/* Error Summary */}
+          {summaryErrors.length > 0 ? (
+            <div
+              className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 p-4"
+              data-testid="form-error-summary"
+            >
+              <p className="text-sm font-medium text-red-700">
+                {summaryErrors.length > 1
+                  ? `请先修正以下 ${summaryErrors.length} 项问题`
+                  : '请先修正以下问题'}
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-red-600">
+                {summaryErrors.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </div>
+          ) : error ? (
             <div className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 p-4">
               <p className="text-red-600">{error}</p>
             </div>
-          )}
+          ) : null}
 
           {/* URL-prefill hint: shown when modelCode was seeded from ?modelCode=xxx */}
           {urlSeededModelCode && !isEditMode && (
@@ -1256,6 +1444,7 @@ export function FormPageContent(props: PageContentProps) {
                                 rawField,
                                 meta,
                                 t,
+                                locale,
                               );
                               const maxLength = Number(meta?.feature?.validation?.maxLength);
                               // Use pre-computed extensionProps (stable reference from modelFields)
@@ -1277,6 +1466,11 @@ export function FormPageContent(props: PageContentProps) {
                                     referenceModelCode:
                                       rawField.referenceModelCode || meta.referenceModelCode,
                                     required: rawField.required ?? meta.required,
+                                    readOnly:
+                                      rawField.readOnly ??
+                                      meta.extension?.readOnly ??
+                                      (meta.extension as any)?.extension?.readOnly ??
+                                      (extensionProps?.computed === true ? true : undefined),
                                     validation: mergedValidationRules,
                                     props: {
                                       ...(extensionProps || {}),

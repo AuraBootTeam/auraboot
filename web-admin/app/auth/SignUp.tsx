@@ -7,13 +7,12 @@ import {
   useSearchParams,
   redirect,
 } from 'react-router';
-import type { User } from '~/utils/type';
 import { useEffect, useRef, useState } from 'react';
 
 import { createUserSession, getTokenFromRequest } from '~/shared/services/session';
 import { validateEmail } from '~/utils/utils';
 import { post } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
+import { ResultHelper, type User } from '~/utils/type';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const token = await getTokenFromRequest(request);

@@ -236,7 +236,7 @@ app.get('*', (req, res) => {
 app.use(errorLogger);
 
 // Error handling middleware
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const requestId = (req as any).requestId || 'unknown';
   console.error(`[${requestId}] BFF Server Error:`, error);
   res.status(500).json({
@@ -250,7 +250,7 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 });
 
 // 导出BFF路由设置函数，供Vite插件使用
-export const setupBffRoutes = (expressApp: express.Application) => {
+export const setupBffRoutes = (_expressApp: express.Application) => {
   // 所有BFF路由已在上面定义，这里不需要额外设置
 };
 

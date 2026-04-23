@@ -1,18 +1,21 @@
-import { useState, useEffect } from 'react';
-import { useLoaderData, useNavigate, Form, useSubmit } from 'react-router';
+import { useState } from 'react';
+import {
+  useLoaderData,
+  useNavigate,
+  useSubmit,
+  type LoaderFunctionArgs,
+  type ActionFunctionArgs,
+} from 'react-router';
 import { useToastContext } from '~/contexts/ToastContext';
-import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import {
   getStoreList,
   createStore,
   updateStore,
   deleteStore,
   batchDeleteStores,
-  checkStoreCodeUnique,
   type Store,
   type StoreCreateRequest,
   type StoreUpdateRequest,
-  type PaginationResult,
 } from '~/shared/services/store';
 
 // Loader函数 - 获取Store列表数据

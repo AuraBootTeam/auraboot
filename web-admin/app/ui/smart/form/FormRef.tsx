@@ -6,7 +6,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   FormRefComponentProps,
-  FormRef as FormRefSchema,
   FormRefState,
   FormRefEvent,
 } from '~/plugins/core-designer/components/studio/domain/schema/formref';
@@ -124,7 +123,6 @@ export const FormRef: React.FC<FormRefProps> = ({
   onSubmit,
   onCancel,
   onValuesChange,
-  onFieldsChange,
 }) => {
   const formRefManager = useFormRefManager();
   const [formRefState, setFormRefState] = useState<FormRefState>({

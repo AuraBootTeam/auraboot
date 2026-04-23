@@ -1,5 +1,4 @@
 import { createCookieSessionStorage, redirect } from 'react-router';
-import type { Result, User } from '~/utils/type';
 
 import { JWT_TOKEN_KEY, TOKEN_EXPIRY_KEY, REFRESH_TOKEN_KEY } from '~/constants/AuthConstant';
 

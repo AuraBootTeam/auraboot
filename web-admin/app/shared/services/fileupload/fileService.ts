@@ -1,7 +1,6 @@
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { getTokenFromRequest, sessionStorage } from '~/shared/services/session.js';
-import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
+import { getTokenFromRequest } from '~/shared/services/session.js';
 
 export interface FileRecord {
   fileId?: string; // 改为fileId而不是id

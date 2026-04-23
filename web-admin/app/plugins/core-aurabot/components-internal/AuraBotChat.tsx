@@ -7,10 +7,11 @@
  * @since 1.0.0
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import type { KeyboardEvent } from 'react';
-import { useAuraBot } from '../components-shell/AuraBotProvider';
-import type { SimpleMessage } from '../components-shell/AuraBotProvider';
+import React, { useState, useCallback, useRef, useEffect, type KeyboardEvent } from 'react';
+import {
+  useAuraBot,
+  type SimpleMessage,
+} from '../components-shell/AuraBotProvider';
 import { useI18n } from '~/contexts/I18nContext';
 import { ToolResultCard } from './ToolResultCard';
 import { ChatBiResultCard } from './ChatBiResultCard';

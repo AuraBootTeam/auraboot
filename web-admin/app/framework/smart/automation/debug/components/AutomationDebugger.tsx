@@ -38,7 +38,6 @@ function DebugActionList() {
           const result = resultMap.get(index);
           const isCurrent = index === session.currentActionIndex;
           const isBreakpoint = session.breakpoints.includes(index);
-          const isDone = index < session.currentActionIndex;
 
           let statusClass = 'border-gray-200 bg-white';
           if (result) {

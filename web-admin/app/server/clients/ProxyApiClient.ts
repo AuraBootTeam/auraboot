@@ -1,14 +1,8 @@
 import axios from 'axios';
-import type {
-  AxiosInstance,
-  AxiosResponse,
-  AxiosRequestConfig,
-  InternalAxiosRequestConfig,
-} from 'axios';
+import type { AxiosInstance, AxiosResponse, AxiosRequestConfig } from 'axios';
 import * as http from 'http';
 import * as https from 'https';
-import { config } from '~/server/utils/config';
-import type { RetryConfig } from '~/server/utils/config';
+import { config, type RetryConfig } from '~/server/utils/config';
 import logger, { logPerformance } from '~/server/utils/logger';
 import { HealthCheckService } from '~/server/utils/HealthCheckService';
 

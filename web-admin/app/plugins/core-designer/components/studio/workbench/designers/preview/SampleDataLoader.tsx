@@ -44,23 +44,36 @@ export const SampleDataLoader: React.FC<SampleDataLoaderProps> = ({
   };
 
   return (
-    <div className="mt-3 border-t pt-3 text-xs" data-testid="sample-data-loader">
-      <button
-        type="button"
-        onClick={load}
-        disabled={loading || !modelCode}
-        className="rounded border px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
-        data-testid="sample-data-load-btn"
-      >
-        {loading ? 'Loading...' : 'Load sample data'}
-      </button>
-      {count !== undefined && !error && (
-        <span className="ml-2 text-green-600" data-testid="sample-data-count">
-          Loaded {count} row{count === 1 ? '' : 's'}
-        </span>
-      )}
+    <div
+      className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-xs"
+      data-testid="sample-data-loader"
+    >
+      <div className="mb-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          样例数据
+        </div>
+        <div className="mt-1 text-sm text-slate-600">
+          拉取 3 条真实数据，验证字段命名与列宽是否合理。
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading || !modelCode}
+          className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+          data-testid="sample-data-load-btn"
+        >
+          {loading ? '加载中...' : '加载样例数据'}
+        </button>
+        {count !== undefined && !error && (
+          <span className="text-emerald-600" data-testid="sample-data-count">
+            已加载 {count} 条
+          </span>
+        )}
+      </div>
       {error && (
-        <div className="mt-1 text-red-600" data-testid="sample-data-error">
+        <div className="mt-2 text-red-600" data-testid="sample-data-error">
           {error}
         </div>
       )}

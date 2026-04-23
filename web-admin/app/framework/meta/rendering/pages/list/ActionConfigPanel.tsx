@@ -55,7 +55,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     const configMap = new Map((currentConfig || []).map((c) => [c.code, c]));
 
     // DSL buttons
-    const dslItems: ActionItem[] = buttons.map((btn, idx) => {
+    const dslItems: ActionItem[] = buttons.map((btn, _idx) => {
       const cfg = configMap.get(btn.code);
       const isPrimary = btn.primary || btn.variant === 'primary';
       return {
@@ -68,7 +68,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     });
 
     // Built-in items (always start unpinned unless configured)
-    const builtinItems: ActionItem[] = BUILTIN_ACTIONS.map((ba, i) => {
+    const builtinItems: ActionItem[] = BUILTIN_ACTIONS.map((ba, _i) => {
       const cfg = configMap.get(ba.code);
       return {
         code: ba.code,

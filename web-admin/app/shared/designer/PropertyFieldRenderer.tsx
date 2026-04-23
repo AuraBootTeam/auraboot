@@ -27,8 +27,9 @@ import { ExpressionEditor } from './expression';
 import { DependentFieldSelect } from './DependentFieldSelect';
 import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
+import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
 import type { FieldAdapter } from '~/ui/field-adapter';
-import type { PropertySchema, PropertyType } from './types';
+import type { PropertySchema } from './types';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -271,6 +272,17 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           label={label}
           placeholder={placeholder}
           testId={schema.key}
+        />
+      );
+
+    case 'icon':
+      return (
+        <IconPicker
+          value={(adapter.value as string) || ''}
+          onChange={(next) => adapter.setValue(next)}
+          label={label}
+          error={adapter.error}
+          disabled={adapter.disabled}
         />
       );
 

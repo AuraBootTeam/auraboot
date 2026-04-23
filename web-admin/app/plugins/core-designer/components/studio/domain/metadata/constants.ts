@@ -1,5 +1,3 @@
-import { VersionStatus, VersionType } from '~/plugins/core-designer/components/studio/domain/metadata/types';
-
 // 常量
 export const VERSION_CONSTANTS = {
   // 默认配置

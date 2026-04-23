@@ -6,8 +6,11 @@
  */
 
 import React from 'react';
-import type { DslBlock, DslFieldRef } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import {
+  resolveLocalizedText,
+  type DslBlock,
+  type DslFieldRef,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { FilterFormPreview } from './FilterFormPreview';
 import { DataTablePreview } from './DataTablePreview';
 import { FormSectionPreview } from './FormSectionPreview';
@@ -52,6 +55,7 @@ export const BlockPreview: React.FC<BlockPreviewProps> = ({
   return (
     <div
       ref={setNodeRef}
+      onClick={onClick}
       className={`group relative rounded-lg border-2 transition-all ${
         showDropIndicator
           ? 'border-green-500 bg-green-50/50 ring-2 ring-green-200'
@@ -186,7 +190,7 @@ const BlockContent: React.FC<{
 /**
  * Selection info preview
  */
-const SelectionInfoPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+const SelectionInfoPreview: React.FC<{ block: DslBlock }> = ({ block: _block }) => {
   return (
     <div className="bg-blue-50 p-3">
       <div className="flex items-center gap-2 text-blue-700">

@@ -147,7 +147,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`overflow-auto bg-gray-50 p-4 ${className}`}
+      className={`overflow-auto rounded-[28px] bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_24%),linear-gradient(180deg,_#f8fbff_0%,_#f8fafc_48%,_#ffffff_100%)] p-5 md:p-6 ${className}`}
       data-testid={deriveTestId('dashboard', title.replace(/\s+/g, '_'), 'container')}
     >
       {showExport && widgets.length > 0 && (
@@ -177,7 +177,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
       >
         {widgets.map((widget) => (
           <div key={widget.id}>
-            <div className="h-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="h-full overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm">
               {renderViewerWidget(widget)}
             </div>
           </div>

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link, useLoaderData } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
+import { useNavigate, Link, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import { Button } from '~/ui/ui/button';
 import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
 import { bootstrapT } from '~/services/bootstrapTexts';
@@ -34,6 +33,23 @@ export default function SetupWizard() {
   const [formError, setFormError] = useState('');
   const [setupError, setSetupError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Poll progress while in progress phase
+  useEffect(() => {
+    if (phase !== 'progress') return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/bootstrap/progress');
+        const result = await res.json();
+        if (result.code === '0' && result.data) {
+          setProgress(result.data);
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase]);
 
   if (status?.initialized) {
     return (
@@ -100,23 +116,6 @@ export default function SetupWizard() {
       setPhase('error');
     }
   };
-
-  // Poll progress while in progress phase
-  useEffect(() => {
-    if (phase !== 'progress') return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch('/api/bootstrap/progress');
-        const result = await res.json();
-        if (result.code === '0' && result.data) {
-          setProgress(result.data);
-        }
-      } catch {
-        // ignore polling errors
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [phase]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4 dark:from-gray-900 dark:to-gray-800">

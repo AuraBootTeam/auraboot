@@ -494,6 +494,8 @@ test.describe('BPM Designer UserTask formPageKey Lifecycle', { tag: ['@bpm-regre
             wd_req_reason: 'E2E B3.3 approved via backend contract',
             wd_req_days: 2,
             wd_req_type: 'annual',
+            wd_req_start_slot: 'AM',
+            wd_req_end_slot: 'PM',
           },
         },
       },

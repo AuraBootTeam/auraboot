@@ -64,12 +64,6 @@ function extractVariables(template: string): string[] {
   return unique;
 }
 
-function renderTemplate(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-    return vars[key] !== undefined ? vars[key] : match;
-  });
-}
-
 function timeAgo(dateStr?: string): string {
   if (!dateStr) return 'Unknown';
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -103,7 +97,6 @@ export default function PromptTemplatesPage() {
     loading,
     level,
     setLevel,
-    editingConfig,
     handleCreate,
     handleEdit,
     handleDelete,
@@ -626,18 +619,15 @@ function EditorTabContent({
 function PreviewTabContent({
   template,
   sampleData,
-  providerCode,
 }: {
   template: string;
   sampleData: Record<string, string>;
-  providerCode: string;
 }) {
   const [customData, setCustomData] = useState<Record<string, string>>({});
   const variables = useMemo(() => extractVariables(template), [template]);
 
   // Merge sample data with any custom overrides
   const mergedData = useMemo(() => ({ ...sampleData, ...customData }), [sampleData, customData]);
-  const rendered = useMemo(() => renderTemplate(template, mergedData), [template, mergedData]);
 
   if (!template.trim()) {
     return (

@@ -12,8 +12,14 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { useNavigate, useParams, useLoaderData, useLocation, Link } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
+import {
+  useNavigate,
+  useParams,
+  useLoaderData,
+  useLocation,
+  Link,
+  type LoaderFunctionArgs,
+} from 'react-router';
 import { modelService, type RelatedPage } from '~/shared/services/modelService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { permissionService } from '~/shared/services/permissionService';
@@ -24,7 +30,7 @@ import { FieldListManager } from '~/ui/meta/FieldListManager';
 import { FieldConfigDialog, type FieldBindingConfig } from '~/ui/meta/FieldConfigDialog';
 import { DictConfigDialog } from '~/ui/meta/DictConfigDialog';
 import { SourceTypeBadge } from '~/shared/components/SourceTypeBadge';
-import type { MetaModelDTO, ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
+import type { ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
 
 /**
  * Check whether the given model is a virtual model (non-physical sourceType).
@@ -199,8 +205,8 @@ export default function ModelDetailPage() {
 
   // 数据状态
   const [fields, setFields] = useState<ModelFieldBinding[]>(initialFields);
-  const [permissions, setPermissions] = useState<Permission[]>(initialPermissions);
-  const [versions, setVersions] = useState<ModelVersion[]>(initialVersions);
+  const [permissions] = useState<Permission[]>(initialPermissions);
+  const [versions] = useState<ModelVersion[]>(initialVersions);
   const [pages, setPages] = useState<any[]>(initialPages);
 
   // 加载状态

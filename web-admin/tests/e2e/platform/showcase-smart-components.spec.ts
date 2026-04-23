@@ -234,7 +234,9 @@ test.describe('Showcase Smart Components', () => {
     await budgetInput.scrollIntoViewIfNeeded();
     if (await budgetInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await budgetInput.click();
-      await budgetInput.fill('9999.99');
+      await budgetInput.press('Meta+A');
+      await budgetInput.type('9999.99');
+      await budgetInput.blur();
     }
 
     // 3. TimePicker
@@ -391,8 +393,9 @@ test.describe('Showcase Smart Components', () => {
     await budgetInput.scrollIntoViewIfNeeded();
     if (await budgetInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await budgetInput.click();
-      await budgetInput.fill('');
-      await budgetInput.fill('88888.88');
+      await budgetInput.press('Meta+A');
+      await budgetInput.type('88888.88');
+      await budgetInput.blur();
     }
 
     // Edit time slot

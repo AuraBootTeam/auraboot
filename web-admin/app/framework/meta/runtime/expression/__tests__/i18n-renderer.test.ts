@@ -5,8 +5,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { renderText } from '~/framework/meta/runtime/expression/i18n-renderer';
-import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
-import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+import {
+  createExpressionContext,
+  type ExpressionContext,
+} from '~/framework/meta/runtime/expression/context';
 
 describe('i18n-renderer', () => {
   const createContext = (

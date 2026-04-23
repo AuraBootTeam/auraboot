@@ -12,12 +12,10 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { useLoaderData, useNavigate, useParams } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
+import { useLoaderData, useNavigate, useParams, type LoaderFunctionArgs } from 'react-router';
 import { fieldLibraryService } from '~/shared/services/fieldLibraryService';
 import { fieldService } from '~/shared/services/fieldService';
 import { useToastContext } from '~/contexts/ToastContext';
-import type { FieldImpactAnalysis, MetaFieldDTO } from '~/types/fieldLibrary';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { ErrorAlert } from '~/ui/ErrorAlert';
 
@@ -163,24 +161,6 @@ export default function FieldImpactPage() {
         return '严重';
       default:
         return level;
-    }
-  };
-
-  /**
-   * Get severity color
-   */
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'low':
-        return 'text-green-600';
-      case 'medium':
-        return 'text-yellow-600';
-      case 'high':
-        return 'text-orange-600';
-      case 'critical':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
     }
   };
 

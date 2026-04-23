@@ -14,7 +14,6 @@ import type {
   ColumnConfig,
   SubTableConfig,
   ValidationRule,
-  CrossRowValidationRule,
   LocalizedText,
 } from '~/framework/meta/schemas/types';
 import { fetchResult } from '~/shared/services/http-client';
@@ -133,8 +132,8 @@ export function useInlineRowEdit({
     (col: ColumnConfig, value: any): string | null => {
       // Required check
       if (col.required && (value === undefined || value === null || value === '')) {
-        const reqMsg = t('validation.required');
-        return reqMsg !== 'validation.required' ? reqMsg : 'This field is required';
+        const reqMsg = t('common.validation.required');
+        return reqMsg !== 'common.validation.required' ? reqMsg : 'This field is required';
       }
 
       // Numeric min/max

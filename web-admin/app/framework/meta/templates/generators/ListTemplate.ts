@@ -25,9 +25,9 @@ import type {
   TemplateAction,
   TemplateClassOverrides,
   TemplateStyleSet,
+  TEMPLATE_STYLES,
 } from '../types';
-import { TEMPLATE_STYLES } from '../types';
-import { mapFieldToComponent, mapFieldToValueType } from '../utils';
+import { mapFieldToValueType } from '../utils';
 
 export const ListTemplate: TemplateGenerator = {
   type: 'list',

@@ -9,8 +9,10 @@ import {
   AlignmentSystemPresets,
   type AlignmentConfig,
 } from '~/plugins/core-designer/components/studio/services/layout/alignment/AlignmentSystem';
-import { useSnapAlignConfig } from '~/plugins/core-designer/components/studio/hooks/layout/useSnapAndAlign';
-import type { SnapAndAlignConfig } from '~/plugins/core-designer/components/studio/hooks/layout/useSnapAndAlign';
+import {
+  useSnapAlignConfig,
+  type SnapAndAlignConfig,
+} from '~/plugins/core-designer/components/studio/hooks/layout/useSnapAndAlign';
 
 export interface SnapAlignPanelProps {
   /** 当前配置 */
@@ -538,7 +540,7 @@ export function SnapAlignToolbar({
  * 使用配置Hook的面板组件
  */
 export function SnapAlignConfigPanel() {
-  const { config, updateSnapPreset, updateAlignPreset, updateCustomConfig } = useSnapAlignConfig();
+  const { config, updateCustomConfig } = useSnapAlignConfig();
 
   return <SnapAlignPanel config={config} onConfigChange={updateCustomConfig} />;
 }

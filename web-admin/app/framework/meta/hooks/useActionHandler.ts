@@ -58,9 +58,7 @@ import { executeRegistryAction } from '~/framework/meta/hooks/executeRegistryAct
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
-import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 import { confirmDialog } from '~/utils/confirmDialog';
-import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { normalizeAction, normalizeButtonProps } from '~/framework/meta/utils/normalizeAction';
 
 // Navigate function type (compatible with react-router v7)

@@ -3,7 +3,7 @@
  * 提供表单引用的 CRUD 操作和状态管理
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type {
   FormRef,
   FormRefManager,
@@ -279,7 +279,10 @@ class FormRefManagerImpl implements FormRefManager {
     };
   }
 
-  renderFormRef(formRefId: string, props?: Partial<FormRefComponentProps>): React.ReactElement {
+  renderFormRef(
+    _formRefId: string,
+    _props?: Partial<FormRefComponentProps>,
+  ): React.ReactElement {
     // 这里应该返回 SmartFormRef 组件
     // 由于这是在 Hook 中，实际实现会在组件中处理
     throw new Error('renderFormRef should be called from a React component');

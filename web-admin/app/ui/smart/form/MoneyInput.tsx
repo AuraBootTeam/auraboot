@@ -17,7 +17,7 @@
  * @since 3.3.0
  */
 
-import React, { useRef, useCallback, useMemo, useState } from 'react';
+import React, { useRef, useCallback, useMemo, useState, useEffect } from 'react';
 import type { FormFieldProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
@@ -64,8 +64,6 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
   max,
   precision = 2,
   size = 'medium',
-  variant = 'default',
-  currencyCode,
   currencySymbol = '',
   baseCurrencySymbol = '\u00a5',
   exchangeRate,
@@ -78,11 +76,11 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
   onChange,
   onBlur,
   onFocus,
-  ...restProps
 }) => {
   const st = useSmartText();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [editingValue, setEditingValue] = useState('');
 
   const {
     labelText,
@@ -115,7 +113,6 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
   const meta = useSmartFieldMeta({ field });
   const errorText = meta.meta.error ? st(meta.meta.error) : undefined;
 
-  const isReadOnly = readOnly || disabledValue;
   const sizeConfig = SIZE_CONFIG[size];
 
   // Intl formatter for display (with thousand separators)
@@ -159,6 +156,12 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
     [precision],
   );
 
+  useEffect(() => {
+    if (!isFocused) {
+      setEditingValue(formatEdit(field.value));
+    }
+  }, [field.value, formatEdit, isFocused]);
+
   // Clamp value to min/max
   const clampValue = useCallback(
     (val: number | undefined): number | undefined => {
@@ -172,7 +175,9 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseValue(e.target.value);
+    const nextEditingValue = e.target.value;
+    setEditingValue(nextEditingValue);
+    const parsed = parseValue(nextEditingValue);
     field.setValue(parsed);
   };
 
@@ -181,12 +186,14 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
     const clamped = clampValue(field.value);
     if (clamped !== field.value) {
       field.setValue(clamped);
+      setEditingValue(formatEdit(clamped));
     }
     field.onBlur();
   };
 
   const handleFocus = () => {
     setIsFocused(true);
+    setEditingValue(formatEdit(field.value));
     onFocus?.();
   };
 
@@ -206,7 +213,7 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
   }
 
   // Determine the display value: formatted with separators when not focused, plain when editing
-  const displayValue = isFocused ? formatEdit(field.value) : formatDisplay(field.value);
+  const displayValue = isFocused ? editingValue : formatDisplay(field.value);
 
   const hasError = meta.showError;
 

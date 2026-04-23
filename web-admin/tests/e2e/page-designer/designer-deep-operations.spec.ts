@@ -200,7 +200,7 @@ test.describe('Page Designer Deep Operations', () => {
             modelCode: 'tenant',
             blocks: [
               { id: 'blk_sec', blockType: 'form-section', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 0 } },
-              { id: 'blk_stat', blockType: 'stat-card', config: {}, layout: { col: 0, colSpan: 6, rowSpan: 1, order: 1 } },
+              { id: 'blk_actions', blockType: 'form-buttons', config: {}, layout: { col: 0, colSpan: 12, rowSpan: 1, order: 1 } },
             ],
             metaInfo: { componentCount: 2 },
             semver: '0.1.0',

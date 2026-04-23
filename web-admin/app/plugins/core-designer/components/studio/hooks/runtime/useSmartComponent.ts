@@ -9,8 +9,10 @@ import {
   bind as bindExpression,
   evaluateCondition as evaluateDslCondition,
 } from '~/framework/meta/runtime/expression/evaluator';
-import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
-import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
+import {
+  createExpressionContext,
+  type ExpressionContext,
+} from '~/framework/meta/runtime/expression/context';
 
 // 基础类型定义
 export interface ValidationRule {
@@ -79,7 +81,7 @@ export const useControllableValue = <T>({
 };
 
 export const useSmartComponentState = ({
-  name,
+  name: _name,
   value: propValue,
   defaultValue,
   onChange,

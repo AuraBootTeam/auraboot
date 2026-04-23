@@ -1,6 +1,9 @@
 import React from 'react';
-import type { SchemaRendererProps } from '~/framework/meta/rendering/SchemaRenderer';
-import { SchemaRenderer, SchemaRendererWithContainer } from '~/framework/meta/rendering/SchemaRenderer';
+import {
+  SchemaRenderer,
+  SchemaRendererWithContainer,
+  type SchemaRendererProps,
+} from '~/framework/meta/rendering/SchemaRenderer';
 
 export interface RenderSchemaOptions {
   container?: boolean;

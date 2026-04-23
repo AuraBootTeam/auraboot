@@ -377,13 +377,17 @@ export interface PermissionReference {
  * CRUD Template Configuration
  */
 export interface CrudTemplateConfig {
-  menuName: string;
+  menuName?: string;
   menuParentId?: string;
   menuIcon?: string;
-  defaultRoles: string[];
+  defaultRoles?: string[];
   generateList: boolean;
   generateForm: boolean;
   generateDetail: boolean;
+  createMenu?: boolean;
+  createPermissions?: boolean;
+  assignRoles?: boolean;
+  openDesignerAfterGenerate?: boolean;
   enableExport: boolean;
   enableImport: boolean;
   listColumns?: string[];
@@ -422,8 +426,10 @@ export interface GeneratedResources {
  */
 export interface PageInfo {
   id: string;
+  pid?: string;
   pageName: string;
   pageType: string;
+  kind?: 'list' | 'form' | 'detail' | string;
   route: string;
   createdAt: string;
 }

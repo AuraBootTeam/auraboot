@@ -49,7 +49,7 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
       readOnly = false, // 新增只读属性，默认为false
       onChange,
     },
-    ref,
+    _ref,
   ) => {
     const st = useSmartText();
     const {

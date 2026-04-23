@@ -137,6 +137,35 @@ async function loginViaApi(
   baseURL: string,
   user: TestUser,
 ): Promise<boolean> {
+  const persistSessionCookie = async (jwt: string): Promise<boolean> => {
+    if (!jwt) return false;
+
+    const cookieBase = {
+      name: '__session',
+      value: jwt,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Lax' as const,
+      expires: Math.floor(Date.now() / 1000) + 604800,
+    };
+    await page.context().addCookies([
+      { ...cookieBase, domain: 'localhost' },
+      { ...cookieBase, domain: '127.0.0.1' },
+    ]);
+
+    return true;
+  };
+
+  const extractSessionCookieFromHeaders = (setCookieHeader?: string): string | null => {
+    const match = setCookieHeader?.match(/__session=([^;]+)/);
+    return match?.[1] ?? null;
+  };
+
+  const extractSessionCookieFromContext = async (): Promise<string | null> => {
+    const cookies = await page.context().cookies();
+    return cookies.find((c) => c.name === '__session')?.value ?? null;
+  };
+
   // Retry up to 3 times with increasing delays to handle intermittent
   // BFF cold-start issues where it returns 200 instead of 302.
   const maxAttempts = 3;
@@ -154,23 +183,11 @@ async function loginViaApi(
         maxRedirects: 0,
       });
 
-      if (resp.status() === 302) {
-        const setCookie = resp.headers()['set-cookie'];
-        const match = setCookie?.match(/__session=([^;]+)/);
-        if (match) {
-          const cookieBase = {
-            name: '__session',
-            value: match[1],
-            path: '/',
-            httpOnly: true,
-            sameSite: 'Lax' as const,
-            expires: Math.floor(Date.now() / 1000) + 604800,
-          };
-          await page.context().addCookies([
-            { ...cookieBase, domain: 'localhost' },
-            { ...cookieBase, domain: '127.0.0.1' },
-          ]);
-
+      if (resp.ok() || resp.status() === 302) {
+        const sessionCookie =
+          extractSessionCookieFromHeaders(resp.headers()['set-cookie']) ||
+          (await extractSessionCookieFromContext());
+        if (await persistSessionCookie(sessionCookie || '')) {
           // Check if redirected to /tenant-selection (multi-tenant, no default tenant).
           // If so, auto-select the first business space to get a JWT with tenantId.
           const location = resp.headers()['location'] || '';

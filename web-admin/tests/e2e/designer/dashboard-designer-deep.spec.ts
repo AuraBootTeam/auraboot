@@ -53,7 +53,8 @@ async function openDashboardWithWidget(page: Page): Promise<string> {
       layoutConfig: { columns: 12, rowHeight: 60 },
     },
   });
-  const body = await resp.json();
+  expect(resp.ok(), `create dashboard api status=${resp.status()}`).toBe(true);
+  const body = (await resp.json()) as { data?: { pid?: string; id?: string } };
   const pid = body.data?.pid || body.data?.id;
   expect(pid).toBeTruthy();
 
@@ -497,6 +498,38 @@ test.describe('Widget Operations', () => {
         timeout: 3000,
       });
     }
+  });
+
+  test('DD-OP-04: NumberCard icon uses picker and persists after save', async ({ page }) => {
+    const pid = await openDashboardWithWidget(page);
+    const panel = page.getByTestId('widget-property-panel');
+
+    const iconLabel = panel.locator('label', { hasText: /^图标$/ }).first();
+    await expect(iconLabel).toBeVisible({ timeout: 5000 });
+
+    const iconTrigger = iconLabel.locator('xpath=following-sibling::*[1]').getByRole('button');
+    await expect(iconTrigger).toBeVisible({ timeout: 5000 });
+    await iconTrigger.click();
+
+    const warningIcon = page.getByTitle('警告');
+    await expect(warningIcon).toBeVisible({ timeout: 5000 });
+    await warningIcon.click();
+
+    await expect(iconTrigger).toContainText('警告');
+    const saveButton = page.locator('[data-testid="designer-toolbar-btn-save"]');
+    await expect(saveButton).toBeEnabled({ timeout: 5000 });
+    await saveButton.click();
+
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/dashboards/${pid}`);
+          if (!resp.ok()) return '';
+          return JSON.stringify(await resp.json());
+        },
+        { timeout: 10000 },
+      )
+      .toContain('"icon":"warning"');
   });
 });
 

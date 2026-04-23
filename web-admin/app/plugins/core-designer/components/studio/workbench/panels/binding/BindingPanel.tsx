@@ -8,7 +8,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BindingList } from './BindingList';
-import { BindingStatus } from './BindingStatus';
 import {
   fieldBindingService,
   bindingValidator,
@@ -41,7 +40,7 @@ export const BindingPanel: React.FC<BindingPanelProps> = ({
   viewModelCode,
   isVisible = true,
   onBindingSelect,
-  onFocusComponent,
+  onFocusComponent: _onFocusComponent,
 }) => {
   const { showSuccessToast, showInfoToast } = useToastContext();
   const [viewMode, setViewMode] = useState<ViewMode>('byField');
@@ -66,7 +65,7 @@ export const BindingPanel: React.FC<BindingPanelProps> = ({
 
     refreshBindings();
 
-    const unsubscribe = fieldBindingService.subscribe((event: BindingChangeEvent) => {
+    const unsubscribe = fieldBindingService.subscribe((_event: BindingChangeEvent) => {
       refreshBindings();
     });
 

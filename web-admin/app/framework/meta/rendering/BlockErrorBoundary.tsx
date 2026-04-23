@@ -1,5 +1,4 @@
-import React, { Component } from 'react';
-import type { ReactNode } from 'react';
+import React, { Component, type ReactNode } from 'react';
 
 interface BlockErrorBoundaryProps {
   blockType: string;

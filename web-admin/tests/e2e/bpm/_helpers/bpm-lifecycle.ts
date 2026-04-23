@@ -8,7 +8,7 @@
  * (project red line: "no silent fallback").
  */
 
-import type { APIRequestContext } from '@playwright/test';
+import { expect, type APIRequestContext } from '@playwright/test';
 
 export interface StartInstanceArgs {
   processDefinitionId: string;
@@ -43,6 +43,15 @@ export interface AuditEvent {
   createdAt: string;
   activityId?: string | null;
   taskId?: string | null;
+}
+
+export interface TodoTaskRecord {
+  instanceId: string;
+  taskId: string | null;
+  processInstanceId: string;
+  processDefinitionActivityId: string;
+  businessKey: string | null;
+  raw: Record<string, unknown>;
 }
 
 /**
@@ -134,6 +143,55 @@ export async function queryInstanceStatus(
     startUserId: data.startUserId ?? null,
     variables: (data.variables ?? {}) as Record<string, unknown>,
   };
+}
+
+export async function listTodoTasks(
+  request: APIRequestContext,
+  token: string,
+): Promise<TodoTaskRecord[]> {
+  const resp = await request.get('/api/bpm/tasks/todo?pageNum=1&pageSize=50', {
+    headers: authHeaders(token),
+  });
+  if (!resp.ok()) {
+    throw new Error(`listTodoTasks failed: ${resp.status()} ${await resp.text()}`);
+  }
+  const body = await resp.json();
+  const raw = body?.data;
+  const tasks = (Array.isArray(raw) ? raw : raw?.records ?? []) as Array<Record<string, unknown>>;
+  return tasks.map((task) => ({
+    instanceId: String(task.instanceId ?? task.activityInstanceId ?? task.taskId ?? ''),
+    taskId: task.taskId == null ? null : String(task.taskId),
+    processInstanceId: String(task.processInstanceId ?? ''),
+    processDefinitionActivityId: String(task.processDefinitionActivityId ?? ''),
+    businessKey: task.businessKey == null ? null : String(task.businessKey),
+    raw: task,
+  }));
+}
+
+export async function waitForTodoTask(
+  request: APIRequestContext,
+  token: string,
+  predicate: (task: TodoTaskRecord) => boolean,
+  opts?: { timeout?: number; message?: string },
+): Promise<TodoTaskRecord> {
+  let matched: TodoTaskRecord | null = null;
+  await expect
+    .poll(
+      async () => {
+        const tasks = await listTodoTasks(request, token);
+        matched = tasks.find(predicate) ?? null;
+        return Boolean(matched);
+      },
+      {
+        timeout: opts?.timeout ?? 15_000,
+        message: opts?.message ?? 'expected matching todo task to appear',
+      },
+    )
+    .toBe(true);
+  if (!matched) {
+    throw new Error(opts?.message ?? 'expected matching todo task to appear');
+  }
+  return matched;
 }
 
 /**

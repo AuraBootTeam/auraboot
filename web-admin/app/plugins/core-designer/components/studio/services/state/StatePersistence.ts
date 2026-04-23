@@ -6,8 +6,6 @@
 
 import type {
   PageState,
-  StateSnapshot,
-  StateExportData,
 } from '~/plugins/core-designer/components/studio/services/state/PageStateManager';
 
 /**

@@ -32,7 +32,8 @@ export type PropertyType =
   | 'process-select'
   | 'automation-select'
   | 'command-select'
-  | 'localizedText';
+  | 'localizedText'
+  | 'icon';
 
 /**
  * Property schema definition for designer configuration panels.

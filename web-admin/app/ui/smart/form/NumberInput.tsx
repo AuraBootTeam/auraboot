@@ -28,6 +28,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
   defaultValue,
   required = false,
   disabled = false,
+  readOnly = false,
   min,
   max,
   step = 1,
@@ -35,7 +36,6 @@ const NumberInput: React.FC<NumberInputProps> = ({
   size = 'medium',
   variant = 'default',
   showButtons = true,
-  buttonLayout = 'stacked',
   prefix,
   suffix,
   className = '',
@@ -47,7 +47,6 @@ const NumberInput: React.FC<NumberInputProps> = ({
   onBlur,
   onFocus,
   keyboard = true,
-  ...restProps
 }) => {
   const st = useSmartText();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -141,14 +140,14 @@ const NumberInput: React.FC<NumberInputProps> = ({
   };
 
   const increment = () => {
-    if (disabledValue) return;
+    if (disabledValue || readOnly) return;
     const currentValue = field.value ?? 0;
     const newValue = clampValue(currentValue + step);
     field.setValue(newValue);
   };
 
   const decrement = () => {
-    if (disabledValue) return;
+    if (disabledValue || readOnly) return;
     const currentValue = field.value ?? 0;
     const newValue = clampValue(currentValue - step);
     field.setValue(newValue);
@@ -196,7 +195,9 @@ const NumberInput: React.FC<NumberInputProps> = ({
           <button
             type="button"
             onClick={decrement}
-            disabled={disabledValue || (min !== undefined && (field.value ?? 0) <= min)}
+            disabled={
+              disabledValue || readOnly || (min !== undefined && (field.value ?? 0) <= min)
+            }
             className={`${buttonClass} absolute top-1/2 left-1 -translate-y-1/2`}
             tabIndex={-1}
           >
@@ -215,6 +216,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
           value={formatValue(field.value)}
           placeholder={placeholderText}
           disabled={disabledValue}
+          readOnly={readOnly}
           className={`w-full ${inputClasses} ${showButtons ? 'px-9' : ''} ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-8' : ''}`}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -231,7 +233,9 @@ const NumberInput: React.FC<NumberInputProps> = ({
           <button
             type="button"
             onClick={increment}
-            disabled={disabledValue || (max !== undefined && (field.value ?? 0) >= max)}
+            disabled={
+              disabledValue || readOnly || (max !== undefined && (field.value ?? 0) >= max)
+            }
             className={`${buttonClass} absolute top-1/2 right-1 -translate-y-1/2`}
             tabIndex={-1}
           >

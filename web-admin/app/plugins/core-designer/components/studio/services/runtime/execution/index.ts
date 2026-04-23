@@ -72,8 +72,8 @@ export const ActionUtils = {
    */
   createContext: (data: Partial<ActionContext> = {}): ActionContext => {
     const defaultUtils = {
-      formatDate: (date: Date, format: string) => date.toLocaleDateString(),
-      formatNumber: (num: number, format: string) => num.toString(),
+      formatDate: (date: Date, _format: string) => date.toLocaleDateString(),
+      formatNumber: (num: number, _format: string) => num.toString(),
       validateEmail: (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
       generateId: () => Math.random().toString(36).slice(2),
     };

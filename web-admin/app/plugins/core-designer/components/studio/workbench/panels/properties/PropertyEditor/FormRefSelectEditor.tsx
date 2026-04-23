@@ -3,8 +3,8 @@
  * 用于在属性面板中选择表单引用
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { DocumentTextIcon, EyeIcon } from '@heroicons/react/24/outline';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import Button from '~/ui/smart/interaction/Button';
 import { Modal, Spin, Tag } from '~/ui/smart/ui';
 import { useFormRefManager } from '~/plugins/core-designer/components/studio/hooks/forms/useFormRefManager';
@@ -29,19 +29,19 @@ export const FormRefSelectEditor: React.FC<FormRefSelectEditorProps> = ({
   const [formRefs, setFormRefs] = useState<FormRef[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedFormRef, setSelectedFormRef] = useState<FormRef | null>(null);
-  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchKeyword] = useState('');
 
   // 加载表单引用列表
   useEffect(() => {
     loadFormRefs();
-  }, []);
+  }, [getAllFormRefs]);
 
-  const loadFormRefs = async () => {
+  const loadFormRefs = useCallback(async () => {
     const refs = await getAllFormRefs();
     if (refs) {
       setFormRefs(refs);
     }
-  };
+  }, [getAllFormRefs]);
 
   // 过滤表单引用
   const filteredFormRefs = useMemo(() => {
@@ -58,50 +58,12 @@ export const FormRefSelectEditor: React.FC<FormRefSelectEditorProps> = ({
 
   // 选择表单引用
   const handleSelect = (formRefId: string) => {
+    setSelectedFormRef(formRefs.find((formRef) => formRef.id === formRefId) ?? null);
     onChange?.(formRefId);
   };
 
   // 查看表单详情
-  const handleViewFormRef = (formRef: FormRef) => {
-    setSelectedFormRef(formRef);
-    setModalVisible(true);
-  };
-
   // 渲染表单引用选项
-  const renderFormRefOption = (formRef: FormRef) => (
-    <div
-      key={formRef.id}
-      className="flex items-center justify-between rounded p-2 hover:bg-gray-50"
-    >
-      <div className="flex-1">
-        <div className="font-medium">{formRef.title}</div>
-        <div className="text-sm text-gray-500">{formRef.name}</div>
-        {formRef.description && (
-          <div className="mt-1 text-xs text-gray-400">{formRef.description}</div>
-        )}
-        <div className="mt-1 flex items-center gap-2">
-          <Tag size="small" color="blue">
-            v{formRef.version}
-          </Tag>
-          <Tag size="small">{formRef.schema.fields.length} 字段</Tag>
-        </div>
-      </div>
-      <div className="ml-2 flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          className="p-1"
-          onClick={(e: React.MouseEvent) => {
-            e.stopPropagation();
-            handleViewFormRef(formRef);
-          }}
-        >
-          <EyeIcon className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-
   // 渲染表单详情
   const renderFormRefDetail = () => {
     if (!selectedFormRef) return null;

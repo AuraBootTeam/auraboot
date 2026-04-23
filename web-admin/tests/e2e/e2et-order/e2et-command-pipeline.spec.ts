@@ -14,17 +14,11 @@
 import { test, expect } from '@playwright/test';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { DynamicListPage } from '../../pages/DynamicListPage';
-import { DynamicFormPage } from '../../pages/DynamicFormPage';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 import {
   uniqueId,
-  todayStr,
   executeCommandViaApi,
-  findRowByContent,
   findRowInPaginatedList,
-  acceptConfirmDialog,
-  waitForToast,
   clickRowActionByLocator,
   queryFilteredList,
 } from '../helpers';
@@ -81,7 +75,7 @@ test.describe('Command Pipeline Depth', () => {
     }
   });
 
-  test('CP-003: precondition — submitted can be approved @smoke', async ({ page }) => {
+  test('CP-003: precondition — submitted can be approved @smoke', async ({ page: _page }) => {
     const pid = await order.createViaApi();
     await order.child('item').createForParent(pid);
     await order.executeCommand('submit', pid);
@@ -118,7 +112,7 @@ test.describe('Command Pipeline Depth', () => {
   // --- autoSetFields ---
 
   test('CP-005: autoSetFields AUTO_GENERATE — order number auto-generated @smoke', async ({
-    page,
+    page: _page,
   }) => {
     const pid = await order.createViaApi();
     try {
@@ -131,7 +125,9 @@ test.describe('Command Pipeline Depth', () => {
     }
   });
 
-  test('CP-006: autoSetFields CURRENT_DATETIME — date auto-filled @smoke', async ({ page }) => {
+  test('CP-006: autoSetFields CURRENT_DATETIME — date auto-filled @smoke', async ({
+    page: _page,
+  }) => {
     const pid = await order.createViaApi({ e2et_order_date: undefined });
     try {
       const record = await order.fetchViaApi(pid);
@@ -142,7 +138,7 @@ test.describe('Command Pipeline Depth', () => {
     }
   });
 
-  test('CP-007: autoSetFields FIXED_VALUE — default status draft', async ({ page }) => {
+  test('CP-007: autoSetFields FIXED_VALUE — default status draft', async ({ page: _page }) => {
     const pid = await order.createViaApi();
     try {
       const record = await order.fetchViaApi(pid);
@@ -154,7 +150,9 @@ test.describe('Command Pipeline Depth', () => {
 
   // --- computedFields ---
 
-  test('CP-008: computedFields — item subtotal = qty × price @smoke', async ({ page }) => {
+  test('CP-008: computedFields — item subtotal = qty × price @smoke', async ({
+    page: _page,
+  }) => {
     const pid = await order.createViaApi();
     try {
       const itemPid = await order.child('item').createForParent(pid, {
@@ -175,7 +173,9 @@ test.describe('Command Pipeline Depth', () => {
 
   // --- sideEffect ---
 
-  test('CP-009: sideEffect CREATE_RECORD — submit creates audit log @smoke', async ({ page }) => {
+  test('CP-009: sideEffect CREATE_RECORD — submit creates audit log @smoke', async ({
+    page: _page,
+  }) => {
     const pid = await order.createViaApi();
     await order.child('item').createForParent(pid);
     try {
@@ -189,7 +189,9 @@ test.describe('Command Pipeline Depth', () => {
     }
   });
 
-  test('CP-010: sideEffect AGGREGATE SUM — items sum to order amount @smoke', async ({ page }) => {
+  test('CP-010: sideEffect AGGREGATE SUM — items sum to order amount @smoke', async ({
+    page: _page,
+  }) => {
     const pid = await order.createViaApi();
     try {
       // Add 3 items
@@ -207,7 +209,9 @@ test.describe('Command Pipeline Depth', () => {
 
   // --- cascadeDelete ---
 
-  test('CP-011: cascadeDelete — delete parent removes children @smoke', async ({ page }) => {
+  test('CP-011: cascadeDelete — delete parent removes children @smoke', async ({
+    page: _page,
+  }) => {
     const pid = await order.createViaApi();
     await order.child('item').createForParent(pid);
     await order.child('item').createForParent(pid);
@@ -220,7 +224,9 @@ test.describe('Command Pipeline Depth', () => {
 
   // --- STATE_TRANSITION ---
 
-  test('CP-012: STATE_TRANSITION — draft→submitted→approved @smoke', async ({ page }) => {
+  test('CP-012: STATE_TRANSITION — draft→submitted→approved @smoke', async ({
+    page: _page,
+  }) => {
     const pid = await order.createViaApi();
     await order.child('item').createForParent(pid);
     try {
@@ -232,7 +238,9 @@ test.describe('Command Pipeline Depth', () => {
     }
   });
 
-  test('CP-013: STATE_TRANSITION — submitted→rejected→draft @critical', async ({ page }) => {
+  test('CP-013: STATE_TRANSITION — submitted→rejected→draft @critical', async ({
+    page: _page,
+  }) => {
     const pid = await order.createViaApi();
     await order.child('item').createForParent(pid);
     try {
@@ -253,7 +261,7 @@ test.describe('Command Pipeline Depth', () => {
     const title = `ConfirmDel_${uniqueId()}`;
     const pid = await order.createViaApi({ e2et_order_title: title });
     try {
-      const listPage = await order.gotoList();
+      await order.gotoList();
       const row = await findRowInPaginatedList(page, title, 10000);
       // Click delete on the row via dropdown helper
       await clickRowActionByLocator(page, row, 'delete');
@@ -280,7 +288,7 @@ test.describe('Command Pipeline Depth', () => {
     const pid1 = await order.createViaApi({ e2et_order_title: `BatchDel1_${uniqueId()}` });
     const pid2 = await order.createViaApi({ e2et_order_title: `BatchDel2_${uniqueId()}` });
     try {
-      const listPage = await order.gotoList();
+      await order.gotoList();
       // Check if batch select checkboxes exist
       const checkboxes = page.locator('tbody tr input[type="checkbox"]');
       const count = await checkboxes.count();
@@ -298,7 +306,7 @@ test.describe('Command Pipeline Depth', () => {
     await order.child('item').createForParent(pid);
     await order.executeCommand('submit', pid);
     try {
-      const listPage = await order.gotoList();
+      await order.gotoList();
       // Dismiss any blocking overlay
       await page.keyboard.press('Escape').catch(() => null);
       // submitted order should not show edit button (precondition hides it)
@@ -345,7 +353,7 @@ test.describe('Command Pipeline Depth', () => {
     }
   });
 
-  test('CP-018: concurrent edit — conflict handling', async ({ page }) => {
+  test('CP-018: concurrent edit — conflict handling', async ({ page: _page }) => {
     // Create a record and simulate concurrent modification via API
     const pid = await order.createViaApi();
     try {

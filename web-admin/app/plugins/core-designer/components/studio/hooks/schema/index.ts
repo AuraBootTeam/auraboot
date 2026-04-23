@@ -4,15 +4,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
-import type {
-  PageSchemaVersion,
-  CreatePageSchemaVersionRequest,
-  UpdatePageSchemaVersionRequest,
-  PageSchemaVersionConfig,
+import {
+  getPageSchemaVersionManager,
+  type PageSchemaVersion,
+  type CreatePageSchemaVersionRequest,
+  type UpdatePageSchemaVersionRequest,
+  type PageSchemaVersionConfig,
 } from '~/plugins/core-designer/components/studio/domain/metadata/PageSchemaVersionManager';
-import { PageSchemaVersionManager } from '~/plugins/core-designer/components/studio/domain/metadata/PageSchemaVersionManager';
-import { getPageSchemaVersionManager } from '~/plugins/core-designer/components/studio/domain/metadata/PageSchemaVersionManager';
-import { VersionStatus, VersionType } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 import { useAuth } from '~/contexts/AuthContext';
 
 /**

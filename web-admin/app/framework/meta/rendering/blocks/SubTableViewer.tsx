@@ -17,7 +17,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type {
   ColumnConfig,
   SubTableConfig,
-  SummaryConfig,
   ValidationRule,
 } from '~/framework/meta/schemas/types';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -106,6 +105,20 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     setRefreshCounter((c) => c + 1);
   }, []);
 
+  const interpolateRecordValue = useCallback(
+    (raw: string): string => {
+      let value = raw.replace(/\$\{recordId\}/g, parentRecordId);
+      value = value.replace(/\$\{record\.(\w+)\}/g, (_: string, field: string) => {
+        return String(parentRecordData?.[field] ?? parentRecordId);
+      });
+      value = value.replace(/\$\{(\w+)\}/g, (_: string, field: string) => {
+        return String(parentRecordData?.[field] ?? '');
+      });
+      return value;
+    },
+    [parentRecordData, parentRecordId],
+  );
+
   useEffect(() => {
     if (!parentRecordId) return;
 
@@ -122,20 +135,17 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           const ds = (config as any).dataSource;
           // Interpolate ${recordId} and ${record.field} placeholders in URL
           let rawUrl = ds.url || '/api/datasource/list';
-          rawUrl = rawUrl.replace(/\$\{recordId\}/g, parentRecordId);
-          rawUrl = rawUrl.replace(/\$\{record\.(\w+)\}/g, (_: string, field: string) => {
-            return parentRecordData?.[field] || parentRecordId;
-          });
+          rawUrl = interpolateRecordValue(rawUrl);
           endpoint = rawUrl;
           const params: Record<string, string> = {};
           if (ds.params) {
             for (const [k, v] of Object.entries(ds.params)) {
-              let val = String(v);
-              val = val.replace(/\$\{record\.(\w+)\}/g, (_: string, field: string) => {
-                return parentRecordData?.[field] || parentRecordId;
-              });
-              params[k] = val;
+              params[k] = interpolateRecordValue(String(v));
             }
+          }
+          if ((ds.kind === 'namedQuery' || ds.type === 'namedQuery') && ds.queryCode) {
+            params.datasourceId = `nq:${String(ds.queryCode)}`;
+            params.format = params.format || 'records';
           }
           const result = await fetchResult<any>(endpoint, {
             method: 'get',
@@ -230,7 +240,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     };
 
     loadData();
-  }, [parentRecordId, parentRecordData, config, token, refreshCounter]);
+  }, [parentRecordId, parentRecordData, config, token, refreshCounter, interpolateRecordValue]);
 
   // Resolve column label from i18n with model-qualified fallback
   const resolveColumnLabel = useCallback(
@@ -253,8 +263,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     (col: ColumnConfig, value: any): string | null => {
       // Required
       if (col.required && (value === undefined || value === null || value === '')) {
-        const msg = t('validation.required');
-        return msg !== 'validation.required' ? msg : 'This field is required';
+        const msg = t('common.validation.required');
+        return msg !== 'common.validation.required' ? msg : 'This field is required';
       }
 
       if (value === undefined || value === null || value === '') return null;
@@ -605,6 +615,17 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   const sortField = config.sortField || 'sort_order';
   const totalCols = config.columns.length + (hasActions ? 1 : 0) + (isSortable ? 1 : 0);
   const extraColCount = (hasActions ? 1 : 0) + (isSortable ? 1 : 0);
+  const emptyStateTitle = config.emptyState?.title
+    ? getLocalizedText(config.emptyState.title, locale, t)
+    : t('common.noData') || 'No data';
+  const emptyStateDescription = config.emptyState?.description
+    ? getLocalizedText(config.emptyState.description, locale, t)
+    : '';
+  const emptyStateActionLabel = config.emptyState?.actionLabel
+    ? getLocalizedText(config.emptyState.actionLabel, locale, t)
+    : t('common.addLine') !== 'common.addLine'
+      ? t('common.addLine')
+      : 'Add Line';
 
   // Tree data management
   const { visibleRows: treeRows, toggleExpand } = useTreeData(rows, config.treeConfig);
@@ -618,7 +639,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   // DnD drop handler → batch API update
   const handleDragEnd = useCallback(
-    async (activeId: string, overId: string, deltaX: number) => {
+    async (activeId: string, overId: string, _deltaX: number) => {
       if (!isSortable) return;
 
       // Simple flat sort: swap positions
@@ -673,7 +694,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200">
+    <div className="overflow-hidden rounded-lg border border-gray-200" data-testid="subtable-viewer">
       {/* Cross-row validation errors banner */}
       {crossRowErrors.length > 0 && (
         <div
@@ -687,7 +708,29 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         </div>
       )}
 
-      <table className="min-w-full divide-y divide-gray-200">
+      {displayRows.length === 0 && !isAdding ? (
+        <div
+          className="flex flex-col items-center justify-center px-6 py-10 text-center"
+          data-testid="subtable-empty-state"
+        >
+          <div className="text-sm font-medium text-gray-700">{emptyStateTitle}</div>
+          {emptyStateDescription ? (
+            <div className="mt-2 max-w-md text-sm leading-6 text-gray-500">
+              {emptyStateDescription}
+            </div>
+          ) : null}
+          {isEditable && config.commands?.create ? (
+            <button
+              onClick={() => setIsAdding(true)}
+              data-testid="subtable-empty-action"
+              className="mt-5 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100"
+            >
+              {emptyStateActionLabel}
+            </button>
+          ) : null}
+        </div>
+      ) : (
+      <table className="min-w-full divide-y divide-gray-200" data-testid="subtable-table">
         <thead className="bg-gray-50">
           <tr>
             {isSortable && <th className="w-10 px-1 py-2.5 text-xs font-medium text-gray-400"></th>}
@@ -719,14 +762,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">
-          {displayRows.length === 0 && !isAdding ? (
-            <tr>
-              <td colSpan={totalCols} className="px-4 py-6 text-center text-sm text-gray-400">
-                {t('common.noData') || 'No data'}
-              </td>
-            </tr>
-          ) : (
-            <DndSubTableWrapper
+          <DndSubTableWrapper
               items={dndItems}
               onDragEnd={handleDragEnd}
               disabled={!isSortable || !!editingRowId}
@@ -735,16 +771,16 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                 const rowId = row.pid || String(rowIndex);
                 const isEditingThis = editingRowId === rowId;
                 return (
-                  <SortableSubTableRow
-                    key={rowId}
-                    id={rowId}
-                    depth={row._depth || 0}
-                    hasChildren={row._hasChildren || false}
-                    expanded={row._expanded || false}
-                    onToggleExpand={() => toggleExpand(rowId)}
-                    sortable={!!isSortable && !editingRowId}
-                  >
-                    {config.columns.map((col: ColumnConfig, colIndex: number) => {
+                <SortableSubTableRow
+                  key={rowId}
+                  id={rowId}
+                  depth={row._depth || 0}
+                  hasChildren={row._hasChildren || false}
+                  expanded={row._expanded || false}
+                  onToggleExpand={() => toggleExpand(rowId)}
+                  sortable={!!isSortable && !editingRowId}
+                >
+                    {config.columns.map((col: ColumnConfig) => {
                       const cellAlign =
                         col.align === 'right'
                           ? 'text-right'
@@ -879,7 +915,6 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                 );
               })}
             </DndSubTableWrapper>
-          )}
 
           {/* Inline add form row */}
           {isEditable && isAdding && (
@@ -1007,9 +1042,10 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           />
         )}
       </table>
+      )}
 
       {/* Add Line button */}
-      {isEditable && config.commands?.create && !isAdding && (
+      {isEditable && config.commands?.create && !isAdding && displayRows.length > 0 && (
         <div className="border-t border-gray-200">
           <button
             onClick={() => setIsAdding(true)}

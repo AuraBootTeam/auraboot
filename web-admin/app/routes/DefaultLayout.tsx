@@ -11,6 +11,22 @@ import { recordVisit } from '~/plugins/core-dashboard/widgets/workbench/useRecen
 // leaving the panel invisible after the first click. See GAP-262.
 import { AuraBotPanel } from '~/plugins/core-aurabot/components-shell/AuraBotPanel';
 
+function inferModelCodeFromPath(pathname: string): string | undefined {
+  if (!pathname || pathname === '/') return undefined;
+
+  if (pathname.startsWith('/p/c/')) {
+    return undefined;
+  }
+
+  if (pathname.startsWith('/p/')) {
+    const [, , pageKey] = pathname.split('/');
+    return pageKey || undefined;
+  }
+
+  const [, firstSegment] = pathname.split('/');
+  return firstSegment || undefined;
+}
+
 export default function DefaultLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { state } = useAuraBot();
@@ -27,6 +43,7 @@ export default function DefaultLayout() {
       recordVisit({
         title: document.title || location.pathname,
         path: location.pathname,
+        modelCode: inferModelCodeFromPath(location.pathname),
       });
     }, 500);
 

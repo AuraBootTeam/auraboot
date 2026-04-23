@@ -128,7 +128,6 @@ export class StateHistoryManager {
   async undo(): Promise<HistoryEntry | null> {
     if (!this.canUndo()) return null;
 
-    const currentEntry = this.history[this.currentIndex];
     this.currentIndex--;
 
     // 执行撤销
@@ -219,7 +218,7 @@ export class StateHistoryManager {
   createComponentAddAction(
     componentId: string,
     componentData: any,
-    parentId?: string,
+    _parentId?: string,
   ): HistoryAction {
     return {
       type: HistoryActionType.COMPONENT_ADD,
@@ -256,7 +255,7 @@ export class StateHistoryManager {
     componentId: string,
     propertyPath: string,
     oldValue: any,
-    newValue: any,
+    _newValue: any,
   ): HistoryAction {
     return {
       type: HistoryActionType.PROPERTY_CHANGE,

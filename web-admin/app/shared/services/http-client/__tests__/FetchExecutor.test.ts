@@ -88,6 +88,26 @@ describe('executeFetch', () => {
     expect(result.success).toBe(false);
   });
 
+  it('should preserve backend error context on HTTP errors', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      json: () =>
+        Promise.resolve({
+          code: '35000',
+          message: 'Bad parameter',
+          context: { error: "Field 'wd_req_days' is required" },
+        }),
+    });
+
+    const result = await executeFetch('http://localhost:3500/api/test', { method: 'post' });
+
+    expect(result.code).toBe('35000');
+    expect(result.success).toBe(false);
+    expect(result.context).toEqual({ error: "Field 'wd_req_days' is required" });
+  });
+
   it('should handle HTTP error with empty statusText', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,

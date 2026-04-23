@@ -45,8 +45,8 @@ export const Form: React.FC<FormProps> = ({
 
   // 表单数据状态管理
   const [formData, setFormData] = useState(data);
-  const [errors, setErrors] = useState<Record<string, string[]>>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [_errors, setErrors] = useState<Record<string, string[]>>({});
+  const [_touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 更新表单数据

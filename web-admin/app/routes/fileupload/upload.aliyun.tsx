@@ -42,7 +42,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const aliyunConfig = configResult.data;
 
     // 使用从后端获取的配置创建 OSS 客户端
-    const client = new OSS({
+    const _client = new OSS({
       region: aliyunConfig.region,
       accessKeyId: aliyunConfig.accessKeyId,
       accessKeySecret: aliyunConfig.accessKeySecret,
@@ -57,7 +57,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const objectName = `${folder}/${filename}`;
 
     // 上传到OSS
-    const arrayBuffer = await file.arrayBuffer();
+    const _arrayBuffer = await file.arrayBuffer();
 
     // 获取CDN配置
     const cdnDomain =

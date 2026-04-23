@@ -33,8 +33,6 @@ const Upload: React.FC<UploadProps> = ({
   buttonText = '点击上传',
   hint = '',
   headers = {},
-  data = {},
-  withCredentials = false,
   className = '',
   validationRules = [],
   context,
@@ -42,10 +40,8 @@ const Upload: React.FC<UploadProps> = ({
   visible,
   onChange,
   onBlur,
-  beforeUpload,
   onRemove,
   onPreview,
-  ...restProps
 }) => {
   const st = useSmartText();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -296,6 +292,7 @@ const Upload: React.FC<UploadProps> = ({
         {canUploadMore && (
           <div
             className={`relative rounded-lg border-2 border-dashed transition-colors ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'} ${disabledValue ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${listType === 'picture-card' ? 'inline-flex h-28 w-28' : 'p-4'} `}
+            data-testid={`upload-area-${name}`}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDragOver={handleDragOver}
@@ -309,6 +306,7 @@ const Upload: React.FC<UploadProps> = ({
               multiple={multiple}
               disabled={disabledValue}
               className="hidden"
+              data-testid={`upload-input-${name}`}
               onChange={handleInputChange}
             />
 

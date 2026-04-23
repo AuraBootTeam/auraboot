@@ -48,7 +48,6 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
 
     // 条件渲染检查
     const shouldRender = useConditionalRender(visible, context);
-    if (!shouldRender || !isVisible) return null;
 
     // 状态管理 - 支持 value 和 checked 两种方式
     // 优先使用 value (用于属性面板)，否则使用 checked (用于表单)
@@ -75,7 +74,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
     };
 
     // 处理失焦
-    const handleCheckboxBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    const handleCheckboxBlur = (_event: React.FocusEvent<HTMLInputElement>) => {
       field.onBlur();
     };
 
@@ -105,6 +104,8 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
     ]
       .filter(Boolean)
       .join(' ');
+
+    if (!shouldRender || !isVisible) return null;
 
     return (
       <FieldBase

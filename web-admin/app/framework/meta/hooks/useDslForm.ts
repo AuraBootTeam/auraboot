@@ -20,8 +20,7 @@
  */
 
 import { useState, useCallback, useRef, useMemo } from 'react';
-import { useSchemaLoader } from './useSchemaLoader';
-import type { UseSchemaLoaderOptions } from './useSchemaLoader';
+import { useSchemaLoader, type UseSchemaLoaderOptions } from './useSchemaLoader';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
 
 // ---------------------------------------------------------------------------
@@ -188,7 +187,6 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
     fieldPermissions: callerPermissions = {},
     permissionMode = 'merge',
     onSubmit,
-    profile,
     enabled = true,
   } = options;
 

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Plus, Trash2, Copy, Move, ChevronDown, ChevronRight, Play, Settings } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronDown, ChevronRight, Play } from 'lucide-react';
 import { useToastContext } from '~/contexts/ToastContext';
 import type {
   Action,
@@ -15,7 +15,6 @@ import type {
 } from '~/plugins/core-designer/components/studio/services/runtime/execution/types';
 import { globalActionRegistry } from '~/plugins/core-designer/components/studio/services/runtime/execution/ActionRegistry';
 import { globalActionScheduler } from '~/plugins/core-designer/components/studio/services/runtime/execution/ActionScheduler';
-import { ExpressionEvaluator } from '~/plugins/core-designer/components/studio/services/runtime/execution/ExpressionEvaluator';
 
 interface ActionBuilderProps {
   /** 当前动作链 */
@@ -207,7 +206,7 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
         showErrorToast(`动作测试失败: ${error instanceof Error ? error.message : '未知错误'}`);
       }
     },
-    [context],
+    [actionContext, showErrorToast, showSuccessToast],
   );
 
   return (
@@ -550,7 +549,7 @@ interface ActionParameterEditorProps {
 
 const ActionParameterEditor: React.FC<ActionParameterEditorProps> = ({
   params,
-  schema,
+  schema: _schema,
   readonly,
   onChange,
 }) => {

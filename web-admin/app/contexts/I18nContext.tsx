@@ -29,6 +29,7 @@ interface I18nContextType {
   locale: string;
   setLocale: (locale: string) => void;
   loading: boolean;
+  recovering: boolean;
   isRTL: boolean;
 }
 
@@ -37,6 +38,7 @@ const I18nContext = createContext<I18nContextType>({
   locale: 'zh-CN',
   setLocale: () => {},
   loading: false,
+  recovering: false,
   isRTL: false,
 });
 
@@ -196,7 +198,12 @@ export function I18nProvider({ children, initialData = {}, initialLocale }: I18n
 
     // 3. 如果仍未找到，返回 fallback 或 key 本身
     if (text === undefined || text === null) {
-      if (process.env.NODE_ENV !== 'production' && !MISSING_KEY_WARNED.has(key)) {
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        !loading &&
+        !recovering &&
+        !MISSING_KEY_WARNED.has(key)
+      ) {
         MISSING_KEY_WARNED.add(key);
         console.warn(`[i18n] Missing translation key: "${key}" (locale: ${locale})`);
       }
@@ -225,6 +232,7 @@ export function I18nProvider({ children, initialData = {}, initialLocale }: I18n
         locale,
         setLocale: handleSetLocale,
         loading,
+        recovering,
         isRTL: isRTLLocale(locale),
       }}
     >

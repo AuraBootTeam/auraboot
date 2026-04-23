@@ -58,7 +58,6 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   recordPid,
   token,
   locale = 'zh-CN',
-  t = (key: string) => key,
 }) => {
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +99,10 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-400">
+      <div
+        className="flex items-center justify-center py-12 text-gray-400"
+        data-testid="activity-timeline-loading"
+      >
         <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
         {locale === 'zh-CN' ? '加载活动记录...' : 'Loading activities...'}
       </div>
@@ -108,12 +110,16 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   }
 
   if (error) {
-    return <div className="py-8 text-center text-sm text-red-500">{error}</div>;
+    return (
+      <div className="py-8 text-center text-sm text-red-500" data-testid="activity-timeline-error">
+        {error}
+      </div>
+    );
   }
 
   if (activities.length === 0) {
     return (
-      <div className="py-12 text-center text-sm text-gray-400">
+      <div className="py-12 text-center text-sm text-gray-400" data-testid="activity-timeline-empty">
         {locale === 'zh-CN' ? '暂无活动记录' : 'No activities yet'}
       </div>
     );
@@ -123,7 +129,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   const groups = groupByDate(activities);
 
   return (
-    <div className="relative">
+    <div className="relative" data-testid="activity-timeline">
       {/* Timeline line */}
       <div className="absolute top-0 bottom-0 left-4 w-px bg-gray-200" />
 
@@ -146,7 +152,12 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                 const [icon, _zhLabel, _enLabel, dotColor] = config;
 
                 return (
-                  <div key={activity.id} className="relative">
+                  <div
+                    key={activity.id}
+                    className="relative"
+                    data-testid={`activity-timeline-item-${activity.id}`}
+                    data-activity-type={activity.activityType}
+                  >
                     {/* Timeline dot */}
                     <div className={`absolute top-1.5 -left-10 h-3 w-3 rounded-full ${dotColor}`} />
 

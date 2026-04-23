@@ -41,16 +41,19 @@
  * @since P2.3 (OSS BPM rule-task regression)
  */
 
-import { test, expect, type Page } from '../../fixtures';
+import { test, expect } from '../../fixtures';
 import { uniqueId, dateOffsetStr } from '../helpers';
+import { ensureRoleUsers } from '../../helpers/wd-fixtures';
 import {
   loginAsAdmin,
   queryInstanceStatus,
   listAuditEvents,
   collectActivityEvents,
+  waitForTodoTask,
   AuditOp,
   type InstanceStatus,
 } from './_helpers/bpm-lifecycle';
+import { findTaskRowByBusinessKey, openTaskCenterAsRole } from './_helpers/task-center';
 
 const PROCESS_KEY = 'wd_leave_approval';
 const RULE_NODE_ID = 'svc_rule_route';
@@ -61,6 +64,7 @@ const HR_TASK_ID = 'task_hr_approve';
 // Shared across serial tests
 let adminToken = '';
 let adminUserId = '';
+let hrToken = '';
 
 // Per-scenario state (instance ids + business keys)
 const scenarios = {
@@ -95,7 +99,9 @@ async function seedAndSubmitLeave(
           wd_req_applicant: adminUserId,
           wd_req_type: 'annual',
           wd_req_start_date: dateOffsetStr(10),
+          wd_req_start_slot: 'AM',
           wd_req_end_date: dateOffsetStr(10 + days),
+          wd_req_end_slot: 'PM',
           wd_req_days: days,
           wd_req_reason: `RT rule-task test ${uidTag} days=${days}`,
         },
@@ -132,7 +138,9 @@ async function seedAndSubmitLeave(
           wd_req_applicant: adminUserId,
           wd_req_type: 'annual',
           wd_req_start_date: dateOffsetStr(10),
+          wd_req_start_slot: 'AM',
           wd_req_end_date: dateOffsetStr(10 + days),
+          wd_req_end_slot: 'PM',
           wd_req_days: days,
           wd_req_reason: `RT rule-task test ${uidTag} days=${days}`,
         },
@@ -203,31 +211,6 @@ async function waitForRuleAndGatewayCompleted(
   return lastStatus;
 }
 
-async function navigateToTaskCenter(page: Page): Promise<void> {
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-
-  const nav = page.locator('nav').first();
-  await nav.waitFor({ state: 'visible', timeout: 10_000 });
-
-  const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
-    .first();
-  if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await bpmParent.scrollIntoViewIfNeeded();
-    await bpmParent.evaluate((el: HTMLElement) => el.click());
-  }
-
-  const taskCenterLink = nav.locator('a[href*="task-center"]').first();
-  await taskCenterLink.waitFor({ state: 'attached', timeout: 8_000 });
-  await taskCenterLink.evaluate((el: HTMLElement) => el.click());
-
-  await page.waitForURL(/task-center/, { timeout: 20_000 });
-  await expect(page.locator('h1:has-text("任务中心")')).toBeVisible({ timeout: 10_000 });
-
-  const tableOrEmpty = page.locator('table').or(page.locator('text=暂无任务'));
-  await expect(tableOrEmpty.first()).toBeVisible({ timeout: 10_000 });
-}
-
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -240,6 +223,7 @@ test.describe.serial(
 
     test.beforeAll(async ({ request }) => {
       adminToken = await loginAsAdmin(request);
+      ({ hrToken } = await ensureRoleUsers(request));
       const meResp = await request.get('/api/auth/me', {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
@@ -283,7 +267,7 @@ test.describe.serial(
     // RT-2: days=5 → approverRole=hr → hr branch; Task Center surfaces the task
     // =====================================================================
     test('RT-2: days=5 routes to hr branch and surfaces in Task Center', async ({
-      page,
+      browser,
       request,
     }) => {
       const uid = uniqueId('RT2');
@@ -301,40 +285,36 @@ test.describe.serial(
       expect(activeIds).toContain(HR_TASK_ID);
       expect(activeIds).not.toContain(MANAGER_TASK_ID);
 
-      // UI verification: the hr task must surface in Task Center (D1 + D10).
-      // We do NOT rely on the businessKey column (which may render "-"), we
-      // filter by processKey + taskDefKey substring.
-      await navigateToTaskCenter(page);
+      const ourTask = await waitForTodoTask(
+        request,
+        hrToken,
+        (candidate) =>
+          candidate.processInstanceId === String(instanceId) &&
+          candidate.processDefinitionActivityId.includes(HR_TASK_ID),
+        {
+          timeout: 15_000,
+          message: `todo tasks must include our hr-branch task for instanceId=${instanceId}`,
+        },
+      );
 
-      const taskRow = page
-        .locator('table tbody tr')
-        .filter({ hasText: PROCESS_KEY })
-        .filter({ hasText: /task_hr_approve|HR 审批|HR Approve/i })
-        .first();
+      // UI verification: the hr task must surface in Task Center (D1 + D10).
+      const { context: hrCtx, page: hrPage } = await openTaskCenterAsRole(
+        browser,
+        'wd_hr@example.com',
+        'Test2026x',
+      );
+
+      const taskRow = findTaskRowByBusinessKey(
+        hrPage,
+        pid,
+        /task_hr_approve|HR 审批|HR Approve/i,
+      );
       await expect(
         taskRow,
-        `a task_hr_approve row for ${PROCESS_KEY} must appear in Task Center`,
+        `a task_hr_approve row for businessKey=${pid} must appear in Task Center`,
       ).toBeVisible({ timeout: 15_000 });
-
-      // Cross-check via API that OUR instance in particular is behind that row
-      const todoResp = await request.get('/api/bpm/tasks/todo?pageNum=1&pageSize=50', {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      expect(todoResp.ok()).toBe(true);
-      const todoBody = await todoResp.json();
-      const tasksRaw = todoBody?.data;
-      const tasks = (Array.isArray(tasksRaw) ? tasksRaw : tasksRaw?.records ?? []) as Array<
-        Record<string, unknown>
-      >;
-      const ourTask = tasks.find(
-        (t) =>
-          String(t.processInstanceId ?? '') === String(instanceId) &&
-          String(t.processDefinitionActivityId ?? '').includes(HR_TASK_ID),
-      );
-      expect(
-        ourTask,
-        `todo tasks must include our hr-branch task for instanceId=${instanceId}`,
-      ).toBeTruthy();
+      expect(ourTask.instanceId).toBeTruthy();
+      await hrCtx.close();
     });
 
     // =====================================================================

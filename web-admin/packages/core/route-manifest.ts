@@ -48,6 +48,11 @@ export function coreRoutes() {
     ...opsRoutes(),
     ...dashboardRoutes(),
 
+    // Legacy unified inbox route remains static during Task Center migration.
+    // Old links still deep-link with ?task=... and should not fall through to
+    // the menu-driven catch-all route.
+    route('/inbox', './routes/inbox/index.tsx'),
+
     // Page routes — /p/:pageKey based (V2, underscores)
     route('/p/:pageKey', './routes/p.$pageKey.tsx'),
     route('/p/:pageKey/new', './routes/p.$pageKey.new.tsx'),

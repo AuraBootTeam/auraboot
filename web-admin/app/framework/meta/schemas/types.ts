@@ -424,6 +424,11 @@ export interface SubTableConfig {
    * [semantic requiresInlineEdit:true]
    */
   crossRowRules?: CrossRowValidationRule[];
+  emptyState?: {
+    title?: string | LocalizedText;
+    description?: string | LocalizedText;
+    actionLabel?: string | LocalizedText;
+  };
 }
 
 /** Cross-row validation rule for sub-tables */

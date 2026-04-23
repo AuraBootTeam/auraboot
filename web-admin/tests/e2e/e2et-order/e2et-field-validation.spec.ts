@@ -21,11 +21,10 @@
  * @since 7.0.0
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { DynamicFormPage } from '../../pages/DynamicFormPage';
-import { uniqueId, todayStr, executeCommandViaApi, waitForToast } from '../helpers';
+import { uniqueId, todayStr, executeCommandViaApi } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
 // Customer config for UNIQUE testing — field names match e2et_cust_* (not e2et_customer_*)
@@ -96,7 +95,7 @@ test.describe('Field Validation Depth', () => {
     expect(hasServerError || hasClientError || staysOnForm).toBe(true);
   });
 
-  test('FV-002: required ENUM — unselected submit shows error', async ({ page }) => {
+  test('FV-002: required ENUM — unselected submit shows error', async ({ page: _page }) => {
     const formPage = await order.gotoNewForm();
     // Fill required title but leave type empty if possible
     await formPage.fillField('e2et_order_title', `Validation Test ${uniqueId()}`);
@@ -110,7 +109,7 @@ test.describe('Field Validation Depth', () => {
     await expect(select.first()).toBeVisible();
   });
 
-  test('FV-003: required REFERENCE — unselected submit shows error', async ({ page }) => {
+  test('FV-003: required REFERENCE — unselected submit shows error', async ({ page: _page }) => {
     // Navigate to order form and try submitting without selecting customer
     // Customer reference field is not required in current config, but we can
     // test that reference fields render correctly with a combobox
@@ -122,7 +121,7 @@ test.describe('Field Validation Depth', () => {
     }
   });
 
-  test('FV-004: required BOOLEAN — default false passes validation', async ({ page }) => {
+  test('FV-004: required BOOLEAN — default false passes validation', async ({ page: _page }) => {
     // Boolean fields with default false should pass required validation
     const formPage = await order.gotoNewForm();
     const urgentContainer = formPage.fieldContainer('e2et_order_urgent');
@@ -155,7 +154,7 @@ test.describe('Field Validation Depth', () => {
       expect(value.length).toBeLessThanOrEqual(200);
     } else {
       // No HTML maxLength — try to submit and verify server-side rejection
-      const [response] = await Promise.all([
+      await Promise.all([
         page.waitForResponse(
           (r) =>
             r.url().includes('/api/meta/commands/execute/') &&
@@ -164,7 +163,6 @@ test.describe('Field Validation Depth', () => {
         ),
         formPage.submit(),
       ]);
-      const body = await response.json().catch(() => ({}));
       // Server should either reject (validation error) or truncate (DB VARCHAR(200))
       // If error, ErrorAlert replaces the form (bg-red-50 + h3 + p.text-red-600)
       // If success, it navigates to list. Either outcome is valid.
@@ -182,7 +180,9 @@ test.describe('Field Validation Depth', () => {
     }
   });
 
-  test('FV-006: minLength STRING — less than minimum chars shows error', async ({ page }) => {
+  test('FV-006: minLength STRING — less than minimum chars shows error', async ({
+    page: _page,
+  }) => {
     // This test validates minLength behavior if configured in the model
     const formPage = await order.gotoNewForm();
     await formPage.fillField('e2et_order_title', 'AB');
@@ -297,7 +297,7 @@ test.describe('Field Validation Depth', () => {
 
   // --- Pattern validation ---
 
-  test('FV-011: pattern STRING — invalid pattern rejected @smoke', async ({ page }) => {
+  test('FV-011: pattern STRING — invalid pattern rejected @smoke', async ({ page: _page }) => {
     // Test pattern validation via API since pattern fields may need plugin extension
     // Create an order and check that title (free text) can be any pattern
     const formPage = await order.gotoNewForm();
@@ -458,7 +458,7 @@ test.describe('Field Validation Depth', () => {
 
   // --- Hidden/disabled field ---
 
-  test('FV-017: hidden field — visibleWhen=false does not render', async ({ page }) => {
+  test('FV-017: hidden field — visibleWhen=false does not render', async ({ page: _page }) => {
     const formPage = await order.gotoNewForm();
     // The order form DSL defines:
     //   e2et_order_discount: visibleWhen: "form.e2et_order_type === 'bulk'"
@@ -479,7 +479,7 @@ test.describe('Field Validation Depth', () => {
     await expect(remarkContainer).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('FV-018: disabled field — visible but not interactive', async ({ page }) => {
+  test('FV-018: disabled field — visible but not interactive', async ({ page: _page }) => {
     // Amount field is readOnly (computed from AGGREGATE)
     const pid = await order.createViaApi();
     try {
@@ -514,7 +514,9 @@ test.describe('Field Validation Depth', () => {
 
   // --- Conditional required ---
 
-  test('FV-019: conditional required — urgent=true makes remark required', async ({ page }) => {
+  test('FV-019: conditional required — urgent=true makes remark required', async ({
+    page: _page,
+  }) => {
     const formPage = await order.gotoNewForm();
     await formPage.fillField('e2et_order_title', `Cond Required ${uniqueId()}`);
     // Set urgent to true
@@ -572,7 +574,9 @@ test.describe('Field Validation Depth', () => {
 
   // --- Chinese character handling ---
 
-  test('FV-021: maxLength with Chinese — character count not byte count', async ({ page }) => {
+  test('FV-021: maxLength with Chinese — character count not byte count', async ({
+    page: _page,
+  }) => {
     const formPage = await order.gotoNewForm();
     // Fill with Chinese characters (each is 3 bytes but 1 character)
     const chineseTitle = '测试'.repeat(50); // 100 chars
@@ -586,7 +590,7 @@ test.describe('Field Validation Depth', () => {
 
   // --- Type validation ---
 
-  test('FV-022: DATE invalid format — invalid date rejected', async ({ page }) => {
+  test('FV-022: DATE invalid format — invalid date rejected', async ({ page: _page }) => {
     const formPage = await order.gotoNewForm();
     await formPage.fillField('e2et_order_title', `Date Test ${uniqueId()}`);
 
@@ -626,7 +630,7 @@ test.describe('Field Validation Depth', () => {
     // Navigate to order item form via UI - add subtable row
     const pid = await order.createViaApi();
     try {
-      const formPage = await order.gotoEditForm(pid);
+      await order.gotoEditForm(pid);
       // Try to add a subtable row
       const addBtn = page.locator('[data-testid="subtable-add-row"]');
       if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -648,7 +652,7 @@ test.describe('Field Validation Depth', () => {
   test('FV-024: INTEGER decimal — decimal input truncated or rejected', async ({ page }) => {
     const pid = await order.createViaApi();
     try {
-      const formPage = await order.gotoEditForm(pid);
+      await order.gotoEditForm(pid);
       const addBtn = page.locator('[data-testid="subtable-add-row"]');
       if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await addBtn.click();

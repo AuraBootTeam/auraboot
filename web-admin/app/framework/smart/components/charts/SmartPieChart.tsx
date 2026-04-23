@@ -16,6 +16,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { ChartEmptyState } from './ChartEmptyState';
 
 /**
  * Props for SmartPieChart component
@@ -131,6 +132,7 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
     refreshInterval,
     enabled: isConfigured,
   });
+  const isEmpty = !loading && !error && !data?.rows?.length;
 
   /**
    * Handle chart click events for drill-down and linkage
@@ -316,6 +318,17 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
           <div className="text-sm text-gray-500">{error.message}</div>
         </div>
       </div>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <ChartEmptyState
+        title={title || 'No distribution data yet'}
+        description="Breakdown slices will appear after the first grouped records arrive."
+        variant="pie"
+        className={className}
+      />
     );
   }
 

@@ -3,24 +3,23 @@
  * 提供 actions.* 标准 API
  */
 
-import type {
-  Action,
-  ActionContext,
-  ActionResult,
-  ActionChain,
-  ActionChainResult,
-  BaseActionParams,
-  NavigateActionParams,
-  FetchDataActionParams,
-  FormSubmitActionParams,
-  ShowModalActionParams,
-  ShowToastActionParams,
-  SetStateActionParams,
-  EmitEventActionParams,
-  RefreshActionParams,
-  IfConditionActionParams,
+import {
+  ActionType,
+  type Action,
+  type ActionContext,
+  type ActionResult,
+  type ActionChain,
+  type ActionChainResult,
+  type NavigateActionParams,
+  type FetchDataActionParams,
+  type FormSubmitActionParams,
+  type ShowModalActionParams,
+  type ShowToastActionParams,
+  type SetStateActionParams,
+  type EmitEventActionParams,
+  type RefreshActionParams,
+  type IfConditionActionParams,
 } from '~/plugins/core-designer/components/studio/services/runtime/execution/types';
-import { ActionType } from '~/plugins/core-designer/components/studio/services/runtime/execution/types';
 import { ActionRegistry } from '~/plugins/core-designer/components/studio/services/runtime/execution/ActionRegistry';
 import { ActionScheduler } from '~/plugins/core-designer/components/studio/services/runtime/execution/ActionScheduler';
 import { ExpressionEvaluator } from '~/plugins/core-designer/components/studio/services/runtime/execution/ExpressionEvaluator';
@@ -424,8 +423,8 @@ export class ActionProtocol {
       globalState: {},
       env: {},
       utils: {
-        formatDate: (date: Date, format: string) => date.toLocaleDateString(),
-        formatNumber: (num: number, format: string) => num.toString(),
+        formatDate: (date: Date, _format: string) => date.toLocaleDateString(),
+        formatNumber: (num: number, _format: string) => num.toString(),
         validateEmail: (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
         generateId: () => Math.random().toString(36).substr(2, 9),
       },

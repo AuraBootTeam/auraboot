@@ -188,7 +188,8 @@ export function toCreateRequest(request: CreatePageRequest): PageSchemaCreateReq
  *   - blocks (JSONB array)
  *   - layout (JSONB object)
  *   - kind
- *   - title (string)
+ *   - pageKey
+ *   - title (string or LocalizedText object)
  *   - metaInfo
  */
 export function createDslSchemaPayload(
@@ -206,12 +207,14 @@ export function createDslSchemaPayload(
     schemaVersion: schema.schemaVersion,
   };
 
+  if (schema.pageKey != null) {
+    payload.pageKey = schema.pageKey;
+  }
   if (schema.extension && Object.keys(schema.extension).length > 0) {
     payload.extension = { ...schema.extension };
   }
   if (schema.title != null) {
-    payload.title =
-      typeof schema.title === 'string' ? schema.title : JSON.stringify(schema.title);
+    payload.title = schema.title;
   }
 
   return payload;

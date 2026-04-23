@@ -5,19 +5,23 @@
  *
  * 功能特性:
  * - 加载现有Model数据
+ * - 最小编辑表单
  * - 表单验证（必填、格式、唯一性）
- * - 异步编码唯一性检查（编码变更时）
- * - Git-First工作流提示
- * - 版本管理集成
+ * - 版本信息摘要
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useParams, useLoaderData } from 'react-router';
-import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
+import {
+  useNavigate,
+  useParams,
+  useLoaderData,
+  type LoaderFunctionArgs,
+  type ActionFunctionArgs,
+} from 'react-router';
 import { modelService } from '~/shared/services/modelService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
-import type { MetaModelDTO, MetaModelUpdateRequest } from '~/types/model';
+import type { MetaModelUpdateRequest } from '~/types/model';
 
 /**
  * Loader函数 - 加载Model数据
@@ -84,7 +88,7 @@ export default function ModelEditPage() {
   const [formData, setFormData] = useState<MetaModelUpdateRequest>({
     displayName: initialModel.displayName,
     description: initialModel.description || '',
-    modelType: initialModel.modelType,
+    modelType: initialModel.modelType || 'entity',
     namespace: initialModel.namespace || '',
     env: initialModel.env || 'dev',
     extension: initialModel.extension,
@@ -106,10 +110,7 @@ export default function ModelEditPage() {
   useEffect(() => {
     const changed =
       formData.displayName !== initialModel.displayName ||
-      formData.description !== (initialModel.description || '') ||
-      formData.modelType !== initialModel.modelType ||
-      formData.namespace !== (initialModel.namespace || '') ||
-      formData.env !== (initialModel.env || 'dev');
+      formData.description !== (initialModel.description || '');
 
     setHasChanges(changed);
   }, [formData, initialModel]);
@@ -143,10 +144,6 @@ export default function ModelEditPage() {
       newErrors.displayName = '显示名称不能为空';
     } else if (formData.displayName.length > 100) {
       newErrors.displayName = '显示名称长度不能超过100个字符';
-    }
-
-    if (!formData.modelType) {
-      newErrors.modelType = '模型类型不能为空';
     }
 
     if (formData.description && formData.description.length > 500) {
@@ -227,17 +224,17 @@ export default function ModelEditPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">编辑模型</h1>
         <p className="mt-1 text-sm text-gray-500">
-          编辑模型 <span className="font-mono text-blue-600">{initialModel.code}</span> 的配置信息
+          调整模型名称和说明，字段与页面配置请在详情页继续处理
         </p>
       </div>
 
       {/* 表单 */}
-      <form onSubmit={handleSubmit} className="rounded-lg bg-white p-6 shadow">
+      <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         {/* 基本信息区域 */}
         <div className="mb-6">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">基本信息</h2>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-5 md:grid-cols-2">
             {/* 模型编码（只读） */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">模型编码</label>
@@ -272,35 +269,13 @@ export default function ModelEditPage() {
               )}
             </div>
 
-            {/* 模型类型 */}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                模型类型 <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.modelType}
-                onChange={(e) => handleChange('modelType', e.target.value)}
-                className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none ${
-                  errors.modelType
-                    ? 'border-red-300 focus:ring-red-500'
-                    : 'border-gray-300 focus:ring-blue-500'
-                }`}
-                disabled={submitting}
-              >
-                <option value="entity">实体</option>
-                <option value="view">视图</option>
-                <option value="aggregate">聚合</option>
-              </select>
-              {errors.modelType && <p className="mt-1 text-sm text-red-600">{errors.modelType}</p>}
-            </div>
-
             {/* 描述 */}
             <div className="col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700">描述</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
-                placeholder="请输入模型描述"
+                placeholder="选填，帮助团队理解模型用途"
                 rows={3}
                 className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:outline-none ${
                   errors.description
@@ -316,85 +291,8 @@ export default function ModelEditPage() {
           </div>
         </div>
 
-        {/* 高级配置区域 */}
-        <div className="mb-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">高级配置</h2>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* 命名空间 */}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">命名空间</label>
-              <input
-                type="text"
-                value={formData.namespace}
-                onChange={(e) => handleChange('namespace', e.target.value)}
-                placeholder="例如: com.example"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                disabled={submitting}
-              />
-            </div>
-
-            {/* 环境 */}
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">环境</label>
-              <select
-                value={formData.env}
-                onChange={(e) => handleChange('env', e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                disabled={submitting}
-              >
-                <option value="dev">开发环境</option>
-                <option value="test">测试环境</option>
-                <option value="staging">预发布环境</option>
-                <option value="prod">生产环境</option>
-              </select>
-            </div>
-
-            {/* 版本说明 */}
-            <div className="col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">版本说明</label>
-              <textarea
-                value={formData.versionNote}
-                onChange={(e) => handleChange('versionNote', e.target.value)}
-                placeholder="请输入本次修改的说明（用于版本历史记录）"
-                rows={2}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                disabled={submitting}
-              />
-              <p className="mt-1 text-xs text-gray-500">建议填写本次修改的内容，便于后续版本追踪</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Git-First提示 */}
-        <div className="mb-6 rounded-md border border-blue-200 bg-blue-50 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">Git-First工作流</h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>更新Model将触发Git提交和Release流程：</p>
-                <ul className="mt-1 list-inside list-disc space-y-1">
-                  <li>更新DSL文件并提交到Git仓库</li>
-                  <li>自动创建Release并处理</li>
-                  <li>投影到运行时数据表</li>
-                  <li>保留完整的版本历史记录</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* 版本信息 */}
-        <div className="mb-6 rounded-md border border-gray-200 bg-gray-50 p-4">
+        <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
           <h3 className="mb-2 text-sm font-medium text-gray-700">当前版本信息</h3>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>

@@ -1,8 +1,6 @@
-import type { Result, User } from '~/utils/type';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { getTokenFromRequest, sessionStorage } from '~/shared/services/session.js';
-import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
+import { getTokenFromRequest } from '~/shared/services/session.js';
 
 export async function getFormSchema(id: string, request: Request) {
   // 如果提供了请求对象，则从中获取 token

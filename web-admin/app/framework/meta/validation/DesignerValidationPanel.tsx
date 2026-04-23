@@ -18,12 +18,6 @@ interface DesignerValidationPanelProps {
   collapsed?: boolean;
 }
 
-const SEVERITY_ICONS: Record<ValidationSeverity, string> = {
-  error: 'x-circle',
-  warning: 'alert-triangle',
-  info: 'info',
-};
-
 const SEVERITY_COLORS: Record<ValidationSeverity, { bg: string; text: string; border: string }> = {
   error: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
   warning: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },

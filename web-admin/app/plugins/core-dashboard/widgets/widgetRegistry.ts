@@ -3,7 +3,7 @@
  * Central registry for dashboard widget definitions
  */
 
-import type { WidgetDefinition, WidgetType, PropertySchema } from '../types';
+import type { WidgetDefinition, PropertySchema } from '../types';
 import { DesignerRegistry } from '~/shared/designer';
 import { resolveWidgetTier } from '../registry/widgetManifest';
 
@@ -67,6 +67,11 @@ const widgetDefinitions: WidgetDefinition[] = [
         label: '标题',
         type: 'text',
         required: true,
+      },
+      {
+        key: 'icon',
+        label: '图标',
+        type: 'icon',
       },
       ...dataSourcePropertySchemas,
       {

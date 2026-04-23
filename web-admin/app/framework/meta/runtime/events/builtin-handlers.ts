@@ -3,7 +3,7 @@
  * 提供常用的预定义 handler，遵循约定大于配置原则
  */
 
-import type { HandlerConfig, FlowStep } from '~/framework/meta/schemas/types';
+import type { HandlerConfig } from '~/framework/meta/schemas/types';
 
 /**
  * 内置 Handler 模板

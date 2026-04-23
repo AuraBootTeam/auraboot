@@ -16,7 +16,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation, useNavigate as useRouterNavigate } from 'react-router';
 import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
 import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
@@ -54,6 +54,10 @@ interface RecordData {
   pid?: string;
 }
 
+export function buildDetailRecordEndpoint(tableName: string, recordId: string): string {
+  return buildApiEndpoint(tableName, recordId);
+}
+
 /**
  * DetailPageContent - renders a detail/view page from DSL schema.
  *
@@ -62,6 +66,8 @@ interface RecordData {
  */
 export function DetailPageContent(props: PageContentProps) {
   const { schema, tableName, recordId, token } = props;
+  const location = useLocation();
+  const routerNavigate = useRouterNavigate();
 
   // Client-side record + model field loading (parallelized)
   const [recordData, setRecordData] = useState<RecordData>({});
@@ -94,7 +100,7 @@ export function DetailPageContent(props: PageContentProps) {
     }
 
     async function loadRecord(): Promise<void> {
-      const endpoint = `${buildApiEndpoint(tableName)}/${recordId}`;
+      const endpoint = buildDetailRecordEndpoint(tableName, recordId);
       const result = await fetchResult<RecordData>(endpoint, {
         method: 'get',
         token: token || undefined,
@@ -123,7 +129,7 @@ export function DetailPageContent(props: PageContentProps) {
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
     if (!recordId || !tableName) return;
-    const endpoint = `${buildApiEndpoint(tableName)}/${recordId}`;
+    const endpoint = buildDetailRecordEndpoint(tableName, recordId);
     fetchResult<RecordData>(endpoint, { method: 'get', token: token || undefined })
       .then((result) => {
         if (ResultHelper.isSuccess(result) && result.data) setRecordData(result.data);
@@ -138,6 +144,14 @@ export function DetailPageContent(props: PageContentProps) {
       if (!meta) return field;
 
       const enriched = { ...field } as any;
+      const extensionProps = meta.extension && typeof meta.extension === 'object'
+        ? meta.extension
+        : {};
+
+      enriched.props = {
+        ...(field.props || {}),
+        ...extensionProps,
+      };
 
       // Add dictCode from model field
       if (meta.dictCode && !enriched.dictCode) {
@@ -159,6 +173,13 @@ export function DetailPageContent(props: PageContentProps) {
         } else if (meta.dataType === 'datetime') {
           enriched.component = 'datetime';
         }
+      }
+
+      if (!enriched.referenceModelCode) {
+        enriched.referenceModelCode =
+          meta.referenceModelCode ||
+          meta.extension?.referenceModelCode ||
+          meta.extension?.refModelCode;
       }
 
       return enriched as FieldConfig;
@@ -220,7 +241,6 @@ export function DetailPageContent(props: PageContentProps) {
     [showSuccessToast, showErrorToast, showWarningToast, showInfoToast],
   );
 
-  const [activeTab, setActiveTab] = useState(0);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   // Use usePageRuntime instead of useDynamicPageSetup
@@ -368,6 +388,57 @@ export function DetailPageContent(props: PageContentProps) {
   // System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordId (new record).
   const allTabs = (tabsBlock?.tabs || []) as DetailTabConfig[];
   const tabs = recordId ? allTabs : allTabs.filter((t) => !t.system);
+  const [activeTab, setActiveTab] = useState(0);
+
+  const tabHashKeys = useMemo(
+    () =>
+      tabs.map((tab, index) => {
+        const rawKey = typeof tab.key === 'string' && tab.key.trim().length > 0
+          ? tab.key.trim()
+          : `tab-${index + 1}`;
+        return decodeURIComponent(rawKey);
+      }),
+    [tabs],
+  );
+
+  const resolveTabIndexFromHash = useCallback(
+    (hash: string): number => {
+      if (!hash) return -1;
+      const decodedHash = decodeURIComponent(hash.replace(/^#/, '').trim());
+      if (!decodedHash) return -1;
+      return tabHashKeys.findIndex((key) => key === decodedHash);
+    },
+    [tabHashKeys],
+  );
+
+  useEffect(() => {
+    if (tabs.length === 0) return;
+    const matchedIndex = resolveTabIndexFromHash(location.hash);
+    if (matchedIndex >= 0) {
+      setActiveTab(matchedIndex);
+      return;
+    }
+    setActiveTab((current) => (current < tabs.length ? current : 0));
+  }, [location.hash, resolveTabIndexFromHash, tabs.length]);
+
+  const handleTabChange = useCallback(
+    (index: number) => {
+      setActiveTab(index);
+      const nextTabKey = tabHashKeys[index];
+      if (!nextTabKey) return;
+      const nextHash = `#${encodeURIComponent(nextTabKey)}`;
+      if (location.hash === nextHash) return;
+      routerNavigate(
+        {
+          pathname: location.pathname,
+          search: location.search,
+          hash: nextHash,
+        },
+        { preventScrollReset: true },
+      );
+    },
+    [location.hash, location.pathname, location.search, routerNavigate, tabHashKeys],
+  );
 
   // Show loading while record is being fetched
   if (recordLoading) {
@@ -497,7 +568,7 @@ export function DetailPageContent(props: PageContentProps) {
                       'tab',
                       tab.key || String(index),
                     )}
-                    onClick={() => setActiveTab(index)}
+                    onClick={() => handleTabChange(index)}
                     className={`border-b-2 px-1 py-3 text-sm font-medium ${
                       activeTab === index
                         ? 'border-blue-500 text-blue-600'
@@ -888,12 +959,10 @@ function FallbackDetailView({
   schema,
   recordData,
   locale,
-  t,
 }: {
   schema: any;
   recordData: RecordData;
   locale: string;
-  t: (key: string) => string;
 }) {
   // Try to extract fields from any block
   const fields: FieldConfig[] = [];

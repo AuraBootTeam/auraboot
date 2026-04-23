@@ -38,145 +38,108 @@ const TEST_PAGES = [
   {
     pageKey: 'e2e_test_dashboard',
     name: 'E2E Test Dashboard',
-    title: 'E2E 测试仪表盘',
-    description: 'Dashboard page for E2E testing Page Designer',
-    pageType: 'dashboard',
-    pageCategory: 'dashboard',
-    dslSchema: {
-      layout: 'grid',
-      columns: 12,
-      areas: [
-        {
-          id: 'main',
-          name: '主内容区',
-          blocks: [
-            {
-              id: 'block_stats',
-              type: 'stats',
-              position: { x: 0, y: 0, w: 12, h: 2 },
-              props: {
-                title: '统计概览',
-                items: [
-                  { label: '总数', value: '1,234' },
-                  { label: '今日新增', value: '56' },
-                ],
-              },
-            },
-            {
-              id: 'block_chart',
-              type: 'chart',
-              position: { x: 0, y: 2, w: 6, h: 4 },
-              props: {
-                title: '趋势图表',
-                chartType: 'line',
-              },
-            },
-            {
-              id: 'block_table',
-              type: 'table',
-              position: { x: 6, y: 2, w: 6, h: 4 },
-              props: {
-                title: '数据列表',
-                columns: ['名称', '状态', '时间'],
-              },
-            },
-          ],
-        },
-      ],
-    },
+    title: 'E2E Test Dashboard',
+    modelCode: 'page_schema',
+    description: 'Overview-style list fixture for Page Designer E2E tests',
+    kind: 'list',
+    layout: { type: 'grid', cols: 12 },
+    blocks: [
+      {
+        id: 'block_overview_stats',
+        blockType: 'stat-card',
+        layout: { colSpan: 12, rowSpan: 1 },
+        title: 'Overview',
+        cards: [
+          { label: 'Total', value: '1234' },
+          { label: 'Today', value: '56' },
+        ],
+      },
+      {
+        id: 'block_overview_table',
+        blockType: 'table',
+        layout: { colSpan: 12, rowSpan: 1 },
+        columns: [
+          { field: 'name', title: 'Name', width: 200 },
+          { field: 'page_key', title: 'Page Key', width: 220 },
+          { field: 'status', title: 'Status', width: 120 },
+          { field: 'updated_at', title: 'Updated At', width: 180 },
+        ],
+      },
+    ],
   },
   {
     pageKey: 'e2e_test_form',
     name: 'E2E Test Form',
-    title: 'E2E 测试表单',
-    description: 'Form page for E2E testing Page Designer',
-    pageType: 'form',
-    pageCategory: 'custom',
-    dslSchema: {
-      layout: 'vertical',
-      areas: [
-        {
-          id: 'main',
-          name: '主内容区',
-          blocks: [
-            {
-              id: 'block_input',
-              type: 'input',
-              position: { row: 0, col: 0 },
-              props: {
-                label: '名称',
-                placeholder: '请输入名称',
-                required: true,
-              },
-            },
-            {
-              id: 'block_select',
-              type: 'select',
-              position: { row: 1, col: 0 },
-              props: {
-                label: '类型',
-                options: [
-                  { value: 'A', label: '类型A' },
-                  { value: 'B', label: '类型B' },
-                ],
-              },
-            },
-            {
-              id: 'block_textarea',
-              type: 'textarea',
-              position: { row: 2, col: 0 },
-              props: {
-                label: '描述',
-                rows: 4,
-              },
-            },
-          ],
-        },
-      ],
-      actions: ['submit', 'reset'],
-    },
+    title: 'E2E Test Form',
+    modelCode: 'page_schema',
+    description: 'Form fixture for Page Designer E2E tests',
+    kind: 'form',
+    layout: { type: 'grid', cols: 12, gap: 12 },
+    blocks: [
+      {
+        id: 'block_form_main',
+        blockType: 'form-section',
+        title: 'Basic Information',
+        layout: { colSpan: 12, rowSpan: 1 },
+        columns: 2,
+        fields: [
+          { field: 'name', layout: { colSpan: 6, rowSpan: 1 } },
+          { field: 'page_key', layout: { colSpan: 6, rowSpan: 1 } },
+          { field: 'kind', layout: { colSpan: 4, rowSpan: 1 } },
+          { field: 'profile', layout: { colSpan: 4, rowSpan: 1 } },
+          { field: 'model_code', layout: { colSpan: 4, rowSpan: 1 } },
+          { field: 'description', layout: { colSpan: 12, rowSpan: 1 } },
+        ],
+      },
+      {
+        id: 'block_form_actions',
+        blockType: 'form-buttons',
+        layout: { colSpan: 12, rowSpan: 1 },
+        buttons: [
+          { code: 'save', primary: true, label: 'save' },
+          { code: 'reset', label: 'reset' },
+        ],
+      },
+    ],
   },
   {
     pageKey: 'e2e_test_list',
     name: 'E2E Test List',
-    title: 'E2E 测试列表',
-    description: 'List page for E2E testing Page Designer',
-    pageType: 'list',
-    pageCategory: 'custom',
-    dslSchema: {
-      areas: [
-        {
-          id: 'main',
-          name: '主内容区',
-          blocks: [
-            {
-              id: 'block_filter',
-              type: 'filter',
-              position: { row: 0 },
-              props: {
-                fields: ['keyword', 'status', 'dateRange'],
-              },
-            },
-            {
-              id: 'block_table',
-              type: 'table',
-              position: { row: 1 },
-              props: {
-                columns: [
-                  { field: 'name', title: '名称', width: 200 },
-                  { field: 'status', title: '状态', width: 100 },
-                  { field: 'createdAt', title: '创建时间', width: 180 },
-                ],
-                actions: ['view', 'edit', 'delete'],
-              },
-            },
-          ],
-        },
-      ],
-      toolbar: {
-        actions: ['create', 'export', 'refresh'],
+    title: 'E2E Test List',
+    modelCode: 'page_schema',
+    description: 'List fixture for Page Designer E2E tests',
+    kind: 'list',
+    layout: { type: 'stack' },
+    blocks: [
+      {
+        id: 'block_list_toolbar',
+        blockType: 'toolbar',
+        buttons: [
+          { code: 'create', variant: 'primary', label: 'create' },
+          { code: 'refresh', label: 'refresh' },
+        ],
       },
-    },
+      {
+        id: 'block_list_filters',
+        blockType: 'filters',
+        fields: [{ field: 'name' }, { field: 'status' }],
+      },
+      {
+        id: 'block_list_table',
+        blockType: 'table',
+        columns: [
+          { field: 'name', title: 'Name', width: 200 },
+          { field: 'page_key', title: 'Page Key', width: 220 },
+          { field: 'status', title: 'Status', width: 120 },
+          { field: 'updated_at', title: 'Updated At', width: 180 },
+        ],
+        rowActions: [
+          { code: 'view', label: 'view' },
+          { code: 'edit', label: 'edit' },
+          { code: 'delete', label: 'delete' },
+        ],
+      },
+    ],
   },
 ];
 
@@ -689,21 +652,10 @@ test.describe('Environment Initialization', () => {
     const login = await loginByApi(page.request, TEST_USER.email, TEST_USER.password);
     await assertUserAndTenant(page.request, login.jwt, { requireTenant: true });
 
-    const checkResponse = await page.request.get('/api/dashboards/code/system_overview', {
-      headers: authHeaders(login.jwt),
-    });
-    if (checkResponse.ok()) {
-      const checkData = await checkResponse.json();
-      if (checkData.success !== false && checkData.data) {
-        console.log('✅ system_overview dashboard already exists, skipping');
-        return;
-      }
-    }
-
     const dashboardPayload = {
       code: 'system_overview',
       title: '系统概览',
-      description: 'System overview dashboard for Reports page',
+      description: 'Live overview dashboard for Reports page',
       scope: 'global',
       layoutConfig: {
         columns: 12,
@@ -712,81 +664,106 @@ test.describe('Environment Initialization', () => {
       },
       widgets: [
         {
-          i: 'widget_total_users',
+          i: 'widget_total_accounts',
           x: 0,
           y: 0,
           w: 3,
           h: 2,
           type: 'NumberCard',
-          title: '用户总数',
+          title: '客户总数',
           config: {
-            label: '用户总数',
-            value: 0,
-            suffix: '人',
-            color: '#3B82F6',
+            title: '客户总数',
+            label: '客户总数',
+            color: '#2563EB',
+            dataSource: {
+              type: 'aggregate',
+              modelCode: 'crm_account',
+              metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
+            },
           },
         },
         {
-          i: 'widget_total_models',
+          i: 'widget_total_contacts',
           x: 3,
           y: 0,
           w: 3,
           h: 2,
           type: 'NumberCard',
-          title: '模型数量',
+          title: '联系人',
           config: {
-            label: '模型数量',
-            value: 0,
-            suffix: '个',
+            title: '联系人',
+            label: '联系人',
             color: '#10B981',
+            dataSource: {
+              type: 'aggregate',
+              modelCode: 'crm_contact',
+              metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
+            },
           },
         },
         {
-          i: 'widget_bar_chart',
-          x: 0,
-          y: 2,
-          w: 6,
-          h: 3,
-          type: 'BarChart',
-          title: '数据分布',
-          config: {
-            xAxis: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-            series: [{ name: 'Count', data: [10, 20, 15, 25, 18] }],
-          },
-        },
-        {
-          i: 'widget_line_chart',
+          i: 'widget_total_leads',
           x: 6,
           y: 0,
-          w: 6,
-          h: 3,
-          type: 'LineChart',
-          title: '趋势图',
+          w: 3,
+          h: 2,
+          type: 'NumberCard',
+          title: '线索',
           config: {
-            xAxis: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-            series: [{ name: 'Trend', data: [5, 10, 8, 15, 12] }],
+            title: '线索',
+            label: '线索',
+            color: '#F59E0B',
+            dataSource: {
+              type: 'aggregate',
+              modelCode: 'crm_lead',
+              metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
+            },
           },
         },
         {
-          i: 'widget_pie_chart',
-          x: 6,
-          y: 3,
-          w: 6,
-          h: 3,
-          type: 'PieChart',
-          title: '类型分布',
+          i: 'widget_total_opportunities',
+          x: 9,
+          y: 0,
+          w: 3,
+          h: 2,
+          type: 'NumberCard',
+          title: '商机',
           config: {
-            data: [
-              { name: 'Type A', value: 40 },
-              { name: 'Type B', value: 30 },
-              { name: 'Type C', value: 20 },
-              { name: 'Type D', value: 10 },
-            ],
+            title: '商机',
+            label: '商机',
+            color: '#8B5CF6',
+            dataSource: {
+              type: 'aggregate',
+              modelCode: 'crm_opportunity',
+              metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
+            },
           },
         },
       ],
       isDefault: true,
     };
+
+    const checkResponse = await page.request.get('/api/dashboards/code/system_overview', {
+      headers: authHeaders(login.jwt),
+    });
+    if (checkResponse.ok()) {
+      const checkData = await checkResponse.json();
+      if (checkData.success !== false && checkData.data?.pid) {
+        const updateResponse = await page.request.put(
+          `/api/dashboards/${checkData.data.pid}`,
+          {
+            data: dashboardPayload,
+            headers: authHeaders(login.jwt),
+          },
+        );
+        expect(updateResponse.ok(), 'system_overview dashboard should update').toBeTruthy();
+        await page.request.post(`/api/dashboards/${checkData.data.pid}/publish`, {
+          headers: authHeaders(login.jwt),
+        });
+        console.log('✅ system_overview dashboard updated');
+        return;
+      }
+    }
 
     const createResponse = await page.request.post(`/api/dashboards`, {
       data: dashboardPayload,

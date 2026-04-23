@@ -1314,7 +1314,7 @@ export const CHART_COMPONENT_CONFIGS: ComponentConfig[] = [
     },
     propertySchema: [
       { key: 'title', label: '标题', type: 'string', group: 'basic' },
-      { key: 'icon', label: '图标', type: 'string', group: 'basic' },
+      { key: 'icon', label: '图标', type: 'icon', group: 'basic' },
       {
         key: 'format',
         label: '格式',

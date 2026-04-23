@@ -35,6 +35,8 @@ export function createFieldRenderer(
   data: Record<string, any>,
   setData: (data: Record<string, any>) => void,
   context: ExpressionContext,
+  fieldErrors: Record<string, string> = {},
+  onFieldChange?: (fieldCode: string) => void,
 ) {
   return (field: FieldConfig) => (
     <ControlledFieldRenderer
@@ -42,12 +44,14 @@ export function createFieldRenderer(
       field={field}
       value={data[field.field]}
       onChange={(newValue) => {
+        onFieldChange?.(field.field);
         setData({
           ...data,
           [field.field]: newValue,
         });
       }}
       context={context}
+      error={fieldErrors[field.field]}
     />
   );
 }
