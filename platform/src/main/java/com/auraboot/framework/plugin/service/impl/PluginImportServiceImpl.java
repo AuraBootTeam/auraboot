@@ -33,6 +33,9 @@ import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
 import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.rbac.entity.RolePermission;
+import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -40,6 +43,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -90,7 +94,9 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.service.CommandService commandService;
     private final SchemaManagementService schemaManagementService;
     private final PermissionService permissionService;
+    private final UserPermissionService userPermissionService;
     private final RoleService roleService;
+    private final RolePermissionMapper rolePermissionMapper;
     private final DistributedLock distributedLock;
     private final I18nResourceService i18nResourceService;
     private final I18nCompiler i18nCompiler;
@@ -1212,7 +1218,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         importSlaConfigs(manifest);
 
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
-        autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace());
+        autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
 
         // Post-processing: Auto-publish DRAFT fields and commands for newly published models.
         // Fields are imported BEFORE models (importOrder FIELD=20 < MODEL=30), so field autoPublish
@@ -1263,7 +1269,8 @@ public class PluginImportServiceImpl implements PluginImportService {
      * For DRAFT models: publish.
      * For PUBLISHED ENTITY models: sync schema (adds any new columns from new field bindings).
      */
-    private void autoPublishAndSyncModels(List<String> modelCodes, ImportRequest request, String pluginNamespace) {
+    private void autoPublishAndSyncModels(
+            List<String> modelCodes, ImportRequest request, String pluginNamespace, Long tenantId) {
         if (modelCodes.isEmpty() || !Boolean.TRUE.equals(request.getAutoPublishModels())) {
             return;
         }
@@ -1294,7 +1301,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
 
                 // Ensure hierarchical permissions exist (idempotent — skips if already created)
-                autoPermissionAssignmentService.autoAssignPermissions(modelCode, pluginNamespace);
+                autoPermissionAssignmentService.autoAssignPermissions(modelCode, pluginNamespace, tenantId);
             }
         }
     }
@@ -1457,7 +1464,18 @@ public class PluginImportServiceImpl implements PluginImportService {
 
                     continue;
                 }
-                permissionService.bindToRole(tenantAdminRole.getId(), permissionDTO.getId());
+                RolePermission binding = new RolePermission();
+                binding.setPid(UniqueIdGenerator.generate());
+                binding.setTenantId(tenantId);
+                binding.setRoleId(tenantAdminRole.getId());
+                binding.setPermissionId(permissionDTO.getId());
+                binding.setGrantType(StatusConstants.GRANT);
+                binding.setPriority(0);
+                binding.setStatus(StatusConstants.ACTIVE);
+                binding.setDeletedFlag(false);
+                binding.setCreatedAt(Instant.now());
+                binding.setUpdatedAt(Instant.now());
+                rolePermissionMapper.insert(binding);
                 boundPermissionIds.add(permissionDTO.getId());
             } catch (Exception e) {
                 // Duplicate bind and stale edge cases should not fail plugin import.
@@ -1465,6 +1483,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                         permission.getCode(), e.getMessage());
             }
         }
+        userPermissionService.evictRoleUsers(tenantAdminRole.getId());
     }
 
     private void importRoles(PluginManifestExtended manifest, ImportRequest request,

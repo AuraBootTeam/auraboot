@@ -16,6 +16,8 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -47,6 +49,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     private final ApplicationEventPublisher eventPublisher;
     private final MetaModelService metaModelService;
     private final PageSchemaDefaultBlockGenerator defaultBlockGenerator;
+    private final ObjectMapper objectMapper;
 
     /** Extension key used to snapshot the bound {modelCode}@{version} at page-save time. */
     private static final String EXT_BOUND_MODEL_VERSION = "boundModelVersion";
@@ -477,7 +480,9 @@ public class PageSchemaServiceImpl implements PageSchemaService {
 
         // Collect existing tab keys for deduplication
         Set<String> existingKeys = new HashSet<>();
+        List<Map<String, Object>> existingTabs = new ArrayList<>();
         for (Map<String, Object> tab : tabsList) {
+            existingTabs.add(tab);
             Object key = tab.get("key");
             if (key != null) {
                 existingKeys.add(key.toString());
@@ -491,7 +496,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         boolean modified = false;
         for (Map<String, Object> sysTab : systemTabs) {
             String key = (String) sysTab.get("key");
-            if (!existingKeys.contains(key)) {
+            if (!existingKeys.contains(key) && !hasEquivalentTab(existingTabs, sysTab)) {
                 mutableTabs.add(sysTab);
                 modified = true;
             }
@@ -502,6 +507,42 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         }
 
         return dto;
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean hasEquivalentTab(List<Map<String, Object>> existingTabs, Map<String, Object> systemTab) {
+        List<String> systemBlockTypes = extractBlockTypes(systemTab);
+        if (systemBlockTypes.isEmpty()) {
+            return false;
+        }
+        for (Map<String, Object> existingTab : existingTabs) {
+            if (systemBlockTypes.equals(extractBlockTypes(existingTab))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> extractBlockTypes(Map<String, Object> tab) {
+        if (tab == null) {
+            return List.of();
+        }
+        Object blocksObj = tab.get("blocks");
+        if (!(blocksObj instanceof List<?> blocks)) {
+            return List.of();
+        }
+        List<String> blockTypes = new ArrayList<>();
+        for (Object blockObj : blocks) {
+            if (!(blockObj instanceof Map<?, ?> blockMap)) {
+                continue;
+            }
+            Object blockType = blockMap.get("blockType");
+            if (blockType != null) {
+                blockTypes.add(blockType.toString());
+            }
+        }
+        return blockTypes;
     }
 
     /**
@@ -596,7 +637,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
 
         // I18n compliance: scan page-level fields AND all blocks recursively
         Map<String, Object> pageMap = new HashMap<>();
-        pageMap.put("title", request.getTitle());
+        pageMap.put("title", normalizeTextFieldForI18nValidation(request.getTitle()));
         pageMap.put("description", request.getDescription());
         pageMap.put("blocks", request.getBlocks());
         PageSchemaDslI18nValidator.validatePageSchema(pageMap, request.getPageKey());
@@ -618,10 +659,43 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         // I18n compliance: scan page-level fields AND all blocks recursively
         String pageKey = request.getPageKey() != null ? request.getPageKey() : "(update)";
         Map<String, Object> pageMap = new HashMap<>();
-        pageMap.put("title", request.getTitle());
+        pageMap.put("title", normalizeTextFieldForI18nValidation(request.getTitle()));
         pageMap.put("description", request.getDescription());
         pageMap.put("blocks", request.getBlocks());
         PageSchemaDslI18nValidator.validatePageSchema(pageMap, pageKey);
+    }
+
+    private Object normalizeTextFieldForI18nValidation(Object rawValue) {
+        if (rawValue == null) {
+            return rawValue;
+        }
+
+        if (rawValue instanceof Map<?, ?>) {
+            return rawValue;
+        }
+
+        if (!(rawValue instanceof String rawText) || !StringUtils.hasText(rawText)) {
+            return rawValue;
+        }
+
+        String trimmed = rawText.trim();
+        if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+            return rawValue;
+        }
+
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(
+                trimmed,
+                new TypeReference<Map<String, Object>>() {}
+            );
+            if (parsed.containsKey("zh-CN") || parsed.containsKey("en-US")) {
+                return parsed;
+            }
+        } catch (Exception ignored) {
+            // Fall back to raw string so the validator can treat malformed JSON as invalid text.
+        }
+
+        return rawValue;
     }
 
     /**

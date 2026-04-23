@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -176,5 +177,32 @@ class PageSchemaI18nValidationControllerTest {
                         "DSL i18n compliance violation: hardcoded non-ASCII text found in page schema. " +
                         "Use LocalizedText object or $i18n:key instead. Violations:\n" +
                         "  path=pages[test_i18n_page].blocks[0].label, value=\"工具栏\"");
+    }
+
+    @Test
+    @DisplayName("I18N-U-02: PUT with LocalizedText title — request binds and reaches service")
+    void update_localizedTitle_serviceCalledNormally() throws Exception {
+        PageSchemaDTO returned = new PageSchemaDTO();
+        returned.setPageKey("test_i18n_page");
+        when(pageSchemaService.update(
+                anyString(),
+                argThat(request -> request != null
+                        && request.getTitle() instanceof Map<?, ?> titleMap
+                        && "合同详情".equals(titleMap.get("zh-CN"))
+                        && "Contract Detail".equals(titleMap.get("en-US")))))
+                .thenReturn(returned);
+
+        Map<String, Object> updateBody = new HashMap<>();
+        updateBody.put("pageKey", "test_i18n_page");
+        updateBody.put("title", Map.of(
+                "zh-CN", "合同详情",
+                "en-US", "Contract Detail"
+        ));
+
+        mockMvc.perform(put("/api/pages/{pid}", "test-pid-002")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateBody)))
+                .andDo(print())
+                .andExpect(status().is2xxSuccessful());
     }
 }
