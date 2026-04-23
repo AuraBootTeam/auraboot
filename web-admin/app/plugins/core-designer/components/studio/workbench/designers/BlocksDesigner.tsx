@@ -28,6 +28,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import type {
   PageSchema,
   DslBlock,
@@ -36,7 +37,6 @@ import type {
   DslFieldOverride,
   parseFieldShorthand,
   serializeFieldOverride,
-  resolveLocalizedText,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { BlockLibrary } from './areas/BlockLibrary';
 import { BlockPropertyPanel } from './areas/BlockPropertyPanel';
