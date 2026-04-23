@@ -43,7 +43,7 @@ const WIZARD_TEMPLATES: WizardTemplate[] = [
     icon: '\uD83E\uDD1D',
     features: ['Lead Management', 'Sales Pipeline', 'Contact Tracking', 'Opportunity Lifecycle'],
     modelCount: 4,
-    pluginPath: 'plugins/templates/crm-quick-start',
+    pluginPath: 'plugins/crm-quick-start',
     color: 'blue',
   },
   {
@@ -53,7 +53,7 @@ const WIZARD_TEMPLATES: WizardTemplate[] = [
     icon: '\uD83D\uDCCB',
     features: ['Project Tracking', 'Task Management', 'Milestones', 'Team Collaboration'],
     modelCount: 3,
-    pluginPath: 'plugins/templates/project-management',
+    pluginPath: 'plugins/project-management',
     color: 'indigo',
   },
   {
@@ -63,7 +63,7 @@ const WIZARD_TEMPLATES: WizardTemplate[] = [
     icon: '\uD83D\uDCE6',
     features: ['Asset Registry', 'Category Management', 'Maintenance Tracking'],
     modelCount: 3,
-    pluginPath: 'plugins/templates/asset-management',
+    pluginPath: 'plugins/asset-management',
     color: 'amber',
   },
   {
@@ -73,7 +73,7 @@ const WIZARD_TEMPLATES: WizardTemplate[] = [
     icon: '\uD83D\uDCE6',
     features: ['Product Catalog', 'Warehouse Management', 'Stock Movements'],
     modelCount: 4,
-    pluginPath: 'plugins/templates/simple-inventory',
+    pluginPath: 'plugins/simple-inventory',
     color: 'emerald',
   },
   {
@@ -83,7 +83,7 @@ const WIZARD_TEMPLATES: WizardTemplate[] = [
     icon: '\uD83D\uDC65',
     features: ['Employee Records', 'Attendance Tracking', 'Leave Requests', 'Approval Workflow'],
     modelCount: 3,
-    pluginPath: 'plugins/templates/hr-essentials',
+    pluginPath: 'plugins/hr-essentials',
     color: 'violet',
   },
 ];
