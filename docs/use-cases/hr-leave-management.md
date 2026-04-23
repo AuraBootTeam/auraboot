@@ -639,7 +639,7 @@ The template is available from the AuraBoot Template Gallery. Install via the ad
 Or import the plugin directly:
 
 ```bash
-aura plugin publish plugins/templates/hr-essentials --yes
+aura plugin publish plugins/hr-essentials --yes
 ```
 
 ### 2. Create Your First Employee

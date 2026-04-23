@@ -31,6 +31,10 @@ const COLOR_MAP: Record<string, { badge: string; accent: string }> = {
     badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
     accent: 'bg-violet-500',
   },
+  slate: {
+    badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    accent: 'bg-slate-500',
+  },
 };
 
 function getColor(color: string) {
@@ -73,12 +77,23 @@ export function TemplateCard({ template, installed }: TemplateCardProps) {
         )}
 
         {/* Installed badge overlay */}
-        {installed && (
-          <div className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-xs font-medium text-white shadow">
-            <CheckCircleIcon className="h-3.5 w-3.5" />
-            Installed
+        <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+          <div
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase shadow ${
+              template.source === 'enterprise'
+                ? 'bg-slate-900/85 text-white dark:bg-slate-700'
+                : 'bg-white/90 text-gray-700 dark:bg-gray-900/80 dark:text-gray-200'
+            }`}
+          >
+            {template.source === 'enterprise' ? 'Enterprise' : 'OSS'}
           </div>
-        )}
+          {installed && (
+            <div className="flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-xs font-medium text-white shadow">
+              <CheckCircleIcon className="h-3.5 w-3.5" />
+              Installed
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}

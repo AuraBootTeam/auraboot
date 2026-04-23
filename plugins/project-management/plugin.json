@@ -1,0 +1,44 @@
+{
+  "pluginId": "com.auraboot.template.project-management",
+  "namespace": "tpm",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "catalogType": "template",
+  "displayName": "Project Management",
+  "displayName:zh-CN": "项目管理",
+  "displayName:en": "Project Management",
+  "description": "Simple project and task tracking for teams. Includes projects, tasks, and milestones with full lifecycle management.",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/templates/project-management",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "provides": [
+    {"type": "model", "code": "tpm_project"},
+    {"type": "model", "code": "tpm_task"},
+    {"type": "model", "code": "tpm_milestone"}
+  ],
+  "requires": [],
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields",
+    "modelFieldBindings": "config/bindings",
+    "commands": "config/commands",
+    "pages": "config/pages",
+    "dicts": "config/dicts.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "i18n": "config/i18n.json",
+    "namedQueries": "config/named-queries.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true,
+    "autoPublishPages": true,
+    "autoDeployProcesses": false,
+    "createResourcePermissions": true
+  }
+}

@@ -1,8 +1,0 @@
-[
-  {"modelCode":"ehr_department","fieldCode":"ehr_dp_code","sequence":1,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true,"sortable":true}},
-  {"modelCode":"ehr_department","fieldCode":"ehr_dp_name","sequence":2,"required":true,"visible":true,"editable":true,"displayConfig":{"searchable":true,"sortable":true}},
-  {"modelCode":"ehr_department","fieldCode":"ehr_dp_parent_id","sequence":3,"required":false,"visible":true,"editable":true},
-  {"modelCode":"ehr_department","fieldCode":"ehr_dp_manager","sequence":4,"required":false,"visible":true,"editable":true,"displayConfig":{"searchable":true}},
-  {"modelCode":"ehr_department","fieldCode":"ehr_dp_headcount","sequence":5,"required":false,"visible":true,"editable":true},
-  {"modelCode":"ehr_department","fieldCode":"ehr_dp_description","sequence":6,"required":false,"visible":false,"editable":true}
-]
