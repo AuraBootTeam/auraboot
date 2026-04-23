@@ -18,8 +18,6 @@ import type {
   WatermarkBlock,
   ReportBand,
   BandElement,
-  ReportColumn,
-  SummaryColumnConfig,
 } from '../types';
 
 function escapeHtml(str: string): string {
@@ -383,9 +381,6 @@ function renderChart(block: ChartBlock, data: Record<string, unknown>[]): string
     '#06b6d4',
     '#f97316',
   ];
-  const w = block.width || 400;
-  const h = block.height || 240;
-
   // For PDF: render as HTML table-based bar chart (openhtmltopdf doesn't support SVG well)
   let html = '';
   if (block.title)

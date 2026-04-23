@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import {
-  PlusIcon,
   TrashIcon,
   ArrowUpIcon,
   ArrowDownIcon,
@@ -98,7 +97,6 @@ const ProgramEditor = () => {
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showTextEditor, setShowTextEditor] = useState(false);
-  const [selectedContent, setSelectedContent] = useState<ProgramContent | null>(null);
   const [textForm, setTextForm] = useState({
     text: '',
     fontSize: 24,

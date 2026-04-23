@@ -403,7 +403,7 @@ export const SmartGanttChart: React.FC<SmartGanttChartProps> = ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formatter: (params: any) => {
           if (!params?.value) return '';
-          const [startTs, endTs, yIdx] = params.value as [number, number, number];
+          const [, , yIdx] = params.value as [number, number, number];
           const taskIdx = taskNames.length - 1 - yIdx;
           const t = tasks[taskIdx];
           if (!t) return '';

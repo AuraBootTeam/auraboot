@@ -27,11 +27,11 @@ import {
 } from '~/plugins/core-designer/components/bpmn-designer/components/nodes';
 import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
 import { BPMNNodeType, type BPMNNode, type BPMNEdge } from '~/plugins/core-designer/components/bpmn-designer/types';
-import type { ProcessInstanceNodeStatus } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
 import {
   getProcessDefinitionByKey,
   getProcessInstanceStatus,
   getProcessInstanceStatusByBusinessKey,
+  type ProcessInstanceNodeStatus,
 } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
 import { ResultHelper } from '~/utils/type';
 
@@ -209,7 +209,7 @@ export function ProcessStatusViewer({
     );
   }
 
-  const processStatus = instanceStatus?.status?.toLowerCase() as
+  const _processStatus = instanceStatus?.status?.toLowerCase() as
     | 'draft'
     | 'published'
     | 'suspended'

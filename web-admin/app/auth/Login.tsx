@@ -10,13 +10,10 @@ import {
   redirect,
 } from 'react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-
-import type { User } from '~/utils/type';
-
 import { createUserSession, getTokenFromRequest, sessionStorage } from '~/shared/services/session';
 import { safeRedirect, validateEmail } from '~/utils/utils';
 import { post, fetchResult } from '~/shared/services/http-client';
-import { ResultHelper } from '~/utils/type';
+import { ResultHelper, type User } from '~/utils/type';
 import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
 
@@ -506,7 +503,7 @@ function EmailPasswordForm({
   passwordRef,
   actionData,
   redirectTo,
-  searchParams,
+  searchParams: _searchParams,
   email,
   setEmail,
   password,

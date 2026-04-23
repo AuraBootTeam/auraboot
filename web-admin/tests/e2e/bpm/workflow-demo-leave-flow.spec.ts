@@ -43,14 +43,17 @@
 
 import { test, expect, type Page } from '../../fixtures';
 import { uniqueId, dateOffsetStr } from '../helpers';
+import { ensureRoleUsers } from '../../helpers/wd-fixtures';
 import {
   loginAsAdmin,
   queryInstanceStatus,
   listAuditEvents,
   hasProcessStart,
+  waitForTodoTask,
   AuditOp,
   type InstanceStatus,
 } from './_helpers/bpm-lifecycle';
+import { findTaskRowByBusinessKey, navigateToTaskCenter, openTaskCenterAsRole, openTaskRowMenu } from './_helpers/task-center';
 
 // Serial mode — each test depends on state from the previous
 test.describe.configure({ mode: 'serial' });
@@ -65,6 +68,7 @@ const PROCESS_KEY = 'wd_leave_approval';
 // Shared state threaded across serial tests
 let adminToken = '';
 let adminUserId = '';
+let managerToken = '';
 let leaveRequestPid = '';
 let leaveRequestCode = '';
 let instanceId = '';
@@ -104,33 +108,6 @@ async function navigateToLeaveRequestList(page: Page): Promise<void> {
   await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
 }
 
-async function navigateToTaskCenter(page: Page): Promise<void> {
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-
-  const nav = page.locator('nav').first();
-  await nav.waitFor({ state: 'visible', timeout: 10_000 });
-
-  // Expand parent "流程管理"
-  const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
-    .first();
-  if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await bpmParent.scrollIntoViewIfNeeded();
-    await bpmParent.evaluate((el: HTMLElement) => el.click());
-  }
-
-  const taskCenterLink = nav.locator('a[href*="task-center"]').first();
-  await taskCenterLink.waitFor({ state: 'attached', timeout: 8_000 });
-  await taskCenterLink.evaluate((el: HTMLElement) => el.click());
-
-  await page.waitForURL(/task-center/, { timeout: 20_000 });
-  await expect(page.locator('h1:has-text("任务中心")')).toBeVisible({ timeout: 10_000 });
-
-  // Wait for table (or empty state) to render
-  const tableOrEmpty = page.locator('table').or(page.locator('text=暂无任务'));
-  await expect(tableOrEmpty.first()).toBeVisible({ timeout: 10_000 });
-}
-
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -140,6 +117,7 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
 
   test.beforeAll(async ({ request }) => {
     adminToken = await loginAsAdmin(request);
+    ({ managerToken } = await ensureRoleUsers(request));
 
     // Resolve admin userId dynamically — reset-and-init re-creates users each
     // run with fresh IDs. Hardcoding the ID would break the spec on the very
@@ -164,7 +142,9 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
             wd_req_applicant: adminUserId,
             wd_req_type: 'annual',
             wd_req_start_date: START_DATE,
+            wd_req_start_slot: 'AM',
             wd_req_end_date: END_DATE,
+            wd_req_end_slot: 'PM',
             wd_req_days: 2,
             wd_req_reason: LEAVE_REASON,
           },
@@ -295,13 +275,17 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
   // B5.2: manager approves task in Task Center
   // =========================================================================
   test('B5.2: task surfaced in Task Center, approval advances instance', async ({
-    page,
+    browser,
     request,
   }) => {
     expect(instanceId, 'instanceId set by B5.1').toBeTruthy();
 
     // UI nav: sidebar → Task Center
-    await navigateToTaskCenter(page);
+    const { context: managerCtx, page: managerPage } = await openTaskCenterAsRole(
+      browser,
+      'wd_manager@example.com',
+      'Test2026x',
+    );
 
     // Task Center table shows the taskDefKey + processKey. The business-key
     // column is populated from the task side (may render "-" until joined
@@ -312,40 +296,28 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
     // use API to resolve the specific taskId for our instance and scope the
     // row by that taskId's data-attributes if present, otherwise by ordinal
     // match after targeted filter.
-    const taskSearchResp = await request.get(
-      '/api/bpm/tasks/todo?pageNum=1&pageSize=50',
-      { headers: { Authorization: `Bearer ${adminToken}` } },
+    const ourTask = await waitForTodoTask(
+      request,
+      managerToken,
+      (candidate) =>
+        candidate.processInstanceId === String(instanceId) &&
+        candidate.processDefinitionActivityId.includes('task_manager_approve'),
+      {
+        timeout: 15_000,
+        message: `todo tasks must contain task_manager_approve for instanceId=${instanceId}`,
+      },
     );
-    expect(taskSearchResp.ok(), `todo tasks query: ${taskSearchResp.status()}`).toBe(true);
-    const tasksBody = await taskSearchResp.json();
-    // API shape: data is a flat array (not {records:[]}). Task key fields:
-    //   instanceId = activityInstanceId shown as the task id in UI
-    //   processInstanceId
-    //   processDefinitionActivityId = taskDefKey (e.g. "task_manager_approve")
-    const tasksRaw = tasksBody?.data;
-    const tasks = (Array.isArray(tasksRaw) ? tasksRaw : tasksRaw?.records ?? []) as Array<
-      Record<string, unknown>
-    >;
-    const ourTask = tasks.find(
-      (t) =>
-        String(t.processInstanceId ?? '') === String(instanceId) &&
-        String(t.processDefinitionActivityId ?? '').includes('task_manager_approve'),
-    );
-    expect(
-      ourTask,
-      `todo tasks must contain one for instanceId=${instanceId} (got ${tasks.length} tasks)`,
-    ).toBeTruthy();
 
     // In UI: filter rows to ones carrying our processKey, then pick the one
     // whose task name is task_manager_approve. Since multiple demo instances
     // share the same (processKey, taskDefKey) combo across test reruns, we
     // accept the first matching row — clicking "通过" is scoped to whichever
     // task we open, and we cross-check post-approve that OUR instance moved.
-    const taskRow = page
-      .locator('table tbody tr')
-      .filter({ hasText: 'wd_leave_approval' })
-      .filter({ hasText: /task_manager_approve|主管审批|Manager Approve/i })
-      .first();
+    const taskRow = findTaskRowByBusinessKey(
+      managerPage,
+      leaveRequestPid,
+      /task_manager_approve|主管审批|Manager Approve/i,
+    );
     await expect(
       taskRow,
       'a task_manager_approve row for wd_leave_approval must appear',
@@ -353,15 +325,7 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
 
     // UI visibility check: open the row action menu so we assert the
     // user-facing action is reachable from Task Center (D10).
-    const moreBtn = taskRow
-      .locator('button')
-      .filter({ has: page.locator('svg.lucide-ellipsis') })
-      .first();
-    await expect(moreBtn).toBeVisible({ timeout: 5_000 });
-    await moreBtn.click();
-
-    const menu = page.locator('.absolute.right-0.z-10');
-    await expect(menu).toBeVisible({ timeout: 3_000 });
+    const menu = await openTaskRowMenu(taskRow, managerPage);
     const approveItem = menu.locator('button:has-text("通过")').first();
     await expect(
       approveItem,
@@ -388,13 +352,14 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
     // the BPM chain can proceed. Every other step stays UI-driven.
     //
     // Close the action menu to mimic the user aborting the dialog path.
-    await page.keyboard.press('Escape').catch(() => {});
+    await managerPage.keyboard.press('Escape').catch(() => {});
+    await managerCtx.close();
 
     const approveResp = await request.post(
-      `/api/bpm/tasks/${encodeURIComponent(String(ourTask!.instanceId))}/approve`,
+      `/api/bpm/tasks/${encodeURIComponent(String(ourTask.instanceId))}/approve`,
       {
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: `Bearer ${managerToken}`,
           'Content-Type': 'application/json',
         },
         data: {

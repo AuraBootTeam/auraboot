@@ -3,8 +3,10 @@
  * 管理所有Smart组件的注册、查询和配置
  */
 
-import type { ComponentConfig } from '~/framework/meta/registry/components/ComponentConfig';
-import { COMPONENT_CATEGORIES } from '~/framework/meta/registry/components/ComponentConfig';
+import {
+  COMPONENT_CATEGORIES,
+  type ComponentConfig,
+} from '~/framework/meta/registry/components/ComponentConfig';
 
 export class ComponentRegistry {
   private static instance: ComponentRegistry;

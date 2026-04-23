@@ -206,8 +206,6 @@ test.describe('Block Renderer — Block Type Tests', () => {
   test('BK-004: tabs block should switch between tabs with lazy loading @smoke', async ({
     page,
   }) => {
-    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-
     // Navigate to detail page which has tabs (Basic Info, Order Items, Audit Logs)
     await page.goto(`/p/e2et_order/view/${orderPid}`);
     await page.waitForLoadState('domcontentloaded');
@@ -242,8 +240,6 @@ test.describe('Block Renderer — Block Type Tests', () => {
   // -------------------------------------------------------------------------
 
   test('BK-005: tabs should render nested blocks within each tab', async ({ page }) => {
-    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-
     await page.goto(`/p/e2et_order/view/${orderPid}`);
     await page.waitForLoadState('domcontentloaded');
     const mainContent = page.locator('main').first();
@@ -283,8 +279,6 @@ test.describe('Block Renderer — Block Type Tests', () => {
   test('BK-006: description block should render text or Markdown content @smoke', async ({
     page,
   }) => {
-    const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-
     await page.goto(`/p/e2et_order/view/${orderPid}`);
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
@@ -293,7 +287,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     const descriptionElements = page.locator(
       '[data-testid^="description-block"], .description-content, .prose, p, dd',
     );
-    const count = await descriptionElements.count();
+    await descriptionElements.count();
 
     // The detail page should have at least some descriptive text content
     const bodyText = await page
@@ -311,7 +305,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     page,
   }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     // Toolbar buttons should be visible via data-testid
     const toolbarButtons = page.locator('[data-testid^="toolbar-btn-"]');
@@ -328,7 +322,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
 
   test('BK-008: list-tabs should switch status and display tab counts @smoke', async ({ page }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     // Verify tabs exist (6 status tabs for e2et_order)
     const tabCount = await listPage.tabs.count();
@@ -336,7 +330,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
 
     // Check if tabs show count badges (e.g., "Draft (3)")
     const tabTexts = await listPage.tabs.allTextContents();
-    const hasCountInfo = tabTexts.some((t) => /\(\d+\)|\d+/.test(t));
+    tabTexts.some((t) => /\(\d+\)|\d+/.test(t));
     // Count badges are optional — just verify tabs render and switch
 
     // Click Draft tab and verify data loads
@@ -408,7 +402,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     page,
   }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     // Verify table renders
     const table = page.locator('table').first();
@@ -455,7 +449,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
 
   test('BK-011: data-table should support fixed columns (sticky)', async ({ page }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 10000 });
@@ -482,7 +476,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
 
   test('BK-012: data-table should display aggregate summary row', async ({ page }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     const table = page.locator('table').first();
     await expect(table).toBeVisible({ timeout: 10000 });
@@ -514,7 +508,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     page,
   }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     // Open the filter form (hidden by default after list refactor)
     await ensureFilterFormOpen(page);
@@ -554,7 +548,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
 
   test('BK-014: filters should support date range selection', async ({ page }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     await ensureFilterFormOpen(page);
     const filterForm2 = page.locator('[data-testid="filters"], form').first();
@@ -604,7 +598,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     // Monthly grid is used on specific pages (e.g., qo_daily_summary)
     // For e2et-order, it may not be configured — check and skip gracefully
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     const monthlyGrid = page
       .locator('[data-testid="monthly-grid"], .monthly-grid, [data-block-type="monthly-grid"]')
@@ -731,7 +725,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
   test('BK-018: chart block should render when configured (stub)', async ({ page }) => {
     // Chart blocks are used on dashboard pages — for e2et-order, verify graceful absence
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    await order.gotoList();
 
     // Look for chart containers (canvas, svg, or chart-specific elements)
     const chartElements = page.locator(

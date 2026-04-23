@@ -60,7 +60,7 @@ export function InlineApprovalPanel({ recordPid, className }: InlineApprovalPane
       try {
         const result = await get<ProcessInstanceStatusDTO>(
           '/api/bpm/process-instances/by-business-key/status',
-          { params: { businessKey: recordPid } },
+          { businessKey: recordPid },
         );
 
         if (!cancelled) {

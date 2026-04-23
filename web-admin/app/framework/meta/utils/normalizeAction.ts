@@ -10,6 +10,7 @@ const BUILTIN_CODES = new Set([
   'view',
   'delete',
   'back',
+  'cancel',
   'noop',
 ]);
 

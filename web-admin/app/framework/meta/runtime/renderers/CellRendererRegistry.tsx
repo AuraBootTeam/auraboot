@@ -263,7 +263,7 @@ const TAG_COLOR_CLASSES: Record<string, string> = {
   cyan: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-800 dark:text-cyan-100',
 };
 
-cellRendererRegistry.register('tag', ({ value, column }) => {
+cellRendererRegistry.register('tag', ({ value, column, locale, t }) => {
   if (!value) return null;
 
   // Support tagMap format: { "value": { "label": "Display", "color": "green" } }
@@ -280,7 +280,7 @@ cellRendererRegistry.register('tag', ({ value, column }) => {
           label:
             typeof entry.label === 'string'
               ? entry.label
-              : getLocalizedText(entry.label, locale),
+              : getLocalizedText(entry.label, locale, t),
           color: entry.color || 'gray',
         };
       }

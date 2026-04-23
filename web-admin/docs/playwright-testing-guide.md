@@ -93,6 +93,27 @@ tests/
 | `test-data/` | Static test data definitions | `TEST_USERS` |
 | `storage/` | Cached auth state | `admin.json` |
 
+### 2.2 Page Designer Regression Layers
+
+当前 `page-designer` 已收敛为 8 个稳定回归入口，不再包含历史 V2/composite/list-canvas 套件。
+
+| Layer | Specs |
+|-------|-------|
+| `smoke` | `tests/e2e/page-designer/load-existing-page.spec.ts` |
+| `smoke` | `tests/e2e/page-designer/field-properties.spec.ts` |
+| `smoke` | `tests/e2e/page-designer/smart-components.spec.ts` |
+| `critical` | `tests/e2e/page-designer/page-designer-full-lifecycle.spec.ts` |
+| `critical` | `tests/e2e/page-designer/designer-toolbar-permissions.spec.ts` |
+| `deep` | `tests/e2e/page-designer/designer-deep-operations.spec.ts` |
+| `deep` | `tests/e2e/page-designer/custom-page-designer.spec.ts` |
+| `deep` | `tests/e2e/studio/ai-page-gen.spec.ts` |
+
+不再建议保留或恢复下列类型的 page-designer 旧 spec：
+
+1. 仍把 `chart` / `table` / `toolbar` / `sub-table` 当成当前 form designer 主 block 契约。
+2. 依赖已删除的 V2/composite workbench 或 list canvas。
+3. 只做“按钮存在/面板可见”的低信号重复覆盖。
+
 ---
 
 ## 3. Fixtures Usage
@@ -237,6 +258,36 @@ test('can delete a model', async ({ page, api }) => {
 ## 5. Login State Management (storageState)
 
 ### 5.1 How It Works
+
+---
+
+## 6. Page Designer Commands
+
+Page Designer 回归不要再手写长文件列表，统一使用 `package.json` 中的专用脚本：
+
+```bash
+cd /Users/ghj/work/auraboot/auraboot/web-admin
+
+pnpm test:page-designer
+pnpm test:page-designer:smoke
+pnpm test:page-designer:critical
+pnpm test:page-designer:deep
+```
+
+说明：
+
+1. `test:page-designer` 跑完整 page-designer 回归集。
+2. `test:page-designer:smoke` 覆盖入口、属性面板、组件库基础行为。
+3. `test:page-designer:critical` 覆盖主闭环和权限门禁。
+4. `test:page-designer:deep` 使用 `PW_WORKERS=1` 和更长超时，避免 deep 套件单独运行时出现设计器加载假红。
+
+推荐日常顺序：
+
+```bash
+pnpm test:page-designer:smoke
+pnpm test:page-designer:critical
+pnpm test:page-designer:deep
+```
 
 1. **auth setup project (`tests/auth.setup.ts`)** runs first
 2. Performs real login (API first, UI fallback)

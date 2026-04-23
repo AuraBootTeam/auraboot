@@ -5,16 +5,15 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { useNavigate, useLoaderData } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
-import { namedQueryService } from '~/shared/services/namedQueryService';
+import { useNavigate, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
-import type {
-  NamedQueryDTO,
-  NamedQueryQueryRequest,
-  PageResult,
-  NamedQueryStatusType,
+import {
+  namedQueryService,
+  type NamedQueryDTO,
+  type NamedQueryQueryRequest,
+  type PageResult,
+  type NamedQueryStatusType,
 } from '~/shared/services/namedQueryService';
 
 /**
@@ -317,14 +316,6 @@ export default function NamedQueryListPage() {
       ],
     };
     return transitions[query.status] || [];
-  };
-
-  /**
-   * Truncate SQL text
-   */
-  const truncateSql = (sql: string, maxLen: number = 50) => {
-    if (!sql) return '-';
-    return sql.length > maxLen ? sql.substring(0, maxLen) + '...' : sql;
   };
 
   return (

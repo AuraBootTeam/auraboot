@@ -62,16 +62,11 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   const fieldMeta = stateManager.getFieldMeta(scopeId, field.field);
 
   // Visibility: fieldMeta.hidden takes priority over visibleWhen
-  // Note: depend on JSON-stringified record (not context object identity) so
-  // visibleWhen re-evaluates when record fields mutate in place (B18).
-  const recordKey = JSON.stringify(context?.record ?? null);
   const visible = useMemo(() => {
     if (fieldMeta?.hidden === true) return false;
     if (!field.visibleWhen) return true;
     return evaluateCondition(field.visibleWhen, context);
-  }, [fieldMeta?.hidden, field.visibleWhen, recordKey]);
-
-  if (!visible) return null;
+  }, [fieldMeta?.hidden, field.visibleWhen, context]);
 
   // 从 SchemaRuntime 获取字段值
   const value = stateManager.getFieldValue(scopeId, field.field);
@@ -176,6 +171,8 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
       })),
     } satisfies DataSourceConfig;
   }, [field.dataSource, localizeText]);
+
+  if (!visible) return null;
 
   const componentProps: Record<string, any> = {
     name: field.field,

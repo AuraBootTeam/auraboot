@@ -155,7 +155,7 @@ function CompactStepperRow({
 function StepNode({
   step,
   index,
-  currentIndex,
+  currentIndex: _currentIndex,
   onStepClick,
   compact = false,
 }: {

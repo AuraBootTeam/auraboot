@@ -13,9 +13,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
-import { useLoaderData } from 'react-router';
+import {
+  useLocation,
+  useNavigate,
+  useLoaderData,
+  type LoaderFunctionArgs,
+} from 'react-router';
 import { getTokenFromRequest } from '~/shared/services/session';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
@@ -55,13 +58,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function CatchAllRoute() {
-  const { path, token } = useLoaderData<LoaderData>();
+  const { path: _path, token } = useLoaderData<LoaderData>();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [menuInfo, setMenuInfo] = useState<MenuInfo | null>(null);
+  const [_menuInfo, setMenuInfo] = useState<MenuInfo | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [renderPage, setRenderPage] = useState<{
     tableName: string;

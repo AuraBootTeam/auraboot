@@ -16,6 +16,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { ChartEmptyState } from './ChartEmptyState';
 
 /**
  * Props for SmartBarChart component
@@ -124,6 +125,7 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
     refreshInterval,
     enabled: isConfigured,
   });
+  const isEmpty = !loading && !error && !data?.rows?.length;
 
   /**
    * Handle chart click events for drill-down and linkage
@@ -309,6 +311,17 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
           <div className="text-sm text-gray-500">{error.message}</div>
         </div>
       </div>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <ChartEmptyState
+        title={title || 'No bar data yet'}
+        description="This chart will render once the first matching records are created."
+        variant="bar"
+        className={className}
+      />
     );
   }
 

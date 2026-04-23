@@ -6,7 +6,7 @@
  * @since 3.2.0
  */
 
-import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 
 /**
  * Performance metric
@@ -280,7 +280,7 @@ export function usePerformance(options: UsePerformanceOptions = {}): UsePerforma
  *
  * Track component render timing.
  */
-export function useRenderTiming(componentName: string): RenderTiming {
+export function useRenderTiming(_componentName: string): RenderTiming {
   const renderCountRef = useRef(0);
   const renderStartRef = useRef(0);
   const durationsRef = useRef<number[]>([]);
@@ -316,7 +316,7 @@ export function useRenderTiming(componentName: string): RenderTiming {
       maxRenderDuration: max,
       renderDurations: [...durations],
     });
-  });
+  }, []);
 
   return timing;
 }

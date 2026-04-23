@@ -47,8 +47,10 @@ async function navigateToShowcaseList(page: Page): Promise<void> {
   const nav = page.locator('nav');
   await nav.first().waitFor({ state: 'visible', timeout: 10_000 });
 
-  // Click parent menu "Showcase / 能力展示"
-  const rootBtn = nav.getByRole('button', { name: /Showcase|能力展示|展示/i }).first();
+  // Click parent menu "Field Showcase / 字段展示"
+  const rootBtn = nav
+    .getByRole('button', { name: /Field Showcase|Showcase|字段展示|能力展示|展示/i })
+    .first();
   await rootBtn.scrollIntoViewIfNeeded();
   await rootBtn.evaluate((el: HTMLElement) => el.click());
 

@@ -9,23 +9,56 @@ import { useNavigate } from 'react-router';
 import { Button } from '~/ui/ui/button';
 import { Input } from '~/ui/ui/input';
 import { Search, RefreshCw, CheckCheck, XCircle } from 'lucide-react';
-import { useTaskCenter } from '../hooks/useTaskCenter';
-import type { TabId } from '../hooks/useTaskCenter';
-import type { ProcessInstance } from '../services/bpmWorkbenchService';
+import { useTaskCenter, type TabId } from '../hooks/useTaskCenter';
+import type { ProcessInstance, TaskInstance } from '../services/bpmWorkbenchService';
 import { TaskStatsCards } from './TaskStatsCards';
 import { TaskTable } from './TaskTable';
 import { ProcessTable } from './ProcessTable';
 import { TaskActionDialogs } from './TaskActionDialogs';
-import { TaskDetailDrawer } from './TaskDetailDrawer';
 import { NotifyPanel } from './NotifyPanel';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useAuth } from '~/contexts/AuthContext';
 import * as notifyService from '../services/bpmNotifyService';
+import * as bpmFormService from '../services/bpmFormService';
 
 // ==================== Stable constants ====================
 
 const EMPTY_SET = new Set<string>();
 const NOOP = () => {};
+
+export function deriveTaskDetailModelSegment(formRef?: string | null): string | null {
+  const normalized = formRef?.trim();
+  if (!normalized) return null;
+  if (normalized.endsWith('_detail')) return normalized.slice(0, -'_detail'.length);
+  if (normalized.endsWith('_form')) return normalized.slice(0, -'_form'.length);
+  return null;
+}
+
+export function resolveTaskDetailPath(input: {
+  formRef?: string | null;
+  businessKey?: string | null;
+  processInstanceId?: string | null;
+  processDefinitionKey?: string | null;
+}): string | null {
+  const modelSegment = deriveTaskDetailModelSegment(input.formRef);
+  const businessKey = input.businessKey?.trim();
+  if (modelSegment && businessKey) {
+    return `/p/${encodeURIComponent(modelSegment)}/view/${encodeURIComponent(businessKey)}`;
+  }
+  const processInstanceId = input.processInstanceId?.trim();
+  if (processInstanceId) {
+    return `/bpm/process-status?processInstanceId=${encodeURIComponent(processInstanceId)}`;
+  }
+  if (businessKey) {
+    const params = new URLSearchParams({ businessKey });
+    const processKey = input.processDefinitionKey?.trim();
+    if (processKey) {
+      params.set('processKey', processKey);
+    }
+    return `/bpm/process-status?${params.toString()}`;
+  }
+  return null;
+}
 
 // ==================== Main Component ====================
 
@@ -50,6 +83,36 @@ export function TaskCenter() {
       tc.openDialog('terminate', undefined, process);
     },
     [tc.openDialog],
+  );
+
+  const handleOpenTaskDetail = useCallback(
+    async (task: TaskInstance) => {
+      let formRef: string | null | undefined;
+      let businessKey = task.businessKey;
+
+      try {
+        const formData = await bpmFormService.getTaskForm(task.taskId);
+        formRef = formData.formBinding?.formRef;
+        businessKey = formData.businessKey || businessKey;
+      } catch {
+        // Fall through to process-status when task form metadata is unavailable.
+      }
+
+      const target = resolveTaskDetailPath({
+        formRef,
+        businessKey,
+        processInstanceId: task.processInstanceId,
+        processDefinitionKey: task.processDefinitionKey,
+      });
+
+      if (!target) {
+        showErrorToast('无法打开详情页');
+        return;
+      }
+
+      navigate(target);
+    },
+    [navigate, showErrorToast],
   );
 
   // Urge handler (wraps tc.urgeTask with currentUserId)
@@ -175,7 +238,7 @@ export function TaskCenter() {
               onSelectAll={tc.handleSelectAll}
               onOpenDialog={tc.openDialog}
               onClaim={tc.claimTask}
-              onOpenDetail={tc.openDetail}
+              onOpenDetail={handleOpenTaskDetail}
               onUrge={handleUrge}
               slaWarningTaskIds={tc.slaWarningTaskIds}
             />
@@ -189,7 +252,7 @@ export function TaskCenter() {
               onSelectAll={NOOP}
               onOpenDialog={NOOP}
               onClaim={NOOP}
-              onOpenDetail={tc.openDetail}
+              onOpenDetail={handleOpenTaskDetail}
               showActions={false}
               showCheckbox={false}
             />
@@ -223,14 +286,6 @@ export function TaskCenter() {
         onRemoveSign={tc.removeSign}
         onRollback={tc.rollbackTask}
         onCarbonCopy={handleCarbonCopy}
-      />
-
-      {/* Detail Drawer */}
-      <TaskDetailDrawer
-        task={tc.detailTask}
-        onClose={tc.closeDetail}
-        onOpenDialog={tc.openDialog}
-        onClaim={tc.claimTask}
       />
     </div>
   );

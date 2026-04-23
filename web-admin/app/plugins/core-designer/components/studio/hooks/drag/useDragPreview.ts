@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useDndMonitor } from '@dnd-kit/core';
-import { DragPreviewSystem } from '~/plugins/core-designer/components/studio/services/layout/drag-preview/DragPreviewSystem';
 import type { ComponentSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
-import type {
+import {
+  DragPreviewSystem,
   DragPreviewConfig,
   GhostEffectConfig,
 } from '~/plugins/core-designer/components/studio/services/layout/drag-preview/DragPreviewSystem';
@@ -101,7 +101,7 @@ export const useDragPreview = (options: UseDragPreviewOptions = {}) => {
       onDragStart?.(component, element);
     },
 
-    onDragMove(event) {
+    onDragMove(_event) {
       if (!enabled || !previewSystemRef.current) return;
 
       const state = previewSystemRef.current.getState();

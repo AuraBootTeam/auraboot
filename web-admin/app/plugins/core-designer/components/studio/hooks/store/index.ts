@@ -73,7 +73,7 @@ export function useStateHistory() {
     updateHistoryStatus();
 
     // 监听状态变化
-    const unsubscribe = stateManager.on('stateChange', updateHistoryStatus);
+    stateManager.on('stateChange', updateHistoryStatus);
     return () => stateManager.off('stateChange', updateHistoryStatus);
   }, [stateManager]);
 
@@ -351,7 +351,7 @@ export function useStateDebug(enabled: boolean = process.env.NODE_ENV === 'devel
       }));
     };
 
-    const unsubscribe = stateManager.on('stateChange', handleStateChange);
+    stateManager.on('stateChange', handleStateChange);
     return () => stateManager.off('stateChange', handleStateChange);
   }, [stateManager, enabled]);
 

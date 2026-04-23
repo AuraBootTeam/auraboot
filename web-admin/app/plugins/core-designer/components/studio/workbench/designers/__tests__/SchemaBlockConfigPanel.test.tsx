@@ -1,13 +1,18 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   SchemaBlockConfigPanel,
   type ExtendedPropertySchema,
 } from '../SchemaBlockConfigPanel';
 
 describe('SchemaBlockConfigPanel', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   const schemas: ExtendedPropertySchema<string>[] = [
     { key: 'name', label: 'Name', type: 'text', group: 'Basic' },
+    { key: 'icon', label: 'Icon', type: 'icon', group: 'Basic' },
     {
       key: 'mode',
       label: 'Mode',
@@ -35,56 +40,62 @@ describe('SchemaBlockConfigPanel', () => {
   ];
 
   it('hides field when dependsOn condition not met', () => {
-    render(
+    const { queryByTestId } = render(
       <SchemaBlockConfigPanel
         schemas={schemas}
         value={{ mode: 'c' }}
         onChange={vi.fn()}
       />,
     );
-    expect(screen.queryByText('Extra')).not.toBeInTheDocument();
-    expect(screen.queryByText('Multi')).not.toBeInTheDocument();
+    expect(queryByTestId('schema-config-field-extra')).not.toBeInTheDocument();
+    expect(queryByTestId('schema-config-field-multi')).not.toBeInTheDocument();
   });
 
   it('shows field when dependsOn.value matches', () => {
-    render(
+    const { getByTestId } = render(
       <SchemaBlockConfigPanel
         schemas={schemas}
         value={{ mode: 'a' }}
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getByText('Extra')).toBeInTheDocument();
+    expect(getByTestId('schema-config-field-extra')).toBeInTheDocument();
   });
 
   it('shows field when dependsOn.anyOf includes value', () => {
-    render(
+    const { queryByTestId, getByTestId } = render(
       <SchemaBlockConfigPanel
         schemas={schemas}
         value={{ mode: 'b' }}
         onChange={vi.fn()}
       />,
     );
-    expect(screen.queryByText('Extra')).not.toBeInTheDocument(); // value: 'a' not matched
-    expect(screen.getByText('Multi')).toBeInTheDocument(); // anyOf includes 'b'
+    expect(queryByTestId('schema-config-field-extra')).not.toBeInTheDocument();
+    expect(getByTestId('schema-config-field-multi')).toBeInTheDocument();
   });
 
   it('renders group headings for grouped schemas', () => {
-    render(
+    const { getByTestId } = render(
       <SchemaBlockConfigPanel schemas={schemas} value={{}} onChange={vi.fn()} />,
     );
-    expect(screen.getByText('Basic')).toBeInTheDocument();
+    expect(getByTestId('schema-config-group-Basic')).toBeInTheDocument();
+  });
+
+  it('renders icon picker fields through the shared schema renderer', () => {
+    const { getByTestId } = render(
+      <SchemaBlockConfigPanel schemas={schemas} value={{}} onChange={vi.fn()} />,
+    );
+    expect(getByTestId('schema-config-field-icon')).toBeInTheDocument();
   });
 
   it('hides entire group when all its schemas are dependsOn-hidden', () => {
-    render(
+    const { queryByTestId } = render(
       <SchemaBlockConfigPanel
         schemas={schemas}
         value={{ mode: 'c' }}
         onChange={vi.fn()}
       />,
     );
-    // Both Advanced-group schemas depend on mode being 'a' or ['a','b']
-    expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
+    expect(queryByTestId('schema-config-group-Advanced')).not.toBeInTheDocument();
   });
 });

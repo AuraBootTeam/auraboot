@@ -142,7 +142,7 @@ function mapWorkbenchData(raw: Record<string, unknown>): WorkbenchData {
  */
 export async function getWorkbench(userId?: string): Promise<WorkbenchData> {
   const params = userId ? { userId } : {};
-  const result = await get<Record<string, unknown>>('/api/bpm/workbench', { params });
+  const result = await get<Record<string, unknown>>('/api/bpm/workbench', params);
   if (!isSuccess(result.code) || !result.data) {
     throw new Error(result.desc || 'Failed to get workbench data');
   }
@@ -154,7 +154,7 @@ export async function getWorkbench(userId?: string): Promise<WorkbenchData> {
  */
 export async function getTodoTasks(userId?: string): Promise<TaskInstance[]> {
   const params = userId ? { userId } : {};
-  const result = await get<Record<string, unknown>[]>('/api/bpm/tasks/todo', { params });
+  const result = await get<Record<string, unknown>[]>('/api/bpm/tasks/todo', params);
   if (!isSuccess(result.code) || !result.data) {
     throw new Error(result.desc || 'Failed to get todo tasks');
   }
@@ -166,7 +166,7 @@ export async function getTodoTasks(userId?: string): Promise<TaskInstance[]> {
  */
 export async function getCompletedTasks(userId?: string): Promise<TaskInstance[]> {
   const params = userId ? { userId } : {};
-  const result = await get<Record<string, unknown>[]>('/api/bpm/tasks/completed', { params });
+  const result = await get<Record<string, unknown>[]>('/api/bpm/tasks/completed', params);
   if (!isSuccess(result.code) || !result.data) {
     throw new Error(result.desc || 'Failed to get completed tasks');
   }
@@ -341,7 +341,7 @@ export async function getProcessDetail(processInstanceId: string): Promise<Proce
  */
 export async function getStartedProcesses(userId?: string): Promise<ProcessInstance[]> {
   const params = userId ? { userId } : {};
-  const result = await get<ProcessInstance[]>('/api/bpm/process-instances', { params });
+  const result = await get<ProcessInstance[]>('/api/bpm/process-instances', params);
   if (!isSuccess(result.code) || !result.data) {
     throw new Error(result.desc || 'Failed to get started processes');
   }
@@ -672,20 +672,23 @@ export async function getInstanceForRecord(
   if (processKey) {
     params.processKey = processKey;
   }
-  const result = await get<BpmInstanceForRecord>(
-    '/api/bpm/process-instances/by-business-key/status',
-    { params },
-  );
+  const result = await get<BpmInstanceForRecord>('/api/bpm/process-instances/by-business-key/status', params);
   if (isSuccess(result.code)) {
     return result.data ?? null;
   }
   // Backend throws BadParam when instance is absent; translate to null instead
   // of an error so the UI can render an empty state.
-  const desc = result.desc || '';
-  if (desc.includes('not found')) {
+  const diagnostic = [
+    result.desc || '',
+    result.message || '',
+    typeof result.context === 'string' ? result.context : JSON.stringify(result.context ?? {}),
+  ]
+    .join(' ')
+    .toLowerCase();
+  if (result.code === '35000' || diagnostic.includes('not found')) {
     return null;
   }
-  throw new Error(desc || 'Failed to get process instance for record');
+  throw new Error(result.desc || result.message || 'Failed to get process instance for record');
 }
 
 /**

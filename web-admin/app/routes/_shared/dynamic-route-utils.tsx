@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
+import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
 
 // 导入并重新导出统一的 i18n 实现
 import {
@@ -16,6 +17,42 @@ import {
 
 // 重新导出供外部使用
 export { getLocalizedText, type LocalizedText, type TranslatableText, type TranslateFunction };
+
+function parseMemberPickerValue(value: unknown, multiple: boolean): string | string[] | undefined {
+  if (value == null || value === '') return undefined;
+
+  if (Array.isArray(value)) {
+    const ids = value
+      .map((item) => String(item ?? '').trim())
+      .filter(Boolean);
+    return multiple ? ids : ids[0];
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          const ids = parsed
+            .map((item) => String(item ?? '').trim())
+            .filter(Boolean);
+          return multiple ? ids : ids[0];
+        }
+      } catch {
+        // Ignore malformed persisted payloads and fall back to raw string display.
+      }
+    }
+
+    return multiple ? [trimmed] : trimmed;
+  }
+
+  const normalized = String(value).trim();
+  if (!normalized) return undefined;
+  return multiple ? [normalized] : normalized;
+}
 
 /**
  * Build API endpoint with table name
@@ -87,6 +124,18 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
   const renderField = () => {
     // Read-only display
     if (readOnly) {
+      if (componentType === 'memberpicker') {
+        const memberValue = parseMemberPickerValue(value, Boolean(field.props?.multiple));
+        return (
+          <MemberPicker
+            value={memberValue}
+            multiple={Boolean(field.props?.multiple)}
+            readOnly
+            className="py-1"
+          />
+        );
+      }
+
       // 1. Dict field with color tag
       if (field.dictCode && getDictItems) {
         const items = getDictItems(field.dictCode);

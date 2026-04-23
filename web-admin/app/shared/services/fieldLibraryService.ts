@@ -3,7 +3,7 @@
  * Handles field library, usage tracking, and impact analysis API operations
  */
 
-import { get, post, put, del } from '~/shared/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type {
   FieldSearchRequest,
@@ -13,7 +13,6 @@ import type {
   FieldImpactAnalysis,
   BindingConfiguration,
   MetaFieldDTO,
-  PageResult,
 } from '~/types/fieldLibrary';
 
 /**

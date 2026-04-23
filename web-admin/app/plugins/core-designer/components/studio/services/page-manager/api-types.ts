@@ -79,7 +79,8 @@ export interface PageSchemaCreateRequest {
  */
 export interface PageSchemaUpdateRequest {
   name?: string;
-  title?: string;
+  pageKey?: string;
+  title?: string | Record<string, string>;
   description?: string;
   kind?: ApiPageType;
   blocks?: unknown[];

@@ -29,7 +29,14 @@
  * @since BPM closure spec 1 (Task 12)
  */
 import { useEffect, useState } from 'react';
-import { ReactFlow, Controls, Background, type NodeTypes } from '@xyflow/react';
+import {
+  ReactFlow,
+  Controls,
+  Background,
+  useNodesInitialized,
+  useReactFlow,
+  type NodeTypes,
+} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { getProcessDefinitionByKey } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
@@ -75,6 +82,21 @@ const nodeTypes: NodeTypes = {
   inclusiveGateway: BpmDiagramNode,
   callActivity: BpmDiagramNode,
 };
+
+function DiagramViewportSync({ nodeCount }: { nodeCount: number }) {
+  const nodesInitialized = useNodesInitialized();
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    if (!nodesInitialized || nodeCount === 0) return;
+    const frame = window.requestAnimationFrame(() => {
+      void fitView({ padding: 0.24, duration: 0 });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [fitView, nodeCount, nodesInitialized]);
+
+  return null;
+}
 
 export function BpmDiagramSection({ instance, t }: BpmDiagramSectionProps) {
   const [definition, setDefinition] = useState<BPMNProcessDefinition | null>(null);
@@ -182,8 +204,12 @@ export function BpmDiagramSection({ instance, t }: BpmDiagramSectionProps) {
         elementsSelectable={false}
         panOnDrag={true}
         zoomOnScroll={true}
+        minZoom={0.2}
+        maxZoom={1.5}
         fitView
+        fitViewOptions={{ padding: 0.24 }}
       >
+        <DiagramViewportSync nodeCount={annotatedNodes.length} />
         <Controls showInteractive={false} />
         <Background />
       </ReactFlow>

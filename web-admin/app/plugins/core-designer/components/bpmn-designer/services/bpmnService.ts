@@ -63,11 +63,74 @@ interface UpdateProcessRequest {
 
 // ==================== DTO Mapping ====================
 
+function localeCandidates(): string[] {
+  const rawLocale =
+    typeof navigator !== 'undefined' && typeof navigator.language === 'string'
+      ? navigator.language
+      : 'zh-CN';
+  const baseLocale = rawLocale.split('-')[0];
+
+  return Array.from(
+    new Set([rawLocale, baseLocale, 'zh-CN', 'zh', 'en-US', 'en'].filter(Boolean)),
+  );
+}
+
+export function resolveLocalizedField(
+  record: Record<string, unknown> | null | undefined,
+  baseKey: string,
+): string | undefined {
+  if (!record) return undefined;
+
+  const direct = record[baseKey];
+  if (typeof direct === 'string' && direct.trim()) {
+    return direct;
+  }
+
+  for (const locale of localeCandidates()) {
+    const value = record[`${baseKey}:${locale}`];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeNode(node: Record<string, any>) {
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  const label =
+    resolveLocalizedField(data, 'label') ??
+    resolveLocalizedField((data.config ?? null) as Record<string, unknown> | null, 'name') ??
+    String(node.id ?? '');
+
+  return {
+    ...node,
+    data: {
+      ...data,
+      label,
+    },
+  };
+}
+
+function normalizeEdge(edge: Record<string, any>) {
+  const data = (edge.data ?? {}) as Record<string, unknown>;
+  const label = resolveLocalizedField(data, 'label');
+
+  return {
+    ...edge,
+    ...(label ? { label } : {}),
+    data: {
+      ...data,
+      ...(label ? { label } : {}),
+    },
+  };
+}
+
 /**
  * Map backend DTO to frontend BPMNProcessDefinition type.
  * Parses designerJson from the backend extension field to restore nodes/edges.
  */
-function toFrontend(dto: ProcessDefinitionDTO): BPMNProcessDefinition {
+export function toFrontend(dto: ProcessDefinitionDTO): BPMNProcessDefinition {
   let nodes: BPMNProcessDefinition['nodes'] = [];
   let edges: BPMNProcessDefinition['edges'] = [];
   let aura: BPMNProcessDefinition['aura'];
@@ -75,8 +138,8 @@ function toFrontend(dto: ProcessDefinitionDTO): BPMNProcessDefinition {
   if (dto.designerJson) {
     try {
       const parsed = JSON.parse(dto.designerJson);
-      nodes = parsed.nodes || [];
-      edges = parsed.edges || [];
+      nodes = Array.isArray(parsed.nodes) ? parsed.nodes.map(normalizeNode) : [];
+      edges = Array.isArray(parsed.edges) ? parsed.edges.map(normalizeEdge) : [];
       // Restore process-level AuraBoot policies if present.
       if (parsed.aura && typeof parsed.aura === 'object') aura = parsed.aura;
     } catch {

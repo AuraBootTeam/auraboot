@@ -49,13 +49,16 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
+import { createLeaveApplicant, ensureRoleUsers } from '../../helpers/wd-fixtures';
 import {
   AuditOp,
   listAuditEvents,
   loginAsAdmin,
   queryInstanceStatus,
+  waitForTodoTask,
   undeployProcess,
 } from './_helpers/bpm-lifecycle';
+import { navigateToTaskCenter, openTaskCenterAsRole } from './_helpers/task-center';
 
 // ---------------------------------------------------------------------------
 // Serial mode — shared state (processPid is produced by G1 and reused by G5)
@@ -89,6 +92,10 @@ const LEAVE_END_DATE = dateOffsetStr(15);
 let processPid = '';
 let adminToken = '';
 let adminUserId = '';
+let adminEmail = '';
+let managerToken = '';
+let leaveApplicantUserId = '';
+let leaveApplicantEmail = '';
 // G2 → G3 → G4 threading
 let leaveRequestPid = '';
 let leaveRequestCode = '';
@@ -158,29 +165,6 @@ async function navigateToLeaveRequestList(page: Page): Promise<void> {
 }
 
 /** Expand 流程管理 → click "任务中心" leaf. */
-async function navigateToTaskCenter(page: Page): Promise<void> {
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-  const nav = page.locator('nav').first();
-  await nav.waitFor({ state: 'visible', timeout: 10_000 });
-
-  const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
-    .first();
-  if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await bpmParent.scrollIntoViewIfNeeded();
-    await bpmParent.evaluate((el: HTMLElement) => el.click());
-  }
-
-  const taskCenterLink = nav.locator('a[href*="task-center"]').first();
-  await taskCenterLink.waitFor({ state: 'attached', timeout: 8_000 });
-  await taskCenterLink.evaluate((el: HTMLElement) => el.click());
-
-  await page.waitForURL(/task-center/, { timeout: 20_000 });
-  await expect(page.locator('h1:has-text("任务中心")')).toBeVisible({ timeout: 10_000 });
-  const tableOrEmpty = page.locator('table').or(page.locator('text=暂无任务'));
-  await expect(tableOrEmpty.first()).toBeVisible({ timeout: 10_000 });
-}
-
 /**
  * Choose a value from a Radix Select rendered by SmartSelect.
  * SmartSelect trigger has testid `select-trigger-{name}`; options render
@@ -379,6 +363,7 @@ test.describe(
 
     test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
       adminToken = await loginAsAdmin(request);
+      ({ managerToken } = await ensureRoleUsers(request));
 
       // Resolve admin userId dynamically — reset-and-init re-creates users each
       // run with fresh pids, so hardcoding would break on next rebuild.
@@ -393,7 +378,15 @@ test.describe(
       // reference field stores that same pid. Mixing the two ID systems
       // would leave the MemberPicker option testid lookup empty.
       adminUserId = String(meBody?.data?.user?.pid ?? meBody?.data?.user?.id ?? '');
+      adminEmail = String(meBody?.data?.user?.email ?? '');
       expect(adminUserId, '/me must return a user pid').toBeTruthy();
+      expect(adminEmail, '/me must return an email').toBeTruthy();
+
+      const applicant = await createLeaveApplicant(request, adminToken, `ufs_leave_${TS}`);
+      leaveApplicantUserId = applicant.userId;
+      leaveApplicantEmail = applicant.email;
+      expect(leaveApplicantUserId, 'fixture applicant userId must be created').toBeTruthy();
+      expect(leaveApplicantEmail, 'fixture applicant email must be created').toBeTruthy();
     });
 
     // =======================================================================
@@ -571,7 +564,7 @@ test.describe(
     // G2: UI-driven create→submit path starts wd_leave_approval instance.
     //
     // Pure-UI path: sidebar nav → 我的申请 list → 新建请假 toolbar button →
-    // wd_leave_request_form → MemberPicker (applicant) + SmartSelect (type) +
+    // wd_leave_request_form → MemberPicker (applicant/cc) + SmartSelect (type) +
     // DatePicker (start/end) + SmartNumber (days) + SmartTextArea (reason) →
     // Save → list refresh → row action menu → 执行 → confirm dialog.
     //
@@ -585,110 +578,35 @@ test.describe(
       page,
       request,
     }) => {
+      // Full UI create-path coverage lives in workflow-demo/wd-leave-form-page.spec.ts.
+      // This lifecycle spec now seeds only the draft record through the public
+      // command API, then keeps the actual submit/start-process interaction UI-driven.
+      const createResp = await request.post('/api/meta/commands/execute/wd:create_leave_request', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+        data: {
+          payload: {
+            wd_req_applicant: leaveApplicantUserId,
+            wd_req_type: 'annual',
+            wd_req_start_date: LEAVE_START_DATE,
+            wd_req_start_slot: 'AM',
+            wd_req_end_date: LEAVE_END_DATE,
+            wd_req_end_slot: 'PM',
+            wd_req_days: 2,
+            wd_req_reason: LEAVE_REASON,
+            wd_req_cc_users: JSON.stringify([leaveApplicantUserId]),
+          },
+          operationType: 'create',
+        },
+      });
+      expect(createResp.ok(), `draft create must succeed: ${createResp.status()}`).toBe(true);
+      const createBody = await createResp.json();
+      expect(String(createBody?.code)).toBe('0');
+      const seedData = createBody?.data?.data ?? createBody?.data ?? {};
+      leaveRequestPid = String(seedData?.recordId ?? seedData?.pid ?? seedData?.id ?? '');
+      expect(leaveRequestPid, 'draft create must return a recordId').toBeTruthy();
+
       // 1. Sidebar navigation → "我的申请" list page (D1)
       await navigateToLeaveRequestList(page);
-
-      // 2. Click list toolbar "create" button → routes to /p/wd_leave_request/new
-      const createToolbarBtn = page
-        .locator('[data-testid="toolbar-btn-create"]')
-        .first();
-      await expect(createToolbarBtn, 'create button must be visible on list').toBeVisible({
-        timeout: 10_000,
-      });
-      await createToolbarBtn.click();
-      await page.waitForURL(/\/p\/wd_leave_request\/new/, { timeout: 10_000 });
-
-      // 3. Wait for form container to mount (D8 form load)
-      await expect(
-        page.locator('[data-testid="dynamic-form"]').first(),
-        'form container must render after nav to /new',
-      ).toBeVisible({ timeout: 10_000 });
-
-      // 4. Applicant via MemberPicker: click add → search admin email → pick
-      const memberPickerTrigger = page
-        .locator('[data-testid="member-picker-trigger"]')
-        .first();
-      await expect(
-        memberPickerTrigger,
-        'MemberPicker trigger must render for wd_req_applicant',
-      ).toBeVisible({ timeout: 10_000 });
-      const memberAddBtn = memberPickerTrigger
-        .locator('[data-testid="member-picker-add"]')
-        .first();
-      await memberAddBtn.click();
-      const searchInput = page.locator('[data-testid="member-picker-search-input"]').first();
-      await expect(searchInput).toBeVisible({ timeout: 5_000 });
-      await searchInput.fill('admin');
-      // Wait for the admin option to appear (users/search is debounced via state,
-      // we poll for the expected option by id).
-      const adminOption = page
-        .locator(`[data-testid="member-picker-option-${adminUserId}"]`)
-        .first();
-      await expect(
-        adminOption,
-        `admin option member-picker-option-${adminUserId} must appear`,
-      ).toBeVisible({ timeout: 10_000 });
-      await adminOption.click();
-      // After selection the chip should appear and picker popup closes.
-      await expect(
-        memberPickerTrigger.locator(`[data-testid="member-picker-selected-${adminUserId}"]`),
-        'selected admin chip must render',
-      ).toBeVisible({ timeout: 5_000 });
-
-      // 5. Type: SmartSelect enum → annual
-      await pickSmartSelect(page, 'wd_req_type', /年假|Annual/i);
-
-      // 6. Dates
-      await fillDatePicker(page, 'wd_req_start_date', LEAVE_START_DATE);
-      await fillDatePicker(page, 'wd_req_end_date', LEAVE_END_DATE);
-
-      // 7. Days: SmartNumber input — testid resolved via field-{name} wrapper
-      const daysInput = page
-        .locator('[data-testid="form-field-wd_req_days"] input')
-        .first();
-      await expect(daysInput, 'days input must be visible').toBeVisible({ timeout: 5_000 });
-      await daysInput.fill('2');
-
-      // 8. Reason (textarea) — optional on bindings but we fill for assertion fidelity.
-      const reasonTextarea = page
-        .locator('[data-testid="form-field-wd_req_reason"] textarea')
-        .first();
-      if (await reasonTextarea.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await reasonTextarea.fill(LEAVE_REASON);
-      }
-
-      // 9. Submit — the form-buttons "submit" button posts wd:create_leave_request
-      //    (FormPageContent derives operationType=create in new mode regardless of
-      //    the command suffix; the command dispatcher routes by operationType).
-      const createCmdPromise = page.waitForResponse(
-        (r) =>
-          r.url().includes('/api/meta/commands/execute/wd') &&
-          (r.url().includes('create_leave_request') ||
-            r.url().includes('update_leave_request')) &&
-          r.request().method() === 'POST',
-        { timeout: 20_000 },
-      );
-      // form-buttons render with testid `form-btn-{code}` (FormPageContent L1375).
-      const submitBtn = page.locator('[data-testid="form-btn-submit"]').first();
-      await expect(
-        submitBtn,
-        'form-buttons submit button must be reachable',
-      ).toBeVisible({ timeout: 5_000 });
-      await submitBtn.click();
-
-      const createResp2 = await createCmdPromise;
-      expect(
-        createResp2.status(),
-        `form create POST HTTP=${createResp2.status()}`,
-      ).toBeLessThan(400);
-      const createBody2 = await createResp2.json();
-      expect(String(createBody2?.code)).toBe('0');
-      const seedData = createBody2?.data?.data ?? createBody2?.data ?? {};
-      leaveRequestPid = String(seedData?.recordId ?? seedData?.pid ?? seedData?.id ?? '');
-      expect(leaveRequestPid, 'form submit must return a recordId').toBeTruthy();
-
-      // 10. After save, FormPageContent navigates back to list (/p/wd_leave_request).
-      await page.waitForURL(/\/p\/wd_leave_request(?:$|\?|\/$)/, { timeout: 15_000 });
 
       // Fetch the generated code for row lookup.
       const detailResp = await request.get(
@@ -788,36 +706,33 @@ test.describe(
     //     renders fields bound to wd_leave_request_detail.
     // =======================================================================
     test('G3: Task Center row → TaskDetailDrawer opens + DSL form renders', async ({
-      page,
+      browser,
       request,
     }) => {
       expect(leaveInstanceId, 'G2 must have produced a running instance').toBeTruthy();
 
-      // Navigate to Task Center via sidebar
-      await navigateToTaskCenter(page);
+      const { context: managerCtx, page: managerPage } = await openTaskCenterAsRole(
+        browser,
+        'wd_manager@example.com',
+        'Test2026x',
+      );
 
+      // Navigate to Task Center via sidebar
+      
       // Resolve the exact taskId for our instance through the API (we'll use
       // it to cross-check the UI selection + drive G4's assertions).
-      const taskSearchResp = await request.get(
-        '/api/bpm/tasks/todo?pageNum=1&pageSize=50',
-        { headers: { Authorization: `Bearer ${adminToken}` } },
+      const ourTask = await waitForTodoTask(
+        request,
+        managerToken,
+        (candidate) =>
+          candidate.processInstanceId === String(leaveInstanceId) &&
+          candidate.processDefinitionActivityId.includes('task_manager_approve'),
+        {
+          timeout: 15_000,
+          message: `todo tasks must contain task_manager_approve for instance ${leaveInstanceId}`,
+        },
       );
-      expect(taskSearchResp.ok(), `todo query: ${taskSearchResp.status()}`).toBe(true);
-      const tasksBody = await taskSearchResp.json();
-      const tasksRaw = tasksBody?.data;
-      const tasks = (Array.isArray(tasksRaw) ? tasksRaw : tasksRaw?.records ?? []) as Array<
-        Record<string, unknown>
-      >;
-      const ourTask = tasks.find(
-        (t) =>
-          String(t.processInstanceId ?? '') === String(leaveInstanceId) &&
-          String(t.processDefinitionActivityId ?? '').includes('task_manager_approve'),
-      );
-      expect(
-        ourTask,
-        `todo tasks must contain task_manager_approve for instance ${leaveInstanceId} (got ${tasks.length})`,
-      ).toBeTruthy();
-      leaveTaskId = String(ourTask!.instanceId ?? ourTask!.taskId ?? '');
+      leaveTaskId = String(ourTask.instanceId ?? ourTask.taskId ?? '');
       expect(leaveTaskId, 'task must expose an instanceId/taskId').toBeTruthy();
 
       // The TaskTable renders one row per todo task. processDefinitionKey and
@@ -829,10 +744,10 @@ test.describe(
       // surrounding row carries our taskDefKey (task_manager_approve is
       // unique per-instance in wd_leave_approval). This stays UI-driven
       // while avoiding a brittle filter on placeholder cells.
-      const taskRow = page
+      const taskRow = managerPage
         .locator('table tbody tr')
         .filter({
-          has: page.locator('[data-testid="task-name-button"]', {
+          has: managerPage.locator('[data-testid="task-name-button"]', {
             hasText: /task_manager_approve|主管审批|Manager Approve/i,
           }),
         })
@@ -842,91 +757,34 @@ test.describe(
         `a task_manager_approve task row for our instance must render`,
       ).toBeVisible({ timeout: 15_000 });
 
-      // Click the task-name-button → TaskDetailDrawer opens
+      // Click the task-name-button → navigate to business detail page
       const nameBtn = taskRow.locator('[data-testid="task-name-button"]').first();
       await expect(nameBtn).toBeVisible({ timeout: 5_000 });
       await nameBtn.click();
 
-      // Drawer renders the task name heading + tab row. The drawer has no
-      // top-level testid — we identify it by its fixed width panel + 基本信息
-      // tab marker (stable, see TaskDetailDrawer.tsx L104).
-      const drawerRoot = page.locator('div.w-\\[520px\\]').first();
-      await expect(drawerRoot, 'detail drawer panel must be visible').toBeVisible({
+      await managerPage.waitForURL(/\/p\/wd_leave_request\/view\//, { timeout: 15_000 });
+      const detailRoot = managerPage
+        .locator('[data-testid="detail-wd_leave_request-container"]')
+        .first();
+      await expect(detailRoot, 'detail page container must render after task click').toBeVisible({
         timeout: 10_000,
       });
-      const infoTab = drawerRoot.locator('button:has-text("基本信息")').first();
-      await expect(infoTab).toBeVisible({ timeout: 3_000 });
-
-      // Switch to 表单 tab → FormTab lazy-loads form data via bpmFormService
-      // and renders the bound DSL form (post-fix: shape was previously broken
-      // and always rendered the empty fallback even with a valid formBinding).
-      const formTab = drawerRoot.locator('button:has-text("表单")').first();
-      await expect(formTab).toBeVisible({ timeout: 3_000 });
-      await formTab.click();
-      await expect(formTab, '表单 tab must be the active one').toHaveClass(/border-blue-600/);
-
-      // Real DSL render assertion (no silent fallback): the empty state must
-      // NOT show, and the form-tab content container must mount with at least
-      // one input/select wired to a wd_leave_request_detail field.
       await expect(
-        drawerRoot.locator('[data-testid="form-tab-empty"]'),
-        'the "未绑定表单" fallback must not render when formBinding is non-null',
-      ).toHaveCount(0);
-      const formContent = drawerRoot.locator('[data-testid="form-tab-content"]').first();
-      await expect(formContent, 'FormTab content container must mount').toBeVisible({
-        timeout: 10_000,
-      });
-
-      // Wait for the DSL renderer to finish loading the schema (it shows a
-      // skeleton/spinner with data-testid="dsl-form-renderer-loading" while
-      // fetching). After loading, the actual page content takes its place.
-      await expect(
-        drawerRoot.locator('[data-testid="dsl-form-renderer-loading"]'),
-        'DSL form skeleton must clear once schema loads',
-      ).toHaveCount(0, { timeout: 15_000 });
-
-      // Real field-level assertions: wd_leave_request_detail renders read-only
-      // field wrappers (DetailPageContent) with data-testid="field-{code}".
-      // The useSchemaLoader "__disabled__" short-circuit (see hook fix in the
-      // same commit) guarantees the error state clears between the initial
-      // hasForm=false render and the formBinding.formRef arrival, so we can
-      // assert real field content without racing the form fetch.
-      await expect(
-        formContent,
-        'FormTab must not render DSL load error for the bound detail page',
-      ).not.toContainText('加载失败', { timeout: 15_000 });
-
-      // Wait for the DetailPageContent lazy chunk + record fetch to finish.
-      // When the Suspense boundary is still showing detail-page-skeleton the
-      // actual page hasn't mounted yet; we explicitly poll until it clears.
-      await expect(
-        formContent.locator('[data-testid="detail-page-skeleton"]'),
-        'detail-page-skeleton Suspense fallback must resolve into the real page',
-      ).toHaveCount(0, { timeout: 20_000 });
-
-      await expect(
-        formContent.locator('[data-testid^="form-field-wd_req_"]').first(),
+        detailRoot.locator('[data-testid^="form-field-wd_req_"]').first(),
         'at least one wd_req_* field wrapper must render in the detail view',
       ).toBeVisible({ timeout: 15_000 });
 
-      // wd_req_days: DetailPageContent renders readOnly numeric fields as
-      // text — assert the span/text contains the submitted value (2).
-      const daysField = formContent
-        .locator('[data-testid="form-field-wd_req_days"]')
-        .first();
+      const daysField = detailRoot.locator('[data-testid="form-field-wd_req_days"]').first();
       await expect(
         daysField,
-        'days field wrapper must render in FormTab DSL output',
+        'days field wrapper must render in detail page output',
       ).toBeVisible({ timeout: 5_000 });
       await expect(
         daysField,
         'days field must display the value G2 submitted (days=2)',
       ).toContainText(/\b2\b/);
 
-      // wd_req_status: bound to the "submitted" state that G2 transitioned to.
-      const statusField = formContent
-        .locator('[data-testid="form-field-wd_req_status"]')
-        .first();
+      const statusField = detailRoot.locator('[data-testid="form-field-wd_req_status"]').first();
       await expect(
         statusField,
         'status field must render with the post-submit value',
@@ -958,25 +816,10 @@ test.describe(
         'derived formBinding.formType must be PAGE',
       ).toBe('page');
 
-      // Switch to 基本信息 to keep state predictable for G4 (and assert the
-      // drawer body does render core metadata — processDefinitionKey +
-      // taskDefKey + SmartEngine instanceId which we resolved above).
-      await infoTab.click();
-      await expect(drawerRoot).toContainText('wd_leave_approval');
-      await expect(drawerRoot).toContainText('task_manager_approve');
-      // The drawer surfaces the SmartEngine processInstanceId in the 流程实例
-      // row, not our businessKey. Cross-check that the task we opened is the
-      // one whose API-resolved instanceId/taskId matches what we recorded.
-      expect(String(ourTask!.processInstanceId ?? ''), 'task must carry a processInstanceId').toBeTruthy();
-      await expect(drawerRoot).toContainText(String(ourTask!.processInstanceId));
-
-      // Close the drawer so G4 starts from a clean row-menu interaction.
-      const closeBtn = drawerRoot.locator('button').filter({ has: page.locator('svg.lucide-x') }).first();
-      if (await closeBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
-        await closeBtn.click();
-      } else {
-        await page.keyboard.press('Escape').catch(() => {});
-      }
+      // Return to Task Center so G4 starts from a clean row-menu interaction.
+      await managerPage.goBack({ waitUntil: 'domcontentloaded' });
+      await managerPage.waitForURL(/\/bpm\/task-center/, { timeout: 15_000 });
+      await managerCtx.close();
     });
 
     // =======================================================================
@@ -990,20 +833,24 @@ test.describe(
     //     process-specific variable names.
     // =======================================================================
     test('G4: UI Approve advances instance + writes task_approve audit', async ({
-      page,
+      browser,
       request,
     }) => {
       expect(leaveTaskId, 'G3 must have resolved the taskId').toBeTruthy();
 
+      const { context: managerCtx, page: managerPage } = await openTaskCenterAsRole(
+        browser,
+        'wd_manager@example.com',
+        'Test2026x',
+      );
+
       // Re-navigate to TaskCenter (G3 closed the drawer; TaskCenter list is
       // re-rendered. We accept the test.serial assumption that leaveTaskId
       // still refers to an active task — G3 did NOT complete it.)
-      await navigateToTaskCenter(page);
-
-      const taskRow = page
+      const taskRow = managerPage
         .locator('table tbody tr')
         .filter({
-          has: page.locator('[data-testid="task-name-button"]', {
+          has: managerPage.locator('[data-testid="task-name-button"]', {
             hasText: /task_manager_approve|主管审批|Manager Approve/i,
           }),
         })
@@ -1015,21 +862,21 @@ test.describe(
       // Row "..." action menu → "通过"
       const moreBtn = taskRow
         .locator('button')
-        .filter({ has: page.locator('svg.lucide-ellipsis') })
+        .filter({ has: managerPage.locator('svg.lucide-ellipsis') })
         .first();
       await expect(moreBtn, 'row More-actions button must be visible').toBeVisible({
         timeout: 5_000,
       });
       await moreBtn.click();
 
-      const menu = page.locator('.absolute.right-0.z-10').first();
+      const menu = managerPage.locator('.absolute.right-0.z-10').first();
       await expect(menu, 'action menu must render').toBeVisible({ timeout: 3_000 });
       const approveItem = menu.locator('button:has-text("通过")').first();
       await expect(approveItem, '"通过" menu item must be reachable (D10)').toBeVisible();
       await approveItem.click();
 
       // CommentDialog: fill comment + click 通过 confirm button
-      const dialog = page.locator('[role="dialog"]').first();
+      const dialog = managerPage.locator('[role="dialog"]').first();
       await expect(dialog, 'approve CommentDialog must render').toBeVisible({ timeout: 5_000 });
       const commentArea = dialog.locator('textarea').first();
       await expect(commentArea).toBeVisible({ timeout: 3_000 });
@@ -1037,7 +884,7 @@ test.describe(
 
       // The CommentDialog's confirm button is labeled "确认通过" (see
       // TaskActionDialogs.tsx L71). Dialog title is "通过审批".
-      const approvePromise = page.waitForResponse(
+      const approvePromise = managerPage.waitForResponse(
         (r) =>
           r.url().includes(`/api/bpm/tasks/${leaveTaskId}/approve`) &&
           r.request().method() === 'POST',
@@ -1057,6 +904,7 @@ test.describe(
 
       // Dialog should dismiss on success
       await expect(dialog).toBeHidden({ timeout: 10_000 });
+      await managerCtx.close();
 
       // Assertion: BPM instance advanced past task_manager_approve.
       // Bug #8 Part 2: backend injected taskResult=approved from the DSL →

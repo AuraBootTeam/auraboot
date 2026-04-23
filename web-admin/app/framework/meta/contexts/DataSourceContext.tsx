@@ -10,8 +10,7 @@
  * - SmartSelect, SmartRadio 等组件自动使用 context 中的实例
  */
 
-import { createContext, useContext } from 'react';
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 
 /**

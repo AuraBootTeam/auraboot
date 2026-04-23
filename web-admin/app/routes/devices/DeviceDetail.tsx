@@ -3,14 +3,13 @@ import { useParams, Link } from 'react-router';
 import {
   ArrowLeftIcon,
   PencilIcon,
-  TrashIcon,
   PlayIcon,
   StopIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { useToast } from '~/contexts/ToastContext';
 
-interface DeviceDetail {
+interface DeviceDetailData {
   id: string;
   pid: string;
   deviceName: string;
@@ -44,7 +43,7 @@ interface DeviceDetail {
 const DeviceDetail = () => {
   const { showErrorToast, showSuccessToast } = useToast();
   const { deviceId } = useParams();
-  const [device, setDevice] = useState<DeviceDetail | null>(null);
+  const [device, setDevice] = useState<DeviceDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 

@@ -256,8 +256,8 @@ class TemplateServiceImpl implements ITemplateService {
    */
   async verifyRuntimeLoop(
     model: MetaModelDTO,
-    fields: ModelFieldBinding[],
-    request?: Request,
+    _fields: ModelFieldBinding[],
+    _request?: Request,
   ): Promise<RuntimeVerificationResult> {
     try {
       // TODO: Implement backend API /api/templates/runtime/verify

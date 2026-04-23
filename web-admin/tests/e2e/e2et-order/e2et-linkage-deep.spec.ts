@@ -10,7 +10,6 @@
 import { test, expect } from '@playwright/test';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { DynamicFormPage } from '../../pages/DynamicFormPage';
 import { uniqueId } from '../helpers';
 
 test.describe('Field Linkage Depth', () => {
@@ -20,7 +19,9 @@ test.describe('Field Linkage Depth', () => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
   });
 
-  test('LK-001: visibleWhen boolean — urgent=true shows remark @smoke', async ({ page }) => {
+  test('LK-001: visibleWhen boolean — urgent=true shows remark @smoke', async ({
+    page: _page,
+  }) => {
     const formPage = await order.gotoNewForm();
     // Remark should be hidden by default (urgent=false)
     const remarkContainer = formPage.fieldContainer('e2et_order_remark');
@@ -31,7 +32,9 @@ test.describe('Field Linkage Depth', () => {
     await expect(remarkContainer).toBeVisible({ timeout: 3000 });
   });
 
-  test('LK-002: visibleWhen enum — type=BULK shows discount @smoke', async ({ page }) => {
+  test('LK-002: visibleWhen enum — type=BULK shows discount @smoke', async ({
+    page: _page,
+  }) => {
     const formPage = await order.gotoNewForm();
     const discountContainer = formPage.fieldContainer('e2et_order_discount');
     // Should be hidden for NORMAL (default)
@@ -42,7 +45,9 @@ test.describe('Field Linkage Depth', () => {
     await expect(discountContainer).toBeVisible({ timeout: 3000 });
   });
 
-  test('LK-003: requiredWhen — urgent=true makes remark required @smoke', async ({ page }) => {
+  test('LK-003: requiredWhen — urgent=true makes remark required @smoke', async ({
+    page: _page,
+  }) => {
     const formPage = await order.gotoNewForm();
     await formPage.fillField('e2et_order_title', `Linkage Required ${uniqueId()}`);
     // Toggle urgent on to show remark
@@ -88,7 +93,9 @@ test.describe('Field Linkage Depth', () => {
     }
   });
 
-  test('LK-005: setValue — type selection sets default value @smoke', async ({ page }) => {
+  test('LK-005: setValue — type selection sets default value @smoke', async ({
+    page: _page,
+  }) => {
     const formPage = await order.gotoNewForm();
     // Select BULK type — may auto-set discount value
     await formPage.selectField('e2et_order_type', 'bulk');
@@ -121,7 +128,9 @@ test.describe('Field Linkage Depth', () => {
     }
   });
 
-  test('LK-007: linkage + save — linked field values persist @smoke', async ({ page }) => {
+  test('LK-007: linkage + save — linked field values persist @smoke', async ({
+    page: _page,
+  }) => {
     const title = `LinkSave_${uniqueId()}`;
     // Create a BULK order with discount via API, then verify values persist on edit form
     const pid = await order.createViaApi({
@@ -145,7 +154,7 @@ test.describe('Field Linkage Depth', () => {
   });
 
   test('LK-008: linkage + edit — linked fields render correctly on edit @smoke', async ({
-    page,
+    page: _page,
   }) => {
     // Create a BULK order with discount
     const pid = await order.createViaApi({
@@ -169,7 +178,7 @@ test.describe('Field Linkage Depth', () => {
     }
   });
 
-  test('LK-009: multiple linkages fire simultaneously @smoke', async ({ page }) => {
+  test('LK-009: multiple linkages fire simultaneously @smoke', async ({ page: _page }) => {
     const formPage = await order.gotoNewForm();
     // Set urgent=true AND type=BULK simultaneously
     await formPage.toggleField('e2et_order_urgent');
@@ -181,7 +190,7 @@ test.describe('Field Linkage Depth', () => {
     await expect(discountContainer).toBeVisible({ timeout: 3000 });
   });
 
-  test('LK-010: toggle off hides and clears field', async ({ page }) => {
+  test('LK-010: toggle off hides and clears field', async ({ page: _page }) => {
     const formPage = await order.gotoNewForm();
     // Show remark by setting urgent=true
     await formPage.toggleField('e2et_order_urgent');
@@ -207,7 +216,7 @@ test.describe('Field Linkage Depth', () => {
   test('LK-011: subtable row field linkage', async ({ page }) => {
     const pid = await order.createViaApi();
     try {
-      const formPage = await order.gotoEditForm(pid);
+      await order.gotoEditForm(pid);
       // Try adding a subtable row
       const addBtn = page.locator('[data-testid="subtable-add-row"]');
       if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -235,7 +244,7 @@ test.describe('Field Linkage Depth', () => {
     await expect(h2).toBeVisible();
   });
 
-  test('LK-013: hidden field skipped in validation', async ({ page }) => {
+  test('LK-013: hidden field skipped in validation', async ({ page: _page }) => {
     // Verify that hidden fields (remark when urgent=false) are not validated.
     // Create order via API with urgent=false and no remark — should succeed.
     const title = `HiddenSkip_${uniqueId()}`;
@@ -246,7 +255,7 @@ test.describe('Field Linkage Depth', () => {
     });
     try {
       // Verify the order was created successfully by loading the edit form
-      const formPage = await order.gotoEditForm(pid);
+      await order.gotoEditForm(pid);
       // Title should be visible with the value we set
       const titleInput = formPage.fieldContainer('e2et_order_title').locator('input');
       await expect(titleInput).toHaveValue(title);
@@ -262,7 +271,7 @@ test.describe('Field Linkage Depth', () => {
     // Item subtable: qty × price = subtotal shown in real-time
     const pid = await order.createViaApi();
     try {
-      const formPage = await order.gotoEditForm(pid);
+      await order.gotoEditForm(pid);
       const addBtn = page.locator('[data-testid="subtable-add-row"]');
       if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await addBtn.click();
@@ -284,7 +293,7 @@ test.describe('Field Linkage Depth', () => {
     }
   });
 
-  test('LK-015: linkage + i18n switch still works', async ({ page }) => {
+  test('LK-015: linkage + i18n switch still works', async ({ page: _page }) => {
     const formPage = await order.gotoNewForm();
     // Trigger linkage
     await formPage.toggleField('e2et_order_urgent');
@@ -315,7 +324,7 @@ test.describe('Field Linkage Depth', () => {
     }
   });
 
-  test('LK-017: three-level linkage A→B→C', async ({ page }) => {
+  test('LK-017: three-level linkage A→B→C', async ({ page: _page }) => {
     // Test cascading linkage: type → discount visibility → discount value affects something
     const formPage = await order.gotoNewForm();
     // Level 1: Select BULK
@@ -328,7 +337,7 @@ test.describe('Field Linkage Depth', () => {
     await expect(discountContainer).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('LK-018: linkage loop detection/prevention', async ({ page }) => {
+  test('LK-018: linkage loop detection/prevention', async ({ page: _page }) => {
     // Verify form loads without infinite loop even with complex linkage
     const formPage = await order.gotoNewForm();
     await expect(formPage.submitButton).toBeVisible({ timeout: 5000 });
@@ -348,7 +357,7 @@ test.describe('Field Linkage Depth', () => {
     }
   });
 
-  test('LK-020: linkage + default value on new form', async ({ page }) => {
+  test('LK-020: linkage + default value on new form', async ({ page: _page }) => {
     const formPage = await order.gotoNewForm();
     // Type defaults to NORMAL via autoSetFields
     const typeContainer = formPage.fieldContainer('e2et_order_type');

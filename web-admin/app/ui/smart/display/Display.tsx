@@ -14,14 +14,12 @@ interface DisplayProps {
 }
 
 const Display: React.FC<DisplayProps> = ({
-  name,
   value,
   label,
   format,
   valueMap,
   statusColor,
   className = '',
-  ...props
 }) => {
   // 格式化显示值
   const formatValue = (val: any): string => {

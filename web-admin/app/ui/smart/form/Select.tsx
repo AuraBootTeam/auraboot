@@ -97,16 +97,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     // 条件渲染
     const shouldRender = isVisible;
 
-    // 数据源处理 - 只有在存在 dataSource 配置时才使用 useFieldDataSource
-    const dataSourceResult = dataSource
-      ? useFieldDataSource({
-          staticOptions,
-          dataSource: dataSource as any,
-          context,
-        })
-      : { options: staticOptions, loading: false, error: null };
-
-    const { options: rawOptions, loading, error: dataSourceError } = dataSourceResult;
+    const {
+      options: rawOptions,
+      loading,
+      error: dataSourceError,
+    } = useFieldDataSource({
+      staticOptions,
+      dataSource: dataSource as any,
+      context,
+    });
 
     // 批量翻译 options 的 label 字段
     const options = translateArray(rawOptions || [], ['label'], locale, t);
@@ -157,7 +156,6 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     if (!multiple) {
       const currentValue =
         field.value != null && field.value !== '' ? String(field.value) : undefined;
-      const selectedLabel = options?.find((o) => String(o.value) === currentValue)?.label;
       const actionSelectLabel = (() => {
         const key = 'action.select';
         const translated = t(key);
@@ -186,9 +184,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               )}
               onBlur={field.onBlur}
             >
-              <SelectValue placeholder={placeholderText || actionSelectLabel}>
-                {loading ? t('common.loading') || '...' : selectedLabel}
-              </SelectValue>
+              <SelectValue placeholder={loading ? t('common.loading') || '...' : placeholderText || actionSelectLabel} />
             </SelectTrigger>
             <SelectContent>
               {options?.map((option) => (

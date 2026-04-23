@@ -1,5 +1,3 @@
-import type { LoaderFunctionArgs } from 'react-router';
-
 import {
   Outlet,
   Links,
@@ -9,10 +7,10 @@ import {
   redirect,
   useRouteLoaderData,
   useLoaderData,
+  isRouteErrorResponse,
+  type LoaderFunctionArgs,
 } from 'react-router';
 import React, { useEffect } from 'react';
-
-import { isRouteErrorResponse } from 'react-router';
 import { isSystemTenant } from '~/constants/SpaceConstants';
 
 import { I18nProvider, useI18n } from '~/contexts/I18nContext';
@@ -187,7 +185,7 @@ export function useRootLoaderData(): RootLoaderData | undefined {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN" className="h-full">
+    <html lang="zh-CN" className="h-full" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

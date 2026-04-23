@@ -26,7 +26,7 @@ import { uniqueId } from '../helpers/index';
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function createBlankCompositePage(page: Page): Promise<string> {
+async function createBlankDesignerPage(page: Page): Promise<string> {
   const name = uniqueId('aigen');
   const pageKey = `e2e_aigen_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
   const resp = await page.request.post('/api/pages', {
@@ -62,7 +62,7 @@ test.describe('AI Page Generation Panel', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await ctx.newPage();
-    pid = await createBlankCompositePage(page);
+    pid = await createBlankDesignerPage(page);
     await ctx.close();
   });
 

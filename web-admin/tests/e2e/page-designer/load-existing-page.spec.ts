@@ -59,9 +59,16 @@ test.describe('Page Designer loads existing pages', () => {
     let targetPid: string | null = null;
     try {
       const body = await listResponse.json();
-      const records: Array<{ pid: string; kind: string }> =
+      const records: Array<{ pid: string; kind: string; pageKey?: string }> =
         body?.data?.records ?? body?.records ?? [];
-      const supported = records.find((r) => ['list', 'form', 'detail'].includes(r.kind));
+      const supported =
+        records.find((r) => ['e2e_test_form', 'e2e_test_list'].includes(String(r.pageKey ?? ''))) ??
+        records.find(
+          (r) =>
+            ['list', 'form'].includes(r.kind) &&
+            String(r.pageKey ?? '').startsWith('e2e_'),
+        ) ??
+        records.find((r) => ['list', 'form'].includes(r.kind));
       if (supported) {
         targetPid = supported.pid;
       }
@@ -109,7 +116,7 @@ test.describe('Page Designer loads existing pages', () => {
     await waitForDynamicPageLoad(page);
 
     // Force-navigate to designer with a bogus pid to exercise the error path
-    await page.goto('/page-designer/nonexistent-pid-9999', { waitUntil: 'domcontentloaded' });
+    await page.goto('/page-designer/nonexistent-pid-9999', { waitUntil: 'domcontentloaded' }).catch(() => null);
 
     // Should show error state, not crash or blank screen.
     // Use .or() to combine a text matcher with a CSS selector — mixing them in

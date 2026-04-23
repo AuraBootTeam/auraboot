@@ -49,7 +49,7 @@ interface CollaborationProviderProps {
 
 export function CollaborationProvider({
   children,
-  websocketUrl = 'ws://localhost:3001',
+  websocketUrl: _websocketUrl = 'ws://localhost:3001',
   enabled = false,
 }: CollaborationProviderProps) {
   const [state, setState] = useState<CollaborationState>({
@@ -121,7 +121,7 @@ export function CollaborationProvider({
       }));
     },
 
-    sendOperation: (operation: any) => {
+    sendOperation: (_operation: any) => {
       if (!state.isConnected) {
         console.warn('Cannot send operation: not connected');
         return;

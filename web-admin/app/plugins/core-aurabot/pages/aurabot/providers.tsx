@@ -169,14 +169,10 @@ export default function LlmProvidersPage() {
     loading,
     level,
     setLevel,
-    editingConfig,
     testingPid,
-    handleEdit,
     handleDelete,
-    handleTest,
     handleToggleEnabled,
     handleSave,
-    loadConfigs,
   } = useCloudConfigs();
 
   const { showSuccessToast, showErrorToast } = useToastContext();
@@ -194,10 +190,6 @@ export default function LlmProvidersPage() {
   const [localTestingPid, setLocalTestingPid] = useState<string | null>(null);
 
   // Track dynamic custom provider fields
-  const [customProviderFields, setCustomProviderFields] = useState<
-    Record<string, (typeof PROVIDER_FIELDS)[string]>
-  >({});
-
   // Combined testing state
   const isTestingPid = testingPid || localTestingPid;
 
@@ -691,14 +683,14 @@ function EditSidePanel({
 
   // --- Form state ---
   const [configLevel, setConfigLevel] = useState<ConfigLevel>(config?.configLevel || currentLevel);
-  const [providerCode, setProviderCode] = useState(initialProviderCode);
+  const [providerCode] = useState(initialProviderCode);
   const [enabled, setEnabled] = useState(config?.enabled ?? false);
   const [priority, setPriority] = useState(config?.priority ?? 0);
   const [saving, setSaving] = useState(false);
 
   // Custom mode fields
   const [customDisplayName, setCustomDisplayName] = useState(existingParsed.displayName || '');
-  const [customBaseUrl, setCustomBaseUrl] = useState(existingParsed.baseUrl || '');
+  const [customBaseUrl] = useState(existingParsed.baseUrl || '');
 
   // Config values
   const [configValues, setConfigValues] = useState<Record<string, string>>(existingParsed);

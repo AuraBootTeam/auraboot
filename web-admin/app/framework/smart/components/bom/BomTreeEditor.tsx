@@ -16,7 +16,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { fetchResult } from '~/shared/services/http-client';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 import { cn } from '~/utils/cn';
-import { BomTreeNode } from './BomTreeNode';
 import { BomTreeToolbar } from './BomTreeToolbar';
 import type { BomNode } from './BomTreeNode';
 
@@ -298,7 +297,7 @@ const PropertyRow: React.FC<{ label: string; value: string; testId?: string }> =
  */
 export const BomTreeEditor: React.FC<BomTreeEditorProps> = ({
   bomId,
-  modelCode = 'pe_bom',
+  modelCode: _modelCode = 'pe_bom',
   lineModelCode = 'pe_bom_line',
   foreignKey = 'pe_bl_bom_id',
   readOnly = false,

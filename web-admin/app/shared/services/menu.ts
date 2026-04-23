@@ -1,4 +1,3 @@
-import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { getTokenFromRequest } from '~/shared/services/session';
 
@@ -208,7 +207,7 @@ export function getFlatMenuItems(menus: MenuItem[]): MenuItem[] {
 }
 
 // 默认菜单配置（作为后备方案）
-function getDefaultMenus(): MenuItem[] {
+function _getDefaultMenus(): MenuItem[] {
   return [
     {
       id: 1,

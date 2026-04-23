@@ -6,8 +6,9 @@ import {
   useLoaderData,
   useSearchParams,
   Link,
+  type LoaderFunctionArgs,
+  type ActionFunctionArgs,
 } from 'react-router';
-import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { getUserProfile, updateUserProfile, uploadAvatar } from '~/shared/services/profile';
 import type { UserProfile, UpdateUserProfileRequest } from '~/types/profile';
 import { useToast } from '~/contexts/ToastContext';
@@ -294,7 +295,7 @@ export default function PersonalProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(loaderData?.profile || null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UpdateUserProfileRequest>({});
-  const [retryCount, setRetryCount] = useState(0);
+  const [_retryCount, setRetryCount] = useState(0);
   const [searchParams] = useSearchParams();
   const forceChangePassword = searchParams.get('forceChangePassword') === 'true';
   const securityRef = useRef<HTMLDivElement>(null);

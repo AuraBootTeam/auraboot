@@ -208,6 +208,7 @@ export interface NumberInputProps extends FormFieldProps {
   max?: number;
   step?: number;
   precision?: number;
+  readOnly?: boolean;
   size?: 'small' | 'medium' | 'large';
   variant?: 'default' | 'outline' | 'filled';
   showButtons?: boolean;

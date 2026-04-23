@@ -7,8 +7,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
+import { useI18n } from '~/contexts/I18nContext';
 
 export default function WorkbenchPage() {
+  const { t } = useI18n();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,13 +44,15 @@ export default function WorkbenchPage() {
   if (error) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
-        <span className="text-lg text-gray-400">加载工作台失败</span>
+        <span className="text-lg text-gray-400">
+          {t('workbench.loadFailed')}
+        </span>
         <button
           type="button"
           onClick={loadWorkbench}
           className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
         >
-          重试
+          {t('common.retry')}
         </button>
       </div>
     );
@@ -58,13 +62,9 @@ export default function WorkbenchPage() {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
         <span className="text-4xl">&#127968;</span>
-        <span className="text-lg text-gray-500">工作台尚未配置</span>
-        <a
-          href="/home/settings"
-          className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
-        >
-          配置我的工作台
-        </a>
+        <span className="text-lg text-gray-500">
+          {t('workbench.empty')}
+        </span>
       </div>
     );
   }
@@ -72,7 +72,9 @@ export default function WorkbenchPage() {
   return (
     <div className="h-full w-full px-5 py-4">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">工作台</h1>
+        <h1 className="text-lg font-semibold text-gray-900">
+          {t('workbench.pageTitle')}
+        </h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -83,18 +85,8 @@ export default function WorkbenchPage() {
               <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M13.5 3v4h-4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            刷新
+            {t('workbench.refresh')}
           </button>
-          <a
-            href="/home/settings"
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="8" cy="8" r="2.5" />
-              <path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9" strokeLinecap="round" />
-            </svg>
-            设置
-          </a>
         </div>
       </div>
       <DashboardViewer

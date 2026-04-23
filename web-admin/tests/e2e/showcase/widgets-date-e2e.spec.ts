@@ -613,7 +613,7 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
 
     const showcaseRoot = page
-      .locator('button', { hasText: /能力展示|Showcase/ })
+      .locator('button', { hasText: /字段展示|能力展示|Field Showcase|Showcase/ })
       .first();
     await expect(showcaseRoot).toBeVisible({ timeout: 5_000 });
     await showcaseRoot.evaluate((el: HTMLElement) => el.click());

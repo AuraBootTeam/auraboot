@@ -24,7 +24,7 @@ import { uniqueId } from '../helpers/index';
 // ---------------------------------------------------------------------------
 
 /**
- * Create a composite page via API and return its pid and name.
+ * Create a test page via API and return its pid and name.
  */
 async function createTestPage(
   page: import('@playwright/test').Page,

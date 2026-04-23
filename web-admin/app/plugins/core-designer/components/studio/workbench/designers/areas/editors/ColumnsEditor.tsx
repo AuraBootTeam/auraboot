@@ -7,8 +7,11 @@
 
 import React, { useState, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import type { DslColumnRef, DslColumnConfig } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseColumnShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import {
+  parseColumnShorthand,
+  type DslColumnRef,
+  type DslColumnConfig,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { ActionButtonEditor } from './ActionButtonEditor';
 
 export interface ColumnsEditorProps {
@@ -21,7 +24,7 @@ export interface ColumnsEditorProps {
 
 export const ColumnsEditor: React.FC<ColumnsEditorProps> = ({
   columns,
-  modelCode,
+  modelCode: _modelCode,
   blockId,
   onChange,
   readonly,
@@ -190,7 +193,7 @@ interface ColumnItemProps {
 
 const ColumnItem: React.FC<ColumnItemProps> = ({
   column,
-  index,
+  index: _index,
   isExpanded,
   onToggle,
   onRemove,

@@ -4,8 +4,9 @@
  */
 
 import React, { createContext, useContext, useRef, useEffect, useState } from 'react';
-import { DragPreview, DragPreviewPresets } from '~/plugins/core-designer/components/studio/services/layout/drag-preview/DragPreview';
-import type {
+import {
+  DragPreview,
+  DragPreviewPresets,
   DragPreviewConfig,
   DragPreviewState,
 } from '~/plugins/core-designer/components/studio/services/layout/drag-preview/DragPreview';
@@ -153,7 +154,6 @@ export function useDragItemPreview(
     }
 
     const handleDragStart = (event: DragEvent) => {
-      const rect = element.getBoundingClientRect();
       const position = {
         x: event.clientX,
         y: event.clientY,

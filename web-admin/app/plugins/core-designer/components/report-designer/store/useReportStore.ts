@@ -6,18 +6,15 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type {
-  ReportDsl,
-  ReportBlock,
-  DataTableBlock,
-  GroupedTableBlock,
-  StatCardBlock,
-  RichTextBlock,
-  ReportBand,
-  ReportDataSource,
-  PageConfig,
+import {
+  createEmptyReport,
+  generateBlockId,
+  type ReportDsl,
+  type ReportBlock,
+  type ReportBand,
+  type ReportDataSource,
+  type PageConfig,
 } from '../types';
-import { createEmptyReport, generateBlockId } from '../types';
 import { reportDesignerService } from '../services/reportDesignerService';
 
 interface ReportStore {

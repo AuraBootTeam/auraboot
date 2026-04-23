@@ -13,6 +13,7 @@ export interface PropertySchema {
     | 'select'
     | 'array'
     | 'object'
+    | 'icon'
     | 'color'
     | 'date'
     | 'formref-select'

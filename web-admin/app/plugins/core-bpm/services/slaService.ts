@@ -140,7 +140,7 @@ export async function getSlaByInstance(processInstanceId: string): Promise<SlaRe
 // ==================== SLA Record Drill-down API ====================
 
 export async function listSlaRecords(params?: { status?: string }): Promise<SlaRecord[]> {
-  const result = await get<SlaRecord[]>('/api/bpm/monitor/sla-records', { params });
+  const result = await get<SlaRecord[]>('/api/bpm/monitor/sla-records', params);
   return result.data ?? [];
 }
 

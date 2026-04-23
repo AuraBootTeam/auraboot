@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { expressionParser } from '~/plugins/core-designer/components/studio/services/runtime/expression/expression-parser';
-import type { ExpressionEditorProps, ExpressionValidationResult, ExpressionContext } from './types';
+import type { ExpressionEditorProps, ExpressionValidationResult } from './types';
 import { registerExpressionLanguage } from './syntax/expression-language';
 import { registerExpressionCompletion } from './syntax/expression-completion';
 
@@ -25,7 +25,7 @@ export const ExpressionEditor: React.FC<ExpressionEditorProps> = ({
   value,
   onChange,
   context,
-  returnType,
+  returnType: _returnType,
   mode = 'inline',
   placeholder = '输入表达式，例如: {{ form.name }}',
   disabled = false,

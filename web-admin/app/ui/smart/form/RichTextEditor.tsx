@@ -105,7 +105,6 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
     const actionData = useActionData();
     const actionError =
       actionData?.error?.data?.name === name ? actionData?.error?.data?.desc : undefined;
-    const error = field.error || actionError;
     const meta = useSmartFieldMeta({ field, externalError: actionError });
     const errorText = meta.meta.error ? st(meta.meta.error) : undefined;
 

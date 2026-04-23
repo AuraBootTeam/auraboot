@@ -17,6 +17,5 @@ export const sectionDetailSchemas: ExtendedPropertySchema<string>[] = [
 
 export const detailCustomButtonSchemas: ExtendedPropertySchema<string>[] = [
   { key: 'label', label: '按钮文字', type: 'text', required: true, group: '基础' },
-  { key: 'icon', label: '图标', type: 'text', group: '基础' },
-  { key: 'command', label: 'Command', type: 'text', required: true, placeholder: 'plugin:action', group: '绑定' },
+  { key: 'icon', label: '图标', type: 'icon', group: '基础' },
 ];

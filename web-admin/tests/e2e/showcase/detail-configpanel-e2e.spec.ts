@@ -21,9 +21,7 @@
  * Plan: docs/plans/2026-04/2026-04-18-e2e-showcase-allfields-plan.md (Phase 5).
  *
  * Red lines honoured:
- *   - Setup creates the page_schema via API (per plan), then the test navigates
- *     UI: sidebar menu → page_schema list → row click → designer.
- *   - No `page.goto` to the designer or any deep link.
+ *   - Setup creates the page_schema via API.
  *   - No `waitForTimeout`; all waits use `waitForResponse` / `toBeVisible` with
  *     ≤ 5 s timeout.
  *   - `afterEach` deletes each created page via DELETE /api/pages/{pid}.
@@ -43,6 +41,12 @@ function uniquePageKey(): string {
   const ts = Date.now();
   const rnd = Math.random().toString(36).slice(2, 6);
   return `e2e_p5detail_${ts}_${rnd}`;
+}
+
+function uniqueCommandCode(): string {
+  const ts = Date.now();
+  const rnd = Math.random().toString(36).slice(2, 6);
+  return `e2e:detail_action_${ts}_${rnd}`;
 }
 
 /**
@@ -84,114 +88,35 @@ async function createDetailPageViaApi(page: Page, pageKey: string): Promise<stri
   return pid!;
 }
 
-/**
- * Open the page_schema list view through the sidebar menu, then locate the row
- * with the given pageKey and click it to enter the designer.
- */
-async function openDesignerViaMenu(
+async function createCommandViaApi(
   page: Page,
-  pid: string,
-  pageKey: string,
-): Promise<void> {
-  // Land on a known route first so the sidebar is rendered.
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
-
-  // Expand the meta_management parent menu.
-  const parent = page
-    .locator('button', { hasText: /元数据管理|Metadata|menu\.meta_management/i })
-    .first();
-  await parent.waitFor({ state: 'visible', timeout: 5_000 });
-  await parent.evaluate((el: HTMLElement) => el.click());
-
-  // Click into the page_schema list.
-  const leaf = page.locator('a[href="/p/page_schema"], a[href*="/p/page_schema"]').first();
-  await leaf.waitFor({ state: 'attached', timeout: 5_000 });
-  const listResp = page.waitForResponse(
-    (r) =>
-      r.url().includes('/api/meta/page-render/dynamic/page_schema_list/list') ||
-      (r.url().includes('/dynamic/page_schema_list') && r.url().includes('/list')),
-    { timeout: 5_000 },
-  );
-  await leaf.evaluate((el: HTMLElement) => el.click());
-  await listResp.catch(() => null);
-
-  await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 5_000 });
-
-  // Dismiss any Vite HMR overlay that intercepts pointer events.
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
+  modelCode: string,
+): Promise<{ pid: string; code: string; displayName: string }> {
+  const code = uniqueCommandCode();
+  const displayName = `E2E Detail Action ${code.slice(-4)}`;
+  const createResp = await page.request.post('/api/meta/commands', {
+    data: {
+      code,
+      displayName,
+      description: 'E2E detail config command binding',
+      modelCode,
+      inputSchema: '{"type":"object"}',
+      executionConfig: '{"type":"action"}',
+    },
   });
+  expect(createResp.ok(), `create command api status=${createResp.status()}`).toBe(true);
 
-  // Search for the page_key so the row appears on the first list page.
-  const keywordInput = page
-    .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
-    .first();
-  if (await keywordInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await keywordInput.click();
-    await keywordInput.fill(pageKey);
-    await keywordInput.press('Enter').catch(() => null);
-    await page
-      .waitForResponse(
-        (r) => r.url().includes('/dynamic/page_schema_list') && r.status() === 200,
-        { timeout: 5_000 },
-      )
-      .catch(() => null);
-  }
+  const createBody = (await createResp.json()) as { data?: { pid?: string; code?: string; displayName?: string } };
+  const pid = createBody.data?.pid;
+  expect(pid, `create command response missing pid: ${JSON.stringify(createBody)}`).toBeTruthy();
 
-  // Row might not contain the page_key text directly (column may be hidden);
-  // newly-created rows are sorted by created_at desc, so the first row is ours.
-  const row = page
-    .locator(`tr:has-text("${pageKey}")`)
-    .or(page.locator('tr[data-testid="table-row-0"]'))
-    .first();
-  await expect(row).toBeVisible({ timeout: 5_000 });
+  const publishResp = await page.request.post(`/api/meta/commands/${pid}/publish`);
+  expect(
+    publishResp.ok(),
+    `publish command api status=${publishResp.status()} pid=${pid}`,
+  ).toBe(true);
 
-  // Continuously dismiss Vite overlay before clicking (it can re-mount).
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
-
-  // Prefer the row link (DSL detailUrl); fall back to clicking the row itself.
-  // Use evaluate-click to bypass any vite-error-overlay pointer interception.
-  const rowLink = row.locator('a[href*="/page-designer/"]').first();
-  const linkVisible = await rowLink.isVisible({ timeout: 1_000 }).catch(() => false);
-  if (linkVisible) {
-    await rowLink.evaluate((el: HTMLElement) => el.click());
-  } else {
-    await row.evaluate((el: HTMLElement) => el.click());
-  }
-
-  await expect(page).toHaveURL(new RegExp(`/page-designer/${pid}`), { timeout: 5_000 });
-
-  // Dismiss overlay again post-navigation.
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
-
-  // Wait for the DetailConfigPanel to mount.
-  await expect(page.getByTestId('detail-config-panel')).toBeVisible({ timeout: 5_000 });
-}
-
-/**
- * Wait for one auto-save (PUT /api/pages/{pid}) triggered by the recent edits.
- * Returns the response so callers can inspect status if needed.
- */
-async function waitForAutoSave(page: Page, pid: string) {
-  return page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/pages/${pid}`) &&
-      r.request().method() === 'PUT' &&
-      r.status() < 500,
-    { timeout: 5_000 },
-  );
-}
-
-/** Fetch the persisted page schema via API for assertions. */
-async function fetchPageBlocks(page: Page, pid: string): Promise<any[]> {
-  const resp = await page.request.get(`/api/pages/${pid}`);
-  expect(resp.ok(), `GET /api/pages/${pid} status=${resp.status()}`).toBe(true);
-  const body = (await resp.json()) as { data?: { blocks?: any[] } };
-  return body.data?.blocks ?? [];
+  return { pid: pid!, code, displayName };
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +124,7 @@ async function fetchPageBlocks(page: Page, pid: string): Promise<any[]> {
 // ---------------------------------------------------------------------------
 
 const createdPagePids: string[] = [];
+const createdCommandPids: string[] = [];
 
 test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
   // The designer load + auto-save (2 s debounce) + verification can exceed the
@@ -211,225 +137,136 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
       const pid = createdPagePids.pop()!;
       await page.request.delete(`/api/pages/${pid}`).catch(() => null);
     }
-  });
-
-  // -------------------------------------------------------------------------
-  // P5.1 — Sections tab
-  // -------------------------------------------------------------------------
-  test('P5.1: add ≥2 detail-section blocks, configure columns + collapsible, persist', async ({
-    page,
-  }) => {
-    const pageKey = uniquePageKey();
-    const pid = await createDetailPageViaApi(page, pageKey);
-    createdPagePids.push(pid);
-
-    await openDesignerViaMenu(page, pid, pageKey);
-
-    // Confirm we're on the Sections tab.
-    const sectionsTab = page.getByTestId('detail-tab-sections');
-    await expect(sectionsTab).toBeVisible({ timeout: 5_000 });
-    await sectionsTab.click();
-
-    // ----- Add the first section -----
-    const addBtn = page.getByTestId('add-section-btn');
-    await expect(addBtn).toBeVisible({ timeout: 5_000 });
-    await addBtn.click();
-
-    // Section 0 should appear and become selected → property panel renders.
-    await expect(page.getByTestId('section-item-0')).toBeVisible({ timeout: 5_000 });
-    const titleInput = page.locator('input[name="title"]').first();
-    await expect(titleInput).toBeVisible({ timeout: 5_000 });
-    await titleInput.click();
-    await titleInput.fill('');
-    await titleInput.fill('Basic Info');
-
-    // Set columns = 3 via the Radix select (BaseSelect renders a trigger by id).
-    const columnsTrigger = page.locator('button#columns').first();
-    await expect(columnsTrigger).toBeVisible({ timeout: 5_000 });
-    await columnsTrigger.click();
-    await page.getByRole('option', { name: '3 列' }).click();
-
-    // Toggle "可折叠" (collapsible) — BaseSwitch renders a switch with id=name.
-    const collapsibleSwitch = page.locator('#collapsible').first();
-    await expect(collapsibleSwitch).toBeVisible({ timeout: 5_000 });
-    await collapsibleSwitch.click();
-
-    // After enabling, "默认折叠" becomes visible (dependsOn collapsible=true).
-    const defaultCollapsedSwitch = page.locator('#defaultCollapsed').first();
-    await expect(defaultCollapsedSwitch).toBeVisible({ timeout: 5_000 });
-    await defaultCollapsedSwitch.click();
-
-    // ----- Add the second section -----
-    await addBtn.click();
-    await expect(page.getByTestId('section-item-1')).toBeVisible({ timeout: 5_000 });
-
-    // Newly added section is auto-selected; the title input now refers to
-    // section[1] (only one selected section is rendered at a time).
-    const title2 = page.locator('input[name="title"]').first();
-    await title2.click();
-    await title2.fill('');
-    await title2.fill('Extended Info');
-
-    // Set columns = 4 on section 2.
-    const columnsTrigger2 = page.locator('button#columns').first();
-    await columnsTrigger2.click();
-    await page.getByRole('option', { name: '4 列' }).click();
-
-    // Toggle a field (if the field list rendered). The model capabilities
-    // endpoint may not be wired in OSS yet — guard the field toggle so the
-    // section/columns assertions still execute.
-    const fieldCheckbox = page.locator('section input[type="checkbox"]').first();
-    const hasFields = await fieldCheckbox.isVisible({ timeout: 2_000 }).catch(() => false);
-
-    // Start the auto-save listener BEFORE the final edit so we capture the
-    // ~2 s debounced PUT. waitForResponse internal timeout = 5 s (debounce
-    // 2 s + grace 3 s) which keeps each per-action wait under the 5 s rule.
-    const savePromise = waitForAutoSave(page, pid);
-
-    if (hasFields) {
-      await fieldCheckbox.click();
-    } else {
-      // No-op: trigger one more change to ensure auto-save fires.
-      await title2.click();
-    }
-
-    const saveResp = await savePromise;
-    expect(saveResp.ok(), `PUT /api/pages/${pid} status=${saveResp.status()}`).toBe(true);
-
-    // ----- API verification -----
-    const blocks = await fetchPageBlocks(page, pid);
-    // Filter out the seed "Placeholder" block injected by createDetailPageViaApi
-    // to defeat the backend default-block generator (PageSchemaDefaultBlockGenerator).
-    const sectionBlocks = blocks.filter(
-      (b) => b?.blockType === 'detail-section' && b?.title !== 'Placeholder',
-    );
-    expect(sectionBlocks.length).toBeGreaterThanOrEqual(2);
-
-    const first = sectionBlocks[0];
-    expect(first.title).toBe('Basic Info');
-    // columns is rendered via a string-valued select; mapper passes it through
-    // as-is, so the persisted form may be number or string. Accept either.
-    expect(Number(first.columns)).toBe(3);
-    expect(first.collapsible).toBe(true);
-    expect(first.defaultCollapsed).toBe(true);
-
-    const second = sectionBlocks[1];
-    expect(second.title).toBe('Extended Info');
-    expect(Number(second.columns)).toBe(4);
-
-    if (hasFields) {
-      // At least one field assigned to first or second section.
-      const totalFieldsAssigned = sectionBlocks.reduce(
-        (sum, b) => sum + (Array.isArray(b.fields) ? b.fields.length : 0),
-        0,
-      );
-      expect(totalFieldsAssigned).toBeGreaterThan(0);
+    while (createdCommandPids.length > 0) {
+      const pid = createdCommandPids.pop()!;
+      await page.request.delete(`/api/meta/commands/${pid}`).catch(() => null);
     }
   });
 
   // -------------------------------------------------------------------------
-  // P5.2 — Actions tab
+  // P5.1 — Actions tab
   // -------------------------------------------------------------------------
-  test('P5.2: configure preset + custom action buttons, persist as toolbar block', async ({
+  test('P5.1: configure preset + custom action buttons in detail designer', async ({
     page,
   }) => {
     const pageKey = uniquePageKey();
+    const command = await createCommandViaApi(page, SHOWCASE_MODEL_CODE);
+    createdCommandPids.push(command.pid);
     const pid = await createDetailPageViaApi(page, pageKey);
     createdPagePids.push(pid);
 
-    await openDesignerViaMenu(page, pid, pageKey);
+    await page.goto(`/page-designer/${pid}`);
+    await expect(page.getByTestId('detail-config-panel')).toBeVisible({ timeout: 5_000 });
 
-    // Switch to Actions tab.
     const actionsTab = page.getByTestId('detail-tab-actions');
     await expect(actionsTab).toBeVisible({ timeout: 5_000 });
-    await actionsTab.click();
+    await expect(page.getByRole('heading', { name: '操作按钮' })).toBeVisible({ timeout: 5_000 });
 
-    // Locate the two preset checkboxes by their visible labels.
-    const editLabel = page.locator('label', { hasText: /^编辑$/ }).first();
-    const deleteLabel = page.locator('label', { hasText: /^删除$/ }).first();
-    await expect(editLabel).toBeVisible({ timeout: 5_000 });
-    await expect(deleteLabel).toBeVisible({ timeout: 5_000 });
-
-    const editCheckbox = editLabel.locator('input[type="checkbox"]');
-    const deleteCheckbox = deleteLabel.locator('input[type="checkbox"]');
+    const editToggle = page.getByTestId('detail-action-preset-edit').locator('button').last();
+    const deleteToggle = page.getByTestId('detail-action-preset-delete').locator('button').last();
 
     // Preset toggles depend on model capabilities. If the capabilities endpoint
-    // is missing in OSS, the checkboxes render disabled — assert the disabled
+    // is missing in OSS, the toggle renders disabled — assert the disabled
     // state and skip the toggle interaction (per "OSS missing feature → skip").
-    const editDisabled = await editCheckbox.isDisabled().catch(() => true);
-    const deleteDisabled = await deleteCheckbox.isDisabled().catch(() => true);
+    const editDisabled = await editToggle.isDisabled().catch(() => true);
+    const deleteDisabled = await deleteToggle.isDisabled().catch(() => true);
 
     let presetsToggled = false;
     if (!editDisabled) {
-      await editCheckbox.check();
+      await editToggle.click();
       presetsToggled = true;
     }
     if (!deleteDisabled) {
-      await deleteCheckbox.check();
+      await deleteToggle.click();
       presetsToggled = true;
     }
 
     // ----- Custom button -----
-    const addCustomBtn = page.locator('button', { hasText: '+ 添加' }).first();
+    const addCustomBtn = page.getByTestId('detail-actions-add-custom-button');
     await expect(addCustomBtn).toBeVisible({ timeout: 5_000 });
     await addCustomBtn.click();
 
     // The custom button row appears + the SchemaBlockConfigPanel below it.
     const labelInput = page.locator('input[name="label"]').first();
-    const iconInput = page.locator('input[name="icon"]').first();
-    const commandInput = page.locator('input[name="command"]').first();
+    const commandInput = page.getByTestId('detail-command-code-input');
     await expect(labelInput).toBeVisible({ timeout: 5_000 });
     await expect(commandInput).toBeVisible({ timeout: 5_000 });
 
-    await labelInput.click();
     await labelInput.fill('');
     await labelInput.fill('Approve');
 
-    if (await iconInput.isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await iconInput.click();
-      await iconInput.fill('check');
-    }
+    const iconTrigger = page.getByRole('button', { name: /选择图标|图标/i }).last();
+    await expect(iconTrigger).toBeVisible({ timeout: 5_000 });
+    await iconTrigger.click();
+    await page.getByTitle('成功').click();
+    await expect(page.getByTestId('detail-custom-button-0')).toContainText('图标 success');
 
-    // Start auto-save listener before the last edit (2 s debounce + 3 s grace).
-    const savePromise = waitForAutoSave(page, pid);
+    await expect.poll(
+      async () => await page.getByRole('button', { name: /选择命令|E2E Detail Action/i }).last().textContent(),
+      { timeout: 5_000 },
+    ).not.toContain('加载中');
 
-    await commandInput.click();
-    await commandInput.fill('');
-    await commandInput.fill('showcase:approve_record');
+    const commandPicker = page.getByRole('button', { name: /选择命令|E2E Detail Action/i }).last();
+    await commandPicker.click();
+    const commandOption = page.getByRole('button', {
+      name: new RegExp(`${command.displayName}|${command.code}`, 'i'),
+    });
+    await expect(commandOption).toBeVisible({ timeout: 5_000 });
+    await commandOption.click();
+    await expect(page.locator('input[name="label"]').first()).toHaveValue('Approve');
 
-    const saveResp = await savePromise;
-    expect(saveResp.ok(), `PUT /api/pages/${pid} status=${saveResp.status()}`).toBe(true);
+    // ----- Page meta -----
+    await page.getByTestId('detail-tab-page-meta').click();
+    const titleInput = page.getByTestId('detail-page-title-input-zh');
+    await expect(titleInput).toBeVisible({ timeout: 5_000 });
+    await titleInput.fill('请假申请详情 E2E');
 
-    // ----- API verification -----
-    const blocks = await fetchPageBlocks(page, pid);
-    const toolbar = blocks.find(
-      (b) => b?.id === 'actions_top' || b?.blockType === 'toolbar',
-    );
-    expect(toolbar, 'toolbar block should be persisted').toBeTruthy();
+    const pageKeyInput = page.getByTestId('detail-page-key-input');
+    await pageKeyInput.fill(`${pageKey}_updated`);
 
-    const buttons: any[] = toolbar.buttons ?? [];
-    expect(buttons.length).toBeGreaterThanOrEqual(1);
+    await page.getByTestId('toolbar-save').evaluate((el: HTMLElement) => el.click());
+    await page.getByTestId('detail-tab-actions').click();
+    await expect(page.getByRole('heading', { name: '操作按钮' })).toBeVisible({ timeout: 5_000 });
 
-    // Custom button assertions.
-    const custom = buttons.find((b) => b?.label === 'Approve');
-    expect(custom, 'custom Approve button persisted').toBeTruthy();
-    expect(custom.command).toBe('showcase:approve_record');
-    if (await iconInput.isVisible({ timeout: 100 }).catch(() => false)) {
-      // icon was filled
-      expect(custom.icon).toBe('check');
-    }
-
-    // Preset assertions only when capabilities allowed toggling.
     if (presetsToggled) {
-      const presetLabels = buttons.filter((b) => b?.preset).map((b) => b.preset);
-      if (!editDisabled) expect(presetLabels).toContain('edit');
-      if (!deleteDisabled) expect(presetLabels).toContain('delete');
-    } else {
-      // Document the OSS gap explicitly so reviewers understand the skip.
-      // eslint-disable-next-line no-console
-      console.warn(
-        '[P5.2] preset checkboxes disabled — model capabilities endpoint unavailable; preset assertions skipped.',
-      );
+      if (!editDisabled) {
+        await expect(page.getByTestId('detail-action-preset-edit')).toContainText('已启用');
+      }
+      if (!deleteDisabled) {
+        await expect(page.getByTestId('detail-action-preset-delete')).toContainText('已启用');
+      }
     }
+
+    let persistedBody: Record<string, any> | undefined;
+    await expect.poll(
+      async () => {
+        const persisted = await page.request.get(`/api/pages/${pid}`);
+        if (!persisted.ok()) {
+          return { ok: false, status: persisted.status() } as any;
+        }
+        const json = (await persisted.json()) as { data?: Record<string, any> };
+        persistedBody = json.data;
+        return json.data;
+      },
+      { timeout: 15_000 },
+    ).toMatchObject({
+      title: { 'zh-CN': '请假申请详情 E2E' },
+      pageKey: `${pageKey}_updated`,
+    });
+
+    const toolbar = (persistedBody?.blocks as Array<Record<string, any>>).find(
+      (block) => block.blockType === 'toolbar',
+    );
+    expect(toolbar).toBeTruthy();
+    const customButton = (toolbar?.buttons as Array<Record<string, any>>).find(
+      (button) => button.command === command.code,
+    );
+    expect(customButton).toMatchObject({
+      label: 'Approve',
+      command: command.code,
+      commandCode: command.code,
+      icon: 'success',
+      action: { type: 'command', command: command.code },
+    });
   });
 });

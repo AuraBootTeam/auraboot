@@ -12,12 +12,10 @@ interface ImageDisplayProps {
 }
 
 const ImageDisplay: React.FC<ImageDisplayProps> = ({
-  name,
   value,
   label,
   preview = true,
   className = '',
-  ...props
 }) => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 

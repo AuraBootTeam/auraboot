@@ -5,8 +5,8 @@
  * - TC-01: Page renders with stats cards and tabs
  * - TC-02: Tab switching (todo/completed/started/notifications)
  * - TC-03: Search filtering
- * - TC-04: Task detail drawer open/close
- * - TC-05: Task detail drawer tab navigation
+ * - TC-04: Task detail click navigates to detail page
+ * - TC-05: Task row "查看详情" uses the same detail-page navigation
  * - TC-06: Action menu visibility and entries
  * - TC-07: Approve dialog flow
  * - TC-08: Reject dialog flow
@@ -22,7 +22,7 @@
  * - TC-18: Stats cards display
  * - TC-19: Priority badge rendering
  * - TC-20: Due date countdown rendering
- * - TC-21: Detail drawer footer action buttons
+ * - TC-21: Process detail page opens from task center
  * - TC-22: Started tab (process table)
  * - TC-23: Completed tab (finished tasks or empty state)
  * - TC-24: Started tab process action menu entries
@@ -360,9 +360,9 @@ test.describe('BPM Task Center', () => {
     await expect(urgeContent.first()).toBeVisible({ timeout: 8000 });
   });
 
-  // ==================== Task Detail Drawer ====================
+  // ==================== Task Detail Navigation ====================
 
-  test('TC-04: Task detail drawer opens and closes', async ({ page }) => {
+  test('TC-04: Task detail click navigates to a detail page instead of opening a drawer', async ({ page }) => {
     test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
     const result = await gotoTaskCenter(page);
     if (result !== 'content') {
@@ -370,87 +370,40 @@ test.describe('BPM Task Center', () => {
     }
 
     if (!(await hasTaskRows(page))) {
-      test.skip(true, 'No tasks available to test drawer in current environment');
+      test.skip(true, 'No tasks available to test detail navigation in current environment');
     }
 
     const taskLinks = page.locator('table button.text-blue-600');
 
-    // Click first task name to open drawer
+    // Click first task name to navigate to detail page
     await taskLinks.first().click();
 
-    // Drawer should be visible
-    const drawer = page.locator('.fixed.right-0.w-\\[520px\\]');
-    await expect(drawer).toBeVisible({ timeout: 5000 });
-
-    // Drawer header should show task name or "任务详情"
-    await expect(drawer.locator('h2')).toBeVisible();
-
-    // Drawer should have tabs
-    await expect(drawer.locator('button:has-text("基本信息")')).toBeVisible();
-    await expect(drawer.locator('button:has-text("表单")')).toBeVisible();
-    await expect(drawer.locator('button:has-text("审批记录")')).toBeVisible();
-    await expect(drawer.locator('button:has-text("附件")')).toBeVisible();
-    await expect(drawer.locator('button:has-text("sla")')).toBeVisible();
-
-    // Close drawer via X button
-    const closeBtn = drawer.locator('button').filter({ has: page.locator('svg.lucide-x') });
-    await closeBtn.click();
-    await expect(drawer).not.toBeVisible({ timeout: 3000 });
+    await page.waitForURL(/\/p\/.+\/view\/|\/bpm\/process-status/, { timeout: 10_000 });
+    await expect(page.locator('[data-testid="task-detail-drawer"]')).toHaveCount(0);
   });
 
-  test('TC-05: Task detail drawer tab navigation', async ({ page }) => {
+  test('TC-05: Task row "查看详情" action uses the same detail-page navigation', async ({ page }) => {
     const result = await gotoTaskCenter(page);
     if (result !== 'content') {
       throw new Error(`Task center not available: ${result}`);
     }
 
     if (!(await hasTaskRows(page))) {
-      test.skip(true, 'No tasks available to test drawer tabs in current environment');
+      test.skip(true, 'No tasks available to test detail navigation in current environment');
       return;
     }
 
-    const taskLinks = page.locator('table button.text-blue-600');
+    const moreButtons = page
+      .locator('table button')
+      .filter({ has: page.locator('svg.lucide-ellipsis') });
+    await moreButtons.first().click();
 
-    // Open drawer
-    await taskLinks.first().click();
-    const drawer = page.locator('.fixed.right-0.w-\\[520px\\]');
-    await expect(drawer).toBeVisible({ timeout: 5000 });
+    const viewDetail = page.locator('button:has-text("查看详情")').first();
+    await expect(viewDetail).toBeVisible({ timeout: 5_000 });
+    await viewDetail.click();
 
-    // Default: info tab active
-    const infoTab = drawer.locator('button:has-text("基本信息")');
-    await expect(infoTab).toHaveClass(/border-blue-600/);
-
-    // Switch to form tab
-    const formTab = drawer.locator('button:has-text("表单")');
-    await formTab.click();
-    await expect(formTab).toHaveClass(/border-blue-600/);
-
-    // Form tab shows either form or "该任务未绑定表单"
-    const formContent = drawer
-      .locator('text=该任务未绑定表单')
-      .or(drawer.locator('form, .space-y-4'));
-    await expect(formContent.first()).toBeVisible({ timeout: 5000 });
-
-    // Switch to timeline tab
-    const timelineTab = drawer.locator('button:has-text("审批记录")');
-    await timelineTab.click();
-    await expect(timelineTab).toHaveClass(/border-blue-600/);
-
-    // Switch to SLA tab
-    const slaTab = drawer.locator('button:has-text("sla")');
-    await slaTab.click();
-    await expect(slaTab).toHaveClass(/border-blue-600/);
-
-    // SLA tab shows either records or empty state
-    const slaContent = drawer
-      .locator('text=暂无 SLA 记录')
-      .or(drawer.locator('.border.rounded-lg'));
-    await expect(slaContent.first()).toBeVisible({ timeout: 5000 });
-
-    // Close drawer via backdrop
-    const backdrop = page.locator('.fixed.inset-0.bg-black\\/20');
-    await backdrop.click();
-    await expect(drawer).not.toBeVisible({ timeout: 3000 });
+    await page.waitForURL(/\/p\/.+\/view\/|\/bpm\/process-status/, { timeout: 10_000 });
+    await expect(page.locator('[data-testid="task-detail-drawer"]')).toHaveCount(0);
   });
 
   // ==================== Action Menu ====================
@@ -863,9 +816,9 @@ test.describe('BPM Task Center', () => {
     }
   });
 
-  // ==================== Drawer Footer Actions ====================
+  // ==================== Detail Navigation ====================
 
-  test('TC-21: Detail drawer footer has action buttons', async ({ page }) => {
+  test('TC-21: Task center can open a process/detail page from a task row', async ({ page }) => {
     const result = await gotoTaskCenter(page);
     if (result !== 'content') {
       throw new Error(`Task center not available: ${result}`);
@@ -878,24 +831,8 @@ test.describe('BPM Task Center', () => {
     const taskLinks = page.locator('table button.text-blue-600');
 
     await taskLinks.first().click();
-    const drawer = page.locator('.fixed.right-0.w-\\[520px\\]');
-    await expect(drawer).toBeVisible({ timeout: 5000 });
-
-    // Footer should have action buttons
-    const footer = drawer.locator('.border-t');
-    await expect(footer).toBeVisible();
-
-    // "查看流程图" link
-    await expect(footer.locator('button:has-text("查看流程图")')).toBeVisible();
-
-    // Approve/Reject/Complete buttons
-    await expect(footer.locator('button:has-text("通过")')).toBeVisible();
-    await expect(footer.locator('button:has-text("驳回")')).toBeVisible();
-    await expect(footer.locator('button:has-text("完成")')).toBeVisible();
-
-    // Close
-    const closeBtn = drawer.locator('button').filter({ has: page.locator('svg.lucide-x') });
-    await closeBtn.click();
+    await page.waitForURL(/\/p\/.+\/view\/|\/bpm\/process-status/, { timeout: 10_000 });
+    await expect(page.locator('main')).toBeVisible();
   });
 
   // ==================== Started Tab (Process Table) ====================

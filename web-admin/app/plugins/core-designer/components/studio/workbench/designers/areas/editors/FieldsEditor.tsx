@@ -8,8 +8,12 @@
 
 import React, { useState, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import type { DslFieldRef, DslFieldOverride } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseFieldShorthand, resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import {
+  parseFieldShorthand,
+  resolveLocalizedText,
+  type DslFieldRef,
+  type DslFieldOverride,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface FieldsEditorProps {
   fields: DslFieldRef[];
@@ -22,7 +26,7 @@ export interface FieldsEditorProps {
 
 export const FieldsEditor: React.FC<FieldsEditorProps> = ({
   fields,
-  modelCode,
+  modelCode: _modelCode,
   blockId,
   onChange,
   readonly,
@@ -166,7 +170,7 @@ interface FieldItemProps {
 
 const FieldItem: React.FC<FieldItemProps> = ({
   field,
-  index,
+  index: _index,
   isExpanded,
   onToggle,
   onRemove,

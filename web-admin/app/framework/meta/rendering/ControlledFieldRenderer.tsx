@@ -22,13 +22,26 @@ import type { FieldConfig, DataSourceConfig } from '~/framework/meta/schemas/typ
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
+import { FieldError } from '~/ui/ui/field-meta';
 
 export interface ControlledFieldRendererProps {
   field: FieldConfig;
   value: any;
   onChange: (value: any) => void;
   context: ExpressionContext;
+  error?: string;
 }
+
+const SYSTEM_MODEL_ENDPOINTS: Record<
+  string,
+  { endpoint: string; valueField: string; labelField: string }
+> = {
+  sys_user: {
+    endpoint: '/api/admin/users/search',
+    valueField: 'pid',
+    labelField: 'displayName',
+  },
+};
 
 /**
  * Controlled 模式字段渲染器
@@ -43,9 +56,8 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   value,
   onChange,
   context,
+  error,
 }) => {
-  // 获取 locale 和 t 函数
-  const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
 
   // 条件渲染 - 检查 visibleWhen
@@ -53,8 +65,6 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     if (!field.visibleWhen) return true;
     return evaluateCondition(field.visibleWhen, context);
   }, [field.visibleWhen, context]);
-
-  if (!visible) return null;
 
   // 计算条件属性
   const disableExpr = field.disableWhen || (field as any).disabledWhen;
@@ -119,6 +129,8 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     }
   }
 
+  const componentLower = String(componentName).toLowerCase();
+
   // GAP-258: UI output adapters for pickers whose native shape does not match
   // backend field types. Backend is the source of truth (dataType:string), so we
   // narrow array outputs at the edge.
@@ -126,9 +138,26 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   //   most specific leaf as a single string. We forward the last non-empty value.
   // - memberpicker (multiple): component emits string[]; backend rejects arrays
   //   for string fields, so we serialize as a JSON string ('["id1","id2"]').
-  const componentLower = String(field.component || '').toLowerCase();
   const isMemberPickerMultiple =
     componentLower === 'memberpicker' && Boolean(field.props?.multiple);
+  const isUploadComponent = componentLower === 'upload' || componentLower === 'smartupload';
+  const expectsJsonObjectValue =
+    componentLower === 'daterange' ||
+    componentLower === 'timerangepicker' ||
+    componentLower === 'addressfield';
+
+  const parseJsonObject = (raw: unknown) => {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+    if (typeof raw !== 'string') return raw;
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return raw;
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : raw;
+    } catch {
+      return raw;
+    }
+  };
 
   const adaptedValue = useMemo(() => {
     if (componentLower === 'cascadeselect') {
@@ -150,8 +179,37 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       }
       return value;
     }
+    if (isUploadComponent) {
+      if (typeof value === 'string' && value.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            return parsed.map((item) => ({
+              uid:
+                typeof item?.fileId === 'string'
+                  ? item.fileId
+                  : typeof item?.url === 'string'
+                    ? item.url
+                    : `${item?.name || 'file'}-${item?.size || 0}`,
+              name: item?.name || 'file',
+              status: 'done',
+              url: item?.url,
+              size: item?.size,
+              type: item?.type,
+              response: item,
+            }));
+          }
+        } catch {
+          // Ignore malformed persisted file JSON and fall through to raw value.
+        }
+      }
+      return Array.isArray(value) ? value : [];
+    }
+    if (expectsJsonObjectValue) {
+      return parseJsonObject(value);
+    }
     return value;
-  }, [componentLower, isMemberPickerMultiple, value]);
+  }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, isUploadComponent, value]);
 
   const adaptedOnChange = useMemo(() => {
     if (componentLower === 'cascadeselect') {
@@ -181,8 +239,19 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
         onChange(next);
       };
     }
+    if (expectsJsonObjectValue) {
+      return (next: unknown) => {
+        if (next && typeof next === 'object') {
+          onChange(JSON.stringify(next));
+          return;
+        }
+        onChange(next);
+      };
+    }
     return onChange;
-  }, [componentLower, isMemberPickerMultiple, onChange]);
+  }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, onChange]);
+
+  if (!visible) return null;
 
   const componentProps: Record<string, any> = {
     name: field.field,
@@ -193,6 +262,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     disabled: isDisabled,
     readOnly: isReadOnly,
     required: isRequired,
+    error,
     context,
     ...field.props, // 合并字段配置的其他 props
   };
@@ -224,19 +294,33 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       (field as any).referenceModelCode;
     const labelField = refTarget?.targetField;
     if (targetModelCode) {
-      const referenceDataSource: DataSourceConfig = {
-        type: 'api',
-        endpoint: `/api/dynamic/${targetModelCode}/list`,
-        method: 'get',
-        params: { page: 1, pageSize: 200 },
-        adaptor: 'optionList',
-        valueField: 'pid',
-        autoFetch: true,
-      };
-      if (labelField) {
-        referenceDataSource.labelField = labelField;
+      const systemModel = SYSTEM_MODEL_ENDPOINTS[targetModelCode];
+      if (systemModel) {
+        componentProps.dataSource = {
+          type: 'api',
+          endpoint: systemModel.endpoint,
+          method: 'get',
+          params: { size: 200 },
+          adaptor: 'optionList',
+          valueField: systemModel.valueField,
+          labelField: labelField || systemModel.labelField,
+          autoFetch: true,
+        } satisfies DataSourceConfig;
+      } else {
+        const referenceDataSource: DataSourceConfig = {
+          type: 'api',
+          endpoint: `/api/dynamic/${targetModelCode}/list`,
+          method: 'get',
+          params: { page: 1, pageSize: 200 },
+          adaptor: 'optionList',
+          valueField: 'pid',
+          autoFetch: true,
+        };
+        if (labelField) {
+          referenceDataSource.labelField = labelField;
+        }
+        componentProps.dataSource = referenceDataSource;
       }
-      componentProps.dataSource = referenceDataSource;
     }
   } else if (field.dataSource) {
     // 如果有 dataSource 配置，传递给组件
@@ -288,7 +372,10 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
           {typeof value === 'object' ? JSON.stringify(value) : String(value)}
         </div>
       ) : (
-        <ComponentLoader componentName={componentName} props={componentProps} />
+        <>
+          <ComponentLoader componentName={componentName} props={componentProps} />
+          <FieldError message={error} />
+        </>
       )}
     </div>
   );

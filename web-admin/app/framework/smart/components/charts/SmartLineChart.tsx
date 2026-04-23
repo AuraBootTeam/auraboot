@@ -16,6 +16,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { ChartEmptyState } from './ChartEmptyState';
 
 /**
  * Props for SmartLineChart component
@@ -127,6 +128,7 @@ export const SmartLineChart: React.FC<SmartLineChartProps> = ({
     refreshInterval,
     enabled: isConfigured,
   });
+  const isEmpty = !loading && !error && !data?.rows?.length;
 
   /**
    * Handle chart click events for drill-down and linkage
@@ -310,6 +312,17 @@ export const SmartLineChart: React.FC<SmartLineChartProps> = ({
           <div className="text-sm text-gray-500">{error.message}</div>
         </div>
       </div>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <ChartEmptyState
+        title={title || 'No trend data yet'}
+        description="Trends appear automatically after incoming records create a timeline."
+        variant="line"
+        className={className}
+      />
     );
   }
 

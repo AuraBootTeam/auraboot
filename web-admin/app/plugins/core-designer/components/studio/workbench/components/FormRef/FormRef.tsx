@@ -4,7 +4,7 @@
  * 支持独立表单的引用和嵌入
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useStateContext } from '~/plugins/core-designer/components/studio/workbench/providers/StateProvider';
 import { FormRefManagerImpl } from '~/plugins/core-designer/components/studio/workbench/components/FormRef/FormRefManager';
 import { FormFieldRenderer } from '~/plugins/core-designer/components/studio/workbench/components/FormRef/FormFieldRenderer';
@@ -339,7 +339,7 @@ export const FormRef: React.FC<FormRefProps> = ({
         }
 
         // 提交表单
-        const result = await managerRef.current.submitForm(schema, formData);
+        await managerRef.current.submitForm(schema, formData);
 
         onSubmit?.(formData);
         setIsDirty(false);

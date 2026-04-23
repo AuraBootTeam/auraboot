@@ -6,6 +6,7 @@
 
 import React, { useCallback } from 'react';
 import { useLocalizedText } from '~/utils/i18n';
+import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
 
 // PropertySchema interface definition
 interface PropertySchema {
@@ -85,9 +86,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
       property.min,
       property.max,
       property.defaultValue,
-      property.key,
       onChange,
-      value,
     ],
   );
 
@@ -203,6 +202,25 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
               placeholder="#000000"
               className="flex-1"
               data-domain="input"
+            />
+          </div>
+        );
+
+      case 'icon':
+        return (
+          <div
+            data-domain="input"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+            }}
+            onFocus={(e: React.FocusEvent) => {
+              e.stopPropagation();
+            }}
+          >
+            <IconPicker
+              value={typeof value === 'string' ? value : ''}
+              onChange={onChange}
+              size="md"
             />
           </div>
         );

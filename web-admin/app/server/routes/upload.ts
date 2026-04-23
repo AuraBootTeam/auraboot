@@ -326,9 +326,6 @@ router.post('/admin/documents/upload', async (req: Request, res: Response) => {
  * Forwards multipart data to Spring Boot /api/file/upload.
  */
 router.post('/file/upload', async (req: Request, res: Response) => {
-  const startTime = Date.now();
-  const requestId = Math.random().toString(36).substring(7);
-
   const jwtToken = await extractJwtToken(req);
   if (!jwtToken && !req.headers.authorization) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
@@ -368,21 +365,37 @@ router.post('/file/upload', async (req: Request, res: Response) => {
           chunks.push(chunk as Buffer);
         }
         const fileBuffer = Buffer.concat(chunks);
-
-        const FormData = (await import('form-data')).default;
         const form = new FormData();
-        form.append('file', fileBuffer, { filename: info.filename, contentType: info.mimeType });
+        form.append(
+          'file',
+          new Blob([fileBuffer], { type: info.mimeType || 'application/octet-stream' }),
+          info.filename,
+        );
 
-        const response = await axios.post(`${SPRING_BOOT_URL}/api/file/upload`, form, {
+        const response = await fetch(`${SPRING_BOOT_URL}/api/file/upload`, {
+          method: 'POST',
+          body: form,
           headers: {
-            ...form.getHeaders(),
             Authorization: req.headers.authorization || (jwtToken ? `Bearer ${jwtToken}` : ''),
           },
-          maxBodyLength: Infinity,
-          timeout: UPLOAD_TIMEOUT,
         });
 
-        res.json(response.data);
+        const responseBody = await response.text();
+        const parsed =
+          responseBody && response.headers.get('content-type')?.includes('application/json')
+            ? JSON.parse(responseBody)
+            : responseBody;
+
+        if (!response.ok) {
+          res.status(response.status).json(
+            typeof parsed === 'object' && parsed
+              ? parsed
+              : { success: false, message: String(parsed || 'Upload failed') },
+          );
+          return;
+        }
+
+        res.json(parsed);
       } catch (error) {
         uploadError = error as Error;
         if (!res.headersSent) {

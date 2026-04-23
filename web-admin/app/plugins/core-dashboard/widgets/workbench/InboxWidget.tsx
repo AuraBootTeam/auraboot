@@ -68,7 +68,9 @@ export function InboxWidget({
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<number | null>(null);
 
-  const resolvedTitle = title || t('workbench.inbox.title', {}, 'Inbox');
+  const resolvedTitle = title
+    ? t(title)
+    : t('workbench.inbox.title');
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -122,10 +124,10 @@ export function InboxWidget({
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const hours = Math.floor(diff / 3600000);
-    if (hours < 1) return t('workbench.inbox.justNow', {}, 'Just now');
-    if (hours < 24) return t('workbench.inbox.hoursAgo', { hours }, `${hours}h ago`);
+    if (hours < 1) return t('workbench.inbox.justNow');
+    if (hours < 24) return t('workbench.inbox.hoursAgo', { hours });
     const days = Math.floor(hours / 24);
-    if (days < 7) return t('workbench.inbox.daysAgo', { days }, `${days}d ago`);
+    if (days < 7) return t('workbench.inbox.daysAgo', { days });
     return date.toLocaleDateString();
   };
 
@@ -137,12 +139,12 @@ export function InboxWidget({
 
   // --- Header ---
   const renderHeader = () => (
-    <div className="mb-3 flex items-center justify-between gap-2">
+    <div className="mb-3 flex items-center justify-between gap-2 px-3 pt-3">
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
         {urgentCount > 0 && (
           <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-            {urgentCount} {t('workbench.inbox.urgent', {}, 'urgent')}
+            {urgentCount} {t('workbench.inbox.urgent')}
           </span>
         )}
       </div>
@@ -152,7 +154,7 @@ export function InboxWidget({
             href="/inbox"
             className="whitespace-nowrap text-[11px] text-blue-500 hover:text-blue-600"
           >
-            {t('workbench.inbox.viewAll', {}, 'View all')} &rarr;
+            {t('workbench.inbox.viewAll')} &rarr;
           </a>
         )}
       </div>
@@ -161,7 +163,7 @@ export function InboxWidget({
 
   // --- Filter pills ---
   const renderFilters = () => (
-    <div className="mb-3 flex items-center gap-1">
+    <div className="mb-3 flex items-center gap-1 px-3">
       {FILTER_PILLS.map((pill) => {
         const isActive = activeFilter === pill.key;
         return (
@@ -175,7 +177,7 @@ export function InboxWidget({
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
-            {t(pill.labelKey, {}, pill.key ?? 'All')}
+            {t(pill.labelKey)}
           </button>
         );
       })}
@@ -201,10 +203,10 @@ export function InboxWidget({
       <div className={`flex h-full flex-col ${className}`}>
         {renderHeader()}
         {renderFilters()}
-        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
+        <div className="flex flex-1 flex-col items-center justify-center px-3 pb-3 text-gray-400">
           <span className="mb-1 text-2xl">{'\uD83C\uDF89'}</span>
           <span className="text-sm">
-            {t('workbench.inbox.empty', {}, 'No pending items')}
+            {t('workbench.inbox.empty')}
           </span>
         </div>
       </div>
@@ -216,7 +218,7 @@ export function InboxWidget({
     <div className={`flex h-full flex-col ${className}`}>
       {renderHeader()}
       {renderFilters()}
-      <div className="flex-1 space-y-2 overflow-y-auto">
+      <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-3">
         {items.map((item) => {
           const urgent = isUrgent(item);
           const iconBg = TYPE_ICON_BG[item.itemType] || 'bg-gray-100';
@@ -275,14 +277,14 @@ export function InboxWidget({
                   >
                     {isApproving
                       ? '...'
-                      : t('workbench.inbox.approve', {}, 'Approve')}
+                      : t('workbench.inbox.approve')}
                   </button>
                   <button
                     type="button"
                     onClick={(e) => handleView(e, item)}
                     className="rounded-md border border-gray-200 bg-white px-3 py-1 text-[11px] text-gray-600 hover:bg-gray-50"
                   >
-                    {t('workbench.inbox.view', {}, 'View')}
+                    {t('workbench.inbox.view')}
                   </button>
                 </div>
               )}

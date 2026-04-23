@@ -209,7 +209,7 @@ export class FieldBindingService {
   /**
    * Sync changes to component
    */
-  private syncToComponent(binding: FieldBinding, changes: FieldChanges): void {
+  private syncToComponent(_binding: FieldBinding, _changes: FieldChanges): void {
     // This will be connected to the designer store
     // For now, emit an event that can be handled by the store
   }

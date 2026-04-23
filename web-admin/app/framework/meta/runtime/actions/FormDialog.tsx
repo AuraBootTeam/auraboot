@@ -14,6 +14,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 
 interface FormFieldConfig {
   field: string;
@@ -112,7 +113,12 @@ export default function FormDialog() {
         const value = formData[field.field];
         if (value === undefined || value === null || value === '') {
           const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
-          newErrors[field.field] = `${label} ${t('common.validation.required') || 'is required'}`;
+          newErrors[field.field] = buildRequiredFieldMessage(label, {
+            dataType: field.type,
+            component: field.type,
+            locale,
+            t,
+          });
         }
       }
     }

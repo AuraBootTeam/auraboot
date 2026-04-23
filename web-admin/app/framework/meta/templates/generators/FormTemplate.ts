@@ -11,15 +11,15 @@
  */
 
 import type { UnifiedSchema, FieldConfig, BlockConfig, ButtonConfig } from '~/framework/meta/schemas/types';
-import type {
-  TemplateModelMeta,
-  TemplateOptions,
-  TemplateFieldMeta,
-  TemplateGenerator,
-  TemplateClassOverrides,
-  TemplateStyleSet,
+import {
+  TEMPLATE_STYLES,
+  type TemplateModelMeta,
+  type TemplateOptions,
+  type TemplateFieldMeta,
+  type TemplateGenerator,
+  type TemplateClassOverrides,
+  type TemplateStyleSet,
 } from '../types';
-import { TEMPLATE_STYLES } from '../types';
 import { mapFieldToComponent, buildValidationRules } from '../utils';
 
 export const FormTemplate: TemplateGenerator = {
@@ -29,11 +29,9 @@ export const FormTemplate: TemplateGenerator = {
       variant = 'default',
       formColumns = 2,
       classOverrides = {},
-      formMode = 'page',
     } = options;
 
     const styles = TEMPLATE_STYLES[variant] ?? TEMPLATE_STYLES.default;
-    const primaryKey = model.primaryKey ?? 'id';
     const apiBase = model.apiBasePath ?? `/api/dynamic/${model.modelCode}`;
 
     const formFields = model.fields.filter((f) => f.formVisible !== false);

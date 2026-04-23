@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { CrossColumnDragEnginePresets } from '~/plugins/core-designer/components/studio/services/layout/resize/CrossColumnDragEngine';
-import type {
+import {
+  CrossColumnDragEnginePresets,
   CrossColumnDragConfig,
   ResizeTarget,
 } from '~/plugins/core-designer/components/studio/services/layout/resize/CrossColumnDragEngine';
@@ -513,7 +513,7 @@ export const CrossColumnDragPanel: React.FC<CrossColumnDragPanelProps> = ({
   className = '',
 }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'handles' | 'behavior' | 'targets'>('basic');
-  const { resetConfig, applyPreset } = useCrossColumnDragConfig(config);
+  const { resetConfig, applyPreset: _applyPreset } = useCrossColumnDragConfig(config);
 
   const handleResetConfig = useCallback(() => {
     resetConfig();

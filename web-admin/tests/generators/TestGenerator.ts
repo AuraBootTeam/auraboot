@@ -10,7 +10,7 @@
  * @since 4.0.0
  */
 
-import type { TemplateFieldMeta, TemplateModelMeta } from '../../app/framework/meta/templates/types';
+import type { TemplateModelMeta } from '../../app/framework/meta/templates/types';
 
 export interface TestGenConfig {
   /** Model metadata */
@@ -86,7 +86,7 @@ export function generateTestSpec(config: TestGenConfig): string {
   return lines.join('\n');
 }
 
-function generateImports(config: TestGenConfig): string {
+function generateImports(_config: TestGenConfig): string {
   return `import { test, expect } from '../fixtures/auth.fixture';
 import { setupCrudMocks } from '../fixtures/api-mock.fixture';
 import { DynamicListPage } from '../pages/DynamicListPage';
@@ -96,7 +96,7 @@ import type { TemplateFieldMeta } from '../../app/framework/meta/templates/types
 }
 
 function generateSetup(config: TestGenConfig): string {
-  const { model, paths } = config;
+  const { model } = config;
   const fields = JSON.stringify(model.fields, null, 2);
 
   return `  const MODEL_CODE = '${model.modelCode}';
@@ -163,7 +163,7 @@ function generateListTests(config: TestGenConfig): string {
 }
 
 function generateCreateTests(config: TestGenConfig): string {
-  const { model, paths } = config;
+  const { paths } = config;
 
   const lines: string[] = [];
   lines.push(`  test.describe('Create Form', () => {`);
@@ -234,7 +234,7 @@ function generateValidationTests(config: TestGenConfig): string {
 }
 
 function generateEditTests(config: TestGenConfig): string {
-  const { model, paths } = config;
+  const { paths } = config;
 
   const lines: string[] = [];
   lines.push(`  test.describe('Edit Form', () => {`);
@@ -252,7 +252,7 @@ function generateEditTests(config: TestGenConfig): string {
 }
 
 function generateCrudFlowTest(config: TestGenConfig): string {
-  const { model, paths } = config;
+  const { paths } = config;
 
   const lines: string[] = [];
   lines.push(`  test.describe('CRUD Flow', () => {`);

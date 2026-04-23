@@ -2,13 +2,8 @@ import { ResultHelper } from '~/utils/type';
 import { fetchResult } from '~/shared/services/http-client';
 import type {
   OverviewSummaryRequest,
-  OverviewSummaryResponse,
   DeviceTrendRequest,
-  DeviceTrendResponse,
-  StoreDistributionResponse,
   ExportConfig,
-  ExportTaskResponse,
-  ExportTaskStatus,
 } from '~/routes/reports/overview/types';
 
 // API 基础路径

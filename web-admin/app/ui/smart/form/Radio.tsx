@@ -28,7 +28,6 @@ export const Radio = forwardRef<HTMLDivElement, RadioProps>(
       onChange,
       onBlur,
       className,
-      ...restProps
     },
     ref,
   ) => {
@@ -82,18 +81,10 @@ export const Radio = forwardRef<HTMLDivElement, RadioProps>(
     const actionError =
       actionData?.error?.data?.name === name ? actionData?.error?.data?.desc : undefined;
 
-    // 综合错误信息
-    const error = field.error || dataSourceError || actionError;
-
     // 处理单选框变化
     const handleRadioChange = (optionValue: string) => {
       field.setValue(optionValue);
     };
-
-    // 如果不应该渲染，返回 null
-    if (!shouldRender) {
-      return null;
-    }
 
     const radioElement = (
       <div className={clsx('space-y-2', inline ? 'flex-1' : 'w-full', className)}>
@@ -143,6 +134,10 @@ export const Radio = forwardRef<HTMLDivElement, RadioProps>(
       externalError: dataSourceError || actionError,
     });
     const errorText = meta.meta.error ? st(meta.meta.error) : undefined;
+
+    if (!shouldRender) {
+      return null;
+    }
 
     return (
       <FieldBase

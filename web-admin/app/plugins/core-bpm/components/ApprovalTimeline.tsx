@@ -9,7 +9,6 @@ import { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   XCircle,
-  Clock,
   PlayCircle,
   RefreshCw,
   User,
@@ -130,7 +129,7 @@ export function ApprovalTimeline({
     return () => {
       cancelled = true;
     };
-  }, [processInstanceId]);
+  }, [processInstanceId, showErrorToast]);
 
   if (loading) {
     return (
@@ -154,7 +153,6 @@ export function ApprovalTimeline({
         {entries.map((entry, index) => {
           const config = getConfig(entry.eventType);
           const Icon = config.icon;
-          const isLast = index === entries.length - 1;
 
           return (
             <div key={entry.id || index} className="relative flex items-start gap-3 py-2">

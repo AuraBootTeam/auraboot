@@ -74,13 +74,13 @@ export default defineConfig({
         target: `http://localhost:${process.env.BFF_PORT || '3500'}`,
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
+        configure: (proxy, _options) => {
           console.log(`🔔 Proxying SSE /api/notifications/stream to BFF server`);
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+          proxy.on('proxyReq', (proxyReq, _req, _res) => {
             proxyReq.setHeader('Cache-Control', 'no-cache');
             proxyReq.setHeader('Connection', 'keep-alive');
           });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes, _req, _res) => {
             proxyRes.headers['cache-control'] = 'no-cache';
             proxyRes.headers['x-accel-buffering'] = 'no';
           });
@@ -90,7 +90,7 @@ export default defineConfig({
         target: `http://localhost:${process.env.BFF_PORT || '3500'}`,
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
+        configure: (_proxy, _options) => {
           console.log(
             `🔗 Proxying /api/* requests to BFF server at http://localhost:${process.env.BFF_PORT || '3500'}`,
           );

@@ -12,17 +12,13 @@
  * - Keyboard support (Escape to close)
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import dayjs from 'dayjs';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
-import {
-  DynamicField,
-  buildApiEndpoint,
-  getLocalizedText,
-} from '~/routes/_shared/dynamic-route-utils';
+import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 
 // ============================================================================
 // Types
@@ -251,13 +247,11 @@ function FieldRow({
   field,
   value,
   modelCode,
-  locale,
   t,
 }: {
   field: PreviewField;
   value: unknown;
   modelCode: string;
-  locale: string;
   t: (key: string) => string;
 }) {
   const label = field.label || resolveFieldLabel(field.field, modelCode, t);

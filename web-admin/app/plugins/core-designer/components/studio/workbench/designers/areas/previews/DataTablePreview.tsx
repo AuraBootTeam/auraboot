@@ -5,8 +5,10 @@
  */
 
 import React from 'react';
-import type { DslBlock, DslColumnRef } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseColumnShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import {
+  parseColumnShorthand,
+  type DslBlock,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface DataTablePreviewProps {
   block: DslBlock;
@@ -135,7 +137,7 @@ interface CellPreviewProps {
   rowIndex: number;
 }
 
-const CellPreview: React.FC<CellPreviewProps> = ({ column, rowIndex }) => {
+const CellPreview: React.FC<CellPreviewProps> = ({ column, rowIndex: _rowIndex }) => {
   // Actions column
   if (column.field === '$actions' || column.actions) {
     return (

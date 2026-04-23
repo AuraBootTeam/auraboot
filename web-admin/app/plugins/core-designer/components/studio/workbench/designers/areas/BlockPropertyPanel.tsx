@@ -8,7 +8,6 @@
 
 import React, { useState, useEffect } from 'react';
 import type { DslBlock, DslFieldRef, DslFieldOverride } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseFieldShorthand } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { FieldsEditor } from './editors/FieldsEditor';
 import { ColumnsEditor } from './editors/ColumnsEditor';
 import { ActionsEditor } from './editors/ActionsEditor';

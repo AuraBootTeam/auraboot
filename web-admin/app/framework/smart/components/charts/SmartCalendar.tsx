@@ -51,7 +51,6 @@ export interface SmartCalendarProps {
 }
 
 // Color palette for category-based coloring
-const CATEGORY_COLORS: Record<string, string> = {};
 const PALETTE = [
   'bg-blue-500',
   'bg-green-500',
@@ -219,7 +218,7 @@ export const SmartCalendar: React.FC<SmartCalendarProps> = ({
   /**
    * Parse events from data rows
    */
-  const { events, eventsByDate, categories } = useMemo(() => {
+  const { events: _events, eventsByDate, categories } = useMemo(() => {
     if (!data?.rows?.length) {
       return {
         events: [],

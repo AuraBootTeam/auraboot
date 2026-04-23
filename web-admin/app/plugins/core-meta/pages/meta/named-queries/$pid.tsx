@@ -5,9 +5,13 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useParams, useLoaderData, useLocation } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
-import { namedQueryService } from '~/shared/services/namedQueryService';
+import {
+  useNavigate,
+  useParams,
+  useLoaderData,
+  useLocation,
+  type LoaderFunctionArgs,
+} from 'react-router';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 import type {
@@ -19,6 +23,7 @@ import type {
   NamedQueryTestResult,
   NamedQueryPolicyDTO,
   NamedQueryVersionDTO,
+  namedQueryService,
 } from '~/shared/services/namedQueryService';
 import { OPERATOR_LABELS } from './components/constants';
 import SqlEditor from './components/SqlEditor';

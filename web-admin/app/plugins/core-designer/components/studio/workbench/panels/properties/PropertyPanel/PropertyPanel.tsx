@@ -1,10 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import type {
   PropertyPanelProps,
-  ComponentType,
 } from '~/plugins/core-designer/components/studio/workbench/panels/properties/PropertyPanel/types';
 import { PropertyEditor } from '~/plugins/core-designer/components/studio/workbench/panels/properties/PropertyEditor';
-import { InputPropertyEditor } from '~/plugins/core-designer/components/studio/workbench/panels/properties/PropertyEditor/InputPropertyEditor';
 import { InputPropertyPanel } from '~/plugins/core-designer/components/studio/workbench/panels/properties/InputPropertyPanel';
 import { componentRegistry } from '~/framework/meta/registry/components';
 import { eventDomainManager } from '~/plugins/core-designer/components/studio/services/actions/event/EventDomainManager';

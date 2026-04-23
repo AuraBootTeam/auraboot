@@ -74,11 +74,6 @@ export function TemplatePreviewDialog({
     errorMessage: '',
   });
   const sseRef = useRef<EventSource | null>(null);
-  const token =
-    typeof document !== 'undefined'
-      ? (document.cookie.match(/(?:^|;\s*)token=([^;]+)/)?.[1] ?? '')
-      : '';
-
   // Cleanup SSE on unmount
   useEffect(() => {
     return () => {
@@ -368,8 +363,6 @@ function InstallingView({ progress }: { progress: ProgressState }) {
         {INSTALL_STEPS.map((step) => {
           const isActive = step.id === activeStep;
           const isDone = progress.progress >= step.maxPct;
-          const isPending = !isActive && !isDone;
-
           return (
             <div key={step.id} className="flex items-center gap-3">
               {/* Step indicator */}

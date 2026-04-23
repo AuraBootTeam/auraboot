@@ -29,6 +29,7 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
       <label className="mb-1 block text-xs font-medium text-gray-500">关联命令</label>
       <div className="flex items-center gap-1">
         <button
+          type="button"
           onClick={() => setOpen(!open)}
           className="flex flex-1 items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm hover:border-blue-400 focus:ring-1 focus:ring-blue-400 focus:outline-none"
           disabled={loading}
@@ -50,6 +51,7 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
           </svg>
         </button>
         <button
+          type="button"
           onClick={onRefresh}
           className="rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           title="刷新命令列表"
@@ -75,6 +77,7 @@ export const CommandSelector: React.FC<CommandSelectorProps> = ({
           ) : (
             commands.map((cmd) => (
               <button
+                type="button"
                 key={cmd.pid}
                 onClick={() => {
                   onChange(cmd.code, cmd);

@@ -5,7 +5,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type {
   Version,
-  VersionListResponse,
   VersionQueryParams,
   CreateVersionRequest,
   UpdateVersionRequest,
@@ -14,10 +13,7 @@ import type {
   VersionEvent,
   VersionEventListener,
   VersionSync,
-} from '~/plugins/core-designer/components/studio/domain/metadata/types';
-import {
   VersionStatus,
-  VersionType,
   VersionEventType,
   SyncStatus,
 } from '~/plugins/core-designer/components/studio/domain/metadata/types';
@@ -215,7 +211,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager, getActor],
+    [pageId, versionManager, getActor],
   );
 
   const publishVersion = useCallback(
@@ -239,7 +235,7 @@ export function useVersionOperations(pageId: string) {
         setLoading(false);
       }
     },
-    [versionManager, getActor],
+    [pageId, versionManager, getActor],
   );
 
   const unpublishVersion = useCallback(

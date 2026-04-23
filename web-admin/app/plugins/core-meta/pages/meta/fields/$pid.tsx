@@ -11,13 +11,11 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { useNavigate, useParams, useLoaderData, Link } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
+import { useNavigate, useParams, useLoaderData, Link, type LoaderFunctionArgs } from 'react-router';
 import { fieldService } from '~/shared/services/fieldService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { fieldLibraryService } from '~/shared/services/fieldLibraryService';
 import { useToastContext } from '~/contexts/ToastContext';
-import type { MetaFieldDTO } from '~/types/model';
 import type { FieldUsageInfo, FieldImpactAnalysis } from '~/types/fieldLibrary';
 
 /**
