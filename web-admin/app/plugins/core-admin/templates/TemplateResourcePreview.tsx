@@ -101,7 +101,18 @@ function OverviewView({ template, groups }: { template: AppTemplate; groups: Pre
           </span>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{template.name}</h1>
-            <span className="text-sm text-gray-500 dark:text-gray-400">{template.category}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 dark:text-gray-400">{template.category}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                  template.source === 'enterprise'
+                    ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                }`}
+              >
+                {template.source === 'enterprise' ? 'Enterprise' : 'OSS'}
+              </span>
+            </div>
           </div>
         </div>
         <p className="max-w-2xl text-base leading-relaxed text-gray-600 dark:text-gray-400">

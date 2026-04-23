@@ -35,4 +35,22 @@ export const RESOURCES: PluginResource[] = [
     permission: 'dashboard.view',
     file: './plugins/core-dashboard/pages/dashboards/view.$code.tsx',
   },
+  {
+    key: 'dashboard.designer.create',
+    path: '/dashboard-designer',
+    title: { en: 'Dashboard Designer', zh: '仪表板设计器' },
+    menu: false,
+    parentKey: 'dashboard.list',
+    permission: 'dashboard.view',
+    file: './routes/dashboard-designer.tsx',
+  },
+  {
+    key: 'dashboard.designer.edit',
+    path: '/dashboard-designer/:id',
+    title: { en: 'Edit Dashboard', zh: '编辑仪表板' },
+    menu: false,
+    parentKey: 'dashboard.list',
+    permission: 'dashboard.view',
+    file: './routes/dashboard-designer.$id.tsx',
+  },
 ]

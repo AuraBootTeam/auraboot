@@ -96,7 +96,18 @@ export function TemplatePreviewSidebar({
             >
               {template.name}
             </h2>
-            <span className="text-xs text-gray-500 dark:text-gray-400">{template.category}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400">{template.category}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                  template.source === 'enterprise'
+                    ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                }`}
+              >
+                {template.source === 'enterprise' ? 'Enterprise' : 'OSS'}
+              </span>
+            </div>
           </div>
         </div>
         <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">

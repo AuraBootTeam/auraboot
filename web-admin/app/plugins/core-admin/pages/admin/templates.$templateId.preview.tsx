@@ -15,7 +15,7 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { APP_TEMPLATES } from '~/plugins/core-admin/templates/templateCatalog';
+import { useTemplateCatalog } from '~/plugins/core-admin/templates/useTemplateCatalog';
 import { useTemplatePreview } from '~/plugins/core-admin/templates/useTemplatePreview';
 import {
   TemplatePreviewSidebar,
@@ -29,14 +29,24 @@ type InstallState = 'idle' | 'installing' | 'success' | 'error';
 export default function TemplatePreviewPage() {
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
+  const { templates, loading: catalogLoading } = useTemplateCatalog();
 
-  const template = APP_TEMPLATES.find((t) => t.id === templateId) ?? null;
+  const template = templates.find((t) => t.id === templateId) ?? null;
   const { groups, loading, error } = useTemplatePreview(template);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [installState, setInstallState] = useState<InstallState>('idle');
   const [installError, setInstallError] = useState('');
 
   // ── Not found ──────────────────────────────────────────────────────────────
+  if (catalogLoading && !template) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4">
+        <ArrowPathIcon className="h-10 w-10 animate-spin text-gray-400" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading template catalog...</p>
+      </div>
+    );
+  }
+
   if (!template) {
     return (
       <div
