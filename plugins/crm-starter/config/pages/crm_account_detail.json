@@ -109,6 +109,25 @@
                 "childModel": "crm_contact",
                 "parentField": "crm_ct_account_id",
                 "readOnly": false,
+                "commands": {
+                  "create": "crm:create_contact",
+                  "update": "crm:update_contact",
+                  "delete": "crm:delete_contact"
+                },
+                "emptyState": {
+                  "title": {
+                    "zh-CN": "暂无联系人",
+                    "en-US": "No contacts yet"
+                  },
+                  "description": {
+                    "zh-CN": "该客户尚未录入对接人，建议先添加主联系人。",
+                    "en-US": "No stakeholder has been recorded for this account yet. Add a primary contact first."
+                  },
+                  "actionLabel": {
+                    "zh-CN": "添加联系人",
+                    "en-US": "Add Contact"
+                  }
+                },
                 "columns": [
                   {
                     "field": "crm_ct_name",
