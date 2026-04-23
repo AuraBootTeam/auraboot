@@ -429,6 +429,31 @@ public class PluginManifestExtended extends PluginManifest {
             }
         }
 
+        // Validate pages
+        if (pages != null) {
+            for (int i = 0; i < pages.size(); i++) {
+                PageSchemaDTO page = pages.get(i);
+                if (page == null) {
+                    continue;
+                }
+                String prefix = "pages[" + i + "]";
+                if (page.getPageKey() == null || page.getPageKey().isBlank()) {
+                    errors.add(prefix + ": pageKey is required");
+                }
+                if (page.getKind() == null || page.getKind().isBlank()) {
+                    errors.add(prefix + " (" + page.getPageKey() + "): kind is required");
+                }
+                if (page.getLayout() == null || page.getLayout().isEmpty()) {
+                    errors.add(prefix + " (" + page.getPageKey() + "): layout is required. " +
+                            "Page JSON must use the latest V2 flat format with top-level kind/layout/blocks");
+                }
+                if (page.getBlocks() == null || page.getBlocks().isEmpty()) {
+                    errors.add(prefix + " (" + page.getPageKey() + "): blocks is required and cannot be empty. " +
+                            "Page JSON must use the latest V2 flat format with top-level kind/layout/blocks");
+                }
+            }
+        }
+
         return errors;
     }
 
