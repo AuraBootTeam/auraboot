@@ -12,8 +12,6 @@
 
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5173';
-
 test.describe('Unified Inbox', () => {
   let inboxAvailable = true;
 
@@ -21,7 +19,9 @@ test.describe('Unified Inbox', () => {
     const ctx = await browser.newContext({ storageState: './tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
-      const resp = await page.request.get('/api/inbox?pageNum=1&pageSize=1', { failOnStatusCode: false });
+      const resp = await page.request.get('/api/inbox?pageNum=1&pageSize=1', {
+        failOnStatusCode: false,
+      });
       if (!resp.ok()) {
         inboxAvailable = false;
       }
@@ -59,6 +59,13 @@ test.describe('Unified Inbox', () => {
 
     // Mark all read button visible
     await expect(page.getByTestId('inbox-mark-all-read')).toBeVisible();
+
+    // Summary and refresh affordances visible
+    await expect(page.getByTestId('inbox-summary-cards')).toBeVisible();
+    await expect(page.getByTestId('inbox-refresh')).toBeVisible();
+
+    // Primary toolbar is visible
+    await expect(page.getByTestId('inbox-primary-toolbar')).toBeVisible();
   });
 
   test('tab filtering changes displayed items', async ({ page }) => {
@@ -99,8 +106,7 @@ test.describe('Unified Inbox', () => {
   test('status filter changes displayed items', async ({ page }) => {
     // Click "All" status filter and wait for the API response
     const responsePromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/inbox') && resp.request().method() === 'GET',
+      (resp) => resp.url().includes('/api/inbox') && resp.request().method() === 'GET',
     );
     await page.getByTestId('inbox-status-all').click();
     const response = await responsePromise;
@@ -121,8 +127,7 @@ test.describe('Unified Inbox', () => {
     await alertResponsePromise;
 
     const closedResponsePromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/inbox') && resp.request().method() === 'GET',
+      (resp) => resp.url().includes('/api/inbox') && resp.request().method() === 'GET',
     );
     await page.getByTestId('inbox-status-closed').click();
     await closedResponsePromise;
@@ -146,8 +151,7 @@ test.describe('Unified Inbox', () => {
 
     // Set up response listener BEFORE clicking — match any inbox-related PUT
     const responsePromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/inbox') && resp.request().method() === 'PUT',
+      (resp) => resp.url().includes('/api/inbox') && resp.request().method() === 'PUT',
       { timeout: 10_000 },
     );
 
