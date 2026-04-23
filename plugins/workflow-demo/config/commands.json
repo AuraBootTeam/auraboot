@@ -9,7 +9,9 @@
       "wd_req_applicant",
       "wd_req_type",
       "wd_req_start_date",
+      "wd_req_start_slot",
       "wd_req_end_date",
+      "wd_req_end_slot",
       "wd_req_days",
       "wd_req_reason",
       "wd_req_attachments",
@@ -28,7 +30,7 @@
     "permissions": [
       "wd.leave_request.manage"
     ],
-    "agent_hint": "Create a draft leave request. Key inputs: applicant, type, start_date, end_date, days.",
+    "agent_hint": "Create a draft leave request. Key inputs: applicant, type, start_date, start_slot, end_date, end_slot, days.",
     "cmd_risk_level": "L1"
   },
   {
@@ -40,7 +42,9 @@
     "inputFields": [
       "wd_req_type",
       "wd_req_start_date",
+      "wd_req_start_slot",
       "wd_req_end_date",
+      "wd_req_end_slot",
       "wd_req_days",
       "wd_req_reason",
       "wd_req_attachments",
@@ -100,6 +104,28 @@
     "extension": {
       "confirmMessage:zh-CN": "确认提交该请假申请？提交后将进入审批流程。",
       "confirmMessage:en": "Confirm submission? The request will enter the approval workflow."
+    }
+  },
+  {
+    "code": "wd:cancel_leave_request",
+    "displayName:zh-CN": "撤销申请",
+    "displayName:en": "Cancel Leave Request",
+    "type": "state_transition",
+    "modelCode": "wd_leave_request",
+    "stateField": "wd_req_status",
+    "fromStates": [
+      "submitted",
+      "approving"
+    ],
+    "toState": "cancelled",
+    "permissions": [
+      "wd.leave_request.submit"
+    ],
+    "agent_hint": "Withdraw a submitted leave request before approval completes.",
+    "cmd_risk_level": "L2",
+    "extension": {
+      "confirmMessage:zh-CN": "确认撤销该请假申请？撤销后当前审批任务会被关闭。",
+      "confirmMessage:en": "Cancel this leave request? The current approval task will be closed."
     }
   },
   {

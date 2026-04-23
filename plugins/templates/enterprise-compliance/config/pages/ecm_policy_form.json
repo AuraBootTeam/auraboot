@@ -1,1 +1,91 @@
-{"pageKey":"ecm_policy_form","name:zh-CN":"政策表单","name:en":"Policy Form","pageType":"form","modelCode":"ecm_policy","dslSchema":{"id":"form.ecm_policy","kind":"Form","version":"1.0.0","modelCode":"ecm_policy","layout":{"areas":["main","footer"],"areasConfig":{"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16},"footer":{"type":"flex","direction":"row"}}},"areas":{"main":{"blocks":[{"id":"basic","blockType":"form-section","title":{"zh-CN":"政策信息","en-US":"Policy Information"},"fields":[{"field":"ecm_po_title","colSpan":12},{"field":"ecm_po_category","colSpan":6},{"field":"ecm_po_version","colSpan":6},{"field":"ecm_po_owner","colSpan":6},{"field":"ecm_po_effective_date","colSpan":3},{"field":"ecm_po_review_date","colSpan":3},{"field":"ecm_po_description","colSpan":12},{"field":"ecm_po_notes","colSpan":12}]}]},"footer":{"blocks":[{"id":"buttons","blockType":"form-buttons","buttons":[{"code":"submit","action":"save","commandCode":"ecm:update_policy","primary":true},{"code":"cancel","action":"cancel"}]}]}}}}
+{
+  "pageKey": "ecm_policy_form",
+  "name:zh-CN": "政策表单",
+  "name:en": "Policy Form",
+  "modelCode": "ecm_policy",
+  "kind": "form",
+  "title": {
+    "zh-CN": "政策表单",
+    "en": "Policy Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "footer": {
+        "type": "flex",
+        "direction": "row"
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "政策信息",
+        "en-US": "Policy Information"
+      },
+      "fields": [
+        {
+          "field": "ecm_po_title",
+          "colSpan": 12
+        },
+        {
+          "field": "ecm_po_category",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_po_version",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_po_owner",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_po_effective_date",
+          "colSpan": 3
+        },
+        {
+          "field": "ecm_po_review_date",
+          "colSpan": 3
+        },
+        {
+          "field": "ecm_po_description",
+          "colSpan": 12
+        },
+        {
+          "field": "ecm_po_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "ecm:create_policy",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
+}

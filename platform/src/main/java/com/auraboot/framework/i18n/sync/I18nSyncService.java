@@ -103,7 +103,7 @@ public class I18nSyncService {
 
             while (hasMore) {
                 PageResult<MetaModelDTO> pageResult = metaModelService.searchModels(
-                    page, PAGE_SIZE, null, null, null, null, null, true
+                    page, PAGE_SIZE, null, null, null, null, null, null, null, null, true
                 );
 
                 List<MetaModelDTO> models = pageResult.getRecords();

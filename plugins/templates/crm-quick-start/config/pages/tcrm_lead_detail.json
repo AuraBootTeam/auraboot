@@ -2,53 +2,113 @@
   "pageKey": "tcrm_lead_detail",
   "name:zh-CN": "线索详情",
   "name:en": "Lead Detail",
-  "pageType": "detail",
+  "kind": "detail",
   "modelCode": "tcrm_lead",
-  "dslSchema": {
-    "id": "detail.tcrm_lead",
-    "kind": "Detail",
-    "version": "1.0.0",
-    "modelCode": "tcrm_lead",
-    "layout": {
-      "areas": ["header", "main"],
-      "areasConfig": {
-        "header": { "type": "flex", "direction": "row" },
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 }
-      }
-    },
-    "areas": {
+  "title": {
+    "zh-CN": "线索详情",
+    "en": "Lead Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main"
+    ],
+    "areasConfig": {
       "header": {
-        "blocks": [{
-          "id": "action_bar",
-          "blockType": "toolbar",
-          "buttons": [
-            { "code": "edit", "action": "edit", "navigateTo": "tcrm_lead_form", "permissionCode": "TCRM.lead.manage" },
-            { "code": "contact_lead", "commandCode": "tcrm:contact_lead", "permissionCode": "TCRM.lead.manage" },
-            { "code": "qualify_lead", "commandCode": "tcrm:qualify_lead", "permissionCode": "TCRM.lead.manage" },
-            { "code": "lose_lead", "commandCode": "tcrm:lose_lead", "permissionCode": "TCRM.lead.manage" },
-            { "code": "delete", "action": "delete", "danger": true, "commandCode": "tcrm:delete_lead", "permissionCode": "TCRM.lead.manage", "confirmMessageKey": "delete.confirm" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       },
       "main": {
-        "blocks": [{
-          "id": "info",
-          "blockType": "form-section",
-          "readOnly": true,
-          "title": { "zh-CN": "线索信息", "en-US": "Lead Information" },
-          "fields": [
-            { "field": "tcrm_ld_code", "colSpan": 6 },
-            { "field": "tcrm_ld_name", "colSpan": 6 },
-            { "field": "tcrm_ld_company", "colSpan": 6 },
-            { "field": "tcrm_ld_status", "colSpan": 6 },
-            { "field": "tcrm_ld_email", "colSpan": 6 },
-            { "field": "tcrm_ld_phone", "colSpan": 6 },
-            { "field": "tcrm_ld_source", "colSpan": 6 },
-            { "field": "tcrm_ld_assignee", "colSpan": 6 },
-            { "field": "tcrm_ld_notes", "colSpan": 12 }
-          ]
-        }]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "tcrm.lead.manage"
+        },
+        {
+          "code": "contact_lead",
+          "commandCode": "tcrm:contact_lead",
+          "permissionCode": "tcrm.lead.manage"
+        },
+        {
+          "code": "qualify_lead",
+          "commandCode": "tcrm:qualify_lead",
+          "permissionCode": "tcrm.lead.manage"
+        },
+        {
+          "code": "lose_lead",
+          "commandCode": "tcrm:lose_lead",
+          "permissionCode": "tcrm.lead.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "tcrm:delete_lead",
+          "permissionCode": "tcrm.lead.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "线索信息",
+        "en-US": "Lead Information"
+      },
+      "fields": [
+        {
+          "field": "tcrm_ld_code",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ld_name",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ld_company",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ld_status",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ld_email",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ld_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ld_source",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ld_assignee",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ld_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    }
+  ]
 }

@@ -1,7 +1,126 @@
 [
-  {"code":"ehr:create_attendance","displayName:zh-CN":"新建考勤","displayName:en":"Create Attendance","type":"create","modelCode":"ehr_attendance","inputFields":["ehr_at_employee_id","ehr_at_date","ehr_at_check_in","ehr_at_check_out","ehr_at_type","ehr_at_overtime_hours","ehr_at_notes"],"autoSetFields":{"ehr_at_code":{"strategy":"auto_generate","pattern":"ATT-{yyyyMMdd}-{seq}"}},"permissions":["EHR.attendance.manage"],"agent_hint":"Create attendance record. Required: employee, date.","cmd_risk_level":"L1","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns the created attendance record.","example_input":{"ehr_at_date":"2026-03-18","ehr_at_type":"normal"},"idempotent":false,"reversible":true},
-  {"code":"ehr:update_attendance","displayName:zh-CN":"编辑考勤","displayName:en":"Update Attendance","type":"update","modelCode":"ehr_attendance","inputFields":["ehr_at_check_in","ehr_at_check_out","ehr_at_type","ehr_at_overtime_hours","ehr_at_notes"],"permissions":["EHR.attendance.manage"],"agent_hint":"Update attendance record.","cmd_risk_level":"L1","precondition_description":"Attendance record must exist.","side_effect_description":null,"output_description":"Returns the updated attendance record.","example_input":{"ehr_at_overtime_hours":2.0},"idempotent":true,"reversible":true},
-  {"code":"ehr:delete_attendance","displayName:zh-CN":"删除考勤","displayName:en":"Delete Attendance","type":"delete","modelCode":"ehr_attendance","extension":{"confirmMessage:zh-CN":"确认删除此考勤记录？","confirmMessage:en":"Confirm delete?"},"permissions":["EHR.attendance.manage"],"agent_hint":"Delete attendance record.","cmd_risk_level":"L3","precondition_description":"Attendance record must exist.","side_effect_description":null,"output_description":"Attendance record is permanently removed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ehr:detail_attendance","displayName:zh-CN":"查看考勤","displayName:en":"View Attendance","type":"query","modelCode":"ehr_attendance","permissions":["EHR.attendance.read"],"agent_hint":"Retrieve attendance record by ID.","cmd_risk_level":"L0","precondition_description":"Record must exist.","side_effect_description":null,"output_description":"Returns the full attendance record.","example_input":{},"idempotent":true,"reversible":true},
-  {"code":"ehr:list_attendance","displayName:zh-CN":"考勤列表","displayName:en":"List Attendance","type":"query","modelCode":"ehr_attendance","permissions":["EHR.attendance.read"],"agent_hint":"Query attendance records with pagination.","cmd_risk_level":"L0","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns a paginated list of attendance records.","example_input":{"pageNum":1,"pageSize":20},"idempotent":true,"reversible":true}
+  {
+    "code": "ehr:create_attendance",
+    "displayName:zh-CN": "新建考勤",
+    "displayName:en": "Create Attendance",
+    "type": "create",
+    "modelCode": "ehr_attendance",
+    "inputFields": [
+      "ehr_at_employee_id",
+      "ehr_at_date",
+      "ehr_at_check_in",
+      "ehr_at_check_out",
+      "ehr_at_type",
+      "ehr_at_overtime_hours",
+      "ehr_at_notes"
+    ],
+    "autoSetFields": {
+      "ehr_at_code": {
+        "strategy": "auto_generate",
+        "pattern": "ATT-{yyyyMMdd}-{seq}"
+      }
+    },
+    "permissions": [
+      "ehr.attendance.manage"
+    ],
+    "agent_hint": "Create attendance record. Required: employee, date.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns the created attendance record.",
+    "example_input": {
+      "ehr_at_date": "2026-03-18",
+      "ehr_at_type": "normal"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "ehr:update_attendance",
+    "displayName:zh-CN": "编辑考勤",
+    "displayName:en": "Update Attendance",
+    "type": "update",
+    "modelCode": "ehr_attendance",
+    "inputFields": [
+      "ehr_at_check_in",
+      "ehr_at_check_out",
+      "ehr_at_type",
+      "ehr_at_overtime_hours",
+      "ehr_at_notes"
+    ],
+    "permissions": [
+      "ehr.attendance.manage"
+    ],
+    "agent_hint": "Update attendance record.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Attendance record must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated attendance record.",
+    "example_input": {
+      "ehr_at_overtime_hours": 2.0
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "ehr:delete_attendance",
+    "displayName:zh-CN": "删除考勤",
+    "displayName:en": "Delete Attendance",
+    "type": "delete",
+    "modelCode": "ehr_attendance",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此考勤记录？",
+      "confirmMessage:en": "Confirm delete?"
+    },
+    "permissions": [
+      "ehr.attendance.manage"
+    ],
+    "agent_hint": "Delete attendance record.",
+    "cmd_risk_level": "L3",
+    "precondition_description": "Attendance record must exist.",
+    "side_effect_description": null,
+    "output_description": "Attendance record is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ehr:detail_attendance",
+    "displayName:zh-CN": "查看考勤",
+    "displayName:en": "View Attendance",
+    "type": "query",
+    "modelCode": "ehr_attendance",
+    "permissions": [
+      "ehr.attendance.read"
+    ],
+    "agent_hint": "Retrieve attendance record by ID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Record must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full attendance record.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "ehr:list_attendance",
+    "displayName:zh-CN": "考勤列表",
+    "displayName:en": "List Attendance",
+    "type": "query",
+    "modelCode": "ehr_attendance",
+    "permissions": [
+      "ehr.attendance.read"
+    ],
+    "agent_hint": "Query attendance records with pagination.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of attendance records.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
+    "idempotent": true,
+    "reversible": true
+  }
 ]

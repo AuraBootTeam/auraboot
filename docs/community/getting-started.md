@@ -53,6 +53,8 @@ pnpm dev:full
 
 This launches Vite + the BFF on `http://localhost:5173`.
 
+`pnpm dev:full` is intended for foreground development. If you need a background setup, run `pnpm sync-plugins` once and then launch `pnpm dev:web` and `pnpm dev:bff` separately.
+
 ## 5. Log in
 
 Open `http://localhost:5173` and sign in with:
@@ -84,6 +86,7 @@ A successful `UP` response means the database connection, Redis, and core subsys
 - **`bootRun` fails with `relation does not exist`** — re-run `./scripts/oss-reset-and-init.sh`; the schema is out of sync.
 - **Frontend shows `undefined/api/...` in the network tab** — set `SPRING_BOOT_URL=http://127.0.0.1:6443` in `web-admin/.env.local`.
 - **`pnpm dev:full` cannot reach the backend** — prefix the command with `NO_PROXY=localhost` if you have a system HTTP proxy.
+- **Need frontend in background mode** — do not run `nohup pnpm dev:full`. Use `pnpm sync-plugins`, then start `nohup pnpm dev:web` and `nohup pnpm dev:bff` separately.
 - **Port already in use** — `pkill -f MetaApplication` (backend) or `pkill -f "bff.server"` (frontend), then retry.
 
 For deeper issues please open a [GitHub issue](https://github.com/AuraBootTeam/auraboot/issues) with the failing command and its full output.

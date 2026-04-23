@@ -1,1 +1,278 @@
-{"pageKey":"ehr_employee_detail","name:zh-CN":"员工详情","name:en":"Employee Detail","pageType":"detail","modelCode":"ehr_employee","dslSchema":{"id":"detail.ehr_employee","kind":"Detail","version":"1.0.0","modelCode":"ehr_employee","layout":{"areas":["header","main","sub-tables"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16},"sub-tables":{"type":"stack"}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"ehr_employee_form","permissionCode":"EHR.employee.manage"},{"code":"confirm_employee","commandCode":"ehr:confirm_employee","permissionCode":"EHR.employee.manage"},{"code":"employee_on_leave","commandCode":"ehr:employee_on_leave","permissionCode":"EHR.employee.manage"},{"code":"employee_return","commandCode":"ehr:employee_return","permissionCode":"EHR.employee.manage"},{"code":"resign_employee","commandCode":"ehr:resign_employee","permissionCode":"EHR.employee.manage"},{"code":"terminate_employee","commandCode":"ehr:terminate_employee","permissionCode":"EHR.employee.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"ehr:delete_employee","permissionCode":"EHR.employee.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"basic_info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"基本信息","en-US":"Basic Information"},"fields":[{"field":"ehr_em_code","colSpan":6},{"field":"ehr_em_name","colSpan":6},{"field":"ehr_em_email","colSpan":6},{"field":"ehr_em_phone","colSpan":6},{"field":"ehr_em_gender","colSpan":6},{"field":"ehr_em_birth_date","colSpan":6}]},{"id":"employment_info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"工作信息","en-US":"Employment Information"},"fields":[{"field":"ehr_em_department_id","colSpan":6},{"field":"ehr_em_position_id","colSpan":6},{"field":"ehr_em_hire_date","colSpan":6},{"field":"ehr_em_status","colSpan":6},{"field":"ehr_em_base_salary","colSpan":6},{"field":"ehr_em_emergency_contact","colSpan":6},{"field":"ehr_em_address","colSpan":12},{"field":"ehr_em_notes","colSpan":12}]}]},"sub-tables":{"blocks":[{"id":"attendance","blockType":"sub-table","title":{"zh-CN":"考勤记录","en-US":"Attendance Records"},"modelCode":"ehr_attendance","foreignKey":"ehr_at_employee_id","columns":[{"field":"ehr_at_code","width":140},{"field":"ehr_at_date","width":120},{"field":"ehr_at_check_in","width":100},{"field":"ehr_at_check_out","width":100},{"field":"ehr_at_type","width":100,"renderType":"tag","dictCode":"ehr_attendance_type"},{"field":"ehr_at_overtime_hours","width":100}],"createCommandCode":"ehr:create_attendance"},{"id":"leave_requests","blockType":"sub-table","title":{"zh-CN":"请假记录","en-US":"Leave Requests"},"modelCode":"ehr_leave_request","foreignKey":"ehr_lv_employee_id","columns":[{"field":"ehr_lv_code","width":140},{"field":"ehr_lv_leave_type","width":100,"renderType":"tag","dictCode":"ehr_leave_type"},{"field":"ehr_lv_start_date","width":120},{"field":"ehr_lv_end_date","width":120},{"field":"ehr_lv_days","width":80},{"field":"ehr_lv_status","width":110,"renderType":"tag","dictCode":"ehr_leave_status"}],"createCommandCode":"ehr:create_leave"},{"id":"payroll","blockType":"sub-table","title":{"zh-CN":"薪资记录","en-US":"Payroll Records"},"modelCode":"ehr_payroll","foreignKey":"ehr_pr_employee_id","columns":[{"field":"ehr_pr_code","width":140},{"field":"ehr_pr_period","width":100},{"field":"ehr_pr_base_salary","width":120},{"field":"ehr_pr_net_pay","width":120},{"field":"ehr_pr_status","width":110,"renderType":"tag","dictCode":"ehr_payroll_status"}],"createCommandCode":"ehr:create_payroll"}]}}}}
+{
+  "pageKey": "ehr_employee_detail",
+  "name:zh-CN": "员工详情",
+  "name:en": "Employee Detail",
+  "modelCode": "ehr_employee",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "员工详情",
+    "en": "Employee Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main",
+      "sub-tables"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "sub-tables": {
+        "type": "stack"
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "ehr.employee.manage"
+        },
+        {
+          "code": "confirm_employee",
+          "commandCode": "ehr:confirm_employee",
+          "permissionCode": "ehr.employee.manage"
+        },
+        {
+          "code": "employee_on_leave",
+          "commandCode": "ehr:employee_on_leave",
+          "permissionCode": "ehr.employee.manage"
+        },
+        {
+          "code": "employee_return",
+          "commandCode": "ehr:employee_return",
+          "permissionCode": "ehr.employee.manage"
+        },
+        {
+          "code": "resign_employee",
+          "commandCode": "ehr:resign_employee",
+          "permissionCode": "ehr.employee.manage"
+        },
+        {
+          "code": "terminate_employee",
+          "commandCode": "ehr:terminate_employee",
+          "permissionCode": "ehr.employee.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "ehr:delete_employee",
+          "permissionCode": "ehr.employee.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "basic_info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "基本信息",
+        "en-US": "Basic Information"
+      },
+      "fields": [
+        {
+          "field": "ehr_em_code",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_name",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_email",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_gender",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_birth_date",
+          "colSpan": 6
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "employment_info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "工作信息",
+        "en-US": "Employment Information"
+      },
+      "fields": [
+        {
+          "field": "ehr_em_department_id",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_position_id",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_hire_date",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_status",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_base_salary",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_emergency_contact",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_em_address",
+          "colSpan": 12
+        },
+        {
+          "field": "ehr_em_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "attendance",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "考勤记录",
+        "en-US": "Attendance Records"
+      },
+      "modelCode": "ehr_attendance",
+      "foreignKey": "ehr_at_employee_id",
+      "columns": [
+        {
+          "field": "ehr_at_code",
+          "width": 140
+        },
+        {
+          "field": "ehr_at_date",
+          "width": 120
+        },
+        {
+          "field": "ehr_at_check_in",
+          "width": 100
+        },
+        {
+          "field": "ehr_at_check_out",
+          "width": 100
+        },
+        {
+          "field": "ehr_at_type",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "ehr_attendance_type"
+        },
+        {
+          "field": "ehr_at_overtime_hours",
+          "width": 100
+        }
+      ],
+      "createCommandCode": "ehr:create_attendance",
+      "area": "sub-tables"
+    },
+    {
+      "id": "leave_requests",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "请假记录",
+        "en-US": "Leave Requests"
+      },
+      "modelCode": "ehr_leave_request",
+      "foreignKey": "ehr_lv_employee_id",
+      "columns": [
+        {
+          "field": "ehr_lv_code",
+          "width": 140
+        },
+        {
+          "field": "ehr_lv_leave_type",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "ehr_leave_type"
+        },
+        {
+          "field": "ehr_lv_start_date",
+          "width": 120
+        },
+        {
+          "field": "ehr_lv_end_date",
+          "width": 120
+        },
+        {
+          "field": "ehr_lv_days",
+          "width": 80
+        },
+        {
+          "field": "ehr_lv_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "ehr_leave_status"
+        }
+      ],
+      "createCommandCode": "ehr:create_leave",
+      "area": "sub-tables"
+    },
+    {
+      "id": "payroll",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "薪资记录",
+        "en-US": "Payroll Records"
+      },
+      "modelCode": "ehr_payroll",
+      "foreignKey": "ehr_pr_employee_id",
+      "columns": [
+        {
+          "field": "ehr_pr_code",
+          "width": 140
+        },
+        {
+          "field": "ehr_pr_period",
+          "width": 100
+        },
+        {
+          "field": "ehr_pr_base_salary",
+          "width": 120
+        },
+        {
+          "field": "ehr_pr_net_pay",
+          "width": 120
+        },
+        {
+          "field": "ehr_pr_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "ehr_payroll_status"
+        }
+      ],
+      "createCommandCode": "ehr:create_payroll",
+      "area": "sub-tables"
+    }
+  ]
+}

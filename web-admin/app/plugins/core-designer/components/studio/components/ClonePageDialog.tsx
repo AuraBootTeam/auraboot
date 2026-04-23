@@ -32,8 +32,8 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
   sourcePage,
   onSuccess,
 }) => {
-  const displayName = sourcePage.title || sourcePage.name || 'Page';
-  const [name, setName] = useState(`${displayName} (Copy)`);
+  const displayName = sourcePage.title || sourcePage.name || '页面';
+  const [name, setName] = useState(`${displayName}（副本）`);
   const [pageKey, setPageKey] = useState(`page_clone_${Date.now().toString(36)}`);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
       // Fetch full DSL so we copy blocks + layout
       const fetchResult = await getPageByPid(sourcePage.id);
       if (!fetchResult || fetchResult.code !== '0' || !fetchResult.data) {
-        throw new Error(fetchResult?.desc || 'Failed to load source page');
+        throw new Error(fetchResult?.desc || '加载源页面失败');
       }
       const source = fetchResult.data;
 
@@ -71,13 +71,13 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
       } as any);
 
       if (!result || result.code !== '0') {
-        throw new Error(result?.desc || 'Failed to clone page');
+        throw new Error(result?.desc || '复制页面失败');
       }
 
       onSuccess(result.data?.pid ?? '');
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to clone page');
+      setError(err instanceof Error ? err.message : '复制页面失败');
     } finally {
       setCreating(false);
     }
@@ -99,7 +99,7 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Clone Page</h2>
+          <h2 className="text-lg font-semibold text-gray-900">复制页面</h2>
           <button
             onClick={onClose}
             disabled={creating}
@@ -122,7 +122,7 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
             />
           </svg>
           <div className="min-w-0">
-            <div className="text-xs font-medium text-purple-700">Cloning from</div>
+            <div className="text-xs font-medium text-purple-700">复制来源</div>
             <div className="truncate text-sm font-semibold text-purple-900">{displayName}</div>
           </div>
         </div>
@@ -131,7 +131,7 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
         <div className="space-y-4">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              New Page Name <span className="text-red-500">*</span>
+              新页面名称 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -142,12 +142,12 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
               data-testid="clone-name-input"
               autoFocus
               disabled={creating}
-              placeholder="Enter page name..."
+              placeholder="输入页面名称..."
             />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Page Key <span className="text-red-500">*</span>
+              页面 Key <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -160,7 +160,7 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
               placeholder="unique_page_key"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Must be unique. Used as the page identifier in URLs and APIs.
+              必须唯一，用作页面在 URL 和 API 中的标识。
             </p>
           </div>
 
@@ -181,7 +181,7 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
             disabled={creating}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
           >
-            Cancel
+            取消
           </button>
           <button
             onClick={handleClone}
@@ -192,7 +192,7 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
             {creating ? (
               <>
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                Cloning...
+                复制中...
               </>
             ) : (
               <>
@@ -204,7 +204,7 @@ export const ClonePageDialog: React.FC<ClonePageDialogProps> = ({
                     d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                   />
                 </svg>
-                Clone Page
+                复制页面
               </>
             )}
           </button>

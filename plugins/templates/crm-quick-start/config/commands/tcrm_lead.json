@@ -5,18 +5,39 @@
     "displayName:en": "Create Lead",
     "type": "create",
     "modelCode": "tcrm_lead",
-    "inputFields": ["tcrm_ld_name", "tcrm_ld_company", "tcrm_ld_email", "tcrm_ld_phone", "tcrm_ld_source", "tcrm_ld_assignee", "tcrm_ld_notes"],
+    "inputFields": [
+      "tcrm_ld_name",
+      "tcrm_ld_company",
+      "tcrm_ld_email",
+      "tcrm_ld_phone",
+      "tcrm_ld_source",
+      "tcrm_ld_assignee",
+      "tcrm_ld_notes"
+    ],
     "autoSetFields": {
-      "tcrm_ld_code": { "strategy": "auto_generate", "pattern": "LEAD-{yyyyMMdd}-{seq}" },
-      "tcrm_ld_status": { "strategy": "fixed_value", "value": "new" }
+      "tcrm_ld_code": {
+        "strategy": "auto_generate",
+        "pattern": "LEAD-{yyyyMMdd}-{seq}"
+      },
+      "tcrm_ld_status": {
+        "strategy": "fixed_value",
+        "value": "new"
+      }
     },
-    "permissions": ["TCRM.lead.manage"],
+    "permissions": [
+      "tcrm.lead.manage"
+    ],
     "agent_hint": "Create a new sales lead. Required: name. Optional: company, email, phone, source (WEBSITE/REFERRAL/COLD_CALL/SOCIAL/OTHER), assignee, notes.",
     "cmd_risk_level": "L1",
     "precondition_description": "No preconditions.",
     "side_effect_description": null,
     "output_description": "Returns the created lead with auto-generated code and status NEW.",
-    "example_input": { "tcrm_ld_name": "John Smith", "tcrm_ld_company": "Acme Corp", "tcrm_ld_email": "john@acme.com", "tcrm_ld_source": "website" },
+    "example_input": {
+      "tcrm_ld_name": "John Smith",
+      "tcrm_ld_company": "Acme Corp",
+      "tcrm_ld_email": "john@acme.com",
+      "tcrm_ld_source": "website"
+    },
     "idempotent": false,
     "reversible": true
   },
@@ -26,14 +47,27 @@
     "displayName:en": "Update Lead",
     "type": "update",
     "modelCode": "tcrm_lead",
-    "inputFields": ["tcrm_ld_name", "tcrm_ld_company", "tcrm_ld_email", "tcrm_ld_phone", "tcrm_ld_source", "tcrm_ld_assignee", "tcrm_ld_notes"],
-    "permissions": ["TCRM.lead.manage"],
+    "inputFields": [
+      "tcrm_ld_name",
+      "tcrm_ld_company",
+      "tcrm_ld_email",
+      "tcrm_ld_phone",
+      "tcrm_ld_source",
+      "tcrm_ld_assignee",
+      "tcrm_ld_notes"
+    ],
+    "permissions": [
+      "tcrm.lead.manage"
+    ],
     "agent_hint": "Update an existing lead. Status cannot be changed here — use state transition commands.",
     "cmd_risk_level": "L1",
     "precondition_description": "Lead must exist.",
     "side_effect_description": null,
     "output_description": "Returns the updated lead record.",
-    "example_input": { "tcrm_ld_name": "John Smith Jr.", "tcrm_ld_phone": "+1-555-0100" },
+    "example_input": {
+      "tcrm_ld_name": "John Smith Jr.",
+      "tcrm_ld_phone": "+1-555-0100"
+    },
     "idempotent": true,
     "reversible": true
   },
@@ -44,9 +78,13 @@
     "type": "state_transition",
     "modelCode": "tcrm_lead",
     "stateField": "tcrm_ld_status",
-    "fromStates": ["new"],
+    "fromStates": [
+      "new"
+    ],
     "toState": "contacted",
-    "permissions": ["TCRM.lead.manage"],
+    "permissions": [
+      "tcrm.lead.manage"
+    ],
     "agent_hint": "Transition lead from NEW to CONTACTED. Indicates first outreach has been made.",
     "cmd_risk_level": "L1",
     "precondition_description": "Lead must be in NEW status.",
@@ -63,9 +101,13 @@
     "type": "state_transition",
     "modelCode": "tcrm_lead",
     "stateField": "tcrm_ld_status",
-    "fromStates": ["contacted"],
+    "fromStates": [
+      "contacted"
+    ],
     "toState": "qualified",
-    "permissions": ["TCRM.lead.manage"],
+    "permissions": [
+      "tcrm.lead.manage"
+    ],
     "agent_hint": "Transition lead from CONTACTED to QUALIFIED. Lead is ready for opportunity creation.",
     "cmd_risk_level": "L1",
     "precondition_description": "Lead must be in CONTACTED status.",
@@ -82,9 +124,14 @@
     "type": "state_transition",
     "modelCode": "tcrm_lead",
     "stateField": "tcrm_ld_status",
-    "fromStates": ["new", "contacted"],
+    "fromStates": [
+      "new",
+      "contacted"
+    ],
     "toState": "lost",
-    "permissions": ["TCRM.lead.manage"],
+    "permissions": [
+      "tcrm.lead.manage"
+    ],
     "agent_hint": "Transition lead to LOST. Can be done from NEW or CONTACTED status.",
     "cmd_risk_level": "L2",
     "precondition_description": "Lead must be in NEW or CONTACTED status.",
@@ -100,9 +147,22 @@
     "displayName:en": "Delete Lead",
     "type": "delete",
     "modelCode": "tcrm_lead",
-    "preconditions": [{ "field": "tcrm_ld_status", "operator": "IN", "value": ["new"] }],
-    "extension": { "confirmMessage:zh-CN": "确认删除此线索？", "confirmMessage:en": "Confirm delete this lead?" },
-    "permissions": ["TCRM.lead.manage"],
+    "preconditions": [
+      {
+        "field": "tcrm_ld_status",
+        "operator": "IN",
+        "value": [
+          "new"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此线索？",
+      "confirmMessage:en": "Confirm delete this lead?"
+    },
+    "permissions": [
+      "tcrm.lead.manage"
+    ],
     "agent_hint": "Delete a lead permanently. Only allowed when status is NEW.",
     "cmd_risk_level": "L4",
     "precondition_description": "Lead must be in NEW status.",
@@ -118,7 +178,9 @@
     "displayName:en": "View Lead",
     "type": "query",
     "modelCode": "tcrm_lead",
-    "permissions": ["TCRM.lead.read"],
+    "permissions": [
+      "tcrm.lead.read"
+    ],
     "agent_hint": "Retrieve a single lead by ID.",
     "cmd_risk_level": "L0",
     "precondition_description": "Lead must exist.",
@@ -134,13 +196,18 @@
     "displayName:en": "List Leads",
     "type": "query",
     "modelCode": "tcrm_lead",
-    "permissions": ["TCRM.lead.read"],
+    "permissions": [
+      "tcrm.lead.read"
+    ],
     "agent_hint": "Query leads with pagination and filtering. Supports filters by status, source, assignee.",
     "cmd_risk_level": "L0",
     "precondition_description": "No preconditions.",
     "side_effect_description": null,
     "output_description": "Returns a paginated list of leads.",
-    "example_input": { "pageNum": 1, "pageSize": 20 },
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
     "idempotent": true,
     "reversible": true
   }

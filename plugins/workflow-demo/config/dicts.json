@@ -84,6 +84,36 @@
         "sortNo": 50,
         "status": "enabled",
         "extension": { "color": "red" }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已撤销",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": { "color": "gray" }
+      }
+    ]
+  },
+  {
+    "code": "wd_leave_day_slot",
+    "name": "Leave Day Slot",
+    "name:zh-CN": "请假时段",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "AM",
+        "label": "Morning",
+        "label:zh-CN": "上午",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "PM",
+        "label": "Afternoon",
+        "label:zh-CN": "下午",
+        "sortNo": 20,
+        "status": "enabled"
       }
     ]
   }

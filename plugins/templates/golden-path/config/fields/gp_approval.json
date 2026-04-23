@@ -1,6 +1,6 @@
 [
   {
-    "fieldCode": "gp_apr_task_pid",
+    "code": "gp_apr_task_pid",
     "displayName:zh-CN": "关联任务",
     "displayName:en": "Task",
     "dataType": "string",
@@ -12,7 +12,7 @@
     }
   },
   {
-    "fieldCode": "gp_apr_approver",
+    "code": "gp_apr_approver",
     "displayName:zh-CN": "审批人",
     "displayName:en": "Approver",
     "dataType": "string",
@@ -23,7 +23,7 @@
     }
   },
   {
-    "fieldCode": "gp_apr_status",
+    "code": "gp_apr_status",
     "displayName:zh-CN": "状态",
     "displayName:en": "Status",
     "dataType": "string",
@@ -36,14 +36,14 @@
     }
   },
   {
-    "fieldCode": "gp_apr_decision_at",
+    "code": "gp_apr_decision_at",
     "displayName:zh-CN": "决策时间",
     "displayName:en": "Decision Time",
     "dataType": "datetime",
     "fieldType": "date"
   },
   {
-    "fieldCode": "gp_apr_notes",
+    "code": "gp_apr_notes",
     "displayName:zh-CN": "备注",
     "displayName:en": "Notes",
     "dataType": "text",

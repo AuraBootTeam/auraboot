@@ -216,7 +216,7 @@ public class PlatformToolProvider implements ToolProvider {
         String keyword = getStringParam(params, "keyword");
         boolean includeFields = parseBool(params.get("includeFields"));
 
-        var modelsPage = metaModelService.searchModels(1, 50, keyword, null, null, null, null, true);
+        var modelsPage = metaModelService.searchModels(1, 50, keyword, null, null, null, null, null, null, null, true);
         if (modelsPage == null || modelsPage.getRecords() == null) {
             return errorResult("No models found");
         }

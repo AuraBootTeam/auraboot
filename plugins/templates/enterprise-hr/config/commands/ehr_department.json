@@ -1,7 +1,119 @@
 [
-  {"code":"ehr:create_department","displayName:zh-CN":"新建部门","displayName:en":"Create Department","type":"create","modelCode":"ehr_department","inputFields":["ehr_dp_code","ehr_dp_name","ehr_dp_parent_id","ehr_dp_manager","ehr_dp_headcount","ehr_dp_description"],"permissions":["EHR.department.manage"],"agent_hint":"Create a new department. Required: code, name.","cmd_risk_level":"L1","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns the created department.","example_input":{"ehr_dp_code":"DEPT-ENG","ehr_dp_name":"Engineering"},"idempotent":false,"reversible":true},
-  {"code":"ehr:update_department","displayName:zh-CN":"编辑部门","displayName:en":"Update Department","type":"update","modelCode":"ehr_department","inputFields":["ehr_dp_name","ehr_dp_parent_id","ehr_dp_manager","ehr_dp_headcount","ehr_dp_description"],"permissions":["EHR.department.manage"],"agent_hint":"Update department details.","cmd_risk_level":"L1","precondition_description":"Department must exist.","side_effect_description":null,"output_description":"Returns the updated department.","example_input":{"ehr_dp_manager":"Jane Doe"},"idempotent":true,"reversible":true},
-  {"code":"ehr:delete_department","displayName:zh-CN":"删除部门","displayName:en":"Delete Department","type":"delete","modelCode":"ehr_department","extension":{"confirmMessage:zh-CN":"确认删除此部门？","confirmMessage:en":"Confirm delete this department?"},"permissions":["EHR.department.manage"],"agent_hint":"Delete department. Ensure no employees are assigned.","cmd_risk_level":"L3","precondition_description":"Department should have no active employees.","side_effect_description":null,"output_description":"Department is permanently removed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ehr:detail_department","displayName:zh-CN":"查看部门","displayName:en":"View Department","type":"query","modelCode":"ehr_department","permissions":["EHR.department.read"],"agent_hint":"Retrieve department by ID.","cmd_risk_level":"L0","precondition_description":"Department must exist.","side_effect_description":null,"output_description":"Returns the full department record.","example_input":{},"idempotent":true,"reversible":true},
-  {"code":"ehr:list_departments","displayName:zh-CN":"部门列表","displayName:en":"List Departments","type":"query","modelCode":"ehr_department","permissions":["EHR.department.read"],"agent_hint":"Query departments with pagination.","cmd_risk_level":"L0","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns a paginated list of departments.","example_input":{"pageNum":1,"pageSize":50},"idempotent":true,"reversible":true}
+  {
+    "code": "ehr:create_department",
+    "displayName:zh-CN": "新建部门",
+    "displayName:en": "Create Department",
+    "type": "create",
+    "modelCode": "ehr_department",
+    "inputFields": [
+      "ehr_dp_code",
+      "ehr_dp_name",
+      "ehr_dp_parent_id",
+      "ehr_dp_manager",
+      "ehr_dp_headcount",
+      "ehr_dp_description"
+    ],
+    "permissions": [
+      "ehr.department.manage"
+    ],
+    "agent_hint": "Create a new department. Required: code, name.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns the created department.",
+    "example_input": {
+      "ehr_dp_code": "DEPT-ENG",
+      "ehr_dp_name": "Engineering"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "ehr:update_department",
+    "displayName:zh-CN": "编辑部门",
+    "displayName:en": "Update Department",
+    "type": "update",
+    "modelCode": "ehr_department",
+    "inputFields": [
+      "ehr_dp_name",
+      "ehr_dp_parent_id",
+      "ehr_dp_manager",
+      "ehr_dp_headcount",
+      "ehr_dp_description"
+    ],
+    "permissions": [
+      "ehr.department.manage"
+    ],
+    "agent_hint": "Update department details.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Department must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated department.",
+    "example_input": {
+      "ehr_dp_manager": "Jane Doe"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "ehr:delete_department",
+    "displayName:zh-CN": "删除部门",
+    "displayName:en": "Delete Department",
+    "type": "delete",
+    "modelCode": "ehr_department",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此部门？",
+      "confirmMessage:en": "Confirm delete this department?"
+    },
+    "permissions": [
+      "ehr.department.manage"
+    ],
+    "agent_hint": "Delete department. Ensure no employees are assigned.",
+    "cmd_risk_level": "L3",
+    "precondition_description": "Department should have no active employees.",
+    "side_effect_description": null,
+    "output_description": "Department is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ehr:detail_department",
+    "displayName:zh-CN": "查看部门",
+    "displayName:en": "View Department",
+    "type": "query",
+    "modelCode": "ehr_department",
+    "permissions": [
+      "ehr.department.read"
+    ],
+    "agent_hint": "Retrieve department by ID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Department must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full department record.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "ehr:list_departments",
+    "displayName:zh-CN": "部门列表",
+    "displayName:en": "List Departments",
+    "type": "query",
+    "modelCode": "ehr_department",
+    "permissions": [
+      "ehr.department.read"
+    ],
+    "agent_hint": "Query departments with pagination.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of departments.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 50
+    },
+    "idempotent": true,
+    "reversible": true
+  }
 ]

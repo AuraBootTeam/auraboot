@@ -3,6 +3,60 @@
   "modelCode": "wd_leave_request",
   "kind": "form",
   "layout": { "type": "stack" },
+  "rules": [
+    {
+      "id": "wd_leave_date_order",
+      "assert": {
+        "field": "wd_req_end_date",
+        "gte": { "ref": "wd_req_start_date" }
+      },
+      "message": "结束日期不能早于开始日期",
+      "severity": "error",
+      "targetField": "wd_req_end_date",
+      "dependsOn": ["wd_req_start_date", "wd_req_end_date"]
+    },
+    {
+      "id": "wd_leave_slot_order_same_day",
+      "when": {
+        "field": "wd_req_start_date",
+        "eq": { "ref": "wd_req_end_date" }
+      },
+      "assert": {
+        "field": "wd_req_end_slot",
+        "gte": { "ref": "wd_req_start_slot" }
+      },
+      "message": "同一天请假时，结束时段不能早于开始时段",
+      "severity": "error",
+      "targetField": "wd_req_end_slot",
+      "dependsOn": ["wd_req_start_date", "wd_req_end_date", "wd_req_start_slot", "wd_req_end_slot"]
+    },
+    {
+      "id": "wd_leave_days_computed",
+      "when": {
+        "and": [
+          { "field": "wd_req_start_date", "neq": "" },
+          { "field": "wd_req_end_date", "neq": "" },
+          { "field": "wd_req_start_slot", "neq": "" },
+          { "field": "wd_req_end_slot", "neq": "" },
+          { "field": "wd_req_end_date", "gte": { "ref": "wd_req_start_date" } },
+          {
+            "or": [
+              { "field": "wd_req_start_date", "neq": { "ref": "wd_req_end_date" } },
+              { "field": "wd_req_end_slot", "gte": { "ref": "wd_req_start_slot" } }
+            ]
+          }
+        ]
+      },
+      "assert": {
+        "field": "wd_req_days",
+        "required": true
+      },
+      "message": "请完善开始/结束日期与时段，系统才能计算请假天数",
+      "severity": "error",
+      "targetField": "wd_req_days",
+      "dependsOn": ["wd_req_start_date", "wd_req_end_date", "wd_req_start_slot", "wd_req_end_slot", "wd_req_days"]
+    }
+  ],
   "blocks": [
     {
       "id": "basic",
@@ -20,10 +74,12 @@
       "title": { "zh-CN": "请假详情", "en": "Leave Details" },
       "columns": 2,
       "fields": [
-        { "field": "wd_req_start_date", "colSpan": 6 },
-        { "field": "wd_req_end_date", "colSpan": 6 },
-        { "field": "wd_req_days", "colSpan": 6 },
-        { "field": "wd_req_reason", "colSpan": 12 }
+        { "field": "wd_req_start_date" },
+        { "field": "wd_req_start_slot" },
+        { "field": "wd_req_end_date" },
+        { "field": "wd_req_end_slot" },
+        { "field": "wd_req_days", "readOnly": true },
+        { "field": "wd_req_reason", "span": 2 }
       ]
     },
     {
@@ -32,8 +88,8 @@
       "title": { "zh-CN": "附件与抄送", "en": "Attachments & CC" },
       "columns": 2,
       "fields": [
-        { "field": "wd_req_attachments", "colSpan": 12 },
-        { "field": "wd_req_cc_users", "colSpan": 12 }
+        { "field": "wd_req_attachments", "span": 2 },
+        { "field": "wd_req_cc_users", "span": 2 }
       ]
     },
     {

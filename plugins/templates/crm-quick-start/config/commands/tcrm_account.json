@@ -5,17 +5,32 @@
     "displayName:en": "Create Account",
     "type": "create",
     "modelCode": "tcrm_account",
-    "inputFields": ["tcrm_ac_name", "tcrm_ac_industry", "tcrm_ac_phone", "tcrm_ac_address", "tcrm_ac_website", "tcrm_ac_notes"],
+    "inputFields": [
+      "tcrm_ac_name",
+      "tcrm_ac_industry",
+      "tcrm_ac_phone",
+      "tcrm_ac_address",
+      "tcrm_ac_website",
+      "tcrm_ac_notes"
+    ],
     "autoSetFields": {
-      "tcrm_ac_code": { "strategy": "auto_generate", "pattern": "ACCT-{yyyyMMdd}-{seq}" }
+      "tcrm_ac_code": {
+        "strategy": "auto_generate",
+        "pattern": "ACCT-{yyyyMMdd}-{seq}"
+      }
     },
-    "permissions": ["TCRM.account.manage"],
+    "permissions": [
+      "tcrm.account.manage"
+    ],
     "agent_hint": "Create a new account. Required: name. Optional: industry, phone, address, website, notes.",
     "cmd_risk_level": "L1",
     "precondition_description": "No preconditions.",
     "side_effect_description": null,
     "output_description": "Returns the created account with auto-generated code.",
-    "example_input": { "tcrm_ac_name": "Acme Corporation", "tcrm_ac_industry": "tech" },
+    "example_input": {
+      "tcrm_ac_name": "Acme Corporation",
+      "tcrm_ac_industry": "tech"
+    },
     "idempotent": false,
     "reversible": true
   },
@@ -25,14 +40,25 @@
     "displayName:en": "Update Account",
     "type": "update",
     "modelCode": "tcrm_account",
-    "inputFields": ["tcrm_ac_name", "tcrm_ac_industry", "tcrm_ac_phone", "tcrm_ac_address", "tcrm_ac_website", "tcrm_ac_notes"],
-    "permissions": ["TCRM.account.manage"],
+    "inputFields": [
+      "tcrm_ac_name",
+      "tcrm_ac_industry",
+      "tcrm_ac_phone",
+      "tcrm_ac_address",
+      "tcrm_ac_website",
+      "tcrm_ac_notes"
+    ],
+    "permissions": [
+      "tcrm.account.manage"
+    ],
     "agent_hint": "Update an existing account.",
     "cmd_risk_level": "L1",
     "precondition_description": "Account must exist.",
     "side_effect_description": null,
     "output_description": "Returns the updated account.",
-    "example_input": { "tcrm_ac_phone": "+1-555-0200" },
+    "example_input": {
+      "tcrm_ac_phone": "+1-555-0200"
+    },
     "idempotent": true,
     "reversible": true
   },
@@ -42,8 +68,13 @@
     "displayName:en": "Delete Account",
     "type": "delete",
     "modelCode": "tcrm_account",
-    "extension": { "confirmMessage:zh-CN": "确认删除此客户？", "confirmMessage:en": "Confirm delete this account?" },
-    "permissions": ["TCRM.account.manage"],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此客户？",
+      "confirmMessage:en": "Confirm delete this account?"
+    },
+    "permissions": [
+      "tcrm.account.manage"
+    ],
     "agent_hint": "Delete an account permanently.",
     "cmd_risk_level": "L4",
     "precondition_description": "No preconditions.",
@@ -59,7 +90,9 @@
     "displayName:en": "View Account",
     "type": "query",
     "modelCode": "tcrm_account",
-    "permissions": ["TCRM.account.read"],
+    "permissions": [
+      "tcrm.account.read"
+    ],
     "agent_hint": "Retrieve a single account by ID.",
     "cmd_risk_level": "L0",
     "precondition_description": "Account must exist.",
@@ -75,13 +108,18 @@
     "displayName:en": "List Accounts",
     "type": "query",
     "modelCode": "tcrm_account",
-    "permissions": ["TCRM.account.read"],
+    "permissions": [
+      "tcrm.account.read"
+    ],
     "agent_hint": "Query accounts with pagination. Supports filters by industry.",
     "cmd_risk_level": "L0",
     "precondition_description": "No preconditions.",
     "side_effect_description": null,
     "output_description": "Returns a paginated list of accounts.",
-    "example_input": { "pageNum": 1, "pageSize": 20 },
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
     "idempotent": true,
     "reversible": true
   }

@@ -117,6 +117,8 @@ chore: upgrade Spring Boot to 3.5.1
 4. **Run all tests** to ensure nothing is broken.
 5. **Push** your branch and **open a Pull Request** against `main`.
 
+For local frontend development, use `pnpm dev:full` in the foreground. For background mode, run `pnpm sync-plugins` first, then start `pnpm dev:web` and `pnpm dev:bff` as separate processes instead of `nohup pnpm dev:full`.
+
 ### PR Requirements
 
 Every pull request must include:

@@ -17,7 +17,7 @@
       }
     },
     "permissions": [
-      "GP.approval.manage"
+      "gp.approval.manage"
     ],
     "agent_hint": "Create a new approval request for a task. Associates the request with the specified task and approver. Status is auto-set to pending.",
     "cmd_risk_level": "L3",
@@ -39,7 +39,9 @@
     "type": "state_transition",
     "modelCode": "gp_approval",
     "stateField": "gp_apr_status",
-    "fromStates": ["pending"],
+    "fromStates": [
+      "pending"
+    ],
     "toState": "approved",
     "autoSetFields": {
       "gp_apr_decision_at": {
@@ -47,7 +49,7 @@
       }
     },
     "permissions": [
-      "GP.approval.manage"
+      "gp.approval.manage"
     ],
     "agent_hint": "Approve a pending approval request. Transitions status from pending to approved and records the decision timestamp automatically.",
     "cmd_risk_level": "L2",
@@ -65,7 +67,9 @@
     "type": "state_transition",
     "modelCode": "gp_approval",
     "stateField": "gp_apr_status",
-    "fromStates": ["pending"],
+    "fromStates": [
+      "pending"
+    ],
     "toState": "rejected",
     "autoSetFields": {
       "gp_apr_decision_at": {
@@ -73,7 +77,7 @@
       }
     },
     "permissions": [
-      "GP.approval.manage"
+      "gp.approval.manage"
     ],
     "agent_hint": "Reject a pending approval request. Transitions status from pending to rejected and records the decision timestamp automatically.",
     "cmd_risk_level": "L2",
@@ -91,7 +95,7 @@
     "type": "query",
     "modelCode": "gp_approval",
     "permissions": [
-      "GP.approval.read"
+      "gp.approval.read"
     ],
     "agent_hint": "Query approval records with pagination and filtering. Supports filters by status, approver, and task PID.",
     "cmd_risk_level": "L0",
@@ -101,7 +105,13 @@
     "example_input": {
       "pageNum": 1,
       "pageSize": 20,
-      "filters": [{"fieldName": "gp_apr_status", "operator": "EQ", "value": "pending"}]
+      "filters": [
+        {
+          "fieldName": "gp_apr_status",
+          "operator": "EQ",
+          "value": "pending"
+        }
+      ]
     },
     "idempotent": true,
     "reversible": true

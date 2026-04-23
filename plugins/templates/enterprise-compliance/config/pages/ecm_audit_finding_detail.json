@@ -1,1 +1,179 @@
-{"pageKey":"ecm_audit_finding_detail","name:zh-CN":"发现详情","name:en":"Finding Detail","pageType":"detail","modelCode":"ecm_audit_finding","dslSchema":{"id":"detail.ecm_audit_finding","kind":"Detail","version":"1.0.0","modelCode":"ecm_audit_finding","layout":{"areas":["header","main","sub-tables"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16},"sub-tables":{"type":"stack"}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"ecm_audit_finding_form","permissionCode":"ECM.audit.manage"},{"code":"start_audit","commandCode":"ecm:start_audit","permissionCode":"ECM.audit.manage"},{"code":"draft_report","commandCode":"ecm:draft_report","permissionCode":"ECM.audit.manage"},{"code":"finalize_report","commandCode":"ecm:finalize_report","permissionCode":"ECM.audit.manage"},{"code":"close_finding","commandCode":"ecm:close_finding","permissionCode":"ECM.audit.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"ecm:delete_finding","permissionCode":"ECM.audit.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"发现信息","en-US":"Finding Information"},"fields":[{"field":"ecm_af_code","colSpan":6},{"field":"ecm_af_title","colSpan":6},{"field":"ecm_af_audit_type","colSpan":4},{"field":"ecm_af_severity","colSpan":4},{"field":"ecm_af_status","colSpan":4},{"field":"ecm_af_auditor","colSpan":6},{"field":"ecm_af_department","colSpan":6},{"field":"ecm_af_found_date","colSpan":6},{"field":"ecm_af_due_date","colSpan":6},{"field":"ecm_af_description","colSpan":12},{"field":"ecm_af_evidence","colSpan":12},{"field":"ecm_af_notes","colSpan":12}]}]},"sub-tables":{"blocks":[{"id":"actions","blockType":"sub-table","title":{"zh-CN":"纠正措施","en-US":"Corrective Actions"},"modelCode":"ecm_corrective_action","foreignKey":"ecm_ca_finding_id","columns":[{"field":"ecm_ca_code","width":130},{"field":"ecm_ca_title","width":200},{"field":"ecm_ca_type","width":100,"renderType":"tag","dictCode":"ecm_action_type"},{"field":"ecm_ca_status","width":110,"renderType":"tag","dictCode":"ecm_action_status"},{"field":"ecm_ca_priority","width":100,"renderType":"tag","dictCode":"ecm_priority"},{"field":"ecm_ca_due_date","width":120}],"createCommandCode":"ecm:create_action"}]}}}}
+{
+  "pageKey": "ecm_audit_finding_detail",
+  "name:zh-CN": "发现详情",
+  "name:en": "Finding Detail",
+  "modelCode": "ecm_audit_finding",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "发现详情",
+    "en": "Finding Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main",
+      "sub-tables"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "sub-tables": {
+        "type": "stack"
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "ecm.audit.manage"
+        },
+        {
+          "code": "start_audit",
+          "commandCode": "ecm:start_audit",
+          "permissionCode": "ecm.audit.manage"
+        },
+        {
+          "code": "draft_report",
+          "commandCode": "ecm:draft_report",
+          "permissionCode": "ecm.audit.manage"
+        },
+        {
+          "code": "finalize_report",
+          "commandCode": "ecm:finalize_report",
+          "permissionCode": "ecm.audit.manage"
+        },
+        {
+          "code": "close_finding",
+          "commandCode": "ecm:close_finding",
+          "permissionCode": "ecm.audit.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "ecm:delete_finding",
+          "permissionCode": "ecm.audit.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "发现信息",
+        "en-US": "Finding Information"
+      },
+      "fields": [
+        {
+          "field": "ecm_af_code",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_af_title",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_af_audit_type",
+          "colSpan": 4
+        },
+        {
+          "field": "ecm_af_severity",
+          "colSpan": 4
+        },
+        {
+          "field": "ecm_af_status",
+          "colSpan": 4
+        },
+        {
+          "field": "ecm_af_auditor",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_af_department",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_af_found_date",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_af_due_date",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_af_description",
+          "colSpan": 12
+        },
+        {
+          "field": "ecm_af_evidence",
+          "colSpan": 12
+        },
+        {
+          "field": "ecm_af_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "actions",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "纠正措施",
+        "en-US": "Corrective Actions"
+      },
+      "modelCode": "ecm_corrective_action",
+      "foreignKey": "ecm_ca_finding_id",
+      "columns": [
+        {
+          "field": "ecm_ca_code",
+          "width": 130
+        },
+        {
+          "field": "ecm_ca_title",
+          "width": 200
+        },
+        {
+          "field": "ecm_ca_type",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "ecm_action_type"
+        },
+        {
+          "field": "ecm_ca_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "ecm_action_status"
+        },
+        {
+          "field": "ecm_ca_priority",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "ecm_priority"
+        },
+        {
+          "field": "ecm_ca_due_date",
+          "width": 120
+        }
+      ],
+      "createCommandCode": "ecm:create_action",
+      "area": "sub-tables"
+    }
+  ]
+}

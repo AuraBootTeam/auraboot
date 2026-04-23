@@ -2,48 +2,90 @@
   "pageKey": "thr_attendance_detail",
   "name:zh-CN": "考勤详情",
   "name:en": "Attendance Detail",
-  "pageType": "detail",
   "modelCode": "thr_attendance",
-  "dslSchema": {
-    "id": "detail.thr_attendance",
-    "kind": "Detail",
-    "version": "1.0.0",
-    "modelCode": "thr_attendance",
-    "layout": {
-      "areas": ["header", "main"],
-      "areasConfig": {
-        "header": { "type": "flex", "direction": "row" },
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 }
-      }
-    },
-    "areas": {
+  "kind": "detail",
+  "title": {
+    "zh-CN": "考勤详情",
+    "en": "Attendance Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main"
+    ],
+    "areasConfig": {
       "header": {
-        "blocks": [{
-          "id": "action_bar",
-          "blockType": "toolbar",
-          "buttons": [
-            { "code": "edit", "action": "edit", "navigateTo": "thr_attendance_form", "permissionCode": "THR.attendance.manage" },
-            { "code": "delete", "action": "delete", "danger": true, "commandCode": "thr:delete_attendance", "permissionCode": "THR.attendance.manage", "confirmMessageKey": "delete.confirm" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       },
       "main": {
-        "blocks": [{
-          "id": "info",
-          "blockType": "form-section",
-          "readOnly": true,
-          "title": { "zh-CN": "考勤信息", "en-US": "Attendance Information" },
-          "fields": [
-            { "field": "thr_at_code", "colSpan": 6 },
-            { "field": "thr_at_employee_id", "colSpan": 6 },
-            { "field": "thr_at_date", "colSpan": 6 },
-            { "field": "thr_at_check_in", "colSpan": 6 },
-            { "field": "thr_at_check_out", "colSpan": 6 },
-            { "field": "thr_at_type", "colSpan": 6 },
-            { "field": "thr_at_notes", "colSpan": 12 }
-          ]
-        }]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "thr.attendance.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "thr:delete_attendance",
+          "permissionCode": "thr.attendance.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "考勤信息",
+        "en-US": "Attendance Information"
+      },
+      "fields": [
+        {
+          "field": "thr_at_code",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_at_employee_id",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_at_date",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_at_check_in",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_at_check_out",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_at_type",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_at_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    }
+  ]
 }

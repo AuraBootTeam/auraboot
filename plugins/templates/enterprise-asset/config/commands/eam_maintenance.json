@@ -1,10 +1,200 @@
 [
-  {"code":"eam:create_schedule","displayName:zh-CN":"新建维护计划","displayName:en":"Create Maintenance Schedule","type":"create","modelCode":"eam_maintenance","inputFields":["eam_ms_name","eam_ms_asset_id","eam_ms_type","eam_ms_frequency","eam_ms_next_due","eam_ms_assigned_to","eam_ms_notes"],"autoSetFields":{"eam_ms_code":{"strategy":"auto_generate","pattern":"MS-{yyyyMMdd}-{seq}"},"eam_ms_status":{"strategy":"fixed_value","value":"active"}},"permissions":["EAM.maintenance.manage"],"agent_hint":"Create maintenance schedule. Required: name, asset, type.","cmd_risk_level":"L1","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns the created schedule with status active.","example_input":{"eam_ms_name":"Quarterly Server Check","eam_ms_type":"preventive"},"idempotent":false,"reversible":true},
-  {"code":"eam:update_schedule","displayName:zh-CN":"编辑维护计划","displayName:en":"Update Schedule","type":"update","modelCode":"eam_maintenance","inputFields":["eam_ms_name","eam_ms_type","eam_ms_frequency","eam_ms_next_due","eam_ms_assigned_to","eam_ms_notes"],"permissions":["EAM.maintenance.manage"],"agent_hint":"Update maintenance schedule.","cmd_risk_level":"L1","precondition_description":"Schedule must exist.","side_effect_description":null,"output_description":"Returns the updated schedule.","example_input":{"eam_ms_next_due":"2026-06-01"},"idempotent":true,"reversible":true},
-  {"code":"eam:pause_schedule","displayName:zh-CN":"暂停计划","displayName:en":"Pause Schedule","type":"state_transition","modelCode":"eam_maintenance","stateField":"eam_ms_status","fromStates":["active"],"toState":"paused","permissions":["EAM.maintenance.manage"],"agent_hint":"Pause active maintenance schedule.","cmd_risk_level":"L1","precondition_description":"Schedule must be active.","side_effect_description":null,"output_description":"Returns schedule with status paused.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:resume_schedule","displayName:zh-CN":"恢复计划","displayName:en":"Resume Schedule","type":"state_transition","modelCode":"eam_maintenance","stateField":"eam_ms_status","fromStates":["paused"],"toState":"active","permissions":["EAM.maintenance.manage"],"agent_hint":"Resume paused maintenance schedule.","cmd_risk_level":"L1","precondition_description":"Schedule must be paused.","side_effect_description":null,"output_description":"Returns schedule with status active.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:complete_schedule","displayName:zh-CN":"完成计划","displayName:en":"Complete Schedule","type":"state_transition","modelCode":"eam_maintenance","stateField":"eam_ms_status","fromStates":["active"],"toState":"completed","permissions":["EAM.maintenance.manage"],"agent_hint":"Mark schedule as completed.","cmd_risk_level":"L2","precondition_description":"Schedule must be active.","side_effect_description":null,"output_description":"Returns schedule with status completed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:delete_schedule","displayName:zh-CN":"删除计划","displayName:en":"Delete Schedule","type":"delete","modelCode":"eam_maintenance","extension":{"confirmMessage:zh-CN":"确认删除此维护计划？","confirmMessage:en":"Confirm delete?"},"permissions":["EAM.maintenance.manage"],"agent_hint":"Delete maintenance schedule.","cmd_risk_level":"L3","precondition_description":"Schedule must exist.","side_effect_description":null,"output_description":"Schedule is permanently removed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:detail_schedule","displayName:zh-CN":"查看计划","displayName:en":"View Schedule","type":"query","modelCode":"eam_maintenance","permissions":["EAM.maintenance.read"],"agent_hint":"Retrieve maintenance schedule by ID.","cmd_risk_level":"L0","precondition_description":"Schedule must exist.","side_effect_description":null,"output_description":"Returns the full schedule record.","example_input":{},"idempotent":true,"reversible":true},
-  {"code":"eam:list_schedules","displayName:zh-CN":"计划列表","displayName:en":"List Schedules","type":"query","modelCode":"eam_maintenance","permissions":["EAM.maintenance.read"],"agent_hint":"Query maintenance schedules.","cmd_risk_level":"L0","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns a paginated list of schedules.","example_input":{"pageNum":1,"pageSize":20},"idempotent":true,"reversible":true}
+  {
+    "code": "eam:create_schedule",
+    "displayName:zh-CN": "新建维护计划",
+    "displayName:en": "Create Maintenance Schedule",
+    "type": "create",
+    "modelCode": "eam_maintenance",
+    "inputFields": [
+      "eam_ms_name",
+      "eam_ms_asset_id",
+      "eam_ms_type",
+      "eam_ms_frequency",
+      "eam_ms_next_due",
+      "eam_ms_assigned_to",
+      "eam_ms_notes"
+    ],
+    "autoSetFields": {
+      "eam_ms_code": {
+        "strategy": "auto_generate",
+        "pattern": "MS-{yyyyMMdd}-{seq}"
+      },
+      "eam_ms_status": {
+        "strategy": "fixed_value",
+        "value": "active"
+      }
+    },
+    "permissions": [
+      "eam.maintenance.manage"
+    ],
+    "agent_hint": "Create maintenance schedule. Required: name, asset, type.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns the created schedule with status active.",
+    "example_input": {
+      "eam_ms_name": "Quarterly Server Check",
+      "eam_ms_type": "preventive"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "eam:update_schedule",
+    "displayName:zh-CN": "编辑维护计划",
+    "displayName:en": "Update Schedule",
+    "type": "update",
+    "modelCode": "eam_maintenance",
+    "inputFields": [
+      "eam_ms_name",
+      "eam_ms_type",
+      "eam_ms_frequency",
+      "eam_ms_next_due",
+      "eam_ms_assigned_to",
+      "eam_ms_notes"
+    ],
+    "permissions": [
+      "eam.maintenance.manage"
+    ],
+    "agent_hint": "Update maintenance schedule.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Schedule must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated schedule.",
+    "example_input": {
+      "eam_ms_next_due": "2026-06-01"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "eam:pause_schedule",
+    "displayName:zh-CN": "暂停计划",
+    "displayName:en": "Pause Schedule",
+    "type": "state_transition",
+    "modelCode": "eam_maintenance",
+    "stateField": "eam_ms_status",
+    "fromStates": [
+      "active"
+    ],
+    "toState": "paused",
+    "permissions": [
+      "eam.maintenance.manage"
+    ],
+    "agent_hint": "Pause active maintenance schedule.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Schedule must be active.",
+    "side_effect_description": null,
+    "output_description": "Returns schedule with status paused.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:resume_schedule",
+    "displayName:zh-CN": "恢复计划",
+    "displayName:en": "Resume Schedule",
+    "type": "state_transition",
+    "modelCode": "eam_maintenance",
+    "stateField": "eam_ms_status",
+    "fromStates": [
+      "paused"
+    ],
+    "toState": "active",
+    "permissions": [
+      "eam.maintenance.manage"
+    ],
+    "agent_hint": "Resume paused maintenance schedule.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Schedule must be paused.",
+    "side_effect_description": null,
+    "output_description": "Returns schedule with status active.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:complete_schedule",
+    "displayName:zh-CN": "完成计划",
+    "displayName:en": "Complete Schedule",
+    "type": "state_transition",
+    "modelCode": "eam_maintenance",
+    "stateField": "eam_ms_status",
+    "fromStates": [
+      "active"
+    ],
+    "toState": "completed",
+    "permissions": [
+      "eam.maintenance.manage"
+    ],
+    "agent_hint": "Mark schedule as completed.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Schedule must be active.",
+    "side_effect_description": null,
+    "output_description": "Returns schedule with status completed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:delete_schedule",
+    "displayName:zh-CN": "删除计划",
+    "displayName:en": "Delete Schedule",
+    "type": "delete",
+    "modelCode": "eam_maintenance",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此维护计划？",
+      "confirmMessage:en": "Confirm delete?"
+    },
+    "permissions": [
+      "eam.maintenance.manage"
+    ],
+    "agent_hint": "Delete maintenance schedule.",
+    "cmd_risk_level": "L3",
+    "precondition_description": "Schedule must exist.",
+    "side_effect_description": null,
+    "output_description": "Schedule is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:detail_schedule",
+    "displayName:zh-CN": "查看计划",
+    "displayName:en": "View Schedule",
+    "type": "query",
+    "modelCode": "eam_maintenance",
+    "permissions": [
+      "eam.maintenance.read"
+    ],
+    "agent_hint": "Retrieve maintenance schedule by ID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Schedule must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full schedule record.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "eam:list_schedules",
+    "displayName:zh-CN": "计划列表",
+    "displayName:en": "List Schedules",
+    "type": "query",
+    "modelCode": "eam_maintenance",
+    "permissions": [
+      "eam.maintenance.read"
+    ],
+    "agent_hint": "Query maintenance schedules.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of schedules.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
+    "idempotent": true,
+    "reversible": true
+  }
 ]

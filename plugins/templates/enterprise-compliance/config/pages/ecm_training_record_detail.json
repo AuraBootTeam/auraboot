@@ -1,1 +1,122 @@
-{"pageKey":"ecm_training_record_detail","name:zh-CN":"培训详情","name:en":"Training Detail","pageType":"detail","modelCode":"ecm_training_record","dslSchema":{"id":"detail.ecm_training_record","kind":"Detail","version":"1.0.0","modelCode":"ecm_training_record","layout":{"areas":["header","main"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"ecm_training_record_form","permissionCode":"ECM.training.manage"},{"code":"start_training","commandCode":"ecm:start_training","permissionCode":"ECM.training.manage"},{"code":"complete_training","commandCode":"ecm:complete_training","permissionCode":"ECM.training.manage"},{"code":"expire_training","commandCode":"ecm:expire_training","permissionCode":"ECM.training.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"ecm:delete_training","permissionCode":"ECM.training.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"培训信息","en-US":"Training Information"},"fields":[{"field":"ecm_tr_code","colSpan":6},{"field":"ecm_tr_course","colSpan":6},{"field":"ecm_tr_employee","colSpan":6},{"field":"ecm_tr_category","colSpan":6},{"field":"ecm_tr_status","colSpan":6},{"field":"ecm_tr_score","colSpan":6},{"field":"ecm_tr_scheduled_date","colSpan":4},{"field":"ecm_tr_completed_date","colSpan":4},{"field":"ecm_tr_cert_expiry","colSpan":4},{"field":"ecm_tr_instructor","colSpan":6},{"field":"ecm_tr_notes","colSpan":12}]}]}}}}
+{
+  "pageKey": "ecm_training_record_detail",
+  "name:zh-CN": "培训详情",
+  "name:en": "Training Detail",
+  "modelCode": "ecm_training_record",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "培训详情",
+    "en": "Training Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "ecm.training.manage"
+        },
+        {
+          "code": "start_training",
+          "commandCode": "ecm:start_training",
+          "permissionCode": "ecm.training.manage"
+        },
+        {
+          "code": "complete_training",
+          "commandCode": "ecm:complete_training",
+          "permissionCode": "ecm.training.manage"
+        },
+        {
+          "code": "expire_training",
+          "commandCode": "ecm:expire_training",
+          "permissionCode": "ecm.training.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "ecm:delete_training",
+          "permissionCode": "ecm.training.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "培训信息",
+        "en-US": "Training Information"
+      },
+      "fields": [
+        {
+          "field": "ecm_tr_code",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_course",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_employee",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_category",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_status",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_score",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_scheduled_date",
+          "colSpan": 4
+        },
+        {
+          "field": "ecm_tr_completed_date",
+          "colSpan": 4
+        },
+        {
+          "field": "ecm_tr_cert_expiry",
+          "colSpan": 4
+        },
+        {
+          "field": "ecm_tr_instructor",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    }
+  ]
+}

@@ -19,8 +19,17 @@
           "code": "submit",
           "primary": true,
           "permissionCode": "wd.leave_request.submit",
+          "visibleWhen": "record.wd_req_status === 'draft' || record.wd_req_status === 'rejected'",
           "label": "execute",
           "action": { "type": "command", "command": "wd:submit_leave_request" }
+        },
+        {
+          "code": "cancel",
+          "danger": true,
+          "permissionCode": "wd.leave_request.submit",
+          "visibleWhen": "record.wd_req_status === 'submitted' || record.wd_req_status === 'approving'",
+          "label": { "zh-CN": "撤销申请", "en": "Cancel Request" },
+          "action": { "type": "command", "command": "wd:cancel_leave_request" }
         }
       ]
     },
@@ -43,7 +52,9 @@
                 { "field": "wd_req_applicant", "readOnly": true },
                 { "field": "wd_req_type", "readOnly": true },
                 { "field": "wd_req_start_date", "readOnly": true },
+                { "field": "wd_req_start_slot", "readOnly": true },
                 { "field": "wd_req_end_date", "readOnly": true },
+                { "field": "wd_req_end_slot", "readOnly": true },
                 { "field": "wd_req_days", "readOnly": true },
                 { "field": "wd_req_process_instance", "readOnly": true },
                 { "field": "wd_req_reason", "span": 2, "readOnly": true },
@@ -73,6 +84,40 @@
                 { "field": "comment", "label": { "zh-CN": "意见", "en": "Comment" } },
                 { "field": "completedAt", "label": { "zh-CN": "完成时间", "en": "Completed At" } }
               ]
+            }
+          ]
+        },
+        {
+          "key": "workflow_diagram",
+          "label": { "zh-CN": "流程图", "en": "Workflow Diagram" },
+          "blocks": [
+            {
+              "id": "workflow_diagram_bpm_panel",
+              "blockType": "bpm-panel",
+              "bpmPanel": {
+                "businessKeyField": "pid",
+                "sections": ["status", "diagram", "operations", "history"]
+              }
+            }
+          ]
+        },
+        {
+          "key": "activity_timeline",
+          "label": { "zh-CN": "流程轨迹", "en": "Activity Timeline" },
+          "blocks": [
+            {
+              "id": "activity_timeline_block",
+              "blockType": "activity-timeline"
+            }
+          ]
+        },
+        {
+          "key": "field_history",
+          "label": { "zh-CN": "变更历史", "en": "Field History" },
+          "blocks": [
+            {
+              "id": "field_history_block",
+              "blockType": "field-history"
             }
           ]
         }

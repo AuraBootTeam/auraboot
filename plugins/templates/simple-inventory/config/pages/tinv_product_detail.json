@@ -1,1 +1,101 @@
-{"pageKey":"tinv_product_detail","name:zh-CN":"产品详情","name:en":"Product Detail","pageType":"detail","modelCode":"tinv_product","dslSchema":{"id":"detail.tinv_product","kind":"Detail","version":"1.0.0","modelCode":"tinv_product","layout":{"areas":["header","main"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"tinv_product_form","permissionCode":"TINV.product.manage"},{"code":"discontinue","commandCode":"tinv:discontinue_product","permissionCode":"TINV.product.manage"},{"code":"activate","commandCode":"tinv:activate_product","permissionCode":"TINV.product.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"tinv:delete_product","permissionCode":"TINV.product.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"产品信息","en-US":"Product Information"},"fields":[{"field":"tinv_pd_code","colSpan":6},{"field":"tinv_pd_name","colSpan":6},{"field":"tinv_pd_category","colSpan":6},{"field":"tinv_pd_status","colSpan":6},{"field":"tinv_pd_unit","colSpan":6},{"field":"tinv_pd_unit_price","colSpan":6},{"field":"tinv_pd_description","colSpan":12}]}]}}}}
+{
+  "pageKey": "tinv_product_detail",
+  "name:zh-CN": "产品详情",
+  "name:en": "Product Detail",
+  "modelCode": "tinv_product",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "产品详情",
+    "en": "Product Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "tinv.product.manage"
+        },
+        {
+          "code": "discontinue",
+          "commandCode": "tinv:discontinue_product",
+          "permissionCode": "tinv.product.manage"
+        },
+        {
+          "code": "activate",
+          "commandCode": "tinv:activate_product",
+          "permissionCode": "tinv.product.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "tinv:delete_product",
+          "permissionCode": "tinv.product.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "产品信息",
+        "en-US": "Product Information"
+      },
+      "fields": [
+        {
+          "field": "tinv_pd_code",
+          "colSpan": 6
+        },
+        {
+          "field": "tinv_pd_name",
+          "colSpan": 6
+        },
+        {
+          "field": "tinv_pd_category",
+          "colSpan": 6
+        },
+        {
+          "field": "tinv_pd_status",
+          "colSpan": 6
+        },
+        {
+          "field": "tinv_pd_unit",
+          "colSpan": 6
+        },
+        {
+          "field": "tinv_pd_unit_price",
+          "colSpan": 6
+        },
+        {
+          "field": "tinv_pd_description",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    }
+  ]
+}

@@ -1,15 +1,83 @@
 {
-  "pageKey": "tpm_project_form", "name:zh-CN": "项目表单", "name:en": "Project Form", "pageType": "form", "modelCode": "tpm_project",
-  "dslSchema": { "id": "form.tpm_project", "kind": "Form", "version": "1.0.0", "modelCode": "tpm_project",
-    "layout": { "areas": ["main", "footer"], "areasConfig": { "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 }, "footer": { "type": "flex", "direction": "row" } } },
-    "areas": {
-      "main": { "blocks": [{ "id": "basic", "blockType": "form-section", "title": { "zh-CN": "项目信息", "en-US": "Project Information" }, "fields": [
-        { "field": "tpm_pj_name", "colSpan": 12 },
-        { "field": "tpm_pj_priority", "colSpan": 6 }, { "field": "tpm_pj_owner", "colSpan": 6 },
-        { "field": "tpm_pj_start_date", "colSpan": 6 }, { "field": "tpm_pj_end_date", "colSpan": 6 },
-        { "field": "tpm_pj_description", "colSpan": 12 }
-      ] }] },
-      "footer": { "blocks": [{ "id": "buttons", "blockType": "form-buttons", "buttons": [{ "code": "submit", "action": "save", "commandCode": "tpm:update_project", "primary": true }, { "code": "cancel", "action": "cancel" }] }] }
+  "pageKey": "tpm_project_form",
+  "name:zh-CN": "项目表单",
+  "name:en": "Project Form",
+  "modelCode": "tpm_project",
+  "kind": "form",
+  "title": {
+    "zh-CN": "项目表单",
+    "en": "Project Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "footer": {
+        "type": "flex",
+        "direction": "row"
+      }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "项目信息",
+        "en-US": "Project Information"
+      },
+      "fields": [
+        {
+          "field": "tpm_pj_name",
+          "colSpan": 12
+        },
+        {
+          "field": "tpm_pj_priority",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_pj_owner",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_pj_start_date",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_pj_end_date",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_pj_description",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tpm:create_project",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
 }

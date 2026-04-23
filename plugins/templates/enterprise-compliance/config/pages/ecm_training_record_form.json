@@ -1,1 +1,91 @@
-{"pageKey":"ecm_training_record_form","name:zh-CN":"培训表单","name:en":"Training Form","pageType":"form","modelCode":"ecm_training_record","dslSchema":{"id":"form.ecm_training_record","kind":"Form","version":"1.0.0","modelCode":"ecm_training_record","layout":{"areas":["main","footer"],"areasConfig":{"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16},"footer":{"type":"flex","direction":"row"}}},"areas":{"main":{"blocks":[{"id":"basic","blockType":"form-section","title":{"zh-CN":"培训信息","en-US":"Training Information"},"fields":[{"field":"ecm_tr_course","colSpan":6},{"field":"ecm_tr_employee","colSpan":6},{"field":"ecm_tr_category","colSpan":6},{"field":"ecm_tr_scheduled_date","colSpan":6},{"field":"ecm_tr_instructor","colSpan":6},{"field":"ecm_tr_score","colSpan":3},{"field":"ecm_tr_cert_expiry","colSpan":3},{"field":"ecm_tr_notes","colSpan":12}]}]},"footer":{"blocks":[{"id":"buttons","blockType":"form-buttons","buttons":[{"code":"submit","action":"save","commandCode":"ecm:update_training","primary":true},{"code":"cancel","action":"cancel"}]}]}}}}
+{
+  "pageKey": "ecm_training_record_form",
+  "name:zh-CN": "培训表单",
+  "name:en": "Training Form",
+  "modelCode": "ecm_training_record",
+  "kind": "form",
+  "title": {
+    "zh-CN": "培训表单",
+    "en": "Training Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "footer": {
+        "type": "flex",
+        "direction": "row"
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "培训信息",
+        "en-US": "Training Information"
+      },
+      "fields": [
+        {
+          "field": "ecm_tr_course",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_employee",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_category",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_scheduled_date",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_instructor",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_tr_score",
+          "colSpan": 3
+        },
+        {
+          "field": "ecm_tr_cert_expiry",
+          "colSpan": 3
+        },
+        {
+          "field": "ecm_tr_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "ecm:create_training",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
+}

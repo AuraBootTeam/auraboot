@@ -79,11 +79,11 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         }));
         setVersions(entries);
       } else {
-        setError(result.desc || 'Failed to load version history');
+        setError(result.desc || '加载版本历史失败');
       }
     } catch (err) {
       console.error('Failed to load versions:', err);
-      setError('Failed to load version history');
+      setError('加载版本历史失败');
     } finally {
       setLoading(false);
     }
@@ -171,11 +171,11 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         await loadVersions();
         onRollbackSuccess?.();
       } else {
-        setError(result.desc || 'Rollback failed');
+        setError(result.desc || '回滚失败');
       }
     } catch (err) {
       console.error('Rollback failed:', err);
-      setError('Rollback failed');
+      setError('回滚失败');
     } finally {
       setRolling(false);
     }
