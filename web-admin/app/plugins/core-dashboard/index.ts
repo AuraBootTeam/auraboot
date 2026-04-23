@@ -4,11 +4,10 @@ import { manifest } from './manifest.js'
 import { RESOURCES } from './resources.js'
 
 /**
- * core-dashboard plugin — dashboard viewer.
+ * core-dashboard plugin — dashboard viewer + designer.
  *
- * The legacy module barrel lives in ./module.ts (exports DashboardViewer,
- * dashboardService, useDashboardStore, widgetRegistry). It's still consumed
- * by enterprise overlay (ent-dashboard-designer adds the authoring UX).
+ * The legacy module barrel lives in ./module.ts and remains the entry used by
+ * route-level lazy imports for both viewer and authoring surfaces.
  */
 export default definePlugin({
   manifest,
