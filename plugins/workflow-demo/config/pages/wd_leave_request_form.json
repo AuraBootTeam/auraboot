@@ -3,60 +3,6 @@
   "modelCode": "wd_leave_request",
   "kind": "form",
   "layout": { "type": "stack" },
-  "rules": [
-    {
-      "id": "wd_leave_date_order",
-      "assert": {
-        "field": "wd_req_end_date",
-        "gte": { "ref": "wd_req_start_date" }
-      },
-      "message": "结束日期不能早于开始日期",
-      "severity": "error",
-      "targetField": "wd_req_end_date",
-      "dependsOn": ["wd_req_start_date", "wd_req_end_date"]
-    },
-    {
-      "id": "wd_leave_slot_order_same_day",
-      "when": {
-        "field": "wd_req_start_date",
-        "eq": { "ref": "wd_req_end_date" }
-      },
-      "assert": {
-        "field": "wd_req_end_slot",
-        "gte": { "ref": "wd_req_start_slot" }
-      },
-      "message": "同一天请假时，结束时段不能早于开始时段",
-      "severity": "error",
-      "targetField": "wd_req_end_slot",
-      "dependsOn": ["wd_req_start_date", "wd_req_end_date", "wd_req_start_slot", "wd_req_end_slot"]
-    },
-    {
-      "id": "wd_leave_days_computed",
-      "when": {
-        "and": [
-          { "field": "wd_req_start_date", "neq": "" },
-          { "field": "wd_req_end_date", "neq": "" },
-          { "field": "wd_req_start_slot", "neq": "" },
-          { "field": "wd_req_end_slot", "neq": "" },
-          { "field": "wd_req_end_date", "gte": { "ref": "wd_req_start_date" } },
-          {
-            "or": [
-              { "field": "wd_req_start_date", "neq": { "ref": "wd_req_end_date" } },
-              { "field": "wd_req_end_slot", "gte": { "ref": "wd_req_start_slot" } }
-            ]
-          }
-        ]
-      },
-      "assert": {
-        "field": "wd_req_days",
-        "required": true
-      },
-      "message": "请完善开始/结束日期与时段，系统才能计算请假天数",
-      "severity": "error",
-      "targetField": "wd_req_days",
-      "dependsOn": ["wd_req_start_date", "wd_req_end_date", "wd_req_start_slot", "wd_req_end_slot", "wd_req_days"]
-    }
-  ],
   "blocks": [
     {
       "id": "basic",
@@ -99,7 +45,12 @@
         {
           "code": "submit",
           "primary": true,
-          "label": "save",
+          "label": "submit",
+          "action": { "type": "command", "command": "wd:create_and_submit_leave_request" }
+        },
+        {
+          "code": "save_draft",
+          "label": { "zh-CN": "保存草稿", "en": "Save Draft" },
           "action": { "type": "command", "command": "wd:create_leave_request" }
         },
         { "code": "cancel", "label": "cancel" }

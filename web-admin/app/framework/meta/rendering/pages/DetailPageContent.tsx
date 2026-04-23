@@ -54,6 +54,35 @@ interface RecordData {
   pid?: string;
 }
 
+export function resolveDetailFieldComponent(meta?: {
+  dataType?: string;
+  extension?: Record<string, any>;
+}): string | undefined {
+  if (!meta) return undefined;
+
+  const renderComp =
+    meta.extension?.renderComponent ||
+    meta.extension?.component ||
+    meta.extension?.uiComponent;
+
+  if (renderComp) {
+    return String(renderComp).trim().toLowerCase();
+  }
+
+  switch (String(meta.dataType || '').toLowerCase()) {
+    case 'boolean':
+      return 'switch';
+    case 'date':
+      return 'date';
+    case 'datetime':
+      return 'datetime';
+    case 'file':
+      return 'fileattachment';
+    default:
+      return undefined;
+  }
+}
+
 export function buildDetailRecordEndpoint(tableName: string, recordId: string): string {
   return buildApiEndpoint(tableName, recordId);
 }
@@ -160,18 +189,9 @@ export function DetailPageContent(props: PageContentProps) {
 
       // Derive component from renderComponent or dataType
       if (!enriched.component) {
-        const renderComp =
-          meta.extension?.renderComponent ||
-          meta.extension?.component ||
-          meta.extension?.uiComponent;
-        if (renderComp) {
-          enriched.component = String(renderComp).trim().toLowerCase();
-        } else if (meta.dataType === 'boolean') {
-          enriched.component = 'switch';
-        } else if (meta.dataType === 'date') {
-          enriched.component = 'date';
-        } else if (meta.dataType === 'datetime') {
-          enriched.component = 'datetime';
+        const resolvedComponent = resolveDetailFieldComponent(meta);
+        if (resolvedComponent) {
+          enriched.component = resolvedComponent;
         }
       }
 
@@ -588,23 +608,33 @@ export function DetailPageContent(props: PageContentProps) {
                 className="p-6"
                 style={{ display: activeTab === tabIndex ? undefined : 'none' }}
               >
-                {tab.blocks?.map((block: BlockConfig, blockIndex: number) => (
-                  <DetailBlockRenderer
-                    key={block.id || `tab-${tabIndex}-block-${blockIndex}`}
-                    block={block}
-                    recordData={recordData}
-                    recordId={recordId!}
-                    token={token || undefined}
-                    locale={locale}
-                    t={t}
-                    modelCode={schema?.modelCode || tableName}
-                    evaluateEditableWhen={evaluateVisibleWhen}
-                    onDataChange={reloadRecord}
-                    getDictItems={getDictItems}
-                    enrichField={enrichField}
-                    runtime={runtime as SchemaRuntime}
-                  />
-                ))}
+                {tab.blocks?.map((block: BlockConfig, blockIndex: number) => {
+                  // BPM panel includes a ReactFlow canvas; mounting it inside a
+                  // display:none tab produces an incorrect first fitView scale.
+                  // Keep other tab blocks pre-rendered, but defer bpm-panel
+                  // until its tab is actually active.
+                  if (activeTab !== tabIndex && block.blockType === 'bpm-panel') {
+                    return null;
+                  }
+
+                  return (
+                    <DetailBlockRenderer
+                      key={block.id || `tab-${tabIndex}-block-${blockIndex}`}
+                      block={block}
+                      recordData={recordData}
+                      recordId={recordId!}
+                      token={token || undefined}
+                      locale={locale}
+                      t={t}
+                      modelCode={schema?.modelCode || tableName}
+                      evaluateEditableWhen={evaluateVisibleWhen}
+                      onDataChange={reloadRecord}
+                      getDictItems={getDictItems}
+                      enrichField={enrichField}
+                      runtime={runtime as SchemaRuntime}
+                    />
+                  );
+                })}
               </div>
             ))}
             {/* Inline approval panel — shown when the record has an associated BPM process */}
