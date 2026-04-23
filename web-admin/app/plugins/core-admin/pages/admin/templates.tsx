@@ -10,21 +10,22 @@
 import { useState, useMemo } from 'react';
 import { CubeIcon } from '@heroicons/react/24/outline';
 import {
-  APP_TEMPLATES,
   TEMPLATE_CATEGORY_TREE,
   type AppTemplate,
 } from '~/plugins/core-admin/templates/templateCatalog';
 import { TemplateCategorySidebar } from '~/plugins/core-admin/templates/TemplateCategorySidebar';
 import { TemplateCard } from '~/plugins/core-admin/templates/TemplateCard';
 import { CreateBlankCard } from '~/plugins/core-admin/templates/CreateBlankCard';
+import { useTemplateCatalog } from '~/plugins/core-admin/templates/useTemplateCatalog';
 
 export default function TemplateCenterPage() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [installedIds] = useState<Set<string>>(new Set());
+  const { templates, loading, error } = useTemplateCatalog();
 
   const filtered = useMemo(() => {
-    let results: AppTemplate[] = APP_TEMPLATES;
+    let results: AppTemplate[] = templates;
 
     // Category filter
     if (activeCategory !== 'all') {
@@ -60,13 +61,34 @@ export default function TemplateCenterPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Template Center</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Browse templates to quickly set up your workspace
+            Browse curated OSS templates and dynamically discovered enterprise templates.
           </p>
         </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
+            Template catalog fallback is active: {error}
+          </div>
+        )}
 
         {/* Template grid */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <CreateBlankCard />
+          {loading &&
+            templates.length === 0 &&
+            Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={index}
+                className="animate-pulse overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div className="aspect-video bg-gray-100 dark:bg-gray-700/50" />
+                <div className="space-y-3 p-4">
+                  <div className="h-5 w-2/3 rounded bg-gray-100 dark:bg-gray-700" />
+                  <div className="h-4 w-full rounded bg-gray-100 dark:bg-gray-700" />
+                  <div className="h-4 w-5/6 rounded bg-gray-100 dark:bg-gray-700" />
+                </div>
+              </div>
+            ))}
           {filtered.map((t) => (
             <TemplateCard key={t.id} template={t} installed={installedIds.has(t.id)} />
           ))}
