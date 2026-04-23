@@ -28,7 +28,7 @@
  *
  * @since BPM closure spec 1 (Task 12)
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -83,7 +83,13 @@ const nodeTypes: NodeTypes = {
   callActivity: BpmDiagramNode,
 };
 
-function DiagramViewportSync({ nodeCount }: { nodeCount: number }) {
+function DiagramViewportSync({
+  nodeCount,
+  containerRef,
+}: {
+  nodeCount: number;
+  containerRef: RefObject<HTMLDivElement>;
+}) {
   const nodesInitialized = useNodesInitialized();
   const { fitView } = useReactFlow();
 
@@ -95,6 +101,24 @@ function DiagramViewportSync({ nodeCount }: { nodeCount: number }) {
     return () => window.cancelAnimationFrame(frame);
   }, [fitView, nodeCount, nodesInitialized]);
 
+  useEffect(() => {
+    if (!nodesInitialized || nodeCount === 0 || !containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      if (width <= 0 || height <= 0) return;
+
+      window.requestAnimationFrame(() => {
+        void fitView({ padding: 0.24, duration: 0 });
+      });
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [fitView, nodeCount, nodesInitialized]);
+
   return null;
 }
 
@@ -102,6 +126,7 @@ export function BpmDiagramSection({ instance, t }: BpmDiagramSectionProps) {
   const [definition, setDefinition] = useState<BPMNProcessDefinition | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (instance === null) {
@@ -192,6 +217,7 @@ export function BpmDiagramSection({ instance, t }: BpmDiagramSectionProps) {
 
   return (
     <div
+      ref={containerRef}
       data-testid="bpm-diagram-container"
       className="h-80 w-full overflow-hidden rounded border border-gray-200 bg-white"
     >
@@ -209,7 +235,10 @@ export function BpmDiagramSection({ instance, t }: BpmDiagramSectionProps) {
         fitView
         fitViewOptions={{ padding: 0.24 }}
       >
-        <DiagramViewportSync nodeCount={annotatedNodes.length} />
+        <DiagramViewportSync
+          nodeCount={annotatedNodes.length}
+          containerRef={containerRef}
+        />
         <Controls showInteractive={false} />
         <Background />
       </ReactFlow>

@@ -106,6 +106,69 @@ public class AuraBotChatService {
             "Help users with their questions about the current page and data. " +
             "Be concise, accurate, and helpful. Respond in the user's language.";
 
+    static Map<String, Object> buildPromptSpanOutput(String systemPrompt) {
+        return Map.of(
+                "system_prompt", systemPrompt,
+                "char_count", systemPrompt != null ? systemPrompt.length() : 0
+        );
+    }
+
+    static Map<String, Object> buildGroundingSpanInput(String userMessage, String modelCode,
+                                                       String recordPid, String sessionId) {
+        return Map.of(
+                "message", userMessage != null ? userMessage : "",
+                "model_code", modelCode != null ? modelCode : "",
+                "record_pid", recordPid != null ? recordPid : "",
+                "session_id", sessionId != null ? sessionId : ""
+        );
+    }
+
+    static Map<String, Object> buildResolveToolsSpanInput(String userMessage, String modelCode,
+                                                          String recordPid) {
+        return Map.of(
+                "message", userMessage != null ? userMessage : "",
+                "model_code", modelCode != null ? modelCode : "",
+                "record_pid", recordPid != null ? recordPid : ""
+        );
+    }
+
+    static Map<String, Object> buildResolveToolsSpanOutput(List<LlmChatRequest.Tool> tools) {
+        List<Map<String, Object>> toolSummaries = tools == null ? List.of() : tools.stream()
+                .map(tool -> Map.<String, Object>of(
+                        "name", tool.getName() != null ? tool.getName() : "",
+                        "description", tool.getDescription() != null ? tool.getDescription() : ""))
+                .toList();
+        return Map.of(
+                "tool_count", tools != null ? tools.size() : 0,
+                "tools", toolSummaries
+        );
+    }
+
+    static Map<String, Object> buildGenerationSpanInput(LlmChatRequest request) {
+        if (request == null) {
+            return Map.of();
+        }
+        return Map.of(
+                "model", request.getModel(),
+                "system_prompt", request.getSystemPrompt(),
+                "messages", request.getMessages() != null ? request.getMessages() : List.of(),
+                "tools", request.getTools() != null ? request.getTools() : List.of(),
+                "max_tokens", request.getMaxTokens()
+        );
+    }
+
+    static Map<String, Object> buildGenerationSpanOutput(LlmChatResponse response) {
+        if (response == null) {
+            return Map.of();
+        }
+        return Map.of(
+                "stop_reason", response.getStopReason(),
+                "content", response.getContent() != null ? response.getContent() : List.of(),
+                "input_tokens", response.getInputTokens(),
+                "output_tokens", response.getOutputTokens()
+        );
+    }
+
     /**
      * Build an intent-aware tool hint based on the resolved tools metadata.
      * Replaces the old static TOOL_HINT constant with dynamic guidance.
@@ -275,17 +338,13 @@ public class AuraBotChatService {
             recordPid = ctx.getRecordPid();
         }
 
-        // --- Trace: resolve tools span ---
-        SpanContext resolveSpan = aiTraceService.startSpan(trace, null, "span", "resolve_tools", null);
-        var resolved = chatToolResolver.resolveTools(request.getMessage(), modelCode, recordPid);
-        List<LlmChatRequest.Tool> tools = resolved.tools();
-        aiTraceService.endSpan(resolveSpan, Map.of("tool_count", tools.size()), "success");
-
         // --- D1 Grounding: compile user message → BIF, constrain tools, persist ---
         com.auraboot.framework.agent.dto.BusinessIntentFrame bif = null;
         String qualityIssue = null;
         if (groundingService != null) {
-            SpanContext groundingSpan = aiTraceService.startSpan(trace, null, "span", "d1_grounding", null);
+            SpanContext groundingSpan = aiTraceService.startSpan(
+                    trace, null, "span", "d1_grounding",
+                    buildGroundingSpanInput(request.getMessage(), modelCode, recordPid, request.getSessionId()));
             try {
                 Long userIdForGrounding = MetaContext.getCurrentUserId();
                 var gctx = com.auraboot.framework.agent.service.GroundingService.GroundingContext.builder()
@@ -297,7 +356,6 @@ public class AuraBotChatService {
                         .agentCode(com.auraboot.framework.agent.service.ActiveMemoryService.DEFAULT_AGENT)
                         .build();
                 bif = groundingService.ground(tenantId, request.getMessage(), gctx);
-                tools = applyCandidateSkillsMode(tools, bif);
                 com.auraboot.framework.agent.service.BifContext.setCurrentBif(bif);
                 if (bifRecorder != null) {
                     bifRecorder.record(tenantId, request.getMessage(), bif, null, request.getSessionId());
@@ -311,14 +369,24 @@ public class AuraBotChatService {
                         "object", bif.getObject() != null ? bif.getObject() : "",
                         "mode", bif.getCandidateSkillsMode() != null ? bif.getCandidateSkillsMode() : "",
                         "risk", bif.getRiskLevel() != null ? bif.getRiskLevel() : "",
-                        "quality_issue", qualityIssue != null ? qualityIssue : "ok",
-                        "tool_count_after", tools.size()), "success");
+                        "quality_issue", qualityIssue != null ? qualityIssue : "ok"), "success");
             } catch (Exception e) {
                 log.warn("D1 Grounding failed, falling back to TF-IDF tool selection: {}", e.getMessage());
                 aiTraceService.endSpan(groundingSpan, Map.of("error", e.getMessage()), "error");
                 bif = null;
             }
         }
+
+        // --- Trace: resolve tools span ---
+        SpanContext resolveSpan = aiTraceService.startSpan(
+                trace, null, "span", "resolve_tools",
+                buildResolveToolsSpanInput(request.getMessage(), modelCode, recordPid));
+        var resolved = chatToolResolver.resolveTools(request.getMessage(), modelCode, recordPid);
+        List<LlmChatRequest.Tool> tools = resolved.tools();
+        if (bif != null) {
+            tools = applyCandidateSkillsMode(tools, bif);
+        }
+        aiTraceService.endSpan(resolveSpan, buildResolveToolsSpanOutput(tools), "success");
 
         // --- Trace: render prompt span ---
         SpanContext promptSpan = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
@@ -341,7 +409,7 @@ public class AuraBotChatService {
                 systemPrompt = soul.get().renderedPromptText() + "\n\n" + systemPrompt;
             }
         }
-        aiTraceService.endSpan(promptSpan, Map.of("char_count", systemPrompt.length()), "success");
+        aiTraceService.endSpan(promptSpan, buildPromptSpanOutput(systemPrompt), "success");
 
         // 5. Route: tool loop (sync) vs text-only streaming
         if (!tools.isEmpty()) {
@@ -405,7 +473,8 @@ public class AuraBotChatService {
                     .build();
 
             // --- Trace: LLM call span ---
-            SpanContext llmSpan = aiTraceService.startSpan(trace, null, "generation", "llm_call_" + round, null);
+            SpanContext llmSpan = aiTraceService.startSpan(
+                    trace, null, "generation", "llm_call_" + round, buildGenerationSpanInput(request));
 
             LlmChatResponse response;
             try {
@@ -427,7 +496,7 @@ public class AuraBotChatService {
             aiTraceService.recordGeneration(llmSpan, model,
                     response.getInputTokens(), response.getOutputTokens(),
                     null, response.getStopReason(), null, null);
-            aiTraceService.endSpan(llmSpan, null, "success");
+            aiTraceService.endSpan(llmSpan, buildGenerationSpanOutput(response), "success");
 
             // Accumulate token counts
             totalInputTokens += response.getInputTokens();
@@ -632,8 +701,9 @@ public class AuraBotChatService {
                     .build();
 
             // --- Trace: LLM call span ---
-            SpanContext llmSpan = aiTraceService.startSpan(trace, null, "generation",
-                    "resume_llm_call_" + round, null);
+            SpanContext llmSpan = aiTraceService.startSpan(
+                    trace, null, "generation",
+                    "resume_llm_call_" + round, buildGenerationSpanInput(request));
 
             LlmChatResponse response;
             try {
@@ -650,7 +720,7 @@ public class AuraBotChatService {
             aiTraceService.recordGeneration(llmSpan, pending.getModel(),
                     response.getInputTokens(), response.getOutputTokens(),
                     null, response.getStopReason(), null, null);
-            aiTraceService.endSpan(llmSpan, null, "success");
+            aiTraceService.endSpan(llmSpan, buildGenerationSpanOutput(response), "success");
 
             if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
                 aiTraceService.endTraceWithError(trace, "Empty response from LLM");

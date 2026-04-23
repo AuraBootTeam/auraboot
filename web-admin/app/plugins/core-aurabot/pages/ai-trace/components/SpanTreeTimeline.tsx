@@ -59,9 +59,41 @@ const STATUS_BAR_COLORS: Record<string, string> = {
   success: 'bg-green-400 dark:bg-green-500',
   confirmed: 'bg-green-400 dark:bg-green-500',
   ERROR: 'bg-red-400 dark:bg-red-500',
+  error: 'bg-red-400 dark:bg-red-500',
   pending: 'bg-amber-400 dark:bg-amber-500',
   in_progress: 'bg-blue-300 dark:bg-blue-400',
   cancelled: 'bg-gray-300 dark:bg-gray-500',
+};
+
+const STATUS_BADGE: Record<string, { text: string; className: string }> = {
+  success: {
+    text: 'check',
+    className: 'bg-green-50 text-green-700 ring-green-200 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-800',
+  },
+  confirmed: {
+    text: 'check',
+    className: 'bg-green-50 text-green-700 ring-green-200 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-800',
+  },
+  ERROR: {
+    text: 'error',
+    className: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800',
+  },
+  error: {
+    text: 'error',
+    className: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800',
+  },
+  pending: {
+    text: 'pending',
+    className: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-800',
+  },
+  in_progress: {
+    text: 'running',
+    className: 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:ring-blue-800',
+  },
+  cancelled: {
+    text: 'cancelled',
+    className: 'bg-gray-50 text-gray-700 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700',
+  },
 };
 
 interface TreeNode extends Span {
@@ -219,6 +251,7 @@ export function SpanTreeTimeline({
           const hasChildren = node.children.length > 0;
           const isCollapsed = collapsedSet.has(node.spanId);
           const cfg = TYPE_CONFIG[node.type] || TYPE_CONFIG.SPAN;
+          const statusBadge = STATUS_BADGE[node.status] || STATUS_BADGE.pending;
           const barColor =
             node.status === 'error'
               ? STATUS_BAR_COLORS.ERROR
@@ -253,6 +286,11 @@ export function SpanTreeTimeline({
                 <span className="shrink-0">{cfg.icon}</span>
                 <span className={`truncate font-mono ${cfg.color}`} title={node.name}>
                   {node.name}
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase ring-1 ${statusBadge.className}`}
+                >
+                  {statusBadge.text}
                 </span>
               </div>
 
