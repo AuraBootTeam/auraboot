@@ -66,7 +66,7 @@ async function createApplicantSession(browser: any, request: any, prefix: string
 }
 
 test.describe('workflow-demo — leave request form page', () => {
-  test('validation UX + create draft + detail roundtrip', async ({ browser, request }) => {
+  test('validation UX + submit new request + detail roundtrip', async ({ browser, request }) => {
     const { applicant, context, page } = await createApplicantSession(
       browser,
       request,
@@ -129,7 +129,7 @@ test.describe('workflow-demo — leave request form page', () => {
       await expect(summary).toContainText('结束日期不能早于开始日期');
     });
 
-    await test.step('complete valid half-day form, upload attachment, create draft', async () => {
+    await test.step('complete valid half-day form, upload attachment, submit request', async () => {
       const sameDay = dateOffsetStr(14);
       const reason = `wd leave form page ${Date.now()}`;
 
@@ -156,19 +156,19 @@ test.describe('workflow-demo — leave request form page', () => {
         timeout: 10_000,
       });
 
-      const createRespPromise = page.waitForResponse(
+      const submitRespPromise = page.waitForResponse(
         (resp: import('@playwright/test').Response) =>
-          resp.url().includes('/api/meta/commands/execute/wd:create_leave_request') &&
+          resp.url().includes('/api/meta/commands/execute/wd:create_and_submit_leave_request') &&
           resp.request().method() === 'POST',
         { timeout: 20_000 },
       );
       await page.locator('[data-testid="form-btn-submit"]').first().click();
-      const createResp = await createRespPromise;
-      expect(createResp.status()).toBeLessThan(400);
-      const createBody = await createResp.json();
-      expect(String(createBody?.code)).toBe('0');
+      const submitResp = await submitRespPromise;
+      expect(submitResp.status()).toBeLessThan(400);
+      const submitBody = await submitResp.json();
+      expect(String(submitBody?.code)).toBe('0');
 
-      const recordId = String(createBody?.data?.data?.recordId ?? '');
+      const recordId = String(submitBody?.data?.data?.recordId ?? '');
       expect(recordId).toBeTruthy();
 
       await page.waitForURL(/\/p\/wd_leave_request(?:$|\?|\/$)/, { timeout: 15_000 });
@@ -183,14 +183,15 @@ test.describe('workflow-demo — leave request form page', () => {
       expect(record?.wd_req_type).toBe('annual');
       expect(String(record?.wd_req_days)).toBe('0.5');
       expect(record?.wd_req_reason).toBe(reason);
-      expect(String(record?.wd_req_status)).toBe('draft');
+      expect(String(record?.wd_req_status)).toBe('submitted');
+      expect(String(record?.wd_req_process_instance ?? '')).toBeTruthy();
       expect(String(record?.wd_req_cc_users || '')).toContain(adminUserId);
       expect(String(record?.wd_req_attachments || '')).toContain(path.basename(LICENSE_FILE));
 
       await page.goto(`/p/wd_leave_request/view/${recordId}`, { waitUntil: 'domcontentloaded' });
       const main = page.locator('main').first();
       await expect(main.locator('[data-testid="form-field-wd_req_status"]').first()).toContainText(
-        /草稿|Draft/i,
+        /已提交|Submitted/i,
       );
       await expect(main.locator('[data-testid="form-field-wd_req_days"]').first()).toContainText('0.5');
       await expect(main.locator('[data-testid="form-field-wd_req_reason"]').first()).toContainText(reason);
