@@ -40,7 +40,11 @@ public class PostgresDdlDialect implements DdlDialect {
                 if (precision != null && scale != null) {
                     return "DECIMAL(" + precision + "," + scale + ")";
                 } else if (precision != null) {
-                    return "DECIMAL(" + precision + ",2)";
+                    // Runtime field metadata often uses `precision` as UI decimal places
+                    // when `scale` is absent (for example moneyinput precision=2).
+                    // Treat that shape as a display-scale hint and keep a safe total
+                    // precision to avoid generating unusable DECIMAL(2,2) columns.
+                    return "DECIMAL(19," + precision + ")";
                 }
                 return "DECIMAL(10,2)";
             case "boolean":
@@ -125,6 +129,42 @@ public class PostgresDdlDialect implements DdlDialect {
             ps.setString(2, columnName.toLowerCase());
             try (java.sql.ResultSet rs = ps.executeQuery()) {
                 return rs.next() && rs.getBoolean(1);
+            }
+        }
+    }
+
+    @Override
+    public String getColumnTypeDefinition(java.sql.Connection connection, String tableName, String columnName) throws java.sql.SQLException {
+        String sql = """
+                SELECT data_type, character_maximum_length, numeric_precision, numeric_scale, udt_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = ? AND column_name = ?
+                """;
+        try (java.sql.PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, tableName.toLowerCase());
+            ps.setString(2, columnName.toLowerCase());
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new java.sql.SQLException("Column not found: " + tableName + "." + columnName);
+                }
+                String dataType = rs.getString("data_type");
+                Integer charLength = (Integer) rs.getObject("character_maximum_length");
+                Integer precision = (Integer) rs.getObject("numeric_precision");
+                Integer scale = (Integer) rs.getObject("numeric_scale");
+                String udtName = rs.getString("udt_name");
+                if ("character varying".equalsIgnoreCase(dataType) && charLength != null) {
+                    return "VARCHAR(" + charLength + ")";
+                }
+                if (("numeric".equalsIgnoreCase(dataType) || "decimal".equalsIgnoreCase(dataType)) && precision != null) {
+                    return scale != null ? "DECIMAL(" + precision + "," + scale + ")" : "DECIMAL(" + precision + ")";
+                }
+                if ("timestamp with time zone".equalsIgnoreCase(dataType)) {
+                    return "TIMESTAMPTZ";
+                }
+                if ("ARRAY".equalsIgnoreCase(dataType) && udtName != null) {
+                    return udtName.toUpperCase() + "[]";
+                }
+                return dataType != null ? dataType.toUpperCase() : null;
             }
         }
     }

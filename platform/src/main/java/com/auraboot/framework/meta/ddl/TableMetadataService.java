@@ -32,6 +32,14 @@ public class TableMetadataService {
         }
     }
 
+    public String getColumnTypeDefinition(String tableName, String columnName) {
+        try (Connection connection = dataSource.getConnection()) {
+            return ddlDialectProvider.getDialect().getColumnTypeDefinition(connection, tableName, columnName);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to check column type: " + tableName + "." + columnName, e);
+        }
+    }
+
     public boolean isColumnNullable(String tableName, String columnName) {
         try (Connection connection = dataSource.getConnection()) {
             return ddlDialectProvider.getDialect().isColumnNullable(connection, tableName, columnName);

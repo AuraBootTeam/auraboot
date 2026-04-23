@@ -227,6 +227,8 @@
     "displayName:zh-CN": "预算金额",
     "displayName:en": "Budget",
     "dataType": "decimal",
+    "precision": 19,
+    "scale": 2,
     "constraints": { "min": 0, "max": 99999999.99 },
     "extension": {
       "renderComponent": "moneyinput",
@@ -242,7 +244,6 @@
     "constraints": { "maxLength": 10 },
     "extension": {
       "renderComponent": "timepicker",
-      "format": "HH:mm",
       "clearable": true
     }
   },
@@ -265,7 +266,6 @@
     "constraints": { "maxLength": 50 },
     "extension": {
       "renderComponent": "timerangepicker",
-      "format": "24h",
       "minuteStep": 15
     }
   },
@@ -294,10 +294,10 @@
     "displayName:zh-CN": "负责人",
     "displayName:en": "Owner",
     "dataType": "reference",
-    "description": "Reference to e2et_customer demonstrating reference data type.",
+    "description": "Reference to sys_user demonstrating reference data type.",
     "refTarget": {
-      "targetModel": "e2et_customer",
-      "targetField": "e2et_cust_name"
+      "targetModel": "sys_user",
+      "targetField": "username"
     },
     "extension": {
       "placeholder:zh-CN": "请选择负责人",

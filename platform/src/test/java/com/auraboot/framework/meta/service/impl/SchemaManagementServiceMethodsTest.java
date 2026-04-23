@@ -178,6 +178,38 @@ class SchemaManagementServiceMethodsTest {
         assertTrue(result.getErrorMessage().contains("Table does not exist"));
     }
 
+    @Test
+    @DisplayName("syncModelToTable - 已存在列类型漂移时应生成 ALTER COLUMN TYPE")
+    void testSyncModelToTable_TypeDriftGeneratesAlterColumnType() {
+        testField = FieldDefinition.builder()
+                .code("test_field")
+                .columnName("test_column")
+                .dataType("decimal")
+                .precision(19)
+                .scale(2)
+                .required(false)
+                .build();
+        testModel.setFields(List.of(testField));
+
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(true);
+        when(tableMetadataService.columnExists("tb_test", "test_column")).thenReturn(true);
+        when(tableMetadataService.getColumnTypeDefinition("tb_test", "test_column"))
+                .thenReturn("DECIMAL(2,2)");
+        when(tableMetadataService.isColumnNullable("tb_test", "test_column")).thenReturn(true);
+        when(ddlDialect.mapDataType(testField)).thenReturn("DECIMAL(19,2)");
+        when(dynamicDataMapper.alterTable(anyString())).thenReturn(0);
+
+        SchemaOperationResult result = schemaManagementService.syncModelToTable("test_model", null);
+
+        assertTrue(result.getSuccess());
+        assertNotNull(result.getExecutedDDL());
+        assertTrue(result.getExecutedDDL().stream().anyMatch(ddl ->
+                ddl.contains("ALTER TABLE tb_test ALTER COLUMN test_column TYPE DECIMAL(19,2)")));
+        verify(dynamicDataMapper, atLeastOnce()).alterTable(anyString());
+    }
+
     // ==================== removeFieldFromModel 测试 ====================
 
     @Test

@@ -23,6 +23,8 @@ public interface DdlDialect {
 
     boolean columnExists(java.sql.Connection connection, String tableName, String columnName) throws java.sql.SQLException;
 
+    String getColumnTypeDefinition(java.sql.Connection connection, String tableName, String columnName) throws java.sql.SQLException;
+
     boolean isColumnNullable(java.sql.Connection connection, String tableName, String columnName) throws java.sql.SQLException;
 
     boolean indexExists(java.sql.Connection connection, String tableName, String indexName) throws java.sql.SQLException;
