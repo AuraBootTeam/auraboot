@@ -38,7 +38,12 @@ public class OrphanMenuCheckRunner implements ApplicationRunner {
     private static final String WHITELIST_RESOURCE = "seed/platform-menu-whitelist.json";
     private static final String ORPHAN_QUERY =
             "SELECT DISTINCT code FROM ab_menu "
-                    + "WHERE plugin_pid IS NULL AND deleted_flag = FALSE AND status = 'active'";
+                    + "WHERE plugin_pid IS NULL AND deleted_flag = FALSE AND status = 'active' "
+                    + "AND code IS NOT NULL AND TRIM(code) <> ''";
+    private static final String MALFORMED_ORPHAN_COUNT_QUERY =
+            "SELECT COUNT(*) FROM ab_menu "
+                    + "WHERE plugin_pid IS NULL AND deleted_flag = FALSE AND status = 'active' "
+                    + "AND (code IS NULL OR TRIM(code) = '')";
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -46,6 +51,13 @@ public class OrphanMenuCheckRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         Set<String> whitelist = loadWhitelist();
+        Integer malformedOrphanCount = jdbcTemplate.queryForObject(MALFORMED_ORPHAN_COUNT_QUERY, Integer.class);
+        if (malformedOrphanCount != null && malformedOrphanCount > 0) {
+            log.warn(
+                    "OrphanMenuCheck: found {} bootstrap menu rows with blank code; "
+                            + "skipping whitelist enforcement for malformed rows and continuing startup",
+                    malformedOrphanCount);
+        }
         List<String> orphanCodes = jdbcTemplate.queryForList(ORPHAN_QUERY, String.class);
         List<String> violations = orphanCodes.stream()
                 .filter(code -> !whitelist.contains(code))
