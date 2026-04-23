@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * This test class does NOT require a Spring context — it only reads files from
  * the filesystem using Jackson. The golden-path directory is located relative
- * to the repo root: plugins/templates/golden-path/
+ * to the repo root: plugins/golden-path/
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -33,7 +33,7 @@ public class GoldenPathPluginTest {
     /**
      * Resolve the golden-path directory by walking up from the working directory
      * until we find the AuraBoot repo root (identified by the presence of
-     * plugins/templates/golden-path).
+     * plugins/golden-path).
      */
     private Path goldenPathDir;
 
@@ -42,8 +42,11 @@ public class GoldenPathPluginTest {
         // Try well-known paths first (CI, local dev)
         String[] candidates = {
             // From repo root
-            "plugins/templates/golden-path",
+            "plugins/golden-path",
             // From platform/ subproject
+            "../plugins/golden-path",
+            // Legacy path during migration
+            "plugins/templates/golden-path",
             "../plugins/templates/golden-path",
         };
 
@@ -56,7 +59,7 @@ public class GoldenPathPluginTest {
         }
 
         assertNotNull(goldenPathDir,
-                "Could not locate plugins/templates/golden-path directory. "
+                "Could not locate plugins/golden-path directory. "
                 + "Tried: " + String.join(", ", candidates));
     }
 
