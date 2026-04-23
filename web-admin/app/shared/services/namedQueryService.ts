@@ -217,6 +217,19 @@ export interface PageResult<T> {
   pages: number;
 }
 
+type NamedQueryPagePayload<T> =
+  | PageResult<T>
+  | {
+      records?: T[];
+      total?: number;
+      size?: number;
+      current?: number;
+      pages?: number;
+      pageSize?: number;
+      page?: number;
+      totalPages?: number;
+    };
+
 // ============================================================================
 // Service
 // ============================================================================
@@ -232,6 +245,16 @@ function handleResponse<T>(
     throw new Error(result.message || errorMessage);
   }
   return result.data as T;
+}
+
+function normalizePageResult<T>(payload: NamedQueryPagePayload<T>): PageResult<T> {
+  return {
+    records: payload.records ?? [],
+    total: payload.total ?? 0,
+    size: payload.size ?? payload.pageSize ?? 20,
+    current: payload.current ?? payload.page ?? 1,
+    pages: payload.pages ?? payload.totalPages ?? 0,
+  };
 }
 
 export const namedQueryService = {
@@ -295,7 +318,7 @@ export const namedQueryService = {
       undefined,
       httpRequest,
     );
-    return handleResponse(result, 'Failed to query named queries');
+    return normalizePageResult(handleResponse(result, 'Failed to query named queries'));
   },
 
   /**
