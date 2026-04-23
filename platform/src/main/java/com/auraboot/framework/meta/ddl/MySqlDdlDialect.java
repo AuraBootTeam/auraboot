@@ -39,7 +39,7 @@ public class MySqlDdlDialect implements DdlDialect {
                 if (precision != null && scale != null) {
                     return "DECIMAL(" + precision + "," + scale + ")";
                 } else if (precision != null) {
-                    return "DECIMAL(" + precision + ",2)";
+                    return "DECIMAL(19," + precision + ")";
                 }
                 return "DECIMAL(10,2)";
             case "boolean":
@@ -127,6 +127,20 @@ public class MySqlDdlDialect implements DdlDialect {
     }
 
     @Override
+    public String getColumnTypeDefinition(java.sql.Connection connection, String tableName, String columnName) throws java.sql.SQLException {
+        java.sql.DatabaseMetaData metaData = connection.getMetaData();
+        try (java.sql.ResultSet columns = metaData.getColumns(connection.getCatalog(), null, tableName, columnName)) {
+            String type = mapColumnType(columns, tableName, columnName);
+            if (type != null) return type;
+        }
+        try (java.sql.ResultSet columns = metaData.getColumns(connection.getCatalog(), null, tableName.toUpperCase(), columnName.toUpperCase())) {
+            String type = mapColumnType(columns, tableName, columnName);
+            if (type != null) return type;
+        }
+        throw new java.sql.SQLException("Column not found: " + tableName + "." + columnName);
+    }
+
+    @Override
     public boolean isColumnNullable(java.sql.Connection connection, String tableName, String columnName) throws java.sql.SQLException {
         java.sql.DatabaseMetaData metaData = connection.getMetaData();
         try (java.sql.ResultSet columns = metaData.getColumns(connection.getCatalog(), null, tableName, columnName)) {
@@ -162,5 +176,25 @@ public class MySqlDdlDialect implements DdlDialect {
             }
         }
         return false;
+    }
+
+    private String mapColumnType(java.sql.ResultSet columns, String tableName, String columnName) throws java.sql.SQLException {
+        if (!columns.next()) {
+            return null;
+        }
+        String typeName = columns.getString("TYPE_NAME");
+        int columnSize = columns.getInt("COLUMN_SIZE");
+        int decimalDigits = columns.getInt("DECIMAL_DIGITS");
+        if (typeName == null) {
+            throw new java.sql.SQLException("Column type unavailable: " + tableName + "." + columnName);
+        }
+        String normalized = typeName.toUpperCase();
+        if (normalized.startsWith("VARCHAR")) {
+            return "VARCHAR(" + columnSize + ")";
+        }
+        if (normalized.startsWith("DECIMAL") || normalized.startsWith("NUMERIC")) {
+            return "DECIMAL(" + columnSize + "," + decimalDigits + ")";
+        }
+        return normalized;
     }
 }

@@ -14,10 +14,12 @@ import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
@@ -45,6 +47,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     private final DdlDialectProvider ddlDialectProvider;
     private final TableMetadataService tableMetadataService;
     private final MultiTenantIndexManager multiTenantIndexManager;
+    private final DataSource dataSource;
 
     @Override
     @Transactional
@@ -1083,6 +1086,13 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 continue;
             }
 
+            String expectedType = canonicalizeColumnType(ddlDialectProvider.getDialect().mapDataType(field));
+            String actualType = canonicalizeColumnType(tableMetadataService.getColumnTypeDefinition(tableName, columnName));
+            if (expectedType != null && actualType != null && !expectedType.equals(actualType)) {
+                ddlStatements.add(String.format("ALTER TABLE %s ALTER COLUMN %s TYPE %s",
+                        tableName, columnName, ddlDialectProvider.getDialect().mapDataType(field)));
+            }
+
             boolean expectedNullable = !(field.isRequired() || field.isPrimaryKey());
             boolean actualNullable = tableMetadataService.isColumnNullable(tableName, columnName);
             if (expectedNullable != actualNullable) {
@@ -1106,6 +1116,16 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         return ddlStatements;
     }
 
+    private String canonicalizeColumnType(String sqlType) {
+        if (sqlType == null) return null;
+        return sqlType
+                .trim()
+                .toUpperCase()
+                .replace("NUMERIC", "DECIMAL")
+                .replace("CHARACTER VARYING", "VARCHAR")
+                .replaceAll("\\s+", "");
+    }
+
     /**
      * Returns true if the given index DDL specifically references {@code columnName} as one of
      * the indexed columns (not just in the index name or table name).
@@ -1126,9 +1146,25 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         String normalized = ddl.trim().toUpperCase();
         if (normalized.startsWith("CREATE TABLE")) {
             dynamicDataMapper.createTable(ddl);
+            clearPostgresPreparedPlans();
             return;
         }
         dynamicDataMapper.alterTable(ddl);
+        clearPostgresPreparedPlans();
+    }
+
+    private void clearPostgresPreparedPlans() {
+        if (!"PostgreSQL".equalsIgnoreCase(ddlDialectProvider.getDialect().getName())) {
+            return;
+        }
+        try {
+            var connection = DataSourceUtils.getConnection(dataSource);
+            try (var statement = connection.createStatement()) {
+                statement.execute("DEALLOCATE ALL");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to clear PostgreSQL prepared plans after DDL: {}", e.getMessage());
+        }
     }
 
     private List<String> filterExistingIndexes(String tableName, List<String> indexDdls) {
