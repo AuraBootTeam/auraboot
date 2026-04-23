@@ -6907,10 +6907,11 @@ DECLARE
 BEGIN
     SELECT COUNT(*) INTO dup_count
     FROM ab_agent_shadow_run a
-    USING ab_agent_shadow_run b
+    JOIN ab_agent_shadow_run b
+      ON a.draft_id = b.draft_id
+     AND a.original_run_id = b.original_run_id
     WHERE a.id > b.id
-      AND a.draft_id = b.draft_id
-      AND a.original_run_id = b.original_run_id;
+    ;
     IF dup_count > 0 THEN
         RAISE NOTICE 'PR-55 migration: purging % duplicate ab_agent_shadow_run rows (dev-stage cleanup)', dup_count;
         DELETE FROM ab_agent_shadow_run a
@@ -7976,4 +7977,3 @@ CREATE TABLE IF NOT EXISTS ab_scheduler_leader (
 
 COMMENT ON TABLE ab_scheduler_leader IS
     'PR-85 — coarse leader election for multi-instance schedulers (orphan / demoter)';
-
