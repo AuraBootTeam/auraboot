@@ -15,9 +15,9 @@ import { resolveLocalizedText } from '~/plugins/core-designer/components/studio/
  * Device preset configurations
  */
 const DEVICE_PRESETS = {
-  desktop: { width: 1440, height: 900, label: 'Desktop' },
-  tablet: { width: 768, height: 1024, label: 'Tablet' },
-  mobile: { width: 375, height: 812, label: 'Mobile' },
+  desktop: { width: 1440, height: 900, label: '桌面' },
+  tablet: { width: 768, height: 1024, label: '平板' },
+  mobile: { width: 375, height: 812, label: '手机' },
 } as const;
 
 type DeviceType = keyof typeof DEVICE_PRESETS;
@@ -93,7 +93,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                 />
               </svg>
-              <h2 className="text-lg font-semibold text-gray-900">Preview</h2>
+              <h2 className="text-lg font-semibold text-gray-900">页面预览</h2>
             </div>
             {pageTitle && <span className="text-sm text-gray-500">· {pageTitle}</span>}
             {schema && (
@@ -128,7 +128,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 onChange={(e) => setShowGrid(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600"
               />
-              Grid
+              网格
             </label>
 
             <button
@@ -182,13 +182,13 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-6 py-3">
-          <div className="text-sm text-gray-500">{elementCount} blocks</div>
+          <div className="text-sm text-gray-500">{elementCount} 个区块</div>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
               className="rounded-lg px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-200"
             >
-              Close
+              关闭
             </button>
           </div>
         </div>
@@ -231,7 +231,7 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
     case 'filters':
       return (
         <div className={`${borderClass} rounded-lg p-3`}>
-          <div className="mb-2 text-[10px] text-gray-400 uppercase">Filters</div>
+          <div className="mb-2 text-[10px] text-gray-400 uppercase">筛选器</div>
           <div className="grid grid-cols-3 gap-2">
             {(block.fields || []).slice(0, 6).map((field, i) => {
               const fieldName = typeof field === 'string' ? field : field.field;
@@ -246,8 +246,8 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
             })}
           </div>
           <div className="mt-3 flex justify-end gap-2">
-            <div className="rounded bg-gray-100 px-3 py-1.5 text-xs text-gray-600">Reset</div>
-            <div className="rounded bg-blue-600 px-3 py-1.5 text-xs text-white">Search</div>
+            <div className="rounded bg-gray-100 px-3 py-1.5 text-xs text-gray-600">重置</div>
+            <div className="rounded bg-blue-600 px-3 py-1.5 text-xs text-white">查询</div>
           </div>
         </div>
       );
@@ -255,7 +255,7 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
     case 'table':
       return (
         <div className={`${borderClass} overflow-hidden rounded-lg`}>
-          <div className="px-3 pt-2 text-[10px] text-gray-400 uppercase">Data Table</div>
+          <div className="px-3 pt-2 text-[10px] text-gray-400 uppercase">数据表格</div>
           <table className="mt-1 w-full text-sm">
             <thead>
               <tr className="bg-gray-100 text-left">
@@ -394,8 +394,8 @@ const EmptyPagePlaceholder: React.FC = () => (
           d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
         />
       </svg>
-      <p className="text-sm font-medium">Empty page</p>
-      <p className="mt-1 text-xs">Add blocks or components to start</p>
+      <p className="text-sm font-medium">空白页面</p>
+      <p className="mt-1 text-xs">添加区块或组件后即可开始预览</p>
     </div>
   </div>
 );

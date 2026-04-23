@@ -1244,6 +1244,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (field.getExtension() != null && field.getExtension().getExtension() != null) {
             extensionMap = field.getExtension().getExtension();
         }
+        Map<String, Object> constraintsMap = extractNestedMap(extensionMap.get("constraints"));
         
         return FieldDefinition.builder()
                 .code(field.getCode())
@@ -1257,13 +1258,13 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .unique(feature != null ? Boolean.TRUE.equals(feature.getUnique()) : false)
                 .displayField(Boolean.TRUE.equals(extensionMap.get("displayField")))
                 .defaultValue(feature != null ? feature.getDefaultValue() : null)
-                .maxLength((Integer) extensionMap.get("maxLength"))
-                .minLength((Integer) extensionMap.get("minLength"))
-                .maxValue(extensionMap.get("maxValue"))
-                .minValue(extensionMap.get("minValue"))
+                .maxLength(readInteger(extensionMap, constraintsMap, "maxLength"))
+                .minLength(readInteger(extensionMap, constraintsMap, "minLength"))
+                .maxValue(readValue(extensionMap, constraintsMap, "maxValue", "max"))
+                .minValue(readValue(extensionMap, constraintsMap, "minValue", "min"))
                 .format((String) extensionMap.get("format"))
-                .precision((Integer) extensionMap.get("precision"))
-                .scale((Integer) extensionMap.get("scale"))
+                .precision(readInteger(extensionMap, constraintsMap, "precision"))
+                .scale(readInteger(extensionMap, constraintsMap, "scale"))
                 .sortOrder(sortOrder)
                 .dataTypeMapping(createDataTypeMapping(field.getDataType()))
                 .validationRules(Collections.emptyList()) // TODO: 实现验证规则转换
@@ -1275,6 +1276,32 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .refTarget(convertRefTargetBeanToDto(field.getRefTarget()))
                 .extraProps(extensionMap)
                 .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractNestedMap(Object raw) {
+        if (raw instanceof Map<?, ?> map) {
+            return (Map<String, Object>) map;
+        }
+        return Collections.emptyMap();
+    }
+
+    private Integer readInteger(Map<String, Object> primary, Map<String, Object> constraints, String key) {
+        Object raw = readValue(primary, constraints, key, key);
+        if (raw instanceof Integer integer) {
+            return integer;
+        }
+        if (raw instanceof Number number) {
+            return number.intValue();
+        }
+        return null;
+    }
+
+    private Object readValue(Map<String, Object> primary, Map<String, Object> constraints, String primaryKey, String fallbackKey) {
+        if (primary.containsKey(primaryKey)) {
+            return primary.get(primaryKey);
+        }
+        return constraints.get(fallbackKey);
     }
     
     private FieldDefinition.RefTarget convertRefTargetBeanToDto(FieldRefTargetBean bean) {

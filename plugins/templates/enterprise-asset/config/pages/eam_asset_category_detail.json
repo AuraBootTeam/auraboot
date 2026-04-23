@@ -1,1 +1,122 @@
-{"pageKey":"eam_asset_category_detail","name:zh-CN":"分类详情","name:en":"Category Detail","pageType":"detail","modelCode":"eam_asset_category","dslSchema":{"id":"detail.eam_asset_category","kind":"Detail","version":"1.0.0","modelCode":"eam_asset_category","layout":{"areas":["header","main","sub-tables"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16},"sub-tables":{"type":"stack"}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"eam_asset_category_form","permissionCode":"EAM.category.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"eam:delete_category","permissionCode":"EAM.category.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"分类信息","en-US":"Category Information"},"fields":[{"field":"eam_ct_code","colSpan":6},{"field":"eam_ct_name","colSpan":6},{"field":"eam_ct_parent_id","colSpan":6},{"field":"eam_ct_depreciation_method","colSpan":6},{"field":"eam_ct_description","colSpan":12}]}]},"sub-tables":{"blocks":[{"id":"assets","blockType":"sub-table","title":{"zh-CN":"分类下资产","en-US":"Assets in Category"},"modelCode":"eam_asset","foreignKey":"eam_as_category_id","columns":[{"field":"eam_as_code","width":140},{"field":"eam_as_name","width":200},{"field":"eam_as_status","width":120,"renderType":"tag","dictCode":"eam_asset_status"},{"field":"eam_as_purchase_cost","width":120},{"field":"eam_as_book_value","width":120}]}]}}}}
+{
+  "pageKey": "eam_asset_category_detail",
+  "name:zh-CN": "分类详情",
+  "name:en": "Category Detail",
+  "modelCode": "eam_asset_category",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "分类详情",
+    "en": "Category Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main",
+      "sub-tables"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "sub-tables": {
+        "type": "stack"
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "eam.category.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "eam:delete_category",
+          "permissionCode": "eam.category.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "分类信息",
+        "en-US": "Category Information"
+      },
+      "fields": [
+        {
+          "field": "eam_ct_code",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_ct_name",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_ct_parent_id",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_ct_depreciation_method",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_ct_description",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "assets",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "分类下资产",
+        "en-US": "Assets in Category"
+      },
+      "modelCode": "eam_asset",
+      "foreignKey": "eam_as_category_id",
+      "columns": [
+        {
+          "field": "eam_as_code",
+          "width": 140
+        },
+        {
+          "field": "eam_as_name",
+          "width": 200
+        },
+        {
+          "field": "eam_as_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "eam_asset_status"
+        },
+        {
+          "field": "eam_as_purchase_cost",
+          "width": 120
+        },
+        {
+          "field": "eam_as_book_value",
+          "width": 120
+        }
+      ],
+      "area": "sub-tables"
+    }
+  ]
+}

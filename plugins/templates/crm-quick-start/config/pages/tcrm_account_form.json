@@ -2,46 +2,82 @@
   "pageKey": "tcrm_account_form",
   "name:zh-CN": "客户表单",
   "name:en": "Account Form",
-  "pageType": "form",
+  "kind": "form",
   "modelCode": "tcrm_account",
-  "dslSchema": {
-    "id": "form.tcrm_account",
-    "kind": "Form",
-    "version": "1.0.0",
-    "modelCode": "tcrm_account",
-    "layout": {
-      "areas": ["main", "footer"],
-      "areasConfig": {
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
-        "footer": { "type": "flex", "direction": "row" }
-      }
-    },
-    "areas": {
+  "title": {
+    "zh-CN": "客户表单",
+    "en": "Account Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
       "main": {
-        "blocks": [{
-          "id": "basic",
-          "blockType": "form-section",
-          "title": { "zh-CN": "客户信息", "en-US": "Account Information" },
-          "fields": [
-            { "field": "tcrm_ac_name", "colSpan": 6 },
-            { "field": "tcrm_ac_industry", "colSpan": 6 },
-            { "field": "tcrm_ac_phone", "colSpan": 6 },
-            { "field": "tcrm_ac_website", "colSpan": 6 },
-            { "field": "tcrm_ac_address", "colSpan": 12 },
-            { "field": "tcrm_ac_notes", "colSpan": 12 }
-          ]
-        }]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       },
       "footer": {
-        "blocks": [{
-          "id": "buttons",
-          "blockType": "form-buttons",
-          "buttons": [
-            { "code": "submit", "action": "save", "commandCode": "tcrm:update_account", "primary": true },
-            { "code": "cancel", "action": "cancel" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "客户信息",
+        "en-US": "Account Information"
+      },
+      "fields": [
+        {
+          "field": "tcrm_ac_name",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ac_industry",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ac_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ac_website",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ac_address",
+          "colSpan": 12
+        },
+        {
+          "field": "tcrm_ac_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tcrm:create_account",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
 }

@@ -32,10 +32,10 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
     setError(null);
     try {
       const result = await getTemplates();
-      if (result.code !== '0') throw new Error(result.message || result.desc || 'Failed to load templates');
+      if (result.code !== '0') throw new Error(result.message || result.desc || '加载模板失败');
       setTemplates(Array.isArray(result.data) ? result.data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load templates');
+      setError(err instanceof Error ? err.message : '加载模板失败');
     } finally {
       setLoading(false);
     }
@@ -55,7 +55,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
         className="flex items-center justify-center py-12 text-sm text-gray-400"
         data-testid="template-gallery-loading"
       >
-        Loading templates...
+        正在加载模板...
       </div>
     );
   }
@@ -65,7 +65,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
       <div className="py-8 text-center text-sm text-red-500" data-testid="template-gallery-error">
         {error}
         <button onClick={loadTemplates} className="ml-2 text-purple-600 underline">
-          Retry
+          重试
         </button>
       </div>
     );
@@ -79,7 +79,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search templates..."
+          placeholder="搜索模板..."
           className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none"
           data-testid="template-search"
         />
@@ -91,7 +91,13 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
         >
           {KINDS.map((k) => (
             <option key={k} value={k}>
-              {k === 'all' ? 'All Types' : k}
+              {k === 'all'
+                ? '全部类型'
+                : k === 'list'
+                  ? '列表页'
+                  : k === 'form'
+                    ? '表单页'
+                    : '详情页'}
             </option>
           ))}
         </select>
@@ -101,8 +107,8 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
       {filtered.length === 0 ? (
         <div className="py-12 text-center text-sm text-gray-400" data-testid="template-empty">
           {templates.length === 0
-            ? 'No templates yet. Save a page as template first.'
-            : 'No templates match your search.'}
+            ? '还没有可用模板，请先将页面保存为模板。'
+            : '没有符合当前筛选条件的模板。'}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-4" data-testid="template-grid">
@@ -119,7 +125,13 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
             >
               <div className="mb-2 flex items-center gap-2">
                 <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">
-                  {t.kind}
+                  {t.kind === 'list'
+                    ? '列表页'
+                    : t.kind === 'form'
+                      ? '表单页'
+                      : t.kind === 'detail'
+                        ? '详情页'
+                        : t.kind}
                 </span>
                 {t.templateCategory && (
                   <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
@@ -128,7 +140,7 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({ onSelect, sele
                 )}
               </div>
               <div className="text-sm font-medium text-gray-900">{t.name}</div>
-              <div className="mt-1 text-xs text-gray-400">{t.blocks?.length ?? 0} blocks</div>
+              <div className="mt-1 text-xs text-gray-400">{t.blocks?.length ?? 0} 个区块</div>
             </div>
           ))}
         </div>

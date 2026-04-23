@@ -61,6 +61,7 @@ public class FileServiceImpl implements FileService {
             "application/vnd.ms-excel", "application/msword",
             "text/plain", "text/csv", "text/markdown", "text/html",
             "application/json", "application/xml",
+            "application/x-yaml", "application/yaml", "text/yaml",
             "application/zip", "application/gzip"
     );
 

@@ -1924,9 +1924,44 @@
     "en-US": "Edit"
   },
   {
+    "key": "workbench.shortcuts.done",
+    "zh-CN": "完成",
+    "en-US": "Done"
+  },
+  {
     "key": "workbench.shortcuts.add",
     "zh-CN": "添加",
     "en-US": "Add"
+  },
+  {
+    "key": "workbench.shortcuts.newLead",
+    "zh-CN": "新建线索",
+    "en-US": "New Lead"
+  },
+  {
+    "key": "workbench.shortcuts.newAccount",
+    "zh-CN": "新建客户",
+    "en-US": "New Account"
+  },
+  {
+    "key": "workbench.shortcuts.newOpportunity",
+    "zh-CN": "新建商机",
+    "en-US": "New Opportunity"
+  },
+  {
+    "key": "workbench.shortcuts.taskCenter",
+    "zh-CN": "我的待办",
+    "en-US": "Task Center"
+  },
+  {
+    "key": "workbench.shortcuts.newContract",
+    "zh-CN": "新建合同",
+    "en-US": "New Contract"
+  },
+  {
+    "key": "workbench.shortcuts.reports",
+    "zh-CN": "报表中心",
+    "en-US": "Reports"
   },
   {
     "key": "workbench.shortcuts.customize_hint",
@@ -1942,6 +1977,51 @@
     "key": "workbench.recent.empty",
     "zh-CN": "暂无访问记录",
     "en-US": "No recent visits"
+  },
+  {
+    "key": "workbench.recent.justNow",
+    "zh-CN": "刚刚",
+    "en-US": "Just now"
+  },
+  {
+    "key": "workbench.recent.minutesAgo",
+    "zh-CN": "{minutes}分钟前",
+    "en-US": "{minutes}m ago"
+  },
+  {
+    "key": "workbench.recent.hoursAgo",
+    "zh-CN": "{hours}小时前",
+    "en-US": "{hours}h ago"
+  },
+  {
+    "key": "workbench.pageTitle",
+    "zh-CN": "工作台",
+    "en-US": "Workbench"
+  },
+  {
+    "key": "workbench.refresh",
+    "zh-CN": "刷新",
+    "en-US": "Refresh"
+  },
+  {
+    "key": "workbench.loadFailed",
+    "zh-CN": "加载工作台失败",
+    "en-US": "Failed to load workbench"
+  },
+  {
+    "key": "workbench.empty",
+    "zh-CN": "工作台尚未配置",
+    "en-US": "Workbench is not configured yet"
+  },
+  {
+    "key": "workbench.settingsUnavailable",
+    "zh-CN": "当前版本不支持工作台设置",
+    "en-US": "Workbench settings are unavailable in this edition"
+  },
+  {
+    "key": "workbench.settingsUnavailableHint",
+    "zh-CN": "工作台编辑能力暂未开放在当前版本中。",
+    "en-US": "Workbench editing is not available in the current edition."
   },
   {
     "key": "workbench.category.stats",

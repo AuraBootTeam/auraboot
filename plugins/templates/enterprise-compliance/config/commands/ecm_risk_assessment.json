@@ -1,11 +1,246 @@
 [
-  {"code":"ecm:create_risk","displayName:zh-CN":"新建风险","displayName:en":"Create Risk Assessment","type":"create","modelCode":"ecm_risk_assessment","inputFields":["ecm_ra_title","ecm_ra_category","ecm_ra_likelihood","ecm_ra_impact","ecm_ra_owner","ecm_ra_mitigation","ecm_ra_residual_risk","ecm_ra_review_date","ecm_ra_notes"],"autoSetFields":{"ecm_ra_code":{"strategy":"auto_generate","pattern":"RA-{yyyyMMdd}-{seq}"},"ecm_ra_status":{"strategy":"fixed_value","value":"identified"}},"permissions":["ECM.risk.manage"],"agent_hint":"Create risk assessment. Required: title, category, likelihood, impact, owner.","cmd_risk_level":"L1","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns risk with status IDENTIFIED.","example_input":{"ecm_ra_title":"Data breach risk","ecm_ra_likelihood":"likely","ecm_ra_impact":"high"},"idempotent":false,"reversible":true},
-  {"code":"ecm:update_risk","displayName:zh-CN":"编辑风险","displayName:en":"Update Risk","type":"update","modelCode":"ecm_risk_assessment","inputFields":["ecm_ra_title","ecm_ra_category","ecm_ra_likelihood","ecm_ra_impact","ecm_ra_owner","ecm_ra_mitigation","ecm_ra_residual_risk","ecm_ra_review_date","ecm_ra_notes"],"permissions":["ECM.risk.manage"],"agent_hint":"Update risk assessment.","cmd_risk_level":"L1","precondition_description":"Risk must exist.","side_effect_description":null,"output_description":"Returns the updated risk.","example_input":{"ecm_ra_mitigation":"Implement encryption"},"idempotent":true,"reversible":true},
-  {"code":"ecm:assess_risk","displayName:zh-CN":"完成评估","displayName:en":"Assess Risk","type":"state_transition","modelCode":"ecm_risk_assessment","stateField":"ecm_ra_status","fromStates":["identified"],"toState":"assessed","permissions":["ECM.risk.manage"],"agent_hint":"Mark risk as assessed.","cmd_risk_level":"L1","precondition_description":"Risk must be IDENTIFIED.","side_effect_description":null,"output_description":"Returns risk with status ASSESSED.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ecm:mitigate_risk","displayName:zh-CN":"已缓解","displayName:en":"Mitigate Risk","type":"state_transition","modelCode":"ecm_risk_assessment","stateField":"ecm_ra_status","fromStates":["assessed"],"toState":"mitigated","inputFields":["ecm_ra_mitigation","ecm_ra_residual_risk"],"permissions":["ECM.risk.manage"],"agent_hint":"Mark risk as mitigated with strategy.","cmd_risk_level":"L2","precondition_description":"Risk must be ASSESSED.","side_effect_description":null,"output_description":"Returns risk with status MITIGATED.","example_input":{"ecm_ra_mitigation":"Controls implemented","ecm_ra_residual_risk":"low"},"idempotent":false,"reversible":false},
-  {"code":"ecm:accept_risk","displayName:zh-CN":"接受风险","displayName:en":"Accept Risk","type":"state_transition","modelCode":"ecm_risk_assessment","stateField":"ecm_ra_status","fromStates":["assessed","mitigated"],"toState":"accepted","permissions":["ECM.risk.approve"],"agent_hint":"Accept the residual risk.","cmd_risk_level":"L3","precondition_description":"Risk must be ASSESSED or MITIGATED.","side_effect_description":null,"output_description":"Returns risk with status ACCEPTED.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ecm:close_risk","displayName:zh-CN":"关闭风险","displayName:en":"Close Risk","type":"state_transition","modelCode":"ecm_risk_assessment","stateField":"ecm_ra_status","fromStates":["accepted"],"toState":"closed","permissions":["ECM.risk.approve"],"agent_hint":"Close accepted risk. Terminal.","cmd_risk_level":"L2","precondition_description":"Risk must be ACCEPTED.","side_effect_description":null,"output_description":"Returns risk with status closed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ecm:delete_risk","displayName:zh-CN":"删除风险","displayName:en":"Delete Risk","type":"delete","modelCode":"ecm_risk_assessment","preconditions":[{"field":"ecm_ra_status","operator":"IN","value":["identified"]}],"extension":{"confirmMessage:zh-CN":"确认删除？","confirmMessage:en":"Confirm delete?"},"permissions":["ECM.risk.manage"],"agent_hint":"Delete risk. Only IDENTIFIED.","cmd_risk_level":"L3","precondition_description":"Risk must be IDENTIFIED.","side_effect_description":null,"output_description":"Risk is permanently removed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ecm:detail_risk","displayName:zh-CN":"查看风险","displayName:en":"View Risk","type":"query","modelCode":"ecm_risk_assessment","permissions":["ECM.risk.read"],"agent_hint":"Retrieve risk by ID.","cmd_risk_level":"L0","precondition_description":"Risk must exist.","side_effect_description":null,"output_description":"Returns the full risk record.","example_input":{},"idempotent":true,"reversible":true},
-  {"code":"ecm:list_risks","displayName:zh-CN":"风险列表","displayName:en":"List Risks","type":"query","modelCode":"ecm_risk_assessment","permissions":["ECM.risk.read"],"agent_hint":"Query risk assessments.","cmd_risk_level":"L0","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns a paginated list.","example_input":{"pageNum":1,"pageSize":20},"idempotent":true,"reversible":true}
+  {
+    "code": "ecm:create_risk",
+    "displayName:zh-CN": "新建风险",
+    "displayName:en": "Create Risk Assessment",
+    "type": "create",
+    "modelCode": "ecm_risk_assessment",
+    "inputFields": [
+      "ecm_ra_title",
+      "ecm_ra_category",
+      "ecm_ra_likelihood",
+      "ecm_ra_impact",
+      "ecm_ra_owner",
+      "ecm_ra_mitigation",
+      "ecm_ra_residual_risk",
+      "ecm_ra_review_date",
+      "ecm_ra_notes"
+    ],
+    "autoSetFields": {
+      "ecm_ra_code": {
+        "strategy": "auto_generate",
+        "pattern": "RA-{yyyyMMdd}-{seq}"
+      },
+      "ecm_ra_status": {
+        "strategy": "fixed_value",
+        "value": "identified"
+      }
+    },
+    "permissions": [
+      "ecm.risk.manage"
+    ],
+    "agent_hint": "Create risk assessment. Required: title, category, likelihood, impact, owner.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns risk with status IDENTIFIED.",
+    "example_input": {
+      "ecm_ra_title": "Data breach risk",
+      "ecm_ra_likelihood": "likely",
+      "ecm_ra_impact": "high"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "ecm:update_risk",
+    "displayName:zh-CN": "编辑风险",
+    "displayName:en": "Update Risk",
+    "type": "update",
+    "modelCode": "ecm_risk_assessment",
+    "inputFields": [
+      "ecm_ra_title",
+      "ecm_ra_category",
+      "ecm_ra_likelihood",
+      "ecm_ra_impact",
+      "ecm_ra_owner",
+      "ecm_ra_mitigation",
+      "ecm_ra_residual_risk",
+      "ecm_ra_review_date",
+      "ecm_ra_notes"
+    ],
+    "permissions": [
+      "ecm.risk.manage"
+    ],
+    "agent_hint": "Update risk assessment.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Risk must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated risk.",
+    "example_input": {
+      "ecm_ra_mitigation": "Implement encryption"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "ecm:assess_risk",
+    "displayName:zh-CN": "完成评估",
+    "displayName:en": "Assess Risk",
+    "type": "state_transition",
+    "modelCode": "ecm_risk_assessment",
+    "stateField": "ecm_ra_status",
+    "fromStates": [
+      "identified"
+    ],
+    "toState": "assessed",
+    "permissions": [
+      "ecm.risk.manage"
+    ],
+    "agent_hint": "Mark risk as assessed.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Risk must be IDENTIFIED.",
+    "side_effect_description": null,
+    "output_description": "Returns risk with status ASSESSED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ecm:mitigate_risk",
+    "displayName:zh-CN": "已缓解",
+    "displayName:en": "Mitigate Risk",
+    "type": "state_transition",
+    "modelCode": "ecm_risk_assessment",
+    "stateField": "ecm_ra_status",
+    "fromStates": [
+      "assessed"
+    ],
+    "toState": "mitigated",
+    "inputFields": [
+      "ecm_ra_mitigation",
+      "ecm_ra_residual_risk"
+    ],
+    "permissions": [
+      "ecm.risk.manage"
+    ],
+    "agent_hint": "Mark risk as mitigated with strategy.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Risk must be ASSESSED.",
+    "side_effect_description": null,
+    "output_description": "Returns risk with status MITIGATED.",
+    "example_input": {
+      "ecm_ra_mitigation": "Controls implemented",
+      "ecm_ra_residual_risk": "low"
+    },
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ecm:accept_risk",
+    "displayName:zh-CN": "接受风险",
+    "displayName:en": "Accept Risk",
+    "type": "state_transition",
+    "modelCode": "ecm_risk_assessment",
+    "stateField": "ecm_ra_status",
+    "fromStates": [
+      "assessed",
+      "mitigated"
+    ],
+    "toState": "accepted",
+    "permissions": [
+      "ecm.risk.approve"
+    ],
+    "agent_hint": "Accept the residual risk.",
+    "cmd_risk_level": "L3",
+    "precondition_description": "Risk must be ASSESSED or MITIGATED.",
+    "side_effect_description": null,
+    "output_description": "Returns risk with status ACCEPTED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ecm:close_risk",
+    "displayName:zh-CN": "关闭风险",
+    "displayName:en": "Close Risk",
+    "type": "state_transition",
+    "modelCode": "ecm_risk_assessment",
+    "stateField": "ecm_ra_status",
+    "fromStates": [
+      "accepted"
+    ],
+    "toState": "closed",
+    "permissions": [
+      "ecm.risk.approve"
+    ],
+    "agent_hint": "Close accepted risk. Terminal.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Risk must be ACCEPTED.",
+    "side_effect_description": null,
+    "output_description": "Returns risk with status closed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ecm:delete_risk",
+    "displayName:zh-CN": "删除风险",
+    "displayName:en": "Delete Risk",
+    "type": "delete",
+    "modelCode": "ecm_risk_assessment",
+    "preconditions": [
+      {
+        "field": "ecm_ra_status",
+        "operator": "IN",
+        "value": [
+          "identified"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除？",
+      "confirmMessage:en": "Confirm delete?"
+    },
+    "permissions": [
+      "ecm.risk.manage"
+    ],
+    "agent_hint": "Delete risk. Only IDENTIFIED.",
+    "cmd_risk_level": "L3",
+    "precondition_description": "Risk must be IDENTIFIED.",
+    "side_effect_description": null,
+    "output_description": "Risk is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ecm:detail_risk",
+    "displayName:zh-CN": "查看风险",
+    "displayName:en": "View Risk",
+    "type": "query",
+    "modelCode": "ecm_risk_assessment",
+    "permissions": [
+      "ecm.risk.read"
+    ],
+    "agent_hint": "Retrieve risk by ID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Risk must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full risk record.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "ecm:list_risks",
+    "displayName:zh-CN": "风险列表",
+    "displayName:en": "List Risks",
+    "type": "query",
+    "modelCode": "ecm_risk_assessment",
+    "permissions": [
+      "ecm.risk.read"
+    ],
+    "agent_hint": "Query risk assessments.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
+    "idempotent": true,
+    "reversible": true
+  }
 ]

@@ -1,14 +1,83 @@
 {
-  "pageKey": "tpm_task_form", "name:zh-CN": "任务表单", "name:en": "Task Form", "pageType": "form", "modelCode": "tpm_task",
-  "dslSchema": { "id": "form.tpm_task", "kind": "Form", "version": "1.0.0", "modelCode": "tpm_task",
-    "layout": { "areas": ["main", "footer"], "areasConfig": { "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 }, "footer": { "type": "flex", "direction": "row" } } },
-    "areas": {
-      "main": { "blocks": [{ "id": "basic", "blockType": "form-section", "title": { "zh-CN": "任务信息", "en-US": "Task Information" }, "fields": [
-        { "field": "tpm_ts_title", "colSpan": 12 }, { "field": "tpm_ts_project_id", "colSpan": 6 },
-        { "field": "tpm_ts_priority", "colSpan": 6 }, { "field": "tpm_ts_assignee", "colSpan": 6 }, { "field": "tpm_ts_due_date", "colSpan": 6 },
-        { "field": "tpm_ts_description", "colSpan": 12 }
-      ] }] },
-      "footer": { "blocks": [{ "id": "buttons", "blockType": "form-buttons", "buttons": [{ "code": "submit", "action": "save", "commandCode": "tpm:update_task", "primary": true }, { "code": "cancel", "action": "cancel" }] }] }
+  "pageKey": "tpm_task_form",
+  "name:zh-CN": "任务表单",
+  "name:en": "Task Form",
+  "modelCode": "tpm_task",
+  "kind": "form",
+  "title": {
+    "zh-CN": "任务表单",
+    "en": "Task Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "footer": {
+        "type": "flex",
+        "direction": "row"
+      }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "任务信息",
+        "en-US": "Task Information"
+      },
+      "fields": [
+        {
+          "field": "tpm_ts_title",
+          "colSpan": 12
+        },
+        {
+          "field": "tpm_ts_project_id",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_ts_priority",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_ts_assignee",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_ts_due_date",
+          "colSpan": 6
+        },
+        {
+          "field": "tpm_ts_description",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tpm:create_task",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
 }

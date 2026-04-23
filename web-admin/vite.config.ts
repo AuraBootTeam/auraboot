@@ -47,6 +47,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: Number(process.env.VITE_PORT || 5173),
     strictPort: true,
+    // Allow browser devtools/extensions to probe source modules in local dev
+    // without tripping CORS errors on HEAD/GET requests.
+    cors: true,
     fs: {
       allow: ['..'],
     },

@@ -272,7 +272,7 @@ public class JsonToBpmnConverter {
             // (b) every outgoing flow must carry a non-empty condition
             for (JsonNode edge : outgoing) {
                 String edgeId = edge.path("id").asText();
-                JsonNode condition = edge.path("data").path("condition");
+                JsonNode condition = getNormalizedCondition(edge.path("data"));
                 boolean hasCondition = !condition.isMissingNode() && !condition.isNull()
                         && !condition.path("content").asText("").trim().isEmpty();
                 if (!hasCondition) {
@@ -1159,7 +1159,7 @@ public class JsonToBpmnConverter {
         String label = getTextOrNull(edgeData, "label");
 
         // Check if this edge has a condition expression
-        JsonNode condition = edgeData.path("condition");
+        JsonNode condition = getNormalizedCondition(edgeData);
         boolean hasCondition = !condition.isMissingNode() && !condition.isNull()
                 && condition.has("content") && !condition.path("content").asText("").isEmpty();
 
@@ -1210,6 +1210,27 @@ public class JsonToBpmnConverter {
     }
 
     // ==================== Utility Methods ====================
+
+    /**
+     * Accept both the current structured condition payload and the legacy
+     * conditionExpression string used by older plugin process manifests.
+     */
+    private JsonNode getNormalizedCondition(JsonNode edgeData) {
+        JsonNode condition = edgeData.path("condition");
+        if (!condition.isMissingNode() && !condition.isNull()) {
+            return condition;
+        }
+
+        String legacyExpression = getTextOrNull(edgeData, "conditionExpression");
+        if (legacyExpression == null || legacyExpression.isBlank()) {
+            return condition;
+        }
+
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("type", "expression");
+        normalized.put("content", legacyExpression);
+        return objectMapper.valueToTree(normalized);
+    }
 
     private String getNodeType(JsonNode node) {
         // The node type can be in node.type or node.data.type

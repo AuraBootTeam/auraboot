@@ -2,56 +2,99 @@
   "pageKey": "thr_employee_form",
   "name:zh-CN": "员工表单",
   "name:en": "Employee Form",
-  "pageType": "form",
   "modelCode": "thr_employee",
-  "dslSchema": {
-    "id": "form.thr_employee",
-    "kind": "Form",
-    "version": "1.0.0",
-    "modelCode": "thr_employee",
-    "layout": {
-      "areas": ["main", "footer"],
-      "areasConfig": {
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
-        "footer": { "type": "flex", "direction": "row" }
-      }
-    },
-    "areas": {
+  "kind": "form",
+  "title": {
+    "zh-CN": "员工表单",
+    "en": "Employee Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
       "main": {
-        "blocks": [
-          {
-            "id": "basic",
-            "blockType": "form-section",
-            "title": { "zh-CN": "基本信息", "en-US": "Basic Information" },
-            "fields": [
-              { "field": "thr_em_name", "colSpan": 6 },
-              { "field": "thr_em_department", "colSpan": 6, "required": false },
-              { "field": "thr_em_position", "colSpan": 6 },
-              { "field": "thr_em_email", "colSpan": 6 },
-              { "field": "thr_em_phone", "colSpan": 6 },
-              { "field": "thr_em_hire_date", "colSpan": 6, "required": false }
-            ]
-          },
-          {
-            "id": "detail",
-            "blockType": "form-section",
-            "title": { "zh-CN": "其他信息", "en-US": "Additional Information" },
-            "fields": [
-              { "field": "thr_em_notes", "colSpan": 12 }
-            ]
-          }
-        ]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       },
       "footer": {
-        "blocks": [{
-          "id": "buttons",
-          "blockType": "form-buttons",
-          "buttons": [
-            { "code": "submit", "action": "save", "commandCode": "thr:update_employee", "primary": true },
-            { "code": "cancel", "action": "cancel" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基本信息",
+        "en-US": "Basic Information"
+      },
+      "fields": [
+        {
+          "field": "thr_em_name",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_em_department",
+          "colSpan": 6,
+          "required": false
+        },
+        {
+          "field": "thr_em_position",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_em_email",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_em_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_em_hire_date",
+          "colSpan": 6,
+          "required": false
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "detail",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "其他信息",
+        "en-US": "Additional Information"
+      },
+      "fields": [
+        {
+          "field": "thr_em_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "thr:create_employee",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
 }

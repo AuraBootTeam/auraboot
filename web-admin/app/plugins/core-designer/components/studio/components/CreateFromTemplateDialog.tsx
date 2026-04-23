@@ -36,7 +36,7 @@ export const CreateFromTemplateDialog: React.FC<CreateFromTemplateDialogProps> =
 
   const handleSelectTemplate = (template: PageSchemaDTO) => {
     setSelectedTemplate(template);
-    setName(`${template.name} Copy`);
+    setName(`${template.name} 副本`);
     setPageKey(`${template.kind}_${Date.now().toString(36)}`);
     setError(null);
     setStep('configure');
@@ -60,11 +60,11 @@ export const CreateFromTemplateDialog: React.FC<CreateFromTemplateDialogProps> =
         semver: '0.1.0',
         schemaVersion: CURRENT_SCHEMA_VERSION,
       } as any);
-      if (result.code !== '0') throw new Error(result.message || result.desc || 'Failed to create page');
+      if (result.code !== '0') throw new Error(result.message || result.desc || '创建页面失败');
       onSuccess(result.data!.pid);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create page');
+      setError(err instanceof Error ? err.message : '创建页面失败');
     } finally {
       setCreating(false);
     }
@@ -93,19 +93,19 @@ export const CreateFromTemplateDialog: React.FC<CreateFromTemplateDialogProps> =
               <button
                 onClick={handleBack}
                 className="text-gray-400 hover:text-gray-600"
-                aria-label="Back to template selection"
+                aria-label="返回模板选择"
               >
                 &larr;
               </button>
             )}
             <h2 className="text-lg font-semibold text-gray-900">
-              {step === 'select' ? 'Choose a Template' : 'Configure New Page'}
+              {step === 'select' ? '选择模板' : '配置新页面'}
             </h2>
           </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
-            aria-label="Close dialog"
+            aria-label="关闭弹窗"
           >
             &times;
           </button>
@@ -121,11 +121,11 @@ export const CreateFromTemplateDialog: React.FC<CreateFromTemplateDialogProps> =
           ) : (
             <div className="mx-auto max-w-md space-y-4">
               <div className="rounded-md bg-purple-50 p-3 text-sm text-purple-700">
-                Creating from: <strong>{selectedTemplate?.name}</strong> ({selectedTemplate?.kind})
+                基于模板创建：<strong>{selectedTemplate?.name}</strong>（{selectedTemplate?.kind}）
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Page Name *
+                  页面名称 *
                 </label>
                 <input
                   type="text"
@@ -138,7 +138,7 @@ export const CreateFromTemplateDialog: React.FC<CreateFromTemplateDialogProps> =
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Page Key *
+                  页面 Key *
                 </label>
                 <input
                   type="text"
@@ -162,7 +162,7 @@ export const CreateFromTemplateDialog: React.FC<CreateFromTemplateDialogProps> =
               onClick={handleBack}
               className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
-              Back
+              返回
             </button>
             <button
               onClick={handleCreate}
@@ -170,7 +170,7 @@ export const CreateFromTemplateDialog: React.FC<CreateFromTemplateDialogProps> =
               className="rounded-md bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700 disabled:opacity-50"
               data-testid="create-from-template-btn"
             >
-              {creating ? 'Creating...' : 'Create Page'}
+              {creating ? '创建中...' : '创建页面'}
             </button>
           </div>
         )}

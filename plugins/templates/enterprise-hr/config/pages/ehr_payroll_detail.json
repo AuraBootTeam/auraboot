@@ -1,1 +1,118 @@
-{"pageKey":"ehr_payroll_detail","name:zh-CN":"薪资详情","name:en":"Payroll Detail","pageType":"detail","modelCode":"ehr_payroll","dslSchema":{"id":"detail.ehr_payroll","kind":"Detail","version":"1.0.0","modelCode":"ehr_payroll","layout":{"areas":["header","main"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"ehr_payroll_form","permissionCode":"EHR.payroll.manage"},{"code":"calculate_payroll","commandCode":"ehr:calculate_payroll","permissionCode":"EHR.payroll.manage"},{"code":"approve_payroll","commandCode":"ehr:approve_payroll","permissionCode":"EHR.payroll.approve"},{"code":"pay_payroll","commandCode":"ehr:pay_payroll","permissionCode":"EHR.payroll.approve"},{"code":"delete","action":"delete","danger":true,"commandCode":"ehr:delete_payroll","permissionCode":"EHR.payroll.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"薪资信息","en-US":"Payroll Information"},"fields":[{"field":"ehr_pr_code","colSpan":6},{"field":"ehr_pr_employee_id","colSpan":6},{"field":"ehr_pr_period","colSpan":6},{"field":"ehr_pr_status","colSpan":6},{"field":"ehr_pr_base_salary","colSpan":4},{"field":"ehr_pr_allowances","colSpan":4},{"field":"ehr_pr_overtime_pay","colSpan":4},{"field":"ehr_pr_deductions","colSpan":6},{"field":"ehr_pr_net_pay","colSpan":6},{"field":"ehr_pr_notes","colSpan":12}]}]}}}}
+{
+  "pageKey": "ehr_payroll_detail",
+  "name:zh-CN": "薪资详情",
+  "name:en": "Payroll Detail",
+  "modelCode": "ehr_payroll",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "薪资详情",
+    "en": "Payroll Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "ehr.payroll.manage"
+        },
+        {
+          "code": "calculate_payroll",
+          "commandCode": "ehr:calculate_payroll",
+          "permissionCode": "ehr.payroll.manage"
+        },
+        {
+          "code": "approve_payroll",
+          "commandCode": "ehr:approve_payroll",
+          "permissionCode": "ehr.payroll.approve"
+        },
+        {
+          "code": "pay_payroll",
+          "commandCode": "ehr:pay_payroll",
+          "permissionCode": "ehr.payroll.approve"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "ehr:delete_payroll",
+          "permissionCode": "ehr.payroll.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "薪资信息",
+        "en-US": "Payroll Information"
+      },
+      "fields": [
+        {
+          "field": "ehr_pr_code",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_pr_employee_id",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_pr_period",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_pr_status",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_pr_base_salary",
+          "colSpan": 4
+        },
+        {
+          "field": "ehr_pr_allowances",
+          "colSpan": 4
+        },
+        {
+          "field": "ehr_pr_overtime_pay",
+          "colSpan": 4
+        },
+        {
+          "field": "ehr_pr_deductions",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_pr_net_pay",
+          "colSpan": 6
+        },
+        {
+          "field": "ehr_pr_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    }
+  ]
+}

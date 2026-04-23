@@ -127,7 +127,7 @@ public class QueryBuilderController {
 
         log.info("query-builder listModels: page={}, size={}, keyword={}", page, size, keyword);
         PageResult<MetaModelDTO> result = metaModelService.searchModels(
-                page, size, keyword, null, null, null, "published", true);
+                page, size, keyword, null, null, null, "published", null, null, null, true);
         List<Map<String, Object>> models = result == null || result.getRecords() == null
                 ? Collections.emptyList()
                 : result.getRecords().stream()

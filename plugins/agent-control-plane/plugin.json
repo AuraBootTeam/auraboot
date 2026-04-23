@@ -10,7 +10,9 @@
   "description": "AI Agent orchestration, task management, execution tracking, and governance",
   "author": "AuraBoot Team",
   "minPlatformVersion": "1.0.0",
-  "dependencies": [],
+  "dependencies": [
+    "com.auraboot.core-aurabot"
+  ],
   "resourceDirs": {
     "dicts": "config/dicts.json",
     "fields": "config/fields.json",

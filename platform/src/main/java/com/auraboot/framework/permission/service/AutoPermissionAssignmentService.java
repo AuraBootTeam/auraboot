@@ -63,6 +63,22 @@ public class AutoPermissionAssignmentService {
      */
     @Transactional
     public void autoAssignPermissions(String modelCode, String moduleCode) {
+        autoAssignPermissions(modelCode, moduleCode, MetaContext.getCurrentTenantId());
+    }
+
+    /**
+     * Auto-assign hierarchical permissions for a model under an explicit tenant context.
+     *
+     * <p>This overload is used by plugin import and other async flows where MetaContext may not
+     * reliably carry the tenant ID during post-processing. Passing tenantId explicitly ensures
+     * generated permissions are bound to the correct roles (especially tenant_admin/viewer).
+     *
+     * @param modelCode  the model code (e.g., "crm_lead")
+     * @param moduleCode the module code (e.g., "crm"); if null, derived from modelCode prefix
+     * @param tenantId   the tenant to bind generated permissions to; falls back to MetaContext when null
+     */
+    @Transactional
+    public void autoAssignPermissions(String modelCode, String moduleCode, Long tenantId) {
         log.info("Auto-assigning hierarchical permissions: modelCode={}, moduleCode={}",
                 modelCode, moduleCode);
 
@@ -97,7 +113,7 @@ public class AutoPermissionAssignmentService {
         }
 
         // 5. Assign level-3 action permissions to roles
-        assignPermissionsToRoles(actionPermissions);
+        assignPermissionsToRoles(actionPermissions, tenantId);
 
         log.info("Auto-assignment completed: modelCode={}, moduleCode={}, actionCount={}",
                 modelCode, resolvedModule, actionPermissions.size());
@@ -235,29 +251,29 @@ public class AutoPermissionAssignmentService {
      * Assign permissions to default roles based on templates.
      * VIEWER gets only .read actions, others get all.
      */
-    private void assignPermissionsToRoles(List<Permission> permissions) {
-        Long tenantId = MetaContext.getCurrentTenantId();
+    private void assignPermissionsToRoles(List<Permission> permissions, Long tenantId) {
+        Long effectiveTenantId = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
 
-        if (tenantId == null) {
+        if (effectiveTenantId == null) {
             log.warn("Tenant ID is null, skipping role assignment");
             return;
         }
 
-        List<Role> roles = roleService.findByTenantId(tenantId);
+        List<Role> roles = roleService.findByTenantId(effectiveTenantId);
 
         if (roles.isEmpty()) {
-            log.warn("No roles found for tenant: tenantId={}", tenantId);
+            log.warn("No roles found for tenant: tenantId={}", effectiveTenantId);
             return;
         }
 
-        log.debug("Found {} roles for tenant: tenantId={}", roles.size(), tenantId);
+        log.debug("Found {} roles for tenant: tenantId={}", roles.size(), effectiveTenantId);
 
         for (Role role : roles) {
-            assignPermissionsToRole(role, permissions);
+            assignPermissionsToRole(role, permissions, effectiveTenantId);
         }
     }
 
-    private void assignPermissionsToRole(Role role, List<Permission> permissions) {
+    private void assignPermissionsToRole(Role role, List<Permission> permissions, Long tenantId) {
         String roleCode = role.getCode();
 
         if (roleCode == null) {
@@ -276,7 +292,7 @@ public class AutoPermissionAssignmentService {
 
         for (Permission permission : permissions) {
             if (shouldAssignPermission(template, permission)) {
-                bindPermissionToRole(role.getId(), permission.getId());
+                bindPermissionToRole(role.getId(), permission.getId(), tenantId);
             }
         }
     }
@@ -289,7 +305,7 @@ public class AutoPermissionAssignmentService {
         return template.shouldAssign(permission);
     }
 
-    private void bindPermissionToRole(Long roleId, Long permissionId) {
+    private void bindPermissionToRole(Long roleId, Long permissionId, Long tenantId) {
         RolePermission existing = rolePermissionMapper.findByRoleAndPermission(roleId, permissionId);
 
         if (existing != null) {
@@ -300,7 +316,7 @@ public class AutoPermissionAssignmentService {
 
         RolePermission rolePermission = new RolePermission();
         rolePermission.setPid(UniqueIdGenerator.generate());
-        rolePermission.setTenantId(MetaContext.getCurrentTenantId());
+        rolePermission.setTenantId(tenantId != null ? tenantId : MetaContext.getCurrentTenantId());
         rolePermission.setRoleId(roleId);
         rolePermission.setPermissionId(permissionId);
         rolePermission.setGrantType(StatusConstants.GRANT);

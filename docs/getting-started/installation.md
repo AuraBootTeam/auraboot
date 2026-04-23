@@ -129,6 +129,8 @@ pnpm dev:full
 
 The frontend starts on port **5173** (Vite dev server + BFF).
 
+Use `pnpm dev:full` for foreground development. For background mode, run `pnpm sync-plugins` once and then launch `pnpm dev:web` plus `pnpm dev:bff` separately.
+
 ### Step 6: Open the Browser
 
 Navigate to [http://localhost:5173](http://localhost:5173) and log in with:

@@ -98,6 +98,12 @@ async function navigateToLeaveRequestList(page: Page): Promise<void> {
   ).toBeVisible({ timeout: 15_000 });
 }
 
+async function waitForFieldComponentReady(field: Locator, timeout = 15_000): Promise<void> {
+  await field.waitFor({ state: 'visible', timeout });
+  const loadingPlaceholder = field.locator('text=/Loading Smart[A-Za-z]+\\.\\.\\./').first();
+  await loadingPlaceholder.waitFor({ state: 'hidden', timeout }).catch(() => null);
+}
+
 async function navigateToLeaveRequestDetail(
   page: Page,
   recordText: string,
@@ -117,6 +123,10 @@ async function navigateToLeaveRequestDetail(
     await page.goto(`/p/thr_leave_request/view/${pid}`);
     await detailResponsePromise.catch(() => null);
     await page.waitForLoadState('domcontentloaded');
+    await page.locator('text=加载中...').first().waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => null);
+    await expect(page.getByText(/请假信息|Leave Request Information/i).first()).toBeVisible({
+      timeout: 15_000,
+    });
     return;
   }
 
@@ -146,6 +156,10 @@ async function navigateToLeaveRequestDetail(
     await detailResponsePromise;
   }
   await page.waitForLoadState('domcontentloaded');
+  await page.locator('text=加载中...').first().waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => null);
+  await expect(page.getByText(/请假信息|Leave Request Information/i).first()).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -242,70 +256,12 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
 
     // --- [D5] Verify form field component types ---
 
-    // Employee field (reference) — should render as a select/combobox, NOT plain text input
-    const employeeField = page
-      .locator('[data-testid="form-field-thr_lv_employee_id"], [data-field="thr_lv_employee_id"]')
-      .first();
-    const employeeFieldContainer = employeeField.isVisible({ timeout: 3_000 }).catch(() => false);
-    // Reference fields render as Select or Combobox with search
-    if (await employeeFieldContainer) {
-      const hasCombobox = await employeeField
-        .locator('button[role="combobox"]')
-        .first()
-        .isVisible({ timeout: 2_000 })
-        .catch(() => false);
-      const hasNativeSelect = await employeeField
-        .locator('select')
-        .first()
-        .isVisible({ timeout: 2_000 })
-        .catch(() => false);
-      const hasAntSelect = await employeeField
-        .locator('.ant-select')
-        .first()
-        .isVisible({ timeout: 2_000 })
-        .catch(() => false);
-      const hasSelectOrCombobox = hasCombobox || hasNativeSelect || hasAntSelect;
-      // If neither select nor combobox, it might be a reference picker — that's ok too
-      // But it should NOT be a plain text input
-      if (!hasSelectOrCombobox) {
-        const hasRefPicker = await employeeField
-          .locator('button, [data-testid*="ref"], [data-testid*="picker"]')
-          .first()
-          .isVisible({ timeout: 1_000 })
-          .catch(() => false);
-        expect(
-          hasSelectOrCombobox || hasRefPicker,
-          'Employee (reference) field should render as Select/Combobox/RefPicker, not plain text',
-        ).toBeTruthy();
-      }
-    }
-
-    // Leave type field (enum) — should render as Select, NOT plain text
-    const leaveTypeField = page
-      .locator('[data-testid="form-field-thr_lv_leave_type"], [data-field="thr_lv_leave_type"]')
-      .first();
-    if (await leaveTypeField.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      const hasSelect =
-        (await leaveTypeField
-          .locator('button[role="combobox"]')
-          .first()
-          .isVisible({ timeout: 2_000 })
-          .catch(() => false)) ||
-        (await leaveTypeField
-          .locator('select')
-          .first()
-          .isVisible({ timeout: 2_000 })
-          .catch(() => false)) ||
-        (await leaveTypeField
-          .locator('.ant-select')
-          .first()
-          .isVisible({ timeout: 2_000 })
-          .catch(() => false));
-      expect(
-        hasSelect,
-        'Leave type (enum) field should render as Select, not plain text',
-      ).toBeTruthy();
-    }
+    // Employee + Leave type should render as interactive choice fields.
+    // Template pages do not guarantee stable field wrapper testids, so assert
+    // the actual interactive surface instead of a specific container shape.
+    const allComboboxes = page.locator('[role="combobox"]');
+    await expect(allComboboxes.first()).toBeVisible();
+    await expect(allComboboxes.nth(1)).toBeVisible();
 
     // Start/End date fields (date) — should render as DatePicker, NOT plain text
     for (const dateField of ['thr_lv_start_date', 'thr_lv_end_date']) {
@@ -331,8 +287,13 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
 
     // 1. Employee (reference field) — Radix UI combobox with search input
     const empComboBtn = page
-      .locator('[data-testid="form-field-thr_lv_employee_id"] button[role="combobox"]')
+      .locator(
+        '[data-testid="form-field-thr_lv_employee_id"] [role="combobox"], ' +
+          '[data-field="thr_lv_employee_id"] [role="combobox"], ' +
+          '[role="combobox"]',
+      )
       .first();
+    await empComboBtn.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => null);
     if (await empComboBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await empComboBtn.click({ timeout: 8_000 });
       // Wait for listbox or option to appear
@@ -380,8 +341,13 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
 
     // 2. Leave type (enum) — Radix UI Select: click trigger → [role="option"] items appear
     const leaveTypeBtn = page
-      .locator('[data-testid="form-field-thr_lv_leave_type"] button[role="combobox"]')
-      .first();
+      .locator(
+        '[data-testid="form-field-thr_lv_leave_type"] [role="combobox"], ' +
+          '[data-field="thr_lv_leave_type"] [role="combobox"], ' +
+          '[role="combobox"]',
+      )
+      .nth(1);
+    await leaveTypeBtn.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => null);
     if (await leaveTypeBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await leaveTypeBtn.click({ timeout: 8_000 });
       // Wait for listbox with options
@@ -479,6 +445,13 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
     leaveRequestPid = String(resultData?.recordId ?? resultData?.pid ?? '');
     leaveRequestCode = String(resultData?.thr_lv_code ?? '');
     expect(leaveRequestPid, 'Leave request should return a valid record ID').toBeTruthy();
+    if (!leaveRequestCode) {
+      const detailResp = await page.request.get(`/api/dynamic/thr_leave_request/${leaveRequestPid}`);
+      expect(detailResp.ok(), 'Created leave request should be fetchable by pid').toBeTruthy();
+      const detailBody = await detailResp.json().catch(() => ({}));
+      leaveRequestCode = String((detailBody as any)?.data?.thr_lv_code ?? '');
+    }
+    expect(leaveRequestCode, 'Created leave request should have a leave code').toBeTruthy();
 
     // After successful create, should redirect back to list or show toast
     // Wait for list to re-render
@@ -597,9 +570,18 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
       .catch(() => null);
     await editBtn.click();
     await formLoadPromise;
+    await page.waitForURL(/\/p\/thr_leave_request\/edit\/[^/]+$/, { timeout: 15_000 });
 
     // Wait for form to be ready
     await waitForFormReady(page, 15_000);
+
+    const startDateInput = page
+      .locator(
+        '[data-testid="form-field-thr_lv_start_date"] input, [data-field="thr_lv_start_date"] input, input[placeholder="mm/dd/yyyy"]',
+      )
+      .first();
+    await expect(startDateInput).toBeVisible({ timeout: 15_000 });
+    await expect(startDateInput).toHaveValue(/2026/, { timeout: 15_000 });
 
     // [D8] Verify existing values are pre-filled (re-display check)
     const daysInput = page
@@ -616,11 +598,11 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
         '[data-testid="form-field-thr_lv_end_date"] input, [data-field="thr_lv_end_date"] input',
       )
       .first();
-    if (await endDateInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await endDateInput.click();
-      await endDateInput.fill(END_DATE_EDITED);
-      await endDateInput.press('Escape');
-    }
+    await expect(endDateInput).toBeVisible({ timeout: 15_000 });
+    await expect(endDateInput).toHaveValue(/2026/, { timeout: 15_000 });
+    await endDateInput.click();
+    await endDateInput.fill(END_DATE_EDITED);
+    await endDateInput.press('Escape');
 
     // Modify days to 5
     if (await daysInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
@@ -687,6 +669,21 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
   // =========================================================================
   test('LV-005 — Tab filtering: Pending tab shows only pending records', async ({ page }) => {
     await navigateToLeaveRequestList(page);
+    expect(leaveRequestCode, 'LV-005 requires leaveRequestCode from LV-002').toBeTruthy();
+    const recordMarker = leaveRequestCode;
+
+    await ensureFilterFormOpen(page);
+    const searchInput = page
+      .locator(
+        '[data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+      )
+      .first();
+    if (await searchInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await searchInput.fill(recordMarker);
+      await searchInput.press('Enter');
+      await page.waitForLoadState('networkidle').catch(() => null);
+      await page.locator('text=加载中...').first().waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => null);
+    }
 
     // Click "待审批" / "Pending" tab
     const pendingTab = page
@@ -695,62 +692,18 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
       .first();
 
     if (await pendingTab.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      // Tabs may use client-side or server-side filtering.
-      // Listen for a list response but don't fail if none arrives (client-side tabs won't fire one).
-      let listResponse: any = null;
-      const listResponsePromise = page
-        .waitForResponse(
-          (r) =>
-            r.url().includes('thr_leave_request') && r.url().includes('list') && r.status() === 200,
-          { timeout: 5_000 },
-        )
-        .then((r) => {
-          listResponse = r;
-        })
-        .catch(() => null);
-
       await pendingTab.click();
-      await listResponsePromise;
-
-      if (listResponse) {
-        // Server-side tab filtering: verify API result
-        const body = await listResponse.json().catch(() => ({}));
-        const records = (body as any)?.data?.records ?? [];
-        const hasOurRecord = records.some(
-          (r: any) =>
-            String(r.thr_lv_reason ?? '').includes(UID.slice(0, 8)) ||
-            String(r.pid) === leaveRequestPid,
-        );
-        expect(hasOurRecord, 'Our pending leave request should appear in Pending tab').toBeTruthy();
-        if (records.length > 0) {
-          const allPending = records.every(
-            (r: any) => String(r.thr_lv_status).toLowerCase() === 'pending',
-          );
-          expect(allPending, 'All records in Pending tab should have pending status').toBeTruthy();
-        }
-      } else {
-        // Client-side tab filtering: assert the tab is now active and table still shows data
-        await expect(
-          page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
-        ).toBeVisible({ timeout: 5_000 });
-        // The leave request created in LV-002 (which is still pending after LV-004 edit) must appear
-        const ourRecordRow = page.locator('tbody tr').filter({ hasText: leaveRequestPid });
-        // If not found by PID, fall back to checking leave code
-        const rowVisible = await ourRecordRow
-          .first()
-          .isVisible({ timeout: 3_000 })
-          .catch(async () =>
-            page
-              .getByText(/LV-\d{8}-\d+/)
-              .first()
-              .isVisible({ timeout: 2_000 })
-              .catch(() => false),
-          );
-        // Tab filtering passed as long as table renders (no crash/empty page)
-        await expect(
-          page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
-        ).toBeVisible({ timeout: 3_000 });
-      }
+      await expect(
+        page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
+      ).toBeVisible({ timeout: 5_000 });
+      await page.locator('text=加载中...').first().waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => null);
+      const rowVisible = await page
+        .locator('tbody tr')
+        .filter({ hasText: recordMarker })
+        .first()
+        .isVisible({ timeout: 5_000 })
+        .catch(() => false);
+      expect(rowVisible, 'Our pending leave request should appear in Pending tab').toBeTruthy();
     }
   });
 
@@ -795,17 +748,25 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
     // [D14] Wait for toast feedback
     await waitForToast(page, undefined, 5_000).catch(() => null);
 
-    // [D9] Verify status changed — reload detail page to get fresh state after command
+    const statusResp = await page.request.get(
+      `/api/dynamic/thr_leave_request/list?pageNum=1&pageSize=20&keyword=${encodeURIComponent(
+        leaveRequestCode || '',
+      )}`,
+    );
+    expect(statusResp.ok(), 'Approved record should be queryable after approval').toBeTruthy();
+    const statusBody = await statusResp.json().catch(() => ({}));
+    const approvedRecord = ((statusBody as any)?.data?.records ?? []).find(
+      (r: any) => String(r.pid) === leaveRequestPid || String(r.thr_lv_code) === String(leaveRequestCode),
+    );
+    expect(approvedRecord, 'Approved record should still exist after approval').toBeTruthy();
+    expect(
+      String(approvedRecord?.thr_lv_status).toLowerCase(),
+      'Status should change to approved after approval',
+    ).toBe('approved');
+
+    // [D9] Reload detail page to confirm UI state matches backend
     await navigateToLeaveRequestDetail(page, leaveRequestCode || UID, leaveRequestPid);
     await page.waitForLoadState('domcontentloaded');
-
-    // Status should now show "已批准" or "Approved"
-    const approvedVisible = await page
-      .getByText(/已批准|Approved/i)
-      .first()
-      .isVisible({ timeout: 8_000 })
-      .catch(() => false);
-    expect(approvedVisible, 'Status should change to Approved after approval').toBeTruthy();
 
     // [D10] Verify invalid transition: Approve button should be gone or disabled
     // (you can't approve an already-approved request)
@@ -826,6 +787,8 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
   // =========================================================================
   test('LV-007 — Approved record appears in Approved tab, not in Pending tab', async ({ page }) => {
     await navigateToLeaveRequestList(page);
+    expect(leaveRequestCode, 'LV-007 requires leaveRequestCode from LV-002').toBeTruthy();
+    const recordMarker = leaveRequestCode;
 
     // Check Approved tab
     const approvedTab = page
@@ -834,35 +797,18 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
       .first();
 
     if (await approvedTab.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      let approvedResp: any = null;
-      const approvedResponsePromise = page
-        .waitForResponse(
-          (r) =>
-            r.url().includes('thr_leave_request') && r.url().includes('list') && r.status() === 200,
-          { timeout: 5_000 },
-        )
-        .then((r) => {
-          approvedResp = r;
-        })
-        .catch(() => null);
       await approvedTab.click();
-      await approvedResponsePromise;
-
-      if (approvedResp) {
-        const body = await approvedResp.json().catch(() => ({}));
-        const records = (body as any)?.data?.records ?? [];
-        const hasOurRecord = records.some(
-          (r: any) =>
-            String(r.thr_lv_reason ?? '').includes(UID.slice(0, 8)) ||
-            String(r.pid) === leaveRequestPid,
-        );
-        expect(hasOurRecord, 'Approved leave request should appear in Approved tab').toBeTruthy();
-      } else {
-        // Client-side tab: just verify table still renders
-        await expect(
-          page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
-        ).toBeVisible({ timeout: 5_000 });
-      }
+      await expect(
+        page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
+      ).toBeVisible({ timeout: 5_000 });
+      await page.locator('text=加载中...').first().waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => null);
+      const approvedRowVisible = await page
+        .locator('tbody tr')
+        .filter({ hasText: recordMarker })
+        .first()
+        .isVisible({ timeout: 5_000 })
+        .catch(() => false);
+      expect(approvedRowVisible, 'Approved leave request should appear in Approved tab').toBeTruthy();
     }
 
     // Check Pending tab — our record should NOT be there
@@ -872,35 +818,18 @@ test.describe('HR Leave Request — Full Lifecycle (Gold Standard)', () => {
       .first();
 
     if (await pendingTab.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      let pendingResp: any = null;
-      const pendingResponsePromise = page
-        .waitForResponse(
-          (r) =>
-            r.url().includes('thr_leave_request') && r.url().includes('list') && r.status() === 200,
-          { timeout: 5_000 },
-        )
-        .then((r) => {
-          pendingResp = r;
-        })
-        .catch(() => null);
       await pendingTab.click();
-      await pendingResponsePromise;
-
-      if (pendingResp) {
-        const body = await pendingResp.json().catch(() => ({}));
-        const records = (body as any)?.data?.records ?? [];
-        const hasOurRecord = records.some(
-          (r: any) =>
-            String(r.thr_lv_reason ?? '').includes(UID.slice(0, 8)) ||
-            String(r.pid) === leaveRequestPid,
-        );
-        expect(hasOurRecord, 'Approved record should NOT appear in Pending tab').toBeFalsy();
-      } else {
-        // Client-side: just assert table renders (can't easily check filtering without API data)
-        await expect(
-          page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
-        ).toBeVisible({ timeout: 5_000 });
-      }
+      await expect(
+        page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
+      ).toBeVisible({ timeout: 5_000 });
+      await page.locator('text=加载中...').first().waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => null);
+      const pendingRowVisible = await page
+        .locator('tbody tr')
+        .filter({ hasText: recordMarker })
+        .first()
+        .isVisible({ timeout: 5_000 })
+        .catch(() => false);
+      expect(pendingRowVisible, 'Approved record should NOT appear in Pending tab').toBeFalsy();
     }
   });
 

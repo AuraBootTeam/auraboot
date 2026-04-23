@@ -37,7 +37,7 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
 
   const handleGenerate = async () => {
     if (!description.trim()) {
-      setError('Please describe the page you want to create');
+      setError('请先描述你想生成的页面');
       return;
     }
 
@@ -65,18 +65,18 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
               onGenerated(dsl);
               onClose();
             } catch (parseErr) {
-              setError(`Failed to parse AI response: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+              setError(`AI 响应解析失败：${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
               setGenerating(false);
             }
           },
           onError: (errMsg) => {
-            setError(errMsg || 'AI generation failed');
+            setError(errMsg || 'AI 生成失败');
             setGenerating(false);
           },
         },
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'AI generation failed');
+      setError(err instanceof Error ? err.message : 'AI 生成失败');
       setGenerating(false);
     }
   };
@@ -98,7 +98,7 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div className="flex items-center gap-2">
             <span className="text-lg">✨</span>
-            <h2 className="text-lg font-semibold text-gray-900">AI Page Generator</h2>
+            <h2 className="text-lg font-semibold text-gray-900">AI 页面生成</h2>
           </div>
           <button
             onClick={handleClose}
@@ -114,10 +114,10 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
           {/* Model context indicator */}
           {modelCode && (
             <div className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
-              <span>Model:</span>
+              <span>模型：</span>
               <span className="font-mono font-medium">{modelCode}</span>
               {modelFields && (
-                <span className="text-blue-500">({modelFields.length} fields)</span>
+                <span className="text-blue-500">（{modelFields.length} 个字段）</span>
               )}
             </div>
           )}
@@ -125,15 +125,15 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
           {/* Description input */}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Describe the page you want
+              描述你想生成的页面
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={
                 modelCode
-                  ? `e.g. "List all ${modelCode} records with status filter, show key fields in a table, add approve/reject buttons"`
-                  : 'e.g. "A dashboard with 3 stat cards showing total orders, revenue, and avg order value, plus a bar chart of monthly revenue"'
+                  ? `例如：“基于 ${modelCode} 做一个列表页，支持状态筛选，表格展示关键字段，并提供通过/拒绝按钮”`
+                  : '例如：“做一个仪表盘，展示总订单、收入、平均客单价 3 个指标卡，再加一张月度收入柱状图”'
               }
               rows={4}
               className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
@@ -147,7 +147,7 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
           {(preview || generating) && (
             <div className="flex-1 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-3">
               <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-gray-400">
-                {generating ? 'Generating...' : 'Generated DSL'}
+                {generating ? '生成中...' : '生成结果'}
               </div>
               <pre className="whitespace-pre-wrap font-mono text-xs text-gray-600">
                 {preview || (generating ? '...' : '')}
@@ -170,7 +170,7 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
             className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             disabled={generating}
           >
-            Cancel
+            取消
           </button>
           <button
             onClick={handleGenerate}
@@ -178,7 +178,7 @@ export const AiPageGenerateDialog: React.FC<AiPageGenerateDialogProps> = ({
             className="rounded-md bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2 text-sm text-white hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50"
             data-testid="ai-page-generate-btn"
           >
-            {generating ? 'Generating...' : '✨ Generate Page'}
+            {generating ? '生成中...' : '✨ 生成页面'}
           </button>
         </div>
       </div>

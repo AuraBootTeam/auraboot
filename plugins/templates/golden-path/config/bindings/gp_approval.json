@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "modelCode": "gp_approval",
+    "fieldCode": "gp_apr_task_pid",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "gp_approval",
+    "fieldCode": "gp_apr_approver",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "gp_approval",
+    "fieldCode": "gp_apr_status",
+    "sequence": 3,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "gp_approval",
+    "fieldCode": "gp_apr_decision_at",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "gp_approval",
+    "fieldCode": "gp_apr_notes",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true
+  }
+]

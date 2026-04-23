@@ -1,23 +1,145 @@
 {
-  "pageKey": "tpm_milestone_list", "name:zh-CN": "里程碑列表", "name:en": "Milestones", "pageType": "list", "modelCode": "tpm_milestone",
-  "dslSchema": { "id": "list.tpm_milestone", "kind": "List", "areas": {
-    "toolbar": { "blocks": [{ "id": "tpm_ms_toolbar", "blockType": "toolbar", "buttons": [{ "code": "create", "action": "create", "primary": true, "commandCode": "tpm:create_milestone", "navigateTo": "tpm_milestone_form", "permissionCode": "TPM.milestone.manage" }] }] },
-    "list-tabs": { "blocks": [{ "id": "tpm_ms_tabs", "blockType": "tabs", "tabs": [
-      { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
-      { "key": "pending", "label": { "en": "Pending", "zh-CN": "待达成" }, "filter": { "field": "tpm_ms_status", "value": "pending", "operator": "EQ" } },
-      { "key": "reached", "label": { "en": "Reached", "zh-CN": "已达成" }, "filter": { "field": "tpm_ms_status", "value": "reached", "operator": "EQ" } },
-      { "key": "missed", "label": { "en": "Missed", "zh-CN": "已错过" }, "filter": { "field": "tpm_ms_status", "value": "missed", "operator": "EQ" } }
-    ] }] },
-    "main": { "blocks": [{ "id": "tpm_ms_table", "blockType": "table", "columns": [
-      { "field": "tpm_ms_code", "width": 140, "sortable": true }, { "field": "tpm_ms_name", "width": 220, "sortable": true },
-      { "field": "tpm_ms_project_id", "width": 160 },
-      { "field": "tpm_ms_status", "width": 110, "renderType": "tag", "dictCode": "tpm_milestone_status" },
-      { "field": "tpm_ms_target_date", "width": 130, "sortable": true },
-      { "field": "actions", "isActionColumn": true, "buttons": [
-        { "code": "view", "action": "detail", "navigateTo": "tpm_milestone_detail" },
-        { "code": "edit", "action": "edit", "navigateTo": "tpm_milestone_form", "permissionCode": "TPM.milestone.manage" },
-        { "code": "delete", "action": "delete", "danger": true, "commandCode": "tpm:delete_milestone", "permissionCode": "TPM.milestone.manage", "confirmMessageKey": "delete.confirm" }
-      ] }
-    ], "searchFields": ["tpm_ms_name", "tpm_ms_code"], "defaultSort": { "field": "tpm_ms_target_date", "order": "asc" } }] }
-  } }
+  "pageKey": "tpm_milestone_list",
+  "name:zh-CN": "里程碑列表",
+  "name:en": "Milestones",
+  "modelCode": "tpm_milestone",
+  "kind": "list",
+  "title": {
+    "zh-CN": "里程碑列表",
+    "en": "Milestones"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "tpm_ms_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "action": "create",
+          "primary": true,
+          "permissionCode": "tpm.milestone.manage"
+        }
+      ],
+      "area": "toolbar"
+    },
+    {
+      "id": "tpm_ms_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "pending",
+          "label": {
+            "en": "Pending",
+            "zh-CN": "待达成"
+          },
+          "filter": {
+            "field": "tpm_ms_status",
+            "value": "pending",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "reached",
+          "label": {
+            "en": "Reached",
+            "zh-CN": "已达成"
+          },
+          "filter": {
+            "field": "tpm_ms_status",
+            "value": "reached",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "missed",
+          "label": {
+            "en": "Missed",
+            "zh-CN": "已错过"
+          },
+          "filter": {
+            "field": "tpm_ms_status",
+            "value": "missed",
+            "operator": "EQ"
+          }
+        }
+      ],
+      "area": "list-tabs"
+    },
+    {
+      "id": "tpm_ms_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "tpm_ms_code",
+          "width": 140,
+          "sortable": true
+        },
+        {
+          "field": "tpm_ms_name",
+          "width": 220,
+          "sortable": true
+        },
+        {
+          "field": "tpm_ms_project_id",
+          "width": 160
+        },
+        {
+          "field": "tpm_ms_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "tpm_milestone_status"
+        },
+        {
+          "field": "tpm_ms_target_date",
+          "width": 130,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "action": "detail",
+              "navigateTo": "tpm_milestone_detail"
+            },
+            {
+              "code": "edit",
+              "action": "edit",
+              "navigateTo": "tpm_milestone_form",
+              "permissionCode": "tpm.milestone.manage"
+            },
+            {
+              "code": "delete",
+              "action": "delete",
+              "danger": true,
+              "commandCode": "tpm:delete_milestone",
+              "permissionCode": "tpm.milestone.manage",
+              "confirmMessageKey": "delete.confirm"
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "tpm_ms_name",
+        "tpm_ms_code"
+      ],
+      "defaultSort": {
+        "field": "tpm_ms_target_date",
+        "order": "asc"
+      },
+      "area": "main"
+    }
+  ]
 }

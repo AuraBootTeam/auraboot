@@ -1,1 +1,131 @@
-{"pageKey":"ecm_corrective_action_detail","name:zh-CN":"措施详情","name:en":"Action Detail","pageType":"detail","modelCode":"ecm_corrective_action","dslSchema":{"id":"detail.ecm_corrective_action","kind":"Detail","version":"1.0.0","modelCode":"ecm_corrective_action","layout":{"areas":["header","main"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"ecm_corrective_action_form","permissionCode":"ECM.action.manage"},{"code":"start_action","commandCode":"ecm:start_action","permissionCode":"ECM.action.manage"},{"code":"complete_action","commandCode":"ecm:complete_action","permissionCode":"ECM.action.manage"},{"code":"verify_action","commandCode":"ecm:verify_action","permissionCode":"ECM.action.approve"},{"code":"close_action","commandCode":"ecm:close_action","permissionCode":"ECM.action.approve"},{"code":"delete","action":"delete","danger":true,"commandCode":"ecm:delete_action","permissionCode":"ECM.action.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"措施信息","en-US":"Action Information"},"fields":[{"field":"ecm_ca_code","colSpan":6},{"field":"ecm_ca_title","colSpan":6},{"field":"ecm_ca_finding_id","colSpan":6},{"field":"ecm_ca_type","colSpan":3},{"field":"ecm_ca_priority","colSpan":3},{"field":"ecm_ca_status","colSpan":6},{"field":"ecm_ca_assigned_to","colSpan":3},{"field":"ecm_ca_due_date","colSpan":3},{"field":"ecm_ca_root_cause","colSpan":12},{"field":"ecm_ca_action_plan","colSpan":12},{"field":"ecm_ca_verification","colSpan":12},{"field":"ecm_ca_notes","colSpan":12}]}]}}}}
+{
+  "pageKey": "ecm_corrective_action_detail",
+  "name:zh-CN": "措施详情",
+  "name:en": "Action Detail",
+  "modelCode": "ecm_corrective_action",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "措施详情",
+    "en": "Action Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "ecm.action.manage"
+        },
+        {
+          "code": "start_action",
+          "commandCode": "ecm:start_action",
+          "permissionCode": "ecm.action.manage"
+        },
+        {
+          "code": "complete_action",
+          "commandCode": "ecm:complete_action",
+          "permissionCode": "ecm.action.manage"
+        },
+        {
+          "code": "verify_action",
+          "commandCode": "ecm:verify_action",
+          "permissionCode": "ecm.action.approve"
+        },
+        {
+          "code": "close_action",
+          "commandCode": "ecm:close_action",
+          "permissionCode": "ecm.action.approve"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "ecm:delete_action",
+          "permissionCode": "ecm.action.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "措施信息",
+        "en-US": "Action Information"
+      },
+      "fields": [
+        {
+          "field": "ecm_ca_code",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_ca_title",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_ca_finding_id",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_ca_type",
+          "colSpan": 3
+        },
+        {
+          "field": "ecm_ca_priority",
+          "colSpan": 3
+        },
+        {
+          "field": "ecm_ca_status",
+          "colSpan": 6
+        },
+        {
+          "field": "ecm_ca_assigned_to",
+          "colSpan": 3
+        },
+        {
+          "field": "ecm_ca_due_date",
+          "colSpan": 3
+        },
+        {
+          "field": "ecm_ca_root_cause",
+          "colSpan": 12
+        },
+        {
+          "field": "ecm_ca_action_plan",
+          "colSpan": 12
+        },
+        {
+          "field": "ecm_ca_verification",
+          "colSpan": 12
+        },
+        {
+          "field": "ecm_ca_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    }
+  ]
+}

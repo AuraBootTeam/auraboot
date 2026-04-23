@@ -258,6 +258,161 @@ Users see their pending tasks in the **Task Center** (`/bpm/task-center`).
 |--------|-----|-------------|
 | Approve | `POST /api/bpm/tasks/{taskId}/approve` | Approve with optional comment |
 | Reject | `POST /api/bpm/tasks/{taskId}/reject` | Reject with reason |
+
+## Detail Page Cookbook for Workflow Records
+
+For workflow-backed business records, the detail page should not stop at a read-only form. The recommended structure is:
+
+- an **overview** tab for persisted business fields
+- an **approval history** tab for task-instance rows
+- a **workflow diagram** tab for current BPM runtime state
+- an **activity timeline** tab for business activities
+- a **field history** tab for audit changes
+
+This is the pattern used by `wd_leave_request_detail` in the workflow demo.
+
+### Recommended detail-tab structure
+
+```json
+{
+  "pageKey": "wd_leave_request_detail",
+  "kind": "detail",
+  "modelCode": "wd_leave_request",
+  "blocks": [
+    {
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": { "zh-CN": "基本信息", "en": "Overview" },
+          "blocks": [
+            {
+              "blockType": "form-section",
+              "title": { "zh-CN": "申请信息", "en": "Request Information" },
+              "fields": [
+                { "field": "wd_req_code", "readOnly": true },
+                { "field": "wd_req_status", "readOnly": true },
+                { "field": "wd_req_applicant", "readOnly": true },
+                { "field": "wd_req_type", "readOnly": true },
+                { "field": "wd_req_start_date", "readOnly": true },
+                { "field": "wd_req_end_date", "readOnly": true },
+                { "field": "wd_req_days", "readOnly": true },
+                { "field": "wd_req_process_instance", "readOnly": true }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "approval_history",
+          "label": { "zh-CN": "审批历史", "en": "Approval History" },
+          "blocks": [
+            {
+              "blockType": "sub-table",
+              "title": { "zh-CN": "审批历史", "en": "Approval History" },
+              "dataSource": {
+                "kind": "namedQuery",
+                "queryCode": "wd_leave_request_approval_history",
+                "params": {
+                  "processInstanceId": "${wd_req_process_instance}"
+                }
+              },
+              "columns": [
+                { "field": "taskName", "label": { "zh-CN": "节点", "en": "Node" } },
+                { "field": "status", "label": { "zh-CN": "状态", "en": "Status" } },
+                { "field": "comment", "label": { "zh-CN": "意见", "en": "Comment" } }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "workflow_diagram",
+          "label": { "zh-CN": "流程图", "en": "Workflow Diagram" },
+          "blocks": [
+            {
+              "blockType": "bpm-panel",
+              "bpmPanel": {
+                "businessKeyField": "pid",
+                "sections": ["status", "diagram", "operations", "history"]
+              }
+            }
+          ]
+        },
+        {
+          "key": "activity_timeline",
+          "label": { "zh-CN": "流程轨迹", "en": "Activity Timeline" },
+          "blocks": [{ "blockType": "activity-timeline" }]
+        },
+        {
+          "key": "field_history",
+          "label": { "zh-CN": "变更历史", "en": "Field History" },
+          "blocks": [{ "blockType": "field-history" }]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Approval-history named query
+
+The approval-history tab is usually best implemented as a named query against `se_task_instance`.
+
+Use a query like this:
+
+```json
+{
+  "code": "wd_leave_request_approval_history",
+  "fromSql": "SELECT CAST(t.id AS VARCHAR) AS pid, t.process_definition_activity_id AS \"nodeId\", COALESCE(NULLIF(t.title, ''), t.process_definition_activity_id) AS \"taskName\", t.claim_user_id AS assignee, t.status AS status, t.comment AS comment, t.gmt_create AS \"startedAt\", t.complete_time AS \"completedAt\" FROM se_task_instance t WHERE t.tenant_id = CAST(#{params.tenantId} AS VARCHAR) AND t.process_instance_id = CAST(#{params.processInstanceId} AS BIGINT) ORDER BY t.gmt_create ASC"
+}
+```
+
+Important details:
+
+- `tenant_id` in `se_task_instance` is `varchar`, so cast `#{params.tenantId}` before comparing
+- `process_instance_id` is `bigint`, so cast `#{params.processInstanceId}` accordingly
+- `title` may be empty; fall back to `process_definition_activity_id` so the UI still has a stable node label
+
+### Parameter placeholders inside detail tabs
+
+For detail-page sub-table data sources, both styles are supported:
+
+- `${record.fieldName}`
+- `${fieldName}`
+
+Examples:
+
+```json
+{
+  "params": {
+    "processInstanceId": "${wd_req_process_instance}",
+    "applicantPid": "${record.wd_req_applicant}"
+  }
+}
+```
+
+Use `${record.fieldName}` when you want the template to be explicit.
+Use `${fieldName}` when the parameter mirrors a parent record field and you want shorter DSL.
+
+Unknown placeholders should degrade to empty string instead of leaking raw template text into the outgoing request.
+
+### Testing guidance for workflow detail pages
+
+Do not stop at “tab exists”.
+
+Recommended assertions:
+
+- `Overview`: assert core business fields such as status, reason, dates, and computed days
+- `Approval History`: assert rows exist when a task instance exists; assert status values like `pending`, `completed`, or `aborted`
+- `Workflow Diagram`: assert `bpm-panel` is in `ready` or `empty` state and that the expected section content is visible
+- `Activity Timeline`: assert workflow-related business activities such as submit, approve, reject, or withdraw
+- `Field History`: assert audit entries when available, otherwise assert explicit empty or permission fallback
+
+For pending approval states, wait for the corresponding todo task to exist before asserting the approval-history tab. This avoids false negatives caused by querying the detail page before `se_task_instance` rows are fully visible.
+
+Also note that approval comments do not necessarily appear in every tab:
+
+- they may exist in BPM history or activity timeline
+- the approval-history sub-table should only be asserted against fields the query actually returns
 | Transfer | `POST /api/bpm/tasks/{taskId}/transfer` | Reassign to another user |
 | Delegate | `POST /api/bpm/tasks/{taskId}/delegate` | Delegate while retaining ownership |
 | Rollback | `POST /api/bpm/tasks/{taskId}/rollback` | Return to a previous node |

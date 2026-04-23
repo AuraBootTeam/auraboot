@@ -5,17 +5,33 @@
     "displayName:en": "Create Contact",
     "type": "create",
     "modelCode": "tcrm_contact",
-    "inputFields": ["tcrm_ct_name", "tcrm_ct_account_id", "tcrm_ct_title", "tcrm_ct_email", "tcrm_ct_phone", "tcrm_ct_notes"],
+    "inputFields": [
+      "tcrm_ct_name",
+      "tcrm_ct_account_id",
+      "tcrm_ct_title",
+      "tcrm_ct_email",
+      "tcrm_ct_phone",
+      "tcrm_ct_notes"
+    ],
     "autoSetFields": {
-      "tcrm_ct_code": { "strategy": "auto_generate", "pattern": "CTCT-{yyyyMMdd}-{seq}" }
+      "tcrm_ct_code": {
+        "strategy": "auto_generate",
+        "pattern": "CTCT-{yyyyMMdd}-{seq}"
+      }
     },
-    "permissions": ["TCRM.contact.manage"],
+    "permissions": [
+      "tcrm.contact.manage"
+    ],
     "agent_hint": "Create a new contact. Required: name. Optional: account_id, title, email, phone, notes.",
     "cmd_risk_level": "L1",
     "precondition_description": "No preconditions.",
     "side_effect_description": null,
     "output_description": "Returns the created contact with auto-generated code.",
-    "example_input": { "tcrm_ct_name": "Jane Doe", "tcrm_ct_title": "cto", "tcrm_ct_email": "jane@acme.com" },
+    "example_input": {
+      "tcrm_ct_name": "Jane Doe",
+      "tcrm_ct_title": "cto",
+      "tcrm_ct_email": "jane@acme.com"
+    },
     "idempotent": false,
     "reversible": true
   },
@@ -25,14 +41,25 @@
     "displayName:en": "Update Contact",
     "type": "update",
     "modelCode": "tcrm_contact",
-    "inputFields": ["tcrm_ct_name", "tcrm_ct_account_id", "tcrm_ct_title", "tcrm_ct_email", "tcrm_ct_phone", "tcrm_ct_notes"],
-    "permissions": ["TCRM.contact.manage"],
+    "inputFields": [
+      "tcrm_ct_name",
+      "tcrm_ct_account_id",
+      "tcrm_ct_title",
+      "tcrm_ct_email",
+      "tcrm_ct_phone",
+      "tcrm_ct_notes"
+    ],
+    "permissions": [
+      "tcrm.contact.manage"
+    ],
     "agent_hint": "Update an existing contact.",
     "cmd_risk_level": "L1",
     "precondition_description": "Contact must exist.",
     "side_effect_description": null,
     "output_description": "Returns the updated contact.",
-    "example_input": { "tcrm_ct_phone": "+1-555-0300" },
+    "example_input": {
+      "tcrm_ct_phone": "+1-555-0300"
+    },
     "idempotent": true,
     "reversible": true
   },
@@ -42,8 +69,13 @@
     "displayName:en": "Delete Contact",
     "type": "delete",
     "modelCode": "tcrm_contact",
-    "extension": { "confirmMessage:zh-CN": "确认删除此联系人？", "confirmMessage:en": "Confirm delete this contact?" },
-    "permissions": ["TCRM.contact.manage"],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此联系人？",
+      "confirmMessage:en": "Confirm delete this contact?"
+    },
+    "permissions": [
+      "tcrm.contact.manage"
+    ],
     "agent_hint": "Delete a contact permanently.",
     "cmd_risk_level": "L4",
     "precondition_description": "No preconditions.",
@@ -59,7 +91,9 @@
     "displayName:en": "View Contact",
     "type": "query",
     "modelCode": "tcrm_contact",
-    "permissions": ["TCRM.contact.read"],
+    "permissions": [
+      "tcrm.contact.read"
+    ],
     "agent_hint": "Retrieve a single contact by ID.",
     "cmd_risk_level": "L0",
     "precondition_description": "Contact must exist.",
@@ -75,13 +109,18 @@
     "displayName:en": "List Contacts",
     "type": "query",
     "modelCode": "tcrm_contact",
-    "permissions": ["TCRM.contact.read"],
+    "permissions": [
+      "tcrm.contact.read"
+    ],
     "agent_hint": "Query contacts with pagination. Supports filters by account.",
     "cmd_risk_level": "L0",
     "precondition_description": "No preconditions.",
     "side_effect_description": null,
     "output_description": "Returns a paginated list of contacts.",
-    "example_input": { "pageNum": 1, "pageSize": 20 },
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
     "idempotent": true,
     "reversible": true
   }

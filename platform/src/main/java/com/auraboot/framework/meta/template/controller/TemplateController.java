@@ -5,6 +5,7 @@ import com.auraboot.framework.meta.template.dto.CrudTemplateConfig;
 import com.auraboot.framework.meta.template.dto.TemplateGenerationResult;
 import com.auraboot.framework.meta.template.service.TemplateGeneratorService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,7 @@ public class TemplateController {
      * @return Generation result
      */
     @PostMapping("/crud/generate")
-    @RequirePermission("template.template.generate")
+    @RequirePermission(MetaPermission.PAGE_MANAGE)
     public ApiResponse<TemplateGenerationResult> generateCrudTemplate(
         @Valid @RequestBody TemplateGenerationRequest request
     ) {
@@ -60,4 +61,3 @@ public class TemplateController {
         private CrudTemplateConfig config;
     }
 }
-

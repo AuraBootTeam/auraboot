@@ -5,7 +5,7 @@
     "title:en": "Leave Approval History",
     "description": "Approval task timeline for a given leave request process instance, sourced from SmartEngine's se_task_instance. Consumed by the wd_leave_request_detail page sub-table.",
     "status": "published",
-    "fromSql": "SELECT CAST(t.id AS VARCHAR) AS pid, t.process_definition_activity_id AS \"nodeId\", t.title AS \"taskName\", t.claim_user_id AS assignee, t.status AS status, t.comment AS comment, t.gmt_create AS \"startedAt\", t.complete_time AS \"completedAt\" FROM se_task_instance t WHERE t.tenant_id = #{params.tenantId} AND t.process_instance_id = CAST(#{params.processInstanceId} AS BIGINT) ORDER BY t.gmt_create ASC",
+    "fromSql": "SELECT CAST(t.id AS VARCHAR) AS pid, t.process_definition_activity_id AS \"nodeId\", COALESCE(NULLIF(t.title, ''), t.process_definition_activity_id) AS \"taskName\", t.claim_user_id AS assignee, t.status AS status, t.comment AS comment, t.gmt_create AS \"startedAt\", t.complete_time AS \"completedAt\" FROM se_task_instance t WHERE t.tenant_id = CAST(#{params.tenantId} AS VARCHAR) AND t.process_instance_id = CAST(#{params.processInstanceId} AS BIGINT) ORDER BY t.gmt_create ASC",
     "outputFields": [
       { "fieldCode": "pid", "columnExpr": "pid", "dataType": "string", "sortable": false },
       { "fieldCode": "nodeId", "columnExpr": "\"nodeId\"", "dataType": "string", "sortable": false },

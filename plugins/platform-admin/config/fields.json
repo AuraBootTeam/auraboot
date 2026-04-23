@@ -363,7 +363,7 @@
     "code": "user_id",
     "displayName:zh-CN": "用户 ID",
     "displayName:en": "User ID",
-    "dataType": "integer",
+    "dataType": "long",
     "constraints": { "required": true }
   },
   {

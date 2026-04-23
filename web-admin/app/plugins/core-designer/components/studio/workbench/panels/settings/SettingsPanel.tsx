@@ -108,7 +108,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             data-testid="settings-panel-heading"
             className="mb-4 text-lg font-semibold text-gray-900"
           >
-            Settings
+            设置
           </h2>
           <nav className="space-y-1">
             {(Object.keys(SETTINGS_CATEGORY_INFO) as SettingsCategory[]).map((category) => {
@@ -201,14 +201,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onClick={handleReset}
               className="rounded-lg px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
             >
-              Reset to defaults
+              恢复默认
             </button>
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
                 className="rounded-lg px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
               >
-                Cancel
+                取消
               </button>
               <button
                 data-testid="settings-panel-save"
@@ -216,7 +216,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 disabled={!isDirty}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Save changes
+                保存设置
               </button>
             </div>
           </div>
@@ -235,27 +235,27 @@ const PageSettingsForm: React.FC<{
 }> = ({ settings, onChange }) => {
   return (
     <div className="space-y-6">
-      <SettingsField label="Page Title">
+      <SettingsField label="页面标题">
         <input
           type="text"
           value={settings.title}
           onChange={(e) => onChange({ title: e.target.value })}
-          placeholder="Enter page title"
+          placeholder="输入页面标题"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
         />
       </SettingsField>
 
-      <SettingsField label="Description">
+      <SettingsField label="页面说明">
         <textarea
           value={settings.description}
           onChange={(e) => onChange({ description: e.target.value })}
-          placeholder="Enter page description"
+          placeholder="输入页面说明"
           rows={3}
           className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
         />
       </SettingsField>
 
-      <SettingsField label="Grid Columns" hint="Number of columns in the grid layout">
+      <SettingsField label="网格列数" hint="页面采用网格布局时的列数">
         <input
           type="number"
           value={settings.gridColumns}
@@ -266,7 +266,7 @@ const PageSettingsForm: React.FC<{
         />
       </SettingsField>
 
-      <SettingsField label="Grid Gap" hint="Space between grid items (px)">
+      <SettingsField label="网格间距" hint="网格项之间的间距（px）">
         <input
           type="number"
           value={settings.gridGap}
@@ -277,7 +277,7 @@ const PageSettingsForm: React.FC<{
         />
       </SettingsField>
 
-      <SettingsField label="Page Padding" hint="Padding around the page content (px)">
+      <SettingsField label="页面内边距" hint="页面内容区域的留白（px）">
         <input
           type="number"
           value={settings.padding}
@@ -290,8 +290,8 @@ const PageSettingsForm: React.FC<{
 
       <SettingsToggle
         testId="settings-toggle-enableMultiView"
-        label="Multi-View Support"
-        description="Enable view type tabs (Table, Kanban, Calendar) for list pages"
+        label="多视图支持"
+        description="为列表页启用表格、看板、日历等视图切换"
         checked={settings.enableMultiView}
         onChange={(checked) => onChange({ enableMultiView: checked })}
       />
@@ -309,20 +309,20 @@ const EditorSettingsForm: React.FC<{
   return (
     <div className="space-y-6">
       <SettingsToggle
-        label="Show Grid"
-        description="Display grid lines on the canvas"
+        label="显示网格"
+        description="在画布上显示辅助网格线"
         checked={settings.showGrid}
         onChange={(checked) => onChange({ showGrid: checked })}
       />
 
       <SettingsToggle
-        label="Snap to Grid"
-        description="Automatically align components to grid"
+        label="吸附到网格"
+        description="拖拽组件时自动对齐到网格"
         checked={settings.snapToGrid}
         onChange={(checked) => onChange({ snapToGrid: checked })}
       />
 
-      <SettingsField label="Grid Size" hint="Size of grid cells for snapping (px)">
+      <SettingsField label="网格尺寸" hint="吸附用网格单元大小（px）">
         <input
           type="number"
           value={settings.gridSize}
@@ -334,37 +334,37 @@ const EditorSettingsForm: React.FC<{
       </SettingsField>
 
       <SettingsToggle
-        label="Show Guides"
-        description="Display alignment guides when dragging"
+        label="显示参考线"
+        description="拖拽组件时显示对齐参考线"
         checked={settings.showGuides}
         onChange={(checked) => onChange({ showGuides: checked })}
       />
 
       <SettingsToggle
-        label="Show Rulers"
-        description="Display rulers along the edges"
+        label="显示标尺"
+        description="在画布边缘显示标尺"
         checked={settings.showRulers}
         onChange={(checked) => onChange({ showRulers: checked })}
       />
 
       <SettingsToggle
-        label="Show Component Borders"
-        description="Highlight component boundaries"
+        label="显示组件边界"
+        description="高亮组件边界，方便识别布局范围"
         checked={settings.showComponentBorders}
         onChange={(checked) => onChange({ showComponentBorders: checked })}
       />
 
       <div className="border-t border-gray-200 pt-6">
-        <h4 className="mb-4 text-sm font-medium text-gray-900">Auto-save</h4>
+        <h4 className="mb-4 text-sm font-medium text-gray-900">自动保存</h4>
         <div className="space-y-4">
           <SettingsToggle
-            label="Enable Auto-save"
-            description="Automatically save changes periodically"
+            label="启用自动保存"
+            description="定时自动保存当前修改"
             checked={settings.enableAutoSave}
             onChange={(checked) => onChange({ enableAutoSave: checked })}
           />
           {settings.enableAutoSave && (
-            <SettingsField label="Auto-save Interval" hint="Time between auto-saves (seconds)">
+            <SettingsField label="自动保存间隔" hint="两次自动保存之间的时间（秒）">
               <input
                 type="number"
                 value={settings.autoSaveInterval}
@@ -378,7 +378,7 @@ const EditorSettingsForm: React.FC<{
         </div>
       </div>
 
-      <SettingsField label="Zoom Level" hint="Canvas zoom percentage">
+      <SettingsField label="缩放比例" hint="画布缩放百分比">
         <div className="flex items-center gap-4">
           <input
             type="range"
@@ -405,7 +405,7 @@ const AppearanceSettingsForm: React.FC<{
 }> = ({ settings, onChange }) => {
   return (
     <div className="space-y-6">
-      <SettingsField label="Theme">
+      <SettingsField label="主题">
         <div className="flex items-center gap-3">
           {(['light', 'dark', 'system'] as const).map((theme) => (
             <button
@@ -417,15 +417,15 @@ const AppearanceSettingsForm: React.FC<{
                   : 'border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {theme === 'light' && 'Light'}
-              {theme === 'dark' && 'Dark'}
-              {theme === 'system' && 'System'}
+              {theme === 'light' && '浅色'}
+              {theme === 'dark' && '深色'}
+              {theme === 'system' && '跟随系统'}
             </button>
           ))}
         </div>
       </SettingsField>
 
-      <SettingsField label="Primary Color">
+      <SettingsField label="主色">
         <div className="flex items-center gap-3">
           <input
             type="color"
@@ -442,7 +442,7 @@ const AppearanceSettingsForm: React.FC<{
         </div>
       </SettingsField>
 
-      <SettingsField label="Canvas Background">
+      <SettingsField label="画布背景">
         <div className="grid grid-cols-4 gap-2">
           {(['white', 'light', 'dots', 'grid'] as const).map((bg) => (
             <button
@@ -475,13 +475,18 @@ const AppearanceSettingsForm: React.FC<{
                     bg === 'dots' ? '16px 16px' : bg === 'grid' ? '20px 20px' : undefined,
                 }}
               />
-              <span className="text-xs text-gray-600 capitalize">{bg}</span>
+              <span className="text-xs text-gray-600 capitalize">
+                {bg === 'white' && '白色'}
+                {bg === 'light' && '浅灰'}
+                {bg === 'dots' && '圆点'}
+                {bg === 'grid' && '网格'}
+              </span>
             </button>
           ))}
         </div>
       </SettingsField>
 
-      <SettingsField label="Sidebar Position">
+      <SettingsField label="侧栏位置">
         <div className="flex items-center gap-3">
           {(['left', 'right'] as const).map((pos) => (
             <button
@@ -493,13 +498,13 @@ const AppearanceSettingsForm: React.FC<{
                   : 'border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {pos === 'left' ? 'Left' : 'Right'}
+              {pos === 'left' ? '左侧' : '右侧'}
             </button>
           ))}
         </div>
       </SettingsField>
 
-      <SettingsField label="Panel Width" hint="Width of side panels (px)">
+      <SettingsField label="侧栏宽度" hint="两侧面板的宽度（px）">
         <div className="flex items-center gap-4">
           <input
             type="range"
@@ -526,7 +531,7 @@ const ExportSettingsForm: React.FC<{
 }> = ({ settings, onChange }) => {
   return (
     <div className="space-y-6">
-      <SettingsField label="Export Format">
+      <SettingsField label="导出格式">
         <div className="flex items-center gap-3">
           {(['json', 'yaml'] as const).map((format) => (
             <button
@@ -545,22 +550,22 @@ const ExportSettingsForm: React.FC<{
       </SettingsField>
 
       <SettingsToggle
-        label="Include Metadata"
-        description="Include creation date, author, and other metadata"
+        label="包含元数据"
+        description="导出创建时间、作者等附加信息"
         checked={settings.includeMetadata}
         onChange={(checked) => onChange({ includeMetadata: checked })}
       />
 
       <SettingsToggle
-        label="Pretty Print"
-        description="Format output with indentation for readability"
+        label="美化输出"
+        description="使用缩进格式化导出内容，提升可读性"
         checked={settings.prettyPrint}
         onChange={(checked) => onChange({ prettyPrint: checked })}
       />
 
       <SettingsToggle
-        label="Include Version History"
-        description="Include all previous versions in export"
+        label="包含版本历史"
+        description="导出时附带所有历史版本信息"
         checked={settings.includeVersionHistory}
         onChange={(checked) => onChange({ includeVersionHistory: checked })}
       />

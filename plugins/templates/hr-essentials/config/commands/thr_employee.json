@@ -25,7 +25,7 @@
       }
     },
     "permissions": [
-      "THR.employee.manage"
+      "thr.employee.manage"
     ],
     "agent_hint": "Create a new employee record. Required: name, department (ENGINEERING/SALES/MARKETING/FINANCE/HR/OPERATIONS/OTHER), hire_date. Optional: position, email, phone, notes. Auto-generated: code (EMP-yyyyMMdd-seq), status (active).",
     "cmd_risk_level": "L1",
@@ -60,7 +60,7 @@
       "thr_em_notes"
     ],
     "permissions": [
-      "THR.employee.manage"
+      "thr.employee.manage"
     ],
     "agent_hint": "Update an existing employee record. Editable fields: name, department, position, email, phone, hire_date, notes. Status is NOT editable here — use state transition commands instead.",
     "cmd_risk_level": "L1",
@@ -81,10 +81,12 @@
     "type": "state_transition",
     "modelCode": "thr_employee",
     "stateField": "thr_em_status",
-    "fromStates": ["active"],
+    "fromStates": [
+      "active"
+    ],
     "toState": "on_leave",
     "permissions": [
-      "THR.employee.manage"
+      "thr.employee.manage"
     ],
     "agent_hint": "Transition employee status from active to ON_LEAVE. Indicates the employee is on extended leave (maternity, sabbatical, etc.). Can be reversed via return_from_leave command.",
     "cmd_risk_level": "L2",
@@ -102,10 +104,12 @@
     "type": "state_transition",
     "modelCode": "thr_employee",
     "stateField": "thr_em_status",
-    "fromStates": ["on_leave"],
+    "fromStates": [
+      "on_leave"
+    ],
     "toState": "active",
     "permissions": [
-      "THR.employee.manage"
+      "thr.employee.manage"
     ],
     "agent_hint": "Transition employee status from ON_LEAVE back to active. Indicates the employee has returned from leave and is back to work.",
     "cmd_risk_level": "L1",
@@ -123,14 +127,17 @@
     "type": "state_transition",
     "modelCode": "thr_employee",
     "stateField": "thr_em_status",
-    "fromStates": ["active", "on_leave"],
+    "fromStates": [
+      "active",
+      "on_leave"
+    ],
     "toState": "resigned",
     "extension": {
       "confirmMessage:zh-CN": "确认将此员工标记为已离职？此操作不可撤销。",
       "confirmMessage:en": "Confirm marking this employee as resigned? This cannot be undone."
     },
     "permissions": [
-      "THR.employee.manage"
+      "thr.employee.manage"
     ],
     "agent_hint": "Transition employee status to RESIGNED. This is a terminal state — resigned employees cannot be reactivated. Allowed from both active and ON_LEAVE. Requires user confirmation.",
     "cmd_risk_level": "L2",
@@ -151,7 +158,9 @@
       {
         "field": "thr_em_status",
         "operator": "IN",
-        "value": ["active"]
+        "value": [
+          "active"
+        ]
       }
     ],
     "extension": {
@@ -159,7 +168,7 @@
       "confirmMessage:en": "Confirm delete this employee record? This action is irreversible."
     },
     "permissions": [
-      "THR.employee.manage"
+      "thr.employee.manage"
     ],
     "agent_hint": "Delete an employee record permanently. Irreversible operation. Precondition: employee status must be active — employees on leave or resigned cannot be deleted.",
     "cmd_risk_level": "L4",
@@ -177,7 +186,7 @@
     "type": "query",
     "modelCode": "thr_employee",
     "permissions": [
-      "THR.employee.read"
+      "thr.employee.read"
     ],
     "agent_hint": "Retrieve a single employee record by ID. Returns all fields including status, department, position, and hire date.",
     "cmd_risk_level": "L0",
@@ -195,7 +204,7 @@
     "type": "query",
     "modelCode": "thr_employee",
     "permissions": [
-      "THR.employee.read"
+      "thr.employee.read"
     ],
     "agent_hint": "Query employee records with pagination and filtering. Supports filters by status, department, position. Supports keyword search on name and code.",
     "cmd_risk_level": "L0",
@@ -205,7 +214,13 @@
     "example_input": {
       "pageNum": 1,
       "pageSize": 20,
-      "filters": [{"fieldName": "thr_em_status", "operator": "EQ", "value": "active"}]
+      "filters": [
+        {
+          "fieldName": "thr_em_status",
+          "operator": "EQ",
+          "value": "active"
+        }
+      ]
     },
     "idempotent": true,
     "reversible": true

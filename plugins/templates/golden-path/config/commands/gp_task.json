@@ -23,7 +23,7 @@
       }
     },
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Create a new task. Required: title. Optional: description, priority (LOW/MEDIUM/HIGH/URGENT), assignee, due_date. Auto-generated: code (TASK-yyyyMMdd-seq), status (NEW).",
     "cmd_risk_level": "L1",
@@ -54,7 +54,7 @@
       "gp_task_due_date"
     ],
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Update an existing task. Editable fields: title, description, priority, assignee, due_date. Status is NOT editable here — use state transition commands instead.",
     "cmd_risk_level": "L1",
@@ -76,10 +76,12 @@
     "type": "state_transition",
     "modelCode": "gp_task",
     "stateField": "gp_task_status",
-    "fromStates": ["new"],
+    "fromStates": [
+      "new"
+    ],
     "toState": "in_progress",
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Transition task status from NEW to in_progress. Indicates work has begun on this task. No additional input fields required.",
     "cmd_risk_level": "L1",
@@ -97,7 +99,9 @@
     "type": "state_transition",
     "modelCode": "gp_task",
     "stateField": "gp_task_status",
-    "fromStates": ["in_progress"],
+    "fromStates": [
+      "in_progress"
+    ],
     "toState": "done",
     "sideEffects": [
       {
@@ -111,7 +115,7 @@
       }
     ],
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Transition task status from in_progress to DONE. Automatically creates a completion comment on the task via sideEffect. Use only when the task work is fully finished.",
     "cmd_risk_level": "L2",
@@ -129,14 +133,16 @@
     "type": "state_transition",
     "modelCode": "gp_task",
     "stateField": "gp_task_status",
-    "fromStates": ["done"],
+    "fromStates": [
+      "done"
+    ],
     "toState": "archived",
     "extension": {
       "confirmMessage:zh-CN": "确认归档此任务？归档后不可恢复。",
       "confirmMessage:en": "Confirm archive this task? This cannot be undone."
     },
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Transition task status from DONE to archived. This is a terminal state — archived tasks cannot be reopened. Requires user confirmation.",
     "cmd_risk_level": "L2",
@@ -157,7 +163,9 @@
       {
         "field": "gp_task_status",
         "operator": "IN",
-        "value": ["new"]
+        "value": [
+          "new"
+        ]
       }
     ],
     "extension": {
@@ -165,7 +173,7 @@
       "confirmMessage:en": "Confirm delete this task? This action is irreversible."
     },
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Delete a task permanently. Irreversible operation. Precondition: task status must be NEW — tasks that are in progress, done, or archived cannot be deleted.",
     "cmd_risk_level": "L4",
@@ -183,7 +191,7 @@
     "type": "query",
     "modelCode": "gp_task",
     "permissions": [
-      "GP.task.read"
+      "gp.task.read"
     ],
     "agent_hint": "Retrieve a single task record by ID. Returns all fields including status, priority, assignee, and due date.",
     "cmd_risk_level": "L0",
@@ -201,7 +209,7 @@
     "type": "query",
     "modelCode": "gp_task",
     "permissions": [
-      "GP.task.read"
+      "gp.task.read"
     ],
     "agent_hint": "Query task records with pagination and filtering. Supports filters by status, priority, assignee. Supports keyword search on title and code.",
     "cmd_risk_level": "L0",
@@ -211,7 +219,16 @@
     "example_input": {
       "pageNum": 1,
       "pageSize": 20,
-      "filters": [{"fieldName": "gp_task_status", "operator": "IN", "value": ["new", "in_progress"]}]
+      "filters": [
+        {
+          "fieldName": "gp_task_status",
+          "operator": "IN",
+          "value": [
+            "new",
+            "in_progress"
+          ]
+        }
+      ]
     },
     "idempotent": true,
     "reversible": true

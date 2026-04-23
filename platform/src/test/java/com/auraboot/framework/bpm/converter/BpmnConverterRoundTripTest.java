@@ -107,6 +107,47 @@ class BpmnConverterRoundTripTest {
             assertThat(autoEdge.path("data").path("condition").path("content").asText())
                     .isEqualTo("true");
         }
+
+        @Test
+        @DisplayName("legacy conditionExpression string is normalized into BPMN conditionExpression")
+        void roundTripLegacyConditionExpression() {
+            String json = """
+                {
+                  "key": "legacy-cond",
+                  "name": "Legacy Condition",
+                  "nodes": [
+                    {"id": "start", "type": "startEvent", "data": {"type": "startEvent", "label": "Start"}},
+                    {"id": "gw", "type": "exclusiveGateway", "data": {"type": "exclusiveGateway", "label": "Decide"}},
+                    {"id": "yes", "type": "userTask", "data": {"type": "userTask", "label": "Yes", "config": {}}},
+                    {"id": "no", "type": "userTask", "data": {"type": "userTask", "label": "No", "config": {}}},
+                    {"id": "end", "type": "endEvent", "data": {"type": "endEvent", "label": "End"}}
+                  ],
+                  "edges": [
+                    {"id": "e1", "source": "start", "target": "gw", "data": {}},
+                    {"id": "e_yes", "source": "gw", "target": "yes", "data": {"conditionExpression": "${decision == 'yes'}"}},
+                    {"id": "e_no", "source": "gw", "target": "no", "data": {"conditionExpression": "${decision == 'no'}", "isDefault": true}},
+                    {"id": "e2", "source": "yes", "target": "end", "data": {}},
+                    {"id": "e3", "source": "no", "target": "end", "data": {}}
+                  ]
+                }
+                """;
+
+            String xml = jsonToBpmn.convert(json);
+
+            assertThat(xml).contains("${decision == 'yes'}");
+            assertThat(xml).contains("${decision == 'no'}");
+            assertThat(xml).contains("default=\"e_no\"");
+
+            JsonNode back = bpmnToJson.convertToJsonNode(xml);
+            JsonNode yesEdge = findEdge(back.path("edges"), "e_yes");
+            assertThat(yesEdge.path("data").path("condition").path("content").asText())
+                    .isEqualTo("${decision == 'yes'}");
+
+            JsonNode noEdge = findEdge(back.path("edges"), "e_no");
+            assertThat(noEdge.path("data").path("isDefault").asBoolean()).isTrue();
+            assertThat(noEdge.path("data").path("condition").path("content").asText())
+                    .isEqualTo("${decision == 'no'}");
+        }
     }
 
     // ==================== Branch (b): script conditions (MVEL) round-trip ====================

@@ -24,7 +24,7 @@
       }
     },
     "permissions": [
-      "THR.leave.manage"
+      "thr.leave.manage"
     ],
     "agent_hint": "Create a new leave request. Required: employee_id (reference to thr_employee), leave_type (ANNUAL/SICK/PERSONAL/MATERNITY/OTHER), start_date, end_date, days. Optional: reason. Auto-generated: code (LV-yyyyMMdd-seq), status (pending).",
     "cmd_risk_level": "L1",
@@ -57,7 +57,7 @@
       "thr_lv_reason"
     ],
     "permissions": [
-      "THR.leave.manage"
+      "thr.leave.manage"
     ],
     "agent_hint": "Update an existing leave request. Editable fields: employee, leave_type, start_date, end_date, days, reason. Status is NOT editable here — use state transition commands instead.",
     "cmd_risk_level": "L1",
@@ -79,10 +79,12 @@
     "type": "state_transition",
     "modelCode": "thr_leave_request",
     "stateField": "thr_lv_status",
-    "fromStates": ["pending"],
+    "fromStates": [
+      "pending"
+    ],
     "toState": "approved",
     "permissions": [
-      "THR.leave.manage"
+      "thr.leave.manage"
     ],
     "agent_hint": "Approve a pending leave request. Transitions status from pending to approved. Only leave requests in pending status can be approved.",
     "cmd_risk_level": "L2",
@@ -100,10 +102,12 @@
     "type": "state_transition",
     "modelCode": "thr_leave_request",
     "stateField": "thr_lv_status",
-    "fromStates": ["pending"],
+    "fromStates": [
+      "pending"
+    ],
     "toState": "rejected",
     "permissions": [
-      "THR.leave.manage"
+      "thr.leave.manage"
     ],
     "agent_hint": "Reject a pending leave request. Transitions status from pending to rejected. Only leave requests in pending status can be rejected.",
     "cmd_risk_level": "L2",
@@ -121,10 +125,12 @@
     "type": "state_transition",
     "modelCode": "thr_leave_request",
     "stateField": "thr_lv_status",
-    "fromStates": ["pending"],
+    "fromStates": [
+      "pending"
+    ],
     "toState": "cancelled",
     "permissions": [
-      "THR.leave.manage"
+      "thr.leave.manage"
     ],
     "agent_hint": "Cancel a pending leave request. Transitions status from pending to cancelled. Only the requester or HR manager should cancel leave requests. Only pending requests can be cancelled.",
     "cmd_risk_level": "L2",
@@ -145,7 +151,9 @@
       {
         "field": "thr_lv_status",
         "operator": "IN",
-        "value": ["pending"]
+        "value": [
+          "pending"
+        ]
       }
     ],
     "extension": {
@@ -153,7 +161,7 @@
       "confirmMessage:en": "Confirm delete this leave request? This action is irreversible."
     },
     "permissions": [
-      "THR.leave.manage"
+      "thr.leave.manage"
     ],
     "agent_hint": "Delete a leave request permanently. Irreversible operation. Precondition: leave request status must be pending — approved, rejected, or cancelled requests cannot be deleted.",
     "cmd_risk_level": "L4",
@@ -171,7 +179,7 @@
     "type": "query",
     "modelCode": "thr_leave_request",
     "permissions": [
-      "THR.leave.read"
+      "thr.leave.read"
     ],
     "agent_hint": "Retrieve a single leave request record by ID. Returns all fields including employee, leave type, dates, days, status, and reason.",
     "cmd_risk_level": "L0",
@@ -189,7 +197,7 @@
     "type": "query",
     "modelCode": "thr_leave_request",
     "permissions": [
-      "THR.leave.read"
+      "thr.leave.read"
     ],
     "agent_hint": "Query leave request records with pagination and filtering. Supports filters by status, leave_type, employee. Supports keyword search on code.",
     "cmd_risk_level": "L0",
@@ -199,7 +207,13 @@
     "example_input": {
       "pageNum": 1,
       "pageSize": 20,
-      "filters": [{"fieldName": "thr_lv_status", "operator": "EQ", "value": "pending"}]
+      "filters": [
+        {
+          "fieldName": "thr_lv_status",
+          "operator": "EQ",
+          "value": "pending"
+        }
+      ]
     },
     "idempotent": true,
     "reversible": true

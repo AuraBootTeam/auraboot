@@ -152,7 +152,7 @@ public class ChatBIService {
         // Try to find model by matching model code or name keywords in the question
         // Load a sample of models and find best match
         try {
-            var modelsPage = metaModelService.searchModels(1, 100, null, null, null, null, null, true);
+            var modelsPage = metaModelService.searchModels(1, 100, null, null, null, null, null, null, null, null, true);
             if (modelsPage == null || modelsPage.getRecords() == null) return null;
 
             for (var m : modelsPage.getRecords()) {

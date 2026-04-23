@@ -1,1 +1,168 @@
-{"pageKey":"ehr_payroll_list","name:zh-CN":"薪资列表","name:en":"Payroll","pageType":"list","modelCode":"ehr_payroll","dslSchema":{"id":"list.ehr_payroll","kind":"List","areas":{"toolbar":{"blocks":[{"id":"ehr_pr_toolbar","blockType":"toolbar","buttons":[{"code":"create","action":"create","primary":true,"commandCode":"ehr:create_payroll","navigateTo":"ehr_payroll_form","permissionCode":"EHR.payroll.manage"}]}]},"list-tabs":{"blocks":[{"id":"ehr_pr_tabs","blockType":"tabs","tabs":[{"key":"all","label":{"en":"All","zh-CN":"全部"},"filter":null},{"key":"draft","label":{"en":"Draft","zh-CN":"草稿"},"filter":{"field":"ehr_pr_status","value":"draft","operator":"EQ"}},{"key":"calculated","label":{"en":"Calculated","zh-CN":"已计算"},"filter":{"field":"ehr_pr_status","value":"calculated","operator":"EQ"}},{"key":"approved","label":{"en":"Approved","zh-CN":"已审批"},"filter":{"field":"ehr_pr_status","value":"approved","operator":"EQ"}},{"key":"paid","label":{"en":"Paid","zh-CN":"已发放"},"filter":{"field":"ehr_pr_status","value":"paid","operator":"EQ"}}]}]},"main":{"blocks":[{"id":"ehr_pr_table","blockType":"table","columns":[{"field":"ehr_pr_code","width":140,"sortable":true},{"field":"ehr_pr_employee_id","width":150},{"field":"ehr_pr_period","width":100,"sortable":true},{"field":"ehr_pr_base_salary","width":120},{"field":"ehr_pr_allowances","width":100},{"field":"ehr_pr_deductions","width":100},{"field":"ehr_pr_net_pay","width":120},{"field":"ehr_pr_status","width":110,"renderType":"tag","dictCode":"ehr_payroll_status"},{"field":"actions","isActionColumn":true,"buttons":[{"code":"view","action":"detail","navigateTo":"ehr_payroll_detail"},{"code":"edit","action":"edit","navigateTo":"ehr_payroll_form","permissionCode":"EHR.payroll.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"ehr:delete_payroll","permissionCode":"EHR.payroll.manage","confirmMessageKey":"delete.confirm"}]}],"searchFields":["ehr_pr_code","ehr_pr_period"],"defaultSort":{"field":"ehr_pr_period","order":"desc"}}]}}}}
+{
+  "pageKey": "ehr_payroll_list",
+  "name:zh-CN": "薪资列表",
+  "name:en": "Payroll",
+  "modelCode": "ehr_payroll",
+  "kind": "list",
+  "title": {
+    "zh-CN": "薪资列表",
+    "en": "Payroll"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "ehr_pr_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "action": "create",
+          "primary": true,
+          "permissionCode": "ehr.payroll.manage"
+        }
+      ],
+      "area": "toolbar"
+    },
+    {
+      "id": "ehr_pr_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "draft",
+          "label": {
+            "en": "Draft",
+            "zh-CN": "草稿"
+          },
+          "filter": {
+            "field": "ehr_pr_status",
+            "value": "draft",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "calculated",
+          "label": {
+            "en": "Calculated",
+            "zh-CN": "已计算"
+          },
+          "filter": {
+            "field": "ehr_pr_status",
+            "value": "calculated",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "approved",
+          "label": {
+            "en": "Approved",
+            "zh-CN": "已审批"
+          },
+          "filter": {
+            "field": "ehr_pr_status",
+            "value": "approved",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "paid",
+          "label": {
+            "en": "Paid",
+            "zh-CN": "已发放"
+          },
+          "filter": {
+            "field": "ehr_pr_status",
+            "value": "paid",
+            "operator": "EQ"
+          }
+        }
+      ],
+      "area": "list-tabs"
+    },
+    {
+      "id": "ehr_pr_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "ehr_pr_code",
+          "width": 140,
+          "sortable": true
+        },
+        {
+          "field": "ehr_pr_employee_id",
+          "width": 150
+        },
+        {
+          "field": "ehr_pr_period",
+          "width": 100,
+          "sortable": true
+        },
+        {
+          "field": "ehr_pr_base_salary",
+          "width": 120
+        },
+        {
+          "field": "ehr_pr_allowances",
+          "width": 100
+        },
+        {
+          "field": "ehr_pr_deductions",
+          "width": 100
+        },
+        {
+          "field": "ehr_pr_net_pay",
+          "width": 120
+        },
+        {
+          "field": "ehr_pr_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "ehr_payroll_status"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "action": "detail",
+              "navigateTo": "ehr_payroll_detail"
+            },
+            {
+              "code": "edit",
+              "action": "edit",
+              "navigateTo": "ehr_payroll_form",
+              "permissionCode": "ehr.payroll.manage"
+            },
+            {
+              "code": "delete",
+              "action": "delete",
+              "danger": true,
+              "commandCode": "ehr:delete_payroll",
+              "permissionCode": "ehr.payroll.manage",
+              "confirmMessageKey": "delete.confirm"
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "ehr_pr_code",
+        "ehr_pr_period"
+      ],
+      "defaultSort": {
+        "field": "ehr_pr_period",
+        "order": "desc"
+      },
+      "area": "main"
+    }
+  ]
+}

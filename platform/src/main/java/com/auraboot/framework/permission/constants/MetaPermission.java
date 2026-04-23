@@ -504,7 +504,7 @@ public final class MetaPermission {
     /**
      * File upload permission
      */
-    public static final String SYS_FILE_UPLOAD = "system.file.upload";
+    public static final String SYS_FILE_UPLOAD = "sys.file.upload";
 
     /**
      * Scheduled task management permission

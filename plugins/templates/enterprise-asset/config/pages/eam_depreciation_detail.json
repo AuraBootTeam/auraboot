@@ -1,1 +1,95 @@
-{"pageKey":"eam_depreciation_detail","name:zh-CN":"折旧详情","name:en":"Depreciation Detail","pageType":"detail","modelCode":"eam_depreciation","dslSchema":{"id":"detail.eam_depreciation","kind":"Detail","version":"1.0.0","modelCode":"eam_depreciation","layout":{"areas":["header","main"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"eam_depreciation_form","permissionCode":"EAM.depreciation.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"eam:delete_depreciation","permissionCode":"EAM.depreciation.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"折旧信息","en-US":"Depreciation Information"},"fields":[{"field":"eam_dp_code","colSpan":6},{"field":"eam_dp_asset_id","colSpan":6},{"field":"eam_dp_period","colSpan":6},{"field":"eam_dp_method","colSpan":6},{"field":"eam_dp_amount","colSpan":4},{"field":"eam_dp_accumulated","colSpan":4},{"field":"eam_dp_book_value","colSpan":4},{"field":"eam_dp_notes","colSpan":12}]}]}}}}
+{
+  "pageKey": "eam_depreciation_detail",
+  "name:zh-CN": "折旧详情",
+  "name:en": "Depreciation Detail",
+  "modelCode": "eam_depreciation",
+  "kind": "detail",
+  "title": {
+    "zh-CN": "折旧详情",
+    "en": "Depreciation Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "eam.depreciation.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "eam:delete_depreciation",
+          "permissionCode": "eam.depreciation.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "折旧信息",
+        "en-US": "Depreciation Information"
+      },
+      "fields": [
+        {
+          "field": "eam_dp_code",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_dp_asset_id",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_dp_period",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_dp_method",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_dp_amount",
+          "colSpan": 4
+        },
+        {
+          "field": "eam_dp_accumulated",
+          "colSpan": 4
+        },
+        {
+          "field": "eam_dp_book_value",
+          "colSpan": 4
+        },
+        {
+          "field": "eam_dp_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    }
+  ]
+}

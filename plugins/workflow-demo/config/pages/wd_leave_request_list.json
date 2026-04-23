@@ -32,6 +32,7 @@
     {
       "id": "wd_leave_request_table",
       "blockType": "table",
+      "onRowClick": "navigate",
       "columns": [
         { "field": "wd_req_code", "width": 160, "sortable": true },
         { "field": "wd_req_applicant", "width": 140 },
