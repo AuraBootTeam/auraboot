@@ -355,14 +355,10 @@ public class InboxEventListener {
         card.put("toState", toState);
         card.put("actorName", actorName);
 
-        // Build human-readable title: "Approve Scorecard: draft → approved"
-        String humanCommand = humanize(event.getCommandCode());
-        String fromLabel = fromState != null ? humanize(fromState) : "?";
-        String toLabel = toState != null ? humanize(toState) : "?";
-        String title = humanCommand + ": " + fromLabel + " → " + toLabel;
+        String title = buildStateTransitionTitle(event.getCommandCode(), fromState, toState);
 
         // Build subtitle: "Model Name #recordId"
-        String modelLabel = humanize(event.getModelCode());
+        String modelLabel = humanizeModelCode(event.getModelCode());
         String subtitle = modelLabel + " #" + event.getRecordId();
 
         InboxItem item = new InboxItem();
@@ -454,6 +450,28 @@ public class InboxEventListener {
                 .filter(w -> !w.isEmpty())
                 .map(w -> Character.toUpperCase(w.charAt(0)) + w.substring(1).toLowerCase())
                 .collect(Collectors.joining(" "));
+    }
+
+    private String buildStateTransitionTitle(String commandCode, String fromState, String toState) {
+        String commandLabel = humanizeCommandCode(commandCode);
+        if (fromState != null && !fromState.isBlank() && toState != null && !toState.isBlank()) {
+            return commandLabel + ": " + humanize(fromState) + " → " + humanize(toState);
+        }
+        return commandLabel;
+    }
+
+    private String humanizeCommandCode(String commandCode) {
+        if (commandCode == null || commandCode.isBlank()) return "State Change";
+        int namespaceIdx = commandCode.lastIndexOf(':');
+        String raw = namespaceIdx >= 0 ? commandCode.substring(namespaceIdx + 1) : commandCode;
+        String humanized = humanize(raw);
+        return humanized.isBlank() ? "State Change" : humanized;
+    }
+
+    private String humanizeModelCode(String modelCode) {
+        if (modelCode == null || modelCode.isBlank()) return "Record";
+        String humanized = humanize(modelCode);
+        return humanized.isBlank() ? "Record" : humanized;
     }
 
     // ───────── Helpers ─────────
