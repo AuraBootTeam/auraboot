@@ -4,7 +4,7 @@ export const manifest: PluginManifest = {
   code: 'core.dashboard',
   name: 'Dashboard',
   version: '0.1.0',
-  description: 'Dashboard viewer + basic charts (line/bar/pie/area). The full Dashboard Designer ships in ent-dashboard-designer (enterprise).',
+  description: 'Dashboard viewer and designer with chart widgets, workbench layouts, and authoring tools.',
   kind: 'core',
   visibility: 'public',
   permissions: ['dashboard.view'],
