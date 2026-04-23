@@ -315,6 +315,7 @@ class PluginValidationPipelineTest {
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("pe_order_list");
         page.setKind("list");
+        page.setLayout(Map.of("type", "list"));
         page.setBlocks(List.of(Map.of("blockType", "table")));
         manifest.setPages(List.of(page));
 
@@ -336,7 +337,8 @@ class PluginValidationPipelineTest {
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("pe_order_form");
         // kind intentionally omitted
-        page.setBlocks(List.of());
+        page.setLayout(Map.of("type", "form"));
+        page.setBlocks(List.of(Map.of("blockType", "form-section")));
         manifest.setPages(List.of(page));
 
         PluginValidationContext ctx = PluginValidationContext.builder()
@@ -357,6 +359,7 @@ class PluginValidationPipelineTest {
         PageSchemaDTO page = new PageSchemaDTO();
         page.setPageKey("pe_order_list");
         page.setKind("list");
+        page.setLayout(Map.of("type", "list"));
         page.setBlocks(List.of(Map.of("blockType", "unknown-block")));
         manifest.setPages(List.of(page));
 
@@ -368,6 +371,115 @@ class PluginValidationPipelineTest {
 
         List<PluginValidationMessage> messages = validator.validate(ctx);
         assertTrue(messages.stream().anyMatch(m -> m.getCode().equals("S-PAGE-BLOCK-TYPE")));
+    }
+
+    @Test
+    void pageSchemaValidator_missingLayout_isError() {
+        PageSchemaValidator validator = new PageSchemaValidator();
+
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        PageSchemaDTO page = new PageSchemaDTO();
+        page.setPageKey("pe_order_detail");
+        page.setKind("detail");
+        page.setBlocks(List.of(Map.of("blockType", "tabs")));
+        manifest.setPages(List.of(page));
+
+        PluginValidationContext ctx = PluginValidationContext.builder()
+                .pluginId("com.test.plugin")
+                .namespace("pe")
+                .manifest(manifest)
+                .build();
+
+        List<PluginValidationMessage> messages = validator.validate(ctx);
+        PluginValidationMessage message = messages.stream()
+                .filter(m -> "S-PAGE-LAYOUT".equals(m.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(message.isError());
+        assertTrue(message.getMessage().contains("kind/layout/blocks"));
+    }
+
+    @Test
+    void pageSchemaValidator_emptyBlocks_isError() {
+        PageSchemaValidator validator = new PageSchemaValidator();
+
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        PageSchemaDTO page = new PageSchemaDTO();
+        page.setPageKey("pe_order_form");
+        page.setKind("form");
+        page.setLayout(Map.of("type", "form"));
+        page.setBlocks(List.of());
+        manifest.setPages(List.of(page));
+
+        PluginValidationContext ctx = PluginValidationContext.builder()
+                .pluginId("com.test.plugin")
+                .namespace("pe")
+                .manifest(manifest)
+                .build();
+
+        List<PluginValidationMessage> messages = validator.validate(ctx);
+        PluginValidationMessage message = messages.stream()
+                .filter(m -> "S-PAGE-BLOCKS".equals(m.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(message.isError());
+        assertTrue(message.getMessage().contains("V2 flat page format"));
+    }
+
+    @Test
+    void pageSchemaValidator_legacyDslSchema_isError() {
+        PageSchemaValidator validator = new PageSchemaValidator();
+
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        PageSchemaDTO page = new PageSchemaDTO();
+        page.setPageKey("pe_order_form");
+        page.setKind("form");
+        page.setLayout(Map.of("type", "form"));
+        page.setBlocks(List.of(Map.of("blockType", "form-section")));
+        page.setUnknownField("dslSchema", Map.of("kind", "form"));
+        manifest.setPages(List.of(page));
+
+        PluginValidationContext ctx = PluginValidationContext.builder()
+                .pluginId("com.test.plugin")
+                .namespace("pe")
+                .manifest(manifest)
+                .build();
+
+        List<PluginValidationMessage> messages = validator.validate(ctx);
+        PluginValidationMessage message = messages.stream()
+                .filter(m -> "S-PAGE-LEGACY-FORMAT".equals(m.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(message.isError());
+        assertTrue(message.getMessage().contains("deprecated top-level field 'dslSchema'"));
+    }
+
+    @Test
+    void pageSchemaValidator_pageType_isError() {
+        PageSchemaValidator validator = new PageSchemaValidator();
+
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        PageSchemaDTO page = new PageSchemaDTO();
+        page.setPageKey("pe_order_list");
+        page.setKind("list");
+        page.setLayout(Map.of("type", "list"));
+        page.setBlocks(List.of(Map.of("blockType", "table")));
+        page.setUnknownField("pageType", "LIST");
+        manifest.setPages(List.of(page));
+
+        PluginValidationContext ctx = PluginValidationContext.builder()
+                .pluginId("com.test.plugin")
+                .namespace("pe")
+                .manifest(manifest)
+                .build();
+
+        List<PluginValidationMessage> messages = validator.validate(ctx);
+        PluginValidationMessage message = messages.stream()
+                .filter(m -> "S-PAGE-LEGACY-FORMAT".equals(m.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(message.isError());
+        assertTrue(message.getMessage().contains("pageType"));
     }
 
     // ==================== PluginValidationResult ====================

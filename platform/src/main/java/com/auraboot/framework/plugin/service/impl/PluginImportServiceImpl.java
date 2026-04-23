@@ -1715,8 +1715,9 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         for (PageSchemaDTO page : manifest.getPages()) {
             if (!page.isValid()) {
-                log.warn("Skipping invalid page entry (missing pageKey): index={}", manifest.getPages().indexOf(page));
-                continue;
+                String pageKey = page != null && page.getPageKey() != null ? page.getPageKey() : "<unknown>";
+                throw new PluginException("Invalid page '" + pageKey + "': page JSON must use the latest V2 flat " +
+                        "format with top-level kind/layout/blocks, and layout/blocks cannot be empty.");
             }
             PluginResource resource = resourceImporter.importPage(page, pluginPid, importId, tenantId,
                     request.getConflictStrategy(), request.getAutoPublishPages());
