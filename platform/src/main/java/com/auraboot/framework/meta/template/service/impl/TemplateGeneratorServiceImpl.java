@@ -112,18 +112,22 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             generatedPages.add(buildGeneratedPage(detailPage, modelDTO.getCode(), "detail"));
         }
         
-        // 4. Create menus
-        List<GeneratedMenu> generatedMenus = createMenus(modelDTO, config);
-        
-        // 5. Create permissions
-        List<GeneratedPermission> generatedPermissions = createPermissions(modelDTO, config);
+        // 5. Create menus / permissions only when explicitly requested
+        List<GeneratedMenu> generatedMenus = config.isCreateMenu()
+                ? createMenus(modelDTO, config)
+                : new ArrayList<>();
 
-        // 6. Assign permissions to roles
-        if (config.getDefaultRoles() != null && !config.getDefaultRoles().isEmpty()) {
-            assignPermissionsToRoles(generatedPermissions, config.getDefaultRoles());
-        } else {
-            // Auto-assign to current user's roles if no default roles specified
-            autoAssignPermissionsToCurrentUserRoles(generatedPermissions);
+        List<GeneratedPermission> generatedPermissions = config.isCreatePermissions()
+                ? createPermissions(modelDTO, config)
+                : new ArrayList<>();
+
+        // 6. Assign permissions to roles only when explicitly requested
+        if (config.isAssignRoles() && !generatedPermissions.isEmpty()) {
+            if (config.getDefaultRoles() != null && !config.getDefaultRoles().isEmpty()) {
+                assignPermissionsToRoles(generatedPermissions, config.getDefaultRoles());
+            } else {
+                autoAssignPermissionsToCurrentUserRoles(generatedPermissions);
+            }
         }
         
         // 7. Build generation result
@@ -143,7 +147,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             throw new BusinessException(ResponseCode.CommonValidationFailed, "Configuration cannot be null");
         }
         
-        if (!StringUtils.hasText(config.getMenuName())) {
+        if (config.isCreateMenu() && !StringUtils.hasText(config.getMenuName())) {
             throw new BusinessException(ResponseCode.CommonValidationFailed, "Menu name cannot be empty");
         }
         

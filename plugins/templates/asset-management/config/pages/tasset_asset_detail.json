@@ -1,1 +1,170 @@
-{"pageKey":"tasset_asset_detail","name:zh-CN":"资产详情","name:en":"Asset Detail","pageType":"detail","kind":"detail","modelCode":"tasset_asset","dslSchema":{"id":"detail.tasset_asset","kind":"Detail","version":"1.0.0","modelCode":"tasset_asset","layout":{"areas":["header","main","sub-tables"],"areasConfig":{"header":{"type":"flex","direction":"row"},"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16},"sub-tables":{"type":"stack"}}},"areas":{"header":{"blocks":[{"id":"action_bar","blockType":"toolbar","buttons":[{"code":"edit","action":"edit","navigateTo":"tasset_asset_form","permissionCode":"TASSET.asset.manage"},{"code":"assign_asset","commandCode":"tasset:assign_asset","permissionCode":"TASSET.asset.manage"},{"code":"return_asset","commandCode":"tasset:return_asset","permissionCode":"TASSET.asset.manage"},{"code":"send_maintenance","commandCode":"tasset:send_maintenance","permissionCode":"TASSET.asset.manage"},{"code":"finish_maintenance","commandCode":"tasset:finish_maintenance","permissionCode":"TASSET.asset.manage"},{"code":"retire_asset","commandCode":"tasset:retire_asset","permissionCode":"TASSET.asset.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"tasset:delete_asset","permissionCode":"TASSET.asset.manage","confirmMessageKey":"delete.confirm"}]}]},"main":{"blocks":[{"id":"info","blockType":"form-section","readOnly":true,"title":{"zh-CN":"资产信息","en-US":"Asset Information"},"fields":[{"field":"tasset_as_code","colSpan":6},{"field":"tasset_as_name","colSpan":6},{"field":"tasset_as_category","colSpan":6},{"field":"tasset_as_status","colSpan":6},{"field":"tasset_as_serial","colSpan":6},{"field":"tasset_as_location","colSpan":6},{"field":"tasset_as_assigned_to","colSpan":6},{"field":"tasset_as_purchase_date","colSpan":3},{"field":"tasset_as_purchase_cost","colSpan":3},{"field":"tasset_as_notes","colSpan":12}]}]},"sub-tables":{"blocks":[{"id":"maintenance","blockType":"sub-table","title":{"zh-CN":"维护记录","en-US":"Maintenance Records"},"modelCode":"tasset_maintenance","foreignKey":"tasset_mn_asset_id","columns":[{"field":"tasset_mn_code","width":140},{"field":"tasset_mn_type","width":100,"renderType":"tag","dictCode":"tasset_maint_type"},{"field":"tasset_mn_status","width":110,"renderType":"tag","dictCode":"tasset_maint_status"},{"field":"tasset_mn_scheduled_date","width":120},{"field":"tasset_mn_cost","width":100}],"createCommandCode":"tasset:create_maintenance"}]}}}}
+{
+  "pageKey": "tasset_asset_detail",
+  "name:zh-CN": "资产详情",
+  "name:en": "Asset Detail",
+  "kind": "detail",
+  "modelCode": "tasset_asset",
+  "title": {
+    "zh-CN": "资产详情",
+    "en": "Asset Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main",
+      "sub-tables"
+    ],
+    "areasConfig": {
+      "header": {
+        "type": "flex",
+        "direction": "row"
+      },
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "sub-tables": {
+        "type": "stack"
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "tasset.asset.manage"
+        },
+        {
+          "code": "assign_asset",
+          "commandCode": "tasset:assign_asset",
+          "permissionCode": "tasset.asset.manage"
+        },
+        {
+          "code": "return_asset",
+          "commandCode": "tasset:return_asset",
+          "permissionCode": "tasset.asset.manage"
+        },
+        {
+          "code": "send_maintenance",
+          "commandCode": "tasset:send_maintenance",
+          "permissionCode": "tasset.asset.manage"
+        },
+        {
+          "code": "finish_maintenance",
+          "commandCode": "tasset:finish_maintenance",
+          "permissionCode": "tasset.asset.manage"
+        },
+        {
+          "code": "retire_asset",
+          "commandCode": "tasset:retire_asset",
+          "permissionCode": "tasset.asset.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "tasset:delete_asset",
+          "permissionCode": "tasset.asset.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "资产信息",
+        "en-US": "Asset Information"
+      },
+      "fields": [
+        {
+          "field": "tasset_as_code",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_as_name",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_as_category",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_as_status",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_as_serial",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_as_location",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_as_assigned_to",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_as_purchase_date",
+          "colSpan": 3
+        },
+        {
+          "field": "tasset_as_purchase_cost",
+          "colSpan": 3
+        },
+        {
+          "field": "tasset_as_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "maintenance",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "维护记录",
+        "en-US": "Maintenance Records"
+      },
+      "modelCode": "tasset_maintenance",
+      "foreignKey": "tasset_mn_asset_id",
+      "columns": [
+        {
+          "field": "tasset_mn_code",
+          "width": 140
+        },
+        {
+          "field": "tasset_mn_type",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "tasset_maint_type"
+        },
+        {
+          "field": "tasset_mn_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "tasset_maint_status"
+        },
+        {
+          "field": "tasset_mn_scheduled_date",
+          "width": 120
+        },
+        {
+          "field": "tasset_mn_cost",
+          "width": 100
+        }
+      ],
+      "createCommandCode": "tasset:create_maintenance",
+      "area": "sub-tables"
+    }
+  ]
+}

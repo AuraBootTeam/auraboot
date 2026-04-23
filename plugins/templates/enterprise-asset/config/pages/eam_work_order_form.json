@@ -1,1 +1,87 @@
-{"pageKey":"eam_work_order_form","name:zh-CN":"工单表单","name:en":"Work Order Form","pageType":"form","modelCode":"eam_work_order","dslSchema":{"id":"form.eam_work_order","kind":"Form","version":"1.0.0","modelCode":"eam_work_order","layout":{"areas":["main","footer"],"areasConfig":{"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16},"footer":{"type":"flex","direction":"row"}}},"areas":{"main":{"blocks":[{"id":"basic","blockType":"form-section","title":{"zh-CN":"工单信息","en-US":"Work Order Information"},"fields":[{"field":"eam_wo_asset_id","colSpan":6},{"field":"eam_wo_type","colSpan":6},{"field":"eam_wo_priority","colSpan":6},{"field":"eam_wo_assigned_to","colSpan":6},{"field":"eam_wo_scheduled_date","colSpan":6},{"field":"eam_wo_cost","colSpan":6},{"field":"eam_wo_description","colSpan":12}]}]},"footer":{"blocks":[{"id":"buttons","blockType":"form-buttons","buttons":[{"code":"submit","action":"save","commandCode":"eam:update_wo","primary":true},{"code":"cancel","action":"cancel"}]}]}}}}
+{
+  "pageKey": "eam_work_order_form",
+  "name:zh-CN": "工单表单",
+  "name:en": "Work Order Form",
+  "modelCode": "eam_work_order",
+  "kind": "form",
+  "title": {
+    "zh-CN": "工单表单",
+    "en": "Work Order Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "footer": {
+        "type": "flex",
+        "direction": "row"
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "工单信息",
+        "en-US": "Work Order Information"
+      },
+      "fields": [
+        {
+          "field": "eam_wo_asset_id",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_wo_type",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_wo_priority",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_wo_assigned_to",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_wo_scheduled_date",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_wo_cost",
+          "colSpan": 6
+        },
+        {
+          "field": "eam_wo_description",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "eam:create_wo",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
+}

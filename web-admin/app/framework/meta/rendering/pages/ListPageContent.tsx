@@ -182,6 +182,7 @@ export function ListPageContent(props: PageContentProps) {
   // Search keyword for toolbar search input
   const [keyword, _setKeyword] = useState(urlKeyword);
   const keywordRef = useRef(keyword);
+  const tabRequestSeqRef = useRef(0);
 
   // Debounced URL sync for keyword (300ms) — keeps input responsive while
   // reducing URL/history updates during rapid typing
@@ -556,6 +557,25 @@ export function ListPageContent(props: PageContentProps) {
     return { fieldName: fieldName || field, operator: operator || 'EQ', value };
   }, [schema, activeTab]);
 
+  const displayData = useMemo(() => {
+    const tabCondition = getTabFilter();
+    if (!tabCondition) return data;
+    const operator = String(tabCondition.operator || 'EQ').toUpperCase();
+    const expected = String(tabCondition.value ?? '');
+    return data.filter((record) => {
+      const actual = String((record as Record<string, any>)[tabCondition.fieldName] ?? '');
+      switch (operator) {
+        case 'EQ':
+          return actual === expected;
+        case 'NE':
+        case 'NEQ':
+          return actual !== expected;
+        default:
+          return true;
+      }
+    });
+  }, [data, getTabFilter]);
+
   // Build filters JSON array from tab filter + user filters
   const buildFiltersParam = useCallback(
     (
@@ -867,6 +887,7 @@ export function ListPageContent(props: PageContentProps) {
   const handleTabChange = useCallback(
     (tabKey: string) => {
       setActiveTab(tabKey);
+      const requestSeq = ++tabRequestSeqRef.current;
       // Compute tab filter directly (don't rely on getTabFilter since activeTab is stale in closure)
       let tabCondition: { fieldName: string; operator: string; value: string } | null = null;
       if (schema?.blocks) {
@@ -945,6 +966,7 @@ export function ListPageContent(props: PageContentProps) {
             params: queryParams,
             token: token || undefined,
           });
+          if (requestSeq !== tabRequestSeqRef.current) return;
           if (ResultHelper.isSuccess(result) && result.data) {
             const responseData = result.data;
             if (Array.isArray(responseData)) {
@@ -977,11 +999,14 @@ export function ListPageContent(props: PageContentProps) {
             setError(result.desc || t('common.loadDataError') || 'Failed to load data');
           }
         } catch (err) {
+          if (requestSeq !== tabRequestSeqRef.current) return;
           setError(
             err instanceof Error ? err.message : t('common.loadDataError') || 'Failed to load data',
           );
         } finally {
-          setLoading(false);
+          if (requestSeq === tabRequestSeqRef.current) {
+            setLoading(false);
+          }
         }
       })();
     },
@@ -1495,33 +1520,21 @@ export function ListPageContent(props: PageContentProps) {
   const SYSTEM_FIELD_DEFS: ColumnConfig[] = [
     {
       field: 'created_at',
-      label:
-        t('common.field.created_at') !== 'common.field.created_at'
-          ? t('common.field.created_at')
-          : 'Created At',
+      label: t('common.created_at', undefined, 'Created At'),
       valueType: 'datetime' as any,
     },
     {
       field: 'updated_at',
-      label:
-        t('common.field.updated_at') !== 'common.field.updated_at'
-          ? t('common.field.updated_at')
-          : 'Updated At',
+      label: t('common.updated_at', undefined, 'Updated At'),
       valueType: 'datetime' as any,
     },
     {
       field: 'created_by',
-      label:
-        t('common.field.created_by') !== 'common.field.created_by'
-          ? t('common.field.created_by')
-          : 'Created By',
+      label: t('common.creator', undefined, 'Created By'),
     },
     {
       field: 'updated_by',
-      label:
-        t('common.field.updated_by') !== 'common.field.updated_by'
-          ? t('common.field.updated_by')
-          : 'Updated By',
+      label: t('common.modifier', undefined, 'Updated By'),
     },
   ];
 
@@ -2697,7 +2710,7 @@ export function ListPageContent(props: PageContentProps) {
               {/* Table area — extracted to ListTable with DnD column reorder */}
               <ListTable
                 columns={tableColumns}
-                data={data}
+                data={displayData}
                 loading={loading}
                 activeSorts={activeSorts}
                 selectedIds={selectedIds}

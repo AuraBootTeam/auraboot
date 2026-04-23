@@ -27,7 +27,7 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
   currentName,
   onSuccess,
 }) => {
-  const [name, setName] = useState(`${currentName} Template`);
+  const [name, setName] = useState(`${currentName} 模板`);
   const [category, setCategory] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError('Template name is required');
+      setError('模板名称不能为空');
       return;
     }
     setSaving(true);
@@ -48,12 +48,12 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
         templateCategory: category.trim() || undefined,
       });
       if (result.code !== '0') {
-        throw new Error(result.message || 'Failed to save template');
+        throw new Error(result.message || '保存模板失败');
       }
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save template');
+      setError(err instanceof Error ? err.message : '保存模板失败');
     } finally {
       setSaving(false);
     }
@@ -69,12 +69,12 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
         onClick={(e) => e.stopPropagation()}
         data-testid="save-as-template-dialog"
       >
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Save as Template</h2>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">另存为模板</h2>
 
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Template Name *
+              模板名称 *
             </label>
             <input
               type="text"
@@ -87,12 +87,12 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Category</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">分类</label>
             <input
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g. CRM, HR, Finance"
+              placeholder="例如 CRM、HR、财务"
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
               data-testid="template-category-input"
             />
@@ -114,7 +114,7 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
             className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             disabled={saving}
           >
-            Cancel
+            取消
           </button>
           <button
             onClick={handleSave}
@@ -122,7 +122,7 @@ export const SaveAsTemplateDialog: React.FC<SaveAsTemplateDialogProps> = ({
             className="rounded-md bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700 disabled:opacity-50"
             data-testid="template-save-btn"
           >
-            {saving ? 'Saving...' : 'Save as Template'}
+            {saving ? '保存中...' : '保存为模板'}
           </button>
         </div>
       </div>

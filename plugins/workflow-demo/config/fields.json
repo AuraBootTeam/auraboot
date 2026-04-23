@@ -44,6 +44,18 @@
     "feature": { "sortable": true }
   },
   {
+    "code": "wd_req_start_slot",
+    "displayName:zh-CN": "开始时段",
+    "displayName:en": "Start Session",
+    "dataType": "enum",
+    "dictCode": "wd_leave_day_slot",
+    "constraints": { "required": true },
+    "extension": {
+      "placeholder:zh-CN": "请选择开始时段",
+      "placeholder:en": "Select start session"
+    }
+  },
+  {
     "code": "wd_req_end_date",
     "displayName:zh-CN": "结束日期",
     "displayName:en": "End Date",
@@ -52,13 +64,38 @@
     "feature": { "sortable": true }
   },
   {
+    "code": "wd_req_end_slot",
+    "displayName:zh-CN": "结束时段",
+    "displayName:en": "End Session",
+    "dataType": "enum",
+    "dictCode": "wd_leave_day_slot",
+    "constraints": { "required": true },
+    "extension": {
+      "placeholder:zh-CN": "请选择结束时段",
+      "placeholder:en": "Select end session"
+    }
+  },
+  {
     "code": "wd_req_days",
     "displayName:zh-CN": "天数",
     "displayName:en": "Days",
     "dataType": "decimal",
     "description": "Number of leave days (supports half-day increments).",
-    "constraints": { "required": true, "precision": 6, "scale": 1 },
-    "feature": { "sortable": true }
+    "constraints": { "required": false, "precision": 6, "scale": 1 },
+    "feature": { "sortable": true },
+    "extension": {
+      "computed": true,
+      "readOnly": true,
+      "placeholder:zh-CN": "自动计算",
+      "placeholder:en": "Auto calculated",
+      "computeDependencies": [
+        "wd_req_start_date",
+        "wd_req_start_slot",
+        "wd_req_end_date",
+        "wd_req_end_slot"
+      ],
+      "formula": "${!wd_req_start_date || !wd_req_end_date || !wd_req_start_slot || !wd_req_end_slot ? '' : (() => { const start = new Date(wd_req_start_date + 'T00:00:00'); const end = new Date(wd_req_end_date + 'T00:00:00'); const diffDays = Math.round((end.getTime() - start.getTime()) / 86400000); if (Number.isNaN(diffDays) || diffDays < 0) return ''; if (diffDays === 0 && wd_req_start_slot === 'PM' && wd_req_end_slot === 'AM') return ''; const startDeduction = wd_req_start_slot === 'PM' ? 0.5 : 0; const endDeduction = wd_req_end_slot === 'AM' ? 0.5 : 0; const value = diffDays + 1 - startDeduction - endDeduction; return value > 0 ? Number(value.toFixed(1)) : ''; })()}"
+    }
   },
   {
     "code": "wd_req_reason",
@@ -92,6 +129,7 @@
     "extension": {
       "refModelCode": "sys_user",
       "refDisplayField": "username",
+      "renderComponent": "memberpicker",
       "multiple": true
     }
   },

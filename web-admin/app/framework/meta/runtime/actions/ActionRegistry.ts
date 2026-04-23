@@ -231,7 +231,7 @@ actionRegistry.register('edit', ({ navigate, tableName, record }) => {
     console.error('[ActionRegistry] edit: missing record');
     return;
   }
-  const id = record.id || record.pid;
+  const id = record.pid || record.id;
   navigate(`/p/${tableName}/edit/${id}`);
 });
 
@@ -247,7 +247,7 @@ actionRegistry.register('view', ({ navigate, tableName, record }) => {
     console.error('[ActionRegistry] view: missing record');
     return;
   }
-  const id = record.id || record.pid;
+  const id = record.pid || record.id;
   navigate(`/p/${tableName}/view/${id}`);
 });
 
@@ -293,7 +293,7 @@ actionRegistry.register(
     }
 
     try {
-      const id = record.id || record.pid;
+      const id = record.pid || record.id;
       if (!id) {
         console.error('[ActionRegistry] delete: missing record id/pid');
         return;

@@ -1,12 +1,283 @@
 [
-  {"code":"eam:create_asset","displayName:zh-CN":"新建资产","displayName:en":"Create Asset","type":"create","modelCode":"eam_asset","inputFields":["eam_as_name","eam_as_category_id","eam_as_serial","eam_as_model","eam_as_manufacturer","eam_as_purchase_date","eam_as_purchase_cost","eam_as_useful_life","eam_as_salvage_value","eam_as_location","eam_as_assigned_to","eam_as_warranty_expiry","eam_as_notes"],"autoSetFields":{"eam_as_code":{"strategy":"auto_generate","pattern":"EAM-{yyyyMMdd}-{seq}"},"eam_as_status":{"strategy":"fixed_value","value":"procured"}},"permissions":["EAM.asset.manage"],"agent_hint":"Create a new asset. Required: name, category.","cmd_risk_level":"L1","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns the created asset with status PROCURED.","example_input":{"eam_as_name":"Dell OptiPlex 7090","eam_as_serial":"SN-2026-001"},"idempotent":false,"reversible":true},
-  {"code":"eam:update_asset","displayName:zh-CN":"编辑资产","displayName:en":"Update Asset","type":"update","modelCode":"eam_asset","inputFields":["eam_as_name","eam_as_category_id","eam_as_serial","eam_as_model","eam_as_manufacturer","eam_as_purchase_date","eam_as_purchase_cost","eam_as_useful_life","eam_as_salvage_value","eam_as_location","eam_as_assigned_to","eam_as_warranty_expiry","eam_as_notes"],"permissions":["EAM.asset.manage"],"agent_hint":"Update asset details.","cmd_risk_level":"L1","precondition_description":"Asset must exist.","side_effect_description":null,"output_description":"Returns the updated asset.","example_input":{"eam_as_location":"Building A, Room 305"},"idempotent":true,"reversible":true},
-  {"code":"eam:deploy_asset","displayName:zh-CN":"投入使用","displayName:en":"Deploy Asset","type":"state_transition","modelCode":"eam_asset","stateField":"eam_as_status","fromStates":["procured"],"toState":"in_use","inputFields":["eam_as_assigned_to","eam_as_location"],"permissions":["EAM.asset.manage"],"agent_hint":"Deploy asset into active use.","cmd_risk_level":"L1","precondition_description":"Asset must be PROCURED.","side_effect_description":null,"output_description":"Returns asset with status IN_USE.","example_input":{"eam_as_assigned_to":"Engineering Dept"},"idempotent":false,"reversible":false},
-  {"code":"eam:send_maintenance","displayName:zh-CN":"送修","displayName:en":"Send for Maintenance","type":"state_transition","modelCode":"eam_asset","stateField":"eam_as_status","fromStates":["in_use"],"toState":"maintenance","permissions":["EAM.asset.manage"],"agent_hint":"Send asset for maintenance.","cmd_risk_level":"L2","precondition_description":"Asset must be IN_USE.","side_effect_description":null,"output_description":"Returns asset with status MAINTENANCE.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:return_from_maintenance","displayName:zh-CN":"维护完成","displayName:en":"Return from Maintenance","type":"state_transition","modelCode":"eam_asset","stateField":"eam_as_status","fromStates":["maintenance"],"toState":"in_use","permissions":["EAM.asset.manage"],"agent_hint":"Return asset from maintenance to active use.","cmd_risk_level":"L1","precondition_description":"Asset must be in MAINTENANCE.","side_effect_description":null,"output_description":"Returns asset with status IN_USE.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:retire_asset","displayName:zh-CN":"退役","displayName:en":"Retire Asset","type":"state_transition","modelCode":"eam_asset","stateField":"eam_as_status","fromStates":["in_use","maintenance"],"toState":"retired","extension":{"confirmMessage:zh-CN":"确认退役此资产？","confirmMessage:en":"Confirm retire this asset?"},"permissions":["EAM.asset.manage"],"agent_hint":"Retire asset from active service.","cmd_risk_level":"L2","precondition_description":"Asset must be IN_USE or MAINTENANCE.","side_effect_description":null,"output_description":"Returns asset with status RETIRED.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:dispose_asset","displayName:zh-CN":"处置","displayName:en":"Dispose Asset","type":"state_transition","modelCode":"eam_asset","stateField":"eam_as_status","fromStates":["retired"],"toState":"disposed","extension":{"confirmMessage:zh-CN":"确认处置此资产？此操作不可撤销。","confirmMessage:en":"Confirm dispose this asset? This is irreversible."},"permissions":["EAM.asset.manage"],"agent_hint":"Dispose of retired asset. Terminal state.","cmd_risk_level":"L3","precondition_description":"Asset must be RETIRED.","side_effect_description":null,"output_description":"Returns asset with terminal status DISPOSED.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:delete_asset","displayName:zh-CN":"删除资产","displayName:en":"Delete Asset","type":"delete","modelCode":"eam_asset","preconditions":[{"field":"eam_as_status","operator":"IN","value":["procured"]}],"extension":{"confirmMessage:zh-CN":"确认删除此资产？","confirmMessage:en":"Confirm delete?"},"permissions":["EAM.asset.manage"],"agent_hint":"Delete asset. Only PROCURED assets.","cmd_risk_level":"L4","precondition_description":"Asset must be PROCURED.","side_effect_description":null,"output_description":"Asset is permanently removed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"eam:detail_asset","displayName:zh-CN":"查看资产","displayName:en":"View Asset","type":"query","modelCode":"eam_asset","permissions":["EAM.asset.read"],"agent_hint":"Retrieve asset by ID.","cmd_risk_level":"L0","precondition_description":"Asset must exist.","side_effect_description":null,"output_description":"Returns the full asset record.","example_input":{},"idempotent":true,"reversible":true},
-  {"code":"eam:list_assets","displayName:zh-CN":"资产列表","displayName:en":"List Assets","type":"query","modelCode":"eam_asset","permissions":["EAM.asset.read"],"agent_hint":"Query assets with pagination.","cmd_risk_level":"L0","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns a paginated list of assets.","example_input":{"pageNum":1,"pageSize":20},"idempotent":true,"reversible":true}
+  {
+    "code": "eam:create_asset",
+    "displayName:zh-CN": "新建资产",
+    "displayName:en": "Create Asset",
+    "type": "create",
+    "modelCode": "eam_asset",
+    "inputFields": [
+      "eam_as_name",
+      "eam_as_category_id",
+      "eam_as_serial",
+      "eam_as_model",
+      "eam_as_manufacturer",
+      "eam_as_purchase_date",
+      "eam_as_purchase_cost",
+      "eam_as_useful_life",
+      "eam_as_salvage_value",
+      "eam_as_location",
+      "eam_as_assigned_to",
+      "eam_as_warranty_expiry",
+      "eam_as_notes"
+    ],
+    "autoSetFields": {
+      "eam_as_code": {
+        "strategy": "auto_generate",
+        "pattern": "EAM-{yyyyMMdd}-{seq}"
+      },
+      "eam_as_status": {
+        "strategy": "fixed_value",
+        "value": "procured"
+      }
+    },
+    "permissions": [
+      "eam.asset.manage"
+    ],
+    "agent_hint": "Create a new asset. Required: name, category.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns the created asset with status PROCURED.",
+    "example_input": {
+      "eam_as_name": "Dell OptiPlex 7090",
+      "eam_as_serial": "SN-2026-001"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "eam:update_asset",
+    "displayName:zh-CN": "编辑资产",
+    "displayName:en": "Update Asset",
+    "type": "update",
+    "modelCode": "eam_asset",
+    "inputFields": [
+      "eam_as_name",
+      "eam_as_category_id",
+      "eam_as_serial",
+      "eam_as_model",
+      "eam_as_manufacturer",
+      "eam_as_purchase_date",
+      "eam_as_purchase_cost",
+      "eam_as_useful_life",
+      "eam_as_salvage_value",
+      "eam_as_location",
+      "eam_as_assigned_to",
+      "eam_as_warranty_expiry",
+      "eam_as_notes"
+    ],
+    "permissions": [
+      "eam.asset.manage"
+    ],
+    "agent_hint": "Update asset details.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Asset must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated asset.",
+    "example_input": {
+      "eam_as_location": "Building A, Room 305"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "eam:deploy_asset",
+    "displayName:zh-CN": "投入使用",
+    "displayName:en": "Deploy Asset",
+    "type": "state_transition",
+    "modelCode": "eam_asset",
+    "stateField": "eam_as_status",
+    "fromStates": [
+      "procured"
+    ],
+    "toState": "in_use",
+    "inputFields": [
+      "eam_as_assigned_to",
+      "eam_as_location"
+    ],
+    "permissions": [
+      "eam.asset.manage"
+    ],
+    "agent_hint": "Deploy asset into active use.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Asset must be PROCURED.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with status IN_USE.",
+    "example_input": {
+      "eam_as_assigned_to": "Engineering Dept"
+    },
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:send_maintenance",
+    "displayName:zh-CN": "送修",
+    "displayName:en": "Send for Maintenance",
+    "type": "state_transition",
+    "modelCode": "eam_asset",
+    "stateField": "eam_as_status",
+    "fromStates": [
+      "in_use"
+    ],
+    "toState": "maintenance",
+    "permissions": [
+      "eam.asset.manage"
+    ],
+    "agent_hint": "Send asset for maintenance.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Asset must be IN_USE.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with status MAINTENANCE.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:return_from_maintenance",
+    "displayName:zh-CN": "维护完成",
+    "displayName:en": "Return from Maintenance",
+    "type": "state_transition",
+    "modelCode": "eam_asset",
+    "stateField": "eam_as_status",
+    "fromStates": [
+      "maintenance"
+    ],
+    "toState": "in_use",
+    "permissions": [
+      "eam.asset.manage"
+    ],
+    "agent_hint": "Return asset from maintenance to active use.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Asset must be in MAINTENANCE.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with status IN_USE.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:retire_asset",
+    "displayName:zh-CN": "退役",
+    "displayName:en": "Retire Asset",
+    "type": "state_transition",
+    "modelCode": "eam_asset",
+    "stateField": "eam_as_status",
+    "fromStates": [
+      "in_use",
+      "maintenance"
+    ],
+    "toState": "retired",
+    "extension": {
+      "confirmMessage:zh-CN": "确认退役此资产？",
+      "confirmMessage:en": "Confirm retire this asset?"
+    },
+    "permissions": [
+      "eam.asset.manage"
+    ],
+    "agent_hint": "Retire asset from active service.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Asset must be IN_USE or MAINTENANCE.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with status RETIRED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:dispose_asset",
+    "displayName:zh-CN": "处置",
+    "displayName:en": "Dispose Asset",
+    "type": "state_transition",
+    "modelCode": "eam_asset",
+    "stateField": "eam_as_status",
+    "fromStates": [
+      "retired"
+    ],
+    "toState": "disposed",
+    "extension": {
+      "confirmMessage:zh-CN": "确认处置此资产？此操作不可撤销。",
+      "confirmMessage:en": "Confirm dispose this asset? This is irreversible."
+    },
+    "permissions": [
+      "eam.asset.manage"
+    ],
+    "agent_hint": "Dispose of retired asset. Terminal state.",
+    "cmd_risk_level": "L3",
+    "precondition_description": "Asset must be RETIRED.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with terminal status DISPOSED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:delete_asset",
+    "displayName:zh-CN": "删除资产",
+    "displayName:en": "Delete Asset",
+    "type": "delete",
+    "modelCode": "eam_asset",
+    "preconditions": [
+      {
+        "field": "eam_as_status",
+        "operator": "IN",
+        "value": [
+          "procured"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此资产？",
+      "confirmMessage:en": "Confirm delete?"
+    },
+    "permissions": [
+      "eam.asset.manage"
+    ],
+    "agent_hint": "Delete asset. Only PROCURED assets.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Asset must be PROCURED.",
+    "side_effect_description": null,
+    "output_description": "Asset is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "eam:detail_asset",
+    "displayName:zh-CN": "查看资产",
+    "displayName:en": "View Asset",
+    "type": "query",
+    "modelCode": "eam_asset",
+    "permissions": [
+      "eam.asset.read"
+    ],
+    "agent_hint": "Retrieve asset by ID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Asset must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full asset record.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "eam:list_assets",
+    "displayName:zh-CN": "资产列表",
+    "displayName:en": "List Assets",
+    "type": "query",
+    "modelCode": "eam_asset",
+    "permissions": [
+      "eam.asset.read"
+    ],
+    "agent_hint": "Query assets with pagination.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of assets.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
+    "idempotent": true,
+    "reversible": true
+  }
 ]

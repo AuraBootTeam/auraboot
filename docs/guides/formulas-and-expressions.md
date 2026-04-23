@@ -30,6 +30,27 @@ Formula fields are **virtual fields** that derive their value from other fields.
 | `MATERIALIZED` | Yes | On write (insert/update) | Searchable computed values, indexes |
 | `TRANSIENT` | No | In-page only | Form interaction logic, temporary variables |
 
+### Choose the right computation layer
+
+AuraBoot supports **two different computation layers** and they solve different problems:
+
+| Layer | Where it runs | Expression style | Best for | Should persist? |
+|------|---------------|------------------|----------|-----------------|
+| Form runtime computed field | `web-admin` form page | JavaScript-like expression in `extension.formula` | Instant UI feedback, derived read-only form values, interactive summaries | Optional |
+| Command computed field | backend command pipeline | SpEL in `computedFields` | Write-time normalization, stored values, post-write derived fields | Yes |
+
+Use the **form runtime** when the user needs to see a value update immediately while editing.
+Use the **command pipeline** when the backend must own the final stored value regardless of UI.
+
+For business fields that drive workflow routing, reporting, filtering, or notifications, the recommended pattern is:
+
+1. Keep the user-facing inputs editable.
+2. Keep the business result field read-only.
+3. Compute it in the form for immediate feedback.
+4. Materialize or submit the computed result so backend workflow logic can rely on it.
+
+This pattern avoids making users enter redundant values while still preserving a searchable and routable field.
+
 ---
 
 ## 2. Expression Syntax (SpEL)
@@ -91,7 +112,116 @@ AuraBoot uses **Spring Expression Language (SpEL)** for all formula expressions.
 
 ---
 
-## 3. Creating a Computed Field
+## 3. Form Runtime Computed Fields
+
+For DSL-driven forms, you can declare a computed field directly on the field definition using `extension.computed`, `extension.formula`, and `extension.computeDependencies`.
+
+This is the preferred approach when:
+
+- the field is derived from other form inputs
+- the user should see the result immediately
+- the field should be read-only in the form
+
+### Example: leave duration computed from dates and half-day slots
+
+```json
+{
+  "code": "wd_req_days",
+  "displayName:en": "Days",
+  "displayName:zh-CN": "Days",
+  "dataType": "decimal",
+  "constraints": { "required": true, "precision": 6, "scale": 1 },
+  "extension": {
+    "computed": true,
+    "readOnly": true,
+    "placeholder:en": "Auto calculated",
+    "computeDependencies": [
+      "wd_req_start_date",
+      "wd_req_start_slot",
+      "wd_req_end_date",
+      "wd_req_end_slot"
+    ],
+    "formula": "${!wd_req_start_date || !wd_req_end_date || !wd_req_start_slot || !wd_req_end_slot ? '' : (() => { const start = new Date(wd_req_start_date + 'T00:00:00'); const end = new Date(wd_req_end_date + 'T00:00:00'); const diffDays = Math.round((end.getTime() - start.getTime()) / 86400000); if (Number.isNaN(diffDays) || diffDays < 0) return ''; if (diffDays === 0 && wd_req_start_slot === 'PM' && wd_req_end_slot === 'AM') return ''; const startDeduction = wd_req_start_slot === 'PM' ? 0.5 : 0; const endDeduction = wd_req_end_slot === 'AM' ? 0.5 : 0; const value = diffDays + 1 - startDeduction - endDeduction; return value > 0 ? Number(value.toFixed(1)) : ''; })()}"
+  }
+}
+```
+
+### Runtime properties
+
+| Property | Description |
+|----------|-------------|
+| `extension.computed` | Enables runtime computed behavior on form pages |
+| `extension.formula` | JavaScript-like expression evaluated in the browser |
+| `extension.computeDependencies` | Fields that trigger recomputation |
+| `extension.readOnly` | Makes the target field non-editable |
+| `extension.computeFallbackValue` | Optional fallback value when evaluation fails |
+
+### Runtime expression scope
+
+The form runtime evaluates `extension.formula` against current form values. Common globals available in expressions include:
+
+- `Math`
+- `Number`
+- `String`
+- `Boolean`
+- `parseInt`
+- `parseFloat`
+- `isNaN`
+- `Date`
+
+Unlike backend SpEL formulas, form runtime formulas are evaluated in the browser and are intended for **interactive UI behavior**, not backend trust boundaries.
+
+### Recommended UX pattern
+
+When a value is computed from other inputs, do **not** ask the user to type it manually.
+
+Use this structure instead:
+
+- editable input fields: start date, end date, start session, end session
+- read-only computed field: days
+- optional helper text or placeholder: "Auto calculated"
+
+This keeps the form intuitive and removes redundant input.
+
+### Validation UX convention for computed forms
+
+For forms that combine editable source fields with computed business fields, use a **two-layer validation UX**:
+
+1. **Field-level errors** for simple, actionable input problems
+2. **Page-level summary errors** for cross-field or server-side business rules
+
+Recommended split:
+
+| Error type | Where to show it | Example |
+|-----------|------------------|---------|
+| Required / format / length / single-field range | Directly under the field | `请选择申请人` |
+| Cross-field rule | Top summary, and optionally highlight the target field | `结束日期不能早于开始日期` |
+| Backend business validation | Top summary | `剩余年假不足，无法提交该申请` |
+
+Use this convention:
+
+- Do **not** show only the first required-field error in a top banner
+- Do **show** required-field messages inline near each field
+- Do **keep** complex business rules in a page-level summary area
+- Do **not** model computed persisted fields as low-level schema-required when the value is derived from other inputs
+- Instead, make the computed field read-only and enforce its presence through a business rule once the prerequisite inputs are valid
+
+For leave-request style forms, the preferred behavior is:
+
+- `申请人` empty → inline field error: `请选择申请人`
+- `请假类型` empty → inline field error: `请选择请假类型`
+- `结束日期 < 开始日期` → page summary error: `结束日期不能早于开始日期`
+- legal date/session inputs but no computed `天数` → page summary or target-field error: `请完善开始/结束日期与时段，系统才能计算请假天数`
+
+This produces a clearer correction path:
+
+- users fix missing inputs where they entered them
+- page-level banners stay reserved for multi-field or domain-level problems
+- computed fields remain business-owned, not user-entered
+
+---
+
+## 4. Creating a Computed Field
 
 ### Via plugin configuration (fields.json)
 
@@ -135,7 +265,7 @@ Add a computed field to your plugin's `fields.json`:
 
 ---
 
-## 4. Materialized Computed Fields
+## 5. Materialized Computed Fields
 
 Materialized fields are computed on write and stored in the database. Use them when:
 
@@ -166,7 +296,7 @@ Materialized fields are computed on write and stored in the database. Use them w
 
 ---
 
-## 5. Rollup Fields
+## 6. Rollup Fields
 
 Rollup fields aggregate values from related (child) records. Configure them in the parent model.
 
@@ -222,7 +352,7 @@ Rollup fields are recalculated when:
 
 ---
 
-## 6. Auto-Number Fields
+## 7. Auto-Number Fields
 
 Auto-number fields generate sequential identifiers automatically when a record is created.
 
@@ -271,7 +401,7 @@ Auto-number fields generate sequential identifiers automatically when a record i
 
 ---
 
-## 7. Cross-Model References in Expressions
+## 8. Cross-Model References in Expressions
 
 You can reference fields from related models in expressions using dot notation through reference fields.
 
@@ -294,7 +424,59 @@ The `_display` suffix is automatically populated by the reference enrichment sys
 
 ---
 
-## 8. Complete Example: Order with Computed Total
+## 9. Pattern: Editable Inputs + Persisted Business Field
+
+Many business workflows need a field that is:
+
+- derived from other fields
+- visible in the form
+- used later for routing, filtering, reporting, or notifications
+
+In these cases, do **not** delete the business field from the model. Instead, change its role:
+
+- from user-entered field
+- to system-computed business field
+
+### Recommended structure
+
+| Concern | Recommended design |
+|---------|--------------------|
+| User input | Separate source fields |
+| UI feedback | Runtime computed read-only field |
+| Workflow / reporting / list sort | Persisted business field |
+| Final authority | Backend command or stored payload |
+
+### Leave-request example
+
+For leave duration, prefer:
+
+- `wd_req_start_date`
+- `wd_req_start_slot`
+- `wd_req_end_date`
+- `wd_req_end_slot`
+- `wd_req_days` as computed read-only business field
+
+This is better than letting users type `wd_req_days` manually because:
+
+- it removes duplicate data entry
+- it supports half-day leave cleanly
+- the workflow can still route on `wd_req_days`
+- list pages and reports can still sort and aggregate by `wd_req_days`
+
+### When to use a pure virtual field
+
+Use a pure virtual field when the value is only for display, for example:
+
+- summary text
+- badge label
+- temporary UI hint
+- helper field that should never be queried or routed on
+
+Use a persisted field when the value is part of business state.
+
+---
+
+## 10. Complete Example: Order with Computed Total
 
 ### Scenario
 
@@ -388,7 +570,7 @@ Line Item created:
 
 ---
 
-## 9. Recalculation and Performance
+## 11. Recalculation and Performance
 
 ### When are formulas recalculated?
 
@@ -405,6 +587,25 @@ Line Item created:
 - Keep `computeDependencies` accurate -- missing dependencies cause stale values
 - Avoid circular dependencies (A depends on B, B depends on A)
 - For complex multi-step calculations, chain materialized fields rather than writing one giant expression
+- For form-derived business values, prefer `editable source fields + read-only computed target field`
+- Do not rely on frontend formulas alone for high-value business invariants; the backend should still receive or recompute the authoritative result
+
+### Date and time calculations
+
+Date-range formulas often look simple but become fragile when they include:
+
+- half-day sessions
+- time zones
+- working calendars
+- lunch breaks
+- business holidays
+
+Recommendation:
+
+- if the requirement is only full-day plus half-day, model it explicitly with date + session fields
+- if the requirement is hourly leave or shift-aware leave, move to datetime inputs and backend-owned calendar logic
+
+Avoid pushing complex scheduling semantics into one giant generic formula too early.
 
 ---
 
@@ -415,6 +616,7 @@ Line Item created:
 | Computed field shows blank | Expression error or missing dependency | Check `computeDependencies` includes all referenced fields |
 | Materialized field not updating | Dependency list incomplete | Add the changed field to `computeDependencies` |
 | `SpelEvaluationException` | Syntax error in expression | Validate SpEL syntax; check `#` prefix on field names |
+| Runtime computed field works in form but backend rejects data | Frontend formula and backend contract are out of sync | Ensure the computed value is submitted or recomputed in a command |
 | Rollup shows 0 | Wrong `foreignKey` or `aggregateField` | Verify field codes match exactly |
 | Auto-number gaps | Records deleted after creation | Expected behavior; sequences don't backfill |
 | Division by zero | Denominator field is 0 | Add null/zero check: `#count > 0 ? #total / #count : 0` |

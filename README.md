@@ -110,6 +110,8 @@ pnpm dev:full
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
+`pnpm dev:full` is the default foreground developer entrypoint. If you need the frontend in background mode, run `pnpm sync-plugins` once and then start `pnpm dev:web` and `pnpm dev:bff` separately.
+
 ### Verify Your Setup
 
 ```bash

@@ -1,9 +1,180 @@
 [
-  { "code": "tpm:create_milestone", "displayName:zh-CN": "新建里程碑", "displayName:en": "Create Milestone", "type": "create", "modelCode": "tpm_milestone", "inputFields": ["tpm_ms_name", "tpm_ms_project_id", "tpm_ms_target_date", "tpm_ms_description"], "autoSetFields": { "tpm_ms_code": { "strategy": "auto_generate", "pattern": "MS-{yyyyMMdd}-{seq}" }, "tpm_ms_status": { "strategy": "fixed_value", "value": "pending" } }, "permissions": ["TPM.milestone.manage"], "agent_hint": "Create a new milestone. Required: name. Optional: project_id, target_date, description.", "cmd_risk_level": "L1", "precondition_description": "No preconditions.", "side_effect_description": null, "output_description": "Returns the created milestone with status pending.", "example_input": { "tpm_ms_name": "MVP Launch" }, "idempotent": false, "reversible": true },
-  { "code": "tpm:update_milestone", "displayName:zh-CN": "编辑里程碑", "displayName:en": "Update Milestone", "type": "update", "modelCode": "tpm_milestone", "inputFields": ["tpm_ms_name", "tpm_ms_project_id", "tpm_ms_target_date", "tpm_ms_description"], "permissions": ["TPM.milestone.manage"], "agent_hint": "Update milestone details.", "cmd_risk_level": "L1", "precondition_description": "Milestone must exist.", "side_effect_description": null, "output_description": "Returns the updated milestone.", "example_input": { "tpm_ms_target_date": "2026-06-30" }, "idempotent": true, "reversible": true },
-  { "code": "tpm:reach_milestone", "displayName:zh-CN": "达成里程碑", "displayName:en": "Mark Reached", "type": "state_transition", "modelCode": "tpm_milestone", "stateField": "tpm_ms_status", "fromStates": ["pending"], "toState": "reached", "permissions": ["TPM.milestone.manage"], "agent_hint": "Mark milestone as reached.", "cmd_risk_level": "L1", "precondition_description": "Milestone must be pending.", "side_effect_description": null, "output_description": "Returns milestone with status REACHED.", "example_input": {}, "idempotent": false, "reversible": false },
-  { "code": "tpm:miss_milestone", "displayName:zh-CN": "标记错过", "displayName:en": "Mark Missed", "type": "state_transition", "modelCode": "tpm_milestone", "stateField": "tpm_ms_status", "fromStates": ["pending"], "toState": "missed", "permissions": ["TPM.milestone.manage"], "agent_hint": "Mark milestone as missed.", "cmd_risk_level": "L2", "precondition_description": "Milestone must be pending.", "side_effect_description": null, "output_description": "Returns milestone with status MISSED.", "example_input": {}, "idempotent": false, "reversible": false },
-  { "code": "tpm:delete_milestone", "displayName:zh-CN": "删除里程碑", "displayName:en": "Delete Milestone", "type": "delete", "modelCode": "tpm_milestone", "preconditions": [{ "field": "tpm_ms_status", "operator": "IN", "value": ["pending"] }], "extension": { "confirmMessage:zh-CN": "确认删除此里程碑？", "confirmMessage:en": "Confirm delete?" }, "permissions": ["TPM.milestone.manage"], "agent_hint": "Delete milestone. Only pending.", "cmd_risk_level": "L4", "precondition_description": "Milestone must be pending.", "side_effect_description": null, "output_description": "Milestone is permanently removed.", "example_input": {}, "idempotent": false, "reversible": false },
-  { "code": "tpm:detail_milestone", "displayName:zh-CN": "查看里程碑", "displayName:en": "View Milestone", "type": "query", "modelCode": "tpm_milestone", "permissions": ["TPM.milestone.read"], "agent_hint": "Retrieve milestone by ID.", "cmd_risk_level": "L0", "precondition_description": "Milestone must exist.", "side_effect_description": null, "output_description": "Returns the full milestone record.", "example_input": {}, "idempotent": true, "reversible": true },
-  { "code": "tpm:list_milestones", "displayName:zh-CN": "里程碑列表", "displayName:en": "List Milestones", "type": "query", "modelCode": "tpm_milestone", "permissions": ["TPM.milestone.read"], "agent_hint": "Query milestones with pagination.", "cmd_risk_level": "L0", "precondition_description": "No preconditions.", "side_effect_description": null, "output_description": "Returns a paginated list of milestones.", "example_input": { "pageNum": 1, "pageSize": 20 }, "idempotent": true, "reversible": true }
+  {
+    "code": "tpm:create_milestone",
+    "displayName:zh-CN": "新建里程碑",
+    "displayName:en": "Create Milestone",
+    "type": "create",
+    "modelCode": "tpm_milestone",
+    "inputFields": [
+      "tpm_ms_name",
+      "tpm_ms_project_id",
+      "tpm_ms_target_date",
+      "tpm_ms_description"
+    ],
+    "autoSetFields": {
+      "tpm_ms_code": {
+        "strategy": "auto_generate",
+        "pattern": "MS-{yyyyMMdd}-{seq}"
+      },
+      "tpm_ms_status": {
+        "strategy": "fixed_value",
+        "value": "pending"
+      }
+    },
+    "permissions": [
+      "tpm.milestone.manage"
+    ],
+    "agent_hint": "Create a new milestone. Required: name. Optional: project_id, target_date, description.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns the created milestone with status pending.",
+    "example_input": {
+      "tpm_ms_name": "MVP Launch"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "tpm:update_milestone",
+    "displayName:zh-CN": "编辑里程碑",
+    "displayName:en": "Update Milestone",
+    "type": "update",
+    "modelCode": "tpm_milestone",
+    "inputFields": [
+      "tpm_ms_name",
+      "tpm_ms_project_id",
+      "tpm_ms_target_date",
+      "tpm_ms_description"
+    ],
+    "permissions": [
+      "tpm.milestone.manage"
+    ],
+    "agent_hint": "Update milestone details.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Milestone must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated milestone.",
+    "example_input": {
+      "tpm_ms_target_date": "2026-06-30"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "tpm:reach_milestone",
+    "displayName:zh-CN": "达成里程碑",
+    "displayName:en": "Mark Reached",
+    "type": "state_transition",
+    "modelCode": "tpm_milestone",
+    "stateField": "tpm_ms_status",
+    "fromStates": [
+      "pending"
+    ],
+    "toState": "reached",
+    "permissions": [
+      "tpm.milestone.manage"
+    ],
+    "agent_hint": "Mark milestone as reached.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Milestone must be pending.",
+    "side_effect_description": null,
+    "output_description": "Returns milestone with status REACHED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tpm:miss_milestone",
+    "displayName:zh-CN": "标记错过",
+    "displayName:en": "Mark Missed",
+    "type": "state_transition",
+    "modelCode": "tpm_milestone",
+    "stateField": "tpm_ms_status",
+    "fromStates": [
+      "pending"
+    ],
+    "toState": "missed",
+    "permissions": [
+      "tpm.milestone.manage"
+    ],
+    "agent_hint": "Mark milestone as missed.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Milestone must be pending.",
+    "side_effect_description": null,
+    "output_description": "Returns milestone with status MISSED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tpm:delete_milestone",
+    "displayName:zh-CN": "删除里程碑",
+    "displayName:en": "Delete Milestone",
+    "type": "delete",
+    "modelCode": "tpm_milestone",
+    "preconditions": [
+      {
+        "field": "tpm_ms_status",
+        "operator": "IN",
+        "value": [
+          "pending"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此里程碑？",
+      "confirmMessage:en": "Confirm delete?"
+    },
+    "permissions": [
+      "tpm.milestone.manage"
+    ],
+    "agent_hint": "Delete milestone. Only pending.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Milestone must be pending.",
+    "side_effect_description": null,
+    "output_description": "Milestone is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tpm:detail_milestone",
+    "displayName:zh-CN": "查看里程碑",
+    "displayName:en": "View Milestone",
+    "type": "query",
+    "modelCode": "tpm_milestone",
+    "permissions": [
+      "tpm.milestone.read"
+    ],
+    "agent_hint": "Retrieve milestone by ID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Milestone must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full milestone record.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "tpm:list_milestones",
+    "displayName:zh-CN": "里程碑列表",
+    "displayName:en": "List Milestones",
+    "type": "query",
+    "modelCode": "tpm_milestone",
+    "permissions": [
+      "tpm.milestone.read"
+    ],
+    "agent_hint": "Query milestones with pagination.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of milestones.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
+    "idempotent": true,
+    "reversible": true
+  }
 ]

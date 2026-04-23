@@ -54,7 +54,7 @@
   { "key": "dict.sc_category_dict.SERVICE", "zh-CN": "服务", "en-US": "Service", "source": "import", "refType": "dict_item" },
   { "key": "dict.sc_category_dict.OTHER", "zh-CN": "其他", "en-US": "Other", "source": "import", "refType": "dict_item" },
 
-  { "key": "menu.SC_ROOT.label", "zh-CN": "能力展示", "en-US": "Showcase", "source": "import", "refType": "menu" },
+  { "key": "menu.SC_ROOT.label", "zh-CN": "字段展示", "en-US": "Field Showcase", "source": "import", "refType": "menu" },
   { "key": "menu.SC_ALL_FIELDS.label", "zh-CN": "全字段类型", "en-US": "All Field Types", "source": "import", "refType": "menu" },
 
   { "key": "page.showcase_all_fields_list.title", "zh-CN": "全字段展示列表", "en-US": "All Field Types", "source": "import", "refType": "page" },

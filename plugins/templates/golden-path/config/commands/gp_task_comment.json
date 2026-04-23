@@ -18,7 +18,7 @@
       }
     },
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Create a new comment on a task. Required: task_id (reference to gp_task), content. Author is auto-set to current user.",
     "cmd_risk_level": "L1",
@@ -39,7 +39,7 @@
       "gp_tc_content"
     ],
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Update an existing task comment. Only the content field is editable. Author and task reference are immutable after creation.",
     "cmd_risk_level": "L1"
@@ -57,7 +57,7 @@
       "confirmMessage:en": "Confirm delete this comment?"
     },
     "permissions": [
-      "GP.task.manage"
+      "gp.task.manage"
     ],
     "agent_hint": "Delete a task comment permanently. This is irreversible. No preconditions — any comment can be deleted by users with manage permission.",
     "cmd_risk_level": "L4"
@@ -71,7 +71,7 @@
     "idempotent": true,
     "reversible": false,
     "permissions": [
-      "GP.task.read"
+      "gp.task.read"
     ],
     "agent_hint": "Query comments for a specific task. Filter by gp_tc_task_id to get all comments belonging to a task, ordered by creation time.",
     "cmd_risk_level": "L0"

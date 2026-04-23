@@ -201,7 +201,7 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
               }
             },
             onError: (errMsg) => {
-              const errorText = typeof errMsg === 'string' ? errMsg : 'AI generation failed';
+              const errorText = typeof errMsg === 'string' ? errMsg : 'AI 生成失败';
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantMsgId
@@ -214,7 +214,7 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
           },
         );
       } catch (err) {
-        const errorText = err instanceof Error ? err.message : 'AI generation failed';
+        const errorText = err instanceof Error ? err.message : 'AI 生成失败';
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
@@ -264,13 +264,13 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="text-base">&#x2728;</span>
-          <h3 className="text-sm font-semibold text-gray-900">AI Assistant</h3>
+          <h3 className="text-sm font-semibold text-gray-900">AI 助手</h3>
         </div>
         <button
           onClick={onToggle}
           className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
           data-testid="ai-panel-close"
-          title="Close AI panel"
+          title="关闭 AI 面板"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -286,7 +286,7 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <div className="mb-3 text-3xl">&#x2728;</div>
-            <p className="mb-1 text-sm font-medium text-gray-700">AI Page Assistant</p>
+            <p className="mb-1 text-sm font-medium text-gray-700">AI 页面助手</p>
             <p className="text-xs text-gray-400">
               Describe the page you want or use a quick command above.
             </p>

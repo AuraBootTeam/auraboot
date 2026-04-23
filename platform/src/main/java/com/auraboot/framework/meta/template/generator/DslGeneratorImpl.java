@@ -34,6 +34,17 @@ public class DslGeneratorImpl implements DslGenerator {
     private final FieldTypeMapper fieldTypeMapper;
     private final MetaFieldDictBindingMapper fieldDictBindingMapper;
 
+    private String buildLocalizedTitleJson(String zhTitle, String enTitle) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "zh-CN", zhTitle,
+                    "en-US", enTitle
+            ));
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("Failed to build localized page title", e);
+        }
+    }
+
     /**
      * Load dictionary bindings for fields and create a map of fieldId -> dictCode
      */
@@ -108,7 +119,10 @@ public class DslGeneratorImpl implements DslGenerator {
         PageSchema pageSchema = new PageSchema();
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setName(model.getCode() + "_list");
-        pageSchema.setTitle(model.getDisplayName() + "列表");
+        pageSchema.setTitle(buildLocalizedTitleJson(
+                model.getDisplayName() + "列表",
+                model.getDisplayName() + " List"
+        ));
         pageSchema.setKind("list");
         pageSchema.setSchemaVersion(2);
         pageSchema.setProfile("admin");
@@ -152,7 +166,10 @@ public class DslGeneratorImpl implements DslGenerator {
         PageSchema pageSchema = new PageSchema();
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setName(model.getCode() + "_form");
-        pageSchema.setTitle(model.getDisplayName() + "表单");
+        pageSchema.setTitle(buildLocalizedTitleJson(
+                model.getDisplayName() + "表单",
+                model.getDisplayName() + " Form"
+        ));
         pageSchema.setKind("form");
         pageSchema.setSchemaVersion(2);
         pageSchema.setProfile("admin");
@@ -196,7 +213,10 @@ public class DslGeneratorImpl implements DslGenerator {
         PageSchema pageSchema = new PageSchema();
         pageSchema.setPid(UniqueIdGenerator.generate());
         pageSchema.setName(model.getCode() + "_detail");
-        pageSchema.setTitle(model.getDisplayName() + "详情");
+        pageSchema.setTitle(buildLocalizedTitleJson(
+                model.getDisplayName() + "详情",
+                model.getDisplayName() + " Detail"
+        ));
         pageSchema.setKind("detail");
         pageSchema.setSchemaVersion(2);
         pageSchema.setProfile("admin");

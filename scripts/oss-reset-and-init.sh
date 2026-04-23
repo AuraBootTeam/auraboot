@@ -93,6 +93,8 @@ echo -e "${GREEN}   Backend service stopped${NC}"
 # Step 2: Stop BFF server if running
 echo -e "${YELLOW}Step 2: Stopping BFF server...${NC}"
 pkill -f "concurrently" 2>/dev/null || true
+pkill -f "pnpm dev:web" 2>/dev/null || true
+pkill -f "pnpm dev:bff" 2>/dev/null || true
 pkill -f "pnpm dev" 2>/dev/null || true
 pkill -f "bff.server" 2>/dev/null || true
 pkill -f "react-router dev" 2>/dev/null || true
@@ -117,7 +119,7 @@ cd "$PLATFORM_DIR"
 export AURABOOT_BOOTSTRAP_ENABLED=false
 echo "   AURABOOT_BOOTSTRAP_ENABLED=false (script-driven bootstrap, no auto-runner)"
 
-# Start backend in persistent background process
+# Start backend in background as a single long-running process
 nohup ./gradlew bootRun > /tmp/aura-backend.log 2>&1 &
 BACKEND_PID=$!
 
@@ -252,11 +254,15 @@ fi
 echo -e "${YELLOW}Step 5: Starting frontend...${NC}"
 cd "$WEB_ADMIN_DIR"
 
-# Start frontend+BFF in persistent background process
-nohup pnpm dev:full > /tmp/aura-frontend.log 2>&1 &
-FRONTEND_PID=$!
+echo "   Running plugin sync before starting dev servers..."
+pnpm sync-plugins > /tmp/aura-sync-plugins.log 2>&1
 
-echo "   Frontend starting (PID: $FRONTEND_PID)..."
+nohup pnpm dev:web > /tmp/aura-web.log 2>&1 &
+WEB_PID=$!
+nohup pnpm dev:bff > /tmp/aura-bff.log 2>&1 &
+BFF_PID=$!
+
+echo "   Frontend starting (web PID: $WEB_PID, bff PID: $BFF_PID)..."
 echo "   Waiting for frontend and BFF to be ready..."
 
 # Wait for frontend and BFF to be ready
@@ -278,7 +284,7 @@ done
 
 if [ $WAITED_FE -ge $MAX_WAIT_FE ]; then
     echo -e "${RED}   Frontend/BFF failed to start within ${MAX_WAIT_FE} seconds${NC}"
-    echo "   Check logs at /tmp/aura-frontend.log"
+    echo "   Check logs at /tmp/aura-web.log and /tmp/aura-bff.log"
     exit 1
 fi
 
@@ -292,6 +298,13 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
     # Helper: POST JSON with auth
     api_post() {
         NO_PROXY=localhost curl -s -X POST "$API_BASE$1" \
+            -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+            -d "$2" 2>/dev/null
+    }
+
+    # Helper: PUT JSON with auth
+    api_put() {
+        NO_PROXY=localhost curl -s -X PUT "$API_BASE$1" \
             -H "$AUTH_HEADER" -H "Content-Type: application/json" \
             -d "$2" 2>/dev/null
     }
@@ -312,39 +325,51 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
             return
         fi
         local resp
-        resp=$(api_post "/api/pages" "$payload")
         local pid
+        local message
+        resp=$(api_post "/api/pages" "$payload")
         pid=$(echo "$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('pid',''))" 2>/dev/null || echo "")
+        message=$(echo "$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('errorMessage') or d.get('message') or '')" 2>/dev/null || echo "")
         if [ -n "$pid" ] && [ "$pid" != "None" ] && [ "$pid" != "" ]; then
             api_post "/api/pages/$pid/publish" "{}" > /dev/null
             echo "   Created & published: $page_key"
         else
-            echo -e "${YELLOW}   Failed to create $page_key (may already exist)${NC}"
+            echo -e "${YELLOW}   Failed to create $page_key: ${message:-$resp}${NC}"
         fi
     }
 
     create_test_page "e2e_test_dashboard" '{
-        "pageKey":"e2e_test_dashboard","name":"E2E Test Dashboard","title":"E2E Test Dashboard",
-        "pageType":"dashboard","pageCategory":"dashboard",
-        "dslSchema":{"layout":"grid","columns":12,"areas":[{"id":"main","name":"Main","blocks":[
-            {"id":"block_stats","type":"stats","position":{"x":0,"y":0,"w":12,"h":2},"props":{"title":"Stats","items":[{"label":"Total","value":"0"}]}}
-        ]}]}
+        "pageKey":"e2e_test_dashboard","name":"E2E Test Dashboard","title":"E2E Test Dashboard","modelCode":"page_schema",
+        "description":"Overview-style list fixture for Page Designer E2E tests",
+        "kind":"list",
+        "layout":{"type":"grid","cols":12},
+        "blocks":[
+            {"id":"block_overview_stats","blockType":"stat-card","layout":{"colSpan":12,"rowSpan":1},"title":"Overview","cards":[{"label":"Total","value":"1234"},{"label":"Today","value":"56"}]},
+            {"id":"block_overview_table","blockType":"table","layout":{"colSpan":12,"rowSpan":1},"columns":[{"field":"name","title":"Name","width":200},{"field":"page_key","title":"Page Key","width":220},{"field":"status","title":"Status","width":120},{"field":"updated_at","title":"Updated At","width":180}]}
+        ]
     }'
 
     create_test_page "e2e_test_form" '{
-        "pageKey":"e2e_test_form","name":"E2E Test Form","title":"E2E Test Form",
-        "pageType":"form","pageCategory":"custom",
-        "dslSchema":{"layout":"vertical","areas":[{"id":"main","name":"Main","blocks":[
-            {"id":"block_input","type":"input","position":{"row":0,"col":0},"props":{"label":"Name","required":true}}
-        ]}]}
+        "pageKey":"e2e_test_form","name":"E2E Test Form","title":"E2E Test Form","modelCode":"page_schema",
+        "description":"Form fixture for Page Designer E2E tests",
+        "kind":"form",
+        "layout":{"type":"grid","cols":12,"gap":12},
+        "blocks":[
+            {"id":"block_form_main","blockType":"form-section","title":"Basic Information","layout":{"colSpan":12,"rowSpan":1},"columns":2,"fields":[{"field":"name","layout":{"colSpan":6,"rowSpan":1}},{"field":"page_key","layout":{"colSpan":6,"rowSpan":1}},{"field":"kind","layout":{"colSpan":4,"rowSpan":1}},{"field":"profile","layout":{"colSpan":4,"rowSpan":1}},{"field":"model_code","layout":{"colSpan":4,"rowSpan":1}},{"field":"description","layout":{"colSpan":12,"rowSpan":1}}]},
+            {"id":"block_form_actions","blockType":"form-buttons","layout":{"colSpan":12,"rowSpan":1},"buttons":[{"code":"save","primary":true,"label":"save"},{"code":"reset","label":"reset"}]}
+        ]
     }'
 
     create_test_page "e2e_test_list" '{
-        "pageKey":"e2e_test_list","name":"E2E Test List","title":"E2E Test List",
-        "pageType":"list","pageCategory":"custom",
-        "dslSchema":{"areas":[{"id":"main","name":"Main","blocks":[
-            {"id":"block_table","type":"table","position":{"row":0},"props":{"columns":[{"field":"name","title":"Name"}]}}
-        ]}]}
+        "pageKey":"e2e_test_list","name":"E2E Test List","title":"E2E Test List","modelCode":"page_schema",
+        "description":"List fixture for Page Designer E2E tests",
+        "kind":"list",
+        "layout":{"type":"stack"},
+        "blocks":[
+            {"id":"block_list_toolbar","blockType":"toolbar","buttons":[{"code":"create","variant":"primary","label":"create"},{"code":"refresh","label":"refresh"}]},
+            {"id":"block_list_filters","blockType":"filters","fields":[{"field":"name"},{"field":"status"}]},
+            {"id":"block_list_table","blockType":"table","columns":[{"field":"name","title":"Name","width":200},{"field":"page_key","title":"Page Key","width":220},{"field":"status","title":"Status","width":120},{"field":"updated_at","title":"Updated At","width":180}],"rowActions":[{"code":"view","label":"view"},{"code":"edit","label":"edit"},{"code":"delete","label":"delete"}]}
+        ]
     }'
 
     echo -e "${GREEN}   Test pages complete${NC}"
@@ -352,18 +377,27 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
     # 6b: Create system_overview dashboard (idempotent)
     echo "   Creating system_overview dashboard..."
     DASH_EXISTS=$(api_get "/api/dashboards/code/system_overview" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('pid',''))" 2>/dev/null || echo "")
+    SYSTEM_OVERVIEW_PAYLOAD='{
+        "code":"system_overview",
+        "title":"System Overview",
+        "description":"Live overview dashboard seeded for local development",
+        "scope":"global",
+        "isDefault":true,
+        "layoutConfig":{"columns":12,"rowHeight":100,"gap":16},
+        "widgets":[
+            {"i":"w_accounts","x":0,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Accounts","config":{"title":"Accounts","label":"Accounts","color":"#2563EB","dataSource":{"type":"aggregate","modelCode":"crm_account","metrics":[{"field":"id","aggregation":"count","alias":"count"}]}}},
+            {"i":"w_contacts","x":3,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Contacts","config":{"title":"Contacts","label":"Contacts","color":"#10B981","dataSource":{"type":"aggregate","modelCode":"crm_contact","metrics":[{"field":"id","aggregation":"count","alias":"count"}]}}},
+            {"i":"w_leads","x":6,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Leads","config":{"title":"Leads","label":"Leads","color":"#F59E0B","dataSource":{"type":"aggregate","modelCode":"crm_lead","metrics":[{"field":"id","aggregation":"count","alias":"count"}]}}},
+            {"i":"w_opportunities","x":9,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Opportunities","config":{"title":"Opportunities","label":"Opportunities","color":"#8B5CF6","dataSource":{"type":"aggregate","modelCode":"crm_opportunity","metrics":[{"field":"id","aggregation":"count","alias":"count"}]}}}
+        ]
+    }'
+
     if [ -n "$DASH_EXISTS" ] && [ "$DASH_EXISTS" != "None" ] && [ "$DASH_EXISTS" != "" ]; then
-        echo "   system_overview already exists, skipping"
+        api_put "/api/dashboards/$DASH_EXISTS" "$SYSTEM_OVERVIEW_PAYLOAD" > /dev/null
+        api_post "/api/dashboards/$DASH_EXISTS/publish" "{}" > /dev/null
+        echo "   system_overview updated"
     else
-        DASH_RESP=$(api_post "/api/dashboards" '{
-            "code":"system_overview","title":"System Overview","description":"System overview dashboard",
-            "scope":"global","isDefault":true,
-            "layoutConfig":{"columns":12,"rowHeight":100,"gap":16},
-            "widgets":[
-                {"i":"w_users","x":0,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Users","config":{"label":"Users","value":0,"color":"#3B82F6"}},
-                {"i":"w_models","x":3,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Models","config":{"label":"Models","value":0,"color":"#10B981"}}
-            ]
-        }')
+        DASH_RESP=$(api_post "/api/dashboards" "$SYSTEM_OVERVIEW_PAYLOAD")
         DASH_PID=$(echo "$DASH_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('pid',''))" 2>/dev/null || echo "")
         if [ -n "$DASH_PID" ] && [ "$DASH_PID" != "None" ] && [ "$DASH_PID" != "" ]; then
             api_post "/api/dashboards/$DASH_PID/publish" "{}" > /dev/null
@@ -565,5 +599,7 @@ echo "  - Frontend: http://localhost:5173"
 echo ""
 echo -e "${BLUE}Logs:${NC}"
 echo "  - Backend: /tmp/aura-backend.log"
-echo "  - Frontend: /tmp/aura-frontend.log"
+echo "  - Frontend web: /tmp/aura-web.log"
+echo "  - Frontend bff: /tmp/aura-bff.log"
+echo "  - Plugin sync: /tmp/aura-sync-plugins.log"
 echo ""

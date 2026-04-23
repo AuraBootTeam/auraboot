@@ -1,1 +1,173 @@
-{"pageKey":"ecm_training_record_list","name:zh-CN":"培训记录","name:en":"Training Records","pageType":"list","modelCode":"ecm_training_record","dslSchema":{"id":"list.ecm_training_record","kind":"List","areas":{"toolbar":{"blocks":[{"id":"ecm_tr_toolbar","blockType":"toolbar","buttons":[{"code":"create","action":"create","primary":true,"commandCode":"ecm:create_training","navigateTo":"ecm_training_record_form","permissionCode":"ECM.training.manage"}]}]},"list-tabs":{"blocks":[{"id":"ecm_tr_tabs","blockType":"tabs","tabs":[{"key":"all","label":{"en":"All","zh-CN":"全部"},"filter":null},{"key":"scheduled","label":{"en":"Scheduled","zh-CN":"已计划"},"filter":{"field":"ecm_tr_status","value":"scheduled","operator":"EQ"}},{"key":"in_progress","label":{"en":"In Progress","zh-CN":"进行中"},"filter":{"field":"ecm_tr_status","value":"in_progress","operator":"EQ"}},{"key":"completed","label":{"en":"Completed","zh-CN":"已完成"},"filter":{"field":"ecm_tr_status","value":"completed","operator":"EQ"}},{"key":"expired","label":{"en":"Expired","zh-CN":"已过期"},"filter":{"field":"ecm_tr_status","value":"expired","operator":"EQ"}}]}]},"main":{"blocks":[{"id":"ecm_tr_table","blockType":"table","columns":[{"field":"ecm_tr_code","width":130,"sortable":true},{"field":"ecm_tr_course","width":200,"sortable":true},{"field":"ecm_tr_employee","width":120},{"field":"ecm_tr_category","width":130,"renderType":"tag","dictCode":"ecm_training_category"},{"field":"ecm_tr_status","width":110,"renderType":"tag","dictCode":"ecm_training_status"},{"field":"ecm_tr_score","width":80},{"field":"ecm_tr_scheduled_date","width":120,"sortable":true},{"field":"ecm_tr_cert_expiry","width":120,"sortable":true},{"field":"actions","isActionColumn":true,"buttons":[{"code":"view","action":"detail","navigateTo":"ecm_training_record_detail"},{"code":"edit","action":"edit","navigateTo":"ecm_training_record_form","permissionCode":"ECM.training.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"ecm:delete_training","permissionCode":"ECM.training.manage","confirmMessageKey":"delete.confirm"}]}],"searchFields":["ecm_tr_course","ecm_tr_code","ecm_tr_employee"],"defaultSort":{"field":"ecm_tr_scheduled_date","order":"desc"}}]}}}}
+{
+  "pageKey": "ecm_training_record_list",
+  "name:zh-CN": "培训记录",
+  "name:en": "Training Records",
+  "modelCode": "ecm_training_record",
+  "kind": "list",
+  "title": {
+    "zh-CN": "培训记录",
+    "en": "Training Records"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "ecm_tr_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "action": "create",
+          "primary": true,
+          "permissionCode": "ecm.training.manage"
+        }
+      ],
+      "area": "toolbar"
+    },
+    {
+      "id": "ecm_tr_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "scheduled",
+          "label": {
+            "en": "Scheduled",
+            "zh-CN": "已计划"
+          },
+          "filter": {
+            "field": "ecm_tr_status",
+            "value": "scheduled",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "in_progress",
+          "label": {
+            "en": "In Progress",
+            "zh-CN": "进行中"
+          },
+          "filter": {
+            "field": "ecm_tr_status",
+            "value": "in_progress",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "completed",
+          "label": {
+            "en": "Completed",
+            "zh-CN": "已完成"
+          },
+          "filter": {
+            "field": "ecm_tr_status",
+            "value": "completed",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "expired",
+          "label": {
+            "en": "Expired",
+            "zh-CN": "已过期"
+          },
+          "filter": {
+            "field": "ecm_tr_status",
+            "value": "expired",
+            "operator": "EQ"
+          }
+        }
+      ],
+      "area": "list-tabs"
+    },
+    {
+      "id": "ecm_tr_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "ecm_tr_code",
+          "width": 130,
+          "sortable": true
+        },
+        {
+          "field": "ecm_tr_course",
+          "width": 200,
+          "sortable": true
+        },
+        {
+          "field": "ecm_tr_employee",
+          "width": 120
+        },
+        {
+          "field": "ecm_tr_category",
+          "width": 130,
+          "renderType": "tag",
+          "dictCode": "ecm_training_category"
+        },
+        {
+          "field": "ecm_tr_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "ecm_training_status"
+        },
+        {
+          "field": "ecm_tr_score",
+          "width": 80
+        },
+        {
+          "field": "ecm_tr_scheduled_date",
+          "width": 120,
+          "sortable": true
+        },
+        {
+          "field": "ecm_tr_cert_expiry",
+          "width": 120,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "action": "detail",
+              "navigateTo": "ecm_training_record_detail"
+            },
+            {
+              "code": "edit",
+              "action": "edit",
+              "navigateTo": "ecm_training_record_form",
+              "permissionCode": "ecm.training.manage"
+            },
+            {
+              "code": "delete",
+              "action": "delete",
+              "danger": true,
+              "commandCode": "ecm:delete_training",
+              "permissionCode": "ecm.training.manage",
+              "confirmMessageKey": "delete.confirm"
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "ecm_tr_course",
+        "ecm_tr_code",
+        "ecm_tr_employee"
+      ],
+      "defaultSort": {
+        "field": "ecm_tr_scheduled_date",
+        "order": "desc"
+      },
+      "area": "main"
+    }
+  ]
+}

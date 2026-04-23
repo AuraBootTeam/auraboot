@@ -2,68 +2,136 @@
   "pageKey": "gp_task_detail",
   "name:zh-CN": "任务详情",
   "name:en": "Task Detail",
-  "pageType": "detail",
   "modelCode": "gp_task",
-  "dslSchema": {
-    "id": "detail.gp_task",
-    "kind": "Detail",
-    "version": "1.0.0",
-    "modelCode": "gp_task",
-    "layout": {
-      "areas": ["header", "main", "sub-tables"],
-      "areasConfig": {
-        "header": { "type": "flex", "direction": "row" },
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
-        "sub-tables": { "type": "stack" }
-      }
-    },
-    "areas": {
+  "kind": "detail",
+  "title": {
+    "zh-CN": "任务详情",
+    "en": "Task Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main",
+      "sub-tables"
+    ],
+    "areasConfig": {
       "header": {
-        "blocks": [{
-          "id": "action_bar",
-          "blockType": "toolbar",
-          "buttons": [
-            { "code": "edit", "action": "edit", "navigateTo": "gp_task_form", "permissionCode": "GP.task.manage" },
-            { "code": "start_task", "commandCode": "gp:start_task", "permissionCode": "GP.task.manage" },
-            { "code": "complete_task", "commandCode": "gp:complete_task", "permissionCode": "GP.task.manage" },
-            { "code": "archive_task", "commandCode": "gp:archive_task", "permissionCode": "GP.task.manage" },
-            { "code": "delete", "action": "delete", "danger": true, "commandCode": "gp:delete_task", "permissionCode": "GP.task.manage", "confirmMessageKey": "delete.confirm" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       },
       "main": {
-        "blocks": [{
-          "id": "info",
-          "blockType": "form-section",
-          "readOnly": true,
-          "title": { "zh-CN": "任务信息", "en-US": "Task Information" },
-          "fields": [
-            { "field": "gp_task_code", "colSpan": 6 },
-            { "field": "gp_task_title", "colSpan": 6 },
-            { "field": "gp_task_status", "colSpan": 6 },
-            { "field": "gp_task_priority", "colSpan": 6 },
-            { "field": "gp_task_assignee", "colSpan": 6 },
-            { "field": "gp_task_due_date", "colSpan": 6 },
-            { "field": "gp_task_description", "colSpan": 12 }
-          ]
-        }]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       },
       "sub-tables": {
-        "blocks": [{
-          "id": "comments",
-          "blockType": "sub-table",
-          "title": { "zh-CN": "评论", "en-US": "Comments" },
-          "modelCode": "gp_task_comment",
-          "foreignKey": "gp_tc_task_id",
-          "columns": [
-            { "field": "gp_tc_content", "width": 400 },
-            { "field": "gp_tc_author", "width": 120 },
-            { "field": "created_at", "width": 180 }
-          ],
-          "createCommandCode": "gp:create_task_comment",
-          "deleteCommandCode": "gp:delete_task_comment"
-        }]
+        "type": "stack"
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "gp.task.manage"
+        },
+        {
+          "code": "start_task",
+          "commandCode": "gp:start_task",
+          "permissionCode": "gp.task.manage"
+        },
+        {
+          "code": "complete_task",
+          "commandCode": "gp:complete_task",
+          "permissionCode": "gp.task.manage"
+        },
+        {
+          "code": "archive_task",
+          "commandCode": "gp:archive_task",
+          "permissionCode": "gp.task.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "gp:delete_task",
+          "permissionCode": "gp.task.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "任务信息",
+        "en-US": "Task Information"
+      },
+      "fields": [
+        {
+          "field": "gp_task_code",
+          "colSpan": 6
+        },
+        {
+          "field": "gp_task_title",
+          "colSpan": 6
+        },
+        {
+          "field": "gp_task_status",
+          "colSpan": 6
+        },
+        {
+          "field": "gp_task_priority",
+          "colSpan": 6
+        },
+        {
+          "field": "gp_task_assignee",
+          "colSpan": 6
+        },
+        {
+          "field": "gp_task_due_date",
+          "colSpan": 6
+        },
+        {
+          "field": "gp_task_description",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "comments",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "评论",
+        "en-US": "Comments"
+      },
+      "modelCode": "gp_task_comment",
+      "foreignKey": "gp_tc_task_id",
+      "columns": [
+        {
+          "field": "gp_tc_content",
+          "width": 400
+        },
+        {
+          "field": "gp_tc_author",
+          "width": 120
+        },
+        {
+          "field": "created_at",
+          "width": 180
+        }
+      ],
+      "createCommandCode": "gp:create_task_comment",
+      "deleteCommandCode": "gp:delete_task_comment",
+      "area": "sub-tables"
+    }
+  ]
 }

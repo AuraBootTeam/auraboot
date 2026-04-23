@@ -2,59 +2,165 @@
   "pageKey": "gp_task_list",
   "name:zh-CN": "任务列表",
   "name:en": "Tasks",
-  "pageType": "list",
   "modelCode": "gp_task",
-  "dslSchema": {
-    "id": "list.gp_task",
-    "kind": "List",
-    "areas": {
-      "toolbar": {
-        "blocks": [{
-          "id": "gp_task_toolbar",
-          "blockType": "toolbar",
+  "kind": "list",
+  "title": {
+    "zh-CN": "任务列表",
+    "en": "Tasks"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "gp_task_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "action": "create",
+          "primary": true,
+          "permissionCode": "gp.task.manage"
+        }
+      ],
+      "area": "toolbar"
+    },
+    {
+      "id": "gp_task_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "new",
+          "label": {
+            "en": "New",
+            "zh-CN": "新建"
+          },
+          "filter": {
+            "field": "gp_task_status",
+            "value": "new",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "in_progress",
+          "label": {
+            "en": "In Progress",
+            "zh-CN": "进行中"
+          },
+          "filter": {
+            "field": "gp_task_status",
+            "value": "in_progress",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "done",
+          "label": {
+            "en": "Done",
+            "zh-CN": "已完成"
+          },
+          "filter": {
+            "field": "gp_task_status",
+            "value": "done",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "archived",
+          "label": {
+            "en": "Archived",
+            "zh-CN": "已归档"
+          },
+          "filter": {
+            "field": "gp_task_status",
+            "value": "archived",
+            "operator": "EQ"
+          }
+        }
+      ],
+      "area": "list-tabs"
+    },
+    {
+      "id": "gp_task_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "gp_task_code",
+          "width": 160,
+          "sortable": true
+        },
+        {
+          "field": "gp_task_title",
+          "width": 250,
+          "sortable": true
+        },
+        {
+          "field": "gp_task_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "gp_task_status"
+        },
+        {
+          "field": "gp_task_priority",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "gp_task_priority",
+          "editable": true
+        },
+        {
+          "field": "gp_task_assignee",
+          "width": 120,
+          "editable": true
+        },
+        {
+          "field": "gp_task_due_date",
+          "width": 130,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
           "buttons": [
-            { "code": "create", "action": "create", "primary": true, "commandCode": "gp:create_task", "navigateTo": "gp_task_form", "permissionCode": "GP.task.manage" }
-          ]
-        }]
-      },
-      "list-tabs": {
-        "blocks": [{
-          "id": "gp_task_tabs",
-          "blockType": "tabs",
-          "tabs": [
-            { "key": "all", "label": { "en": "All", "zh-CN": "全部" }, "filter": null },
-            { "key": "new", "label": { "en": "New", "zh-CN": "新建" }, "filter": { "field": "gp_task_status", "value": "new", "operator": "EQ" } },
-            { "key": "in_progress", "label": { "en": "In Progress", "zh-CN": "进行中" }, "filter": { "field": "gp_task_status", "value": "in_progress", "operator": "EQ" } },
-            { "key": "done", "label": { "en": "Done", "zh-CN": "已完成" }, "filter": { "field": "gp_task_status", "value": "done", "operator": "EQ" } },
-            { "key": "archived", "label": { "en": "Archived", "zh-CN": "已归档" }, "filter": { "field": "gp_task_status", "value": "archived", "operator": "EQ" } }
-          ]
-        }]
-      },
-      "main": {
-        "blocks": [{
-          "id": "gp_task_table",
-          "blockType": "table",
-          "columns": [
-            { "field": "gp_task_code", "width": 160, "sortable": true },
-            { "field": "gp_task_title", "width": 250, "sortable": true },
-            { "field": "gp_task_status", "width": 120, "renderType": "tag", "dictCode": "gp_task_status" },
-            { "field": "gp_task_priority", "width": 100, "renderType": "tag", "dictCode": "gp_task_priority", "editable": true },
-            { "field": "gp_task_assignee", "width": 120, "editable": true },
-            { "field": "gp_task_due_date", "width": 130, "sortable": true },
             {
-              "field": "actions",
-              "isActionColumn": true,
-              "buttons": [
-                { "code": "view", "action": "detail", "navigateTo": "gp_task_detail" },
-                { "code": "edit", "action": "edit", "navigateTo": "gp_task_form", "permissionCode": "GP.task.manage" },
-                { "code": "delete", "action": "delete", "danger": true, "commandCode": "gp:delete_task", "permissionCode": "GP.task.manage", "confirmMessageKey": "delete.confirm" }
-              ]
+              "code": "view",
+              "action": "detail",
+              "navigateTo": "gp_task_detail"
+            },
+            {
+              "code": "edit",
+              "action": "edit",
+              "navigateTo": "gp_task_form",
+              "permissionCode": "gp.task.manage"
+            },
+            {
+              "code": "delete",
+              "action": "delete",
+              "danger": true,
+              "commandCode": "gp:delete_task",
+              "permissionCode": "gp.task.manage",
+              "confirmMessageKey": "delete.confirm"
             }
-          ],
-          "searchFields": ["gp_task_title", "gp_task_code", "gp_task_assignee"],
-          "defaultSort": { "field": "created_at", "order": "desc" }
-        }]
-      }
+          ]
+        }
+      ],
+      "searchFields": [
+        "gp_task_title",
+        "gp_task_code",
+        "gp_task_assignee"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      },
+      "area": "main"
     }
-  }
+  ]
 }

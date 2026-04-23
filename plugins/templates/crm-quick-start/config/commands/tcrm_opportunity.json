@@ -5,18 +5,38 @@
     "displayName:en": "Create Opportunity",
     "type": "create",
     "modelCode": "tcrm_opportunity",
-    "inputFields": ["tcrm_op_name", "tcrm_op_account_id", "tcrm_op_contact_id", "tcrm_op_amount", "tcrm_op_expected_close", "tcrm_op_assignee", "tcrm_op_notes"],
+    "inputFields": [
+      "tcrm_op_name",
+      "tcrm_op_account_id",
+      "tcrm_op_contact_id",
+      "tcrm_op_amount",
+      "tcrm_op_expected_close",
+      "tcrm_op_assignee",
+      "tcrm_op_notes"
+    ],
     "autoSetFields": {
-      "tcrm_op_code": { "strategy": "auto_generate", "pattern": "OPP-{yyyyMMdd}-{seq}" },
-      "tcrm_op_stage": { "strategy": "fixed_value", "value": "prospecting" }
+      "tcrm_op_code": {
+        "strategy": "auto_generate",
+        "pattern": "OPP-{yyyyMMdd}-{seq}"
+      },
+      "tcrm_op_stage": {
+        "strategy": "fixed_value",
+        "value": "prospecting"
+      }
     },
-    "permissions": ["TCRM.opportunity.manage"],
+    "permissions": [
+      "tcrm.opportunity.manage"
+    ],
     "agent_hint": "Create a new sales opportunity. Required: name. Optional: account_id, contact_id, amount, expected_close, assignee, notes.",
     "cmd_risk_level": "L1",
     "precondition_description": "No preconditions.",
     "side_effect_description": null,
     "output_description": "Returns the created opportunity with stage PROSPECTING.",
-    "example_input": { "tcrm_op_name": "Acme ERP Deal", "tcrm_op_amount": 50000, "tcrm_op_expected_close": "2026-06-30" },
+    "example_input": {
+      "tcrm_op_name": "Acme ERP Deal",
+      "tcrm_op_amount": 50000,
+      "tcrm_op_expected_close": "2026-06-30"
+    },
     "idempotent": false,
     "reversible": true
   },
@@ -26,14 +46,26 @@
     "displayName:en": "Update Opportunity",
     "type": "update",
     "modelCode": "tcrm_opportunity",
-    "inputFields": ["tcrm_op_name", "tcrm_op_account_id", "tcrm_op_contact_id", "tcrm_op_amount", "tcrm_op_expected_close", "tcrm_op_assignee", "tcrm_op_notes"],
-    "permissions": ["TCRM.opportunity.manage"],
+    "inputFields": [
+      "tcrm_op_name",
+      "tcrm_op_account_id",
+      "tcrm_op_contact_id",
+      "tcrm_op_amount",
+      "tcrm_op_expected_close",
+      "tcrm_op_assignee",
+      "tcrm_op_notes"
+    ],
+    "permissions": [
+      "tcrm.opportunity.manage"
+    ],
     "agent_hint": "Update an existing opportunity. Stage cannot be changed here.",
     "cmd_risk_level": "L1",
     "precondition_description": "Opportunity must exist.",
     "side_effect_description": null,
     "output_description": "Returns the updated opportunity.",
-    "example_input": { "tcrm_op_amount": 75000 },
+    "example_input": {
+      "tcrm_op_amount": 75000
+    },
     "idempotent": true,
     "reversible": true
   },
@@ -44,9 +76,13 @@
     "type": "state_transition",
     "modelCode": "tcrm_opportunity",
     "stateField": "tcrm_op_stage",
-    "fromStates": ["prospecting"],
+    "fromStates": [
+      "prospecting"
+    ],
     "toState": "proposal",
-    "permissions": ["TCRM.opportunity.manage"],
+    "permissions": [
+      "tcrm.opportunity.manage"
+    ],
     "agent_hint": "Advance opportunity from PROSPECTING to PROPOSAL stage.",
     "cmd_risk_level": "L1",
     "precondition_description": "Opportunity must be in PROSPECTING stage.",
@@ -63,9 +99,13 @@
     "type": "state_transition",
     "modelCode": "tcrm_opportunity",
     "stateField": "tcrm_op_stage",
-    "fromStates": ["proposal"],
+    "fromStates": [
+      "proposal"
+    ],
     "toState": "negotiation",
-    "permissions": ["TCRM.opportunity.manage"],
+    "permissions": [
+      "tcrm.opportunity.manage"
+    ],
     "agent_hint": "Advance opportunity from PROPOSAL to NEGOTIATION stage.",
     "cmd_risk_level": "L1",
     "precondition_description": "Opportunity must be in PROPOSAL stage.",
@@ -82,9 +122,13 @@
     "type": "state_transition",
     "modelCode": "tcrm_opportunity",
     "stateField": "tcrm_op_stage",
-    "fromStates": ["negotiation"],
+    "fromStates": [
+      "negotiation"
+    ],
     "toState": "closed_won",
-    "permissions": ["TCRM.opportunity.manage"],
+    "permissions": [
+      "tcrm.opportunity.manage"
+    ],
     "agent_hint": "Close the opportunity as won. Terminal state.",
     "cmd_risk_level": "L2",
     "precondition_description": "Opportunity must be in NEGOTIATION stage.",
@@ -101,9 +145,15 @@
     "type": "state_transition",
     "modelCode": "tcrm_opportunity",
     "stateField": "tcrm_op_stage",
-    "fromStates": ["prospecting", "proposal", "negotiation"],
+    "fromStates": [
+      "prospecting",
+      "proposal",
+      "negotiation"
+    ],
     "toState": "closed_lost",
-    "permissions": ["TCRM.opportunity.manage"],
+    "permissions": [
+      "tcrm.opportunity.manage"
+    ],
     "agent_hint": "Close the opportunity as lost. Can be done from any active stage.",
     "cmd_risk_level": "L2",
     "precondition_description": "Opportunity must be in PROSPECTING, PROPOSAL, or NEGOTIATION stage.",
@@ -119,9 +169,22 @@
     "displayName:en": "Delete Opportunity",
     "type": "delete",
     "modelCode": "tcrm_opportunity",
-    "preconditions": [{ "field": "tcrm_op_stage", "operator": "IN", "value": ["prospecting"] }],
-    "extension": { "confirmMessage:zh-CN": "确认删除此商机？", "confirmMessage:en": "Confirm delete this opportunity?" },
-    "permissions": ["TCRM.opportunity.manage"],
+    "preconditions": [
+      {
+        "field": "tcrm_op_stage",
+        "operator": "IN",
+        "value": [
+          "prospecting"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此商机？",
+      "confirmMessage:en": "Confirm delete this opportunity?"
+    },
+    "permissions": [
+      "tcrm.opportunity.manage"
+    ],
     "agent_hint": "Delete an opportunity. Only allowed in PROSPECTING stage.",
     "cmd_risk_level": "L4",
     "precondition_description": "Opportunity must be in PROSPECTING stage.",
@@ -137,7 +200,9 @@
     "displayName:en": "View Opportunity",
     "type": "query",
     "modelCode": "tcrm_opportunity",
-    "permissions": ["TCRM.opportunity.read"],
+    "permissions": [
+      "tcrm.opportunity.read"
+    ],
     "agent_hint": "Retrieve a single opportunity by ID.",
     "cmd_risk_level": "L0",
     "precondition_description": "Opportunity must exist.",
@@ -153,13 +218,18 @@
     "displayName:en": "List Opportunities",
     "type": "query",
     "modelCode": "tcrm_opportunity",
-    "permissions": ["TCRM.opportunity.read"],
+    "permissions": [
+      "tcrm.opportunity.read"
+    ],
     "agent_hint": "Query opportunities with pagination. Supports filters by stage, assignee, account.",
     "cmd_risk_level": "L0",
     "precondition_description": "No preconditions.",
     "side_effect_description": null,
     "output_description": "Returns a paginated list of opportunities.",
-    "example_input": { "pageNum": 1, "pageSize": 20 },
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
     "idempotent": true,
     "reversible": true
   }

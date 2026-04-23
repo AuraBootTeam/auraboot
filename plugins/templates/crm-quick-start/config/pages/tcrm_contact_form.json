@@ -2,46 +2,82 @@
   "pageKey": "tcrm_contact_form",
   "name:zh-CN": "联系人表单",
   "name:en": "Contact Form",
-  "pageType": "form",
+  "kind": "form",
   "modelCode": "tcrm_contact",
-  "dslSchema": {
-    "id": "form.tcrm_contact",
-    "kind": "Form",
-    "version": "1.0.0",
-    "modelCode": "tcrm_contact",
-    "layout": {
-      "areas": ["main", "footer"],
-      "areasConfig": {
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
-        "footer": { "type": "flex", "direction": "row" }
-      }
-    },
-    "areas": {
+  "title": {
+    "zh-CN": "联系人表单",
+    "en": "Contact Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
       "main": {
-        "blocks": [{
-          "id": "basic",
-          "blockType": "form-section",
-          "title": { "zh-CN": "联系人信息", "en-US": "Contact Information" },
-          "fields": [
-            { "field": "tcrm_ct_name", "colSpan": 6 },
-            { "field": "tcrm_ct_account_id", "colSpan": 6 },
-            { "field": "tcrm_ct_title", "colSpan": 6 },
-            { "field": "tcrm_ct_email", "colSpan": 6 },
-            { "field": "tcrm_ct_phone", "colSpan": 6 },
-            { "field": "tcrm_ct_notes", "colSpan": 12 }
-          ]
-        }]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       },
       "footer": {
-        "blocks": [{
-          "id": "buttons",
-          "blockType": "form-buttons",
-          "buttons": [
-            { "code": "submit", "action": "save", "commandCode": "tcrm:update_contact", "primary": true },
-            { "code": "cancel", "action": "cancel" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "联系人信息",
+        "en-US": "Contact Information"
+      },
+      "fields": [
+        {
+          "field": "tcrm_ct_name",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ct_account_id",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ct_title",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ct_email",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ct_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_ct_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tcrm:create_contact",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
 }

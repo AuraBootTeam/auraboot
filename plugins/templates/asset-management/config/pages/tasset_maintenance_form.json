@@ -1,1 +1,87 @@
-{"pageKey":"tasset_maintenance_form","name:zh-CN":"维护表单","name:en":"Maintenance Form","pageType":"form","kind":"form","modelCode":"tasset_maintenance","dslSchema":{"id":"form.tasset_maintenance","kind":"Form","version":"1.0.0","modelCode":"tasset_maintenance","layout":{"areas":["main","footer"],"areasConfig":{"main":{"type":"grid","cols":12,"rowGap":16,"colGap":16},"footer":{"type":"flex","direction":"row"}}},"areas":{"main":{"blocks":[{"id":"basic","blockType":"form-section","title":{"zh-CN":"维护信息","en-US":"Maintenance Information"},"fields":[{"field":"tasset_mn_asset_id","colSpan":6},{"field":"tasset_mn_type","colSpan":6},{"field":"tasset_mn_scheduled_date","colSpan":6},{"field":"tasset_mn_technician","colSpan":6},{"field":"tasset_mn_cost","colSpan":6},{"field":"tasset_mn_completed_date","colSpan":6},{"field":"tasset_mn_notes","colSpan":12}]}]},"footer":{"blocks":[{"id":"buttons","blockType":"form-buttons","buttons":[{"code":"submit","action":"save","commandCode":"tasset:update_maintenance","primary":true},{"code":"cancel","action":"cancel"}]}]}}}}
+{
+  "pageKey": "tasset_maintenance_form",
+  "name:zh-CN": "维护表单",
+  "name:en": "Maintenance Form",
+  "kind": "form",
+  "modelCode": "tasset_maintenance",
+  "title": {
+    "zh-CN": "维护表单",
+    "en": "Maintenance Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
+      "main": {
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
+      },
+      "footer": {
+        "type": "flex",
+        "direction": "row"
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "维护信息",
+        "en-US": "Maintenance Information"
+      },
+      "fields": [
+        {
+          "field": "tasset_mn_asset_id",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_mn_type",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_mn_scheduled_date",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_mn_technician",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_mn_cost",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_mn_completed_date",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_mn_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tasset:create_maintenance",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
+}

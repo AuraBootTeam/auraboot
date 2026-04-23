@@ -1,12 +1,277 @@
 [
-  {"code":"ehr:create_employee","displayName:zh-CN":"新建员工","displayName:en":"Create Employee","type":"create","modelCode":"ehr_employee","inputFields":["ehr_em_name","ehr_em_email","ehr_em_phone","ehr_em_gender","ehr_em_birth_date","ehr_em_department_id","ehr_em_position_id","ehr_em_hire_date","ehr_em_base_salary","ehr_em_emergency_contact","ehr_em_address","ehr_em_notes"],"autoSetFields":{"ehr_em_code":{"strategy":"auto_generate","pattern":"EMP-{yyyyMMdd}-{seq}"},"ehr_em_status":{"strategy":"fixed_value","value":"probation"}},"permissions":["EHR.employee.manage"],"agent_hint":"Create a new employee record. Required: name, email, department, hire_date.","cmd_risk_level":"L1","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns the created employee with status PROBATION.","example_input":{"ehr_em_name":"John Smith","ehr_em_email":"john@company.com","ehr_em_hire_date":"2026-03-01"},"idempotent":false,"reversible":true},
-  {"code":"ehr:update_employee","displayName:zh-CN":"编辑员工","displayName:en":"Update Employee","type":"update","modelCode":"ehr_employee","inputFields":["ehr_em_name","ehr_em_email","ehr_em_phone","ehr_em_gender","ehr_em_birth_date","ehr_em_department_id","ehr_em_position_id","ehr_em_base_salary","ehr_em_emergency_contact","ehr_em_address","ehr_em_notes"],"permissions":["EHR.employee.manage"],"agent_hint":"Update employee details. Status changes use state transition commands.","cmd_risk_level":"L1","precondition_description":"Employee must exist.","side_effect_description":null,"output_description":"Returns the updated employee.","example_input":{"ehr_em_phone":"13800138000"},"idempotent":true,"reversible":true},
-  {"code":"ehr:confirm_employee","displayName:zh-CN":"转正","displayName:en":"Confirm Employee","type":"state_transition","modelCode":"ehr_employee","stateField":"ehr_em_status","fromStates":["probation"],"toState":"active","permissions":["EHR.employee.manage"],"agent_hint":"Confirm probationary employee to active status.","cmd_risk_level":"L2","precondition_description":"Employee must be in PROBATION status.","side_effect_description":null,"output_description":"Returns employee with status active.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ehr:employee_on_leave","displayName:zh-CN":"员工休假","displayName:en":"Set On Leave","type":"state_transition","modelCode":"ehr_employee","stateField":"ehr_em_status","fromStates":["active"],"toState":"on_leave","permissions":["EHR.employee.manage"],"agent_hint":"Mark employee as on leave.","cmd_risk_level":"L1","precondition_description":"Employee must be active.","side_effect_description":null,"output_description":"Returns employee with status ON_LEAVE.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ehr:employee_return","displayName:zh-CN":"员工复岗","displayName:en":"Return from Leave","type":"state_transition","modelCode":"ehr_employee","stateField":"ehr_em_status","fromStates":["on_leave"],"toState":"active","permissions":["EHR.employee.manage"],"agent_hint":"Return employee from leave to active status.","cmd_risk_level":"L1","precondition_description":"Employee must be ON_LEAVE.","side_effect_description":null,"output_description":"Returns employee with status active.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ehr:resign_employee","displayName:zh-CN":"员工离职","displayName:en":"Resign Employee","type":"state_transition","modelCode":"ehr_employee","stateField":"ehr_em_status","fromStates":["active","on_leave"],"toState":"resigned","extension":{"confirmMessage:zh-CN":"确认办理员工离职？","confirmMessage:en":"Confirm employee resignation?"},"permissions":["EHR.employee.manage"],"agent_hint":"Process employee resignation. Terminal state.","cmd_risk_level":"L3","precondition_description":"Employee must be active or ON_LEAVE.","side_effect_description":null,"output_description":"Returns employee with terminal status RESIGNED.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ehr:terminate_employee","displayName:zh-CN":"解雇员工","displayName:en":"Terminate Employee","type":"state_transition","modelCode":"ehr_employee","stateField":"ehr_em_status","fromStates":["probation","active","on_leave"],"toState":"terminated","extension":{"confirmMessage:zh-CN":"确认解雇此员工？","confirmMessage:en":"Confirm employee termination?"},"permissions":["EHR.employee.manage"],"agent_hint":"Terminate employment. Terminal state.","cmd_risk_level":"L4","precondition_description":"Employee must not already be RESIGNED or TERMINATED.","side_effect_description":null,"output_description":"Returns employee with terminal status TERMINATED.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ehr:delete_employee","displayName:zh-CN":"删除员工","displayName:en":"Delete Employee","type":"delete","modelCode":"ehr_employee","preconditions":[{"field":"ehr_em_status","operator":"IN","value":["probation"]}],"extension":{"confirmMessage:zh-CN":"确认删除此员工记录？","confirmMessage:en":"Confirm delete this employee?"},"permissions":["EHR.employee.manage"],"agent_hint":"Delete employee record. Only PROBATION employees.","cmd_risk_level":"L4","precondition_description":"Employee must be in PROBATION status.","side_effect_description":null,"output_description":"Employee record is permanently removed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"ehr:detail_employee","displayName:zh-CN":"查看员工","displayName:en":"View Employee","type":"query","modelCode":"ehr_employee","permissions":["EHR.employee.read"],"agent_hint":"Retrieve employee by ID.","cmd_risk_level":"L0","precondition_description":"Employee must exist.","side_effect_description":null,"output_description":"Returns the full employee record.","example_input":{},"idempotent":true,"reversible":true},
-  {"code":"ehr:list_employees","displayName:zh-CN":"员工列表","displayName:en":"List Employees","type":"query","modelCode":"ehr_employee","permissions":["EHR.employee.read"],"agent_hint":"Query employees with pagination and filters.","cmd_risk_level":"L0","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns a paginated list of employees.","example_input":{"pageNum":1,"pageSize":20},"idempotent":true,"reversible":true}
+  {
+    "code": "ehr:create_employee",
+    "displayName:zh-CN": "新建员工",
+    "displayName:en": "Create Employee",
+    "type": "create",
+    "modelCode": "ehr_employee",
+    "inputFields": [
+      "ehr_em_name",
+      "ehr_em_email",
+      "ehr_em_phone",
+      "ehr_em_gender",
+      "ehr_em_birth_date",
+      "ehr_em_department_id",
+      "ehr_em_position_id",
+      "ehr_em_hire_date",
+      "ehr_em_base_salary",
+      "ehr_em_emergency_contact",
+      "ehr_em_address",
+      "ehr_em_notes"
+    ],
+    "autoSetFields": {
+      "ehr_em_code": {
+        "strategy": "auto_generate",
+        "pattern": "EMP-{yyyyMMdd}-{seq}"
+      },
+      "ehr_em_status": {
+        "strategy": "fixed_value",
+        "value": "probation"
+      }
+    },
+    "permissions": [
+      "ehr.employee.manage"
+    ],
+    "agent_hint": "Create a new employee record. Required: name, email, department, hire_date.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns the created employee with status PROBATION.",
+    "example_input": {
+      "ehr_em_name": "John Smith",
+      "ehr_em_email": "john@company.com",
+      "ehr_em_hire_date": "2026-03-01"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "ehr:update_employee",
+    "displayName:zh-CN": "编辑员工",
+    "displayName:en": "Update Employee",
+    "type": "update",
+    "modelCode": "ehr_employee",
+    "inputFields": [
+      "ehr_em_name",
+      "ehr_em_email",
+      "ehr_em_phone",
+      "ehr_em_gender",
+      "ehr_em_birth_date",
+      "ehr_em_department_id",
+      "ehr_em_position_id",
+      "ehr_em_base_salary",
+      "ehr_em_emergency_contact",
+      "ehr_em_address",
+      "ehr_em_notes"
+    ],
+    "permissions": [
+      "ehr.employee.manage"
+    ],
+    "agent_hint": "Update employee details. Status changes use state transition commands.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Employee must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated employee.",
+    "example_input": {
+      "ehr_em_phone": "13800138000"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "ehr:confirm_employee",
+    "displayName:zh-CN": "转正",
+    "displayName:en": "Confirm Employee",
+    "type": "state_transition",
+    "modelCode": "ehr_employee",
+    "stateField": "ehr_em_status",
+    "fromStates": [
+      "probation"
+    ],
+    "toState": "active",
+    "permissions": [
+      "ehr.employee.manage"
+    ],
+    "agent_hint": "Confirm probationary employee to active status.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Employee must be in PROBATION status.",
+    "side_effect_description": null,
+    "output_description": "Returns employee with status active.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ehr:employee_on_leave",
+    "displayName:zh-CN": "员工休假",
+    "displayName:en": "Set On Leave",
+    "type": "state_transition",
+    "modelCode": "ehr_employee",
+    "stateField": "ehr_em_status",
+    "fromStates": [
+      "active"
+    ],
+    "toState": "on_leave",
+    "permissions": [
+      "ehr.employee.manage"
+    ],
+    "agent_hint": "Mark employee as on leave.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Employee must be active.",
+    "side_effect_description": null,
+    "output_description": "Returns employee with status ON_LEAVE.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ehr:employee_return",
+    "displayName:zh-CN": "员工复岗",
+    "displayName:en": "Return from Leave",
+    "type": "state_transition",
+    "modelCode": "ehr_employee",
+    "stateField": "ehr_em_status",
+    "fromStates": [
+      "on_leave"
+    ],
+    "toState": "active",
+    "permissions": [
+      "ehr.employee.manage"
+    ],
+    "agent_hint": "Return employee from leave to active status.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Employee must be ON_LEAVE.",
+    "side_effect_description": null,
+    "output_description": "Returns employee with status active.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ehr:resign_employee",
+    "displayName:zh-CN": "员工离职",
+    "displayName:en": "Resign Employee",
+    "type": "state_transition",
+    "modelCode": "ehr_employee",
+    "stateField": "ehr_em_status",
+    "fromStates": [
+      "active",
+      "on_leave"
+    ],
+    "toState": "resigned",
+    "extension": {
+      "confirmMessage:zh-CN": "确认办理员工离职？",
+      "confirmMessage:en": "Confirm employee resignation?"
+    },
+    "permissions": [
+      "ehr.employee.manage"
+    ],
+    "agent_hint": "Process employee resignation. Terminal state.",
+    "cmd_risk_level": "L3",
+    "precondition_description": "Employee must be active or ON_LEAVE.",
+    "side_effect_description": null,
+    "output_description": "Returns employee with terminal status RESIGNED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ehr:terminate_employee",
+    "displayName:zh-CN": "解雇员工",
+    "displayName:en": "Terminate Employee",
+    "type": "state_transition",
+    "modelCode": "ehr_employee",
+    "stateField": "ehr_em_status",
+    "fromStates": [
+      "probation",
+      "active",
+      "on_leave"
+    ],
+    "toState": "terminated",
+    "extension": {
+      "confirmMessage:zh-CN": "确认解雇此员工？",
+      "confirmMessage:en": "Confirm employee termination?"
+    },
+    "permissions": [
+      "ehr.employee.manage"
+    ],
+    "agent_hint": "Terminate employment. Terminal state.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Employee must not already be RESIGNED or TERMINATED.",
+    "side_effect_description": null,
+    "output_description": "Returns employee with terminal status TERMINATED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ehr:delete_employee",
+    "displayName:zh-CN": "删除员工",
+    "displayName:en": "Delete Employee",
+    "type": "delete",
+    "modelCode": "ehr_employee",
+    "preconditions": [
+      {
+        "field": "ehr_em_status",
+        "operator": "IN",
+        "value": [
+          "probation"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此员工记录？",
+      "confirmMessage:en": "Confirm delete this employee?"
+    },
+    "permissions": [
+      "ehr.employee.manage"
+    ],
+    "agent_hint": "Delete employee record. Only PROBATION employees.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Employee must be in PROBATION status.",
+    "side_effect_description": null,
+    "output_description": "Employee record is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "ehr:detail_employee",
+    "displayName:zh-CN": "查看员工",
+    "displayName:en": "View Employee",
+    "type": "query",
+    "modelCode": "ehr_employee",
+    "permissions": [
+      "ehr.employee.read"
+    ],
+    "agent_hint": "Retrieve employee by ID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Employee must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full employee record.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "ehr:list_employees",
+    "displayName:zh-CN": "员工列表",
+    "displayName:en": "List Employees",
+    "type": "query",
+    "modelCode": "ehr_employee",
+    "permissions": [
+      "ehr.employee.read"
+    ],
+    "agent_hint": "Query employees with pagination and filters.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of employees.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
+    "idempotent": true,
+    "reversible": true
+  }
 ]

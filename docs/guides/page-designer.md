@@ -302,6 +302,156 @@ Detail pages combine read-only field display with sub-tables and tabs:
 }
 ```
 
+### Detail tab data contracts
+
+Detail tabs should not be treated as generic containers. Each block type has a different data contract, and the page DSL should reflect that explicitly.
+
+| Block type | Purpose | Expected behavior | Recommended test style |
+|-----------|---------|-------------------|------------------------|
+| `form-section` | Current record snapshot | Shows persisted field values | Assert exact values, allowing locale-aware formatting for dates/numbers |
+| `sub-table` | Related rows or query-backed rows | Shows rows when data exists, otherwise explicit empty state | Assert row presence plus key business cells |
+| `activity-timeline` | Business activity feed | Can be empty for new records | Assert real events when available, otherwise explicit empty / permission state |
+| `field-history` | Audit trail | Can be empty or permission-gated | Assert change entries when available, otherwise explicit empty / permission state |
+| `bpm-panel` | Workflow runtime state | Must show `ready`, `empty`, or `error` clearly | Assert block state plus key section content |
+
+For robust page testing, ask:
+
+1. Does the tab have a backing data source?
+2. If it does, does the UI render actual rows/events/fields?
+3. If empty is valid, does the tab degrade with a clear empty state instead of silent blank content?
+
+### `sub-table` with `namedQuery`
+
+Detail pages support query-backed sub-tables by using `dataSource.kind = "namedQuery"` or `dataSource.type = "namedQuery"`.
+
+Example:
+
+```json
+{
+  "blockType": "sub-table",
+  "config": {
+    "title": { "en": "Approval History", "zh-CN": "审批历史" },
+    "dataSource": {
+      "kind": "namedQuery",
+      "queryCode": "wd_leave_request_approval_history",
+      "params": {
+        "processInstanceId": "${wd_req_process_instance}"
+      }
+    },
+    "columns": [
+      { "fieldCode": "taskName" },
+      { "fieldCode": "status" },
+      { "fieldCode": "comment" }
+    ]
+  }
+}
+```
+
+Rules:
+
+- `queryCode` is required when the data source is a named query.
+- Runtime should resolve this to `/api/datasource/list` with `datasourceId = nq:${queryCode}`.
+- Query-backed table data should use `format = records`.
+- If the query returns zero rows, the sub-table must show its empty state rather than a blank tab.
+
+### Placeholder interpolation in detail sub-table params
+
+For detail-page sub-table params, both placeholder styles are supported:
+
+- `${record.fieldName}`
+- `${fieldName}`
+
+Examples:
+
+```json
+{
+  "params": {
+    "processInstanceId": "${wd_req_process_instance}",
+    "applicantPid": "${record.wd_req_applicant}"
+  }
+}
+```
+
+Rules:
+
+- `${recordId}` resolves to the current detail record id
+- `${record.fieldName}` resolves to the parent record field value
+- `${fieldName}` also resolves to the parent record field value
+- Unknown placeholders should degrade to empty string; never leak raw template text into the outgoing request
+
+### NamedQuery SQL constraints for detail tabs
+
+When a detail tab depends on a named query, the SQL must match the real storage types of the backing tables.
+
+Common pitfalls:
+
+- comparing `varchar tenant_id` columns against numeric `#{params.tenantId}` without a cast
+- assuming workflow tables always populate a human-friendly `title`
+- asserting approval comments in tabs whose query never returns them
+
+Recommended pattern:
+
+```sql
+SELECT
+  CAST(t.id AS VARCHAR) AS pid,
+  COALESCE(NULLIF(t.title, ''), t.process_definition_activity_id) AS "taskName",
+  t.status AS status
+FROM se_task_instance t
+WHERE t.tenant_id = CAST(#{params.tenantId} AS VARCHAR)
+  AND t.process_instance_id = CAST(#{params.processInstanceId} AS BIGINT)
+ORDER BY t.gmt_create ASC
+```
+
+This avoids:
+
+- PostgreSQL type mismatch errors like `character varying = bigint`
+- empty node labels in approval-history tables
+- tests asserting labels the query does not actually return
+
+### E2E guidance for detail pages
+
+Prefer block-specific assertions instead of one generic “tab exists” assertion.
+
+- `form-section`: assert field values directly
+- `sub-table`: assert visible rows and key cell content
+- `activity-timeline`: assert real event content, or explicit empty / permission state
+- `field-history`: assert real change entries, or explicit empty / permission state
+- `bpm-panel`: assert block state and the expected section content
+
+For workflow detail pages specifically:
+
+- wait for the pending todo task to exist before asserting query-backed approval-history tabs
+- do not assume approval comments appear in every tab; they may belong to BPM history or activity timeline instead of the sub-table query
+- avoid exact global DOM counts when the detail page pre-renders hidden tabs; prefer visible-container assertions or lower-bound counts
+
+### List row-click behavior
+
+For DSL list pages, the platform default is:
+
+- row click navigates to the detail page
+- preview drawer is opt-in, not the default
+
+Use explicit configuration only when you want non-default behavior:
+
+```json
+{
+  "props": {
+    "rowClickAction": "drawer"
+  }
+}
+```
+
+Supported values:
+
+- `detail`: navigate to `/p/{model}/view/{recordId}` or the configured detail page
+- `drawer`: open `RecordPreviewDrawer`
+- `none`: disable row-click interaction
+
+Notes:
+
+- older pages that relied on an implicit preview drawer should now declare `rowClickAction: "drawer"` explicitly
+- designer defaults should stay aligned with runtime defaults: if nothing is configured, treat row click as `detail`
+
 ## Troubleshooting
 
 | Problem | Cause | Fix |

@@ -2,47 +2,86 @@
   "pageKey": "tcrm_opportunity_form",
   "name:zh-CN": "商机表单",
   "name:en": "Opportunity Form",
-  "pageType": "form",
+  "kind": "form",
   "modelCode": "tcrm_opportunity",
-  "dslSchema": {
-    "id": "form.tcrm_opportunity",
-    "kind": "Form",
-    "version": "1.0.0",
-    "modelCode": "tcrm_opportunity",
-    "layout": {
-      "areas": ["main", "footer"],
-      "areasConfig": {
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
-        "footer": { "type": "flex", "direction": "row" }
-      }
-    },
-    "areas": {
+  "title": {
+    "zh-CN": "商机表单",
+    "en": "Opportunity Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
       "main": {
-        "blocks": [{
-          "id": "basic",
-          "blockType": "form-section",
-          "title": { "zh-CN": "商机信息", "en-US": "Opportunity Information" },
-          "fields": [
-            { "field": "tcrm_op_name", "colSpan": 12 },
-            { "field": "tcrm_op_account_id", "colSpan": 6 },
-            { "field": "tcrm_op_contact_id", "colSpan": 6 },
-            { "field": "tcrm_op_amount", "colSpan": 6 },
-            { "field": "tcrm_op_expected_close", "colSpan": 6 },
-            { "field": "tcrm_op_assignee", "colSpan": 6 },
-            { "field": "tcrm_op_notes", "colSpan": 12 }
-          ]
-        }]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       },
       "footer": {
-        "blocks": [{
-          "id": "buttons",
-          "blockType": "form-buttons",
-          "buttons": [
-            { "code": "submit", "action": "save", "commandCode": "tcrm:update_opportunity", "primary": true },
-            { "code": "cancel", "action": "cancel" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "商机信息",
+        "en-US": "Opportunity Information"
+      },
+      "fields": [
+        {
+          "field": "tcrm_op_name",
+          "colSpan": 12
+        },
+        {
+          "field": "tcrm_op_account_id",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_op_contact_id",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_op_amount",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_op_expected_close",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_op_assignee",
+          "colSpan": 6
+        },
+        {
+          "field": "tcrm_op_notes",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "tcrm:create_opportunity",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
 }

@@ -1275,29 +1275,33 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
      */
     @SuppressWarnings("unchecked")
     private String compileBpmnContent(ProcessDefinitionDTO dto, Integer version) {
-        if (dto.getBpmnContent() != null && !dto.getBpmnContent().isBlank()) {
-            return stampVersion(dto.getBpmnContent(), version);
-        }
         Map<String, Object> designerJson = dto.getDesignerJson() != null
                 ? objectMapper.convertValue(dto.getDesignerJson(), new TypeReference<Map<String, Object>>() {})
                 : null;
+        if (designerJson != null && !designerJson.isEmpty()) {
+            // Prefer designerJson when both sources are present. It is the editable source of truth
+            // and avoids importing stale embedded BPMN XML from older plugin manifests.
+            designerJson.putIfAbsent("key", dto.getKey());
+            if (dto.getEffectiveName() != null) {
+                designerJson.putIfAbsent("name", dto.getEffectiveName());
+            }
+            try {
+                String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
+                return stampVersion(bpmnXml, version);
+            } catch (Exception e) {
+                log.error("Failed to compile BPMN for {}: {}", dto.getKey(), e.getMessage(), e);
+                throw new PluginException("Failed to compile BPMN for " + dto.getKey() + ": " + e.getMessage(), e);
+            }
+        }
+
+        if (dto.getBpmnContent() != null && !dto.getBpmnContent().isBlank()) {
+            return stampVersion(dto.getBpmnContent(), version);
+        }
+
         if (designerJson == null || designerJson.isEmpty()) {
             return "";
         }
-        // designerJson typically contains only {nodes, edges} — the process key/name live
-        // on the DTO root. Propagate them so JsonToBpmnConverter emits <process id="<key>">
-        // instead of the default "process_1", which would collide across imports.
-        designerJson.putIfAbsent("key", dto.getKey());
-        if (dto.getEffectiveName() != null) {
-            designerJson.putIfAbsent("name", dto.getEffectiveName());
-        }
-        try {
-            String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
-            return stampVersion(bpmnXml, version);
-        } catch (Exception e) {
-            log.error("Failed to compile BPMN for {}: {}", dto.getKey(), e.getMessage(), e);
-            throw new PluginException("Failed to compile BPMN for " + dto.getKey() + ": " + e.getMessage(), e);
-        }
+        return "";
     }
 
     /**

@@ -1,12 +1,269 @@
 [
-  {"code":"tasset:create_asset","displayName:zh-CN":"新建资产","displayName:en":"Create Asset","type":"create","modelCode":"tasset_asset","inputFields":["tasset_as_name","tasset_as_category","tasset_as_serial","tasset_as_purchase_date","tasset_as_purchase_cost","tasset_as_location","tasset_as_notes"],"autoSetFields":{"tasset_as_code":{"strategy":"auto_generate","pattern":"AST-{yyyyMMdd}-{seq}"},"tasset_as_status":{"strategy":"fixed_value","value":"available"}},"permissions":["TASSET.asset.manage"],"agent_hint":"Create a new asset. Required: name. Optional: category, serial, purchase_date, purchase_cost, location, notes.","cmd_risk_level":"L1","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns the created asset with status AVAILABLE.","example_input":{"tasset_as_name":"MacBook Pro 16","tasset_as_category":"it_equipment","tasset_as_serial":"sn123456"},"idempotent":false,"reversible":true},
-  {"code":"tasset:update_asset","displayName:zh-CN":"编辑资产","displayName:en":"Update Asset","type":"update","modelCode":"tasset_asset","inputFields":["tasset_as_name","tasset_as_category","tasset_as_serial","tasset_as_purchase_date","tasset_as_purchase_cost","tasset_as_location","tasset_as_notes"],"permissions":["TASSET.asset.manage"],"agent_hint":"Update asset details. Status changes use state transition commands.","cmd_risk_level":"L1","precondition_description":"Asset must exist.","side_effect_description":null,"output_description":"Returns the updated asset.","example_input":{"tasset_as_location":"Floor 3, Room 301"},"idempotent":true,"reversible":true},
-  {"code":"tasset:assign_asset","displayName:zh-CN":"分配资产","displayName:en":"Assign Asset","type":"state_transition","modelCode":"tasset_asset","stateField":"tasset_as_status","fromStates":["available"],"toState":"in_use","inputFields":["tasset_as_assigned_to"],"permissions":["TASSET.asset.manage"],"agent_hint":"Assign asset to a person. Sets status to IN_USE.","cmd_risk_level":"L1","precondition_description":"Asset must be AVAILABLE.","side_effect_description":null,"output_description":"Returns asset with status IN_USE and assigned_to set.","example_input":{"tasset_as_assigned_to":"alice"},"idempotent":false,"reversible":false},
-  {"code":"tasset:return_asset","displayName:zh-CN":"归还资产","displayName:en":"Return Asset","type":"state_transition","modelCode":"tasset_asset","stateField":"tasset_as_status","fromStates":["in_use"],"toState":"available","permissions":["TASSET.asset.manage"],"agent_hint":"Return asset, clearing assignee. Sets status to AVAILABLE.","cmd_risk_level":"L1","precondition_description":"Asset must be IN_USE.","side_effect_description":null,"output_description":"Returns asset with status AVAILABLE.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"tasset:send_maintenance","displayName:zh-CN":"送修","displayName:en":"Send for Maintenance","type":"state_transition","modelCode":"tasset_asset","stateField":"tasset_as_status","fromStates":["available","in_use"],"toState":"under_maintenance","permissions":["TASSET.asset.manage"],"agent_hint":"Send asset for maintenance.","cmd_risk_level":"L2","precondition_description":"Asset must be AVAILABLE or IN_USE.","side_effect_description":null,"output_description":"Returns asset with status UNDER_MAINTENANCE.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"tasset:finish_maintenance","displayName:zh-CN":"完成维护","displayName:en":"Finish Maintenance","type":"state_transition","modelCode":"tasset_asset","stateField":"tasset_as_status","fromStates":["under_maintenance"],"toState":"available","permissions":["TASSET.asset.manage"],"agent_hint":"Mark maintenance as finished. Asset becomes available.","cmd_risk_level":"L1","precondition_description":"Asset must be UNDER_MAINTENANCE.","side_effect_description":null,"output_description":"Returns asset with status AVAILABLE.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"tasset:retire_asset","displayName:zh-CN":"报废","displayName:en":"Retire Asset","type":"state_transition","modelCode":"tasset_asset","stateField":"tasset_as_status","fromStates":["available","in_use","under_maintenance"],"toState":"retired","extension":{"confirmMessage:zh-CN":"确认报废此资产？","confirmMessage:en":"Confirm retire this asset?"},"permissions":["TASSET.asset.manage"],"agent_hint":"Retire asset permanently. Terminal state.","cmd_risk_level":"L2","precondition_description":"Asset must not already be RETIRED.","side_effect_description":null,"output_description":"Returns asset with terminal status RETIRED.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"tasset:delete_asset","displayName:zh-CN":"删除资产","displayName:en":"Delete Asset","type":"delete","modelCode":"tasset_asset","preconditions":[{"field":"tasset_as_status","operator":"IN","value":["available"]}],"extension":{"confirmMessage:zh-CN":"确认删除此资产？","confirmMessage:en":"Confirm delete?"},"permissions":["TASSET.asset.manage"],"agent_hint":"Delete asset. Only AVAILABLE.","cmd_risk_level":"L4","precondition_description":"Asset must be AVAILABLE.","side_effect_description":null,"output_description":"Asset is permanently removed.","example_input":{},"idempotent":false,"reversible":false},
-  {"code":"tasset:detail_asset","displayName:zh-CN":"查看资产","displayName:en":"View Asset","type":"query","modelCode":"tasset_asset","permissions":["TASSET.asset.read"],"agent_hint":"Retrieve asset by ID.","cmd_risk_level":"L0","precondition_description":"Asset must exist.","side_effect_description":null,"output_description":"Returns the full asset record.","example_input":{},"idempotent":true,"reversible":true},
-  {"code":"tasset:list_assets","displayName:zh-CN":"资产列表","displayName:en":"List Assets","type":"query","modelCode":"tasset_asset","permissions":["TASSET.asset.read"],"agent_hint":"Query assets with pagination.","cmd_risk_level":"L0","precondition_description":"No preconditions.","side_effect_description":null,"output_description":"Returns a paginated list of assets.","example_input":{"pageNum":1,"pageSize":20},"idempotent":true,"reversible":true}
+  {
+    "code": "tasset:create_asset",
+    "displayName:zh-CN": "新建资产",
+    "displayName:en": "Create Asset",
+    "type": "create",
+    "modelCode": "tasset_asset",
+    "inputFields": [
+      "tasset_as_name",
+      "tasset_as_category",
+      "tasset_as_serial",
+      "tasset_as_purchase_date",
+      "tasset_as_purchase_cost",
+      "tasset_as_location",
+      "tasset_as_notes"
+    ],
+    "autoSetFields": {
+      "tasset_as_code": {
+        "strategy": "auto_generate",
+        "pattern": "AST-{yyyyMMdd}-{seq}"
+      },
+      "tasset_as_status": {
+        "strategy": "fixed_value",
+        "value": "available"
+      }
+    },
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Create a new asset. Required: name. Optional: category, serial, purchase_date, purchase_cost, location, notes.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns the created asset with status AVAILABLE.",
+    "example_input": {
+      "tasset_as_name": "MacBook Pro 16",
+      "tasset_as_category": "it_equipment",
+      "tasset_as_serial": "sn123456"
+    },
+    "idempotent": false,
+    "reversible": true
+  },
+  {
+    "code": "tasset:update_asset",
+    "displayName:zh-CN": "编辑资产",
+    "displayName:en": "Update Asset",
+    "type": "update",
+    "modelCode": "tasset_asset",
+    "inputFields": [
+      "tasset_as_name",
+      "tasset_as_category",
+      "tasset_as_serial",
+      "tasset_as_purchase_date",
+      "tasset_as_purchase_cost",
+      "tasset_as_location",
+      "tasset_as_notes"
+    ],
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Update asset details. Status changes use state transition commands.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Asset must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the updated asset.",
+    "example_input": {
+      "tasset_as_location": "Floor 3, Room 301"
+    },
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "tasset:assign_asset",
+    "displayName:zh-CN": "分配资产",
+    "displayName:en": "Assign Asset",
+    "type": "state_transition",
+    "modelCode": "tasset_asset",
+    "stateField": "tasset_as_status",
+    "fromStates": [
+      "available"
+    ],
+    "toState": "in_use",
+    "inputFields": [
+      "tasset_as_assigned_to"
+    ],
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Assign asset to a person. Sets status to IN_USE.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Asset must be AVAILABLE.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with status IN_USE and assigned_to set.",
+    "example_input": {
+      "tasset_as_assigned_to": "alice"
+    },
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tasset:return_asset",
+    "displayName:zh-CN": "归还资产",
+    "displayName:en": "Return Asset",
+    "type": "state_transition",
+    "modelCode": "tasset_asset",
+    "stateField": "tasset_as_status",
+    "fromStates": [
+      "in_use"
+    ],
+    "toState": "available",
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Return asset, clearing assignee. Sets status to AVAILABLE.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Asset must be IN_USE.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with status AVAILABLE.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tasset:send_maintenance",
+    "displayName:zh-CN": "送修",
+    "displayName:en": "Send for Maintenance",
+    "type": "state_transition",
+    "modelCode": "tasset_asset",
+    "stateField": "tasset_as_status",
+    "fromStates": [
+      "available",
+      "in_use"
+    ],
+    "toState": "under_maintenance",
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Send asset for maintenance.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Asset must be AVAILABLE or IN_USE.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with status UNDER_MAINTENANCE.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tasset:finish_maintenance",
+    "displayName:zh-CN": "完成维护",
+    "displayName:en": "Finish Maintenance",
+    "type": "state_transition",
+    "modelCode": "tasset_asset",
+    "stateField": "tasset_as_status",
+    "fromStates": [
+      "under_maintenance"
+    ],
+    "toState": "available",
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Mark maintenance as finished. Asset becomes available.",
+    "cmd_risk_level": "L1",
+    "precondition_description": "Asset must be UNDER_MAINTENANCE.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with status AVAILABLE.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tasset:retire_asset",
+    "displayName:zh-CN": "报废",
+    "displayName:en": "Retire Asset",
+    "type": "state_transition",
+    "modelCode": "tasset_asset",
+    "stateField": "tasset_as_status",
+    "fromStates": [
+      "available",
+      "in_use",
+      "under_maintenance"
+    ],
+    "toState": "retired",
+    "extension": {
+      "confirmMessage:zh-CN": "确认报废此资产？",
+      "confirmMessage:en": "Confirm retire this asset?"
+    },
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Retire asset permanently. Terminal state.",
+    "cmd_risk_level": "L2",
+    "precondition_description": "Asset must not already be RETIRED.",
+    "side_effect_description": null,
+    "output_description": "Returns asset with terminal status RETIRED.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tasset:delete_asset",
+    "displayName:zh-CN": "删除资产",
+    "displayName:en": "Delete Asset",
+    "type": "delete",
+    "modelCode": "tasset_asset",
+    "preconditions": [
+      {
+        "field": "tasset_as_status",
+        "operator": "IN",
+        "value": [
+          "available"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此资产？",
+      "confirmMessage:en": "Confirm delete?"
+    },
+    "permissions": [
+      "tasset.asset.manage"
+    ],
+    "agent_hint": "Delete asset. Only AVAILABLE.",
+    "cmd_risk_level": "L4",
+    "precondition_description": "Asset must be AVAILABLE.",
+    "side_effect_description": null,
+    "output_description": "Asset is permanently removed.",
+    "example_input": {},
+    "idempotent": false,
+    "reversible": false
+  },
+  {
+    "code": "tasset:detail_asset",
+    "displayName:zh-CN": "查看资产",
+    "displayName:en": "View Asset",
+    "type": "query",
+    "modelCode": "tasset_asset",
+    "permissions": [
+      "tasset.asset.read"
+    ],
+    "agent_hint": "Retrieve asset by ID.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "Asset must exist.",
+    "side_effect_description": null,
+    "output_description": "Returns the full asset record.",
+    "example_input": {},
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "tasset:list_assets",
+    "displayName:zh-CN": "资产列表",
+    "displayName:en": "List Assets",
+    "type": "query",
+    "modelCode": "tasset_asset",
+    "permissions": [
+      "tasset.asset.read"
+    ],
+    "agent_hint": "Query assets with pagination.",
+    "cmd_risk_level": "L0",
+    "precondition_description": "No preconditions.",
+    "side_effect_description": null,
+    "output_description": "Returns a paginated list of assets.",
+    "example_input": {
+      "pageNum": 1,
+      "pageSize": 20
+    },
+    "idempotent": true,
+    "reversible": true
+  }
 ]

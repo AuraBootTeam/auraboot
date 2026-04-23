@@ -17,7 +17,6 @@ public class CrudTemplateConfig {
     /**
      * Menu name
      */
-    @NotBlank(message = "Menu name cannot be empty")
     private String menuName;
     
     /**
@@ -34,6 +33,21 @@ public class CrudTemplateConfig {
      * Default roles to assign permissions to
      */
     private List<String> defaultRoles = new ArrayList<>();
+
+    /**
+     * Whether to create a menu entry
+     */
+    private boolean createMenu = false;
+
+    /**
+     * Whether to create permissions
+     */
+    private boolean createPermissions = false;
+
+    /**
+     * Whether to assign permissions to roles
+     */
+    private boolean assignRoles = false;
     
     /**
      * Whether to generate list page

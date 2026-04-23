@@ -2,45 +2,74 @@
   "pageKey": "tasset_category_detail",
   "name:zh-CN": "分类详情",
   "name:en": "Category Detail",
-  "pageType": "detail",
   "kind": "detail",
   "modelCode": "tasset_category",
-  "dslSchema": {
-    "id": "detail.tasset_category",
-    "kind": "Detail",
-    "version": "1.0.0",
-    "modelCode": "tasset_category",
-    "layout": {
-      "areas": ["header", "main"],
-      "areasConfig": {
-        "header": { "type": "flex", "direction": "row" },
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 }
-      }
-    },
-    "areas": {
+  "title": {
+    "zh-CN": "分类详情",
+    "en": "Category Detail"
+  },
+  "layout": {
+    "areas": [
+      "header",
+      "main"
+    ],
+    "areasConfig": {
       "header": {
-        "blocks": [{
-          "id": "action_bar",
-          "blockType": "toolbar",
-          "buttons": [
-            { "code": "edit", "action": "edit", "navigateTo": "tasset_category_form", "permissionCode": "TASSET.category.manage" },
-            { "code": "delete", "action": "delete", "danger": true, "commandCode": "tasset:delete_category", "permissionCode": "TASSET.category.manage", "confirmMessageKey": "delete.confirm" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       },
       "main": {
-        "blocks": [{
-          "id": "info",
-          "blockType": "form-section",
-          "readOnly": true,
-          "title": { "zh-CN": "分类信息", "en-US": "Category Information" },
-          "fields": [
-            { "field": "tasset_ct_code", "colSpan": 6 },
-            { "field": "tasset_ct_name", "colSpan": 6 },
-            { "field": "tasset_ct_description", "colSpan": 12 }
-          ]
-        }]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "action_bar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "action": "edit",
+          "permissionCode": "tasset.category.manage"
+        },
+        {
+          "code": "delete",
+          "action": "delete",
+          "danger": true,
+          "commandCode": "tasset:delete_category",
+          "permissionCode": "tasset.category.manage",
+          "confirmMessageKey": "delete.confirm"
+        }
+      ],
+      "area": "header"
+    },
+    {
+      "id": "info",
+      "blockType": "form-section",
+      "readOnly": true,
+      "title": {
+        "zh-CN": "分类信息",
+        "en-US": "Category Information"
+      },
+      "fields": [
+        {
+          "field": "tasset_ct_code",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_ct_name",
+          "colSpan": 6
+        },
+        {
+          "field": "tasset_ct_description",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    }
+  ]
 }

@@ -1,1 +1,156 @@
-{"pageKey":"tinv_stock_in_list","name:zh-CN":"入库列表","name:en":"Stock In","pageType":"list","modelCode":"tinv_stock_in","dslSchema":{"id":"list.tinv_stock_in","kind":"List","areas":{"toolbar":{"blocks":[{"id":"tinv_si_toolbar","blockType":"toolbar","buttons":[{"code":"create","action":"create","primary":true,"commandCode":"tinv:create_stock_in","navigateTo":"tinv_stock_in_form","permissionCode":"TINV.stockin.manage"}]}]},"list-tabs":{"blocks":[{"id":"tinv_si_tabs","blockType":"tabs","tabs":[{"key":"all","label":{"en":"All","zh-CN":"全部"},"filter":null},{"key":"draft","label":{"en":"Draft","zh-CN":"草稿"},"filter":{"field":"tinv_si_status","value":"draft","operator":"EQ"}},{"key":"confirmed","label":{"en":"Confirmed","zh-CN":"已确认"},"filter":{"field":"tinv_si_status","value":"confirmed","operator":"EQ"}},{"key":"cancelled","label":{"en":"Cancelled","zh-CN":"已取消"},"filter":{"field":"tinv_si_status","value":"cancelled","operator":"EQ"}}]}]},"main":{"blocks":[{"id":"tinv_si_table","blockType":"table","columns":[{"field":"tinv_si_code","width":150,"sortable":true},{"field":"tinv_si_product_id","width":160},{"field":"tinv_si_warehouse_id","width":140},{"field":"tinv_si_quantity","width":100},{"field":"tinv_si_unit_cost","width":100},{"field":"tinv_si_status","width":100,"renderType":"tag","dictCode":"tinv_doc_status"},{"field":"tinv_si_supplier","width":140},{"field":"tinv_si_receipt_date","width":120,"sortable":true},{"field":"actions","isActionColumn":true,"buttons":[{"code":"view","action":"detail","navigateTo":"tinv_stock_in_detail"},{"code":"edit","action":"edit","navigateTo":"tinv_stock_in_form","permissionCode":"TINV.stockin.manage"},{"code":"delete","action":"delete","danger":true,"commandCode":"tinv:delete_stock_in","permissionCode":"TINV.stockin.manage","confirmMessageKey":"delete.confirm"}]}],"searchFields":["tinv_si_code","tinv_si_supplier"],"defaultSort":{"field":"created_at","order":"desc"}}]}}}}
+{
+  "pageKey": "tinv_stock_in_list",
+  "name:zh-CN": "入库列表",
+  "name:en": "Stock In",
+  "modelCode": "tinv_stock_in",
+  "kind": "list",
+  "title": {
+    "zh-CN": "入库列表",
+    "en": "Stock In"
+  },
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "tinv_si_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "action": "create",
+          "primary": true,
+          "permissionCode": "tinv.stockin.manage"
+        }
+      ],
+      "area": "toolbar"
+    },
+    {
+      "id": "tinv_si_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "draft",
+          "label": {
+            "en": "Draft",
+            "zh-CN": "草稿"
+          },
+          "filter": {
+            "field": "tinv_si_status",
+            "value": "draft",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "confirmed",
+          "label": {
+            "en": "Confirmed",
+            "zh-CN": "已确认"
+          },
+          "filter": {
+            "field": "tinv_si_status",
+            "value": "confirmed",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "cancelled",
+          "label": {
+            "en": "Cancelled",
+            "zh-CN": "已取消"
+          },
+          "filter": {
+            "field": "tinv_si_status",
+            "value": "cancelled",
+            "operator": "EQ"
+          }
+        }
+      ],
+      "area": "list-tabs"
+    },
+    {
+      "id": "tinv_si_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "tinv_si_code",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "tinv_si_product_id",
+          "width": 160
+        },
+        {
+          "field": "tinv_si_warehouse_id",
+          "width": 140
+        },
+        {
+          "field": "tinv_si_quantity",
+          "width": 100
+        },
+        {
+          "field": "tinv_si_unit_cost",
+          "width": 100
+        },
+        {
+          "field": "tinv_si_status",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "tinv_doc_status"
+        },
+        {
+          "field": "tinv_si_supplier",
+          "width": 140
+        },
+        {
+          "field": "tinv_si_receipt_date",
+          "width": 120,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "action": "detail",
+              "navigateTo": "tinv_stock_in_detail"
+            },
+            {
+              "code": "edit",
+              "action": "edit",
+              "navigateTo": "tinv_stock_in_form",
+              "permissionCode": "tinv.stockin.manage"
+            },
+            {
+              "code": "delete",
+              "action": "delete",
+              "danger": true,
+              "commandCode": "tinv:delete_stock_in",
+              "permissionCode": "tinv.stockin.manage",
+              "confirmMessageKey": "delete.confirm"
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "tinv_si_code",
+        "tinv_si_supplier"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      },
+      "area": "main"
+    }
+  ]
+}

@@ -2,55 +2,93 @@
   "pageKey": "thr_leave_request_form",
   "name:zh-CN": "请假表单",
   "name:en": "Leave Request Form",
-  "pageType": "form",
   "modelCode": "thr_leave_request",
-  "dslSchema": {
-    "id": "form.thr_leave_request",
-    "kind": "Form",
-    "version": "1.0.0",
-    "modelCode": "thr_leave_request",
-    "layout": {
-      "areas": ["main", "footer"],
-      "areasConfig": {
-        "main": { "type": "grid", "cols": 12, "rowGap": 16, "colGap": 16 },
-        "footer": { "type": "flex", "direction": "row" }
-      }
-    },
-    "areas": {
+  "kind": "form",
+  "title": {
+    "zh-CN": "请假表单",
+    "en": "Leave Request Form"
+  },
+  "layout": {
+    "areas": [
+      "main",
+      "footer"
+    ],
+    "areasConfig": {
       "main": {
-        "blocks": [
-          {
-            "id": "basic",
-            "blockType": "form-section",
-            "title": { "zh-CN": "请假信息", "en-US": "Leave Information" },
-            "fields": [
-              { "field": "thr_lv_employee_id", "colSpan": 6 },
-              { "field": "thr_lv_leave_type", "colSpan": 6 },
-              { "field": "thr_lv_start_date", "colSpan": 6 },
-              { "field": "thr_lv_end_date", "colSpan": 6 },
-              { "field": "thr_lv_days", "colSpan": 6 }
-            ]
-          },
-          {
-            "id": "detail",
-            "blockType": "form-section",
-            "title": { "zh-CN": "请假原因", "en-US": "Reason" },
-            "fields": [
-              { "field": "thr_lv_reason", "colSpan": 12 }
-            ]
-          }
-        ]
+        "type": "grid",
+        "cols": 12,
+        "rowGap": 16,
+        "colGap": 16
       },
       "footer": {
-        "blocks": [{
-          "id": "buttons",
-          "blockType": "form-buttons",
-          "buttons": [
-            { "code": "submit", "action": "save", "commandCode": "thr:update_leave_request", "primary": true },
-            { "code": "cancel", "action": "cancel" }
-          ]
-        }]
+        "type": "flex",
+        "direction": "row"
       }
     }
-  }
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "请假信息",
+        "en-US": "Leave Information"
+      },
+      "fields": [
+        {
+          "field": "thr_lv_employee_id",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_lv_leave_type",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_lv_start_date",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_lv_end_date",
+          "colSpan": 6
+        },
+        {
+          "field": "thr_lv_days",
+          "colSpan": 6
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "detail",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "请假原因",
+        "en-US": "Reason"
+      },
+      "fields": [
+        {
+          "field": "thr_lv_reason",
+          "colSpan": 12
+        }
+      ],
+      "area": "main"
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "action": "save",
+          "commandCode": "thr:create_leave_request",
+          "primary": true
+        },
+        {
+          "code": "cancel",
+          "action": "cancel"
+        }
+      ],
+      "area": "footer"
+    }
+  ]
 }
