@@ -163,7 +163,9 @@ public class PageSchemaDTO {
      */
     public boolean isValid() {
         return pageKey != null && !pageKey.isBlank()
-                && kind != null && !kind.isBlank();
+                && kind != null && !kind.isBlank()
+                && layout != null && !layout.isEmpty()
+                && blocks != null && !blocks.isEmpty();
     }
 
     /**
@@ -187,4 +189,5 @@ public class PageSchemaDTO {
         }
         return name != null ? name : pageKey;
     }
+
 }
