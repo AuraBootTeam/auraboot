@@ -44,7 +44,7 @@ test.describe('Command Pipeline — API Tests', () => {
     customer = new ModelTestHelper(page, CUSTOMER_CONFIG);
   });
 
-  test('CP-A01: BATCH_CREATE — create multiple records', async ({ page }) => {
+  test('CP-A01: BATCH_CREATE — create multiple records', async ({ page: _page }) => {
     const pids: string[] = [];
     try {
       for (let i = 0; i < 3; i++) {
@@ -64,7 +64,7 @@ test.describe('Command Pipeline — API Tests', () => {
     }
   });
 
-  test('CP-A02: BATCH_UPDATE — update multiple records', async ({ page }) => {
+  test('CP-A02: BATCH_UPDATE — update multiple records', async ({ page: _page }) => {
     const pids: string[] = [];
     try {
       for (let i = 0; i < 2; i++) {
@@ -124,7 +124,7 @@ test.describe('Command Pipeline — API Tests', () => {
   });
 
   test('CP-A05: postAction CREATE_CHILDREN — side effect creates child records', async ({
-    page,
+    page: _page,
   }) => {
     const pid = await order.createViaApi();
     try {
@@ -139,7 +139,9 @@ test.describe('Command Pipeline — API Tests', () => {
     }
   });
 
-  test('CP-A06: sideEffect UPDATE_RECORD — approval updates related records', async ({ page }) => {
+  test('CP-A06: sideEffect UPDATE_RECORD — approval updates related records', async ({
+    page: _page,
+  }) => {
     const pid = await order.createViaApi();
     await order.child('item').createForParent(pid);
     try {
@@ -204,7 +206,7 @@ test.describe('Command Pipeline — API Tests', () => {
     }
   });
 
-  test('CP-A09: stateTransitionRules — conditional branch', async ({ page }) => {
+  test('CP-A09: stateTransitionRules — conditional branch', async ({ page: _page }) => {
     const pid = await order.createViaApi();
     await order.child('item').createForParent(pid);
     try {
@@ -219,7 +221,7 @@ test.describe('Command Pipeline — API Tests', () => {
     }
   });
 
-  test('CP-A10: operationType — parameter validation', async ({ page }) => {
+  test('CP-A10: operationType — parameter validation', async ({ page: _page }) => {
     const pid = await order.createViaApi();
     try {
       // Execute with explicit operationType

@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import clsx from 'clsx';
-import { ChevronUpIcon, ChevronDownIcon, FilterIcon, SearchIcon } from 'lucide-react';
+import { ChevronUpIcon, ChevronDownIcon, FilterIcon } from 'lucide-react';
 import type { ButtonProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 import {
   useSmartComponentState,
-  useValidation,
   useConditionalRender,
-  useDataSource,
-  useExpressionValue,
 } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { ExpressionParser } from '~/plugins/core-designer/components/studio/services/runtime/expression/expression-parser';
 import { Button } from '~/ui/smart/interaction/Button';
@@ -164,7 +161,7 @@ export const Table: React.FC<TableProps> = ({
   const { value: tableData, handleChange } = useSmartComponentState({
     name: name ?? 'smart-table',
     value: propData,
-    onChange: (data) => {
+    onChange: (_data) => {
       // 处理数据变化
     },
   });

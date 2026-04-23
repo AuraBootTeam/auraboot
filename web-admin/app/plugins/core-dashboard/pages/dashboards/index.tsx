@@ -39,6 +39,11 @@ import { userPreferenceService } from '~/shared/services/userPreferenceService';
 
 const PREF_KEY = 'dashboard_tab_order';
 const HINT_STORAGE_KEY = 'dashboard_drag_hint_shown';
+const HIDDEN_DEFAULT_TAB_CODES = new Set([
+  'sc_workflow_dashboard',
+  'sc_arsenal_dashboard',
+  'acs_dashboard',
+]);
 
 // ---------------------------------------------------------------------------
 // SortableTab — individual draggable tab
@@ -137,11 +142,22 @@ export default function DashboardViewerPage() {
 
   const dashboardRef = useRef<HTMLDivElement>(null);
 
+  const visibleDashboards = useMemo(
+    () =>
+      publishedList.filter(
+        (dashboard) =>
+          !dashboard.code ||
+          !HIDDEN_DEFAULT_TAB_CODES.has(dashboard.code) ||
+          dashboard.code === activeCode,
+      ),
+    [activeCode, publishedList],
+  );
+
   // Merge saved order with fetched list (new dashboards appended, removed ones filtered)
   const sortedList = useMemo(() => {
-    if (orderedCodes.length === 0) return publishedList;
+    if (orderedCodes.length === 0) return visibleDashboards;
 
-    const byCode = new Map(publishedList.map((d) => [d.code, d]));
+    const byCode = new Map(visibleDashboards.map((d) => [d.code, d]));
     const sorted: Dashboard[] = [];
 
     // First: dashboards in saved order
@@ -157,7 +173,7 @@ export default function DashboardViewerPage() {
       sorted.push(d);
     }
     return sorted;
-  }, [publishedList, orderedCodes]);
+  }, [visibleDashboards, orderedCodes]);
 
   const activeDashboard = useMemo(
     () => sortedList.find((d) => d.code === activeCode) ?? null,

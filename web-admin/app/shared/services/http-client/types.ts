@@ -172,6 +172,14 @@ export interface Result<T> {
    * Set to null when an error occurs.
    */
   data: T | null;
+
+  /**
+   * Optional backend error context
+   *
+   * Preserves structured validation/diagnostic details returned by the backend
+   * so callers can surface specific messages instead of a generic fallback.
+   */
+  context?: Record<string, unknown> | null;
 }
 
 /**

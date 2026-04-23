@@ -10,8 +10,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import GridLayout from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-import type { EnhancedGridConfig, EnhancedGridCellConfig, Layout } from '~/framework/smart/types/dashboard';
-import { cellToLayout, layoutToCell } from '~/framework/smart/types/dashboard';
+import {
+  cellToLayout,
+  layoutToCell,
+  type EnhancedGridConfig,
+  type EnhancedGridCellConfig,
+  type Layout,
+} from '~/framework/smart/types/dashboard';
 import type { FilterConfig } from '~/framework/smart/types/chart';
 import {
   SmartNumberCard,

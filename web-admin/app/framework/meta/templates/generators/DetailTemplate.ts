@@ -17,8 +17,8 @@ import type {
   TemplateGenerator,
   TemplateClassOverrides,
   TemplateStyleSet,
+  TEMPLATE_STYLES,
 } from '../types';
-import { TEMPLATE_STYLES } from '../types';
 import { mapFieldToValueType } from '../utils';
 
 export const DetailTemplate: TemplateGenerator = {
@@ -27,7 +27,6 @@ export const DetailTemplate: TemplateGenerator = {
     const { variant = 'default', classOverrides = {} } = options;
 
     const styles = TEMPLATE_STYLES[variant] ?? TEMPLATE_STYLES.default;
-    const primaryKey = model.primaryKey ?? 'id';
     const apiBase = model.apiBasePath ?? `/api/dynamic/${model.modelCode}`;
 
     const detailFields = model.fields.filter((f) => f.detailVisible !== false);

@@ -6,7 +6,7 @@
  * @since 3.2.0
  */
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 
 export interface VirtualListOptions {
   /** Total number of items */
@@ -57,7 +57,7 @@ export function useVirtualList(options: VirtualListOptions): VirtualListResult {
   const scrollContainerRef = useRef<HTMLElement | null>(null);
 
   // Calculate visible range
-  const { startIndex, endIndex, virtualItems } = useMemo(() => {
+  const { virtualItems } = useMemo(() => {
     const start = Math.floor(scrollOffset / itemHeight);
     const visibleCount = Math.ceil(containerHeight / itemHeight);
 

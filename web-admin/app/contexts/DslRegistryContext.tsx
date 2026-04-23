@@ -8,19 +8,17 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
-import type {
-  DslRegistryData,
-  DslEnumEntry,
-  RenderComponentEntry,
-  BlockRendererEntry,
-  CommandHandlerEntry,
-} from '~/shared/services/dslRegistryService';
 import {
   fetchDslRegistry,
   getFallbackRegistry,
   getEnumCodes,
   getEnumOptions,
   invalidateRegistryCache,
+  type DslRegistryData,
+  type DslEnumEntry,
+  type RenderComponentEntry,
+  type BlockRendererEntry,
+  type CommandHandlerEntry,
 } from '~/shared/services/dslRegistryService';
 
 // ---------------------------------------------------------------------------

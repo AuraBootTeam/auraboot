@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import dayjs from 'dayjs';
 import { Calendar, Clock } from 'lucide-react';
 
@@ -28,13 +28,11 @@ export const Datetime: React.FC<DatetimeProps> = ({
   required = false,
   readOnly = false,
   visible = true,
-  format = 'YYYY-MM-DD HH:mm:ss',
+  format: _format = 'YYYY-MM-DD HH:mm:ss',
   showTime = true,
   allowClear = true,
   className = '',
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
   const handleDateTimeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = event.target.value;
     onChange?.(newValue || undefined);

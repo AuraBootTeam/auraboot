@@ -20,7 +20,6 @@ import { ProfileProvider } from '~/framework/meta/profiles/ProfileContext';
 import { ErrorAlert } from '~/ui/ErrorAlert';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 
-
 // Ensure profiles are registered
 import '~/framework/meta/profiles/admin';
 import '~/framework/meta/profiles/report';
@@ -50,6 +49,18 @@ export function DynamicPageRenderer({
 }: DynamicPageRendererProps) {
   // 1. Validate pageType matches DB kind values
   const VALID_KINDS = ['list', 'form', 'detail', 'kanban'] as const;
+  const isValidPageType = VALID_KINDS.includes(pageType);
+  const schemaRequest = pageKey
+    ? { pageKey, token: token || undefined }
+    : {
+        tableName,
+        type: isValidPageType ? pageType : 'list',
+        token: token || undefined,
+      };
+
+  // 2. Load schema
+  const { schema, loading, error } = useSchemaLoader(schemaRequest);
+
   if (!VALID_KINDS.includes(pageType)) {
     return (
       <ErrorAlert
@@ -57,13 +68,6 @@ export function DynamicPageRenderer({
       />
     );
   }
-
-  // 2. Load schema
-  const { schema, loading, error } = useSchemaLoader(
-    pageKey
-      ? { pageKey, token: token || undefined }
-      : { tableName, type: pageType, token: token || undefined },
-  );
 
   // 2. Resolve profile (schema.profile > props.profileName > "admin")
   let profile;

@@ -8,26 +8,24 @@ import {
   EnvelopeIcon,
 } from '@heroicons/react/24/outline';
 import { fetchResult } from '~/shared/services/http-client';
-import { useTheme } from '~/contexts/ThemeContext';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
-import { getIndustryLabel, type TenantInfo } from '~/hooks/useTenantForm';
+import { getIndustryLabel, type TenantInfo as TenantInfoData } from '~/hooks/useTenantForm';
 
 export default function TenantInfo() {
-  const [tenant, setTenant] = useState<TenantInfo | null>(null);
+  const [tenant, setTenant] = useState<TenantInfoData | null>(null);
   const [loading, setLoading] = useState(true);
-  const { isDark } = useTheme();
   const { handleSubmitResult } = useFormSubmit();
 
   const fetchTenantInfo = async () => {
     setLoading(true);
     try {
-      const result = await fetchResult<TenantInfo>('/api/tenant/info', {
+      const result = await fetchResult<TenantInfoData>('/api/tenant/info', {
         method: 'get',
       });
 
       handleSubmitResult(result, {
         showToast: false,
-        onSuccess: (data: TenantInfo) => {
+        onSuccess: (data: TenantInfoData) => {
           setTenant(data);
         },
         onError: (error) => {

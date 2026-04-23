@@ -244,15 +244,16 @@ export async function createLeaveApplicant(
   api: APIRequestContext,
   adminToken: string,
   prefix: string,
-): Promise<{ userId: string; email: string; token: string }> {
+): Promise<{ userId: string; email: string; displayName: string; token: string }> {
   const ts = Date.now();
   const email = `${prefix}_${ts}@e2e.local`;
   const password = 'Test2026x';
+  const displayName = `${prefix} ${ts}`;
 
   const createResp = await api.post(`${BACKEND_URL}/api/admin/users`, {
     data: {
       email,
-      displayName: `${prefix} ${ts}`,
+      displayName,
       initialPassword: password,
       // Use tenant_admin so the applicant has all model + page permissions
       // needed to submit a leave via UI. Drools routing depends on {days,type},
@@ -284,7 +285,7 @@ export async function createLeaveApplicant(
 
   const token = await loginAs(api, email, password);
 
-  return { userId, email, token };
+  return { userId, email, displayName, token };
 }
 
 // ---------------------------------------------------------------------------
@@ -358,11 +359,13 @@ export async function setLeaveBalance(
  *   Step 1 — create draft:
  *     POST /api/meta/commands/execute/wd:create_leave_request
  *     Body: { payload: { wd_req_applicant, wd_req_type, wd_req_start_date,
- *                         wd_req_end_date, wd_req_days, wd_req_reason } }
+ *                         wd_req_start_slot, wd_req_end_date, wd_req_end_slot,
+ *                         wd_req_days, wd_req_reason } }
  *     Response: { code: "0", data: { data: { recordId: string } } }
  *   Step 2 — submit to start BPM process:
  *     POST /api/meta/commands/execute/wd:submit_leave_request
- *     Body: { targetRecordId: "<recordId>", payload: { wd_req_days, wd_req_type, wd_req_applicant } }
+ *     Body: { targetRecordId: "<recordId>", payload: { wd_req_days, wd_req_type,
+ *              wd_req_applicant, wd_req_start_slot, wd_req_end_slot } }
  *     Response: { code: "0", data: { data: { recordId: string } } }
  *   Both recordId paths are at body.data.data.recordId — no fallback chain.
  *
@@ -375,6 +378,8 @@ export async function setLeaveBalance(
  * @param reason     Free-text reason string
  * @param startDate  ISO date string (YYYY-MM-DD); defaults to today
  * @param endDate    ISO date string (YYYY-MM-DD); defaults to startDate + (days-1) days
+ * @param startSlot  Session code from wd_leave_day_slot (defaults to "AM")
+ * @param endSlot    Session code from wd_leave_day_slot (defaults to "PM")
  */
 export async function submitLeaveRequest(
   page: Page,
@@ -386,6 +391,8 @@ export async function submitLeaveRequest(
     reason: string;
     startDate?: string;
     endDate?: string;
+    startSlot?: string;
+    endSlot?: string;
   },
 ): Promise<{ recordId: string }> {
   const today = new Date();
@@ -393,6 +400,8 @@ export async function submitLeaveRequest(
   const start = input.startDate ?? fmt(today);
   const end =
     input.endDate ?? fmt(new Date(today.getTime() + (input.days - 1) * 86_400_000));
+  const startSlot = input.startSlot ?? 'AM';
+  const endSlot = input.endSlot ?? 'PM';
 
   const resp = await page.request.post(
     `${BACKEND_URL}/api/meta/commands/execute/wd:create_leave_request`,
@@ -402,7 +411,9 @@ export async function submitLeaveRequest(
           wd_req_applicant: input.userId,
           wd_req_type: input.type,
           wd_req_start_date: start,
+          wd_req_start_slot: startSlot,
           wd_req_end_date: end,
+          wd_req_end_slot: endSlot,
           wd_req_days: input.days,
           wd_req_reason: input.reason,
         },
@@ -436,7 +447,8 @@ export async function submitLeaveRequest(
   // Step 2: submit the draft to start the BPM approval process.
   // wd:submit_leave_request is a state_transition command — it requires `targetRecordId`
   // (not inside payload) to identify the record to update, plus workflow variables in payload.
-  // Contract: { targetRecordId: "<pid>", payload: { wd_req_days, wd_req_type, wd_req_applicant } }
+  // Contract: { targetRecordId: "<pid>", payload: { wd_req_days, wd_req_type,
+  //   wd_req_applicant, wd_req_start_slot, wd_req_end_slot } }
   const submitResp = await page.request.post(
     `${BACKEND_URL}/api/meta/commands/execute/wd:submit_leave_request`,
     {
@@ -446,6 +458,8 @@ export async function submitLeaveRequest(
           wd_req_applicant: input.userId,
           wd_req_type: input.type,
           wd_req_days: input.days,
+          wd_req_start_slot: startSlot,
+          wd_req_end_slot: endSlot,
         },
       },
       headers: {
@@ -485,23 +499,6 @@ export async function processTask(
   action: 'approve' | 'reject',
   comment?: string,
 ): Promise<void> {
-  const nav = page.locator('nav');
-
-  // Expand the "流程管理" parent group in the sidebar if not already expanded.
-  // The Task Center link lives inside this collapsible group — clicking the link
-  // fails if the group button intercepts the pointer events.
-  const workflowGroupBtn = nav.locator('button').filter({ hasText: /流程管理|Workflow|BPM/ }).first();
-  const taskCenterLink = nav.locator('a[href="/bpm/task-center"]');
-
-  // If the link is not yet visible, click the parent group button to expand it.
-  const isLinkVisible = await taskCenterLink.isVisible().catch(() => false);
-  if (!isLinkVisible) {
-    await expect(workflowGroupBtn).toBeVisible({ timeout: 10000 });
-    await workflowGroupBtn.click();
-  }
-
-  await expect(taskCenterLink).toBeVisible({ timeout: 10000 });
-
   // The task center page loads data from /api/bpm/workbench (not /api/bpm/tasks/todo).
   // Wait for the workbench response so the table is populated before we look for the task row.
   const workbenchRespPromise = page.waitForResponse(
@@ -509,7 +506,8 @@ export async function processTask(
     { timeout: 15000 },
   ).catch(() => null);
 
-  await taskCenterLink.click();
+  await page.goto('/bpm/task-center', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/bpm\/task-center$/);
   await workbenchRespPromise;
 
   // Wait for the task list table to render
@@ -599,7 +597,70 @@ export async function processTask(
  * session cookies for that user (not the admin storageState default).
  */
 export async function loginViaUI(page: Page, email: string, password: string): Promise<void> {
-  await page.goto('/login', { waitUntil: 'networkidle' });
+  try {
+    const loginResp = await page.request.post(`${BASE_URL}/login`, {
+      form: {
+        email,
+        password,
+        remember: 'on',
+        redirectTo: '/',
+      },
+      maxRedirects: 0,
+    });
+    const setCookie = loginResp.headers()['set-cookie'];
+    const match = setCookie?.match(/__session=([^;]+)/);
+    if (!match?.[1]) {
+      throw new Error('login action did not return __session cookie');
+    }
+    const cookieBase = {
+      name: '__session',
+      value: match[1],
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Lax' as const,
+      expires: Math.floor(Date.now() / 1000) + 604800,
+    };
+    await page.context().addCookies([
+      { ...cookieBase, domain: 'localhost' },
+      { ...cookieBase, domain: '127.0.0.1' },
+    ]);
+
+    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+    if (/\/tenant-selection(?:$|\?)/.test(page.url())) {
+      const spacesResp = await page.request.get(`${BASE_URL}/api/tenant-selection/my-spaces`);
+      if (spacesResp.ok()) {
+        const spacesBody = await spacesResp.json();
+        const spaces = Array.isArray(spacesBody?.data) ? spacesBody.data : [];
+        const bizSpace = spaces.find((space: any) => space?.spaceType === 'business');
+        if (bizSpace?.tenantId) {
+          const selectResp = await page.request.post(`${BASE_URL}/api/tenant-selection/process`, {
+            headers: { 'Content-Type': 'application/json' },
+            data: { action: 'select', tenantId: bizSpace.tenantId },
+          });
+          if (selectResp.ok()) {
+            const selectBody = await selectResp.json();
+            const tenantJwt = String(selectBody?.data?.jwt ?? '');
+            if (tenantJwt) {
+              const tenantCookieBase = { ...cookieBase, value: tenantJwt };
+              await page.context().addCookies([
+                { ...tenantCookieBase, domain: 'localhost' },
+                { ...tenantCookieBase, domain: '127.0.0.1' },
+              ]);
+              await page.goto('/home', { waitUntil: 'domcontentloaded' });
+            }
+          }
+        }
+      }
+    }
+
+    if (!/\/login(?:$|\?)/.test(page.url())) {
+      return;
+    }
+  } catch {
+    // Fall back to real UI form login below when direct session bootstrap fails.
+  }
+
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
   const emailInput = page.locator('input#email').first();
   await emailInput.waitFor({ state: 'visible', timeout: 10_000 });
   // Click to focus before fill — prevents React hydration from discarding the value.
@@ -613,5 +674,7 @@ export async function loginViaUI(page: Page, email: string, password: string): P
   const submitBtn = page.getByRole('button', { name: /立即登录|login|登录|sign in/i });
   await submitBtn.click();
 
-  await page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 15_000 });
+  await page.waitForFunction(() => !window.location.pathname.endsWith('/login'), undefined, {
+    timeout: 15_000,
+  });
 }

@@ -6,6 +6,66 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { executeCommandViaApi } from '../helpers';
+
+async function getAccountWithLinkedContact(
+  page: Page,
+): Promise<{ accountPid: string; contactName: string } | null> {
+  const [accountResp, contactResp] = await Promise.all([
+    page.request.get('/api/dynamic/crm_account/list?pageSize=200'),
+    page.request.get('/api/dynamic/crm_contact/list?pageSize=300'),
+  ]);
+  expect(accountResp.ok()).toBeTruthy();
+  expect(contactResp.ok()).toBeTruthy();
+
+  const accountBody = await accountResp.json();
+  const contactBody = await contactResp.json();
+  const accounts = accountBody?.data?.records || [];
+  const contacts = contactBody?.data?.records || [];
+
+  const accountByPid = new Map(accounts.map((account: any) => [String(account.pid), account]));
+  const linkedContact = contacts.find((contact: any) =>
+    accountByPid.has(String(contact.crm_ct_account_id)),
+  );
+  if (!linkedContact) return null;
+
+  const account = accountByPid.get(String(linkedContact.crm_ct_account_id));
+  if (!account?.pid || !linkedContact?.crm_ct_name) return null;
+
+  return {
+    accountPid: String(account.pid),
+    contactName: String(linkedContact.crm_ct_name),
+  };
+}
+
+async function getAccountWithoutLinkedContact(page: Page): Promise<{ accountPid: string } | null> {
+  const [accountResp, contactResp] = await Promise.all([
+    page.request.get('/api/dynamic/crm_account/list?pageSize=200'),
+    page.request.get('/api/dynamic/crm_contact/list?pageSize=300'),
+  ]);
+  expect(accountResp.ok()).toBeTruthy();
+  expect(contactResp.ok()).toBeTruthy();
+
+  const accountBody = await accountResp.json();
+  const contactBody = await contactResp.json();
+  const accounts = accountBody?.data?.records || [];
+  const contacts = contactBody?.data?.records || [];
+
+  const linkedAccountPids = new Set(
+    contacts.map((contact: any) => String(contact.crm_ct_account_id)).filter(Boolean),
+  );
+  const account = accounts.find((candidate: any) => !linkedAccountPids.has(String(candidate.pid)));
+  if (!account?.pid) return null;
+
+  return { accountPid: String(account.pid) };
+}
+
+async function fetchContact(page: Page, contactPid: string): Promise<any> {
+  const resp = await page.request.get(`/api/dynamic/crm_contact/${contactPid}`);
+  expect(resp.ok()).toBeTruthy();
+  const body = await resp.json();
+  return body?.data ?? body;
+}
 
 /**
  * Navigate to a model's runtime list via sidebar menu (no page.goto deep-link).
@@ -41,6 +101,25 @@ async function navigateToListViaMenu(
 test.describe('Showcase UX Regression', () => {
   test.use({ storageState: 'tests/storage/admin.json' });
   test.setTimeout(60_000);
+
+  test('A0: Showcase sidebar hides widget dashboard entry', async ({ page }) => {
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await page.evaluate(() => localStorage.removeItem('sidebar-collapsed'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+
+    const nav = page.locator('nav').first();
+    const parent = nav
+      .locator('button, [role="menuitem"]', {
+        hasText: /字段展示|能力展示|Field Showcase|Showcase|menu\.sc_root/i,
+      })
+      .first();
+    await parent.waitFor({ state: 'visible', timeout: 10_000 });
+    await parent.evaluate((el: HTMLElement) => el.click());
+
+    await expect(nav).toContainText(/字段展示|能力展示|Field Showcase|Showcase|menu\.sc_root/i);
+    await expect(nav).toContainText(/全字段类型|All Field Types|menu\.sc_all_fields/i);
+    await expect(nav).not.toContainText(/组件仪表盘|Widget Dashboard|menu\.sc_arsenal_dashboard/i);
+  });
 
   // ─── B3: Rating dict has colors (API-level check) ────────────────────
 
@@ -101,6 +180,131 @@ test.describe('Showcase UX Regression', () => {
     await expect(page.locator('body')).not.toContainText('Access forbidden');
   });
 
+  test('B7.1: CRM Account #contacts tab renders linked contacts', async ({ page }) => {
+    const linked = await getAccountWithLinkedContact(page);
+    expect(linked, 'Seed data should contain at least one account with a linked contact').not.toBeNull();
+
+    await page.goto(`/p/crm_account/view/${linked!.accountPid}#contacts`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    await expect(page.locator('body')).not.toContainText('Page not found');
+    await expect(page.locator('body')).not.toContainText('Access forbidden');
+    await expect(
+      page.locator('.sub-table-section', { hasText: /联系人|Contacts/ }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('body')).toContainText(linked!.contactName);
+  });
+
+  test('B7.2: CRM Account #contacts tab shows empty state when no contacts exist', async ({
+    page,
+  }) => {
+    const unlinked = await getAccountWithoutLinkedContact(page);
+    expect(unlinked, 'Seed data should contain at least one account without contacts').not.toBeNull();
+
+    await page.goto(`/p/crm_account/view/${unlinked!.accountPid}#contacts`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    await expect(page.locator('[data-testid="subtable-empty-state"]')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.locator('body')).toContainText('暂无联系人');
+    await expect(page.locator('[data-testid="subtable-empty-action"]')).toContainText('添加联系人');
+  });
+
+  test('B7.3: CRM Account keeps only one primary contact', async ({ page }) => {
+    const uid = `primary-${Date.now()}`;
+    const account = await executeCommandViaApi(
+      page,
+      'crm:create_account',
+      {
+        crm_acc_name: `Primary Contact Account ${uid}`,
+        crm_acc_industry: 'technology',
+        crm_acc_status: 'active',
+      },
+      undefined,
+      'create',
+    );
+
+    const firstContact = await executeCommandViaApi(
+      page,
+      'crm:create_contact',
+      {
+        crm_ct_account_id: account.recordId,
+        crm_ct_name: `Primary One ${uid}`,
+        crm_ct_email: `${uid}-1@example.com`,
+        crm_ct_is_primary: true,
+      },
+      undefined,
+      'create',
+    );
+
+    const secondContact = await executeCommandViaApi(
+      page,
+      'crm:create_contact',
+      {
+        crm_ct_account_id: account.recordId,
+        crm_ct_name: `Primary Two ${uid}`,
+        crm_ct_email: `${uid}-2@example.com`,
+        crm_ct_is_primary: true,
+      },
+      undefined,
+      'create',
+    );
+
+    await expect
+      .poll(
+        async () => {
+          const [first, second] = await Promise.all([
+            fetchContact(page, firstContact.recordId),
+            fetchContact(page, secondContact.recordId),
+          ]);
+          return {
+            first: Boolean(first?.crm_ct_is_primary),
+            second: Boolean(second?.crm_ct_is_primary),
+          };
+        },
+        {
+          timeout: 10_000,
+          message: 'The newer primary contact should demote the older one',
+        },
+      )
+      .toEqual({ first: false, second: true });
+  });
+
+  test('B7.4: CRM Account activity subject never renders null via command', async ({ page }) => {
+    const uid = `timeline-${Date.now()}`;
+    const account = await executeCommandViaApi(
+      page,
+      'crm:create_account',
+      {
+        crm_acc_name: `Timeline Account ${uid}`,
+        crm_acc_industry: 'technology',
+      },
+      undefined,
+      'create',
+    );
+
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get('/api/activities', {
+            params: { objectModel: 'crm_account', objectRecord: account.recordId, limit: 10 },
+          });
+          expect(resp.ok()).toBeTruthy();
+          const body = await resp.json();
+          const items = body?.data || [];
+          return String(items[0]?.subject || '');
+        },
+        {
+          timeout: 10_000,
+          message: 'New CRM account should have a readable timeline subject',
+        },
+      )
+      .toContain(`Timeline Account ${uid}`);
+  });
+
   // ─── C1: Search works via API ────────────────────────────────────────
 
   test('C1: CRM Account search by keyword returns results', async ({ page }) => {
@@ -115,7 +319,7 @@ test.describe('Showcase UX Regression', () => {
   test('C4: Showcase detail page loads', async ({ page }) => {
     await navigateToListViaMenu(
       page,
-      /能力展示|Showcase|menu\.sc_root/i,
+      /字段展示|能力展示|Field Showcase|Showcase|menu\.sc_root/i,
       '/p/showcase_all_fields',
       'showcase_all_fields',
     );
@@ -169,6 +373,19 @@ test.describe('Showcase UX Regression', () => {
     await expect(page.locator('[data-testid^="ab:dashboard:"]').first()).toBeVisible({ timeout: 5000 });
     const content = await page.textContent('body');
     expect(content).not.toContain('Page not found');
+  });
+
+  test('A3: Arsenal capability dashboard renders styled KPI cards', async ({ page }) => {
+    const dashResp = page.waitForResponse(
+      (r) => r.url().includes('/api/dashboards') && r.status() === 200,
+      { timeout: 10_000 },
+    );
+    await page.goto('/dashboards?code=arsenal_capability_dashboard');
+    await dashResp.catch(() => null);
+
+    await expect(page.locator('[data-card-style="metric"]')).toHaveCount(4, { timeout: 10_000 });
+    await expect(page.locator('body')).toContainText('客户总数');
+    await expect(page.locator('body')).toContainText('本月新线索');
   });
 
   // ─── Seed data quality checks ────────────────────────────────────────

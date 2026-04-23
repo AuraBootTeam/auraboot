@@ -11,7 +11,7 @@
  * { "blockType": "form-wizard", "steps": [...] }
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';

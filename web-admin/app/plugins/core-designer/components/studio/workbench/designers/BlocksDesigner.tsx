@@ -19,6 +19,8 @@ import {
   useSensors,
   PointerSensor,
   KeyboardSensor,
+  type DragStartEvent,
+  type DragEndEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -26,15 +28,12 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import type { DragStartEvent, DragEndEvent, Active } from '@dnd-kit/core';
 import type {
   PageSchema,
   DslBlock,
   BlockType,
   DslFieldRef,
   DslFieldOverride,
-} from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import {
   parseFieldShorthand,
   serializeFieldOverride,
   resolveLocalizedText,
@@ -55,7 +54,6 @@ export interface BlocksDesignerProps {
   previewMode?: boolean;
   isCustomApiMode?: boolean;
 }
-
 
 /**
  * Left panel tab types
@@ -104,7 +102,6 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   const [leftPanelTab, setLeftPanelTab] = useState<LeftPanelTab>('fields');
 
   // Drag state for visual feedback
-  const [activeFieldDrag, setActiveFieldDrag] = useState<Active | null>(null);
   const [draggedBlock, setDraggedBlock] = useState<DslBlock | null>(null);
   const [draggedFieldName, setDraggedFieldName] = useState<string | null>(null);
 
@@ -119,7 +116,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   );
 
   // Flat blocks array from V2 schema
-  const blocks = schema.blocks ?? [];
+  const blocks = useMemo(() => schema.blocks ?? [], [schema.blocks]);
 
   // Find selected block
   const selectedBlock = useMemo(
@@ -309,9 +306,6 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
       if (typeof active.id === 'string' && active.id.startsWith('library:')) {
         setDraggedBlockType(active.id.replace('library:', '') as BlockType);
       }
-      if (active.data.current?.type === DRAG_TYPES.PALETTE_ITEM) {
-        setActiveFieldDrag(active);
-      }
       if (active.data.current?.type === 'block') {
         const block = blocks.find((b) => b.id === active.data.current?.blockId);
         if (block) setDraggedBlock(block);
@@ -328,7 +322,6 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
       const { active, over } = event;
       setActiveDragId(null);
       setDraggedBlockType(null);
-      setActiveFieldDrag(null);
       setDraggedBlock(null);
       setDraggedFieldName(null);
 

@@ -22,7 +22,6 @@
  */
 
 import { test, expect } from '../../fixtures';
-import type { Page } from '../../fixtures';
 
 // Slot IDs matching the SLOT_IDS constant in web-admin/app/plugins/types.ts
 const SLOT_IDS = {
@@ -32,72 +31,6 @@ const SLOT_IDS = {
   DASHBOARD_WIDGETS: 'dashboard:widgets',
   DETAIL_TABS_EXTRA: 'detail:tabs:extra',
 } as const;
-
-// Test plugin manifest that registers slot contributions
-const SLOT_TEST_PLUGIN = {
-  pluginId: 'com.test.slot-test-plugin',
-  namespace: 'slottest',
-  version: '1.0.0',
-  displayName: 'Slot Test Plugin',
-  'displayName:zh-CN': 'Slot测试插件',
-  description: 'Plugin for testing slot contribution system',
-  author: 'Test Team',
-  minPlatformVersion: '1.0.0',
-
-  clientConfig: {
-    slots: [
-      {
-        slotId: SLOT_IDS.PAGE_HEADER_ACTIONS,
-        componentName: 'HeaderActionButton',
-        priority: 10,
-        props: { label: 'Slot Test Action' },
-      },
-      {
-        slotId: SLOT_IDS.TABLE_ROW_ACTIONS,
-        componentName: 'RowAction',
-        priority: 20,
-        props: { label: 'Custom Row Action' },
-      },
-    ],
-  },
-
-  // Minimal config resources to make it a valid plugin
-  dicts: [],
-  fields: [],
-  models: [],
-  modelFieldBindings: [],
-  permissions: [],
-  menus: [],
-};
-
-/**
- * Check if any plugin with slot contributions is installed.
- * Returns the plugin info if found, null otherwise.
- */
-async function findPluginWithSlots(page: Page): Promise<boolean> {
-  try {
-    const response = await page.request.get(`/api/plugins?status=enabled`);
-    if (!response.ok()) return false;
-
-    const data = await response.json();
-    const plugins = data.plugins || data.data || data;
-
-    if (!Array.isArray(plugins)) return false;
-
-    // Look for any plugin that has frontend config with slots
-    return plugins.some((p: any) => p.hasFrontend || p.manifest?.clientConfig?.slots?.length > 0);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Check if a specific slot has rendered contributions on the current page.
- */
-async function hasSlotContributions(page: Page, slotId: string): Promise<boolean> {
-  const slotContainer = page.locator(`[data-slot-id="${slotId}"]`);
-  return await slotContainer.isVisible({ timeout: 3000 }).catch(() => false);
-}
 
 test.describe('PluginSlot System', () => {
   /**
@@ -286,7 +219,7 @@ test.describe('PluginSlot System', () => {
     // Verify through JavaScript evaluation that PluginSlot uses error boundaries
     // by checking the component structure exists in the DOM
     const errorFallbacks = page.locator('.bg-red-50.border.border-red-200');
-    const errorFallbackCount = await errorFallbacks.count();
+    await errorFallbacks.count();
 
     // errorFallbackCount of 0 means no errors occurred (good)
     // errorFallbackCount > 0 means errors were caught by the boundary (also good - it worked)
@@ -385,7 +318,7 @@ test.describe('PluginSlot - Structural Verification', () => {
 
     // Check all rendered slot containers have the data-slot-id attribute
     const slotsWithId = page.locator('[data-slot-id]');
-    const count = await slotsWithId.count();
+    await slotsWithId.count();
 
     // Verify each slot has a non-empty data-slot-id
     for (let i = 0; i < count; i++) {
@@ -417,7 +350,7 @@ test.describe('PluginSlot - Structural Verification', () => {
     // 2. Or slot containers are visible with content
 
     const slotsWithId = page.locator('[data-slot-id]');
-    const count = await slotsWithId.count();
+    await slotsWithId.count();
 
     // After networkidle, loading fallbacks should be resolved
     const loadingFallbacks = page.locator('[data-slot-id] .animate-pulse.bg-gray-100');

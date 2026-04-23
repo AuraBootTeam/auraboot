@@ -7,8 +7,10 @@
 
 import { useI18n } from '~/contexts/I18nContext';
 import { useCallback } from 'react';
-import { getLocalizedText as getLocalizedTextImpl } from '~/framework/meta/runtime/expression/i18n-renderer';
-import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import {
+  getLocalizedText as getLocalizedTextImpl,
+  type LocalizedText,
+} from '~/framework/meta/runtime/expression/i18n-renderer';
 
 // 重新导出统一实现的类型和函数
 export {

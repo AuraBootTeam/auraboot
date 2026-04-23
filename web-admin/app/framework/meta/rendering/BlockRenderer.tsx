@@ -92,7 +92,7 @@ export interface BlockRendererProps {
   areaId: string;
 }
 
-export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, areaId }) => {
+export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, areaId: _areaId }) => {
   const context = runtime.getContext();
   const profile = useProfileSafe();
 

@@ -130,6 +130,7 @@ describe('validateDetailVm', () => {
   const detailVm: DetailViewModel = {
     sections: [],
     actions: { presets: ['edit'], customButtons: [] },
+    passthroughBlocks: [],
   };
 
   it('rejects edit preset when caps.update=false', () => {
@@ -142,6 +143,7 @@ describe('validateDetailVm', () => {
     const vm: DetailViewModel = {
       sections: [],
       actions: { presets: ['delete'], customButtons: [] },
+      passthroughBlocks: [],
     };
     const errors = validateDetailVm(vm, caps);
     expect(errors.some((e) => e.tab === 'actions' && e.severity === 'error')).toBe(
@@ -152,7 +154,7 @@ describe('validateDetailVm', () => {
   it('rejects when caps.detail=false', () => {
     const noDetailCaps: ModelCapabilities = { ...caps, detail: false };
     const errors = validateDetailVm(
-      { sections: [], actions: { presets: [], customButtons: [] } },
+      { sections: [], actions: { presets: [], customButtons: [] }, passthroughBlocks: [] },
       noDetailCaps,
     );
     expect(errors.some((e) => e.tab === 'sections')).toBe(true);
@@ -161,7 +163,7 @@ describe('validateDetailVm', () => {
   it('returns empty when caps undefined', () => {
     expect(
       validateDetailVm(
-        { sections: [], actions: { presets: [], customButtons: [] } },
+        { sections: [], actions: { presets: [], customButtons: [] }, passthroughBlocks: [] },
         undefined,
       ),
     ).toEqual([]);

@@ -25,8 +25,12 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import type { ColumnConfig, ButtonConfig } from '~/framework/meta/schemas/types';
-import type { SortConfig, RowHeight } from '~/framework/smart/types/savedView';
-import { ROW_HEIGHT_CONFIG, DEFAULT_ROW_HEIGHT } from '~/framework/smart/types/savedView';
+import {
+  ROW_HEIGHT_CONFIG,
+  DEFAULT_ROW_HEIGHT,
+  type SortConfig,
+  type RowHeight,
+} from '~/framework/smart/types/savedView';
 import { DraggableColumnHeader } from './DraggableColumnHeader';
 import { RowActionButtons } from './RowActionButtons';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';

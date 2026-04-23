@@ -104,7 +104,7 @@ export const ChartWidgetWrapper: React.FC<ChartWidgetWrapperProps> = ({
       <div className="absolute top-1 right-1 z-10" ref={menuRef}>
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          className="rounded-full border border-white/70 bg-white/80 p-1.5 text-slate-400 shadow-sm backdrop-blur transition hover:border-slate-200 hover:bg-white hover:text-slate-600"
           title="Actions"
         >
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
@@ -113,11 +113,11 @@ export const ChartWidgetWrapper: React.FC<ChartWidgetWrapperProps> = ({
         </button>
 
         {menuOpen && (
-          <div className="absolute right-0 mt-1 w-36 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+          <div className="absolute right-0 mt-2 w-36 rounded-2xl border border-slate-200/80 bg-white/95 py-1 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur">
             <button
               onClick={exportAsCsv}
               disabled={!data?.rows?.length}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -132,7 +132,7 @@ export const ChartWidgetWrapper: React.FC<ChartWidgetWrapperProps> = ({
             <button
               onClick={exportAsJson}
               disabled={!data?.rows?.length}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

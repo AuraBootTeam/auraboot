@@ -20,6 +20,18 @@ const OSS_DASHBOARD_CODES = [
 ] as const;
 
 test.describe('Plan 3a - kind=dashboard removal', () => {
+  test('Default /dashboards hides placeholder OSS dashboards from the tab bar', async ({
+    page,
+  }) => {
+    await page.goto('/dashboards');
+
+    const tabBar = page.locator('nav[aria-label="Dashboard tabs"]');
+    await expect(tabBar).toBeVisible();
+    await expect(tabBar).not.toContainText('Showcase Workflow Dashboard');
+    await expect(tabBar).not.toContainText('Showcase Arsenal Dashboard');
+    await expect(tabBar).not.toContainText('ACP Showcase Dashboard');
+  });
+
   for (const code of OSS_DASHBOARD_CODES) {
     test(`Dashboard ${code} is accessible via /dashboards route`, async ({ page }) => {
       const response = await page.goto(`/dashboards?code=${code}`);

@@ -93,7 +93,7 @@ export class BindingSyncManager {
   /**
    * Handle component change and reverse sync to field
    */
-  public onComponentChanged(componentId: string, propertyPath: string, value: unknown): void {
+  public onComponentChanged(componentId: string, propertyPath: string, _value: unknown): void {
     const bindings = fieldBindingService.getBindingsForComponent(componentId);
     if (bindings.length === 0) return;
 
@@ -166,7 +166,10 @@ export class BindingSyncManager {
   /**
    * Map field changes to component prop updates
    */
-  private mapChangesToProps(changes: FieldChanges, propertyPath: string): Record<string, unknown> {
+  private mapChangesToProps(
+    changes: FieldChanges,
+    _propertyPath: string,
+  ): Record<string, unknown> {
     const props: Record<string, unknown> = {};
 
     if (changes.label !== undefined) {

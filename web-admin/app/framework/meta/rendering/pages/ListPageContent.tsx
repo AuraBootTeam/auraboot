@@ -20,7 +20,6 @@ import { createExpressionContext } from '~/framework/meta/runtime/expression/con
 import type { BlockConfig, ColumnConfig, FieldConfig, ButtonConfig } from '~/framework/meta/schemas/types';
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
-import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -31,36 +30,31 @@ import { useAuth } from '~/contexts/AuthContext';
 import { ListPageHeader } from './list/ListPageHeader';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
 import { useAutoSaveView } from '~/framework/smart/hooks/useAutoSaveView';
-import { ViewSelector } from '~/framework/smart/components/view/ViewSelector';
-import { RowHeightSelector } from '~/framework/smart/components/view/RowHeightSelector';
-import { ColumnResizeHandle } from '~/framework/smart/components/view/ColumnResizeHandle';
-import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
-import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
-import type { RowHeight } from '~/framework/smart/types/savedView';
-import { ROW_HEIGHT_CONFIG, DEFAULT_ROW_HEIGHT } from '~/framework/smart/types/savedView';
+import {
+  DEFAULT_ROW_HEIGHT,
+  type ViewFilterConfig,
+  type RowHeight,
+  type SavedViewCreateRequest,
+  type ColumnConfig as ViewColumnConfig,
+  type ViewType,
+  type ViewScope,
+  type SortConfig,
+} from '~/framework/smart/types/savedView';
 import {
   evaluateConditionalFormats,
   buildConditionalStyle,
 } from '~/framework/smart/utils/conditionalFormatEvaluator';
 import { SmartViewRenderer } from '~/framework/smart/components/view/SmartViewRenderer';
-import type {
-  SavedViewCreateRequest,
-  ColumnConfig as ViewColumnConfig,
-  ViewType,
-  ViewScope,
-  SortConfig,
-} from '~/framework/smart/types/savedView';
 import { modelService } from '~/shared/services/modelService';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
-import { RowActionButtons } from './list/RowActionButtons';
 import { ListTabs } from './list/ListTabs';
 import { ListPagination } from './list/ListPagination';
 import { ListModals } from './list/ListModals';
-import { SortIndicator } from './list/SortIndicator';
 import { ListToolbar } from './list/ListToolbar';
 import { ListTable } from './list/ListTable';
 import { encodeSorts, decodeSorts } from './list/useListUrlState';
+import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
@@ -1666,10 +1660,17 @@ export function ListPageContent(props: PageContentProps) {
       const pid = record.pid as string | undefined;
       if (!pid) return;
 
-      // Check DSL config for navigation preference (on schema or table block)
-      const detailNav =
-        (schema as any)?.options?.detailNavigation || (tableBlock as any)?.onRowClick;
-      if (detailNav === 'navigate' || detailNav === 'page') {
+      const rowClickMode = resolveListRowClickMode({
+        schemaDetailNavigation: (schema as any)?.options?.detailNavigation,
+        tableOnRowClick: (tableBlock as any)?.onRowClick,
+        tableRowClickAction: (tableBlock as any)?.props?.rowClickAction,
+      });
+
+      if (rowClickMode === 'none') {
+        return;
+      }
+
+      if (rowClickMode === 'detail') {
         // Support custom URL template with {field} placeholders
         const detailUrl = (schema as any)?.options?.detailUrl || (tableBlock as any)?.detailUrl;
         if (detailUrl) {
@@ -1882,7 +1883,6 @@ export function ListPageContent(props: PageContentProps) {
 
   // Row height from current view config (with fallback)
   const effectiveRowHeight: RowHeight = currentView?.viewConfig?.rowHeight || DEFAULT_ROW_HEIGHT;
-  const rowHeightCfg = ROW_HEIGHT_CONFIG[effectiveRowHeight];
 
   // Handle row height change -> update SavedView
   const handleRowHeightChange = useCallback(

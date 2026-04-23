@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toPageMeta, toPageSchema } from '../converters';
+import { createDslSchemaPayload, toPageMeta, toPageSchema } from '../converters';
 
 const baseDto: any = {
   pid: 'p1',
@@ -74,5 +74,44 @@ describe('toPageMeta', () => {
   it('componentCount derives from blocks length', () => {
     const meta = toPageMeta({ ...baseDto, blocks: [1, 2, 3] as any });
     expect(meta.componentCount).toBe(3);
+  });
+});
+
+describe('createDslSchemaPayload', () => {
+  it('preserves structured title objects in update payload', () => {
+    const payload = createDslSchemaPayload(
+      {
+        schemaVersion: 2,
+        kind: 'detail',
+        id: 'p1',
+        pageKey: 'wd_leave_request_detail',
+        title: { 'zh-CN': '请假申请详情', en: 'Leave Request Detail' },
+        layout: { type: 'stack' },
+        blocks: [],
+      } as any,
+      0,
+    );
+
+    expect(payload.title).toEqual({
+      'zh-CN': '请假申请详情',
+      en: 'Leave Request Detail',
+    });
+  });
+
+  it('includes pageKey in update payload so page-level edits persist', () => {
+    const payload = createDslSchemaPayload(
+      {
+        schemaVersion: 2,
+        kind: 'detail',
+        id: 'p1',
+        pageKey: 'wd_leave_request_detail_v2',
+        title: '请假申请详情',
+        layout: { type: 'stack' },
+        blocks: [],
+      } as any,
+      0,
+    );
+
+    expect(payload.pageKey).toBe('wd_leave_request_detail_v2');
   });
 });

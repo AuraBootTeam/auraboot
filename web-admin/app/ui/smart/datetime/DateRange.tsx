@@ -5,9 +5,9 @@
  * Supports defaultRange presets like THIS_MONTH, THIS_WEEK, LAST_MONTH.
  */
 
-import React, { forwardRef, useEffect, useMemo, useRef } from 'react';
+import React, { forwardRef, useEffect, useRef } from 'react';
 import clsx from 'clsx';
-import { useExpressionValue, useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
@@ -160,7 +160,7 @@ export const DateRange = forwardRef<HTMLDivElement, DateRangeProps>(
 
     const {
       labelText,
-      placeholderText,
+      placeholderText: _placeholderText,
       required: requiredValue,
       disabled: disabledValue,
       visible: isVisible,

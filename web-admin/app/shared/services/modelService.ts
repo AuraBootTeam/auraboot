@@ -1,5 +1,4 @@
-import { get, post, put, del } from '~/shared/services/http-client';
-import type { Result } from '~/shared/services/http-client';
+import { get, post, put, del, type Result } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type {
   MetaModelDTO,
@@ -19,8 +18,10 @@ import type {
 
 export interface RelatedPage {
   pid: string;
-  code: string;
-  title: string;
+  code?: string;
+  pageKey?: string;
+  name?: string;
+  title?: string | Record<string, unknown>;
   kind: string;
   route?: string;
   [key: string]: unknown;

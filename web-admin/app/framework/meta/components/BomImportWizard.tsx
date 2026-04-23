@@ -195,7 +195,7 @@ export const BomImportWizard: React.FC<BomImportWizardProps> = ({
 
   // -- Step 1: Upload --
   const [file, setFile] = useState<File | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
+  const [_headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<Record<string, string>[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
 

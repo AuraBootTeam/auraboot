@@ -1,5 +1,4 @@
-import Datepicker from 'tailwind-datepicker-react';
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
 
@@ -69,9 +68,9 @@ export const Date = forwardRef<HTMLInputElement, DateProps>(
       minDate,
       maxDate,
       showTime = false,
-      showToday, // Extract to prevent DOM passing
-      disabledDate, // Extract to prevent DOM passing
-      layoutConfig, // Extract to prevent DOM passing
+      showToday: _showToday, // Extract to prevent DOM passing
+      disabledDate: _disabledDate, // Extract to prevent DOM passing
+      layoutConfig: _layoutConfig, // Extract to prevent DOM passing
       className,
       name,
       value,

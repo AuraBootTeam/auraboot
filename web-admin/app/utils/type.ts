@@ -31,25 +31,25 @@ export const ERROR_CODES = {
  * Provides type-safe response code checking without magic strings.
  */
 export class ResultHelper {
-  static isSuccess<T>(result: { code: string | number }): boolean {
+  static isSuccess(result: { code: string | number }): boolean {
     return String(result.code) === ErrorCodes.SUCCESS;
   }
 
-  static isValidationError<T>(result: { code: string }): boolean {
+  static isValidationError(result: { code: string }): boolean {
     return result.code === ERROR_CODES.VALIDATION_ERROR;
   }
 
-  static isAuthError<T>(result: { code: string }): boolean {
+  static isAuthError(result: { code: string }): boolean {
     return [ERROR_CODES.UNAUTHORIZED, ERROR_CODES.FORBIDDEN, ERROR_CODES.TOKEN_EXPIRED].includes(
       result.code as any,
     );
   }
 
-  static isBusinessError<T>(result: { code: string }): boolean {
+  static isBusinessError(result: { code: string }): boolean {
     return result.code === ERROR_CODES.BUSINESS_ERROR;
   }
 
-  static isSystemError<T>(result: { code: string }): boolean {
+  static isSystemError(result: { code: string }): boolean {
     return [
       ERROR_CODES.SERVICE_UNAVAILABLE,
       ErrorCodes.NETWORK_ERROR,

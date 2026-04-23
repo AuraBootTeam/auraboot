@@ -132,7 +132,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             )}
             {...(() => {
               // Filter out non-DOM props to prevent React warnings
-              const { showCount, ...domProps } = restProps as any;
+              const { showCount: _showCount, ...domProps } = restProps as any;
               return domProps;
             })()}
           />

@@ -6,7 +6,7 @@
  * @since 3.2.0
  */
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { DeviceSelector, useViewport } from '../../canvas/devices';
 import type { PreviewState, PreviewEventLog, PreviewMode } from './types';
 
@@ -27,7 +27,7 @@ interface PreviewPanelProps {
  * PreviewPanel Component
  */
 export const PreviewPanel: React.FC<PreviewPanelProps> = ({
-  pageSchema,
+  pageSchema: _pageSchema,
   viewModelFields = [],
   onClose,
   initialMode = 'panel',

@@ -54,7 +54,6 @@ const Switch: React.FC<SwitchProps> = ({
   visible,
   onChange,
   onBlur,
-  ...restProps
 }) => {
   const st = useSmartText();
 

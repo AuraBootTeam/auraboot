@@ -7,7 +7,6 @@
 
 type Subscriber = () => void;
 type Getter<T> = () => T;
-type Setter<T> = (value: T | ((prev: T) => T)) => void;
 
 /**
  * Signal - 响应式值
@@ -179,14 +178,6 @@ export function batch(fn: () => void): void {
 /**
  * 将通知添加到批量队列
  */
-function scheduleEffect(subscriber: Subscriber) {
-  if (batchDepth > 0) {
-    pendingEffects.add(subscriber);
-  } else {
-    subscriber();
-  }
-}
-
 /**
  * Reactive - 响应式对象
  * 将普通对象转为响应式对象

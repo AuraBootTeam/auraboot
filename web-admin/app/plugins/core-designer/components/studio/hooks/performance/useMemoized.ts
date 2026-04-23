@@ -6,7 +6,7 @@
  * @since 3.2.0
  */
 
-import { useRef, useCallback, useMemo, useState, useEffect } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 
 /**
  * Deep comparison memoization hook

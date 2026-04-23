@@ -51,16 +51,19 @@
  * @since Epic P2.4 (notification-task real delivery E2E)
  */
 
-import { test, expect, type Page } from '../../fixtures';
+import { test, expect } from '../../fixtures';
 import { uniqueId, dateOffsetStr } from '../helpers';
+import { ensureRoleUsers } from '../../helpers/wd-fixtures';
 import {
   loginAsAdmin,
   queryInstanceStatus,
   listAuditEvents,
+  waitForTodoTask,
   AuditOp,
   type InstanceStatus,
   type AuditEvent,
 } from './_helpers/bpm-lifecycle';
+import { findTaskRowByBusinessKey, navigateToTaskCenter, openTaskCenterAsRole, openTaskRowMenu } from './_helpers/task-center';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -70,6 +73,7 @@ const UID = uniqueId('NT');
 // Shared state threaded across serial tests
 let adminToken = '';
 let adminUserId = '';
+let managerToken = '';
 
 // Approve branch state (NT-1)
 let approvePid = '';
@@ -178,7 +182,9 @@ async function seedLeaveDraft(
           wd_req_applicant: applicantUserId,
           wd_req_type: 'annual',
           wd_req_start_date: dateOffsetStr(7),
+          wd_req_start_slot: 'AM',
           wd_req_end_date: dateOffsetStr(8),
+          wd_req_end_slot: 'PM',
           wd_req_days: 2,
           wd_req_reason: reason,
         },
@@ -207,6 +213,8 @@ async function seedLeaveDraft(
         payload: {
           wd_req_applicant: applicantUserId,
           wd_req_type: 'annual',
+          wd_req_start_slot: 'AM',
+          wd_req_end_slot: 'PM',
           wd_req_days: 2,
         },
       },
@@ -239,20 +247,18 @@ async function findManagerTaskId(
   token: string,
   processInstanceId: string,
 ): Promise<string> {
-  const resp = await request.get('/api/bpm/tasks/todo?pageNum=1&pageSize=50', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  expect(resp.ok(), `tasks/todo: ${resp.status()}`).toBe(true);
-  const body = await resp.json();
-  const raw = body?.data;
-  const tasks = (Array.isArray(raw) ? raw : raw?.records ?? []) as Array<Record<string, unknown>>;
-  const task = tasks.find(
-    (t) =>
-      String(t.processInstanceId ?? '') === processInstanceId &&
-      String(t.processDefinitionActivityId ?? '').includes('task_manager_approve'),
+  const task = await waitForTodoTask(
+    request,
+    token,
+    (candidate) =>
+      candidate.processInstanceId === processInstanceId &&
+      candidate.processDefinitionActivityId.includes('task_manager_approve'),
+    {
+      timeout: 15_000,
+      message: `task_manager_approve must appear in todo tasks for instance ${processInstanceId}`,
+    },
   );
-  expect(task, `no task_manager_approve found for instance ${processInstanceId}`).toBeTruthy();
-  return String(task!.instanceId ?? '');
+  return task.instanceId;
 }
 
 /**
@@ -292,26 +298,6 @@ async function waitForNotifyCompletion(
  * notification test also asserts a real navigation (D1), not a direct
  * page.goto to /task-center.
  */
-async function navigateToTaskCenter(page: Page): Promise<void> {
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-  const nav = page.locator('nav').first();
-  await nav.waitFor({ state: 'visible', timeout: 10_000 });
-
-  const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
-    .first();
-  if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await bpmParent.scrollIntoViewIfNeeded();
-    await bpmParent.evaluate((el: HTMLElement) => el.click());
-  }
-
-  const taskCenterLink = nav.locator('a[href*="task-center"]').first();
-  await taskCenterLink.waitFor({ state: 'attached', timeout: 8_000 });
-  await taskCenterLink.evaluate((el: HTMLElement) => el.click());
-  await page.waitForURL(/task-center/, { timeout: 20_000 });
-  await expect(page.locator('h1:has-text("任务中心")')).toBeVisible({ timeout: 10_000 });
-}
-
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -324,6 +310,7 @@ test.describe(
 
     test.beforeAll(async ({ request }) => {
       adminToken = await loginAsAdmin(request);
+      ({ managerToken } = await ensureRoleUsers(request));
 
       const meResp = await request.get('/api/auth/me', {
         headers: { Authorization: `Bearer ${adminToken}` },
@@ -344,7 +331,7 @@ test.describe(
     // =========================================================================
     test(
       'NT-1: approve flow fires notify_approved and persists recipient notification',
-      async ({ page, request }) => {
+      async ({ browser, request }) => {
         // --- Seed + submit ---
         const seeded = await seedLeaveDraft(
           request,
@@ -369,31 +356,29 @@ test.describe(
         );
 
         // --- UI reachability: Task Center row menu surfaces "通过" ---
-        await navigateToTaskCenter(page);
-        const taskId = await findManagerTaskId(request, adminToken, approveInstanceId);
+        const { context: managerCtx, page: managerPage } = await openTaskCenterAsRole(
+          browser,
+          'wd_manager@example.com',
+          'Test2026x',
+        );
+        const taskId = await findManagerTaskId(request, managerToken, approveInstanceId);
 
-        const taskRow = page
-          .locator('table tbody tr')
-          .filter({ hasText: PROCESS_KEY })
-          .filter({ hasText: /task_manager_approve|主管审批|Manager Approve/i })
-          .first();
+        const taskRow = findTaskRowByBusinessKey(
+          managerPage,
+          approvePid,
+          /task_manager_approve|主管审批|Manager Approve/i,
+        );
         await expect(taskRow, 'manager-approve row must render').toBeVisible({
           timeout: 15_000,
         });
 
-        const moreBtn = taskRow
-          .locator('button')
-          .filter({ has: page.locator('svg.lucide-ellipsis') })
-          .first();
-        await expect(moreBtn).toBeVisible({ timeout: 5_000 });
-        await moreBtn.click();
-        const menu = page.locator('.absolute.right-0.z-10');
-        await expect(menu).toBeVisible({ timeout: 3_000 });
+        const menu = await openTaskRowMenu(taskRow, managerPage);
         await expect(
           menu.locator('button:has-text("通过")').first(),
           'Approve action must be reachable from Task Center row menu',
         ).toBeVisible();
-        await page.keyboard.press('Escape').catch(() => {});
+        await managerPage.keyboard.press('Escape').catch(() => {});
+        await managerCtx.close();
 
         // --- Fire approve via API with taskResult=approved so gw_result routes
         // to svc_notify_approved. (B5 established that the UI dialog omits the
@@ -403,7 +388,7 @@ test.describe(
           `/api/bpm/tasks/${encodeURIComponent(taskId)}/approve`,
           {
             headers: {
-              Authorization: `Bearer ${adminToken}`,
+              Authorization: `Bearer ${managerToken}`,
               'Content-Type': 'application/json',
             },
             data: {
@@ -504,7 +489,7 @@ test.describe(
     // =========================================================================
     test(
       'NT-2: reject flow fires notify_rejected and persists recipient notification',
-      async ({ page, request }) => {
+      async ({ browser, request }) => {
         const seeded = await seedLeaveDraft(
           request,
           adminToken,
@@ -526,33 +511,32 @@ test.describe(
         );
 
         // UI reachability: reject menu item is exposed
-        await navigateToTaskCenter(page);
-        const taskId = await findManagerTaskId(request, adminToken, rejectInstanceId);
+        const { context: managerCtx, page: managerPage } = await openTaskCenterAsRole(
+          browser,
+          'wd_manager@example.com',
+          'Test2026x',
+        );
+        const taskId = await findManagerTaskId(request, managerToken, rejectInstanceId);
 
-        const taskRow = page
-          .locator('table tbody tr')
-          .filter({ hasText: PROCESS_KEY })
-          .filter({ hasText: /task_manager_approve|主管审批|Manager Approve/i })
-          .first();
+        const taskRow = findTaskRowByBusinessKey(
+          managerPage,
+          rejectPid,
+          /task_manager_approve|主管审批|Manager Approve/i,
+        );
         await expect(taskRow).toBeVisible({ timeout: 15_000 });
-        const moreBtn = taskRow
-          .locator('button')
-          .filter({ has: page.locator('svg.lucide-ellipsis') })
-          .first();
-        await moreBtn.click();
-        const menu = page.locator('.absolute.right-0.z-10');
-        await expect(menu).toBeVisible({ timeout: 3_000 });
+        const menu = await openTaskRowMenu(taskRow, managerPage);
         await expect(
           menu.locator('button').filter({ hasText: /驳回|Reject|拒绝/i }).first(),
           'Reject action must be reachable from Task Center row menu',
         ).toBeVisible();
-        await page.keyboard.press('Escape').catch(() => {});
+        await managerPage.keyboard.press('Escape').catch(() => {});
+        await managerCtx.close();
 
         const rejectResp = await request.post(
           `/api/bpm/tasks/${encodeURIComponent(taskId)}/reject`,
           {
             headers: {
-              Authorization: `Bearer ${adminToken}`,
+              Authorization: `Bearer ${managerToken}`,
               'Content-Type': 'application/json',
             },
             data: {

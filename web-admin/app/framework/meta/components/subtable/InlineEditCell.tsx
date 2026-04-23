@@ -135,7 +135,7 @@ export const InlineEditCell: React.FC<InlineEditCellProps> = ({
   );
 };
 
-function formatDisplayValue(value: any, col: ColumnConfig): string {
+function formatDisplayValue(value: any, _col: ColumnConfig): string {
   if (value == null) return '-';
   if (typeof value === 'number') {
     return value.toLocaleString(undefined, {

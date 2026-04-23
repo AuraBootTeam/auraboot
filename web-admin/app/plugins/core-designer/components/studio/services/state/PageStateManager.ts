@@ -101,8 +101,7 @@ class PageStateManagerImpl implements IPageStateManager {
     return { ...this.currentState };
   }
 
-  setState(state: Partial<PageState>, source?: string): void {
-    const previousState = { ...this.currentState };
+  setState(state: Partial<PageState>, _source?: string): void {
     this.currentState = { ...this.currentState, ...state };
 
     // 更新修改时间
@@ -113,8 +112,6 @@ class PageStateManagerImpl implements IPageStateManager {
   }
 
   updateState(changes: StateChange[]): void {
-    const previousState = { ...this.currentState };
-
     // 应用所有变更
     changes.forEach((change) => {
       this.applyStateChange(change);
@@ -381,7 +378,7 @@ class PageStateManagerImpl implements IPageStateManager {
     return this.currentState.components[componentId] || null;
   }
 
-  setComponentState(componentId: string, state: Partial<ComponentState>, source?: string): void {
+  setComponentState(componentId: string, state: Partial<ComponentState>, _source?: string): void {
     const currentCompState = this.getComponentState(componentId);
     if (!currentCompState) {
       console.warn(`Component ${componentId} not found`);
@@ -402,7 +399,7 @@ class PageStateManagerImpl implements IPageStateManager {
     });
   }
 
-  setGlobalState(key: string, value: any, source?: string): void {
+  setGlobalState(key: string, value: any, _source?: string): void {
     this.setState({
       globalState: {
         ...this.currentState.globalState,
@@ -411,7 +408,7 @@ class PageStateManagerImpl implements IPageStateManager {
     });
   }
 
-  setFormData(key: string, value: any, source?: string): void {
+  setFormData(key: string, value: any, _source?: string): void {
     this.setState({
       formData: {
         ...this.currentState.formData,
@@ -420,7 +417,7 @@ class PageStateManagerImpl implements IPageStateManager {
     });
   }
 
-  setUIState(updates: Partial<PageState['uiState']>, source?: string): void {
+  setUIState(updates: Partial<PageState['uiState']>, _source?: string): void {
     this.setState({
       uiState: {
         ...this.currentState.uiState,

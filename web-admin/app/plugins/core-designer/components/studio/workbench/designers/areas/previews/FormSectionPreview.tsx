@@ -8,8 +8,12 @@
 import React from 'react';
 import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { DslBlock, DslFieldRef } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseFieldShorthand, resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import {
+  parseFieldShorthand,
+  resolveLocalizedText,
+  type DslBlock,
+  type DslFieldRef,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface FormSectionPreviewProps {
   block: DslBlock;
@@ -22,7 +26,7 @@ export interface FormSectionPreviewProps {
 export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
   block,
   selectedFieldIndex,
-  onFieldReorder,
+  onFieldReorder: _onFieldReorder,
   onFieldSelect,
   readonly,
 }) => {

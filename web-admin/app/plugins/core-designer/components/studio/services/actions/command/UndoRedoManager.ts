@@ -14,7 +14,6 @@ import type {
   CommandResult,
   CommandEvents,
 } from '~/plugins/core-designer/components/studio/services/actions/command/Command';
-import { CommandExecutor } from '~/plugins/core-designer/components/studio/services/actions/command/Command';
 import {
   DesignerCommandFactory,
   registerDesignerCommandFactories,
@@ -270,7 +269,6 @@ export class UndoRedoManager {
    */
   getState(): UndoRedoManagerState {
     const stackState = this.historyStack.getState();
-    const history = this.historyStack.getHistory();
     const redoHistory = this.historyStack.getRedoHistory();
 
     return {

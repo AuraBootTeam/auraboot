@@ -87,7 +87,7 @@ async function deleteRecord(request: APIRequestContext, pid: string): Promise<vo
 /**
  * Navigate to the showcase list page by clicking through the sidebar menu.
  * Menu hierarchy (per plugins/showcase/config/menus.json):
- *   "能力展示" (sc_root) → "全字段类型" (sc_all_fields) → /p/showcase_all_fields
+ *   "字段展示" (sc_root) → "全字段类型" (sc_all_fields) → /p/showcase_all_fields
  */
 async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
@@ -96,10 +96,10 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
   await page.evaluate(() => localStorage.removeItem('sidebar-collapsed'));
   await page.reload({ waitUntil: 'domcontentloaded' });
 
-  // Expand the "能力展示" parent (i18n: Showcase / menu.sc_root fallback).
+  // Expand the "字段展示" parent (i18n: Field Showcase / menu.sc_root fallback).
   const parent = page
     .locator('button, [role="menuitem"]', {
-      hasText: /能力展示|Showcase|menu\.sc_root/i,
+      hasText: /字段展示|能力展示|Field Showcase|Showcase|menu\.sc_root/i,
     })
     .first();
   await parent.waitFor({ state: 'visible', timeout: 10_000 });

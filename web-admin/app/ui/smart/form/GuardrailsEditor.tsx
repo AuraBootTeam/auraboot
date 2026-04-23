@@ -6,9 +6,8 @@
  *   forbiddenTools, requireApproval, timeoutMs }
  */
 
-import React, { forwardRef, useState, useCallback, useMemo, useEffect } from 'react';
+import React, { forwardRef, useState, useCallback, useMemo } from 'react';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
-import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/ui/ui/field-base';
 import { FieldControl } from '~/ui/ui/field-control';
 
@@ -102,7 +101,6 @@ export const GuardrailsEditor = forwardRef<HTMLDivElement, GuardrailsEditorProps
     },
     ref,
   ) => {
-    const st = useSmartText();
     const { labelText, required: requiredValue } = useSmartFieldContract({
       label,
       placeholder,
@@ -200,6 +198,8 @@ function GuardrailField({
   readOnly: boolean;
   onChange: (val: any) => void;
 }) {
+  const [input, setInput] = useState('');
+
   if (field.type === 'boolean') {
     return (
       <div className="flex items-center justify-between">
@@ -225,7 +225,6 @@ function GuardrailField({
 
   if (field.type === 'tags') {
     const tags = Array.isArray(value) ? value : [];
-    const [input, setInput] = useState('');
 
     return (
       <div>

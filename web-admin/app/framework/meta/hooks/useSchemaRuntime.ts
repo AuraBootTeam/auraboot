@@ -116,7 +116,7 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
     [showSuccessToast, showErrorToast, showInfoToast],
   );
 
-  const { schema, dataSourceManager, navigate, locale, t, disableAutoFetch = true } = options;
+  const { schema, dataSourceManager, navigate, disableAutoFetch = true } = options;
 
   // 使用 ref 跟踪 schema ID，避免重复创建
   const schemaIdRef = React.useRef<string | null>(null);

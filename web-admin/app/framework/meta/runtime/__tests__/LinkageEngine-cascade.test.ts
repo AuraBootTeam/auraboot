@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LinkageEngine } from '~/framework/meta/runtime/linkage/LinkageEngine';
 import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
-import type { ExpressionContext, GlobalState } from '~/framework/meta/runtime/expression/context';
+import type { GlobalState } from '~/framework/meta/runtime/expression/context';
 import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
 
 const SCOPE_ID = 'cascade-test';

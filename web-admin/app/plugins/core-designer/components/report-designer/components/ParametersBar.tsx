@@ -3,7 +3,7 @@
  * Allows users to fill in report parameters before viewing/exporting
  */
 
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import type { ReportParameter } from '../types';
 
 interface ParametersBarProps {

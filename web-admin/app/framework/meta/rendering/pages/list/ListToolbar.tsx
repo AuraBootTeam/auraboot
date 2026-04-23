@@ -8,9 +8,7 @@ import React, { useCallback } from 'react';
 import { RowHeightSelector } from '~/framework/smart/components/view/RowHeightSelector';
 import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
 import type { SortConfig, ViewFilterConfig, RowHeight } from '~/framework/smart/types/savedView';
-import type { ColumnConfig } from '~/framework/meta/schemas/types';
-import { SortPopover } from './SortPopover';
-import type { SortableColumn } from './SortPopover';
+import { SortPopover, type SortableColumn } from './SortPopover';
 
 type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
 

@@ -143,7 +143,7 @@ async function gotoShowcaseListViaMenu(page: Page): Promise<void> {
 
   const parent = page
     .locator('button, [role="menuitem"]', {
-      hasText: /能力展示|Showcase|menu\.sc_root/i,
+      hasText: /字段展示|能力展示|Field Showcase|Showcase|menu\.sc_root/i,
     })
     .first();
   await parent.waitFor({ state: 'visible', timeout: 10_000 });

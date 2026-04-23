@@ -62,7 +62,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 字典数据缓存
   const dictDataCache = useRef<Map<string, DictItem[]>>(new Map());
-  const [dictLoaded, setDictLoaded] = useState(false);
+  const [_dictLoaded, setDictLoaded] = useState(false);
 
   // 加载字典数据
   useEffect(() => {

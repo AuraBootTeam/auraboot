@@ -5,7 +5,7 @@
  */
 
 import { EventEmitter } from 'events';
-import type { PageState, StateChangeEvent } from '~/plugins/core-designer/components/studio/services/state/PageStateManager';
+import type { PageState } from '~/plugins/core-designer/components/studio/services/state/PageStateManager';
 
 /**
  * 用户信息
@@ -216,7 +216,7 @@ export class CollaborationManager extends EventEmitter {
           resolve();
         });
 
-        this.once('error', (error) => {
+        this.once('error', (_error) => {
           clearTimeout(timeout);
           reject(error);
         });
@@ -449,7 +449,7 @@ export class CollaborationManager extends EventEmitter {
     }
   };
 
-  private handleWebSocketError = (event: Event): void => {
+  private handleWebSocketError = (_event: Event): void => {
     this.connectionStatus = ConnectionStatus.Error;
     this.emit('connectionStatusChange', this.connectionStatus);
     this.emit('error', new Error('WebSocket error'));

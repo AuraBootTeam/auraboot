@@ -40,16 +40,6 @@ export const ParallelGatewayNode = memo(({ id, data, selected }: NodeProps<BPMNN
           position={Position.Right}
           className="!h-3 !w-3 -rotate-45 !bg-blue-500"
         />
-        <Handle
-          type="source"
-          position={Position.Top}
-          className="!h-3 !w-3 -rotate-45 !bg-blue-500"
-        />
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="!h-3 !w-3 -rotate-45 !bg-blue-500"
-        />
       </div>
       {monitorStatus === 'completed' && (
         <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500">

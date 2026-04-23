@@ -5,13 +5,13 @@
  * Rules are evaluated top-to-bottom; first match wins per row.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type {
   ViewConfig,
   ConditionalFormatRule,
   ConditionalFormatStyle,
+  CONDITIONAL_FORMAT_PRESETS,
 } from '~/framework/smart/types/savedView';
-import { CONDITIONAL_FORMAT_PRESETS } from '~/framework/smart/types/savedView';
 
 interface FieldOption {
   code: string;
@@ -53,7 +53,7 @@ export const ConditionalFormatPanel: React.FC<ConditionalFormatPanelProps> = ({
   onChange,
   fields,
 }) => {
-  const rules = viewConfig.conditionalFormats || [];
+  const rules = useMemo(() => viewConfig.conditionalFormats || [], [viewConfig.conditionalFormats]);
 
   const updateRules = useCallback(
     (newRules: ConditionalFormatRule[]) => {

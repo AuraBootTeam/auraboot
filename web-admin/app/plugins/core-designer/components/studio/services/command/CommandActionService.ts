@@ -13,9 +13,7 @@ export class CommandActionService {
    * GET /api/meta/commands?modelCode={modelCode}
    */
   async listByModelCode(modelCode: string): Promise<CommandDefinitionDTO[]> {
-    const result = await get<CommandDefinitionDTO[]>('/api/meta/commands', {
-      params: { modelCode },
-    });
+    const result = await get<CommandDefinitionDTO[]>('/api/meta/commands', { modelCode });
     return result?.data ?? [];
   }
 

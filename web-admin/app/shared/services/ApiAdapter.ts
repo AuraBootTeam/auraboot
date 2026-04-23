@@ -1,6 +1,5 @@
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import type { Result } from '~/utils/type';
 
 // API 调用类型
 export type ApiType = 'http' | 'grpc';
@@ -98,7 +97,7 @@ export class ApiAdapter {
   /**
    * 调用 gRPC API (示例实现，需要根据您的 gRPC 客户端库调整)
    */
-  private static async callGrpc<T>(config: ApiConfig, data: any): Promise<ApiResult<T>> {
+  private static async callGrpc<T>(config: ApiConfig, _data: any): Promise<ApiResult<T>> {
     // 这里需要根据您使用的 gRPC 客户端库进行实现
     // 以下是一个示例框架，实际实现需要替换
 

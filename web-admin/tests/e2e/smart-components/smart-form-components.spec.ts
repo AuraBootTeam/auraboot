@@ -238,7 +238,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-004: SmartSelect should render select with enum options @smoke', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
     await waitForSelectOptions(page);
 
     // order_type is an ENUM field rendered via SmartSelect (native <select>)
@@ -278,7 +278,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-005: SmartMultiSelect should render multi-select with tag chips', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // Look for multi-select fields (multiple attribute or specific component)
     const multiSelect = page
@@ -310,7 +310,7 @@ test.describe('Smart Components — Form Components', () => {
   test('SC-006: SmartSwitch should render toggle switch for boolean field @smoke', async ({
     page,
   }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // order_urgent is a BOOLEAN field rendered as switch (button[role="switch"])
     const urgentSwitch = page.locator('button[role="switch"]').first();
@@ -341,7 +341,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-007: SmartCheckbox should render checkbox input', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // Look for checkbox inputs (may be rendered for boolean fields without switch)
     const checkboxes = page.locator('input[type="checkbox"], [role="checkbox"]');
@@ -367,7 +367,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-008: SmartRadio should render radio group', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // Look for radio inputs or radio group
     const radios = page.locator('input[type="radio"], [role="radio"], [role="radiogroup"]');
@@ -406,7 +406,7 @@ test.describe('Smart Components — Form Components', () => {
   test('SC-009: SmartDatePicker should render date input and accept date value @smoke', async ({
     page,
   }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // order_date is a DATE field rendered via SmartDatePicker (native input[type="date"])
     const dateInput = page.locator('input[type="date"]').first();
@@ -418,8 +418,6 @@ test.describe('Smart Components — Form Components', () => {
     }
 
     // Verify date input has a value (autoSetValues may pre-fill)
-    const currentValue = await dateInput.inputValue();
-
     // Set a new date value
     const newDate = '2026-06-15';
     await dateInput.fill(newDate);
@@ -432,7 +430,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-010: SmartDateRange should render start/end date fields', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // SmartDateRange renders two date inputs (start and end)
     const dateInputs = page.locator('input[type="date"]');
@@ -462,7 +460,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-011: SmartTimePicker should render time input', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     const timeInput = page.locator('input[type="time"], [data-testid*="time-picker"]').first();
     const hasTime = await timeInput.isVisible({ timeout: 3000 }).catch(() => false);
@@ -484,7 +482,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-012: SmartTimeRangePicker should render start/end time fields', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     const timeInputs = page.locator('input[type="time"]');
     const timeCount = await timeInputs.count();
@@ -575,7 +573,7 @@ test.describe('Smart Components — Form Components', () => {
 
   test('SC-015: SmartTreeSelect should render tree-structured dropdown', async ({ page }) => {
     test.setTimeout(30000);
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // TreeSelect renders with a specific component or as a cascader
     const treeSelect = page
@@ -602,7 +600,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-016: SmartUserSelect should render user picker', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // SmartUserSelect renders a select/combobox with user options
     const userSelect = page
@@ -632,7 +630,7 @@ test.describe('Smart Components — Form Components', () => {
   // -------------------------------------------------------------------------
 
   test('SC-017: SmartOrganizationSelect should render org picker', async ({ page }) => {
-    const { formPage } = await navigateToNewOrderForm(page);
+    await navigateToNewOrderForm(page);
 
     // SmartOrganizationSelect renders for org/department reference fields
     const orgSelect = page

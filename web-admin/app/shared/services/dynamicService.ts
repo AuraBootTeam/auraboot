@@ -4,7 +4,6 @@ import type {
   PaginationRequest,
   PaginationResult,
   DynamicEntity,
-  BatchOperationRequest,
   CustomQueryRequest,
   FieldOptionsRequest,
   RelatedDataRequest,
@@ -13,7 +12,6 @@ import type {
   EntityStats,
   PageSchema,
   FieldOption,
-  ApiResponse,
 } from '~/types/dynamic';
 
 /**

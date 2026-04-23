@@ -31,8 +31,6 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
   onClear,
   resolveLabel,
 }) => {
-  if (selectedIds.length === 0) return null;
-
   const handleAction = useCallback(
     (button: ButtonConfig) => {
       const actionStr = typeof button.action === 'string' ? button.action : button.code;
@@ -40,6 +38,8 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
     },
     [selectedIds, onAction],
   );
+
+  if (selectedIds.length === 0) return null;
 
   return (
     <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-lg">

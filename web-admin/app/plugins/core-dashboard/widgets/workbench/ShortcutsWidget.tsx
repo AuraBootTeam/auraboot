@@ -7,8 +7,12 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
-import { listFavorites, removeFavorite, reorderFavorites } from '~/shared/services/engagementService';
-import type { UserEngagement } from '~/shared/services/engagementService';
+import {
+  listFavorites,
+  removeFavorite,
+  reorderFavorites,
+  type UserEngagement,
+} from '~/shared/services/engagementService';
 import { AddFavoriteModal } from '~/plugins/core-dashboard/widgets/workbench/AddFavoriteModal';
 
 export interface ShortcutItem {
@@ -34,18 +38,18 @@ const I18N_KEYS = {
   newLead: 'workbench.shortcuts.newLead',
   newAccount: 'workbench.shortcuts.newAccount',
   newOpportunity: 'workbench.shortcuts.newOpportunity',
-  startProcess: 'workbench.shortcuts.startProcess',
+  taskCenter: 'workbench.shortcuts.taskCenter',
   newContract: 'workbench.shortcuts.newContract',
   reports: 'workbench.shortcuts.reports',
 } as const;
 
-function getDefaultShortcuts(t: (key: string) => string): ShortcutItem[] {
+function getDefaultShortcuts(t: (key: string, params?: Record<string, unknown>) => string): ShortcutItem[] {
   return [
-    { label: t(I18N_KEYS.newLead), icon: '\uD83C\uDFAF', path: '/crm_lead?action=create', color: 'bg-blue-50' },
-    { label: t(I18N_KEYS.newAccount), icon: '\uD83C\uDFE2', path: '/crm_account?action=create', color: 'bg-green-50' },
-    { label: t(I18N_KEYS.newOpportunity), icon: '\uD83D\uDCB0', path: '/crm_opportunity?action=create', color: 'bg-amber-50' },
-    { label: t(I18N_KEYS.startProcess), icon: '\uD83D\uDCCB', path: '/bpm/process-management', color: 'bg-violet-50' },
-    { label: t(I18N_KEYS.newContract), icon: '\uD83D\uDCC4', path: '/cc_contract?action=create', color: 'bg-orange-50' },
+    { label: t(I18N_KEYS.newLead), icon: '\uD83C\uDFAF', path: '/p/crm_lead/new', color: 'bg-blue-50' },
+    { label: t(I18N_KEYS.newAccount), icon: '\uD83C\uDFE2', path: '/p/crm_account/new', color: 'bg-green-50' },
+    { label: t(I18N_KEYS.newOpportunity), icon: '\uD83D\uDCB0', path: '/p/crm_opportunity/new', color: 'bg-amber-50' },
+    { label: t(I18N_KEYS.taskCenter), icon: '\uD83D\uDCCB', path: '/bpm/task-center', color: 'bg-violet-50' },
+    { label: t(I18N_KEYS.newContract), icon: '\uD83D\uDCC4', path: '/p/cc_contract/new', color: 'bg-orange-50' },
     { label: t(I18N_KEYS.reports), icon: '\uD83D\uDCCA', path: '/reports/overview', color: 'bg-indigo-50' },
   ];
 }
@@ -74,7 +78,7 @@ export function ShortcutsWidget({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
-  const displayTitle = title || t(I18N_KEYS.title);
+  const displayTitle = title ? t(title) : t(I18N_KEYS.title);
 
   const loadFavorites = useCallback(async () => {
     if (overrideShortcuts) {
@@ -154,11 +158,11 @@ export function ShortcutsWidget({
   if (loading) {
     return (
       <div className={`flex h-full flex-col ${className}`}>
-        <div className="mb-3 flex items-center justify-between px-1">
+        <div className="mb-3 flex items-center justify-between px-3 pt-3">
           <span className="text-sm font-medium text-gray-700">{displayTitle}</span>
         </div>
         <div
-          className="grid flex-1 gap-2"
+          className="grid flex-1 gap-2 px-3 pb-3"
           style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}
         >
           {Array.from({ length: 6 }).map((_, i) => (
@@ -178,7 +182,7 @@ export function ShortcutsWidget({
   return (
     <div className={`flex h-full flex-col ${className}`}>
       {/* Header */}
-      <div className="mb-3 flex items-center justify-between px-1">
+      <div className="mb-3 flex items-center justify-between px-3 pt-3">
         <span className="text-sm font-medium text-gray-700">{displayTitle}</span>
         {isFromFavorites && (
           <button
@@ -192,7 +196,7 @@ export function ShortcutsWidget({
 
       {/* Grid */}
       <div
-        className="grid flex-1 gap-2"
+        className="grid flex-1 gap-2 px-3 pb-3"
         style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}
       >
         {items.map((item, index) => (
@@ -246,7 +250,7 @@ export function ShortcutsWidget({
 
       {/* Customize hint when showing defaults — clicking opens the modal */}
       {!isFromFavorites && !editing && (
-        <div className="mt-2 text-center">
+        <div className="px-3 pb-3 text-center">
           <button
             onClick={() => setModalOpen(true)}
             className="text-[10px] text-gray-300 transition-colors hover:text-blue-400"

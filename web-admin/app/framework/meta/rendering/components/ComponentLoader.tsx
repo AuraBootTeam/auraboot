@@ -3,8 +3,7 @@
  * 支持动态加载 Smart 组件,带缓存机制
  */
 
-import React, { useState, useEffect } from 'react';
-import type { ComponentType } from 'react';
+import React, { useState, useEffect, type ComponentType } from 'react';
 import { componentRegistry, initializeComponentRegistry } from '~/framework/meta/registry/components';
 import { getRuntimeComponentEntry } from '~/framework/meta/rendering/components/runtime-component-loaders';
 

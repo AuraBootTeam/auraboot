@@ -37,7 +37,6 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
   onKeyDown,
   dictOptions,
   autoFocus = false,
-  t = (k) => k,
 }) => {
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
 

@@ -6,7 +6,6 @@
  */
 
 import React, { useCallback } from 'react';
-import type { DragEndEvent } from '@dnd-kit/core';
 import {
   DndContext,
   closestCenter,
@@ -14,14 +13,19 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type DragEndEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
-import type { DslBlock, DslFieldRef } from '~/plugins/core-designer/components/studio/domain/dsl/types';
-import { parseFieldShorthand, resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import {
+  parseFieldShorthand,
+  resolveLocalizedText,
+  type DslBlock,
+  type DslFieldRef,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { SortableFilterField } from './SortableFilterField';
 
 export interface FilterFormPreviewProps {

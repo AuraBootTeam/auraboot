@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
-import type { AxiosResponse } from 'axios';
-import axios from 'axios';
+import axios, { type AxiosResponse } from 'axios';
 import * as http from 'http';
 import * as https from 'https';
 import { config } from '~/server/utils/config';
@@ -1054,7 +1053,6 @@ export class BffProxyService {
     if (!data) return null;
 
     try {
-      const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
       const parsed = typeof data === 'string' ? JSON.parse(data) : data;
 
       // 移除可能的敏感字段

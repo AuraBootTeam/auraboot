@@ -3,7 +3,6 @@
  */
 
 import React, { useState } from 'react';
-import { cn } from '~/utils/cn';
 import { useDebugSession } from '../hooks/useDebugSession';
 
 function JsonTree({ data, depth = 0 }: { data: unknown; depth?: number }) {

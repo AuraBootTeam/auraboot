@@ -3,8 +3,19 @@
  */
 
 import { memo } from 'react';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from '@xyflow/react';
 import type { BPMNEdgeData } from '~/plugins/core-designer/components/bpmn-designer/types';
+
+export function formatConditionForDisplay(condition: string | undefined): string | null {
+  if (!condition) return null;
+
+  const normalized = condition.replace(/\s+/g, '');
+  if (normalized === '${true}' || normalized === 'true' || normalized === '${$true}') {
+    return null;
+  }
+
+  return condition;
+}
 
 export const ConditionalEdge = memo(
   ({
@@ -19,18 +30,19 @@ export const ConditionalEdge = memo(
     selected,
     markerEnd,
   }: EdgeProps) => {
-    const [edgePath, labelX, labelY] = getBezierPath({
+    const [edgePath, labelX, labelY] = getSmoothStepPath({
       sourceX,
       sourceY,
       sourcePosition,
       targetX,
       targetY,
       targetPosition,
+      borderRadius: 16,
     });
 
     const edgeData = data as BPMNEdgeData | undefined;
     const label = edgeData?.label;
-    const condition = edgeData?.condition?.content;
+    const condition = formatConditionForDisplay(edgeData?.condition?.content);
     const isDefault = edgeData?.isDefault;
 
     // Build display text: label first, then condition in smaller font

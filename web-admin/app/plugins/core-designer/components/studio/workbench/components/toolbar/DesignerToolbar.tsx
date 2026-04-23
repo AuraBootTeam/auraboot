@@ -10,8 +10,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import type { PageMeta } from '../../../services/page-manager';
-import { PAGE_STATUS_INFO } from '../../../services/page-manager';
+import { PAGE_STATUS_INFO, type PageMeta } from '../../../services/page-manager';
 import { SaveAsTemplateDialog } from '~/plugins/core-designer/components/studio/components/SaveAsTemplateDialog';
 import { AiPageGenerateDialog } from '~/plugins/core-designer/components/studio/components/AiPageGenerateDialog';
 import type { MergeMode } from '~/plugins/core-designer/components/studio/components/ai-page-prompt';
@@ -96,14 +95,14 @@ const ToolbarButton: React.FC<{
   size = 'md',
   'data-testid': testId,
 }) => {
-  const baseClass = size === 'sm' ? 'p-1.5' : 'px-2.5 py-1.5';
+  const baseClass = size === 'sm' ? 'h-8 px-2' : 'h-9 px-3';
   const variantClass = {
     default: active
-      ? 'bg-blue-100 text-blue-700'
-      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
-    primary: 'bg-blue-600 text-white hover:bg-blue-700',
-    success: 'bg-green-600 text-white hover:bg-green-700',
-    danger: 'text-red-600 hover:bg-red-50',
+      ? 'border-blue-200 bg-blue-50 text-blue-700'
+      : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900',
+    primary: 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700 hover:border-blue-700',
+    success: 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 hover:border-emerald-700',
+    danger: 'border-transparent text-red-600 hover:border-red-100 hover:bg-red-50',
   }[variant];
 
   const resolvedTitle = disabled && disabledTitle ? disabledTitle : title;
@@ -115,7 +114,7 @@ const ToolbarButton: React.FC<{
       title={resolvedTitle}
       aria-label={resolvedTitle}
       data-testid={testId}
-      className={` ${baseClass} flex items-center gap-1.5 rounded-md text-sm font-medium transition-colors ${variantClass} ${disabled ? 'cursor-not-allowed opacity-40' : ''} `}
+      className={` ${baseClass} inline-flex items-center gap-1.5 rounded-lg border text-sm font-medium transition-colors ${variantClass} ${disabled ? 'cursor-not-allowed opacity-40' : ''} `}
     >
       {icon}
       {label && <span>{label}</span>}
@@ -126,7 +125,7 @@ const ToolbarButton: React.FC<{
 /**
  * Toolbar divider
  */
-const ToolbarDivider: React.FC = () => <div className="mx-1 h-6 w-px bg-gray-200" />;
+const ToolbarDivider: React.FC = () => <div className="mx-1.5 h-6 w-px bg-slate-200" />;
 
 /**
  * Toolbar group
@@ -212,9 +211,9 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   ];
 
   return (
-    <div className="flex h-12 items-center justify-between border-b border-gray-200 bg-white px-3">
+    <div className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4">
       {/* Left section */}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         {/* Zone A: Navigation */}
         <ToolbarGroup>
           <ToolbarButton
@@ -233,13 +232,13 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
             data-testid="toolbar-back"
           />
           {pageMeta && (
-            <div className="ml-2 flex items-center gap-2">
-              <span className="max-w-[200px] truncate font-medium text-gray-900">
+            <div className="ml-1 flex min-w-0 items-center gap-2">
+              <span className="max-w-[220px] truncate text-base font-semibold text-slate-900">
                 {pageMeta.title}
               </span>
               {statusInfo && (
                 <span
-                  className={`rounded px-1.5 py-0.5 text-xs ${statusInfo.color} ${statusInfo.bgColor}`}
+                  className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusInfo.color} ${statusInfo.bgColor}`}
                 >
                   {statusInfo.label}
                 </span>
@@ -330,13 +329,13 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowZoomMenu(!showZoomMenu)}
-              className="min-w-[60px] rounded px-2 py-1 text-center text-sm text-gray-600 hover:bg-gray-100"
+              className="min-w-[64px] rounded-lg border border-transparent px-2.5 py-1.5 text-center text-sm font-medium text-slate-600 hover:border-slate-200 hover:bg-slate-50"
               data-testid="toolbar-zoom-level"
             >
               {zoomLevel}%
             </button>
             {showZoomMenu && (
-              <div className="absolute top-full left-0 z-50 mt-1 min-w-[100px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <div className="absolute top-full left-0 z-50 mt-2 min-w-[112px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                 {zoomPresets.map((preset) => (
                   <button
                     key={preset}
@@ -344,20 +343,20 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                       onZoomChange?.(preset);
                       setShowZoomMenu(false);
                     }}
-                    className={`w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 ${
-                      zoomLevel === preset ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                      zoomLevel === preset ? 'bg-blue-50 text-blue-600' : 'text-slate-700'
                     }`}
                   >
                     {preset}%
                   </button>
                 ))}
-                <div className="my-1 border-t border-gray-100" />
+                <div className="my-1 border-t border-slate-100" />
                 <button
                   onClick={() => {
                     onZoomReset?.();
                     setShowZoomMenu(false);
                   }}
-                  className="w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100"
+                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                 >
                   Fit to screen
                 </button>
@@ -390,7 +389,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowDeviceMenu(!showDeviceMenu)}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-transparent px-3 text-sm font-medium text-slate-600 hover:border-slate-200 hover:bg-slate-50"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -411,7 +410,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
               </svg>
             </button>
             {showDeviceMenu && (
-              <div className="absolute top-full left-0 z-50 mt-1 min-w-[140px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <div className="absolute top-full left-0 z-50 mt-2 min-w-[160px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                 {devices.map((device) => (
                   <button
                     key={device.id}
@@ -419,10 +418,10 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                       onDeviceChange?.(device.id);
                       setShowDeviceMenu(false);
                     }}
-                    className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                   >
                     <span>{device.label}</span>
-                    <span className="text-xs text-gray-400">{device.width}px</span>
+                    <span className="text-xs text-slate-400">{device.width}px</span>
                   </button>
                 ))}
               </div>
@@ -436,7 +435,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
         {/* Save status indicator */}
         {autoSaveEnabled && (
           <span
-            className="mr-2 flex items-center gap-1 text-xs"
+            className="mr-1 flex items-center gap-1.5 text-xs"
             data-testid="toolbar-save-status"
           >
             {isSaving ? (
@@ -460,12 +459,12 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                <span className="text-blue-500">Saving...</span>
+                <span className="text-blue-600">Saving...</span>
               </>
             ) : lastSavedAt ? (
               <>
-                <span className="h-2 w-2 rounded-full bg-green-500" />
-                <span className="text-gray-400">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="text-slate-400">
                   Saved {formatLastSaved(lastSavedAt)}
                 </span>
               </>
@@ -562,8 +561,6 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           data-testid="toolbar-preview"
         />
 
-        <ToolbarDivider />
-
         {/* AI Generate — toggles the side panel */}
         <ToolbarButton
           icon={<span className="text-sm">&#x2728;</span>}
@@ -629,6 +626,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
           disabledTitle={!canSave ? (DESIGNER_I18N.permissions.missingManage[locale] ?? DESIGNER_I18N.permissions.missingManage['en-US']) : undefined}
           onClick={onSave}
           disabled={isSaving || !hasUnsavedChanges || !canSave}
+          variant={hasUnsavedChanges ? 'default' : 'default'}
           data-testid="toolbar-save"
         />
 

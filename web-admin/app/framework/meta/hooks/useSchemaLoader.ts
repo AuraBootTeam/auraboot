@@ -7,7 +7,7 @@
  * - Model 无关页面：pageKey 为自定义标识，如 "dashboard_main"
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';

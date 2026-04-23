@@ -306,7 +306,7 @@ export class CrossColumnDragEngine {
   private setupHandleStyles(
     element: HTMLElement,
     type: ResizeHandle['type'],
-    position: ResizeHandle['position'],
+    _position: ResizeHandle['position'],
   ): void {
     const size = this.config.handleSize;
 
@@ -356,7 +356,7 @@ export class CrossColumnDragEngine {
   /**
    * 获取手柄光标样式
    */
-  private getHandleCursor(type: ResizeHandle['type'], position: ResizeHandle['position']): string {
+  private getHandleCursor(type: ResizeHandle['type'], _position: ResizeHandle['position']): string {
     switch (type) {
       case 'column':
         return 'col-resize';
@@ -716,7 +716,7 @@ export class CrossColumnDragEngine {
   /**
    * 创建预览
    */
-  private createPreview(target: ResizeTarget): void {
+  private createPreview(_target: ResizeTarget): void {
     if (!this.container) return;
 
     this.previewElement = document.createElement('div');
@@ -736,7 +736,6 @@ export class CrossColumnDragEngine {
   private updatePreview(area: ResizeOperation['currentArea']): void {
     if (!this.previewElement || !this.container) return;
 
-    const containerRect = this.container.getBoundingClientRect();
     const left = (area.columnStart - 1) * (this.config.columnWidth + this.config.gap);
     const top = (area.rowStart - 1) * (this.config.rowHeight + this.config.gap);
     const width =

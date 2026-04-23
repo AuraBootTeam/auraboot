@@ -5,11 +5,10 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { useNavigate, useParams, useLoaderData } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
+import { useNavigate, useParams, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import { dictService } from '~/shared/services/dictService';
 import { useToastContext } from '~/contexts/ToastContext';
-import type { DictDTO, DictUpdateRequest } from '~/types/dict';
+import type { DictUpdateRequest } from '~/types/dict';
 
 /**
  * Loader function

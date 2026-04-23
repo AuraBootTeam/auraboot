@@ -5,8 +5,7 @@
  * Converts all errors to standardized Result format.
  */
 
-import type { Result } from './types';
-import { ErrorCodes } from './types';
+import { ErrorCodes, type Result } from './types';
 
 function normalizeResult<T>(result: Result<T>): Result<T> {
   // Ensure code is always a string — backend may return numeric 0 instead of "0"
@@ -23,6 +22,7 @@ function normalizeResult<T>(result: Result<T>): Result<T> {
     message,
     success,
     data: result.data ?? null,
+    context: result.context ?? null,
   };
 }
 
@@ -131,6 +131,7 @@ async function handleHttpError(response: Response): Promise<Result<any>> {
       message: body.message || `HTTP Error: ${statusCode} ${statusText}`,
       success: false,
       data: body.data || null,
+      context: body.context ?? null,
     };
   } catch {
     // Response body is not JSON or empty — fall back to status info
@@ -140,6 +141,7 @@ async function handleHttpError(response: Response): Promise<Result<any>> {
       message: `HTTP Error: ${statusCode} ${statusText}`,
       success: false,
       data: null,
+      context: null,
     };
   }
 }
@@ -164,6 +166,7 @@ function handleNetworkError(error: Error): Result<any> {
     message: `Network error: ${error.message}`,
     success: false,
     data: null,
+    context: null,
   };
 }
 
@@ -190,6 +193,7 @@ function handleJsonError(error: Error): Result<any> {
     message: `Failed to parse JSON response: ${error.message}`,
     success: false,
     data: null,
+    context: null,
   };
 }
 
@@ -212,5 +216,6 @@ function handleTimeoutError(error: Error): Result<any> {
     message: `Request timeout: ${error.message}`,
     success: false,
     data: null,
+    context: null,
   };
 }

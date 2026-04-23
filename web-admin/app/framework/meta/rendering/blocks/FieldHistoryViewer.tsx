@@ -37,7 +37,6 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   recordId,
   token,
   locale = 'zh-CN',
-  t = (key: string) => key,
 }) => {
   const [changes, setChanges] = useState<FieldChangeLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +79,10 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-400">
+      <div
+        className="flex items-center justify-center py-12 text-gray-400"
+        data-testid="field-history-loading"
+      >
         <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
         {locale === 'zh-CN' ? '加载变更历史...' : 'Loading change history...'}
       </div>
@@ -88,12 +90,16 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   }
 
   if (error) {
-    return <div className="py-8 text-center text-sm text-red-500">{error}</div>;
+    return (
+      <div className="py-8 text-center text-sm text-red-500" data-testid="field-history-error">
+        {error}
+      </div>
+    );
   }
 
   if (changes.length === 0) {
     return (
-      <div className="py-12 text-center text-sm text-gray-400">
+      <div className="py-12 text-center text-sm text-gray-400" data-testid="field-history-empty">
         {locale === 'zh-CN' ? '暂无变更记录' : 'No change history'}
       </div>
     );
@@ -103,13 +109,13 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   const groups = groupByTimestamp(changes);
 
   return (
-    <div className="relative">
+    <div className="relative" data-testid="field-history">
       {/* Timeline line */}
       <div className="absolute top-0 bottom-0 left-4 w-px bg-gray-200" />
 
       <div className="space-y-6 pl-10">
         {groups.map((group, gi) => (
-          <div key={gi} className="relative">
+          <div key={gi} className="relative" data-testid={`field-history-group-${gi}`}>
             {/* Timeline dot */}
             <div className="absolute top-1 -left-10 h-3 w-3 rounded-full border-2 border-blue-500 bg-white" />
 
@@ -129,7 +135,12 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
             {/* Change entries */}
             <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 bg-gray-50">
               {group.entries.map((entry) => (
-                <div key={entry.id} className="flex items-start gap-3 px-3 py-2 text-sm">
+                <div
+                  key={entry.id}
+                  className="flex items-start gap-3 px-3 py-2 text-sm"
+                  data-testid={`field-history-entry-${entry.id}`}
+                  data-field-code={entry.fieldCode}
+                >
                   <ChangeTypeBadge type={entry.changeType} locale={locale} />
                   <div className="min-w-0 flex-1">
                     <span className="font-medium text-gray-700">

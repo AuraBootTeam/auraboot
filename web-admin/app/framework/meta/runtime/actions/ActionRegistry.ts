@@ -17,6 +17,7 @@
 import type { NavigateFunction } from 'react-router';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { confirmDialog, type ConfirmOptions } from '~/utils/confirmDialog';
+import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 import { ResultHelper } from '~/utils/type';
 
 /**
@@ -370,7 +371,7 @@ actionRegistry.register('refresh', ({ loadData, filters }) => {
  */
 actionRegistry.register(
   'export',
-  async ({ tableName, filters, token, fetchResult, buildApiEndpoint, t }) => {
+  async ({ tableName, filters, token, fetchResult, buildApiEndpoint }) => {
     if (!tableName) {
       console.error('[ActionRegistry] export: missing tableName');
       return;
@@ -492,6 +493,17 @@ actionRegistry.register('router.push', ({ args, navigate }) => {
 actionRegistry.register('router.back', ({ navigate }) => {
   if (!navigate) {
     console.error('[ActionRegistry] router.back: missing navigate');
+    return;
+  }
+  navigate(-1 as any);
+});
+
+/**
+ * cancel - legacy alias for form cancel/back navigation
+ */
+actionRegistry.register('cancel', ({ navigate }) => {
+  if (!navigate) {
+    console.error('[ActionRegistry] cancel: missing navigate');
     return;
   }
   navigate(-1 as any);
@@ -888,7 +900,13 @@ function validateField(value: any, rule: any, field: any, context: any): string 
       if (value === undefined || value === null || value === '') {
         return typeof rule.message === 'string' && rule.message.startsWith('$i18n:')
           ? t(rule.message.substring(7))
-          : rule.message || `${field.label || field.field} is required`;
+          : rule.message ||
+              buildRequiredFieldMessage(field.label || field.field, {
+                dataType: field.dataType || field.type,
+                component: field.component || field.type,
+                locale: context.locale,
+                t,
+              });
       }
       break;
 

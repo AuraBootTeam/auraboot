@@ -61,7 +61,7 @@ export async function getUserMemories(params?: {
 }): Promise<{ memories: UserMemory[]; total: number }> {
   const result = await get<{ memories: UserMemory[]; total: number }>(
     `${API_BASE_URL}/user-memory`,
-    { params },
+    params,
   );
   if (!ResultHelper.isSuccess(result)) {
     throw new Error(result.desc || 'Failed to get user memories');

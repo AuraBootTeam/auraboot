@@ -86,7 +86,6 @@ export const SmartNpsChart: React.FC<SmartNpsChartProps> = ({
   ringWidth = 30,
   centerFontSize = 36,
   linkage,
-  onLinkageEmit,
   linkageFilters,
   refreshInterval,
   className,

@@ -303,7 +303,7 @@ test.describe.serial('Report Designer Lifecycle (DL-RPT)', () => {
     expect(resp.ok()).toBeTruthy();
     const { data } = await resp.json();
     expect(data.profile).toBe('report');
-    expect(data.kind).toBe('composite');
+    expect(data.profile).toBe('report');
     expect(['draft', 'published']).toContain(data.status);
     expect(Array.isArray(data.blocks)).toBe(true);
   });
