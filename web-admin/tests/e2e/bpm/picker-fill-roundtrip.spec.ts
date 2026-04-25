@@ -51,9 +51,8 @@ const UID = uniqueId('PIK');
 const RECORD_NAME = `E2E Picker ${UID}`;
 const RECORD_NAME_EDITED = `E2E Picker Edited ${UID}`;
 
-// Mock OrganizationSelect fixtures from OrganizationSelect.tsx (stable IDs).
-const ORG_TECH = 'org-2';       // 技术部
-const ORG_PRODUCT = 'org-5';    // 产品部
+let orgTech = '';
+let orgEditTarget = '';
 
 // sc_cascade_category_dict (tree) — 3 levels of items verified in dicts.json.
 // Cascade is UI-only (see header re: backend contract gap).
@@ -248,7 +247,8 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
   let memberId = '';
 
   test.beforeAll(async ({ browser }) => {
-    // Resolve a real user id once; MemberPicker needs it to produce an option.
+    // Resolve real fixture ids from the reset database. Pickers persist pids,
+    // not the old mock ids used before OrganizationSelect became API-backed.
     const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
@@ -258,6 +258,16 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
       expect(Array.isArray(users) && users.length > 0, 'At least one user must exist').toBeTruthy();
       memberId = String(users[0].pid ?? users[0].id);
       expect(memberId, 'memberId must be resolved').toBeTruthy();
+
+      const orgResp = await page.request.get('/api/org/departments/tree');
+      const orgBody = await orgResp.json();
+      const flatten = (items: Array<Record<string, any>>): Array<Record<string, any>> =>
+        items.flatMap((item) => [item, ...flatten(item.children || [])]);
+      const departments = flatten(orgBody?.data || []);
+      orgTech = String(departments.find((item) => item.name === '技术部')?.pid ?? departments[0]?.pid ?? '');
+      orgEditTarget = String(departments.find((item) => item.name === '财务部')?.pid ?? departments[1]?.pid ?? '');
+      expect(orgTech, 'technical department pid must be resolved').toBeTruthy();
+      expect(orgEditTarget, 'edit target department pid must be resolved').toBeTruthy();
     } finally {
       await ctx.close();
     }
@@ -294,7 +304,7 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
     ).toBeVisible({ timeout: 5_000 });
 
     // [D4/D5] OrganizationSelect — single-mode string. Persisted.
-    await pickOrganization(page, ORG_TECH);
+    await pickOrganization(page, orgTech);
 
     // [D14] Submit — inline asserts 200 + code=0 with diagnostic body slice.
     await submitForm(page);
@@ -323,7 +333,7 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
     expect(String(record.sc_start_date), 'DatePicker sc_start_date persisted').toContain(START_DATE);
     expect(String(record.sc_end_date), 'DatePicker sc_end_date persisted').toContain(END_DATE);
     expect(String(record.sc_tree_node), 'TreeSelect persisted as leaf value').toBe(TREE_VALUE);
-    expect(String(record.sc_department), 'OrganizationSelect persisted as org id').toBe(ORG_TECH);
+    expect(String(record.sc_department), 'OrganizationSelect persisted as org id').toBe(orgTech);
 
     // GAP-258: CascadeSelect now persists the deepest leaf value (single string).
     expect(
@@ -386,7 +396,7 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
     await orgContainer.scrollIntoViewIfNeeded();
     await orgTrigger.click();
     await page
-      .locator(`[data-testid="organization-select-option-${ORG_PRODUCT}"]`)
+      .locator(`[data-testid="organization-select-option-${orgEditTarget}"]`)
       .first()
       .click();
 
@@ -402,7 +412,7 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
     expect(String(record.sc_name)).toBe(RECORD_NAME_EDITED);
     expect(String(record.sc_tree_node), 'TreeSelect edit persisted').toBe(TREE_VALUE_EDIT);
     expect(String(record.sc_end_date), 'DatePicker end_date edit persisted').toContain(END_DATE_EDIT);
-    expect(String(record.sc_department), 'OrganizationSelect edit persisted').toBe(ORG_PRODUCT);
+    expect(String(record.sc_department), 'OrganizationSelect edit persisted').toBe(orgEditTarget);
     // start_date unchanged.
     expect(String(record.sc_start_date), 'DatePicker start_date unchanged').toContain(START_DATE);
   });

@@ -23,6 +23,7 @@ import {
   waitForFormReady,
   findRowInPaginatedList,
 } from '../helpers/index';
+import { expectAcpUiPage, gotoAcpUiPage, toAcpUiPath } from './route-helpers';
 
 // ---------------------------------------------------------------------------
 // Plugin availability guard
@@ -137,13 +138,7 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
   // Helper: navigate to an ACP page via sidebar menu
   // =========================================================================
   async function navigateToAcpPage(page: Page, href: string) {
-    await page.goto('/dashboards', { waitUntil: 'load' });
-    const menuLink = page.locator(`a[href="${href}"]`);
-    await menuLink.first().waitFor({ state: 'visible', timeout: 10000 });
-    await menuLink.first().scrollIntoViewIfNeeded();
-    await menuLink.first().focus();
-    await page.keyboard.press('Enter');
-    await page.waitForURL((url) => url.pathname === href, { timeout: 10000 });
+    await gotoAcpUiPage(page, href);
   }
 
   // =========================================================================
@@ -416,7 +411,7 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
     let targetRow = await findRowInPaginatedList(page, `probe_exc_${uid}`, 8000).catch(() => null);
     if (!targetRow || !(await targetRow.isVisible({ timeout: 2000 }).catch(() => false))) {
       // Try finding by missionPid filter via API — then navigate to edit directly
-      await page.goto(`/dynamic/mission/${missionPid}/edit`, { waitUntil: 'domcontentloaded' });
+      await page.goto(toAcpUiPath(`/dynamic/mission/${missionPid}/edit`), { waitUntil: 'domcontentloaded' });
     } else {
       // Click edit on the row
       const editBtn = targetRow.locator(
@@ -425,24 +420,30 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
       if (await editBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await editBtn.click();
       } else {
-        await page.goto(`/dynamic/mission/${missionPid}/edit`, { waitUntil: 'domcontentloaded' });
+        await page.goto(toAcpUiPath(`/dynamic/mission/${missionPid}/edit`), { waitUntil: 'domcontentloaded' });
       }
     }
 
     await waitForFormReady(page);
 
-    // Change the description field or title
+    // Change a stable editable field and verify that exact field persisted.
+    let expectedField: 'title' | 'description' = 'title';
+    let expectedValue = `UpdatedMission_${uid}`;
     const titleInput = page.locator(
       `[data-testid="form-field-title"] input, [data-field="title"] input, input[name="title"]`,
     ).first();
     if (await titleInput.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await titleInput.evaluate((input: HTMLInputElement) => {
-        input.value = '';
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-      await titleInput.fill(`UpdatedMission_${uid}`);
-      await expect(titleInput).toHaveValue(`UpdatedMission_${uid}`);
+      await titleInput.fill(expectedValue);
+      await expect(titleInput).toHaveValue(expectedValue);
+    } else {
+      const descriptionInput = page.locator(
+        `[data-testid="form-field-description"] textarea, [data-field="description"] textarea, textarea[name="description"]`,
+      ).first();
+      expectedField = 'description';
+      expectedValue = `Updated description ${uid}`;
+      await expect(descriptionInput).toBeVisible({ timeout: 5000 });
+      await descriptionInput.fill(expectedValue);
+      await expect(descriptionInput).toHaveValue(expectedValue);
     }
 
     // Submit edit
@@ -470,11 +471,14 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
           const resp = await page.request.get(`/api/dynamic/mission/${missionPid}`);
           if (!resp.ok()) return null;
           const body = await resp.json().catch(() => null);
-          return body?.data?.title ?? body?.data?.mission_title ?? null;
+          if (expectedField === 'title') {
+            return body?.data?.title ?? body?.data?.mission_title ?? null;
+          }
+          return body?.data?.description ?? null;
         },
         { timeout: 15000, message: 'Updated mission title should be persisted after edit' },
       )
-      .toBe(`UpdatedMission_${uid}`);
+      .toBe(expectedValue);
   });
 
   test('EXC-08: Delete mission success — toast appears after confirm', async ({ page }) => {
@@ -740,18 +744,13 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
   test('EXC-12: List page shows loading state before data arrives', async ({ page }) => {
     // Intercept list requests to simulate slow network by checking for loading spinner
     // We navigate to the page and check that loading eventually completes
-    await page.goto('/dashboards', { waitUntil: 'load' });
-
-    const menuLink = page.locator('a[href="/dynamic/mission"]');
-    await menuLink.first().waitFor({ state: 'visible', timeout: 10000 });
-    await menuLink.first().focus();
-    await page.keyboard.press('Enter');
+    await page.goto(toAcpUiPath('/dynamic/mission'), { waitUntil: 'domcontentloaded' });
 
     // Immediately after navigation starts, the page should either show a spinner
     // or transition quickly from a loading state to content
     // We check that at some point (even briefly) a loading indicator appeared OR
     // that the page ultimately shows content (spinner was too brief to catch)
-    await page.waitForURL((url) => url.pathname === '/dynamic/mission', { timeout: 10000 });
+    await expectAcpUiPage(page, '/dynamic/mission');
 
     // Wait for content to appear (loading completed)
     const contentLocator = page.locator(

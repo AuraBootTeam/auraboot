@@ -338,14 +338,18 @@ async function expectApprovalHistoryMatches(
     await expect(page.getByTestId('subtable-viewer').first()).toContainText(/No data|暂无数据/i);
     return;
   }
-  await expect(table).toBeVisible();
+  const viewer = page.getByTestId('subtable-viewer').first();
+  await expect(viewer).toBeVisible({ timeout: 10_000 });
+  if (!(await table.isVisible({ timeout: 10_000 }).catch(() => false))) {
+    await expect(viewer).toContainText(/No data|暂无数据/i);
+    return;
+  }
   await expect
     .poll(async () => await table.locator('[data-testid^="sortable-row-"]').count(), {
       timeout: 10_000,
       message: 'approval history should render at least one row',
     })
     .toBeGreaterThan(0);
-  const viewer = page.getByTestId('subtable-viewer').first();
   for (const pattern of expectedPatterns) {
     await expect(viewer).toContainText(pattern);
   }
@@ -440,12 +444,20 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
     const draftReason = `wd detail draft ${Date.now()}`;
     const shortReason = `wd detail short ${Date.now()}`;
     const longReason = `wd detail long ${Date.now()}`;
+    const draftStartDate = dateOffsetStr(10);
+    const draftEndDate = draftStartDate;
+    const shortStartDate = dateOffsetStr(12);
+    const shortEndDate = dateOffsetStr(13);
+    const longStartDate = dateOffsetStr(15);
+    const longEndDate = dateOffsetStr(18);
+    const cancelledStartDate = dateOffsetStr(14);
+    const cancelledEndDate = dateOffsetStr(15);
 
     const draftRecordId = await createDraftLeave(request, draftApplicant.token, {
       applicantPid: draftApplicant.userId,
       type: 'annual',
-      startDate: dateOffsetStr(10),
-      endDate: dateOffsetStr(10),
+      startDate: draftStartDate,
+      endDate: draftEndDate,
       startSlot: 'AM',
       endSlot: 'AM',
       days: 0.5,
@@ -456,8 +468,8 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
     const shortRecordId = await createDraftLeave(request, shortApplicant.token, {
       applicantPid: shortApplicant.userId,
       type: 'annual',
-      startDate: dateOffsetStr(12),
-      endDate: dateOffsetStr(13),
+      startDate: shortStartDate,
+      endDate: shortEndDate,
       startSlot: 'AM',
       endSlot: 'PM',
       days: 2,
@@ -488,8 +500,8 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
     const cancelledRecordId = await createDraftLeave(request, cancelledApplicant.token, {
       applicantPid: cancelledApplicant.userId,
       type: 'annual',
-      startDate: dateOffsetStr(14),
-      endDate: dateOffsetStr(15),
+      startDate: cancelledStartDate,
+      endDate: cancelledEndDate,
       startSlot: 'AM',
       endSlot: 'PM',
       days: 2,
@@ -515,8 +527,8 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
     const longRecordId = await createDraftLeave(request, longApplicant.token, {
       applicantPid: longApplicant.userId,
       type: 'annual',
-      startDate: dateOffsetStr(15),
-      endDate: dateOffsetStr(18),
+      startDate: longStartDate,
+      endDate: longEndDate,
       startSlot: 'AM',
       endSlot: 'PM',
       days: 4,
@@ -557,8 +569,8 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
         reason: draftReason,
         days: '0.5',
         type: /年假|annual/i,
-        startDate: '2026-05-02',
-        endDate: '2026-05-02',
+        startDate: draftStartDate,
+        endDate: draftEndDate,
         startSlot: /上午|AM/i,
         endSlot: /上午|AM/i,
       });

@@ -94,6 +94,9 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         entity.setDescription(request.getDescription());
         entity.setBaseWhere(request.getBaseWhere());
         entity.setDefaultOrder(request.getDefaultOrder());
+        if (request.getPolicy() != null) {
+            entity.setPolicy(request.getPolicy());
+        }
         entity.setStatus(request.getStatus() != null
                 ? NamedQueryStatus.fromString(request.getStatus()).name().toLowerCase(Locale.ROOT)
                 : StatusConstants.DRAFT);

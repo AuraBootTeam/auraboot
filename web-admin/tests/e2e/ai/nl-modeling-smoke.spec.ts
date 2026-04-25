@@ -129,9 +129,12 @@ test.describe('AI Natural Language Modeling', () => {
     const textarea = page.locator('textarea').first();
     await expect(textarea).toBeVisible({ timeout: 8000 });
 
-    // Type a description
+    // Type like a real user so the controlled textarea state always updates.
     await textarea.click();
-    await textarea.fill('Task management module with task name, owner, due date, and status');
+    await textarea.pressSequentially(
+      'Task management module with task name, owner, due date, and status',
+      { delay: 10 },
+    );
     await expect(textarea).toHaveValue(/Task management module/i);
 
     // Generate button should be enabled
@@ -140,7 +143,7 @@ test.describe('AI Natural Language Modeling', () => {
       .filter({ hasText: /AI\s*生成|Generate with AI/i })
       .first();
     await generateBtn.scrollIntoViewIfNeeded();
-    await expect.poll(async () => generateBtn.isEnabled()).toBe(true);
+    await expect(generateBtn).toBeEnabled({ timeout: 8_000 });
   });
 
   test('should have generation options checkboxes visible and checked by default', async ({

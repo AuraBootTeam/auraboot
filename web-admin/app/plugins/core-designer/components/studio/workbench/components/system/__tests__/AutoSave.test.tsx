@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { AutoSave } from '~/plugins/core-designer/components/studio/workbench/components/system/AutoSave';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
@@ -50,6 +50,10 @@ describe('AutoSave (studio implementation)', () => {
       onLine: true,
       sendBeacon: vi.fn(),
     };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders status indicator', () => {

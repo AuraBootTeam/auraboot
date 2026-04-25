@@ -307,7 +307,7 @@ export default function PageDesignerEditorImpl() {
   // Error state
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex h-screen items-center justify-center bg-gray-50" data-testid="error-state">
         <div className="flex max-w-md flex-col items-center gap-4 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
             <svg

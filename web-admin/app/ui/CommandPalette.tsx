@@ -62,16 +62,28 @@ type SearchResult =
 const RECENT_KEY = 'auraboot_recent_searches';
 const MAX_RECENT = 8;
 
+function getRecentStorage(): Storage | null {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return null;
+  }
+  return window.localStorage;
+}
+
 export function loadRecent(): string[] {
+  const storage = getRecentStorage();
+  if (!storage) return [];
   try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    return JSON.parse(storage.getItem(RECENT_KEY) || '[]');
   } catch {
+    storage.removeItem(RECENT_KEY);
     return [];
   }
 }
 
 export function saveRecent(items: string[]) {
-  localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0, MAX_RECENT)));
+  const storage = getRecentStorage();
+  if (!storage) return;
+  storage.setItem(RECENT_KEY, JSON.stringify(items.slice(0, MAX_RECENT)));
 }
 
 function addRecent(keyword: string) {

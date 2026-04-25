@@ -72,9 +72,16 @@ async function fillFormField(
 ) {
   const input = page
     .locator(
-      `[data-testid="form-field-${fieldCode}"] input, [data-field="${fieldCode}"] input, [name="${fieldCode}"]`,
+      [
+        `[data-testid="form-field-${fieldCode}"] input:visible`,
+        `[data-testid="form-field-${fieldCode}"] textarea:visible`,
+        `[data-field="${fieldCode}"] input:visible`,
+        `[data-field="${fieldCode}"] textarea:visible`,
+        `[name="${fieldCode}"]:visible`,
+      ].join(', '),
     )
     .first();
+  await input.waitFor({ state: 'visible', timeout: 5000 });
   await input.fill(value);
 }
 
@@ -143,7 +150,6 @@ test.describe('Data Permissions @gap010', () => {
     } catch {
       await fillFormField(page, 'model_code', 'e2et_order');
     }
-    await fillFormField(page, 'priority', '5');
     const body = await clickSaveAndWait(page);
     const recordId = extractRecordId(await body.json().catch(() => ({})));
 
@@ -178,7 +184,6 @@ test.describe('Data Permissions @gap010', () => {
     }
     await fillFormField(page, 'field_code', 'e2et_order_title');
     await selectFormField(page, 'mask_type', 'partial');
-    await fillFormField(page, 'priority', '10');
     const body = await clickSaveAndWait(page);
     const recordId = extractRecordId(await body.json().catch(() => ({})));
 
@@ -217,9 +222,10 @@ test.describe('Data Permissions @gap010', () => {
     // Update name to verify edit works
     const updatedName = `DP-EDITED-${uniqueId()}`;
     const nameInput = page
-      .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
+      .locator('[data-testid="form-field-name"] input:visible, [data-field="name"] input:visible, [name="name"]:visible')
       .first();
     await nameInput.fill(updatedName);
+    await expect(nameInput).toHaveValue(updatedName);
 
     await clickSaveAndWait(page);
 

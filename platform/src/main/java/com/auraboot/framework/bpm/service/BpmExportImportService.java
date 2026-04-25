@@ -195,6 +195,7 @@ public class BpmExportImportService {
                     existing.setBpmnContent((String) pd.get("bpmnContent"));
                     existing.setProcessName((String) pd.get("processName"));
                     existing.setExtension((Map<String, Object>) pd.get("extension"));
+                    existing.setBusinessDataBindings(normalizeBusinessDataBindings(pd.get("businessDataBindings")));
                     existing.setUpdatedAt(Instant.now());
                     processDefinitionMapper.updateById(existing);
                     imported.add("processDefinition (overwritten)");
@@ -210,6 +211,7 @@ public class BpmExportImportService {
                     newDef.setProcessName((String) pd.get("processName"));
                     newDef.setBpmnContent((String) pd.get("bpmnContent"));
                     newDef.setExtension((Map<String, Object>) pd.get("extension"));
+                    newDef.setBusinessDataBindings(normalizeBusinessDataBindings(pd.get("businessDataBindings")));
                     newDef.setStatus(StatusConstants.DRAFT);
                     newDef.setVersion(existing.getVersion() != null ? existing.getVersion() + 1 : 1);
                     newDef.setIsCurrent(true);
@@ -227,6 +229,7 @@ public class BpmExportImportService {
                 newDef.setProcessName((String) pd.get("processName"));
                 newDef.setBpmnContent((String) pd.get("bpmnContent"));
                 newDef.setExtension((Map<String, Object>) pd.get("extension"));
+                newDef.setBusinessDataBindings(normalizeBusinessDataBindings(pd.get("businessDataBindings")));
                 newDef.setStatus(StatusConstants.DRAFT);
                 newDef.setVersion(1);
                 newDef.setIsCurrent(true);
@@ -265,5 +268,17 @@ public class BpmExportImportService {
                 "imported", imported,
                 "skipped", skipped
         );
+    }
+
+    private Map<String, Object> normalizeBusinessDataBindings(Object raw) {
+        if (raw instanceof Map<?, ?> map) {
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            map.forEach((key, value) -> normalized.put(String.valueOf(key), value));
+            return normalized;
+        }
+        if (raw instanceof List<?> list) {
+            return Map.of("bindings", list);
+        }
+        return Map.of();
     }
 }

@@ -318,7 +318,7 @@ test.describe('PluginSlot - Structural Verification', () => {
 
     // Check all rendered slot containers have the data-slot-id attribute
     const slotsWithId = page.locator('[data-slot-id]');
-    await slotsWithId.count();
+    const count = await slotsWithId.count();
 
     // Verify each slot has a non-empty data-slot-id
     for (let i = 0; i < count; i++) {

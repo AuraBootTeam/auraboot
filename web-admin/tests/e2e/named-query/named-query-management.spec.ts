@@ -132,10 +132,23 @@ test.describe('Named Query Management', () => {
 
     expect(queryPid).not.toBeNull();
 
-    // Verify draft status via API
+    // Verify draft status via API. Newer detail payloads may omit a top-level
+    // status field even though list/batch-status still exposes the lifecycle
+    // state, so fall back to those shapes before failing.
     const resp = await page.request.get(`/api/meta/named-queries/${queryPid}`);
     const result = await resp.json();
-    const status = pickStatus(result);
+    let status = pickStatus(result);
+    if (!status && queryCode) {
+      const listResp = await page.request.get(
+        `/api/meta/named-queries?pageSize=10&sortBy=createdAt&sortOrder=desc`,
+      );
+      if (listResp.ok()) {
+        const listData = await listResp.json();
+        const records = listData.data?.data || listData.data?.records || [];
+        const found = records.find((r: any) => r.code === queryCode || r.pid === queryPid);
+        status = pickStatus(found);
+      }
+    }
     expect(status).toBe('draft');
   });
 

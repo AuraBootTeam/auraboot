@@ -52,6 +52,7 @@ export function InclusiveGatewayEditor({
           value={config?.defaultFlow || ''}
           onChange={(e) => handleChange('defaultFlow', e.target.value)}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          data-testid="gateway-default-flow"
         >
           <option value="">{t('bpmn.gateway.noDefaultFlow')}</option>
           {outgoingEdges.map((edge) => (

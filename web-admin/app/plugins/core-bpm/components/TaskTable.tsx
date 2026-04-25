@@ -146,6 +146,7 @@ export function TaskTable({
               </th>
             )}
             <th className="px-4 py-3">任务名称</th>
+            <th className="px-4 py-3">流程</th>
             <th className="px-4 py-3">业务单号</th>
             <th className="w-16 px-4 py-3">优先级</th>
             <th className="px-4 py-3">创建时间</th>
@@ -253,6 +254,9 @@ function TaskRow({
           </div>
         </div>
       </td>
+      <td className="px-4 py-3 text-xs text-gray-600" data-testid="task-process-key-cell">
+        {task.processDefinitionKey || <span className="text-gray-400">-</span>}
+      </td>
       <td className="px-4 py-3 font-mono text-xs text-gray-700" data-testid="task-business-key">
         {task.businessKey || <span className="text-gray-400">-</span>}
       </td>
@@ -280,7 +284,7 @@ function TaskRow({
       </td>
       {showActions && (
         <td className="relative px-4 py-3">
-          <Button variant="ghost" size="sm" onClick={handleToggle}>
+          <Button variant="ghost" size="sm" onClick={handleToggle} data-testid="task-row-actions">
             <MoreHorizontal className="h-4 w-4" />
           </Button>
           {isMenuOpen && (
@@ -324,6 +328,7 @@ function TaskActionMenu({
   return (
     <div className="ring-opacity-5 absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black">
       <button
+        data-testid="task-action-detail"
         className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
         onClick={() => menuAction(() => onOpenDetail(task))}
       >
@@ -331,12 +336,14 @@ function TaskActionMenu({
       </button>
       <div className="my-1 border-t" />
       <button
+        data-testid="task-action-approve"
         className="block w-full px-4 py-2 text-left text-sm text-green-700 hover:bg-gray-100"
         onClick={() => menuAction(() => onOpenDialog('approve', task))}
       >
         通过
       </button>
       <button
+        data-testid="task-action-reject"
         className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
         onClick={() => menuAction(() => onOpenDialog('reject', task))}
       >

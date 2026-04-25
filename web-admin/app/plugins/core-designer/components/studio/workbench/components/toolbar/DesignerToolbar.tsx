@@ -674,6 +674,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
               title="设置"
               onClick={onSettings}
               size="sm"
+              data-testid="toolbar-settings"
             />
             <ToolbarButton
               icon={
