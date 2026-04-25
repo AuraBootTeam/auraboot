@@ -1,30 +1,28 @@
-name: OSS E2E Smoke
+name: OSS E2E Smoke (scaffold — manual only)
 
-# BACKLOG-CI-001: gate the OSS smoke regression on PRs that touch the
-# runtime + showcase plugins, plus an opt-in label trigger so reviewers
-# can request a smoke run on demand without running it on every doc-only
-# change. CI minutes are constrained — this is the smoke set, not full.
+# BACKLOG-CI-001: scaffolded smoke pipeline. Manual-trigger only until
+# the prerequisites below are resolved.
+#
+# Prerequisites BEFORE enabling automatic PR/push triggers:
+#   1. Frontend service in the GA-E2E docker stack — currently the stack
+#      ships backend + postgres only because web-admin/Dockerfile uses
+#      `npm ci && npm run build` while the build script chains
+#      `pnpm sync-plugins` (pnpm not present in node:18-alpine). Either
+#      fix the prod Dockerfile or add a CI step that boots vite/BFF on
+#      the runner host before the playwright invocation.
+#   2. `@smoke`-tagged specs split into UI-driven (need vite) vs.
+#      API-driven so PW_PROFILE=smoke does not silently include specs
+#      that ECONNREFUSED on :5174 when no frontend is up.
+#   3. `oss-test.sh --oss-smoke` (referenced in BACKLOG-CI-001) does not
+#      currently exist; today only `--smoke` is implemented. Decide
+#      whether to add `--oss-smoke` or rename the backlog item.
+#
+# Until those land, this workflow is manual (`workflow_dispatch`) so
+# operators can dry-run it from a PR branch and surface the gaps —
+# without burning CI minutes on every push.
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'web-admin/**'
-      - 'plugins/**'
-      - 'platform/**'
-      - 'docker-compose.yml'
-      - 'docker-compose.ga-e2e.override.yml'
-      - 'scripts/docker-ga-e2e-*.sh'
-      - 'scripts/oss-test.sh'
-      - 'oss-scope.json'
-      - '.github/workflows/oss-e2e-smoke.yml'
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'web-admin/**'
-      - 'plugins/**'
-      - 'platform/**'
 
 concurrency:
   group: oss-e2e-smoke-${{ github.ref }}
