@@ -1,0 +1,50 @@
+# GA Follow-up E2E override — isolated backend + postgres on non-default ports.
+#
+# Goals:
+#   - Run a clean OSS backend + DB stack without colliding with developers'
+#     local bootRun (6443) or postgres (5432).
+#   - Use COMPOSE_PROJECT_NAME=auraboot-ga-e2e for distinct volumes/network/
+#     containers so down + up cycles don't touch other compose stacks.
+#
+# Why no frontend service:
+#   web-admin/Dockerfile and Dockerfile.dev both use `npm ci` + `npm run build`,
+#   but the build script (web-admin/package.json) chains pnpm sync-plugins
+#   which requires pnpm (not installed in node:18-alpine). Fixing the prod
+#   Dockerfile is out of scope for Batch 0; the host vite/BFF dev server is
+#   re-pointed at the docker backend on 6444.
+#
+# Usage (from this worktree root):
+#   ./scripts/docker-ga-e2e-up.sh
+#   ./scripts/docker-ga-e2e-down.sh
+#   ./scripts/docker-ga-e2e-logs.sh [backend|postgres]
+#
+# Host ports:
+#   postgres : 5433 -> 5432
+#   backend  : 6444 -> 6443
+
+services:
+  postgres:
+    container_name: auraboot-ga-e2e-postgres
+    # Compose merges list-typed fields by appending. Use !override to replace
+    # the base file's "5432:5432" mapping (which would conflict with the dev's
+    # local postgres on 5432) with our isolated 5433.
+    ports: !override
+      - "5433:5432"
+
+  backend:
+    container_name: auraboot-ga-e2e-backend
+    # Compose appends profile lists; this gives backend [full, ga-e2e-stack].
+    # Frontend stays at [full] only, so `--profile ga-e2e-stack` skips it.
+    profiles:
+      - ga-e2e-stack
+    ports:
+      - "6444:6443"
+    volumes:
+      # Mount the worktree's plugins read-only so import-directory-sync
+      # can resolve absolute paths like /app/plugins/<name>.
+      - ./plugins:/app/plugins:ro
+    environment:
+      # CORS allow-list covers the common dev-server ports a developer might
+      # use to talk to this isolated backend (vite default 5173, BFF dev 3500).
+      FRONTEND_BASE_URL: http://localhost:5173
+      CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3500,http://127.0.0.1:3500"
