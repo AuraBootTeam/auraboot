@@ -16,11 +16,23 @@ pnpm test:full            # full regression (slow; nightly / pre-release)
 ```
 
 The runner expects a host BFF on `localhost:3500` proxying to a
-backend on `localhost:6443`. Use the **GA-E2E docker stack** (PR #29 /
-`scripts/docker-ga-e2e-up.sh`) when you want backend isolation on
-:6444 + :5433 — start a host BFF with `SPRING_BOOT_URL=http://localhost:6444`
-to drive Playwright against the docker backend without touching your
-own dev environment.
+backend on `localhost:6443`. Alternatively use the **GA-E2E docker
+stack** to run a fully-isolated backend + postgres + vite + BFF on
+non-default ports without touching your dev environment:
+
+```bash
+./scripts/docker-ga-e2e-up.sh           # boot stack on :5174 / :3501 / :6444 / :5433
+./scripts/docker-ga-e2e-bootstrap.sh    # import OSS plugins + provision e2e users
+
+cd web-admin
+PLAYWRIGHT_BASE_URL=http://localhost:5174 PW_SKIP_WEBSERVER=1 \
+  npx playwright test ...
+```
+
+Operator details, the five first-boot traps (wrapper jar, frontend
+Dockerfile pnpm/npm mismatch, _public-routes stub, pnpm-lock cwd,
+SSR BFF_INTERNAL_URL), and the diagnostic table live in
+[`docs/operations/ga-e2e-docker-stack.md`](../../../docs/operations/ga-e2e-docker-stack.md).
 
 Always tee the run log:
 
