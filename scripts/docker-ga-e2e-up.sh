@@ -79,10 +79,29 @@ while :; do
   sleep 3
 done
 
+echo "[ga-e2e] waiting for frontend (vite+BFF) — first run installs deps, allow ~5min..."
+deadline=$(( $(date +%s) + 360 ))
+while :; do
+  # vite first (fast TLS-free 200), then BFF as a sanity check
+  if curl -fsS -o /dev/null http://localhost:5174 2>/dev/null \
+     && curl -fsS -o /dev/null http://localhost:3501 2>/dev/null; then
+    echo "[ga-e2e] frontend up: vite :5174, BFF :3501"
+    break
+  fi
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "[ga-e2e] frontend health check timed out" >&2
+    docker compose -p "$COMPOSE_PROJECT_NAME" logs --tail=120 frontend >&2
+    exit 1
+  fi
+  sleep 5
+done
+
 echo "[ga-e2e] stack ready:"
 echo "  backend  http://localhost:6444  (actuator/health)"
 echo "  postgres localhost:5433  user=auraboot db=aura_boot"
+echo "  vite     http://localhost:5174"
+echo "  BFF      http://localhost:3501"
 echo
-echo "[ga-e2e] frontend NOT in this stack — start the host vite/BFF dev"
-echo "         server with SPRING_BOOT_URL=http://localhost:6444 to point"
-echo "         it at this isolated backend."
+echo "[ga-e2e] run Playwright against this stack with:"
+echo "  PLAYWRIGHT_BASE_URL=http://localhost:5174 PW_SKIP_WEBSERVER=1 \\"
+echo "    npx playwright test ..."
