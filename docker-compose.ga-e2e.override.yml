@@ -81,6 +81,13 @@ services:
       # CI mode for vite to avoid interactive prompts if any.
       CI: "true"
       NODE_ENV: development
+      # SSR-side fetch base URL. Without this, app/shared/services/http-client
+      # falls back to "use the incoming request origin", which becomes the
+      # host port (5174) — unreachable from inside the container — so SSR
+      # actions like the /login form submit fail with ECONNREFUSED. Pinning
+      # BFF_INTERNAL_URL to in-container localhost:3500 keeps SSR fetches
+      # on the loopback inside the same container that runs vite + BFF.
+      BFF_INTERNAL_URL: http://localhost:3500
     volumes:
       # Bind-mount the whole repo so workspace deps + plugins resolve and
       # hot-reload works the same way as host-mode dev.
