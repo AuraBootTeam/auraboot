@@ -61,14 +61,21 @@ async function loginViaUI(page: Page, email: string, password: string) {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   const emailInput = page.locator('input#email');
   await emailInput.waitFor({ state: 'visible', timeout: 5000 });
-  // Wait for React hydration: controlled-input onChange handlers must be attached
-  // before .fill() mutates the DOM, otherwise React state stays empty and the
-  // form submits blank values. Probe by typing one char then clearing.
-  await emailInput.pressSequentially(' ', { delay: 10 });
-  await emailInput.fill('');
-  await emailInput.fill(email);
   const pwd = page.locator('input#password');
-  await pwd.fill(password);
+  await pwd.waitFor({ state: 'visible', timeout: 5000 });
+
+  // Clear deterministically first, then type through keyboard events so controlled
+  // inputs still receive the same user-like change sequence after hydration.
+  await emailInput.click();
+  await emailInput.fill('');
+  await emailInput.pressSequentially(email, { delay: 5 });
+  await expect(emailInput).toHaveValue(email, { timeout: 3000 });
+
+  await pwd.click();
+  await pwd.fill('');
+  await pwd.pressSequentially(password, { delay: 5 });
+  await expect(pwd).toHaveValue(password, { timeout: 3000 });
+
   await page
     .locator(
       'form button[type="submit"], form button:has-text("立即登录"), form button:has-text("Login"), form button:has-text("loginNow")',
@@ -952,7 +959,9 @@ test.describe('Forgot & Reset Password', () => {
     await page.locator('[data-testid="reset-submit-btn"]').click();
 
     // Error is rendered in a <p> tag; use locator for more reliable matching
-    await expect(page.locator('p.text-red-600')).toContainText(/invalid reset link/i, {
+    await expect(
+      page.locator('p.text-red-600').filter({ hasText: /invalid reset link/i }).first(),
+    ).toContainText(/invalid reset link/i, {
       timeout: 5000,
     });
   });

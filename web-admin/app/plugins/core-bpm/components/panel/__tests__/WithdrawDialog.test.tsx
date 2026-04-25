@@ -17,7 +17,6 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { WithdrawDialog } from '../WithdrawDialog';
 
 afterEach(() => {
-  document.body.innerHTML = '';
   vi.restoreAllMocks();
 });
 

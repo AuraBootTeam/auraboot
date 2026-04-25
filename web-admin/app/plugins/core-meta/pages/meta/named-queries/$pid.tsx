@@ -14,6 +14,7 @@ import {
 } from 'react-router';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
+import { namedQueryService } from '~/shared/services/namedQueryService';
 import type {
   NamedQueryDTO,
   NamedQueryUpdateRequest,
@@ -23,7 +24,6 @@ import type {
   NamedQueryTestResult,
   NamedQueryPolicyDTO,
   NamedQueryVersionDTO,
-  namedQueryService,
 } from '~/shared/services/namedQueryService';
 import { OPERATOR_LABELS } from './components/constants';
 import SqlEditor from './components/SqlEditor';

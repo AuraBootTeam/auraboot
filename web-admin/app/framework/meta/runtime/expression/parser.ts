@@ -608,7 +608,7 @@ export class ExpressionParser {
     }
 
     // 检查 JSON 对象（提供安全的 JSON 函数）
-    if (name === 'json') {
+    if (name === 'JSON' || name === 'json') {
       return this.createSafeJSONProxy();
     }
 

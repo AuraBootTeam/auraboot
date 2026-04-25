@@ -7,14 +7,20 @@ const emptySession = {
   unset: vi.fn(),
 };
 
-vi.mock('react-router', () => ({
-  createCookieSessionStorage: vi.fn(() => ({
-    getSession: getSessionMock,
-    commitSession: vi.fn(),
-    destroySession: vi.fn(),
-  })),
-  redirect: vi.fn((url: string, init?: ResponseInit) => ({ url, ...init })),
-}));
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>();
+  return {
+    ...actual,
+    createCookieSessionStorage: vi.fn(() => ({
+      getSession: getSessionMock,
+      commitSession: vi.fn(),
+      destroySession: vi.fn(),
+    })),
+    redirect: vi.fn((url: string, init?: ResponseInit | number) =>
+      typeof init === 'number' ? { url, status: init } : { url, ...init },
+    ),
+  };
+});
 
 describe('session recovery', () => {
   beforeEach(() => {

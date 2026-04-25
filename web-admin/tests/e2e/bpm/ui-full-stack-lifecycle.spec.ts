@@ -732,8 +732,8 @@ test.describe(
           message: `todo tasks must contain task_manager_approve for instance ${leaveInstanceId}`,
         },
       );
-      leaveTaskId = String(ourTask.instanceId ?? ourTask.taskId ?? '');
-      expect(leaveTaskId, 'task must expose an instanceId/taskId').toBeTruthy();
+      leaveTaskId = String(ourTask.instanceId ?? ourTask.taskId ?? ourTask.id ?? '');
+      expect(leaveTaskId, 'task must expose an instanceId/taskId/id').toBeTruthy();
 
       // The TaskTable renders one row per todo task. processDefinitionKey and
       // businessKey come back as null from the workbench endpoint for
@@ -764,7 +764,7 @@ test.describe(
 
       await managerPage.waitForURL(/\/p\/wd_leave_request\/view\//, { timeout: 15_000 });
       const detailRoot = managerPage
-        .locator('[data-testid="detail-wd_leave_request-container"]')
+        .locator('[data-testid="ab:detail:wd_leave_request:container"]')
         .first();
       await expect(detailRoot, 'detail page container must render after task click').toBeVisible({
         timeout: 10_000,
@@ -836,7 +836,21 @@ test.describe(
       browser,
       request,
     }) => {
-      expect(leaveTaskId, 'G3 must have resolved the taskId').toBeTruthy();
+      if (!leaveTaskId) {
+        const freshTask = await waitForTodoTask(
+          request,
+          managerToken,
+          (candidate) =>
+            candidate.processInstanceId === String(leaveInstanceId) &&
+            candidate.processDefinitionActivityId.includes('task_manager_approve'),
+          {
+            timeout: 15_000,
+            message: `G4 must resolve task_manager_approve for instance ${leaveInstanceId}`,
+          },
+        );
+        leaveTaskId = String(freshTask.instanceId ?? freshTask.taskId ?? freshTask.id ?? '');
+      }
+      expect(leaveTaskId, 'G4 must resolve the taskId before approving').toBeTruthy();
 
       const { context: managerCtx, page: managerPage } = await openTaskCenterAsRole(
         browser,
@@ -860,18 +874,13 @@ test.describe(
       });
 
       // Row "..." action menu → "通过"
-      const moreBtn = taskRow
-        .locator('button')
-        .filter({ has: managerPage.locator('svg.lucide-ellipsis') })
-        .first();
+      const moreBtn = taskRow.getByTestId('task-row-actions').first();
       await expect(moreBtn, 'row More-actions button must be visible').toBeVisible({
         timeout: 5_000,
       });
       await moreBtn.click();
 
-      const menu = managerPage.locator('.absolute.right-0.z-10').first();
-      await expect(menu, 'action menu must render').toBeVisible({ timeout: 3_000 });
-      const approveItem = menu.locator('button:has-text("通过")').first();
+      const approveItem = managerPage.getByTestId('task-action-approve').first();
       await expect(approveItem, '"通过" menu item must be reachable (D10)').toBeVisible();
       await approveItem.click();
 

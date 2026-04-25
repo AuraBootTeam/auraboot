@@ -528,16 +528,16 @@ export function AuraBotChat() {
       // Cmd/Ctrl + Enter to send
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        sendMessage(inputValue);
+        sendMessage(e.currentTarget.value);
       }
 
       // Enter without shift to send (if not empty)
-      if (e.key === 'Enter' && !e.shiftKey && inputValue.trim()) {
+      if (e.key === 'Enter' && !e.shiftKey && e.currentTarget.value.trim()) {
         e.preventDefault();
-        sendMessage(inputValue);
+        sendMessage(e.currentTarget.value);
       }
     },
-    [sendMessage, inputValue],
+    [sendMessage],
   );
 
   // Handle send button click
@@ -610,6 +610,7 @@ export function AuraBotChat() {
             {/* Send button */}
             <button
               onClick={handleSend}
+              data-testid="aurabot-send"
               disabled={!inputValue.trim() || isLoading}
               className={`flex-shrink-0 rounded-xl p-2.5 transition-colors ${
                 inputValue.trim() && !isLoading

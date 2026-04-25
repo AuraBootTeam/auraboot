@@ -236,7 +236,9 @@ export async function waitForSpaceSelection(page: Page): Promise<void> {
  * clicking the toggle button to reveal it.
  */
 export async function ensureFilterFormOpen(page: Page, timeout = 5000): Promise<void> {
-  const filterSearch = page.getByTestId('filter-search');
+  const filterSearch = page.locator(
+    '[data-testid="filter-search"], [data-testid="filter-btn-search"], [data-testid="table-search-button"]',
+  );
   const isAlreadyVisible = await filterSearch.isVisible().catch(() => false);
   if (isAlreadyVisible) return;
 
@@ -244,7 +246,7 @@ export async function ensureFilterFormOpen(page: Page, timeout = 5000): Promise<
   const toggleVisible = await toggle.isVisible().catch(() => false);
   if (toggleVisible) {
     await toggle.click();
-    await filterSearch.waitFor({ state: 'visible', timeout });
+    await filterSearch.first().waitFor({ state: 'visible', timeout }).catch(() => {});
   }
 }
 

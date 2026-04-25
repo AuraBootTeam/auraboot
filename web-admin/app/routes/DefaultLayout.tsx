@@ -61,7 +61,9 @@ export default function DefaultLayout() {
           <PageContent />
         </div>
 
-        {aiPanelOpen && <AuraBotPanel />}
+        <div className={aiPanelOpen ? 'contents' : 'hidden'}>
+          <AuraBotPanel />
+        </div>
       </div>
 
       {/* Feedback floating button — temporarily hidden */}

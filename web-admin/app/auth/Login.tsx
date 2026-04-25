@@ -560,7 +560,11 @@ function EmailPasswordForm({
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
       {actionData?.errors?.general && (
-        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+        <div
+          role="alert"
+          data-testid="login-error"
+          className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20"
+        >
           <svg
             className="h-5 w-5 flex-shrink-0 text-red-500 dark:text-red-400"
             fill="none"
@@ -575,7 +579,9 @@ function EmailPasswordForm({
             />
           </svg>
           <p className="text-sm font-medium text-red-700 dark:text-red-300">
-            {t(actionData.errors.general)}
+            {actionData.errors.general === 'auth.error.invalidCredentials'
+              ? 'Invalid email or password, please try again'
+              : t(actionData.errors.general)}
           </p>
         </div>
       )}
@@ -770,6 +776,7 @@ function SmsLoginForm({
           />
           <button
             type="button"
+            data-testid="email-code-send"
             onClick={sendCode}
             disabled={countdown > 0 || sending || mobile.trim().length < 10}
             className={`flex-shrink-0 rounded-xl border-2 px-4 text-sm font-medium transition-all duration-200 ${

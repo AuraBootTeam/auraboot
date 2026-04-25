@@ -64,7 +64,7 @@ public interface UserMapper extends BaseMapper<User> {
                    ON e.org_emp_user_id = CAST(u.id AS VARCHAR)
                   AND e.tenant_id = #{tenantId}
             LEFT JOIN mt_org_department d
-                   ON d.id = CAST(e.org_emp_dept_id AS BIGINT)
+                   ON (d.pid = e.org_emp_dept_id OR CAST(d.id AS VARCHAR) = e.org_emp_dept_id)
                   AND d.tenant_id = #{tenantId}
             WHERE u.deleted_flag = FALSE
               AND (u.user_type IS NULL OR u.user_type = 'human')
@@ -112,7 +112,7 @@ public interface UserMapper extends BaseMapper<User> {
                    ON e.org_emp_user_id = CAST(u.id AS VARCHAR)
                   AND e.tenant_id = #{tenantId}
             LEFT JOIN mt_org_department d
-                   ON d.id = CAST(e.org_emp_dept_id AS BIGINT)
+                   ON (d.pid = e.org_emp_dept_id OR CAST(d.id AS VARCHAR) = e.org_emp_dept_id)
                   AND d.tenant_id = #{tenantId}
             WHERE u.deleted_flag = FALSE
               AND u.pid = #{pid}

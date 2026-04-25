@@ -141,7 +141,28 @@ export function getLocalizedText(
  * 渲染 i18n key（内部函数）
  */
 function renderI18nKey(key: string, vars: Record<string, any>, context: ExpressionContext): string {
-  // 优先使用 context.t 函数（来自 I18nContext）
+  const locale = context.locale || 'zh-CN';
+  const messages = context.i18n?.[locale] || {};
+  const template = messages[key];
+
+  if (template != null) {
+    // 没有变量，直接返回
+    if (!template.includes('{')) {
+      return template;
+    }
+
+    try {
+      // 使用 ICU MessageFormat 格式化
+      const mf = new MessageFormat(locale);
+      const msg = mf.compile(template);
+      return String(msg(vars));
+    } catch (error) {
+      console.error('i18n rendering failed with ICU MessageFormat:', key, error);
+      return template;
+    }
+  }
+
+  // 回退到 context.t 函数（来自 I18nContext）
   if (context.t && typeof context.t === 'function') {
     try {
       return context.t(key, vars);
@@ -150,25 +171,7 @@ function renderI18nKey(key: string, vars: Record<string, any>, context: Expressi
     }
   }
 
-  // 回退到 context.i18n（ICU MessageFormat）
-  const locale = context.locale || 'zh-CN';
-  const messages = context.i18n?.[locale] || {};
-  const template = messages[key] ?? key;
-
-  // 没有变量，直接返回
-  if (!template.includes('{')) {
-    return template;
-  }
-
-  try {
-    // 使用 ICU MessageFormat 格式化
-    const mf = new MessageFormat(locale);
-    const msg = mf.compile(template);
-    return String(msg(vars));
-  } catch (error) {
-    console.error('i18n rendering failed with ICU MessageFormat:', key, error);
-    return template;
-  }
+  return key;
 }
 
 /**

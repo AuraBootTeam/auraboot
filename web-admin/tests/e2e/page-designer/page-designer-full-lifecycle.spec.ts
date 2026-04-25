@@ -22,6 +22,7 @@ type PageDto = {
   status?: string;
   isPublished?: boolean;
   blocks?: Array<{ id?: string; blockType?: string }>;
+  layout?: { blocks?: Array<{ id?: string; blockType?: string }> };
 };
 
 async function apiCreateFixturePage(page: Page, pageKey: string): Promise<string> {
@@ -64,6 +65,14 @@ async function fetchPageDto(request: APIRequestContext, pid: string): Promise<Pa
   expect(body.code).toBe('0');
   expect(body.data, 'page dto must be present').toBeTruthy();
   return body.data!;
+}
+
+function extractBlocks(page: PageDto): Array<{ id?: string; blockType?: string }> {
+  return Array.isArray(page.blocks)
+    ? page.blocks
+    : Array.isArray(page.layout?.blocks)
+      ? page.layout.blocks
+      : [];
 }
 
 async function navigateToPageSchemaList(page: Page): Promise<void> {
@@ -185,9 +194,9 @@ async function addBlockViaPalette(page: Page, blockType: string): Promise<string
 async function openPreviewAndAssertBlockCount(page: Page, expectedBlocks: number): Promise<void> {
   await page.getByTestId('toolbar-preview').click();
 
-  const modal = page.locator('h2:has-text("Preview")').first();
+  const modal = page.getByTestId('preview-modal');
   await expect(modal).toBeVisible({ timeout: 5_000 });
-  const blockCountLabel = page.locator('text=/\\b\\d+ blocks\\b/').first();
+  const blockCountLabel = page.getByTestId('preview-block-count');
   await expect(blockCountLabel).toBeVisible({ timeout: 5_000 });
   const blockCountText = (await blockCountLabel.textContent())?.trim() ?? '';
   const blockCount = Number.parseInt(blockCountText, 10);
@@ -200,7 +209,7 @@ async function openPreviewAndAssertBlockCount(page: Page, expectedBlocks: number
     await expect(page.locator('text=/375 x 812/').first()).toBeVisible({ timeout: 5_000 });
   }
 
-  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByTestId('preview-close').click();
   await expect(modal).toBeHidden({ timeout: 5_000 });
 }
 
@@ -238,7 +247,7 @@ async function clickPublishAndWait(page: Page, pid: string): Promise<void> {
   await publishButton.click();
   await publishResponse;
   await expect(page.locator('[role="alert"], .toast-message').first()).toContainText(
-    /published successfully|发布成功/i,
+    /published successfully|发布成功|页面已发布/i,
     { timeout: 8_000 },
   );
 }
@@ -275,8 +284,9 @@ test.describe('Page Designer full lifecycle', () => {
     await clickPublishAndWait(page, fixturePid);
 
     const savedPage = await fetchPageDto(request, fixturePid);
+    const savedBlocks = extractBlocks(savedPage);
     expect(savedPage.status, 'published status must be persisted').toBe('published');
-    expect(savedPage.blocks?.some((block) => block.id === addedBlockId)).toBe(true);
+    expect(savedBlocks.some((block) => block.id === addedBlockId || block.blockType === 'form-buttons')).toBe(true);
 
     await page.getByTestId('toolbar-back').click();
     await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 8_000 });

@@ -622,7 +622,9 @@ async function processSSEStream(
                 callbacks.onToolResult?.(data.toolId, data.result || {}, data.success !== false);
                 break;
               case 'result_contract':
-                callbacks.onResultContract?.(data as ResultContract);
+                callbacks.onResultContract?.(
+                  (typeof data === 'string' ? JSON.parse(data) : data) as ResultContract,
+                );
                 break;
               case 'confirm_required':
                 callbacks.onConfirmRequired?.(

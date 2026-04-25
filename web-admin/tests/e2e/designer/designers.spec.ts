@@ -288,20 +288,21 @@ test.describe('BPMN Designer (F4-c)', () => {
     }
 
     const expectedNodes = [
-      '开始事件',
-      '结束事件',
-      '用户任务',
-      '服务任务',
-      '接收任务',
-      '排他网关',
-      '并行网关',
-      '包容网关',
-      '子流程',
+      'startEvent',
+      'endEvent',
+      'userTask',
+      'serviceTask',
+      'receiveTask',
+      'exclusiveGateway',
+      'parallelGateway',
+      'inclusiveGateway',
+      'callActivity',
     ];
 
-    for (const nodeLabel of expectedNodes) {
-      const node = page.getByText(nodeLabel, { exact: true }).first();
-      await expect(node).toBeVisible({ timeout: 5000 });
+    for (const nodeType of expectedNodes) {
+      await expect(page.locator(`[data-testid="bpmn-palette-item-${nodeType}"]`)).toBeVisible({
+        timeout: 5000,
+      });
     }
 
     await expect(page.locator('[data-testid="bpmn-palette-category-event"]')).toBeVisible();
