@@ -1,26 +1,31 @@
-# GA Follow-up E2E override — isolated backend + postgres on non-default ports.
+# GA Follow-up E2E override — fully isolated backend + postgres + frontend.
 #
 # Goals:
-#   - Run a clean OSS backend + DB stack without colliding with developers'
-#     local bootRun (6443) or postgres (5432).
+#   - Run a clean OSS test stack without colliding with developers' local
+#     bootRun (6443), postgres (5432), or vite/BFF (5173/3500).
 #   - Use COMPOSE_PROJECT_NAME=auraboot-ga-e2e for distinct volumes/network/
 #     containers so down + up cycles don't touch other compose stacks.
+#   - Make the host work disturbance ZERO: the operator can run Playwright
+#     against this stack while their own dev server keeps running.
 #
-# Why no frontend service:
-#   web-admin/Dockerfile and Dockerfile.dev both use `npm ci` + `npm run build`,
-#   but the build script (web-admin/package.json) chains pnpm sync-plugins
-#   which requires pnpm (not installed in node:18-alpine). Fixing the prod
-#   Dockerfile is out of scope for Batch 0; the host vite/BFF dev server is
-#   re-pointed at the docker backend on 6444.
+# Frontend service notes:
+#   The base web-admin/Dockerfile uses `npm ci && npm run build`, but the
+#   build script chains `pnpm sync-plugins` and pnpm is not present in
+#   node:18-alpine. Rather than rebuild the prod image, we run the SAME
+#   dev-mode pnpm flow that developers use (vite + BFF), inside a
+#   bind-mounted node:20-alpine container. This keeps the OSS Dockerfile
+#   debt out of scope while still giving us full container isolation.
 #
 # Usage (from this worktree root):
 #   ./scripts/docker-ga-e2e-up.sh
 #   ./scripts/docker-ga-e2e-down.sh
-#   ./scripts/docker-ga-e2e-logs.sh [backend|postgres]
+#   ./scripts/docker-ga-e2e-logs.sh [backend|frontend|postgres]
 #
 # Host ports:
 #   postgres : 5433 -> 5432
 #   backend  : 6444 -> 6443
+#   vite     : 5174 -> 5173
+#   BFF      : 3501 -> 3500
 
 services:
   postgres:
@@ -34,7 +39,6 @@ services:
   backend:
     container_name: auraboot-ga-e2e-backend
     # Compose appends profile lists; this gives backend [full, ga-e2e-stack].
-    # Frontend stays at [full] only, so `--profile ga-e2e-stack` skips it.
     profiles:
       - ga-e2e-stack
     ports:
@@ -44,7 +48,73 @@ services:
       # can resolve absolute paths like /app/plugins/<name>.
       - ./plugins:/app/plugins:ro
     environment:
-      # CORS allow-list covers the common dev-server ports a developer might
-      # use to talk to this isolated backend (vite default 5173, BFF dev 3500).
-      FRONTEND_BASE_URL: http://localhost:5173
-      CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3500,http://127.0.0.1:3500"
+      # CORS allow-list covers the in-container vite/BFF ports plus the
+      # host-mapped variants (5174/3501) that Playwright targets.
+      FRONTEND_BASE_URL: http://localhost:5174
+      CORS_ALLOWED_ORIGINS: "http://localhost:5174,http://127.0.0.1:5174,http://localhost:3501,http://127.0.0.1:3501,http://localhost:5173,http://localhost:3500"
+
+  # Vite + BFF dev server in a node:20-alpine container.
+  # We do NOT use web-admin/Dockerfile because it bakes a prod build via
+  # `npm run build` which depends on pnpm (not in alpine). For E2E we want
+  # the same dev-mode flow developers use — bind-mount the source and run
+  # `pnpm dev:full` directly.
+  #
+  # Distinct service name (`ga-e2e-frontend`, not `frontend`) so compose
+  # does not merge the base file's `frontend.build:` block into us.
+  ga-e2e-frontend:
+    image: node:20-alpine
+    container_name: auraboot-ga-e2e-frontend
+    profiles:
+      - ga-e2e-stack
+    working_dir: /repo/web-admin
+    ports:
+      - "5174:5173"   # vite
+      - "3501:3500"   # BFF
+    environment:
+      # BFF talks to the backend service on the docker network.
+      SPRING_BOOT_URL: http://backend:6443
+      BFF_PORT: "3500"
+      VITE_PORT: "5173"
+      # Vite needs to bind 0.0.0.0 inside the container for the host port
+      # mapping to work; the dev script honors HOST.
+      HOST: "0.0.0.0"
+      # CI mode for vite to avoid interactive prompts if any.
+      CI: "true"
+      NODE_ENV: development
+    volumes:
+      # Bind-mount the whole repo so workspace deps + plugins resolve and
+      # hot-reload works the same way as host-mode dev.
+      - ./:/repo:cached
+      # Use a named volume for node_modules so the host's macOS pnpm store
+      # does not leak into the container (osxfs perf + symlink quirks).
+      - ga_e2e_node_modules:/repo/node_modules
+      - ga_e2e_web_admin_node_modules:/repo/web-admin/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Install deps at boot (idempotent; pnpm fast-path when lockfile matches),
+    # then run vite + BFF concurrently. Keep stdout for `docker compose logs`.
+    command: >-
+      sh -c "
+      set -e;
+      apk add --no-cache bash git;
+      corepack enable;
+      corepack prepare pnpm@9 --activate;
+      cd /repo;
+      pnpm install --no-frozen-lockfile --prefer-offline;
+      cd web-admin;
+      pnpm sync-plugins;
+      pnpm exec concurrently --names 'web,bff' --prefix-colors 'cyan,green' --restart-tries 5 --restart-after 2000 'pnpm dev:web' 'pnpm dev:bff'
+      "
+    # Generous start period — first install can take a few minutes when the
+    # node_modules volume is empty.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:5173 >/dev/null 2>&1 && wget -q -O- http://localhost:3500/health >/dev/null 2>&1 || wget -q -O- http://localhost:3500 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 5m
+
+volumes:
+  ga_e2e_node_modules:
+  ga_e2e_web_admin_node_modules:
