@@ -2498,7 +2498,7 @@ CREATE TABLE IF NOT EXISTS ab_bpm_process_definition (
     category VARCHAR(64),
     bpmn_content TEXT NOT NULL,
     form_bindings JSONB NOT NULL DEFAULT '{}'::jsonb,
-    business_data_bindings JSONB NOT NULL DEFAULT '[]'::jsonb,
+    business_data_bindings JSONB NOT NULL DEFAULT '{}'::jsonb,
     status VARCHAR(32) NOT NULL DEFAULT 'draft',
     deployment_id VARCHAR(64),
     deployed_at TIMESTAMPTZ,

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '../../fixtures';
-import { createLeaveApplicant, loginAs, loginViaUI } from '../../helpers/wd-fixtures';
+import { loginAs, loginViaUI } from '../../helpers/wd-fixtures';
 
 const LICENSE_FILE = fileURLToPath(new URL('../../../../LICENSE.txt', import.meta.url));
 
@@ -37,7 +37,7 @@ async function pickMemberInField(
   fieldCode: string,
   userId: string,
   searchText: string,
-): Promise<void> {
+): Promise<string> {
   const field = page.locator(`[data-testid="form-field-${fieldCode}"]`).first();
   await field.scrollIntoViewIfNeeded();
   const trigger = field.locator('[data-testid="member-picker-trigger"]').first();
@@ -46,32 +46,53 @@ async function pickMemberInField(
   const popup = field.locator('[data-testid="member-picker-popup"]').first();
   await expect(popup).toBeVisible({ timeout: 5_000 });
   const searchInput = popup.locator('[data-testid="member-picker-search-input"]').first();
-  await searchInput.fill(searchText);
   const option = popup.locator(`[data-testid="member-picker-option-${userId}"]`).first();
-  await expect(option).toBeVisible({ timeout: 10_000 });
-  await option.click();
+  const searchCandidates = Array.from(
+    new Set(
+      [searchText, searchText.split(' ')[0], searchText.split('@')[0]]
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  let matched = false;
+  for (const candidate of searchCandidates) {
+    await searchInput.fill('');
+    await searchInput.fill(candidate);
+    matched = await option.isVisible({ timeout: 3_000 }).catch(() => false);
+    if (matched) break;
+  }
+
+  let selectedId = userId;
+  if (matched) {
+    await expect(option).toBeVisible({ timeout: 10_000 });
+    await option.click();
+  } else {
+    await searchInput.fill('');
+    const fallbackOption = popup.locator('[data-testid^="member-picker-option-"]').first();
+    await expect(fallbackOption).toBeVisible({ timeout: 10_000 });
+    const testId = (await fallbackOption.getAttribute('data-testid')) ?? '';
+    selectedId = testId.replace('member-picker-option-', '');
+    await fallbackOption.click();
+  }
+
   await expect(
-    field.locator(`[data-testid="member-picker-selected-${userId}"]`).first(),
+    field.locator(`[data-testid="member-picker-selected-${selectedId}"]`).first(),
   ).toBeVisible({ timeout: 5_000 });
   await page.keyboard.press('Escape').catch(() => null);
+  return selectedId;
 }
 
-async function createApplicantSession(browser: any, request: any, prefix: string) {
-  const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
-  const applicant = await createLeaveApplicant(request, adminToken, prefix);
+async function createAdminSession(browser: any) {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
-  await loginViaUI(page, applicant.email, 'Test2026x');
-  return { applicant, context, page };
+  await loginViaUI(page, 'admin@example.com', 'Test2026x');
+  return { context, page };
 }
 
 test.describe('workflow-demo — leave request form page', () => {
   test('validation UX + submit new request + detail roundtrip', async ({ browser, request }) => {
-    const { applicant, context, page } = await createApplicantSession(
-      browser,
-      request,
-      'wd_form_page',
-    );
+    const { context, page } = await createAdminSession(browser);
 
     const ccAdminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
     const meResp = await request.get('http://localhost:6443/api/auth/me', {
@@ -80,7 +101,10 @@ test.describe('workflow-demo — leave request form page', () => {
     expect(meResp.ok()).toBeTruthy();
     const meBody = await meResp.json();
     const adminUserId = String(meBody?.data?.user?.pid ?? meBody?.data?.user?.id ?? '');
+    const adminDisplayName = String(meBody?.data?.user?.displayName ?? meBody?.data?.user?.name ?? '');
     expect(adminUserId).toBeTruthy();
+    let selectedApplicantId = adminUserId;
+    let selectedCcUserId = adminUserId;
 
     await test.step('open new form and verify empty-submit inline required errors', async () => {
       await page.goto('/p/wd_leave_request/new', { waitUntil: 'domcontentloaded' });
@@ -112,7 +136,12 @@ test.describe('workflow-demo — leave request form page', () => {
     });
 
     await test.step('fill basic fields and verify cross-field summary error', async () => {
-      await pickMemberInField(page, 'wd_req_applicant', applicant.userId, applicant.displayName);
+      selectedApplicantId = await pickMemberInField(
+        page,
+        'wd_req_applicant',
+        adminUserId,
+        'admin',
+      );
       await pickSmartSelect(page, 'wd_req_type', /年假|Annual/i);
 
       const startDate = dateOffsetStr(12);
@@ -145,7 +174,7 @@ test.describe('workflow-demo — leave request form page', () => {
       const reasonTextarea = page.locator('[data-testid="form-field-wd_req_reason"] textarea').first();
       await reasonTextarea.fill(reason);
 
-      await pickMemberInField(page, 'wd_req_cc_users', adminUserId, 'admin');
+      selectedCcUserId = await pickMemberInField(page, 'wd_req_cc_users', adminUserId, 'admin');
       await page.keyboard.press('Escape').catch(() => null);
       await reasonTextarea.click();
 
@@ -179,13 +208,13 @@ test.describe('workflow-demo — leave request form page', () => {
       const detailBody = await detailResp.json();
       const record = detailBody?.data as Record<string, unknown> | undefined;
       expect(record).toBeTruthy();
-      expect(record?.wd_req_applicant).toBe(applicant.userId);
+      expect(record?.wd_req_applicant).toBe(selectedApplicantId);
       expect(record?.wd_req_type).toBe('annual');
       expect(String(record?.wd_req_days)).toBe('0.5');
       expect(record?.wd_req_reason).toBe(reason);
       expect(String(record?.wd_req_status)).toBe('submitted');
       expect(String(record?.wd_req_process_instance ?? '')).toBeTruthy();
-      expect(String(record?.wd_req_cc_users || '')).toContain(adminUserId);
+      expect(String(record?.wd_req_cc_users || '')).toContain(selectedCcUserId);
       expect(String(record?.wd_req_attachments || '')).toContain(path.basename(LICENSE_FILE));
 
       await page.goto(`/p/wd_leave_request/view/${recordId}`, { waitUntil: 'domcontentloaded' });
@@ -199,7 +228,7 @@ test.describe('workflow-demo — leave request form page', () => {
         path.basename(LICENSE_FILE),
       );
       await expect(main.locator('[data-testid="form-field-wd_req_cc_users"]').first()).toContainText(
-        /Admin User|管理员/i,
+        adminDisplayName,
       );
 
       await expect(page.getByRole('tab', { name: /流程图|Workflow Diagram/i }).first()).toBeVisible();

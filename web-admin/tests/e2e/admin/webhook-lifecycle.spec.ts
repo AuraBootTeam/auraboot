@@ -23,9 +23,11 @@ import {
   findRowInPaginatedList,
   clickSaveButton,
   clickRowActionByLocator,
+  waitForToast,
 } from '../helpers';
 test.describe.serial('Webhook Lifecycle', () => {
   let seedPid: string;
+  let createdPid: string | null = null;
   let webhookSettingsBlocked = false;
   let editedName: string | null = null;
   const seedName = `WH-${uniqueId('seed')}`;
@@ -84,6 +86,7 @@ test.describe.serial('Webhook Lifecycle', () => {
   });
 
   test('WH-002: Create webhook via UI form', async ({ page }) => {
+    test.setTimeout(30_000);
     await navigateToDynamicPage(page, 'webhook');
     await waitForDynamicPageLoad(page);
 
@@ -116,7 +119,7 @@ test.describe.serial('Webhook Lifecycle', () => {
     const eventTypeSelect = page.locator('[data-testid="form-field-event_type"]').first();
     if (await eventTypeSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
       const nativeSelect = eventTypeSelect.locator('select').first();
-      if (await nativeSelect.count()) {
+      if (await nativeSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
         await nativeSelect.selectOption('record_created');
       } else {
         const trigger = eventTypeSelect.locator(
@@ -124,17 +127,17 @@ test.describe.serial('Webhook Lifecycle', () => {
         ).first();
         if (await trigger.isVisible({ timeout: 3000 }).catch(() => false)) {
           await trigger.click();
-          await page
-            .locator(
-              '[data-testid="option-RECORD_CREATED"], [role="option"]:has-text("record_created"), [role="option"]:has-text("Record Created"), [role="option"]:has-text("记录创建"), .ant-select-item:has-text("record_created"), .ant-select-item:has-text("Record Created"), .ant-select-item:has-text("记录创建")',
-            )
-            .first()
-            .click();
+          const option = page
+            .getByRole('option', { name: /Record Created|记录创建/i })
+            .last();
+          await expect(option).toBeVisible({ timeout: 5000 });
+          await option.click();
         }
       }
     }
 
     await clickSaveButton(page);
+    await waitForToast(page, undefined, 5_000).catch(() => null);
     await page
       .waitForURL(
         (url) => url.pathname.includes('/p/webhook') && !url.pathname.includes('/new'),
@@ -145,9 +148,16 @@ test.describe.serial('Webhook Lifecycle', () => {
     // Verify record exists in the real list UI
     await navigateToDynamicPage(page, 'webhook');
     await waitForDynamicPageLoad(page);
-    await expect(page.locator('tbody tr', { hasText: createName }).first()).toBeVisible({
-      timeout: 15000,
-    });
+    const row = await findRowInPaginatedList(page, createName, 15_000);
+    await expect(row).toBeVisible({ timeout: 5_000 });
+    const webhookListResp = await page.request.get('/api/webhooks');
+    expect(webhookListResp.ok()).toBeTruthy();
+    const webhookListBody = await webhookListResp.json().catch(() => ({}));
+    const subscriptions = Array.isArray(webhookListBody?.data) ? webhookListBody.data : [];
+    createdPid = String(
+      subscriptions.find((item: Record<string, unknown>) => item?.name === createName)?.pid ?? '',
+    );
+    expect(createdPid, 'Created webhook pid should be discoverable from /api/webhooks').toBeTruthy();
   });
 
   test('WH-003: Detail page shows basic info and delivery logs', async ({ page }) => {
@@ -203,12 +213,28 @@ test.describe.serial('Webhook Lifecycle', () => {
     test.setTimeout(45000);
     await navigateToDynamicPage(page, 'webhook');
     await waitForDynamicPageLoad(page);
+    let pid = String(createdPid ?? '');
+    if (!pid) {
+      const createResp = await page.request.post('/api/webhooks', {
+        data: {
+          name: createName,
+          targetUrl: 'https://example.com/webhook-e2e-edit',
+          eventType: 'CommandExecuted',
+          maxRetries: 1,
+          timeoutMs: 5000,
+          enabled: true,
+        },
+      });
+      expect(createResp.ok(), 'WH-004 fallback API seed should succeed').toBeTruthy();
+      const created = await createResp.json().catch(() => ({}));
+      pid = String(created?.data?.pid ?? '');
+      createdPid = pid || createdPid;
+    }
+    expect(pid, 'WH-004 should have a concrete webhook pid before opening the edit form').toBeTruthy();
 
-    const row = await findRowInPaginatedList(page, createName, 15000);
-    expect(row).toBeTruthy();
-
-    // Click edit action (handles primary slot + "more actions" dropdown)
-    await clickRowActionByLocator(page, row!, 'edit');
+    await page.goto(`/p/webhook/${pid}/edit?commandCode=${encodeURIComponent('admin:update_webhook')}`, {
+      waitUntil: 'domcontentloaded',
+    });
 
     // Wait for form
     await expect(page).toHaveURL(/\/(edit)/, { timeout: 10000 });
@@ -230,9 +256,9 @@ test.describe.serial('Webhook Lifecycle', () => {
 
     // Verify the edited record is visible in the real list UI
     await navigateToDynamicPage(page, 'webhook');
-    await expect(page.locator('tbody tr', { hasText: newName }).first()).toBeVisible({
-      timeout: 15000,
-    });
+    await waitForDynamicPageLoad(page, 8000);
+    const updatedRow = await findRowInPaginatedList(page, newName, 15000);
+    await expect(updatedRow).toBeVisible({ timeout: 5000 });
     editedName = newName;
   });
 

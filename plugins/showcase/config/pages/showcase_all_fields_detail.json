@@ -319,7 +319,7 @@
         {
           "code": "submit_review",
           "permissionCode": "sc.showcase.manage",
-          "visibleWhen": "record.sc_status === 'draft'",
+          "visibleWhen": "record.sc_status === 'active'",
           "label": {
             "zh-CN": "提交审核",
             "en": "Submit Review"

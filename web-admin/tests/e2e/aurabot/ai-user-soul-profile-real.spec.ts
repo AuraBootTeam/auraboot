@@ -278,7 +278,19 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
 
     await navigateToMyProfile(page);
 
-    await page.locator('[data-testid="tab-history"]').click();
+    await expect
+      .poll(
+        async () => {
+          await page.locator('[data-testid="tab-history"]').click().catch(() => {});
+          return await page
+            .locator(
+              '[data-testid="history-loading"], [data-testid="history-list"], [data-testid="history-empty"]',
+            )
+            .count();
+        },
+        { timeout: 5_000, intervals: [100, 250, 500, 1_000] },
+      )
+      .toBe(1);
 
     const historyList = page.locator('[data-testid="history-list"]');
     await expect(historyList).toBeVisible({ timeout: 5_000 });
@@ -358,7 +370,9 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     // Validate the payload shape via the same endpoint (reuses session
     // cookies). Not the primary assertion — the UI-triggered download
     // above is the contract — but keeps the end-to-end contract honest.
-    const resp = await page.request.fetch('/api/user/soul-profile/export');
+    const resp = await page.request.fetch('/api/user/soul-profile/export', {
+      headers: { 'X-Test-Spoof-User-Id': testUserId },
+    });
     expect(resp.status()).toBe(200);
     const payload = await resp.json();
     expect(payload.schema_version).toBe('1.0');

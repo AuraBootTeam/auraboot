@@ -22,31 +22,37 @@ test.describe('Global Search (Cmd+K) @smoke', () => {
   // Helper: navigate to home and open palette
   async function openPalette(page: import('@playwright/test').Page) {
     await page.goto('/dashboards', { waitUntil: 'load' });
+    await page.waitForLoadState('networkidle').catch(() => null);
 
-    // Wait for React hydration — trigger button must be interactive
     const trigger = page.locator('[data-testid="cmd-k-trigger"]');
     await expect(trigger).toBeVisible({ timeout: 15000 });
     await expect(trigger).toBeEnabled({ timeout: 5000 });
+    await page.waitForFunction(() => {
+      const btn = document.querySelector('[data-testid="cmd-k-trigger"]');
+      return (
+        !!btn &&
+        Object.keys(btn).some((k) => k.startsWith('__reactFiber') || k.startsWith('__reactProps'))
+      );
+    }, { timeout: 10000 });
 
     const palette = page.locator('[data-testid="command-palette"]');
+    const input = page.locator('[data-testid="command-palette-input"]');
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 
-    // Strategy 1: Click the trigger button directly (most reliable in batch)
     await trigger.click();
-    const openedViaClick = await palette.isVisible({ timeout: 3000 }).catch(() => false);
+    let opened = await palette.isVisible({ timeout: 3000 }).catch(() => false);
 
-    if (!openedViaClick) {
-      // Strategy 2: Keyboard shortcut
+    if (!opened) {
       await page.locator('body').click({ position: { x: 400, y: 400 } });
-      await page.keyboard.down('Control');
-      await page.keyboard.press('k');
-      await page.keyboard.up('Control');
-      const openedViaShortcut = await palette.isVisible({ timeout: 2000 }).catch(() => false);
-      if (!openedViaShortcut) {
-        // Strategy 3: Retry click
+      await page.keyboard.press(`${modifier}+k`).catch(() => null);
+      opened = await palette.isVisible({ timeout: 2500 }).catch(() => false);
+      if (!opened) {
         await trigger.click();
+        opened = await palette.isVisible({ timeout: 3000 }).catch(() => false);
       }
     }
     await expect(palette).toBeVisible({ timeout: 10000 });
+    await expect(input).toBeVisible({ timeout: 5000 });
     return palette;
   }
 
@@ -82,12 +88,16 @@ test.describe('Global Search (Cmd+K) @smoke', () => {
     // Click somewhere on the page body first to ensure focus
     await page.locator('body').click({ position: { x: 400, y: 400 } });
 
-    // Use keyboard shortcut (Meta on macOS, Control on others)
-    await page.keyboard.down('Meta');
-    await page.keyboard.press('k');
-    await page.keyboard.up('Meta');
+    // Use keyboard shortcut (Meta on macOS, Control on others), then fall back
+    // to the same robust open strategy used by the other command-palette tests.
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+    await page.keyboard.press(`${modifier}+KeyK`).catch(() => null);
 
     const palette = page.locator('[data-testid="command-palette"]');
+    const openedViaShortcut = await palette.isVisible({ timeout: 2000 }).catch(() => false);
+    if (!openedViaShortcut) {
+      await trigger.click();
+    }
     await expect(palette).toBeVisible({ timeout: 5000 });
 
     // Close with Esc

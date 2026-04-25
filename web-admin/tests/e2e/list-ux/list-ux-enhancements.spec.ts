@@ -66,8 +66,8 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
       { timeout: 15000 },
     );
 
-    // Click the Settings button (gear icon with title="Settings")
-    const settingsBtn = page.locator('button[title="Settings"]');
+    // Click the Settings button (gear icon)
+    const settingsBtn = page.getByTestId('toolbar-settings').or(page.locator('button[title="设置"], button[title="Settings"]')).first();
     await settingsBtn.waitFor({ state: 'visible', timeout: 10000 });
     await settingsBtn.click();
 
@@ -99,7 +99,7 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
     );
 
     // Open Settings
-    const settingsBtn = page.locator('button[title="Settings"]');
+    const settingsBtn = page.getByTestId('toolbar-settings').or(page.locator('button[title="设置"], button[title="Settings"]')).first();
     await settingsBtn.waitFor({ state: 'visible', timeout: 10000 });
     await settingsBtn.click();
 
@@ -153,7 +153,7 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
     );
 
     // Open Settings
-    const settingsBtn = page.locator('button[title="Settings"]');
+    const settingsBtn = page.getByTestId('toolbar-settings').or(page.locator('button[title="设置"], button[title="Settings"]')).first();
     await settingsBtn.waitFor({ state: 'visible', timeout: 10000 });
     await settingsBtn.click();
 

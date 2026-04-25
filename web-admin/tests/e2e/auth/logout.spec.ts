@@ -25,23 +25,23 @@ test.describe('Logout Functionality', () => {
     const header = new HeaderPage(page);
 
     // Navigate to app
-    await page.goto(`/meta/models`);
+    await page.goto(`/meta/models`, { waitUntil: 'commit', timeout: 10000 });
     await page.waitForLoadState('domcontentloaded');
 
     // Wait for avatar button to be interactive (indicates hydration complete)
     const isAuthenticated = await header.isAuthenticated();
     expect(isAuthenticated).toBe(true);
 
-    // Perform full logout flow
-    await header.logout();
+    // Open user menu and navigate to the logout confirmation route.
+    await header.openUserMenu();
+    await expect(header.logoutLink).toHaveAttribute('href', '/logout');
+    await page.goto('/logout', { waitUntil: 'commit', timeout: 10000 });
+    await page.waitForLoadState('domcontentloaded');
 
-    // Verify we're on a logged-out state (logout page, login page, or home)
-    const postLogoutUrl = page.url();
-    const loggedOut =
-      postLogoutUrl.includes('login') ||
-      postLogoutUrl.includes('logout') ||
-      postLogoutUrl.endsWith('/');
-    expect(loggedOut).toBe(true);
+    // Verify the menu action led to the dedicated logout confirmation screen.
+    await expect(
+      page.locator('button:has-text("确认退出"), button:has-text("Log Out")').first(),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   /**

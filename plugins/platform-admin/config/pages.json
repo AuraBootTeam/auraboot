@@ -1056,6 +1056,55 @@
         ]
       },
       {
+        "id": "tabs",
+        "blockType": "tabs",
+        "tabs": [
+          {
+            "key": "all",
+            "label": {
+              "zh-CN": "全部",
+              "en-US": "All"
+            }
+          },
+          {
+            "key": "draft",
+            "label": {
+              "zh-CN": "草稿",
+              "en-US": "Draft"
+            },
+            "filter": {
+              "field": "status",
+              "operator": "EQ",
+              "value": "draft"
+            }
+          },
+          {
+            "key": "deployed",
+            "label": {
+              "zh-CN": "已部署",
+              "en-US": "Deployed"
+            },
+            "filter": {
+              "field": "status",
+              "operator": "EQ",
+              "value": "deployed"
+            }
+          },
+          {
+            "key": "suspended",
+            "label": {
+              "zh-CN": "已暂停",
+              "en-US": "Suspended"
+            },
+            "filter": {
+              "field": "status",
+              "operator": "EQ",
+              "value": "suspended"
+            }
+          }
+        ]
+      },
+      {
         "id": "table",
         "blockType": "table",
         "columns": [
@@ -1118,6 +1167,68 @@
             "action": {
               "type": "navigate",
               "to": "/bpmn-designer?pid={pid}"
+            }
+          },
+          {
+            "code": "deploy",
+            "visibleWhen": "row.status === 'draft'",
+            "label": "部署",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "endpoint": "/api/bpm/process-definitions/${record.pid}/deploy",
+                  "method": "post"
+                }
+              ]
+            }
+          },
+          {
+            "code": "suspend",
+            "visibleWhen": "row.status === 'deployed'",
+            "label": "暂停",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "endpoint": "/api/bpm/process-definitions/${record.pid}/suspend",
+                  "method": "post"
+                }
+              ]
+            }
+          },
+          {
+            "code": "resume",
+            "visibleWhen": "row.status === 'suspended'",
+            "label": "恢复",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "endpoint": "/api/bpm/process-definitions/${record.pid}/resume",
+                  "method": "post"
+                }
+              ]
+            }
+          },
+          {
+            "code": "delete",
+            "visibleWhen": "row.status === 'draft'",
+            "danger": true,
+            "label": "删除",
+            "confirm": "confirm.delete",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "endpoint": "/api/bpm/process-definitions/${record.pid}",
+                  "method": "delete"
+                }
+              ]
             }
           }
         ],

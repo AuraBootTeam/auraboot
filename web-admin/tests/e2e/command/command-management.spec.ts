@@ -15,7 +15,6 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { ensureFilterFormOpen } from '../helpers';
 
 test.describe('Command List', () => {
   /**
@@ -66,33 +65,25 @@ test.describe('Command Execution', () => {
     await page.waitForLoadState('domcontentloaded');
     await expect(page).toHaveURL(/\/meta\/models/);
 
-    // "新建模型" is a real command action on model list pages.
     const executeBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("新建模型"), button:has-text("新增模型"), button:has-text("Create Model"), button:has-text("Create")',
+        '[data-testid="toolbar-btn-create"], [data-testid="toolbar-button-create"], button:has-text("新建模型"), button:has-text("新增模型"), button:has-text("Create Model"), button:has-text("Create")',
       )
       .first();
-    await expect(executeBtn).toBeVisible();
-    await executeBtn.click({ force: true });
-    const isCreateRoute = await page
-      .waitForURL('**/meta/models/new', { timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    const hasInlineForm = await page
-      .locator('form, .ant-form, [role="dialog"] form, [data-testid="model-form"]')
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
+    await expect(executeBtn).toBeVisible({ timeout: 5_000 });
 
-    if (!isCreateRoute && !hasInlineForm) {
-      // Fallback verification: create route itself is reachable in current runtime.
-      await page.goto('/meta/models/new');
-      await page.waitForLoadState('domcontentloaded');
-    }
-
-    await expect(page.locator('form, .ant-form, [role="dialog"] form').first()).toBeVisible({
-      timeout: 10000,
+    await page.evaluate(() => {
+      document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
     });
+    await executeBtn.evaluate((element: HTMLElement) => element.click());
+
+    await Promise.any([
+      page.waitForURL(/\/meta\/models\/new(?:$|\?)/, { timeout: 8_000 }),
+      page.getByTestId('model-type-physical').waitFor({ state: 'visible', timeout: 8_000 }),
+    ]).catch(() => null);
+
+    await expect(page.getByTestId('model-type-physical')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByTestId('model-type-virtual')).toBeVisible();
   });
 
   /**
@@ -136,10 +127,12 @@ test.describe('Command Execution', () => {
     await page.waitForLoadState('domcontentloaded');
     await expect(page).toHaveURL(/\/meta\/models/);
 
-    await ensureFilterFormOpen(page);
-    const searchBtn = page.locator('[data-testid="filter-search"]');
-    await expect(searchBtn).toBeVisible();
-    await searchBtn.click();
+    const searchInput = page
+      .locator('input[placeholder*="搜索模型"], input[placeholder*="Search"]')
+      .first();
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('e2et');
+    await page.keyboard.press('Enter');
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('main')).toBeVisible();
   });

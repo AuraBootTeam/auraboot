@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.dto;
 
+import com.auraboot.framework.meta.entity.NamedQueryPolicy;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Data;
 
@@ -91,6 +92,11 @@ public class NamedQueryCreateRequest {
      * 扩展属性
      */
     private JsonNode metadata;
+
+    /**
+     * Execution policy (maxRows, timeoutMs, rateLimitPerMinute, etc.)
+     */
+    private NamedQueryPolicy policy;
 
     /**
      * 是否自动创建字段

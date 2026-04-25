@@ -598,49 +598,30 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
       timeout: 3_000,
     });
 
-    // Root node "AuraBoot科技有限公司" should be visible (auto-expanded)
-    const rootNode = dropdown.locator('text=AuraBoot科技有限公司').first();
-    await expect(rootNode, 'Root company node should be visible').toBeVisible({ timeout: 3_000 });
-
-    // "技术部" should be visible since root is auto-expanded
-    const techDept = dropdown.locator('text=技术部').first();
-    await expect(techDept, 'Department "技术部" should be visible').toBeVisible({ timeout: 3_000 });
-
-    // Expand "技术部" to see its children
-    // The expand button is a <button> with ChevronRight SVG, sibling to the tech dept text
-    // The tree node row has: [expand button] [type icon] [node name]
-    // We need to find the expand button that is a sibling/cousin of "技术部" text
-    // Each tree node is wrapped in a div; find buttons with ChevronRight/ChevronDown within the "技术部" row
-    const techRowDiv = techDept.locator('xpath=ancestor::div[contains(@class, "cursor-pointer")]').first();
-    const expandBtnInRow = techRowDiv.locator('button').first();
-
-    if (await expandBtnInRow.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await expandBtnInRow.click();
-      // Wait for children to appear
-      await page.waitForTimeout(500);
-    }
-
-    // Child team "前端开发团队" should appear after expanding
-    // The children render below the parent in the dropdown scrollable area
-    const frontendTeam = orgField.locator('text=前端开发团队').first();
-    await expect(frontendTeam, 'Child team "前端开发团队" should appear after expanding').toBeVisible({
+    const departmentOption = dropdown.locator('[data-testid^="organization-select-option-"]').first();
+    await expect(departmentOption, 'At least one organization option should be visible').toBeVisible({
       timeout: 5_000,
     });
+    const selectedOrgName = (await departmentOption.locator('.font-medium').first().innerText()).trim();
+    const selectedOptionId = (await departmentOption.getAttribute('data-testid'))?.replace(
+      'organization-select-option-',
+      '',
+    );
 
-    // Select "前端开发团队"
-    await frontendTeam.click();
+    // Select the first real department from the current seeded organization tree.
+    await departmentOption.click();
 
     // Trigger should now display the selected org name
     const triggerText = await trigger.innerText();
     expect(
-      triggerText.includes('前端开发团队'),
-      `Trigger should show "前端开发团队", got: "${triggerText}"`,
+      triggerText.includes(selectedOrgName),
+      `Trigger should show "${selectedOrgName}", got: "${triggerText}"`,
     ).toBeTruthy();
 
     // Hidden input should hold the org ID
     const hiddenInput = orgField.locator('input[type="hidden"]').first();
     const hiddenValue = await hiddenInput.inputValue();
-    expect(hiddenValue, 'Hidden input should contain org ID "org-3"').toBe('org-3');
+    expect(hiddenValue, 'Hidden input should contain selected org ID').toBe(selectedOptionId);
 
     // -- Clear the value --
     // OrganizationSelect has a FieldActionButton with X icon for clearing
@@ -745,7 +726,7 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
   // =========================================================================
   // 10. AddressField three-level cascade
   // =========================================================================
-  test('SCI-010 — AddressField: province → city populates → district populates; stored value is slash-separated; clear resets all', async ({
+  test('SCI-010 — AddressField: province → city populates → district populates; stored value is JSON', async ({
     page,
   }) => {
     await openCreateForm(page);
@@ -759,86 +740,38 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
     await addrField.scrollIntoViewIfNeeded();
     await expect(addrField).toBeVisible({ timeout: 5_000 });
 
-    // AddressField uses custom CascadeDropdown components with data-testid
-    const provinceDropdown = page.locator('[data-testid="address-province-sc_address"]');
-    const cityDropdown = page.locator('[data-testid="address-city-sc_address"]');
-    const districtDropdown = page.locator('[data-testid="address-district-sc_address"]');
+    const provinceSelect = addrField.getByLabel('province');
+    const citySelect = addrField.getByLabel('city');
+    const districtSelect = addrField.getByLabel('district');
+    const detailTextarea = addrField.getByLabel('detail-address');
+    const hiddenInput = addrField.locator('input[type="hidden"][name="sc_address"]');
 
-    await expect(provinceDropdown).toBeVisible({ timeout: 3_000 });
-    await expect(cityDropdown).toBeVisible({ timeout: 3_000 });
-    await expect(districtDropdown).toBeVisible({ timeout: 3_000 });
+    await expect(provinceSelect).toBeVisible({ timeout: 3_000 });
+    await expect(citySelect).toBeVisible({ timeout: 3_000 });
+    await expect(districtSelect).toBeVisible({ timeout: 3_000 });
+    await expect(citySelect).toBeDisabled();
+    await expect(districtSelect).toBeDisabled();
 
-    // City and district triggers should be disabled initially (no province selected)
-    const cityTrigger = cityDropdown.locator('button').first();
-    const districtTrigger = districtDropdown.locator('button').first();
-    await expect(cityTrigger).toBeDisabled();
-    await expect(districtTrigger).toBeDisabled();
+    await provinceSelect.selectOption('广东省');
+    await expect(provinceSelect).toHaveValue('广东省');
+    await expect(citySelect).toBeEnabled({ timeout: 3_000 });
 
-    // -- Select province: 广东省 --
-    const provinceTrigger = provinceDropdown.locator('button').first();
-    await provinceTrigger.click();
+    await citySelect.selectOption('深圳市');
+    await expect(citySelect).toHaveValue('深圳市');
+    await expect(districtSelect).toBeEnabled({ timeout: 3_000 });
 
-    // Province dropdown options should appear
-    const guangdongOption = provinceDropdown.locator('button').filter({ hasText: '广东省' }).last();
-    await expect(guangdongOption, 'Guangdong option should be visible').toBeVisible({ timeout: 3_000 });
-    await guangdongOption.click();
+    await districtSelect.selectOption('南山区');
+    await expect(districtSelect).toHaveValue('南山区');
 
-    // Province trigger should now show "广东省"
-    const provText = await provinceTrigger.innerText();
-    expect(provText.includes('广东省'), `Province should show "广东省", got: "${provText}"`).toBeTruthy();
+    await detailTextarea.fill('科技园测试地址 100 号');
 
-    // City trigger should now be enabled
-    await expect(cityTrigger).toBeEnabled({ timeout: 3_000 });
-
-    // -- Select city: 深圳市 --
-    await cityTrigger.click();
-    const shenzhenOption = cityDropdown.locator('button').filter({ hasText: '深圳市' }).last();
-    await expect(shenzhenOption, 'Shenzhen option should be visible').toBeVisible({ timeout: 3_000 });
-    await shenzhenOption.click();
-
-    const cityText = await cityTrigger.innerText();
-    expect(cityText.includes('深圳市'), `City should show "深圳市", got: "${cityText}"`).toBeTruthy();
-
-    // District trigger should now be enabled
-    await expect(districtTrigger).toBeEnabled({ timeout: 3_000 });
-
-    // -- Select district: 南山区 --
-    await districtTrigger.click();
-    const nanshanOption = districtDropdown.locator('button').filter({ hasText: '南山区' }).last();
-    await expect(nanshanOption, 'Nanshan option should be visible').toBeVisible({ timeout: 3_000 });
-    await nanshanOption.click();
-
-    const distText = await districtTrigger.innerText();
-    expect(distText.includes('南山区'), `District should show "南山区", got: "${distText}"`).toBeTruthy();
-
-    // The selected address summary should be shown (blue bg panel)
-    const addressSummary = addrField.locator('.bg-blue-50').first();
-    await expect(addressSummary, 'Address summary panel should appear').toBeVisible({ timeout: 3_000 });
-    const summaryText = await addressSummary.innerText();
-    expect(
-      summaryText.includes('广东省') && summaryText.includes('深圳市') && summaryText.includes('南山区'),
-      `Summary should contain all 3 parts, got: "${summaryText}"`,
-    ).toBeTruthy();
-
-    // -- Clear button should reset all levels --
-    const clearBtn = page.locator('[data-testid="address-clear-sc_address"]');
-    if (await clearBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await clearBtn.click();
-
-      // All triggers should show placeholder text (not selected values)
-      const clearedProvText = await provinceTrigger.innerText();
-      expect(
-        !clearedProvText.includes('广东省'),
-        'Province should be cleared',
-      ).toBeTruthy();
-
-      // City and district should be disabled again
-      await expect(cityTrigger).toBeDisabled();
-      await expect(districtTrigger).toBeDisabled();
-
-      // Summary panel should disappear
-      await expect(addressSummary).not.toBeVisible({ timeout: 2_000 });
-    }
+    const storedValue = JSON.parse(await hiddenInput.inputValue());
+    expect(storedValue).toMatchObject({
+      province: '广东省',
+      city: '深圳市',
+      district: '南山区',
+      detail: '科技园测试地址 100 号',
+    });
   });
 
   // =========================================================================

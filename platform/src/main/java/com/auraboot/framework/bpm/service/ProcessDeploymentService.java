@@ -192,10 +192,14 @@ public class ProcessDeploymentService {
             extension.put(EXTENSION_KEY_DESIGNER_JSON, request.designerJson());
         }
 
-        // Use empty BPMN placeholder when only designer JSON is provided (DRAFT state)
+        // Compile designer JSON immediately so draft save/export round-trips
+        // have durable BPMN XML before the process is deployed.
         String bpmnContent = StringUtils.hasText(request.bpmnContent())
                 ? request.bpmnContent()
-                : "";
+                : StringUtils.hasText(request.designerJson())
+                        ? compileDesignerJson(
+                                request.designerJson(), request.processKey(), request.processName())
+                        : "";
 
         // Derive form_bindings from designerJson when the caller did not supply them explicitly
         Map<String, Object> resolvedFormBindings = request.formBindings();
@@ -263,12 +267,18 @@ public class ProcessDeploymentService {
         if (request.businessDataBindings() != null) {
             existing.setBusinessDataBindings(Map.of("bindings", request.businessDataBindings()));
         }
+        String generatedBpmnContent = null;
         if (StringUtils.hasText(request.designerJson())) {
             Map<String, Object> ext = existing.getExtension() != null
                     ? new HashMap<>(existing.getExtension())
                     : new HashMap<>();
             ext.put(EXTENSION_KEY_DESIGNER_JSON, request.designerJson());
             existing.setExtension(ext);
+            if (!StringUtils.hasText(request.bpmnContent())) {
+                generatedBpmnContent = compileDesignerJson(
+                        request.designerJson(), existing.getProcessKey(), existing.getProcessName());
+                existing.setBpmnContent(generatedBpmnContent);
+            }
 
             // Re-derive form_bindings from the new designerJson when the caller did
             // not supply explicit formBindings (designer save path never pre-derives them).
@@ -283,6 +293,14 @@ public class ProcessDeploymentService {
 
         existing.setUpdatedAt(Instant.now());
         processDefinitionMapper.updateById(existing);
+        if (StringUtils.hasText(generatedBpmnContent)) {
+            processDefinitionMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<BpmProcessDefinition>()
+                            .eq("pid", pid)
+                            .eq("tenant_id", existing.getTenantId())
+                            .set("bpmn_content", generatedBpmnContent)
+                            .set("updated_at", existing.getUpdatedAt()));
+        }
 
         log.info("Updated process definition: pid={}", pid);
         return existing;
@@ -365,18 +383,8 @@ public class ProcessDeploymentService {
         com.fasterxml.jackson.databind.JsonNode designerRoot = null;
         String designerJson = getDesignerJson(definition);
         if (StringUtils.hasText(designerJson)) {
-            try {
-                com.fasterxml.jackson.databind.node.ObjectNode root =
-                        (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(designerJson);
-                root.put("key", definition.getProcessKey());
-                if (!root.has("name") && definition.getProcessName() != null) {
-                    root.put("name", definition.getProcessName());
-                }
-                designerRoot = root;
-            } catch (Exception e) {
-                throw new IllegalStateException(
-                        "Failed to parse designerJson on deploy: " + e.getMessage(), e);
-            }
+            designerRoot = parseCanonicalDesignerJson(
+                    designerJson, definition.getProcessKey(), definition.getProcessName());
         }
 
         // Auto-convert designer JSON to BPMN XML if bpmnContent is empty
@@ -679,6 +687,27 @@ public class ProcessDeploymentService {
             return Map.of();
         }
         return objectMapper.convertValue(node, Map.class);
+    }
+
+    private String compileDesignerJson(String designerJson, String processKey, String processName) {
+        return jsonToBpmnConverter.convertFromJsonNode(
+                parseCanonicalDesignerJson(designerJson, processKey, processName));
+    }
+
+    private com.fasterxml.jackson.databind.node.ObjectNode parseCanonicalDesignerJson(
+            String designerJson, String processKey, String processName) {
+        try {
+            com.fasterxml.jackson.databind.node.ObjectNode root =
+                    (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(designerJson);
+            root.put("key", processKey);
+            if (!StringUtils.hasText(root.path("name").asText()) && StringUtils.hasText(processName)) {
+                root.put("name", processName);
+            }
+            return root;
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Failed to parse designerJson for process '" + processKey + "': " + e.getMessage(), e);
+        }
     }
 
     /**

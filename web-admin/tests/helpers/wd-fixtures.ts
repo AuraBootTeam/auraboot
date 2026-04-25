@@ -524,15 +524,6 @@ export async function processTask(
   // Get the table row for this task
   const taskRow = businessKeyCell.locator('xpath=ancestor::tr').first();
 
-  // Click the task name button to open the detail drawer.
-  // The drawer has 通过 / 驳回 action buttons at the bottom — use those directly.
-  const taskNameBtn = taskRow.locator('[data-testid="task-name-button"]').first();
-  await taskNameBtn.click();
-
-  // Wait for the detail drawer to open (slide-in panel on the right)
-  const drawer = page.locator('[data-testid="task-detail-drawer"]');
-  await expect(drawer).toBeVisible({ timeout: 5000 });
-
   // Intercept the approve/reject API call before clicking to avoid race
   const actionPath = action === 'approve' ? 'approve' : 'reject';
   const apiRespPromise = page.waitForResponse(
@@ -543,38 +534,29 @@ export async function processTask(
     { timeout: 15000 },
   );
 
-  // Click 通过 or 驳回 button in the drawer footer
-  if (action === 'approve') {
-    await drawer.getByRole('button', { name: /^通过$/ }).first().click();
-  } else {
-    await drawer.getByRole('button', { name: /^驳回$/ }).first().click();
-  }
+  const actionMenuButton = taskRow.getByRole('button').last();
+  await expect(actionMenuButton).toBeVisible({ timeout: 5000 });
+  await actionMenuButton.click();
 
-  // A confirmation dialog may open — fill comment if provided
-  // The CommentDialog renders with role="dialog" and a title matching 通过审批/驳回审批
+  const actionLabel = action === 'approve' ? /^通过$/ : /^驳回$/;
+  const actionButton = page.getByRole('button', { name: actionLabel }).first();
+  await expect(actionButton).toBeVisible({ timeout: 5000 });
+  await actionButton.click();
+
   const dialogTitle = action === 'approve' ? /通过审批/ : /驳回审批/;
   const dialog = page.locator('[role="dialog"]').filter({ hasText: dialogTitle }).first();
-  const hasDialog = await dialog.isVisible().catch(() => false);
-  if (hasDialog) {
-    if (comment) {
-      const commentTextarea = dialog.locator('textarea').first();
-      await expect(commentTextarea).toBeVisible({ timeout: 3000 });
-      await commentTextarea.fill(comment);
-    }
-    const confirmLabel = action === 'approve' ? /确认通过/ : /确认驳回/;
-    const confirmBtn = dialog.getByRole('button', { name: confirmLabel }).first();
-    await expect(confirmBtn).toBeVisible({ timeout: 3000 });
-    await confirmBtn.click();
-  } else if (comment) {
-    // If no separate dialog, the comment might be inline in the drawer
-    const commentTextarea = drawer.locator('textarea').first();
-    const hasTextarea = await commentTextarea.isVisible().catch(() => false);
-    if (hasTextarea) {
-      await commentTextarea.fill(comment);
-      const confirmLabel = action === 'approve' ? /确认通过|通过/ : /确认驳回|驳回/;
-      await drawer.getByRole('button', { name: confirmLabel }).first().click();
-    }
+  await expect(dialog).toBeVisible({ timeout: 5000 });
+
+  if (comment) {
+    const commentTextarea = dialog.locator('textarea').first();
+    await expect(commentTextarea).toBeVisible({ timeout: 3000 });
+    await commentTextarea.fill(comment);
   }
+
+  const confirmLabel = action === 'approve' ? /确认通过/ : /确认驳回/;
+  const confirmBtn = dialog.getByRole('button', { name: confirmLabel }).first();
+  await expect(confirmBtn).toBeVisible({ timeout: 3000 });
+  await confirmBtn.click();
 
   const apiResp = await apiRespPromise;
   if (!apiResp.ok()) {

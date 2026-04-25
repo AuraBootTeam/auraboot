@@ -1,8 +1,10 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { cleanup } from '@testing-library/react';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 // Mock React Router
-vi.mock('react-router', () => {
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
   const mockSession = {
     get: vi.fn(),
     set: vi.fn(),
@@ -16,15 +18,49 @@ vi.mock('react-router', () => {
   };
 
   return {
+    ...actual,
     useActionData: vi.fn(() => null),
     useLoaderData: vi.fn(() => ({})),
     useNavigate: vi.fn(() => vi.fn()),
     useLocation: vi.fn(() => ({ pathname: '/', search: '', hash: '', state: null })),
     useParams: vi.fn(() => ({})),
     useSearchParams: vi.fn(() => [new URLSearchParams(), vi.fn()]),
-    redirect: vi.fn((url: string) => ({ url })),
+    redirect: vi.fn((url: string, init?: ResponseInit | number) =>
+      typeof init === 'number' ? { url, status: init } : { url, ...init },
+    ),
     createCookieSessionStorage: vi.fn(() => mockCookieSessionStorage),
   };
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+function createStorageMock() {
+  const storage = new Map<string, string>();
+  return {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      storage.set(key, value);
+    },
+    removeItem: (key: string) => {
+      storage.delete(key);
+    },
+    clear: () => {
+      storage.clear();
+    },
+  };
+}
+
+beforeEach(() => {
+  Object.defineProperty(window, 'localStorage', {
+    value: createStorageMock(),
+    configurable: true,
+  });
+  Object.defineProperty(window, 'sessionStorage', {
+    value: createStorageMock(),
+    configurable: true,
+  });
 });
 
 // Mock window.matchMedia

@@ -824,31 +824,55 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
     const btn = (await submitBtn.isVisible({ timeout: 2_000 }).catch(() => false))
       ? submitBtn
       : submitBtnAlt;
+    let commandExecuted = false;
+    page.on('request', (req) => {
+      if (req.url().includes('/api/meta/commands/execute/') && req.method() === 'POST') {
+        commandExecuted = true;
+      }
+    });
     await btn.click();
 
-    // Should show validation errors
-    const errorMessage = page.locator(
-      '.ant-form-item-explain-error, [data-testid*="error"], .field-error, [role="alert"], .text-red-500, .text-destructive',
-    );
-    const hasErrors = await errorMessage
-      .first()
-      .isVisible({ timeout: 5_000 })
+    await waitForToast(page, undefined, 3_000).catch(() => null);
+
+    const hasErrors = await expect
+      .poll(
+        async () => {
+          const selectors = [
+            '.ant-form-item-explain-error',
+            '[data-testid*="error"]',
+            '.field-error',
+            '[role="alert"]',
+            '.text-red-500',
+            '.text-red-600',
+            '.text-destructive',
+            '[class*="border-red"]',
+            'p:has-text("必填")',
+            'p:has-text("required")',
+            'span:has-text("必填")',
+            'span:has-text("required")',
+          ];
+          for (const selector of selectors) {
+            const visible = await page
+              .locator(selector)
+              .first()
+              .isVisible({ timeout: 500 })
+              .catch(() => false);
+            if (visible) return true;
+          }
+          return false;
+        },
+        { timeout: 5_000, intervals: [200, 400, 800] },
+      )
+      .toBe(true)
+      .then(() => true)
       .catch(() => false);
 
-    if (!hasErrors) {
-      // Check for error toast if inline validation not visible
-      const errorToast = page
-        .locator('[role="alert"]')
-        .filter({ hasText: /错误|error|required|必填/i })
-        .first();
-      const hasErrorToast = await errorToast.isVisible({ timeout: 5_000 }).catch(() => false);
-      expect(
-        hasErrors || hasErrorToast,
-        'Submitting empty form should show validation errors or error toast',
-      ).toBeTruthy();
-    } else {
-      expect(hasErrors, 'At least one validation error should be visible').toBeTruthy();
-    }
+    expect(commandExecuted, 'Invalid empty form should not execute backend command').toBe(false);
+    expect(
+      /\/(new|edit)(?:$|\?)/.test(page.url()),
+      'Validation failure should keep the user on the form page',
+    ).toBe(true);
+    expect(hasErrors, 'Submitting empty form should show validation feedback').toBeTruthy();
 
     // Navigate back to prevent interference
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
@@ -1083,9 +1107,20 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
     await navigateToShowcaseDetail(page, RECORD_NAME_A, recordPidA);
     await page.waitForLoadState('domcontentloaded');
 
-    // Status should now show "active"
+    // Status should now be active in backend and visible in detail UI.
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/dynamic/showcase_all_fields/${recordPidA}`);
+          const body = await resp.json().catch(() => ({}));
+          return String(body?.data?.sc_status ?? '').toLowerCase();
+        },
+        { timeout: 10_000, intervals: [500, 1000, 1500] },
+      )
+      .toBe('active');
+
     const activeVisible = await page
-      .getByText(/活跃|Active/i)
+      .getByText(/启用|Active/i)
       .first()
       .isVisible({ timeout: 8_000 })
       .catch(() => false);
@@ -1204,28 +1239,13 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
     const row = await findRowInPaginatedList(page, RECORD_NAME_B, 12_000);
     await expect(row).toBeVisible();
 
-    // Click delete from row actions (may be in "more actions" dropdown)
-    const moreActionsBtn = row.locator('[data-testid="row-action-more"]').first();
-    const hasMoreActions = await moreActionsBtn.isVisible({ timeout: 2_000 }).catch(() => false);
-    if (hasMoreActions) {
-      await moreActionsBtn.click();
-      await page
-        .locator('[data-testid="row-action-dropdown"]')
-        .waitFor({ state: 'visible', timeout: 3_000 })
-        .catch(() => null);
-    }
-
-    // Delete button: inside portal dropdown or directly in row
-    const deleteBtn = page.locator('[data-testid="row-action-delete"]').first();
-    await deleteBtn.waitFor({ state: 'visible', timeout: 5_000 });
-
     const commandResponsePromise = page.waitForResponse(
       (r) =>
         r.url().includes('/api/meta/commands/execute/') &&
         r.request().method().toLowerCase() === 'post',
       { timeout: 20_000 },
     );
-    await deleteBtn.click();
+    await clickRowActionByLocator(page, row, 'delete', '删除');
 
     // [D11] Confirm dialog should appear
     const confirmDialog = page.locator(

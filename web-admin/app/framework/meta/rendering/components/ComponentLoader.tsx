@@ -6,12 +6,46 @@
 import React, { useState, useEffect, type ComponentType } from 'react';
 import { componentRegistry, initializeComponentRegistry } from '~/framework/meta/registry/components';
 import { getRuntimeComponentEntry } from '~/framework/meta/rendering/components/runtime-component-loaders';
+import Input from '~/ui/smart/form/Input';
+import NumberInput from '~/ui/smart/form/NumberInput';
+import DatePicker from '~/ui/smart/datetime/DatePicker';
+import Select from '~/ui/smart/form/Select';
+import Switch from '~/ui/smart/form/Switch';
+import Textarea from '~/ui/smart/form/Textarea';
 
 // LRU-style component cache with max size
 const MAX_CACHE_SIZE = 100;
 const componentCache = new Map<string, ComponentType<any>>();
 const nameResolutionCache = new Map<string, string>();
 let registryInitialized = false;
+
+const EAGER_CORE_COMPONENTS: Record<string, ComponentType<any>> = {
+  datepicker: DatePicker,
+  smartdatepicker: DatePicker,
+  DatePicker,
+  SmartDatePicker: DatePicker,
+  input: Input,
+  smartinput: Input,
+  Input,
+  SmartInput: Input,
+  numberinput: NumberInput,
+  smartnumberinput: NumberInput,
+  number: NumberInput,
+  NumberInput,
+  SmartNumberInput: NumberInput,
+  textarea: Textarea,
+  smarttextarea: Textarea,
+  Textarea,
+  SmartTextarea: Textarea,
+  select: Select,
+  smartselect: Select,
+  Select,
+  SmartSelect: Select,
+  switch: Switch,
+  smartswitch: Switch,
+  Switch,
+  SmartSwitch: Switch,
+};
 
 function cacheSet(key: string, value: ComponentType<any>) {
   if (componentCache.size >= MAX_CACHE_SIZE) {
@@ -59,6 +93,20 @@ export const ComponentLoader: React.FC<ComponentLoaderProps> = ({
 
         ensureRegistryInitialized();
         let normalizedName = resolveComponentName(componentName);
+
+        const eagerComponent =
+          EAGER_CORE_COMPONENTS[normalizedName] ||
+          EAGER_CORE_COMPONENTS[normalizedName.toLowerCase()] ||
+          EAGER_CORE_COMPONENTS[componentName] ||
+          EAGER_CORE_COMPONENTS[componentName.toLowerCase()];
+        if (eagerComponent) {
+          cacheSet(normalizedName, eagerComponent);
+          if (mounted) {
+            setComponent(() => eagerComponent);
+            setLoading(false);
+          }
+          return;
+        }
 
         if (componentCache.has(normalizedName)) {
           if (mounted) {

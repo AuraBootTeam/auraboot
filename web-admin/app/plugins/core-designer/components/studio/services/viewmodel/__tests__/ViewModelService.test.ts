@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ViewModelService } from '../ViewModelService';
 import type {
   ResolvedField,
   ViewModelSummary,
@@ -7,26 +6,30 @@ import type {
 } from '~/plugins/core-designer/components/studio/domain/viewmodel/types';
 
 // Mock the http-client module
-vi.mock('~/shared/services/http-client', () => ({
-  get: vi.fn(),
-  post: vi.fn(),
-}));
-
-import { get, post } from '~/shared/services/http-client';
-
-const mockGet = vi.mocked(get);
-const mockPost = vi.mocked(post);
-
 describe('ViewModelService', () => {
-  let service: ViewModelService;
+  let service: InstanceType<typeof import('../ViewModelService').ViewModelService>;
+  let mockGet: ReturnType<typeof vi.fn>;
+  let mockPost: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    service = new ViewModelService();
+    vi.resetModules();
+    mockGet = vi.fn();
+    mockPost = vi.fn();
   });
+
+  async function loadService() {
+    vi.doMock('~/shared/services/http-client', () => ({
+      get: mockGet,
+      post: mockPost,
+    }));
+
+    const { ViewModelService } = await import('../ViewModelService');
+    service = new ViewModelService();
+  }
 
   describe('getResolvedFields', () => {
     it('should call GET /api/meta/view-models/{code}/resolved-fields', async () => {
+      await loadService();
       const mockFields: ResolvedField[] = [
         { code: 'name', displayName: 'Name', dataType: 'string', sourceType: 'field_binding' },
         { code: 'email', displayName: 'Email', dataType: 'email', sourceType: 'field_binding' },
@@ -40,6 +43,7 @@ describe('ViewModelService', () => {
     });
 
     it('should return empty array when response is null', async () => {
+      await loadService();
       mockGet.mockResolvedValueOnce(null as any);
 
       const result = await service.getResolvedFields('not-found');
@@ -48,6 +52,7 @@ describe('ViewModelService', () => {
     });
 
     it('should return empty array when data is null', async () => {
+      await loadService();
       mockGet.mockResolvedValueOnce({ data: null } as any);
 
       const result = await service.getResolvedFields('empty');
@@ -58,6 +63,7 @@ describe('ViewModelService', () => {
 
   describe('getSummary', () => {
     it('should call GET /api/meta/view-models/{code}/summary', async () => {
+      await loadService();
       const mockSummary: ViewModelSummary = {
         code: 'my-view',
         displayName: 'My View',
@@ -74,6 +80,7 @@ describe('ViewModelService', () => {
     });
 
     it('should return null when response is null', async () => {
+      await loadService();
       mockGet.mockResolvedValueOnce(null as any);
 
       const result = await service.getSummary('not-found');
@@ -84,6 +91,7 @@ describe('ViewModelService', () => {
 
   describe('validate', () => {
     it('should call POST /api/meta/view-models/{code}/validate', async () => {
+      await loadService();
       const mockResult: ViewModelValidationResult = {
         valid: true,
         errors: [],
@@ -98,6 +106,7 @@ describe('ViewModelService', () => {
     });
 
     it('should return default failure when response is null', async () => {
+      await loadService();
       mockPost.mockResolvedValueOnce(null as any);
 
       const result = await service.validate('broken');
@@ -110,6 +119,7 @@ describe('ViewModelService', () => {
     });
 
     it('should return validation errors from backend', async () => {
+      await loadService();
       const mockResult: ViewModelValidationResult = {
         valid: false,
         errors: ['Base entity not found: customer'],
@@ -127,6 +137,7 @@ describe('ViewModelService', () => {
 
   describe('listViewModels', () => {
     it('should call GET /api/meta/models with VIEW type filter', async () => {
+      await loadService();
       const mockModels = [
         { pid: 'p1', code: 'view1', displayName: 'View 1', modelType: 'view' },
         { pid: 'p2', code: 'view2', displayName: 'View 2', modelType: 'view' },
@@ -145,6 +156,7 @@ describe('ViewModelService', () => {
     });
 
     it('should return empty array when response has no data', async () => {
+      await loadService();
       mockGet.mockResolvedValueOnce({ data: null } as any);
 
       const result = await service.listViewModels();
@@ -153,6 +165,7 @@ describe('ViewModelService', () => {
     });
 
     it('should return empty array when data.data is null', async () => {
+      await loadService();
       mockGet.mockResolvedValueOnce({ data: { data: null } } as any);
 
       const result = await service.listViewModels();
@@ -161,6 +174,7 @@ describe('ViewModelService', () => {
     });
 
     it('should return empty array when response is null', async () => {
+      await loadService();
       mockGet.mockResolvedValueOnce(null as any);
 
       const result = await service.listViewModels();

@@ -154,9 +154,24 @@ export default function MissionControl() {
   const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<MCTab>('dashboard');
+  const getTabFromHash = useCallback((): MCTab => {
+    if (typeof window === 'undefined') return 'dashboard';
+    const tab = window.location.hash.replace('#', '');
+    return tab === 'analytics' || tab === 'observations' ? tab : 'dashboard';
+  }, []);
+  const [activeTab, setActiveTab] = useState<MCTab>(getTabFromHash);
   const sseKey = useAgentSse();
   const refreshKey = useAutoRefresh(sseKey);
+  const activateTab = useCallback((tab: MCTab) => {
+    setActiveTab(tab);
+  }, []);
+
+  useEffect(() => {
+    const handleHashChange = () => setActiveTab(getTabFromHash());
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [getTabFromHash]);
 
   const tabs: { key: MCTab; label: { zh: string; en: string }; icon: string }[] = [
     { key: 'dashboard', label: { zh: '仪表盘', en: 'Dashboard' }, icon: '📊' },
@@ -198,21 +213,29 @@ export default function MissionControl() {
         className="flex border-b border-gray-200 bg-white px-6 dark:border-gray-700 dark:bg-gray-800"
         data-testid="mc-tabs"
       >
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-            data-testid={`mc-tab-${tab.key}`}
-          >
-            <span className="text-sm">{tab.icon}</span>
-            {l(tab.label.zh, tab.label.en)}
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <a
+              key={tab.key}
+              href={`#${tab.key}`}
+              onPointerDown={() => activateTab(tab.key)}
+              onMouseDown={() => activateTab(tab.key)}
+              onClick={() => activateTab(tab.key)}
+              className={`flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                isActive
+                  ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+              data-active={isActive ? 'true' : 'false'}
+              data-mc-tab={tab.key}
+              data-testid={`mc-tab-${tab.key}`}
+            >
+              <span className="pointer-events-none text-sm">{tab.icon}</span>
+              <span className="pointer-events-none">{l(tab.label.zh, tab.label.en)}</span>
+            </a>
+          );
+        })}
       </div>
 
       {/* Tab Content */}

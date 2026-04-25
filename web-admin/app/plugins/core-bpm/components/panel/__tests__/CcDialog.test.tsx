@@ -58,7 +58,6 @@ vi.mock('~/ui/smart/picker/MemberPicker', () => {
 import { CcDialog } from '../CcDialog';
 
 afterEach(() => {
-  document.body.innerHTML = '';
   vi.restoreAllMocks();
 });
 

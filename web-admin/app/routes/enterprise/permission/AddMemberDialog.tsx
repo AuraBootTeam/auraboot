@@ -243,11 +243,17 @@ export default function AddMemberDialog({
               {/* Table */}
               <div className="max-h-64 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-600">
                 {candidatesLoading ? (
-                  <div className="flex items-center justify-center py-8">
+                  <div
+                    data-testid="candidate-loading"
+                    className="flex items-center justify-center py-8"
+                  >
                     <LoadingSpinner />
                   </div>
                 ) : candidates.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-gray-400">
+                  <div
+                    data-testid="candidate-empty-state"
+                    className="py-8 text-center text-sm text-gray-400"
+                  >
                     {t('admin.permission.members.noCandidates') ||
                       'No available members found'}
                   </div>
