@@ -16,7 +16,6 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { TerminateDialog } from '../TerminateDialog';
 
 afterEach(() => {
-  document.body.innerHTML = '';
   vi.clearAllMocks();
 });
 

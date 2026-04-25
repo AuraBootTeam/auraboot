@@ -305,6 +305,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     page,
   }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
     await order.gotoList();
 
     // Toolbar buttons should be visible via data-testid
@@ -322,6 +323,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
 
   test('BK-008: list-tabs should switch status and display tab counts @smoke', async ({ page }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
     await order.gotoList();
 
     // Verify tabs exist (6 status tabs for e2et_order)
@@ -402,6 +404,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     page,
   }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
     await order.gotoList();
 
     // Verify table renders
@@ -548,6 +551,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
 
   test('BK-014: filters should support date range selection', async ({ page }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    const listPage = new DynamicListPage(page, `/p/${ORDER_PAGE_KEY}`);
     await order.gotoList();
 
     await ensureFilterFormOpen(page);

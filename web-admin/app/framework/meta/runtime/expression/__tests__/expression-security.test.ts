@@ -318,7 +318,7 @@ describe('Expression Security', () => {
   describe('Safe String Operations', () => {
     it('should allow string methods', () => {
       const parser = new ExpressionParser(createTestContext());
-      expect(parser.evaluate('${form.name.toUpperCase()}')).toBe('test');
+      expect(parser.evaluate('${form.name.toUpperCase()}')).toBe('TEST');
       expect(parser.evaluate('${form.name.toLowerCase()}')).toBe('test');
       expect(parser.evaluate('${form.name.includes("es")}')).toBe(true);
       expect(parser.evaluate('${form.name.startsWith("Te")}')).toBe(true);

@@ -118,15 +118,23 @@ test.describe.serial('Page Schema List (DSL)', () => {
     await navigateToDynamicPage(page, 'page_schema');
     await waitForDynamicPageLoad(page);
 
+    const waitForFilteredList = (status: 'published' | 'draft' | 'archived') =>
+      page.waitForResponse(
+        async (r) => {
+          if (!r.url().includes('/list') || r.status() !== 200) return false;
+          const req = r.request();
+          const haystack = `${r.url()} ${req.postData() ?? ''}`;
+          return haystack.includes(status);
+        },
+        { timeout: 10000 },
+      );
+
     // D3: Click "已发布" (Published) tab
     const publishedTab = page
       .locator('[role="tab"]:has-text("已发布"), button:has-text("已发布"), [data-tab-key="published"]')
       .first();
     if (await publishedTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const filterPromise = page.waitForResponse(
-        (r) => r.url().includes('/list') && r.status() === 200,
-        { timeout: 10000 },
-      );
+      const filterPromise = waitForFilteredList('published');
       await publishedTab.click();
       const resp = await filterPromise;
       const body = await resp.json();
@@ -145,10 +153,7 @@ test.describe.serial('Page Schema List (DSL)', () => {
       .locator('[role="tab"]:has-text("草稿"), button:has-text("草稿"), [data-tab-key="draft"]')
       .first();
     if (await draftTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const filterPromise2 = page.waitForResponse(
-        (r) => r.url().includes('/list') && r.status() === 200,
-        { timeout: 10000 },
-      );
+      const filterPromise2 = waitForFilteredList('draft');
       await draftTab.click();
       const resp2 = await filterPromise2;
       const body2 = await resp2.json();
@@ -254,8 +259,8 @@ test.describe.serial('Page Schema List (DSL)', () => {
     // Verify form section title renders
     await expect(page.getByText('基本信息').or(page.getByText('Basic Information')).first()).toBeVisible({ timeout: 8000 });
 
-    // D5: Verify form fields are present (labels from i18n or field displayName)
-    await expect(page.getByText('Name').or(page.getByText('页面名称')).first()).toBeVisible({ timeout: 3000 });
+    // D5: Verify form fields are present using stable field labels in the current DSL form.
+    await expect(page.getByText('名称').or(page.getByText('页面名称')).first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('页面标识').or(page.getByText('Page Key')).first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('页面类型').or(page.getByText('Page Kind')).first()).toBeVisible({ timeout: 3000 });
 
@@ -270,6 +275,7 @@ test.describe.serial('Page Schema List (DSL)', () => {
       name: createName,
       page_key: createPageKey,
       kind: 'dashboard',
+      model_code: 'tenant',
       description: `E2E create test ${uid}`,
     });
     expect(result.recordId).toBeTruthy();

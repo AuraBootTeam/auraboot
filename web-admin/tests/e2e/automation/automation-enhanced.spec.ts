@@ -158,8 +158,10 @@ test.describe('Automation Enhanced', () => {
 
     // Fill the name and description
     const automationName = `Created ${uniqueId()}`;
-    await nameInput.fill(automationName);
-    await descInput.fill('Created via E2E test');
+    await nameInput.click();
+    await nameInput.pressSequentially(automationName);
+    await descInput.click();
+    await descInput.pressSequentially('Created via E2E test');
 
     // Verify the values were entered correctly
     await expect(nameInput).toHaveValue(automationName);

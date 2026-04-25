@@ -45,6 +45,13 @@ const HIDDEN_DEFAULT_TAB_CODES = new Set([
   'acs_dashboard',
 ]);
 
+function getBrowserStorage(): Storage | null {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return null;
+  }
+  return window.localStorage;
+}
+
 // ---------------------------------------------------------------------------
 // SortableTab — individual draggable tab
 // ---------------------------------------------------------------------------
@@ -93,7 +100,8 @@ function DragHint({ label }: { label: string }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem(HINT_STORAGE_KEY)) return;
+    const storage = getBrowserStorage();
+    if (storage?.getItem(HINT_STORAGE_KEY)) return;
 
     // Fade in after a short delay
     const showTimer = setTimeout(() => setVisible(true), 800);
@@ -101,7 +109,7 @@ function DragHint({ label }: { label: string }) {
     // Auto-dismiss after 4s and mark as shown
     const hideTimer = setTimeout(() => {
       setVisible(false);
-      localStorage.setItem(HINT_STORAGE_KEY, '1');
+      storage?.setItem(HINT_STORAGE_KEY, '1');
     }, 4800);
 
     return () => {
@@ -110,7 +118,7 @@ function DragHint({ label }: { label: string }) {
     };
   }, []);
 
-  if (localStorage.getItem(HINT_STORAGE_KEY) && !visible) return null;
+  if (getBrowserStorage()?.getItem(HINT_STORAGE_KEY) && !visible) return null;
 
   return (
     <span

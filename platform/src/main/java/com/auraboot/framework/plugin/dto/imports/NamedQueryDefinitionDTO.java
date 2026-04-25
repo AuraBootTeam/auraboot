@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.dto.imports;
 
 import com.auraboot.framework.meta.dto.NamedQueryFieldRequest;
+import com.auraboot.framework.meta.entity.NamedQueryPolicy;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -87,6 +88,11 @@ public class NamedQueryDefinitionDTO {
      * Metadata JSON.
      */
     private JsonNode metadata;
+
+    /**
+     * Execution policy (max rows, timeout, rate limit, etc.).
+     */
+    private NamedQueryPolicy policy;
 
     /**
      * Whether to validate SQL when importing.

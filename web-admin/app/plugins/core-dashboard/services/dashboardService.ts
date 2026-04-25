@@ -14,6 +14,22 @@ import type {
 
 const API_BASE = '/api/dashboards';
 
+function normalizeLocalizedText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') {
+    const localized = value as Record<string, unknown>;
+    const candidates = [
+      localized['zh-CN'],
+      localized.zh,
+      localized['en-US'],
+      localized.en,
+    ];
+    const resolved = candidates.find((item) => typeof item === 'string' && item.trim().length > 0);
+    if (typeof resolved === 'string') return resolved;
+  }
+  return '';
+}
+
 /**
  * Backend widget type (PascalCase) to frontend WidgetType (kebab-case with smart- prefix)
  */
@@ -120,7 +136,7 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
   const h = (raw.h as number) ?? 3;
 
   // Title can be at root or nested in config
-  const title = (rawConfig.title as string) || (raw.title as string) || '';
+  const title = normalizeLocalizedText(rawConfig.title) || normalizeLocalizedText(raw.title);
 
   // Base fields required by EnhancedGridCellConfig
   const base = {
@@ -488,11 +504,10 @@ function buildStaticDataSource(type: WidgetType, config: Record<string, unknown>
  * Ensures all widgets conform to the frontend Widget type.
  */
 function normalizeDashboard(raw: Dashboard): Dashboard {
-  if (!raw.widgets?.length) return raw;
-
   return {
     ...raw,
-    widgets: raw.widgets.map((w, i) => normalizeWidget(w as unknown as Record<string, unknown>, i)),
+    title: normalizeLocalizedText(raw.title),
+    widgets: (raw.widgets || []).map((w, i) => normalizeWidget(w as unknown as Record<string, unknown>, i)),
   };
 }
 

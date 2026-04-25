@@ -41,10 +41,10 @@ const PROCESS_KEY = `svch_${TS}`;
 const PROCESS_NAME = `Http ServiceTask E2E ${TS}`;
 const BK = `svch_bk_${TS}`;
 
-// Backend actuator health endpoint — reachable from the platform process to
-// itself. We use 127.0.0.1:6443 which mirrors how the platform logs its own
-// startup bind address.
-const HEALTH_URL = 'http://127.0.0.1:6443/actuator/health';
+// SSRF protection intentionally blocks loopback/private targets and management
+// ports. Use a stable public HTTPS endpoint so the E2E still exercises the real
+// HttpServiceTaskDelegate network path and responseVar capture.
+const HEALTH_URL = 'https://example.com/';
 const RESPONSE_VAR = 'healthResp';
 
 // ---------------------------------------------------------------------------
@@ -308,8 +308,8 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
     expect(healthResp?.status, 'HTTP delegate must record status=200').toBe(200);
     expect(
       String(healthResp?.body ?? ''),
-      'HTTP delegate must capture actuator health body (contains "UP")',
-    ).toContain('UP');
+      'HTTP delegate must capture the remote response body',
+    ).toContain('Example Domain');
 
     // D11: svc_http must appear in completedNodes
     const completedIds = (status.completedNodes ?? []).map((n) => n.nodeId);

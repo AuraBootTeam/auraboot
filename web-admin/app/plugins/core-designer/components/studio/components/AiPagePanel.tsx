@@ -286,7 +286,7 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <div className="mb-3 text-3xl">&#x2728;</div>
-            <p className="mb-1 text-sm font-medium text-gray-700">AI 页面助手</p>
+            <p className="mb-1 text-sm font-medium text-gray-700">AI Page Assistant</p>
             <p className="text-xs text-gray-400">
               Describe the page you want or use a quick command above.
             </p>

@@ -1730,6 +1730,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             updateRequest.setDefaultOrder(dto.getDefaultOrder());
             updateRequest.setTags(dto.getTags());
             updateRequest.setMetadata(dto.getMetadata());
+            updateRequest.setPolicy(dto.getPolicy());
             updateRequest.setValidateSql(dto.getValidateSql() == null || dto.getValidateSql());
             updateRequest.setCheckPermissions(dto.getCheckPermissions() == null || dto.getCheckPermissions());
             namedQueryService.update(existingEntity.getPid(), updateRequest);
@@ -1764,6 +1765,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         createRequest.setFields(clonedFields);
         createRequest.setTags(dto.getTags());
         createRequest.setMetadata(dto.getMetadata());
+        createRequest.setPolicy(dto.getPolicy());
         createRequest.setValidateSql(dto.getValidateSql() == null || dto.getValidateSql());
         createRequest.setCheckPermissions(dto.getCheckPermissions() == null || dto.getCheckPermissions());
 
@@ -1796,6 +1798,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
         if (dto.getMetadata() != null) {
             state.put("metadata", dto.getMetadata());
+        }
+        if (dto.getPolicy() != null) {
+            state.put("policy", dto.getPolicy());
         }
         return state;
     }

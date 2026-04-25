@@ -33,6 +33,7 @@
 
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { uniqueId, executeCommandViaApi, findRowInPaginatedList, queryFilteredList } from '../helpers/index';
+import { gotoAcpUiPage } from './route-helpers';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -75,11 +76,7 @@ const BTN = {
 
 /** Navigate via sidebar href link (same approach as acp-model-lifecycle.spec.ts). */
 async function navigateToAcpPage(page: Page, href: string): Promise<void> {
-  await page.goto('/dashboards', { waitUntil: 'load' });
-  const menuLink = page.locator(`a[href="${href}"]`);
-  await menuLink.first().waitFor({ state: 'visible', timeout: 10_000 });
-  await menuLink.first().evaluate((el: HTMLElement) => el.click());
-  await page.waitForURL((url) => url.pathname === href, { timeout: 10_000 });
+  await gotoAcpUiPage(page, href);
   // Wait for table to load
   await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 }

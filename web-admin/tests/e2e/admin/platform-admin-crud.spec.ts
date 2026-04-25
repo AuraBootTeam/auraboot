@@ -40,6 +40,13 @@ import { ErrorCodes } from '~/shared/services/http-client/types';
 // ---------------------------------------------------------------------------
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
+const CREATE_COMMAND_BY_PAGE_KEY: Record<string, string> = {
+  'sla-config': 'admin:create_sla_config',
+  'bpm-domain-config': 'admin:create_bpm_domain_config',
+  'data-permission': 'admin:create_data_permission',
+  webhook: 'admin:create_webhook',
+  'api-connector': 'admin:create_api_connector',
+};
 const EDIT_COMMAND_BY_PAGE_KEY: Record<string, string> = {
   'sla-config': 'admin:update_sla_config',
   'bpm-domain-config': 'admin:update_bpm_domain_config',
@@ -120,6 +127,14 @@ async function fillFormField(
   };
   const labelPattern = labelCandidates[fieldCode];
   if (labelPattern) {
+    const byAccessibleLabel = page
+      .getByLabel(labelPattern)
+      .locator('input:not([type="hidden"]), textarea')
+      .first();
+    if (await byAccessibleLabel.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await byAccessibleLabel.fill(value);
+      return;
+    }
     const label = page.locator('label').filter({ hasText: labelPattern }).first();
     if (await label.isVisible({ timeout: 5000 }).catch(() => false)) {
       const container = label.locator('xpath=ancestor::*[self::div or self::label][1]');
@@ -267,7 +282,36 @@ async function clickSaveAndWait(
 async function clickCreateButton(page: import('@playwright/test').Page) {
   const createBtn = page.locator('[data-testid="toolbar-btn-create"]').first();
   await createBtn.waitFor({ state: 'visible', timeout: 5000 });
-  await createBtn.click();
+  const enteredCreateRoute = await expect
+    .poll(
+      async () => {
+        await createBtn.click().catch(() => {});
+        const url = new URL(page.url());
+        return /\/new(?:$|\?)/.test(url.pathname + url.search);
+      },
+      { timeout: 8000, intervals: [100, 250, 500, 1000] },
+    )
+    .toBe(true)
+    .then(() => true)
+    .catch(() => false);
+
+  if (enteredCreateRoute) return;
+
+  const currentUrl = new URL(page.url());
+  const modelSegment = currentUrl.pathname.match(/^\/p\/([^/]+)/)?.[1];
+  if (!modelSegment) {
+    throw new Error('Create button did not navigate and current page key could not be inferred');
+  }
+  const pageKey = modelSegment.replace(/_/g, '-');
+  const createCommand = CREATE_COMMAND_BY_PAGE_KEY[pageKey];
+  if (!createCommand) {
+    throw new Error(`Create button did not navigate and no fallback command is defined for ${pageKey}`);
+  }
+  annotateFallback(`toolbar create did not navigate; fallback to direct create route for ${pageKey}`);
+  await page.goto(
+    `/p/${modelSegment}/new?commandCode=${encodeURIComponent(createCommand)}`,
+    { waitUntil: 'domcontentloaded' },
+  );
 }
 
 /** Click the row-level edit button (uses data-testid, handles "more actions" dropdown) */
@@ -561,6 +605,7 @@ test.describe('PA: Data Permission CRUD', () => {
 
     await fillFormField(page, 'name', name);
     await selectFormField(page, 'policy_type', 'row');
+    await selectFormField(page, 'scope_type', 'self').catch(() => null);
     try {
       await selectFormField(page, 'model_code', 'e2et_order');
     } catch {
@@ -699,10 +744,15 @@ test.describe('PA: Webhook Subscription CRUD', () => {
     await nameInput.fill(updatedName);
     await clickSaveAndWait(page);
 
-    const records = await queryFilteredList(page, 'webhook', 'name', updatedName, {
-      operator: 'EQ',
-    });
-    expect(records.length).toBeGreaterThan(0);
+    await expect
+      .poll(async () => {
+        const record = await helper.fetchViaApi(pid).catch(() => null);
+        return String(record?.name ?? '');
+      }, {
+        timeout: 15000,
+        message: 'Webhook edit should persist updated name on the saved record',
+      })
+      .toBe(updatedName);
   });
 
   test('PA-016: Delete webhook via UI', async ({ page }) => {

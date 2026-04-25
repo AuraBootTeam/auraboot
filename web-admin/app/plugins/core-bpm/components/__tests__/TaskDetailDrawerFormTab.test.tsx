@@ -38,9 +38,13 @@ vi.mock('~/plugins/core-bpm/services/slaService', () => ({
   getSlaByInstance: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('react-router', () => ({
-  useNavigate: () => vi.fn(),
-}));
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>();
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+  };
+});
 
 vi.mock('~/plugins/core-bpm/components/ApprovalTimeline', () => ({
   ApprovalTimeline: () => <div data-testid="mock-approval-timeline" />,

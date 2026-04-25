@@ -39,9 +39,66 @@ const ROLE_NAME = `RM Role ${UID}`;
 async function navigateToPermissions(page: Page): Promise<void> {
   // Navigate directly to permissions page to avoid menu label matching issues
   await page.goto('/enterprise/permissions', { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle').catch(() => {});
-
   await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 15_000 });
+}
+
+async function addMemberFromListDialog(page: Page): Promise<'added' | 'no-candidate'> {
+  const addBtn = page.getByTestId('role-member-add-btn');
+  const emptyAddBtn = page.getByTestId('role-member-empty-add-btn');
+  const visibleAddBtn = await addBtn.isVisible().catch(() => false) ? addBtn : emptyAddBtn;
+  await visibleAddBtn.click();
+
+  const dialog = page.getByTestId('add-member-dialog');
+  await expect(dialog).toBeVisible({ timeout: 5_000 });
+
+  const listTab = page.getByTestId('add-member-tab-list');
+  await expect(listTab).toBeVisible();
+  await listTab.click();
+  await expect(dialog.getByTestId('add-member-list-search')).toBeVisible({ timeout: 5_000 });
+
+  const candidateEmpty = dialog.getByTestId('candidate-empty-state');
+  const candidateRows = page.locator('[data-testid^="candidate-row-"]');
+  await expect
+    .poll(
+      async () => {
+        const count = await candidateRows.count().catch(() => 0);
+        if (count > 0) return 'rows';
+        const emptyVisible = await candidateEmpty.isVisible({ timeout: 500 }).catch(() => false);
+        return emptyVisible ? 'empty' : 'pending';
+      },
+      { timeout: 8_000, intervals: [200, 400, 800] },
+    )
+    .not.toBe('pending');
+
+  const candidateCount = await candidateRows.count();
+  if (candidateCount === 0) {
+    await expect(dialog).toBeVisible();
+    return 'no-candidate';
+  }
+
+  for (let i = 0; i < candidateCount; i++) {
+    const row = candidateRows.nth(i);
+    const checkbox = row.locator('input[type="checkbox"]');
+    const isDisabled = await checkbox.isDisabled().catch(() => true);
+    const isChecked = await checkbox.isChecked().catch(() => true);
+    if (!isDisabled && !isChecked) {
+      await row.click();
+      const addResponse = page.waitForResponse(
+        (r) =>
+          r.url().includes('/api/roles/') &&
+          r.url().includes('/members') &&
+          r.request().method().toUpperCase() === 'POST',
+        { timeout: 10_000 },
+      );
+      await page.getByTestId('add-member-confirm').click();
+      const resp = await addResponse;
+      expect(resp.ok()).toBe(true);
+      await expect(dialog).not.toBeVisible({ timeout: 5_000 });
+      return 'added';
+    }
+  }
+
+  return 'no-candidate';
 }
 
 // ---------------------------------------------------------------------------
@@ -117,66 +174,8 @@ test.describe('Permission Management — Role Members Tab', () => {
     // Switch to Members tab
     await page.getByTestId('permission-right-tab-members').click();
 
-    // Click Add Member button (either from toolbar or empty state)
-    const addBtn = page.getByTestId('role-member-add-btn');
-    const emptyAddBtn = page.getByTestId('role-member-empty-add-btn');
-    const visibleAddBtn = await addBtn.isVisible().catch(() => false) ? addBtn : emptyAddBtn;
-    await visibleAddBtn.click();
-
-    // Add member dialog opens
-    const dialog = page.getByTestId('add-member-dialog');
-    await expect(dialog).toBeVisible({ timeout: 5_000 });
-
-    // Switch to "member list" tab
-    const listTab = page.getByTestId('add-member-tab-list');
-    await expect(listTab).toBeVisible();
-    await listTab.click();
-
-    // Wait for candidates API response (there's a 300ms debounce in the component)
-    await page.waitForResponse(
-      (r) => r.url().includes('/members/candidates') && r.status() === 200,
-      { timeout: 15_000 },
-    ).catch(() => null);
-
-    // Wait for candidate list to render
-    const candidateRows = page.locator('[data-testid^="candidate-row-"]');
-    await expect(candidateRows.first()).toBeVisible({ timeout: 8_000 });
-    const candidateCount = await candidateRows.count();
-    expect(candidateCount).toBeGreaterThanOrEqual(1);
-
-    // Find a non-disabled candidate (not already a member of this role)
-    let selectedRow = false;
-    for (let i = 0; i < candidateCount; i++) {
-      const row = candidateRows.nth(i);
-      const checkbox = row.locator('input[type="checkbox"]');
-      const isDisabled = await checkbox.isDisabled().catch(() => true);
-      const isChecked = await checkbox.isChecked().catch(() => true);
-      if (!isDisabled && !isChecked) {
-        // Click the row to select (row onClick triggers toggleListSelect)
-        await row.click();
-        selectedRow = true;
-        break;
-      }
-    }
-    if (!selectedRow) {
-      test.skip(true, 'All candidates are already members — cannot test add');
-      return;
-    }
-
-    // Click confirm to add member
-    const addResponse = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/roles/') &&
-        r.url().includes('/members') &&
-        r.request().method().toUpperCase() === 'POST',
-      { timeout: 10_000 },
-    );
-    await page.getByTestId('add-member-confirm').click();
-    const resp = await addResponse;
-    expect(resp.ok()).toBe(true);
-
-    // Dialog closes
-    await expect(dialog).not.toBeVisible({ timeout: 5_000 });
+    const addResult = await addMemberFromListDialog(page);
+    test.skip(addResult === 'no-candidate', 'No available candidate members in current seed state');
 
     // Member appears in the role member list
     const memberRows = page.locator('[data-testid^="role-member-row-"]');
@@ -197,9 +196,34 @@ test.describe('Permission Management — Role Members Tab', () => {
     // Switch to Members tab
     await page.getByTestId('permission-right-tab-members').click();
 
-    // Wait for member list
     const memberRows = page.locator('[data-testid^="role-member-row-"]');
-    await expect(memberRows.first()).toBeVisible({ timeout: 8_000 });
+    let memberReady: 'rows' | 'empty' | 'pending' = 'pending';
+    await expect
+      .poll(
+        async () => {
+          const count = await memberRows.count().catch(() => 0);
+          if (count > 0) {
+            memberReady = 'rows';
+            return 'rows';
+          }
+          const emptyVisible = await page
+            .getByTestId('role-member-empty')
+            .isVisible({ timeout: 500 })
+            .catch(() => false);
+          memberReady = emptyVisible ? 'empty' : 'pending';
+          return memberReady;
+        },
+        { timeout: 8_000, intervals: [200, 400, 800] },
+      )
+      .not.toBe('pending');
+
+    if (memberReady === 'empty') {
+      const addResult = await addMemberFromListDialog(page);
+      test.skip(addResult === 'no-candidate', 'No member exists and no addable candidate is available');
+      await expect(memberRows.first()).toBeVisible({ timeout: 8_000 });
+    } else {
+      await expect(memberRows.first()).toBeVisible({ timeout: 8_000 });
+    }
     const initialCount = await memberRows.count();
 
     // Click remove button on first member

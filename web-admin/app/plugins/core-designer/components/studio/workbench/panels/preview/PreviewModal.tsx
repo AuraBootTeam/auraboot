@@ -93,7 +93,9 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                 />
               </svg>
-              <h2 className="text-lg font-semibold text-gray-900">页面预览</h2>
+              <h2 className="text-lg font-semibold text-gray-900" data-testid="preview-modal">
+                页面预览
+              </h2>
             </div>
             {pageTitle && <span className="text-sm text-gray-500">· {pageTitle}</span>}
             {schema && (
@@ -182,10 +184,13 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-6 py-3">
-          <div className="text-sm text-gray-500">{elementCount} 个区块</div>
+          <div className="text-sm text-gray-500" data-testid="preview-block-count">
+            {elementCount} 个区块
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
+              data-testid="preview-close"
               className="rounded-lg px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-200"
             >
               关闭

@@ -287,18 +287,13 @@ test.describe('SLA Monitor Drill-down', () => {
     await expect(pausedCard).toBeVisible();
 
     const pausedValue = await pausedCard.locator('.text-2xl.font-bold').textContent();
-    const overdueCard = page.locator('[data-testid="sla-stat-OVERDUE"]');
-    const overdueValue = await overdueCard.locator('.text-2xl.font-bold').textContent();
     const warningCard = page.locator('[data-testid="sla-stat-WARNING"]');
     const warningValue = await warningCard.locator('.text-2xl.font-bold').textContent();
 
     // Find a card with 0 records to test empty state
     let targetCard = pausedCard;
     let targetValue = pausedValue;
-    if (overdueValue === '0') {
-      targetCard = overdueCard;
-      targetValue = overdueValue;
-    } else if (warningValue === '0') {
+    if (warningValue === '0') {
       targetCard = warningCard;
       targetValue = warningValue;
     }

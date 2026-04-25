@@ -35,6 +35,14 @@ function truncate(val: unknown, max = 60): string {
   return s.length > max ? s.slice(0, max) + '…' : s;
 }
 
+function resolveTableRows(contract: ResultContract): Array<Record<string, unknown>> {
+  if (Array.isArray(contract.table) && contract.table.length > 0) {
+    return contract.table;
+  }
+  const candidate = contract.data?.records ?? contract.data?.table;
+  return Array.isArray(candidate) ? (candidate as Array<Record<string, unknown>>) : [];
+}
+
 // ============================================================================
 // Variant renderers
 // ============================================================================
@@ -177,7 +185,7 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
       </div>
 
       {contract.renderHint === 'table' || contract.renderHint === 'chart_table'
-        ? <TableView rows={contract.table ?? []} />
+        ? <TableView rows={resolveTableRows(contract)} />
         : contract.renderHint === 'summary'
           ? <SummaryView contract={contract} />
           : contract.renderHint === 'card'

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-const schemaPath = resolve(__dirname, '../../../../plugins/schemas/dsl-schema.generated.json');
+const schemaPath = resolve(__dirname, '../../../../../plugins/schemas/dsl-schema.generated.json');
 
 describe('DSL Generated Schema', () => {
   const schema = JSON.parse(readFileSync(schemaPath, 'utf-8'));
@@ -75,13 +75,13 @@ describe('DSL Generated Schema', () => {
     expect(defs.DslSchema.required).toContain('kind');
   });
 
-  it('DslSchema should have version, id, title, layout, blocks as required', () => {
+  it('DslSchema should have version, id, title, layout, areas as required', () => {
     const required = defs.DslSchema.required;
     expect(required).toContain('version');
     expect(required).toContain('id');
     expect(required).toContain('title');
     expect(required).toContain('layout');
-    expect(required).toContain('blocks');
+    expect(required).toContain('areas');
   });
 
   // --- DslSchema.kind enum ---
@@ -91,12 +91,12 @@ describe('DSL Generated Schema', () => {
     expect(kindProp?.type).toBe('string');
     expect(kindProp?.enum).toEqual(
       expect.arrayContaining([
-        'page',
-        'list',
-        'form',
-        'detail',
-        'dashboard',
-        'page_layout',
+        'Page',
+        'List',
+        'Form',
+        'Detail',
+        'Dashboard',
+        'PageLayout',
       ]),
     );
   });

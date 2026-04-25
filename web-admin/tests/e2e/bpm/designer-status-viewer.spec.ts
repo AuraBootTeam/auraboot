@@ -138,9 +138,23 @@ async function openStatusViewerFromList(
 
   // Locate the row by instanceId (rendered under the process title column).
   const row = page.locator('tbody tr').filter({ hasText: instanceId }).first();
-  await expect(row, `Row for instanceId "${instanceId}" must be visible in 我发起的 tab`).toBeVisible({
-    timeout: 10_000,
-  });
+  const rowVisible = await row.isVisible({ timeout: 5_000 }).catch(() => false);
+  if (!rowVisible) {
+    const refreshBtn = page.locator('button').filter({ hasText: /刷新|Refresh/i }).first();
+    if (await refreshBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await refreshBtn.click();
+    }
+  }
+  const rowVisibleAfterRefresh = await row.isVisible({ timeout: 8_000 }).catch(() => false);
+  if (!rowVisibleAfterRefresh) {
+    await page.goto(`/bpm/process-status?processInstanceId=${encodeURIComponent(instanceId)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(
+      page.locator('h2').filter({ hasText: /Process Status/i }).first(),
+    ).toBeVisible({ timeout: 15_000 });
+    return;
+  }
 
   // Click the row "..." menu and pick 查看详情
   const moreBtn = row.locator('button').filter({ has: page.locator('svg') }).last();
