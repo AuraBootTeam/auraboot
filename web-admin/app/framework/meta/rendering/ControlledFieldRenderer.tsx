@@ -134,8 +134,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // GAP-258: UI output adapters for pickers whose native shape does not match
   // backend field types. Backend is the source of truth (dataType:string), so we
   // narrow array outputs at the edge.
-  // - cascadeselect: component emits string[] of all levels; backend wants the
-  //   most specific leaf as a single string. We forward the last non-empty value.
+  // - cascadeselect: component emits string[] of all levels; keep that full
+  //   path in UI state so subsequent levels stay enabled. FormPageContent
+  //   narrows the command payload to the deepest leaf for string fields.
   // - memberpicker (multiple): component emits string[]; backend rejects arrays
   //   for string fields, so we serialize as a JSON string ('["id1","id2"]').
   const isMemberPickerMultiple =
@@ -214,19 +215,6 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   const adaptedOnChange = useMemo(() => {
     if (componentLower === 'cascadeselect') {
       return (next: unknown) => {
-        if (Array.isArray(next)) {
-          // Find the last non-empty entry (= the deepest selected level).
-          let leaf: string | undefined;
-          for (let i = next.length - 1; i >= 0; i--) {
-            const candidate = next[i];
-            if (typeof candidate === 'string' && candidate !== '') {
-              leaf = candidate;
-              break;
-            }
-          }
-          onChange(leaf ?? '');
-          return;
-        }
         onChange(next);
       };
     }

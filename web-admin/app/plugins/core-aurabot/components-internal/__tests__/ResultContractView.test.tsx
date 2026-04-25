@@ -52,6 +52,23 @@ describe('ResultContractView', () => {
     expect(headers.map((h: HTMLElement) => h.textContent)).toEqual(['pid', 'name', 'total']);
   });
 
+  it('falls back to data.records when table rows are nested there', () => {
+    const c: ResultContract = {
+      ...baseContract,
+      renderHint: 'table',
+      data: {
+        records: [
+          { pid: '01REC1', name: 'Nested Acme', total: 100 },
+          { pid: '01REC2', name: 'Nested Globex', total: 250 },
+        ],
+      },
+    };
+    render(<ResultContractView contract={c} />);
+    expect(screen.getByTestId('rc-table')).toBeInTheDocument();
+    expect(screen.getByText('Nested Acme')).toBeInTheDocument();
+    expect(screen.getByText('Nested Globex')).toBeInTheDocument();
+  });
+
   it('renders summary when renderHint=summary', () => {
     const c: ResultContract = {
       ...baseContract,

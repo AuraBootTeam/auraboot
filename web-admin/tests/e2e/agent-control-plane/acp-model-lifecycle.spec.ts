@@ -31,6 +31,7 @@ import {
   executeCommandViaApi,
   findRowInPaginatedList,
 } from '../helpers/index';
+import { expectAcpUiPage, gotoAcpUiPage } from './route-helpers';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -91,13 +92,7 @@ const COMMANDS = {
 
 /** Navigate via sidebar menu using href-based anchor link approach. */
 async function navigateToAcpMenu(page: Page, href: string) {
-  await page.goto('/dashboards', { waitUntil: 'load' });
-  const menuLink = page.locator(`a[href="${href}"]`);
-  await menuLink.first().waitFor({ state: 'visible', timeout: 10_000 });
-  await menuLink.first().scrollIntoViewIfNeeded();
-  await menuLink.first().focus();
-  await page.keyboard.press('Enter');
-  await page.waitForURL((url) => url.pathname === href, { timeout: 10_000 });
+  await gotoAcpUiPage(page, href);
 }
 
 /** Fetch a single record by pid from a dynamic model list API. */
@@ -425,9 +420,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     page,
   }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-definition');
-    await expect(page).toHaveURL(/\/dynamic\/agent-definition/, {
-      timeout: 10_000,
-    });
+    await expectAcpUiPage(page, '/dynamic/agent-definition');
 
     // Wait for table to render with data
     await expect(
@@ -487,7 +480,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     page,
   }) => {
     await navigateToAcpMenu(page, '/dynamic/mission');
-    await expect(page).toHaveURL(/\/dynamic\/mission/, { timeout: 10_000 });
+    await expectAcpUiPage(page, '/dynamic/mission');
 
     await expect(
       page.locator('table tbody tr').first(),
@@ -578,7 +571,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     page,
   }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-task');
-    await expect(page).toHaveURL(/\/dynamic\/agent-task/, { timeout: 10_000 });
+    await expectAcpUiPage(page, '/dynamic/agent-task');
 
     await expect(
       page.locator('table tbody tr').first(),
@@ -719,7 +712,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     page,
   }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-run');
-    await expect(page).toHaveURL(/\/dynamic\/agent-run/, { timeout: 10_000 });
+    await expectAcpUiPage(page, '/dynamic/agent-run');
 
     // Run list should have at least one row from seed data
     await expect(
@@ -821,9 +814,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     page,
   }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-schedule');
-    await expect(page).toHaveURL(/\/dynamic\/agent-schedule/, {
-      timeout: 10_000,
-    });
+    await expectAcpUiPage(page, '/dynamic/agent-schedule');
 
     await expect(
       page.locator('table tbody tr').first(),
@@ -895,9 +886,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
 
     // Instead, verify the approval list page loads
     await navigateToAcpMenu(page, '/dynamic/agent-approval');
-    await expect(page).toHaveURL(/\/dynamic\/agent-approval/, {
-      timeout: 10_000,
-    });
+    await expectAcpUiPage(page, '/dynamic/agent-approval');
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('审批标题')).toBeVisible({
@@ -976,9 +965,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     page,
   }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-memory');
-    await expect(page).toHaveURL(/\/dynamic\/agent-memory/, {
-      timeout: 10_000,
-    });
+    await expectAcpUiPage(page, '/dynamic/agent-memory');
 
     await expect(
       page.locator('table tbody tr').first(),
@@ -1046,9 +1033,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
 
     // Navigate to observation page and verify data
     await navigateToAcpMenu(page, '/dynamic/agent-observation');
-    await expect(page).toHaveURL(/\/dynamic\/agent-observation/, {
-      timeout: 10_000,
-    });
+    await expectAcpUiPage(page, '/dynamic/agent-observation');
 
     await expect(
       page.locator('table tbody tr').first(),
@@ -1140,7 +1125,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     page,
   }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-tool');
-    await expect(page).toHaveURL(/\/dynamic\/agent-tool/, { timeout: 10_000 });
+    await expectAcpUiPage(page, '/dynamic/agent-tool');
 
     await expect(
       page.locator('table tbody tr').first(),
@@ -1227,9 +1212,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     page,
   }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-skill');
-    await expect(page).toHaveURL(/\/dynamic\/agent-skill/, {
-      timeout: 10_000,
-    });
+    await expectAcpUiPage(page, '/dynamic/agent-skill');
 
     // Skill list should have data from seeds
     const table = page

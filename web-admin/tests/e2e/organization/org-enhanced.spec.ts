@@ -406,31 +406,15 @@ test.describe('ORG-DEPT-CRUD: Department full lifecycle', () => {
     const actualDeptCode = String(createdDept.org_dept_code ?? deptCode);
     const actualDeptName = String(createdDept.org_dept_name ?? deptName);
 
-    const listResp = await page.request.get(`/api/dynamic/${DEPT_PAGE_KEY}/list?pageNum=1&pageSize=1`);
-    expect(listResp.ok()).toBe(true);
-    const listBody = await listResp.json().catch(() => ({}));
-    const total = Number(listBody?.data?.total ?? 1);
-    const lastPage = Math.max(1, Math.ceil(total / 20));
+    const listResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/list') && resp.status() === 200,
+      { timeout: 10000 },
+    ).catch(() => null);
+    await page.goto(`/dynamic/${DEPT_PAGE_KEY}?pageSize=200`, { waitUntil: 'domcontentloaded' });
+    await listResponsePromise;
 
-    await navigateToDynamicPage(page, DEPT_PAGE_KEY);
-    await page.goto(`/dynamic/${DEPT_PAGE_KEY}?pageNum=${lastPage}&pageSize=20`, {
-      waitUntil: 'domcontentloaded',
-    });
-
-    // After filter narrowed the dataset, use direct row lookup to avoid pagination drift.
-    const row = page.locator('tbody tr', { hasText: actualDeptCode }).first();
-    let rowCount = 0;
-    const hasRow = await expect
-      .poll(async () => {
-        rowCount = await page.locator('tbody tr', { hasText: actualDeptCode }).count();
-        return rowCount;
-      }, {
-        timeout: 10000,
-        intervals: [500, 1000, 1500],
-      })
-      .toBeGreaterThan(0)
-      .then(() => rowCount > 0)
-      .catch(() => false);
+    const row = await findRowInPaginatedList(page, actualDeptName, 15000);
+    const hasRow = await row.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (!hasRow) {
       throw new Error(String('Department row not visible in paginated list'))

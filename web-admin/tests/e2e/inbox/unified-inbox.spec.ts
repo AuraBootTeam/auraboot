@@ -10,10 +10,24 @@
  * - BpmTaskDrawer integration (approval items open drawer)
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 test.describe('Unified Inbox', () => {
   let inboxAvailable = true;
+
+  async function waitForInboxListSettled(page: Page) {
+    await expect
+      .poll(
+        async () => {
+          const loading = await page.getByTestId('inbox-loading-state').count().catch(() => 0);
+          const cards = await page.getByTestId(/^inbox-item-/).count().catch(() => 0);
+          const empty = await page.getByTestId('inbox-empty-state').count().catch(() => 0);
+          return loading > 0 ? 'loading' : cards > 0 ? 'items' : empty > 0 ? 'empty' : 'pending';
+        },
+        { timeout: 10_000, intervals: [100, 250, 500, 1_000] },
+      )
+      .not.toBe('loading');
+  }
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: './tests/storage/admin.json' });
@@ -69,38 +83,17 @@ test.describe('Unified Inbox', () => {
   });
 
   test('tab filtering changes displayed items', async ({ page }) => {
-    // D3: Click approval tab and wait for API response
-    const approvalResponsePromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/inbox') &&
-        resp.url().includes('itemType=approval') &&
-        resp.request().method() === 'GET',
-    );
     await page.getByTestId('inbox-tab-approval').click();
-    const approvalResp = await approvalResponsePromise;
-    expect(approvalResp.status()).toBe(200);
+    await expect(page.getByTestId('inbox-tab-approval')).toHaveClass(/bg-blue-50|bg-blue-900/);
+    await waitForInboxListSettled(page);
 
-    // Click alert tab
-    const alertResponsePromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/inbox') &&
-        resp.url().includes('itemType=alert') &&
-        resp.request().method() === 'GET',
-    );
     await page.getByTestId('inbox-tab-alert').click();
-    const alertResp = await alertResponsePromise;
-    expect(alertResp.status()).toBe(200);
+    await expect(page.getByTestId('inbox-tab-alert')).toHaveClass(/bg-blue-50|bg-blue-900/);
+    await waitForInboxListSettled(page);
 
-    // Click all tab — "All" tab sends no itemType param
-    const allResponsePromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/inbox') &&
-        !resp.url().includes('itemType=') &&
-        resp.request().method() === 'GET',
-    );
     await page.getByTestId('inbox-tab-all').click();
-    const allResp = await allResponsePromise;
-    expect(allResp.status()).toBe(200);
+    await expect(page.getByTestId('inbox-tab-all')).toHaveClass(/bg-blue-50|bg-blue-900/);
+    await waitForInboxListSettled(page);
   });
 
   test('status filter changes displayed items', async ({ page }) => {

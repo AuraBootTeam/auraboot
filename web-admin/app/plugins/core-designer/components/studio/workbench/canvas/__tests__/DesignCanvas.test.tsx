@@ -3,6 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { DesignerCanvas } from '~/plugins/core-designer/components/studio/workbench/canvas/DesignerCanvas';
 
+vi.mock(
+  '~/plugins/core-designer/components/studio/workbench/canvas/GridContainer',
+  () => ({
+    GridContainer: () => <div data-testid="grid-container" />,
+  }),
+);
+
 vi.mock('~/plugins/core-designer/components/studio/services/managers', () => ({
   eventDomainManager: {
     registerDomain: vi.fn(),
@@ -19,8 +26,8 @@ describe('DesignerCanvas (studio)', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders layout with title', () => {
-    const { getByText } = render(
+  it('renders the canvas shell and grid container', () => {
+    const { container, getByTestId } = render(
       <DesignerCanvas
         components={[]}
         selectedComponents={[]}
@@ -29,6 +36,7 @@ describe('DesignerCanvas (studio)', () => {
       />,
     );
 
-    expect(getByText('设计画布')).toBeInTheDocument();
+    expect(container.querySelector('[data-domain="canvas"]')).toBeInTheDocument();
+    expect(getByTestId('grid-container')).toBeInTheDocument();
   });
 });

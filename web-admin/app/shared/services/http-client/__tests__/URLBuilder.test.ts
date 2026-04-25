@@ -164,15 +164,15 @@ describe('buildRequest', () => {
     expect(init.body).toBe('{"name":"John","email":"john@test.com"}');
   });
 
-  it('should build DELETE request with body (not query params)', () => {
+  it('should build DELETE request with query params (not body)', () => {
     const options: FetchOptions = {
       method: 'delete',
       params: { reason: 'inactive' },
     };
     const { url, init } = buildRequest('/api/user/123', options, serverContext);
-    expect(url).not.toContain('?');
+    expect(url).toContain('?reason=inactive');
     expect(init.method).toBe('delete');
-    expect(init.body).toBe('{"reason":"inactive"}');
+    expect(init.body).toBeUndefined();
   });
 
   it('should replace path variables and use remaining as query/body', () => {

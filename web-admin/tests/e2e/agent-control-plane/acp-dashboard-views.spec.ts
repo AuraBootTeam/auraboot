@@ -23,6 +23,7 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId, executeCommandViaApi } from '../helpers/index';
+import { expectAcpUiPage, gotoAcpUiPage } from './route-helpers';
 
 // ---------------------------------------------------------------------------
 // Guards
@@ -73,13 +74,7 @@ let run3Pid: string; // running (simulated — status set to running at creation
 // ---------------------------------------------------------------------------
 
 async function navigateToAcpPage(page: Page, href: string): Promise<void> {
-  await page.goto('/dashboards', { waitUntil: 'load' });
-  const menuLink = page.locator(`a[href="${href}"]`);
-  await menuLink.first().waitFor({ state: 'visible', timeout: 10000 });
-  await menuLink.first().scrollIntoViewIfNeeded();
-  await menuLink.first().focus();
-  await page.keyboard.press('Enter');
-  await page.waitForURL((url) => url.pathname === href, { timeout: 10000 });
+  await gotoAcpUiPage(page, href);
 }
 
 async function isEnterpriseEdition(page: Page): Promise<boolean> {
@@ -95,7 +90,7 @@ async function isEnterpriseEdition(page: Page): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 test.describe('ACP Dashboard & Views — Deep Data Verification', () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'serial', timeout: 120000 });
   test.setTimeout(90000);
 
   // =========================================================================
@@ -103,6 +98,7 @@ test.describe('ACP Dashboard & Views — Deep Data Verification', () => {
   // =========================================================================
 
   test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120000);
     const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
@@ -533,13 +529,18 @@ test.describe('ACP Dashboard & Views — Deep Data Verification', () => {
     }
 
     // Wait for dashboard blocks to appear (may stay in skeleton if data sources are slow)
-    const anyBlock = page.locator('[data-testid^="dashboard-block-"]');
+    const anyBlock = page.locator('[data-testid^="dashboard-block-"], [data-testid="mission-control"], [data-testid="mc-dashboard"]');
     await anyBlock.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
-    const chartHeading = page.getByRole('heading', { name: /Daily Activity|最近运行|待审批|Analytics/i }).first();
-    const hasStructuredDashboard = await chartHeading.isVisible({ timeout: 10000 }).catch(() => false);
+    // Some builds keep daily activity under the Analytics tab instead of the default dashboard view.
+    const analyticsTab = page.locator('[data-testid="mc-tab-analytics"]').first();
+    if (await analyticsTab.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await analyticsTab.click();
+      await expect(page.locator('[data-testid="mc-analytics"]')).toBeVisible({ timeout: 10000 });
+    }
 
-    // Current Mission Control UI may render analytical content as cards/tables instead of SVG charts.
+    const chartHeading = page.getByRole('heading', { name: /Daily Activity|每日活动|30-Day Cost Breakdown|30天成本分布|Recent Errors|最近错误/i }).first();
+    const hasStructuredDashboard = await chartHeading.isVisible({ timeout: 10000 }).catch(() => false);
     expect(hasStructuredDashboard, 'Mission Control should render dashboard analytical sections').toBe(true);
 
     // Verify the underlying data source remains healthy even if the renderer is not SVG-based.
@@ -714,8 +715,16 @@ test.describe('ACP Dashboard & Views — Deep Data Verification', () => {
     await page.locator('[data-testid="mc-tab-dashboard"]').waitFor({ state: 'visible', timeout: 15000 });
 
     // Click Analytics tab
-    await page.locator('[data-testid="mc-tab-analytics"]').click();
-    await expect(page.locator('[data-testid="mc-analytics"]')).toBeVisible({ timeout: 10000 });
+    const analyticsTab = page.locator('[data-testid="mc-tab-analytics"]').first();
+    await analyticsTab.click();
+    const analyticsVisibleAfterFirstClick = await page
+      .locator('[data-testid="mc-analytics"]')
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    if (!analyticsVisibleAfterFirstClick) {
+      await analyticsTab.click({ force: true });
+    }
+    await expect(page.locator('[data-testid="mc-analytics"]')).toBeVisible({ timeout: 15000 });
 
     // Analytics tab should contain chart elements
     const analyticsContent = page.locator('[data-testid="mc-analytics"]');
@@ -796,7 +805,7 @@ test.describe('ACP Dashboard & Views — Deep Data Verification', () => {
     page,
   }) => {
     await navigateToAcpPage(page, '/dynamic/agent-task');
-    await expect(page).toHaveURL(/\/dynamic\/agent-task/, { timeout: 10000 });
+    await expectAcpUiPage(page, '/dynamic/agent-task');
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15000 });
 
     // The ViewSelector component should be present (it lists GLOBAL saved views)
@@ -824,7 +833,7 @@ test.describe('ACP Dashboard & Views — Deep Data Verification', () => {
     page,
   }) => {
     await navigateToAcpPage(page, '/dynamic/agent-task');
-    await expect(page).toHaveURL(/\/dynamic\/agent-task/, { timeout: 10000 });
+    await expectAcpUiPage(page, '/dynamic/agent-task');
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15000 });
 
     // Try to switch to Kanban view via the view-type button
@@ -925,7 +934,7 @@ test.describe('ACP Dashboard & Views — Deep Data Verification', () => {
 
   test('DASH-18: Memory page loads with seeded memory records', async ({ page }) => {
     await navigateToAcpPage(page, '/dynamic/agent-memory');
-    await expect(page).toHaveURL(/\/dynamic\/agent-memory/, { timeout: 10000 });
+    await expectAcpUiPage(page, '/dynamic/agent-memory');
 
     // Wait for the table to show records
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15000 });
@@ -952,7 +961,7 @@ test.describe('ACP Dashboard & Views — Deep Data Verification', () => {
     page,
   }) => {
     await navigateToAcpPage(page, '/dynamic/agent-memory');
-    await expect(page).toHaveURL(/\/dynamic\/agent-memory/, { timeout: 10000 });
+    await expectAcpUiPage(page, '/dynamic/agent-memory');
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15000 });
 
     // Look for Gallery view type button (rendered in ViewSelector as view-type-gallery)

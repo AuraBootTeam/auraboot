@@ -258,8 +258,9 @@ async function clickSidebarLeaf(
   page: Page,
   leafPattern: RegExp,
   pageTestId: string,
+  href?: string,
 ): Promise<void> {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'commit', timeout: 10000 });
   await page.waitForLoadState('domcontentloaded');
 
   const nav = page.locator('nav').first();
@@ -267,9 +268,11 @@ async function clickSidebarLeaf(
   await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
   await aiCenter.evaluate((el: HTMLElement) => el.click());
 
-  const leaf = nav.getByRole('link', { name: leafPattern });
+  const leaf = href
+    ? nav.locator(`a[href="${href}"]`).or(nav.getByRole('link', { name: leafPattern }))
+    : nav.getByRole('link', { name: leafPattern });
   await leaf.waitFor({ state: 'visible', timeout: 5_000 });
-  await leaf.evaluate((el: HTMLElement) => el.click());
+  await leaf.first().evaluate((el: HTMLElement) => el.click());
 
   await expect(page.locator(`[data-testid="${pageTestId}"]`)).toBeVisible({
     timeout: 10_000,
@@ -277,14 +280,15 @@ async function clickSidebarLeaf(
 }
 
 async function openMyProfile(page: Page) {
-  await clickSidebarLeaf(page, /我的画像|My Profile/, 'my-profile-page');
+  await clickSidebarLeaf(page, /我的画像|My Profile/, 'my-profile-page', '/aurabot/my-profile');
 }
 
 async function openAdmin(page: Page) {
   await clickSidebarLeaf(
     page,
-    /Soul Profiles \(管理\)|Soul Profiles \(Admin\)|Soul Profiles/,
+    /Soul Profiles(?:\s*\(?(?:管理|Admin)\)?)?/,
     'soul-profiles-admin-page',
+    '/aurabot/soul-profiles',
   );
 }
 
@@ -341,7 +345,9 @@ test.describe('Mission Control — User Soul Profile (PR-79)', () => {
       .locator('[data-testid="field-persona"] [data-testid="pin-btn"]')
       .click();
 
-    await expect(page.locator('[data-testid="toast"]')).toContainText(/固定|Pinned/);
+    await expect(page.locator('[role="alert"], [data-testid="toast"]').first()).toContainText(
+      /固定|Pinned/,
+    );
     expect(state.captured.pin).toHaveLength(1);
     expect(state.captured.pin[0]).toMatchObject({ field: 'persona' });
 
@@ -457,7 +463,20 @@ test.describe('Mission Control — User Soul Profile (PR-79)', () => {
     await interceptApi(page, state);
     await openMyProfile(page);
 
-    await page.locator('[data-testid="tab-history"]').click();
+    await expect
+      .poll(
+        async () => {
+          await page.locator('[data-testid="tab-history"]').click().catch(() => {});
+          const count = await page
+            .locator(
+              '[data-testid="history-loading"], [data-testid="history-list"], [data-testid="history-empty"]',
+            )
+            .count();
+          return count;
+        },
+        { timeout: 5000, intervals: [100, 250, 500, 1000] },
+      )
+      .toBe(1);
     await expect(page.locator('[data-testid="history-list"]')).toBeVisible();
 
     const superseded = page.locator('[data-testid="history-USP0000000000000000002"]');

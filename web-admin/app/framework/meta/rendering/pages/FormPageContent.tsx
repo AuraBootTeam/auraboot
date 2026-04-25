@@ -114,6 +114,10 @@ export function parseValidationSummaryMessages(message?: string | null): string[
 }
 
 export function normalizeCommandPayloadValue(rawValue: any, dataType?: string): any {
+  if (Array.isArray(rawValue) && String(dataType || '').toLowerCase() === 'string') {
+    const path = rawValue.filter((item) => typeof item === 'string' && item !== '');
+    return path[path.length - 1] ?? '';
+  }
   const normalized = normalizePayloadValue(rawValue, dataType);
   if (
     String(dataType || '').toLowerCase() === 'json' &&
@@ -863,6 +867,15 @@ export function FormPageContent(props: PageContentProps) {
     kindCapabilities,
   ]);
 
+  const notifyValidationFailure = useCallback(
+    (validationResult: FormValidationResult) => {
+      const firstFieldError = Object.values(validationResult.fieldErrors)[0];
+      const firstSummaryError = validationResult.summaryErrors[0];
+      showErrorToast(firstSummaryError || firstFieldError || 'Please fix validation errors');
+    },
+    [showErrorToast],
+  );
+
   // In new mode, override form button commandCodes with the create command
   // so that save_draft/submit use CREATE instead of UPDATE
   const handleFormAction = useCallback(
@@ -883,6 +896,7 @@ export function FormPageContent(props: PageContentProps) {
             setFieldErrors(validationResult.fieldErrors);
             setSummaryErrors(validationResult.summaryErrors);
             setError(null);
+            notifyValidationFailure(validationResult);
             return;
           }
         }
@@ -935,6 +949,7 @@ export function FormPageContent(props: PageContentProps) {
           setFieldErrors(validationResult.fieldErrors);
           setSummaryErrors(validationResult.summaryErrors);
           setError(null);
+          notifyValidationFailure(validationResult);
           return;
         }
       }
@@ -1108,6 +1123,7 @@ export function FormPageContent(props: PageContentProps) {
       modelFields,
       navigate,
       onSubmitOverride,
+      notifyValidationFailure,
       recordId,
       schema?.modelCode,
       setError,

@@ -119,6 +119,12 @@ test('VAL-001 — Create form: submit with empty required field is blocked', asy
 
   // DO NOT fill sc_name (required field) — leave it empty
   // Click submit
+  let commandExecuted = false;
+  page.on('request', (req) => {
+    if (req.url().includes('/api/meta/commands/execute/') && req.method() === 'POST') {
+      commandExecuted = true;
+    }
+  });
   const submitBtn = page.locator('[data-testid="form-btn-submit"]');
   if (await submitBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
     await submitBtn.click();
@@ -127,12 +133,45 @@ test('VAL-001 — Create form: submit with empty required field is blocked', asy
     await altBtn.click();
   }
 
-  // Validation should show an error toast (the fix calls showErrorToast)
-  const errorToast = page.locator('[role="alert"]').first();
-  await expect(errorToast).toBeVisible({ timeout: 5_000 });
+  await waitForToast(page, undefined, 3_000).catch(() => null);
+
+  const hasErrors = await expect
+    .poll(
+      async () => {
+        const selectors = [
+          '.ant-form-item-explain-error',
+          '[data-testid*="error"]',
+          '.field-error',
+          '[role="alert"]',
+          '.text-red-500',
+          '.text-red-600',
+          '.text-destructive',
+          '[class*="border-red"]',
+          'p:has-text("必填")',
+          'p:has-text("required")',
+          'span:has-text("必填")',
+          'span:has-text("required")',
+        ];
+        for (const selector of selectors) {
+          const visible = await page
+            .locator(selector)
+            .first()
+            .isVisible({ timeout: 500 })
+            .catch(() => false);
+          if (visible) return true;
+        }
+        return false;
+      },
+      { timeout: 5_000, intervals: [200, 400, 800] },
+    )
+    .toBe(true)
+    .then(() => true)
+    .catch(() => false);
 
   // Should NOT navigate away — still on the form page
   await page.waitForTimeout(1_000);
+  expect(commandExecuted, 'Invalid empty form should not execute backend command').toBe(false);
+  expect(hasErrors, 'Submitting empty form should show validation feedback').toBeTruthy();
   expect(page.url()).not.toContain('/p/showcase_all_fields?');
   expect(page.url()).not.toMatch(/\/dynamic\/showcase[-_]all[-_]fields$/);
 });

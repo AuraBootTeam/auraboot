@@ -177,7 +177,9 @@ export function SlaRecordListPanel({ statusFilter, onClose }: SlaRecordListPanel
             </thead>
             <tbody>
               {records.map((record) => {
-                const cfg = statusConfig[record.status] || statusConfig.RUNNING;
+                const normalizedStatus = String(record.status || '').toLowerCase();
+                const cfg =
+                  statusConfig[record.status] || statusConfig[normalizedStatus] || statusConfig.running;
                 const StatusIcon = cfg.icon;
                 return (
                   <tr

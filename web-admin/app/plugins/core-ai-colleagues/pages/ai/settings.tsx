@@ -5,7 +5,7 @@
  * Individual settings pages remain as-is; this hub provides navigation entry.
  */
 
-import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import {
   KeyIcon,
   ServerIcon,
@@ -62,8 +62,6 @@ const SETTINGS_ITEMS: SettingsItem[] = [
 ];
 
 export default function AISettingsPage() {
-  const navigate = useNavigate();
-
   return (
     <div className="p-6">
       <h1 className="mb-2 text-2xl font-semibold">AI Settings</h1>
@@ -72,18 +70,18 @@ export default function AISettingsPage() {
       </p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {SETTINGS_ITEMS.map(({ titleKey, descriptionKey, path, Icon }) => (
-          <button
+          <Link
             key={path}
-            type="button"
-            onClick={() => navigate(path)}
+            data-testid="ai-settings-card"
             className="cursor-pointer rounded-lg border border-gray-200 bg-white p-5 text-left transition-all duration-150 hover:border-blue-300 hover:shadow-md focus:ring-2 focus:ring-blue-400 focus:outline-none"
+            to={path}
           >
             <div className="mb-2 flex items-center gap-3">
               <Icon className="h-6 w-6 shrink-0 text-blue-500" />
               <h3 className="font-medium text-gray-800">{titleKey}</h3>
             </div>
             <p className="text-sm text-gray-500">{descriptionKey}</p>
-          </button>
+          </Link>
         ))}
       </div>
     </div>

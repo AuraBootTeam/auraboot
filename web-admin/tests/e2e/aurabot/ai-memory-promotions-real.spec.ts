@@ -222,8 +222,9 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     await navigateViaSidebar(page);
     await page.locator('[data-testid="tab-shadow"]').click();
     await waitShadowRow(page, seed.pid);
+    const row = page.locator(`[data-testid="shadow-${seed.pid}"]`);
 
-    await page.locator('[data-testid="provenance-link"]').click();
+    await row.locator('[data-testid="provenance-link"]').click();
 
     const modal = page.locator('[data-testid="provenance-modal"]');
     await expect(modal).toBeVisible({ timeout: 5_000 });

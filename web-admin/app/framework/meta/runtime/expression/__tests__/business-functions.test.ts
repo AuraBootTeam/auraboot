@@ -104,7 +104,7 @@ describe('Business Functions Library', () => {
     });
 
     it('UPPER/LOWER convert case', () => {
-      expect(fn.UPPER('hello')).toBe('hello');
+      expect(fn.UPPER('hello')).toBe('HELLO');
       expect(fn.LOWER('hello')).toBe('hello');
     });
 

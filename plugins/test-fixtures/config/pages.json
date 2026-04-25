@@ -1518,25 +1518,35 @@
     "layout": {
       "type": "stack"
     },
-    "blocks": [],
-    "extension": {
-      "columns": [
-        {
-          "field": "e2et_name"
-        },
-        {
-          "field": "e2et_status"
-        },
-        {
-          "field": "e2et_count"
-        },
-        {
-          "field": "e2et_due_date"
-        }
-      ],
-      "enableCreate": true,
-      "enableSearch": true
-    }
+    "blocks": [
+      {
+        "id": "block_record_toolbar",
+        "blockType": "toolbar",
+        "buttons": []
+      },
+      {
+        "id": "block_record_table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "e2et_name"
+          },
+          {
+            "field": "e2et_status"
+          },
+          {
+            "field": "e2et_count"
+          },
+          {
+            "field": "e2et_due_date"
+          }
+        ],
+        "searchFields": [
+          "e2et_name",
+          "e2et_status"
+        ]
+      }
+    ]
   },
   {
     "pageKey": "e2et_record_detail",
