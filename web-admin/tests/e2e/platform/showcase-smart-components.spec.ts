@@ -226,12 +226,15 @@ test.describe('Showcase Smart Components', () => {
     await openCreateForm(page);
 
     // 1. Name (required)
-    const nameInput = field(page, 'sc_name').locator('input').first();
+    const nameField = field(page, 'sc_name');
+    await nameField.scrollIntoViewIfNeeded();
+    const nameInput = nameField.locator('input').first();
     await nameInput.fill(RECORD_NAME_UI);
 
     // 2. Budget (MoneyInput)
-    const budgetInput = field(page, 'sc_budget').locator('input').first();
-    await budgetInput.scrollIntoViewIfNeeded();
+    const budgetField = field(page, 'sc_budget');
+    await budgetField.scrollIntoViewIfNeeded();
+    const budgetInput = budgetField.locator('input').first();
     if (await budgetInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await budgetInput.click();
       await budgetInput.press('Meta+A');
@@ -240,13 +243,16 @@ test.describe('Showcase Smart Components', () => {
     }
 
     // 3. TimePicker
-    const timeInput = field(page, 'sc_time_slot').locator('input[step]').first();
-    await timeInput.scrollIntoViewIfNeeded();
+    const timeField = field(page, 'sc_time_slot');
+    await timeField.scrollIntoViewIfNeeded();
+    const timeInput = timeField.locator('input[step]').first();
     if (await timeInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await timeInput.fill('14:30');
     }
 
     // 4. DateRange — use dedicated testids
+    const dateRangeField = field(page, 'sc_date_range');
+    await dateRangeField.scrollIntoViewIfNeeded();
     const startDate = page.locator('[data-testid="daterange-sc_date_range-start"]');
     const endDate = page.locator('[data-testid="daterange-sc_date_range-end"]');
     await startDate.scrollIntoViewIfNeeded();

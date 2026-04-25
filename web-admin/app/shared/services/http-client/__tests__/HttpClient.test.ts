@@ -131,16 +131,16 @@ describe('HttpClient integration', () => {
   });
 
   describe('del', () => {
-    it('should make DELETE request with body (not query params)', async () => {
+    it('should make DELETE request with query params (not body)', async () => {
       mockFetchSuccess();
 
       await del('/api/user/{userId}', { userId: 123, reason: 'inactive' });
 
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/user/123');
-      expect(url).not.toContain('reason=');
+      expect(url).toContain('reason=inactive');
       expect(init.method).toBe('delete');
-      expect(JSON.parse(init.body)).toEqual({ reason: 'inactive' });
+      expect(init.body).toBeUndefined();
     });
 
     it('should make DELETE request without body when no extra params', async () => {

@@ -196,9 +196,15 @@ test.describe('Formula Editor', () => {
     // Navigate to model field management
     await page.goto('/meta/models');
     await page.waitForLoadState('domcontentloaded');
+    await page.locator('main :text-is("加载中..."), main :text-is("Loading...")')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 15_000 })
+      .catch(() => {});
 
     // Verify model list loads
-    const modelTable = page.locator('table, [role="table"]').first();
+    const modelTable = page
+      .locator('table, [role="table"], [data-testid="dynamic-list"], [data-testid$="-table"]')
+      .first();
     const hasTable = await modelTable.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (!hasTable) {

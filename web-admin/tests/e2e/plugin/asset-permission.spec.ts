@@ -271,9 +271,15 @@ test.describe('Asset Permission Control', () => {
     // Navigate to model list page
     await page.goto(`/meta/models`);
     await page.waitForLoadState('domcontentloaded');
+    await page.locator('main :text-is("加载中..."), main :text-is("Loading...")')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 15_000 })
+      .catch(() => {});
 
     // Check if action buttons are visible (based on permissions)
-    const createButton = page.locator('button:has-text("新建"), button:has-text("Create")').first();
+    const createButton = page
+      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create"), button:has-text("create")')
+      .first();
     const hasCreateBtn = await createButton.isVisible({ timeout: 3000 }).catch(() => false);
 
     // The presence of create button indicates user has create permission

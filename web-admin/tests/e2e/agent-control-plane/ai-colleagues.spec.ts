@@ -36,15 +36,15 @@ test.describe('AI Colleagues & Settings', () => {
     );
 
     // Page title
-    await expect(page.locator('h1')).toContainText('AI Colleagues');
+    await expect(page.locator('h1')).toContainText(/AI Colleagues|AI 同事/);
 
     // Subtitle
-    await expect(page.getByText('Manage your AI team members')).toBeVisible();
+    await expect(page.getByText(/Manage your AI team members|管理您?的 AI 团队成员/)).toBeVisible();
 
     // Create button with correct data-testid and text
     const createBtn = page.locator('[data-testid="create-agent-btn"]');
     await expect(createBtn).toBeVisible();
-    await expect(createBtn).toContainText('Create AI Colleague');
+    await expect(createBtn).toContainText(/Create AI Colleague|创建 AI 同事/);
 
     // At least one card visible (AuraBot should always exist)
     const allCards = page.locator('[data-testid="aurabot-card"], [data-testid^="agent-card-"]');
@@ -73,15 +73,15 @@ test.describe('AI Colleagues & Settings', () => {
     await expect(firstCard).toHaveAttribute('data-testid', 'aurabot-card');
 
     // Official badge
-    await expect(aurabotCard.getByText('Official')).toBeVisible();
+    await expect(aurabotCard.getByText(/Official|官方/)).toBeVisible();
 
     // Full Power badge
-    await expect(aurabotCard.getByText('Full Power')).toBeVisible();
+    await expect(aurabotCard.getByText(/Full Power|满血|全权限/)).toBeVisible();
 
     // Chat button with correct data-testid
     const chatBtn = aurabotCard.locator('[data-testid="aurabot-chat-btn"]');
     await expect(chatBtn).toBeVisible();
-    await expect(chatBtn).toContainText('Chat');
+    await expect(chatBtn).toContainText(/Chat|对话/);
 
     // No edit button on AuraBot (AuraBot uses special card without edit)
     const editBtn = page.locator('[data-testid="agent-edit-aurabot"]');
@@ -141,16 +141,16 @@ test.describe('AI Colleagues & Settings', () => {
     // Edit button present (data-testid="agent-edit-{code}")
     const editBtn = firstAgentCard.locator('[data-testid^="agent-edit-"]');
     await expect(editBtn).toBeVisible();
-    await expect(editBtn).toContainText('Edit');
+    await expect(editBtn).toContainText(/Edit|编辑/);
 
     // Chat button present (data-testid="agent-chat-{code}")
     const chatBtn = firstAgentCard.locator('[data-testid^="agent-chat-"]');
     await expect(chatBtn).toBeVisible();
-    await expect(chatBtn).toContainText('Chat');
+    await expect(chatBtn).toContainText(/Chat|对话/);
 
     // Status badge present (text like "active", "disabled", "draft")
     const statusBadge = firstAgentCard.locator('span.inline-flex').filter({
-      hasText: /active|disabled|draft/i,
+      hasText: /active|disabled|draft|活跃|禁用|草稿/i,
     });
     await expect(statusBadge.first()).toBeVisible();
 
@@ -297,8 +297,7 @@ test.describe('AI Colleagues & Settings', () => {
   test('settings card count is exactly 6 and each has an icon', async ({ page }) => {
     await page.goto('/ai/settings', { waitUntil: 'domcontentloaded' });
 
-    // All settings items are rendered as buttons
-    const cards = page.locator('.grid button[type="button"]');
+    const cards = page.getByTestId('ai-settings-card');
     await expect(cards.first()).toBeVisible({ timeout: 5_000 });
     const count = await cards.count();
     expect(count).toBe(6);
@@ -314,11 +313,11 @@ test.describe('AI Colleagues & Settings', () => {
     await page.goto('/ai/settings', { waitUntil: 'domcontentloaded' });
 
     // Wait for all 6 cards to be visible (ensures React hydration complete)
-    const cards = page.locator('.grid button[type="button"]');
+    const cards = page.locator('.grid a[href]');
     await expect(cards.nth(5)).toBeVisible({ timeout: 8_000 });
 
     // Verify LLM Providers card navigates correctly
-    const llmCard = page.locator('button[type="button"]').filter({ hasText: 'LLM Providers' });
+    const llmCard = page.locator('a[href="/aurabot/providers"]').filter({ hasText: 'LLM Providers' });
     await expect(llmCard).toBeVisible();
 
     // Wait for load state before clicking to ensure React handlers are attached

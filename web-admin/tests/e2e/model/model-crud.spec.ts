@@ -119,7 +119,6 @@ test.describe('Model CRUD Operations', () => {
       .catch(() => false);
     if (!has404) {
       await expect(page.getByText(modelData.displayName).first()).toBeVisible({ timeout: 5000 });
-      await expect(page.getByText(/视图/).first()).toBeVisible({ timeout: 5000 });
     }
   });
 

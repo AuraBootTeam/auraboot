@@ -76,13 +76,16 @@ test.describe('System Fields Visible (GAP-126)', () => {
     await expect(panelHeader).toBeVisible({ timeout: 5000 });
 
     // Check "System Fields" section divider is visible
-    await expect(page.locator('.fixed >> text=System Fields')).toBeVisible({ timeout: 3000 });
+    const panel = page.getByTestId('column-settings-panel');
+    await expect(panel.getByText(/System Fields|SYSTEM FIELDS|系统字段/i)).toBeVisible({
+      timeout: 3000,
+    });
 
     // Check system field labels exist in the panel
-    await expect(page.locator('.fixed >> text=Created At')).toBeVisible({ timeout: 3000 });
-    await expect(page.locator('.fixed >> text=Updated At')).toBeVisible();
-    await expect(page.locator('.fixed >> text=Created By')).toBeVisible();
-    await expect(page.locator('.fixed >> text=Updated By')).toBeVisible();
+    await expect(panel.getByText(/Created At|创建时间/i)).toBeVisible({ timeout: 3000 });
+    await expect(panel.getByText(/Updated At|更新时间/i)).toBeVisible();
+    await expect(panel.getByText(/Created By|创建人/i)).toBeVisible();
+    await expect(panel.getByText(/Updated By|修改人|更新人/i)).toBeVisible();
   });
 
   test('SF-002: system fields are hidden by default', async ({ page }) => {
@@ -95,7 +98,10 @@ test.describe('System Fields Visible (GAP-126)', () => {
 
     // System fields should be unchecked (line-through class on label)
     // The "Created At" label should have line-through styling (indicating hidden)
-    const createdAtLabel = page.locator('.fixed span:text("Created At")').first();
+    const createdAtLabel = page
+      .getByTestId('column-settings-panel')
+      .locator('span', { hasText: /Created At|创建时间/i })
+      .first();
     await expect(createdAtLabel).toBeVisible();
     // line-through class indicates unchecked
     await expect(createdAtLabel).toHaveClass(/line-through/);

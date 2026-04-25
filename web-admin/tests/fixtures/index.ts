@@ -44,17 +44,15 @@ export const test = base.extend<CustomFixtures>({
   },
 
   /**
-   * Cap navigation-related waits (including `waitForLoadState('networkidle')`)
-   * at 3 seconds. The admin app keeps a long-lived SSE connection
-   * (`/api/notifications/stream`) open for the entire session, so
-   * Chromium never reports the network as idle. Specs that call
-   * `waitForLoadState('networkidle').catch(() => {})` rely on the wait
-   * failing quickly so the catch handler can resume the test; the
-   * default 15 s navigation timeout otherwise burns the whole per-test
-   * budget before the real assertions run.
+   * Keep navigation timeout aligned with Playwright config.
+   *
+   * A previous 3s override made `page.goto()` fail across large parts of the
+   * suite under normal local load. Specs that intentionally probe
+   * `waitForLoadState('networkidle')` should set an explicit per-call timeout
+   * instead of globally shrinking all navigation waits.
    */
   page: async ({ page }, use) => {
-    page.setDefaultNavigationTimeout(3000);
+    page.setDefaultNavigationTimeout(15000);
     await use(page);
   },
 });

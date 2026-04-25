@@ -33,6 +33,7 @@ async function createTestPage(
   const pageKey = `e2e_tmpl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
   const resp = await page.request.post('/api/pages', {
+    timeout: 15_000,
     data: {
       name,
       pageKey,
@@ -115,8 +116,8 @@ test.describe('Page Templates', () => {
     // Navigate directly to page designer (platform tool — page.goto() allowed)
     await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
 
-    // Wait for the designer canvas to mount
-    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
+    // List pages render through ListConfigPanel rather than the block canvas.
+    await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 15000 });
 
     // The "Template" toolbar button should be visible because pageMeta is loaded
     const templateBtn = page.getByTestId('toolbar-save-as-template');
@@ -131,7 +132,7 @@ test.describe('Page Templates', () => {
     const nameInput = page.getByTestId('template-name-input');
     await expect(nameInput).toBeVisible();
     const prefilled = await nameInput.inputValue();
-    expect(prefilled).toContain('Template');
+    expect(prefilled).toMatch(/Template|模板/);
     // The current page name should appear in the prefilled value
     expect(prefilled.toLowerCase()).toContain(pageName.toLowerCase().slice(0, 8));
 
@@ -392,7 +393,7 @@ test.describe('Page Templates', () => {
   // -------------------------------------------------------------------------
   test('T6 — save-as-template dialog disables save when name is empty', async ({ page }) => {
     await page.goto(`/page-designer/${pagePid}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 15000 });
 
     const templateBtn = page.getByTestId('toolbar-save-as-template');
     await expect(templateBtn).toBeVisible({ timeout: 10000 });
@@ -413,7 +414,7 @@ test.describe('Page Templates', () => {
     await expect(saveBtn).toBeEnabled();
 
     // Cancel without saving — click Cancel button scoped to the dialog
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await dialog.getByRole('button', { name: /Cancel|取消/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
   });
 });
