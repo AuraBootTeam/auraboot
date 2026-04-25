@@ -15,21 +15,44 @@ export COMPOSE_PROJECT_NAME=auraboot-ga-e2e
 # Guard: gradle-wrapper.jar is in .gitignore, so a fresh worktree will be
 # missing it and the backend Dockerfile build will fail with
 # "ClassNotFoundException: org.gradle.wrapper.GradleWrapperMain".
-# If it's missing, try to source it from the closest sibling worktree.
+#
+# This script CAN auto-copy the jar from a sibling worktree, but only
+# when the operator opts in via AURABOOT_AUTO_COPY_WRAPPER=1. Silent
+# auto-copy is rejected because:
+#   - It can pull a wrong-version jar from an unrelated branch and the
+#     resulting build failure is one indirection further from the cause.
+#   - It blurs the "禁止自愈" red line in AGENTS.md; even tooling-side
+#     auto-recovery should be visible to the operator.
+# Without the env var the script fails loud with the source candidates
+# it considered, and the operator decides whether to copy or
+# regenerate via `gradle wrapper`.
 WRAPPER_JAR="platform/gradle/wrapper/gradle-wrapper.jar"
 if [ ! -f "$WRAPPER_JAR" ]; then
-  echo "[ga-e2e] $WRAPPER_JAR missing — locating sibling copy..." >&2
-  for candidate in \
-    "../../platform/gradle/wrapper/gradle-wrapper.jar" \
-    "$HOME/work/auraboot/auraboot/platform/gradle/wrapper/gradle-wrapper.jar"; do
-    if [ -f "$candidate" ]; then
-      cp "$candidate" "$WRAPPER_JAR"
-      echo "[ga-e2e] copied wrapper jar from $candidate" >&2
-      break
-    fi
+  candidates=(
+    "../../platform/gradle/wrapper/gradle-wrapper.jar"
+    "$HOME/work/auraboot/auraboot/platform/gradle/wrapper/gradle-wrapper.jar"
+  )
+  found=""
+  for c in "${candidates[@]}"; do
+    [ -f "$c" ] && { found="$c"; break; }
   done
-  if [ ! -f "$WRAPPER_JAR" ]; then
-    echo "[ga-e2e] cannot locate gradle-wrapper.jar — install gradle and run \`gradle wrapper\` in platform/" >&2
+
+  if [ "${AURABOOT_AUTO_COPY_WRAPPER:-0}" = "1" ] && [ -n "$found" ]; then
+    src_sha=$(shasum -a 256 "$found" | awk '{print $1}')
+    cp "$found" "$WRAPPER_JAR"
+    echo "[ga-e2e] copied wrapper jar from $found (sha256=$src_sha)" >&2
+  else
+    echo "[ga-e2e] $WRAPPER_JAR missing." >&2
+    if [ -n "$found" ]; then
+      src_sha=$(shasum -a 256 "$found" | awk '{print $1}')
+      echo "[ga-e2e] candidate found at: $found (sha256=$src_sha)" >&2
+      echo "[ga-e2e] re-run with AURABOOT_AUTO_COPY_WRAPPER=1 to copy it," >&2
+      echo "[ga-e2e] or run \`(cd platform && gradle wrapper)\` to regenerate." >&2
+    else
+      echo "[ga-e2e] no sibling candidate located. Install gradle and run" >&2
+      echo "[ga-e2e]   (cd platform && gradle wrapper --gradle-version <ver>)" >&2
+      echo "[ga-e2e] using the version pinned in platform/gradle/wrapper/gradle-wrapper.properties." >&2
+    fi
     exit 1
   fi
 fi
