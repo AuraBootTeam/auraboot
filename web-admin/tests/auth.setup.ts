@@ -6,6 +6,14 @@
  * `npx playwright test` commands share the same config.
  *
  * @since 8.0.0
+ *
+ * BACKLOG-AUTH-001 (closed WONT_DO 2026-04-25):
+ *   Do NOT add a 401 self-heal that resets the admin password via SQL.
+ *   The "禁止自愈" red line in AGENTS.md applies even to test infrastructure;
+ *   masking environment drift with implicit recovery breaks the contract
+ *   that `oss-reset-and-init.sh` is the single source of truth for env state.
+ *   When auth.setup hits 401 it MUST fail fast with a clear message that
+ *   the operator should run reset-and-init.sh, not silently retry.
  */
 
 import { test as setup, expect } from '@playwright/test';
