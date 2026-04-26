@@ -217,11 +217,11 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     await page.getByTestId('model-type-physical').click();
 
     // 3. Fill form.
-    const codeInput = page.locator('input[placeholder*="user_order"]');
+    const codeInput = page.getByTestId('model-code-input');
     await expect(codeInput).toBeVisible({ timeout: 5_000 });
     await codeInput.click();
     await codeInput.fill(code);
-    await page.locator('input[placeholder*="用户订单"]').fill(displayName);
+    await page.getByTestId('model-display-name-input').fill(displayName);
 
     // 4. Submit.
     const createResp = page.waitForResponse(
@@ -231,7 +231,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
         r.status() < 500,
       { timeout: 10_000 },
     );
-    await page.locator('button:has-text("创建")').first().click();
+    await page.getByTestId('model-create-submit').click();
     const resp = await createResp;
     expect(resp.ok()).toBe(true);
 
@@ -451,7 +451,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     await expect(row).toBeVisible({ timeout: 5_000 });
 
     // Click 查看 inside the row.
-    await row.locator('button:has-text("查看")').click();
+    await row.getByTestId('row-action-view').click();
     await expect(page).toHaveURL(new RegExp(`/meta/models/${p.data!.pid}`), { timeout: 5_000 });
 
     // Physical → no virtual-model-strip.
@@ -481,7 +481,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
 
     const row = modelListRow(page, code);
     await expect(row).toBeVisible({ timeout: 5_000 });
-    await row.locator('button:has-text("编辑")').click();
+    await row.getByTestId('row-action-edit').click();
 
     await expect(page).toHaveURL(new RegExp(`/meta/models/${created.data!.pid}/edit`), {
       timeout: 5_000,
@@ -489,14 +489,14 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
 
     // Change displayName → save.
     const newName = `A6 Renamed ${code}`;
-    const nameInput = page.locator('input[placeholder*="用户订单"]');
+    const nameInput = page.getByTestId('model-display-name-input');
     await expect(nameInput).toBeVisible({ timeout: 5_000 });
     await nameInput.fill(newName);
     await expect(nameInput).toHaveValue(newName, { timeout: 5_000 });
     await nameInput.blur();
 
     // The 保存 button stays disabled until React's hasChanges effect ticks.
-    const saveBtn = page.locator('button[type="submit"]:has-text("保存")');
+    const saveBtn = page.getByTestId('form-save-submit');
     await expect(saveBtn).toBeEnabled({ timeout: 8_000 });
 
     const saveResp = page.waitForResponse(
@@ -540,7 +540,7 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
 
     const row = modelListRow(page, code);
     await expect(row).toBeVisible({ timeout: 5_000 });
-    await row.locator('button:has-text("删除")').click();
+    await row.getByTestId('row-action-delete').click();
 
     // Confirm dialog appears — click OK.
     const dialog = page.getByTestId('confirm-dialog');
