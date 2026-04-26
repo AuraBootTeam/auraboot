@@ -1,0 +1,40 @@
+[
+  {
+    "code": "sc:create_monthly_metric",
+    "displayName:zh-CN": "新建月度指标",
+    "displayName:en": "Create Monthly Metric",
+    "type": "create",
+    "modelCode": "sc_monthly_metric",
+    "inputFields": [
+      "sc_showcase_pid",
+      "sc_month",
+      "sc_revenue",
+      "sc_cost",
+      "sc_units",
+      "sc_metric_remark"
+    ],
+    "validation": {
+      "rules": [
+        {
+          "type": "unique_composite",
+          "fields": ["sc_showcase_pid", "sc_month"],
+          "message:zh-CN": "同一展示记录的同一个月份只能录入一次",
+          "message:en": "Each showcase record may have only one entry per month"
+        }
+      ]
+    },
+    "permissions": ["sc.showcase.manage"],
+    "agent_hint": "Insert a monthly metric row (revenue/cost/units) for a showcase record. month is 1-12.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "sc:delete_monthly_metric",
+    "displayName:zh-CN": "删除月度指标",
+    "displayName:en": "Delete Monthly Metric",
+    "type": "delete",
+    "modelCode": "sc_monthly_metric",
+    "permissions": ["sc.showcase.manage"],
+    "agent_hint": "Delete a monthly metric row by recordId.",
+    "cmd_risk_level": "L2"
+  }
+]

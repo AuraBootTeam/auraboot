@@ -1,0 +1,54 @@
+[
+  {
+    "code": "sc_showcase_pid",
+    "displayName:zh-CN": "关联展示记录",
+    "displayName:en": "Showcase Record",
+    "description": "Foreign key back to the parent showcase_all_fields record (pid). Drives MonthlyGrid parent/child join.",
+    "dataType": "reference",
+    "constraints": { "required": true, "maxLength": 64 },
+    "feature": { "searchable": true, "sortable": true },
+    "extension": { "referenceModel": "showcase_all_fields", "referenceField": "pid" }
+  },
+  {
+    "code": "sc_month",
+    "displayName:zh-CN": "月份",
+    "displayName:en": "Month",
+    "description": "Calendar month 1-12 used by MonthlyGridConfig.monthField pivot.",
+    "dataType": "integer",
+    "constraints": { "required": true, "min": 1, "max": 12 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "sc_revenue",
+    "displayName:zh-CN": "收入",
+    "displayName:en": "Revenue",
+    "dataType": "decimal",
+    "constraints": { "min": 0 },
+    "extension": { "precision": 14, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "sc_cost",
+    "displayName:zh-CN": "成本",
+    "displayName:en": "Cost",
+    "dataType": "decimal",
+    "constraints": { "min": 0 },
+    "extension": { "precision": 14, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "sc_units",
+    "displayName:zh-CN": "数量",
+    "displayName:en": "Units",
+    "dataType": "integer",
+    "constraints": { "min": 0, "max": 999999 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "sc_metric_remark",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Remark",
+    "dataType": "text",
+    "feature": { "searchable": true }
+  }
+]
