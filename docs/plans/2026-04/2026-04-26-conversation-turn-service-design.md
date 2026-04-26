@@ -899,7 +899,12 @@ public interface Persistence {
 
 ---
 
-## 8. 决策点清单（owner 评审时拍板，v3 增至 13 项）
+## 8. 决策点清单（owner 已拍板 9 项 + 4 项偏好默认，2026-04-26）
+
+> **owner 决策落定**：全部 9 项必决 + 4 项偏好已按设计稿推荐拍板。详见 §13 决策记录。
+> 元决策：Phase A 启动时机选 **B（等 Phase 3 收口再开）**，预计 2-4 周后启动。
+
+
 
 | # | 决策 | 选项 | 我的倾向 |
 |---|------|------|---------|
@@ -1010,6 +1015,39 @@ public interface Persistence {
 | 6 | 启动 Phase A.1（ConversationTurnService 接口 + DTO 新增） | 实施期 |
 
 ---
+
+## 13. 决策记录（owner 2026-04-26 拍板）
+
+| Q | 决策 | 选项 | 关键后续动作 |
+|---|------|------|------|
+| Q1 | refactor 还是 patch | **refactor** | GAP-270 拆为 GAP-275（Phase A）/ GAP-276（Phase B）+ 新增 GAP-274（Phase B+ 群聊 adapter）|
+| Q2 | Phase A 是否作为 Phase 3 前置 | **是**（但元决策选 B 实际等 Phase 3 收口）| 与 Phase 3 owner 协调 Phase A 启动 |
+| Q3 | 命名 | 保持 **`ConversationTurnService`** | 接口签名定稿在 §3.4/§3.8.1 |
+| Q4 | 单 orchestrator 模式 | **runTurn 单段**（已写入设计）| — |
+| Q5 | `endTurn(Interrupted)` partialResponse 持久化 | **持久化 + `card_payload.partial=true`** | Phase B B.3 |
+| Q6 | `endTurn(Failed)` 是否写消息 | **完全不写**（错误走 audit + trace） | Phase B B.4 |
+| Q7 | mobile BFF 是否在 A.2 范围 | **否**（已 unblock 2026-04-26 grep 调研）| A.2 仅改 web-admin 3 处 + AuraBotController.POST /chat/stream |
+| Q8 | outbound sender_type 选项 | **A. 统一 `agent` + agentId** | Q11 必须配套 + 历史 system 行 backfill SQL（详见 §3.6） |
+| Q9 | feature flag 是否引入 | **否**（dev 阶段直切，per `feedback_dev_stage_breaking_ok`） | B.7 直接切 PRODUCTION profile，不带 flag |
+| Q10 | `ab_agent_channel_session` 主表来源 | **X. 补 CREATE TABLE + ChannelSessionResolver SPI** | Sub-design 见 `enterprise/docs/agent/contracts/channel-session.md`（v1 待落） |
+| Q11 | AuraBot 默认 agentId 来源 | **Q. per-tenant bootstrap seed + AuraBotAgentResolver SPI** | Sub-design 见 `enterprise/docs/agent/contracts/aurabot-agent-resolver.md`（v1 待落） |
+| Q12 | Phase A 0 行为变更范围 | **N. observeOnly**（trace + metrics 保留）| A.6 注入 `TurnSideEffects.observeOnly(realMetrics)` |
+| Q13 | 群聊 + WebSocket 路径分期 | **α. Phase B+ 单独 group-chat-adapter sub-design** | 占位 GAP-274；Phase B+ 启动需另起 sub-design 文档 |
+
+### 元决策：启动时机
+
+按 §7 元决策评估，选 **B：等 Phase 3 收口再开 Phase A**。
+
+| 即时可做 | 不影响 Phase 3 |
+|---------|---------------|
+| Q10 sub-design（channel-session schema + ChannelSessionResolver SPI） | ✅ |
+| Q11 sub-design（AuraBotAgentResolver SPI + bootstrap seed 步骤） | ✅ |
+| Backlog 拆 GAP-275/276/274 | ✅ |
+| 与 Phase 3 owner 协商 Phase A 启动节奏 | ✅ |
+
+| 等 Phase 3 收口后 |
+|------------------|
+| Phase A.1-A.7 实施（worktree `feat/conversation-turn-service-phase-a` 已就位）|
 
 ## CHANGELOG
 
