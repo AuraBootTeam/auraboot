@@ -51,6 +51,7 @@ export function initBlockRegistry(): void {
       return { default: mod[exportName] };
     });
 
+  // Data / list blocks
   BlockRegistry.register('table', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/TableBlockRenderer'), 'TableBlockRenderer'),
     normalizeData: normalizeTableData,
@@ -61,8 +62,24 @@ export function initBlockRegistry(): void {
   BlockRegistry.register('toolbar', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/ToolbarBlockRenderer'), 'ToolbarBlockRenderer'),
   });
+
+  // Form blocks
+  BlockRegistry.register('form', {
+    component: lazy(() => import('~/framework/meta/rendering/blocks/FormBlockRenderer'), 'FormBlockRenderer'),
+  });
   BlockRegistry.register('form-section', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/FormSectionBlockRenderer'), 'FormSectionBlockRenderer'),
+  });
+  BlockRegistry.register('form-buttons', {
+    component: lazy(() => import('~/framework/meta/rendering/blocks/FormButtonsBlockRenderer'), 'FormButtonsBlockRenderer'),
+  });
+  BlockRegistry.register('form-wizard', {
+    component: lazy(() => import('~/framework/meta/rendering/blocks/FormWizardBlockRenderer'), 'FormWizardBlockRenderer'),
+  });
+
+  // Detail / display blocks
+  BlockRegistry.register('description', {
+    component: lazy(() => import('~/framework/meta/rendering/blocks/DescriptionBlockRenderer'), 'DescriptionBlockRenderer'),
   });
   BlockRegistry.register('chart', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/ChartBlockRenderer'), 'ChartBlockRenderer'),
