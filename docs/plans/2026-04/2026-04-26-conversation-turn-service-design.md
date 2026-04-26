@@ -909,7 +909,7 @@ public interface Persistence {
 | Q4 | runTurn 单 orchestrator vs begin/execute/end 三段（v2 已采纳 reviewer P1.5 建议）| runTurn 单段 / 三段 / 折中 | **runTurn 单段**（已写入 §3.4） |
 | Q5 | `endTurn(Interrupted)` 的 partialResponse 是否持久化？ | 持久化 / 不持久化 / metadata 标记 | **持久化 + `card_payload.partial=true` 标记** |
 | Q6 | `endTurn(Failed)` 是否完全不写 ab_im_message？ | 完全不写 / 写 agent + content=error | **完全不写**（错误走 audit + trace） |
-| Q7 | 移动端 BFF 是否在 A.2 范围内？ | 是 / 否 / 先调研 | **必须先 grep 调研**，A.2 前给出结论 |
+| Q7 | ~~移动端 BFF 是否在 A.2 范围内？~~ **[已 resolve 2026-04-26]** | 否 | OSS workspace 无独立 mobile BFF；A.2 仅改 web-admin 3 处 chatStream 消费者 + AuraBotController.POST /chat/stream（详见 §11.5）|
 | **Q8** | **outbound sender_type 统一选项**（v2 新增 P2.6）| A=`agent`+agentId / B=保留`system` / C=新增`aurabot` | **A**（与群聊一致 + 历史 backfill）|
 | **Q9** | **feature flag 是否保留**（v2 新增） | 保留（B.0 延迟）/ dev stage 直切（不要 flag）| **直切**（per `feedback_dev_stage_breaking_ok`，避免与 B.0 互斥）|
 | **Q10** | **`ab_agent_channel_session` 主表来源**（v2 新增 P2.8）| X=Phase A 前补 CREATE / Y=合并到 _state 表 / Z=接受 channelSessionId=null 降级 | **X**（保 PER_SESSION 完整语义）|
@@ -963,7 +963,11 @@ public interface Persistence {
 2. **若 Q1=refactor**：Phase A 拆 7 步 + Phase B 拆 9 步 + Phase C 拆 4 步的范围都被认可
 3. **§5 风险表 11 项缓解措施 owner 都接受**（特别是 v2 新增的 4 项：B.0 第三方影响 / 双写 race / Persistence.NOOP / channelSessionId）
 4. **§9 资产对接锚点与 owner 对 ACP canonical 体系的理解一致**
-5. **若 Q7 调研显示 mobile BFF 绕过 AuraBotController**：补一份 mobile-bff 子设计后再开干
+5. ~~**若 Q7 调研显示 mobile BFF 绕过 AuraBotController**~~ **[v3.2 已 unblock 2026-04-26]** Q7 调研完成（grep 全 OSS workspace）：
+   - 没有独立 mobile BFF；web-admin 的 BFF (`app/server/utils/config.ts:179`) 仅做 SSE 透传白名单，不实现 chat 业务
+   - `chatStream` 消费者全 OSS 内仅 3 处：`AuraBotProvider.tsx:653` / `AiPageGenerateDialog.tsx:51` / `AiPagePanel.tsx:169`
+   - iOS/Android native repos 不在当前 workspace（AGENTS.md 提到但物理位置在外），**out of scope for OSS Phase A**
+   - **A.2 范围确认**：仅改 `AuraBotController.POST /chat/stream` + 上述 3 处 web-admin chatStream 消费者；无 mobile BFF 旁路
 6. **若 Q10=X**：补一份 `ab_agent_channel_session` 主表 schema 提案（CREATE TABLE + ChannelSessionResolver 接口签名），由 enterprise/docs/agent/contracts/ 接收
 7. **若 Q8=A**：补一份 `sender_type=system → agent` 的历史数据 backfill SQL + 前端 UI 兼容确认
 
