@@ -184,6 +184,16 @@ else
         # one phase even on enterprise; do not block the bootstrap on it.
         if [ "$seed" = "commercial" ]; then
           echo "PARTIAL (Quote gap, see /tmp/ga-e2e-seed-$seed.log)"
+          # Surface the failing seed step + last error line so operators don't
+          # have to open the log file manually to know which phase failed.
+          failed_phase=$(grep -oE "seed-showcase-commercial[^[:space:]]*" \
+                          "/tmp/ga-e2e-seed-$seed.log" | head -1)
+          last_error=$(grep -E "Error:|FAIL|✘|×|expect\(" \
+                          "/tmp/ga-e2e-seed-$seed.log" | tail -1)
+          echo "    [ga-e2e-bootstrap] commercial PARTIAL detail:" >&2
+          echo "      phase: ${failed_phase:-unknown}" >&2
+          echo "      cause: ${last_error:-Quote model not seeded — see full log}" >&2
+          echo "      log:   /tmp/ga-e2e-seed-$seed.log" >&2
         else
           echo "FAIL (see /tmp/ga-e2e-seed-$seed.log)"
           seed_failures+=("$seed")
