@@ -102,8 +102,12 @@ services:
   frontend:
     profiles: [full]
     build:
-      context: ./web-admin
-      dockerfile: Dockerfile
+      # Build context is the repo root because web-admin depends on
+      # workspace packages outside web-admin/ (packages/dsl-types,
+      # packages/nav-model, packages/plugin-sdk) and the canonical
+      # pnpm-lock.yaml lives at the repo root.
+      context: .
+      dockerfile: web-admin/Dockerfile
     container_name: auraboot-frontend
     restart: unless-stopped
     ports:
