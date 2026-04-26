@@ -6987,7 +6987,23 @@ CREATE TABLE IF NOT EXISTS ab_agent_channel_session_state (
 );
 CREATE INDEX IF NOT EXISTS idx_chan_session_owner ON ab_agent_channel_session_state (owner_pod_id, lease_expires_at);
 CREATE INDEX IF NOT EXISTS idx_chan_session_expired ON ab_agent_channel_session_state (lease_expires_at) WHERE owner_pod_id IS NOT NULL;
-COMMENT ON TABLE ab_agent_channel_session_state IS 'Channel session state + lease for multi-pod crash-safe resume';
+COMMENT ON TABLE ab_agent_channel_session_state IS 'Channel session state + lease for multi-pod crash-safe resume; also acts as session identity table (Q10=Y, 2026-04-26)';
+
+-- 2026-04-26: identity fields for ChannelSessionResolver (GAP-295).
+-- See enterprise/docs/agent/contracts/channel-session.md and
+--     conversation-turn-service-design.md §3.7 (Q10=Y).
+ALTER TABLE ab_agent_channel_session_state
+  ADD COLUMN IF NOT EXISTS channel_user_id VARCHAR(200),  -- channel-specific user id (slack uid / member id / device id)
+  ADD COLUMN IF NOT EXISTS profile_id      VARCHAR(26),   -- ab_agent_user_profile.pid; NULL = tenant default
+  ADD COLUMN IF NOT EXISTS acp_user_id     BIGINT,        -- acp_user.id; NULL = anonymous (e.g. webhook)
+  ADD COLUMN IF NOT EXISTS last_active_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_channel_session_state_identity
+  ON ab_agent_channel_session_state(tenant_id, channel, COALESCE(channel_user_id, session_id), COALESCE(profile_id, ''));
+
+CREATE INDEX IF NOT EXISTS idx_channel_session_state_tenant_user
+  ON ab_agent_channel_session_state(tenant_id, acp_user_id)
+  WHERE acp_user_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS ab_agent_schedule_delivery_outbox (
     id              BIGSERIAL PRIMARY KEY,
