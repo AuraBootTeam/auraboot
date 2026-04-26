@@ -1,6 +1,6 @@
 # ConversationTurnService 抽取设计稿（L5 chokepoint）
 
-**状态**：design proposal v3.2 —— 第五轮 review。本轮重点是 v3.1 暴露的**生命周期错误**：`PendingConfirmation` 不能既是 completed outcome 又是可 resume 状态；引入 TurnPhase + suspendTurn/TurnSuspendedEvent 模型。同时清掉残留架构图、Phase B 群聊验收、/chat 同步路径、PendingTool schema 丢字段、humanMemberId 前端契约错位
+**状态**：design proposal v3.3 —— 自我反思修正。v3.2 owner 已批，但实施前发现 Q10=X 决策错误（基于二手文档推断 phantom table，未读 OSS 源码 verify）。OSS `ab_agent_channel_session_state` 本身就是 session 主表；Q10 修正为 Y（复用 _state + ALTER 加身份字段）。enterprise schemas/tables.sql §2.7.6 + contracts/channel-session.md 同步修订
 **日期**：2026-04-26（v1）/ 2026-04-26（v2 同日二轮 review 后）
 
 > **v2 收口**：v1 review 暴露 5 P1 + 3 P2 + 5 missing 共 13 点结构性问题。已就地修正，重点：
@@ -484,10 +484,20 @@ void finalizeTurn(TurnContext ctx, TurnOutcome outcome) {
 - 选项 Y：**复用 `ab_agent_channel_session_state` 作为 session 主表**（拆掉 _state 后缀，把 lease 列与 session 列合并）
 - 选项 Z：**TurnContext.channelSessionId 接受 null**，PER_SESSION lifetime grant 在 null 时降级为 PER_TURN（已写入 runtime-authorization.md）
 
-**我的倾向**：选项 X + 显式 ChannelSessionResolver。理由：
-1. `ab_agent_channel_session_state` 名字里 `_state` 暗示 lease/heartbeat 是 session 的状态视图，不是 session 本身
-2. ACP-Ideal §6.1 设计本身就分 session vs session_state 两个概念
-3. 选项 Z 是退化路径，PER_SESSION 永远生效不了等于砍掉 EffectLifetime 一整档
+**v3.3 修正决策：选 Y，不是 X**。
+
+读 OSS `schema.sql:6962-6986` 后发现：`ab_agent_channel_session_state` **本身就是 session 主表**，不是状态视图。表 docstring 明确说 "channel session with lease/heartbeat"——`_state` 后缀含义是**包含** lease/heartbeat 状态字段，不是**只是** state。表有自己的 `pid VARCHAR(26)` PK + `(tenant_id, session_id)` UNIQUE 唯一性。
+
+之前选 X 是基于 enterprise/docs/agent/schemas/tables.sql `ALTER TABLE ab_agent_channel_session ADD ...`（line 291）的引用推断出"phantom table"——但那个 ALTER 本身就是 enterprise docs 里的 pre-existing drift（应该 ALTER `_state` 但写错了表名）。
+
+**Y 方案**：`ab_agent_channel_session_state` ALTER 加身份字段（`channel_user_id` / `profile_id` / `acp_user_id` / `last_active_at`），ChannelSessionResolver 直接读这张表。enterprise schemas/tables.sql §2.7.6 已 revert CREATE TABLE 改为 ALTER。
+
+理由：
+1. 不引入重复的 session 模型；与 OSS 现实对齐
+2. session 身份字段 vs 运行时状态字段同表 + pgsql HOT update 性能可接受
+3. 避免双 session 主表的概念分裂
+
+历史教训：基于二手文档（enterprise schemas/tables.sql 的 ALTER 引用）做架构决策时，应同时验证一手源码（OSS schema.sql 的实际 CREATE）。
 
 ### 3.8 IM/AuraBot Sender Identity 模型（v3 新增 P1.5+P1.6 优先项）
 
@@ -917,7 +927,7 @@ public interface Persistence {
 | Q7 | ~~移动端 BFF 是否在 A.2 范围内？~~ **[已 resolve 2026-04-26]** | 否 | OSS workspace 无独立 mobile BFF；A.2 仅改 web-admin 3 处 chatStream 消费者 + AuraBotController.POST /chat/stream（详见 §11.5）|
 | **Q8** | **outbound sender_type 统一选项**（v2 新增 P2.6）| A=`agent`+agentId / B=保留`system` / C=新增`aurabot` | **A**（与群聊一致 + 历史 backfill）|
 | **Q9** | **feature flag 是否保留**（v2 新增） | 保留（B.0 延迟）/ dev stage 直切（不要 flag）| **直切**（per `feedback_dev_stage_breaking_ok`，避免与 B.0 互斥）|
-| **Q10** | **`ab_agent_channel_session` 主表来源**（v2 新增 P2.8）| X=Phase A 前补 CREATE / Y=合并到 _state 表 / Z=接受 channelSessionId=null 降级 | **X**（保 PER_SESSION 完整语义）|
+| **Q10** | **`ab_agent_channel_session` 主表来源**（v2 新增 P2.8；v3.3 修正）| X=新建独立主表 / **Y=复用 OSS `_state` 表 + ALTER 加身份字段** / Z=接受 channelSessionId=null 降级 | **Y**（v3.3 从 X 修正：OSS `_state` 表本身就是 session 主表，无需新建；`_state` 后缀含义是"含 lease 状态"不是"状态视图"）|
 | **Q11** | **AuraBot 默认 agentId 来源**（v3 新增 P1.6）| P=OSS 内置全局 agent_definition / Q=per-tenant bootstrap seed / R=保留 sender_id=0 system 撤回 Q8=A | **Q**（per-tenant seed + AuraBotAgentResolver SPI）|
 | **Q12** | **Phase A 真实 0 行为变更范围**（v3 新增 P1.3）| M=完全 NOOP（含 trace+metrics）/ N=持久化+事件+audit NOOP，trace+metrics 保留 / O=全部正常发布 + metrics 标签区分 | **N**（保观测，不动业务）|
 | **Q13** | **群聊 #7 + WebSocket #8 路径如何归一**（v3 新增 P1.4+P1.7）| α=Phase B+ 单独设计 group chat adapter（异步 lifecycle）/ β=保留现状 / γ=强行同步化 | **α**（Phase B+ 单独 sub-design，非本设计范围）|
@@ -1029,7 +1039,7 @@ public interface Persistence {
 | Q7 | mobile BFF 是否在 A.2 范围 | **否**（已 unblock 2026-04-26 grep 调研）| A.2 仅改 web-admin 3 处 + AuraBotController.POST /chat/stream |
 | Q8 | outbound sender_type 选项 | **A. 统一 `agent` + agentId** | Q11 必须配套 + 历史 system 行 backfill SQL（详见 §3.6） |
 | Q9 | feature flag 是否引入 | **否**（dev 阶段直切，per `feedback_dev_stage_breaking_ok`） | B.7 直接切 PRODUCTION profile，不带 flag |
-| Q10 | `ab_agent_channel_session` 主表来源 | **X. 补 CREATE TABLE + ChannelSessionResolver SPI** | Sub-design 见 `enterprise/docs/agent/contracts/channel-session.md`（v1 待落） |
+| Q10 | `ab_agent_channel_session` 主表来源（v3.3 修正）| **Y. 复用 OSS `ab_agent_channel_session_state` + ALTER 加身份字段**（v3.2 选 X 是误判；OSS `_state` 已经是 session 主表）| Sub-design 见 `enterprise/docs/agent/contracts/channel-session.md` v2；schema 见 enterprise `tables.sql §2.7.6`（已 revert CREATE TABLE，改 ALTER）|
 | Q11 | AuraBot 默认 agentId 来源 | **Q. per-tenant bootstrap seed + AuraBotAgentResolver SPI** | Sub-design 见 `enterprise/docs/agent/contracts/aurabot-agent-resolver.md`（v1 待落） |
 | Q12 | Phase A 0 行为变更范围 | **N. observeOnly**（trace + metrics 保留）| A.6 注入 `TurnSideEffects.observeOnly(realMetrics)` |
 | Q13 | 群聊 + WebSocket 路径分期 | **α. Phase B+ 单独 group-chat-adapter sub-design** | 占位 GAP-274；Phase B+ 启动需另起 sub-design 文档 |
@@ -1104,3 +1114,8 @@ public interface Persistence {
   8. **§3.1 主架构图重画**（P2.8）：runTurn + suspendTurn + Stage 2.5 triage + Phase A/B/B+ 范围标注 + 不归一入口标注；删除旧 beginTurn 内执行 PreGroundingTriage 的描述
   9. **Phase C C.1 + §3.2 表 triage 描述对齐**（P2.9）：明示 ConversationTurnService 仅准备 input；PreGroundingTriage 实际执行在 Stage 2.5
   10. **B.7 profile 名修正**（P2.10）：从已删的 DISABLED 改为按 Q12 决策值的 observeOnly/TRULY_DISABLED → PRODUCTION
+- 2026-04-26 v3.3 自我反思修正：
+  - **Q10 从 X → Y**（最严重的设计错误纠正）：v3.2 选 X 基于 enterprise/docs/agent/schemas/tables.sql `ALTER TABLE ab_agent_channel_session` 引用推断 phantom table。但读 OSS `schema.sql:6962-6986` 后发现 `ab_agent_channel_session_state` 本身就是 session 主表，`_state` 后缀含义是"含 lease 状态字段"不是"另一个表的状态视图"。enterprise 那个 ALTER 是 pre-existing drift（应 ALTER `_state` 写错了表名）
+  - 修订 enterprise `schemas/tables.sql §2.7.6`：revert CREATE TABLE + state FK；改为 ALTER `ab_agent_channel_session_state` 加身份字段（channel_user_id / profile_id / acp_user_id / last_active_at）+ 4 元组身份索引
+  - 修订 enterprise `contracts/channel-session.md` v2：明示实表 = OSS `_state` 表；字段类型对齐；删除"两表分离"的概念架构
+  - **方法论教训**：基于二手文档做架构决策时必须同时验证一手源码。这是同一会话内第二次重复"没读源码就推断"的失败模式，记入反思清单
