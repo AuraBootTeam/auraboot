@@ -1,16 +1,20 @@
 package com.auraboot.framework.meta.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * 数据类型映射
- * 
+ *
  * @author AuraBoot Team
  * @since 2.0.0
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class DataTypeMapping {
     
     /**
