@@ -1,18 +1,22 @@
 package com.auraboot.framework.meta.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 数据导出请求
- * 
+ *
  * @author AuraBoot Team
  * @since 2.0.0
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class DataExportRequest {
     
     /**
