@@ -7993,3 +7993,109 @@ CREATE TABLE IF NOT EXISTS ab_scheduler_leader (
 
 COMMENT ON TABLE ab_scheduler_leader IS
     'PR-85 — coarse leader election for multi-instance schedulers (orphan / demoter)';
+
+-- ============================================================================
+-- ACP v4 patches: Effect Taxonomy + Runtime Authorization + Pre-Grounding Triage
+-- 2026-04-26 — propagated from enterprise/docs/agent/schemas/tables.sql §2.7.
+-- See enterprise/docs/agent/contracts/{effect-taxonomy,runtime-authorization,
+--                                    pre-grounding-triage}.md
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION valid_effect_class(eff TEXT) RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN eff = ANY(ARRAY[
+        'READ_CONTEXT',
+        'READ_PLATFORM_DATA',
+        'WRITE_DRAFT',
+        'WRITE_PLATFORM_STATE',
+        'EXTERNAL_NETWORK',
+        'FILE_WRITE',
+        'TERMINAL_EXEC',
+        'SECRET_ACCESS'
+    ]);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION valid_effect_class_array(arr JSONB) RETURNS BOOLEAN AS $$
+DECLARE
+    elem TEXT;
+BEGIN
+    IF arr IS NULL THEN RETURN TRUE; END IF;
+    IF jsonb_typeof(arr) <> 'array' THEN RETURN FALSE; END IF;
+    FOR elem IN SELECT jsonb_array_elements_text(arr) LOOP
+        IF NOT valid_effect_class(elem) THEN RETURN FALSE; END IF;
+    END LOOP;
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+ALTER TABLE ab_agent_skill
+  ADD COLUMN IF NOT EXISTS declared_effects JSONB
+    CHECK (declared_effects IS NULL OR valid_effect_class_array(declared_effects));
+
+CREATE INDEX IF NOT EXISTS idx_skill_declared_effects
+  ON ab_agent_skill USING GIN (declared_effects);
+
+UPDATE ab_agent_skill SET declared_effects = '[]'::jsonb
+  WHERE declared_effects IS NULL;
+
+ALTER TABLE ab_agent_action
+  ADD COLUMN IF NOT EXISTS actual_effects JSONB
+    CHECK (actual_effects IS NULL OR valid_effect_class_array(actual_effects)),
+  ADD COLUMN IF NOT EXISTS rejected_by JSONB;
+
+CREATE TABLE IF NOT EXISTS ab_agent_authorization_decision (
+    id              BIGSERIAL PRIMARY KEY,
+    pid             VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id       BIGINT NOT NULL,
+    run_id          VARCHAR(26) NOT NULL,
+    step_index      INTEGER,
+    tool_call_index INTEGER,
+    decision_kind   VARCHAR(20) NOT NULL
+        CHECK (decision_kind IN ('plan', 'incremental')),
+
+    tool_ref        VARCHAR(200),
+    skill_code      VARCHAR(200),
+    arg_hash        VARCHAR(64),
+    blast_radius    VARCHAR(20)
+        CHECK (blast_radius IS NULL OR blast_radius IN ('REVERSIBLE', 'SHARED_STATE', 'IRREVERSIBLE')),
+
+    requested_effects JSONB NOT NULL
+        CHECK (valid_effect_class_array(requested_effects)),
+    granted_effects   JSONB
+        CHECK (granted_effects IS NULL OR valid_effect_class_array(granted_effects)),
+    rejected_effects  JSONB,
+
+    plan_hash       VARCHAR(64),
+    grant_scope     JSONB,
+
+    policy_id       VARCHAR(26),
+    policy_version  INTEGER,
+    decision_reason TEXT,
+
+    require_approval BOOLEAN DEFAULT FALSE,
+    approval_id     VARCHAR(26),
+
+    session_scope_key VARCHAR(200),
+
+    decision_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_authz_run            ON ab_agent_authorization_decision(run_id);
+CREATE INDEX IF NOT EXISTS idx_authz_approval       ON ab_agent_authorization_decision(approval_id)
+  WHERE approval_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_authz_tool_ref       ON ab_agent_authorization_decision(tenant_id, tool_ref, decision_at DESC)
+  WHERE tool_ref IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_authz_session_scope  ON ab_agent_authorization_decision(session_scope_key)
+  WHERE session_scope_key IS NOT NULL;
+
+ALTER TABLE ab_im_message
+  ADD COLUMN IF NOT EXISTS triage_bucket VARCHAR(30)
+    CHECK (triage_bucket IS NULL OR triage_bucket IN ('light_chat', 'contextual_answer', 'acp_run')),
+  ADD COLUMN IF NOT EXISTS triage_confidence NUMERIC(3,2)
+    CHECK (triage_confidence IS NULL OR (triage_confidence >= 0 AND triage_confidence <= 1)),
+  ADD COLUMN IF NOT EXISTS triage_reason_codes JSONB;
+
+CREATE INDEX IF NOT EXISTS idx_im_msg_triage_bucket
+  ON ab_im_message(triage_bucket)
+  WHERE triage_bucket IS NOT NULL;
