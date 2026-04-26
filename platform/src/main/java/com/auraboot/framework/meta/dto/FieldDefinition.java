@@ -1,8 +1,10 @@
 package com.auraboot.framework.meta.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
@@ -15,6 +17,8 @@ import java.util.Locale;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class FieldDefinition {
     
     /**
@@ -257,6 +261,8 @@ public class FieldDefinition {
      */
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class RefTarget {
         /** Model code of the referenced entity (e.g. "crm_account"). */
         @JsonAlias("targetModel")
