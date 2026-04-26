@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:smart="http://auraboot.com/schema/smart"
+             targetNamespace="http://auraboot.com/bpm"
+             id="def_e2e_designer_ca_child_1777185115781">
+  <process id="e2e_designer_ca_child_1777185115781" name="D5 Child e2e_designer_ca_child_1777185115781" isExecutable="true">
+    <startEvent id="start_child" name="Start"/>
+    <userTask id="user_child" name="Child Task"/>
+    <endEvent id="end_child" name="End"/>
+    <sequenceFlow id="e_sc_uc" sourceRef="start_child" targetRef="user_child"/>
+    <sequenceFlow id="e_uc_ec" sourceRef="user_child" targetRef="end_child"/>
+  </process>
+</definitions>

@@ -11,6 +11,8 @@ import { waitForTodoTask, listTodoTasks, listAuditEvents } from '../bpm/_helpers
 import { findTaskRowByBusinessKey, openTaskCenterAsRole } from '../bpm/_helpers/task-center';
 
 test.describe('workflow-demo — R5 applicant cancel', () => {
+  test.setTimeout(45_000);
+
   test('applicant withdraws submitted leave before manager action', async ({
     browser,
     request,

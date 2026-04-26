@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             targetNamespace="http://auraboot.com/bpm"
+             id="def_e2e_designer_gw_excl_1777185122725">
+  <process id="e2e_designer_gw_excl_1777185122725" name="D2 Excl GW 1777185122725" isExecutable="true">
+    <startEvent id="start_1"/>
+    <exclusiveGateway id="gw_excl" name="Decision?"/>
+    <endEvent id="end_ok"/>
+    <endEvent id="end_no"/>
+    <endEvent id="end_else"/>
+    <sequenceFlow id="e_start_gw" sourceRef="start_1" targetRef="gw_excl"/>
+    <sequenceFlow id="e_gw_ok" sourceRef="gw_excl" targetRef="end_ok">
+      <conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:type="tFormalExpression">${decision=='approved'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="e_gw_no" sourceRef="gw_excl" targetRef="end_no">
+      <conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:type="tFormalExpression">${decision=='rejected'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="e_gw_else" sourceRef="gw_excl" targetRef="end_else">
+      <conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:type="tFormalExpression">${!(decision=='approved' || decision=='rejected')}</conditionExpression>
+    </sequenceFlow>
+  </process>
+</definitions>

@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:smart="http://smartengine.org/schema/process" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://auraboot.com/bpm">
+
+  <process id="e2e_designer_ut_1777185174557" name="D1 UT e2e_designer_ut_1777185174557" isExecutable="true">
+
+    <startEvent id="start_1" name="Start"/>
+
+    <userTask id="task_manager_approve" name="Manager Approve" smart:assigneeType="role" smart:assigneeId="wd_manager"/>
+
+    <endEvent id="end_1" name="End"/>
+
+    <sequenceFlow id="edge-start_1-task_manager_approve" sourceRef="start_1" targetRef="task_manager_approve"/>
+
+    <sequenceFlow id="edge-task_manager_approve-end_1" sourceRef="task_manager_approve" targetRef="end_1"/>
+  </process>
+
+</definitions>

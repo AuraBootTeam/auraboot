@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             targetNamespace="http://auraboot.com/bpm"
+             id="def_e2e_designer_gw_par_1777185125990">
+  <process id="e2e_designer_gw_par_1777185125990" name="D2 Par GW 1777185125990" isExecutable="true">
+    <startEvent id="start_1"/>
+    <parallelGateway id="gw_par_fork" name="Fork"/>
+    <userTask id="task_a" name="Task A"/>
+    <userTask id="task_b" name="Task B"/>
+    <parallelGateway id="gw_par_join" name="Join"/>
+    <endEvent id="end_1"/>
+    <sequenceFlow id="e_start_fork" sourceRef="start_1" targetRef="gw_par_fork"/>
+    <sequenceFlow id="e_fork_a" sourceRef="gw_par_fork" targetRef="task_a"/>
+    <sequenceFlow id="e_fork_b" sourceRef="gw_par_fork" targetRef="task_b"/>
+    <sequenceFlow id="e_a_join" sourceRef="task_a" targetRef="gw_par_join"/>
+    <sequenceFlow id="e_b_join" sourceRef="task_b" targetRef="gw_par_join"/>
+    <sequenceFlow id="e_join_end" sourceRef="gw_par_join" targetRef="end_1"/>
+  </process>
+</definitions>

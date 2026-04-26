@@ -160,7 +160,11 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
 
     const actionsTab = page.getByTestId('detail-tab-actions');
     await expect(actionsTab).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByRole('heading', { name: '操作按钮' })).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page
+        .getByTestId('detail-designer-workspace')
+        .getByRole('heading', { name: '操作按钮' }),
+    ).toBeVisible({ timeout: 5_000 });
 
     const editToggle = page.getByTestId('detail-action-preset-edit').locator('button').last();
     const deleteToggle = page.getByTestId('detail-action-preset-delete').locator('button').last();
@@ -198,7 +202,7 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
     const iconTrigger = page.getByRole('button', { name: /选择图标|图标/i }).last();
     await expect(iconTrigger).toBeVisible({ timeout: 5_000 });
     await iconTrigger.click();
-    await page.getByTitle('成功').click();
+    await page.getByTitle('成功').evaluate((el: HTMLElement) => el.click());
     await expect(page.getByTestId('detail-custom-button-0')).toContainText('图标 success');
 
     await expect.poll(
@@ -226,7 +230,11 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
 
     await page.getByTestId('toolbar-save').evaluate((el: HTMLElement) => el.click());
     await page.getByTestId('detail-tab-actions').click();
-    await expect(page.getByRole('heading', { name: '操作按钮' })).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page
+        .getByTestId('detail-designer-workspace')
+        .getByRole('heading', { name: '操作按钮' }),
+    ).toBeVisible({ timeout: 5_000 });
 
     if (presetsToggled) {
       if (!editDisabled) {

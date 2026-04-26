@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:smart="http://smartengine.org/schema/process" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://auraboot.com/bpm">
+
+  <process id="e2e_designer_rule_1777185145322" name="D4 RuleTask e2e_designer_rule_1777185145322" isExecutable="true">
+
+    <startEvent id="start_1" name="Start"/>
+
+    <serviceTask id="rule_1" name="Route Leave" smart:class="droolsServiceTaskDelegate" smart:ruleCode="wd_leave_routing" smart:factsVars="days,type"/>
+
+    <exclusiveGateway id="gw_route" name="Who approves?"/>
+
+    <userTask id="task_manager" name="Manager Approve" smart:assigneeType="role" smart:assigneeId="wd_manager"/>
+
+    <userTask id="task_hr" name="HR Approve" smart:assigneeType="role" smart:assigneeId="wd_hr"/>
+
+    <endEvent id="end_1" name="End"/>
+
+    <sequenceFlow id="edge-start_1-rule_1" sourceRef="start_1" targetRef="rule_1"/>
+
+    <sequenceFlow id="edge-rule_1-gw_route" sourceRef="rule_1" targetRef="gw_route"/>
+
+    <sequenceFlow id="edge-gw_route-task_manager" sourceRef="gw_route" targetRef="task_manager">
+      <conditionExpression xsi:type="tFormalExpression">${approverRole=='manager'}</conditionExpression>
+    </sequenceFlow>
+
+    <sequenceFlow id="edge-gw_route-task_hr" sourceRef="gw_route" targetRef="task_hr">
+      <conditionExpression xsi:type="tFormalExpression">${approverRole=='hr'}</conditionExpression>
+    </sequenceFlow>
+
+    <sequenceFlow id="edge-task_manager-end_1" sourceRef="task_manager" targetRef="end_1"/>
+
+    <sequenceFlow id="edge-task_hr-end_1" sourceRef="task_hr" targetRef="end_1"/>
+  </process>
+
+</definitions>
