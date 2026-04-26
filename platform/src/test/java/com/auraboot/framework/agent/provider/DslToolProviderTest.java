@@ -149,6 +149,9 @@ class DslToolProviderTest extends BaseIntegrationTest {
             assertThat(tool.getProviderCode()).isEqualTo("dsl");
             assertThat(tool.getToolType()).isIn("dsl_command", "dsl_query");
             assertThat(tool.getDescription()).isNotBlank();
+            assertThat(tool.getSourceCode()).isNotBlank();
+            assertThat(tool.getRiskLevel()).isIn("L0", "L1", "L2", "L3", "L4");
+            assertThat(tool.getConfirmationPolicy()).isNotBlank();
         }
     }
 
@@ -179,10 +182,10 @@ class DslToolProviderTest extends BaseIntegrationTest {
         boolean hasCmd = tools.stream().anyMatch(t -> t.getToolCode().startsWith("cmd:"));
         assertThat(hasCmd).as("Model %s should have DSL commands", modelCode).isTrue();
 
-        // All cmd tools should have toolType dsl_command
+        // Query commands are exposed as dsl_query so read-only tool filtering can keep them.
         tools.stream()
                 .filter(t -> t.getToolCode().startsWith("cmd:"))
-                .forEach(t -> assertThat(t.getToolType()).isEqualTo("dsl_command"));
+                .forEach(t -> assertThat(t.getToolType()).isIn("dsl_command", "dsl_query"));
     }
 
     // ========== Execute with real tenant data ==========
@@ -207,5 +210,28 @@ class DslToolProviderTest extends BaseIntegrationTest {
         assertThat(result.getData()).containsKey("records");
         assertThat(result.getData()).containsKey("total");
         assertThat(result.getDurationMs()).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    void execute_queryCommandWithRealModel_returnsListShape() {
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(
+                "SELECT tenant_id, code, model_code FROM ab_command_definition " +
+                "WHERE execution_config->>'type' = 'query' " +
+                "AND model_code IS NOT NULL " +
+                "AND (deleted_flag = FALSE OR deleted_flag IS NULL) LIMIT 1", Map.of());
+
+        if (rows.isEmpty()) {
+            return;
+        }
+
+        Long tenantId = ((Number) rows.get(0).get("tenant_id")).longValue();
+        String commandCode = (String) rows.get(0).get("code");
+
+        var result = dslToolProvider.execute(tenantId, "cmd:" + commandCode,
+                Map.of("pageNum", 1, "pageSize", 5));
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).containsKey("records");
+        assertThat(result.getData()).containsKey("total");
     }
 }
