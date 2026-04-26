@@ -111,6 +111,10 @@ export function SchemaRenderer({
   );
 
   // Render a single region based on its type
+  // TODO(DESIGNER-001): this switch keys on `region.type` (filters/action/table),
+  // not `block.blockType`. Reconcile region.type with the V2 blockType taxonomy
+  // before delegating to BlockRenderer/BlockRegistry.
+  // Design: docs/plans/2026-04/2026-04-25-blockrenderer-runtime-registry-design.md
   const renderRegion = useCallback(
     (region: RegionDefinition, index: number) => {
       switch (region.type) {
