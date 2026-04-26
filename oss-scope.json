@@ -84,7 +84,8 @@
     "tests/e2e/setup/**",
     "tests/e2e/aurabot/**",
     "tests/e2e/ai/**",
-    "tests/e2e/agent-control-plane/**"
+    "tests/e2e/agent-control-plane/**",
+    "tests/e2e/showcase/**"
   ],
 
   "test_excludes": [
@@ -174,7 +175,6 @@
     "tests/e2e/tax/**",
     "tests/e2e/construction-process/**",
     "tests/e2e/project-management/**",
-    "tests/e2e/showcase/**",
     "tests/e2e/templates/**",
     "tests/e2e/license/**",
     "tests/e2e/entitlement/**",
