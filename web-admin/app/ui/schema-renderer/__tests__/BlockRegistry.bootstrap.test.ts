@@ -2,16 +2,26 @@ import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
 describe('BlockRegistry bootstrap', () => {
-  it('initBlockRegistry registers all 10 runtime block types', () => {
+  it('initBlockRegistry registers all 14 runtime block types', () => {
     initBlockRegistry();
 
-    expect(BlockRegistry.size()).toBe(10);
+    expect(BlockRegistry.size()).toBe(14);
 
+    // Must mirror the dispatch table in
+    // web-admin/app/framework/meta/rendering/BlockRenderer.tsx — every
+    // blockType the meta dispatcher used to load via _fallbackRenderers must
+    // resolve through the registry. `monthly-grid` is intentionally omitted
+    // (handled by enclosing detail page renderer); `custom` is handled inline
+    // by BlockRenderer via ComponentLoader.
     const expected = [
       'table',
       'filters',
       'toolbar',
+      'form',
       'form-section',
+      'form-buttons',
+      'form-wizard',
+      'description',
       'chart',
       'tabs',
       'sub-table',
