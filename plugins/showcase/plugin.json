@@ -36,6 +36,18 @@
     {
       "type": "command",
       "code": "sc:archive_showcase"
+    },
+    {
+      "type": "model",
+      "code": "sc_monthly_metric"
+    },
+    {
+      "type": "command",
+      "code": "sc:create_monthly_metric"
+    },
+    {
+      "type": "command",
+      "code": "sc:delete_monthly_metric"
     }
   ],
   "requires": [],
