@@ -123,6 +123,11 @@ export const SmartViewRenderer: React.FC<SmartViewRendererProps> = ({
   }, [onDataRefresh]);
 
   const renderView = () => {
+    // TODO(DESIGNER-001): migrate to ViewRegistry.get(viewType)?.component once
+    // per-view callbacks (onCardMove / onTaskDateChange / onEventMove) are
+    // unified into a single ViewSpec context bag. ViewRegistry already knows
+    // all 8 viewTypes; this site stays explicit pending callback unification.
+    // Design: docs/plans/2026-04/2026-04-25-blockrenderer-runtime-registry-design.md
     switch (viewType) {
       case 'table':
         return <>{renderTableView?.()}</>;
