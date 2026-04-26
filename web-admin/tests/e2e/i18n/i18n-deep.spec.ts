@@ -235,7 +235,6 @@ test.describe('i18n Deep — Form Labels', () => {
   test('I18N-009: form field labels are localized', async ({ page }) => {
     await page.goto(`/p/e2et_order/new`);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 });
 
     // Wait for smart components to load (they render labels asynchronously via ComponentLoader)
     await page
@@ -267,7 +266,10 @@ test.describe('i18n Deep — Form Labels', () => {
   test('I18N-010: form save button text is localized', async ({ page }) => {
     await page.goto(`/p/e2et_order/new`);
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 });
+    await page
+      .locator('[data-testid^="form-field-"], [data-testid^="form-btn-"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 });
 
     // Save button should have localized text
     const saveBtn = page.locator('[data-testid^="form-btn-"]').first();
