@@ -317,6 +317,11 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
       records.find((r) => r?.code === 'sc_showcase_summary')?.code ??
       records.find((r) => r?.code)?.code;
 
+    // BACKLOG-PUBLISH-001 (resolved 2026-04-25): oss-reset-and-init.sh now
+    // publishes the showcase plugin by default, so the namedQuery seed is
+    // present after a normal env reset. This skip is a defensive guard for
+    // fresh DBs that bypass the standard reset script — keeping it avoids
+    // a confusing failure mode without masking a real product gap.
     test.skip(
       !sourceRef,
       'No published namedQuery seed — run `aura plugin publish plugins/showcase --yes` first',
@@ -503,28 +508,17 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     await saveBtn.click();
     const sr = await saveResp;
 
-    // KNOWN OSS BACKEND BUG: ModelController.updateModel() builds a new
-    // MetaModelCreateRequest and calls metaModelService.create(), which
-    // throws "Model code already exists". The PUT therefore returns 500
-    // until the backend is fixed to actually update in place.
-    // We assert the UI did fire a PUT request (proves form-submit pipeline
-    // works end-to-end); when the backend is fixed, drop the conditional.
-    if (sr.ok()) {
-      const verified = await api.getModelByCode(code);
-      expect(verified.data!.displayName).toBe(newName);
+    // BACKLOG-MC-001 (resolved 2026-04-25): ModelController.updateModel()
+    // now routes through metaModelService.saveDefinition(), which looks up
+    // by code and calls UPDATE for existing rows (preserving sourceType/
+    // sourceRef/capabilities/primaryKey). Hard-assert the success path.
+    expect(sr.ok()).toBe(true);
+    const verified = await api.getModelByCode(code);
+    expect(verified.data!.displayName).toBe(newName);
 
-      await navigateToModelListViaMenu(page);
-      await searchByKeyword(page, code);
-      await expect(modelListRow(page, code)).toContainText(newName);
-    } else {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[A6] PUT /api/meta/models/{pid} returned ${sr.status()} — known OSS bug ` +
-          `in ModelController.updateModel (calls create()). UI submit pipeline is ` +
-          `verified, backend update path needs a separate fix.`,
-      );
-      expect(sr.status()).toBeGreaterThanOrEqual(200); // PUT was issued
-    }
+    await navigateToModelListViaMenu(page);
+    await searchByKeyword(page, code);
+    await expect(modelListRow(page, code)).toContainText(newName);
   });
 
   // -------------------------------------------------------------------------
@@ -559,33 +553,18 @@ test.describe('Task A — Model creation full lifecycle E2E', () => {
     await page.getByTestId('confirm-ok').click();
     const dr = await delResp;
 
-    // KNOWN OSS BACKEND BUG: deleteModel() blocks deletion when "bound fields"
-    // exist, but the implementation appears to count tenant-wide fields rather
-    // than fields actually bound to the model — even a freshly-created empty
-    // model returns 500 "Cannot delete model with bound fields. Found N bound
-    // fields." We verify the UI fired the DELETE; when backend is fixed,
-    // simplify back to `expect(dr.ok()).toBe(true)`.
-    if (dr.ok()) {
-      await searchByKeyword(page, code);
-      await expect(modelListRow(page, code)).toHaveCount(0);
+    // BACKLOG-MC-001 (resolved 2026-04-25): deleteModel() now applies a
+    // double filter (deleted_flag = false AND is_system_binding = false) so
+    // a freshly-created empty model deletes cleanly. Hard-assert success.
+    expect(dr.ok()).toBe(true);
+    await searchByKeyword(page, code);
+    await expect(modelListRow(page, code)).toHaveCount(0);
 
-      const afterDelete = await api.getModelByCode(code);
-      if (afterDelete.data) {
-        const stillLive =
-          (afterDelete.data as { deletedFlag?: boolean }).deletedFlag !== true;
-        if (stillLive) createdModelPids.push(pid);
-      }
-    } else {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[A7] DELETE /api/meta/models/{pid} returned ${dr.status()} — known OSS ` +
-          `bug in deleteModel "bound fields" guard. UI dialog + DELETE call are ` +
-          `verified.`,
-      );
-      // Verify the request fired and dialog dismissed.
-      await expect(page.getByTestId('confirm-dialog')).toHaveCount(0, { timeout: 3_000 });
-      // Register for cleanup since UI delete failed.
-      createdModelPids.push(pid);
+    const afterDelete = await api.getModelByCode(code);
+    if (afterDelete.data) {
+      const stillLive =
+        (afterDelete.data as { deletedFlag?: boolean }).deletedFlag !== true;
+      if (stillLive) createdModelPids.push(pid);
     }
   });
 });
