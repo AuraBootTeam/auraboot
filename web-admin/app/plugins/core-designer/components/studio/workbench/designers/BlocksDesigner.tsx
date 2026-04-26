@@ -28,15 +28,17 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import {
+  resolveLocalizedText,
+  parseFieldShorthand,
+  serializeFieldOverride,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import type {
   PageSchema,
   DslBlock,
   BlockType,
   DslFieldRef,
   DslFieldOverride,
-  parseFieldShorthand,
-  serializeFieldOverride,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { BlockLibrary } from './areas/BlockLibrary';
 import { BlockPropertyPanel } from './areas/BlockPropertyPanel';
