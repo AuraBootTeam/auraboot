@@ -388,7 +388,11 @@ export class DataSourceManager {
         break;
 
       case 'table':
-        // 表格数据适配
+        // TODO(DESIGNER-001): swap for BlockRegistry.get('table')?.normalizeData
+        // once the adaptor key is reconciled with blockType (this switch keys
+        // on config.adaptor, not block.blockType, so the migration needs an
+        // adaptor → blockType bridge first).
+        // Design: docs/plans/2026-04/2026-04-25-blockrenderer-runtime-registry-design.md
         if (data && typeof data === 'object') {
           return {
             records: data.records || data.list || [],
