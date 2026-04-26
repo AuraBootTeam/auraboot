@@ -175,17 +175,21 @@ function main() {
   const plugins = scanPlugins();
   console.log(`Found ${plugins.length} platform plugin(s)`);
 
-  if (plugins.length === 0) {
-    console.log('No platform plugins found. Skipping route generation.');
-    return;
-  }
-
-  // Generate and write public routes
+  // ALWAYS write _public-routes.ts (even with an empty list). The file is
+  // gitignored, but `app/middleware/sessionMiddlewareFactory.ts` imports
+  // it unconditionally — a fresh checkout with zero platform plugins must
+  // still get a valid stub or the dev server fails on every SSR request
+  // with "Cannot find module '~/plugins/_public-routes'".
   const publicRoutes = generatePublicRoutes(plugins);
   const publicRoutesDir = path.dirname(PUBLIC_ROUTES_FILE);
   if (!fs.existsSync(publicRoutesDir)) fs.mkdirSync(publicRoutesDir, { recursive: true });
   fs.writeFileSync(PUBLIC_ROUTES_FILE, publicRoutes, 'utf-8');
   console.log(`Generated ${PUBLIC_ROUTES_FILE}`);
+
+  if (plugins.length === 0) {
+    console.log('No platform plugins found. Wrote empty PLUGIN_PUBLIC_ROUTES stub.');
+    return;
+  }
 
   // Route entries are now managed by packages/website/route-manifest.ts
   // No longer injecting into routes.ts (Route Manifest architecture)

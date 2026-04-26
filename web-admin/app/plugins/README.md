@@ -30,6 +30,10 @@ plugins/
 | `ent-*` | Enterprise commercial | `auraboot-enterprise/web-admin-ext/plugins/` (overlay) |
 | `sol-*` | Industry/vertical solution | `auraboot-solutions/...` |
 
+Current examples:
+- `core-dashboard` now ships both `DashboardViewer` and `DashboardDesigner` in OSS.
+- Enterprise no longer provides `ent-dashboard-designer`; paid analytics deltas live in `ent-charts-pro`, and enterprise-only workbench additions live in `ent-dashboard-workbench`.
+
 ## Boundaries
 
 A plugin **may**:
