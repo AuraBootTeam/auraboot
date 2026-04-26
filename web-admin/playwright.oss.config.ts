@@ -1,6 +1,6 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { resolve, dirname, relative } from 'path';
+import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import baseConfig from './playwright.config';
 
@@ -11,18 +11,33 @@ const scope = JSON.parse(readFileSync(scopePath, 'utf-8')) as {
   test_excludes?: string[];
 };
 
-function toRegex(entries: string[]): RegExp[] {
-  return entries.map((entry) => {
-    const trimmed = entry.replace(/\/\*\*$/, '');
-    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const isFile = /\.ts$/.test(entry);
-    const suffix = isFile ? '$' : '(?:/.*)?\\.spec\\.ts$';
-    return new RegExp(escaped + suffix);
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function toScopedRegex(entry: string, specPattern = '.*\\.spec\\.ts'): RegExp {
+  const trimmed = entry.replace(/\/\*\*$/, '');
+  const escaped = escapeRegex(trimmed);
+  const isFile = /\.ts$/.test(entry);
+  return new RegExp(isFile ? `${escaped}$` : `${escaped}/(?:.*\\/)?${specPattern}$`);
+}
+
+function toScopedMatch(entries: string[], specPattern = '.*\\.spec\\.ts'): RegExp[] {
+  return entries.map((entry) => toScopedRegex(entry, specPattern));
+}
+
+function keepDeepOnly(entries: string[]): string[] {
+  return entries.filter((entry) => {
+    if (/\.ts$/.test(entry)) {
+      return /-deep\.spec\.ts$/.test(entry);
+    }
+    return true;
   });
 }
 
-const ossTestMatch = toRegex(scope.test_paths);
-const ossTestIgnore = toRegex(scope.test_excludes ?? []);
+const ossTestMatch = toScopedMatch(scope.test_paths);
+const ossDeepTestMatch = toScopedMatch(keepDeepOnly(scope.test_paths), '.*-deep\\.spec\\.ts');
+const ossTestIgnore = toScopedMatch(scope.test_excludes ?? []);
 
 /**
  * OSS-scoped Playwright configuration.
@@ -30,6 +45,12 @@ const ossTestIgnore = toRegex(scope.test_excludes ?? []);
  * Extends the base config but restricts every project's testMatch to files
  * listed in the root `oss-scope.json` manifest. This prevents enterprise-only
  * specs (crm/sales/finance/etc.) from running in the OSS regression suite.
+ *
+ * Important: preserve the base project's intent. In particular, `chromium-deep`
+ * must stay limited to `*-deep.spec.ts`; otherwise the OSS scope inflates that
+ * project back to the whole suite, and a single main-project failure causes a
+ * huge wave of misleading `did not run` counts when the dependent deep project
+ * is skipped.
  *
  * Usage: npx playwright test -c playwright.oss.config.ts
  */
@@ -41,7 +62,7 @@ export default defineConfig({
     }
     return {
       ...project,
-      testMatch: ossTestMatch,
+      testMatch: project.name === 'chromium-deep' ? ossDeepTestMatch : ossTestMatch,
       testIgnore: [...(Array.isArray(project.testIgnore) ? project.testIgnore : project.testIgnore ? [project.testIgnore] : []), ...ossTestIgnore],
     };
   }),
