@@ -149,16 +149,15 @@ async function gotoShowcaseListViaMenu(page: Page): Promise<void> {
   await parent.waitFor({ state: 'visible', timeout: 10_000 });
   await parent.evaluate((el: HTMLElement) => el.click());
 
-  const listResp = page.waitForResponse(
-    (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
-    { timeout: 10_000 },
-  );
   const leaf = page.locator(`a[href="${LIST_URL}"], a[href*="${LIST_URL}"]`).first();
   await leaf.waitFor({ state: 'attached', timeout: 5_000 });
-  await leaf.evaluate((el: HTMLElement) => el.click());
-  await listResp;
+  await Promise.all([
+    page.waitForURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 10_000 }),
+    leaf.evaluate((el: HTMLElement) => el.click()),
+  ]);
 
   await expect(page).toHaveURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 5_000 });
+  await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 10_000 });
   await page.evaluate(() => {
     document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
   });
@@ -172,22 +171,32 @@ async function openDetailViaListRow(page: Page, recordPid: string): Promise<void
   const hasLink = await rowByLink.first().isVisible({ timeout: 3_000 }).catch(() => false);
 
   if (hasLink) {
-    await rowByLink.first().evaluate((tr) => {
-      const a = tr.querySelector('a[href*="/view/"]') as HTMLAnchorElement | null;
-      if (a) a.click();
-    });
+    await Promise.all([
+      page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
+      rowByLink.first().evaluate((tr) => {
+        const a = tr.querySelector('a[href*="/view/"]') as HTMLAnchorElement | null;
+        if (a) a.click();
+      }),
+    ]);
   } else {
     const firstRow = rows.first();
     await firstRow.hover();
     const viewBtn = firstRow.locator('[data-testid="row-action-view"]').first();
     if (await viewBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await viewBtn.click();
+      await Promise.all([
+        page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
+        viewBtn.click(),
+      ]);
     } else {
-      await firstRow.locator('td').nth(1).click({ force: true });
+      await Promise.all([
+        page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
+        firstRow.locator('td').nth(1).click({ force: true }),
+      ]);
     }
   }
 
   await expect(page).toHaveURL(DETAIL_URL_RE, { timeout: 8_000 });
+  await page.waitForLoadState('domcontentloaded').catch(() => null);
   await page
     .waitForResponse(
       (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/`) && r.status() === 200,

@@ -142,6 +142,18 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
         }
     }
 
+    @Test
+    void execute_executeSql_autoInjectsTenantFilterForSimpleSelect() {
+        var result = provider.execute(testTenant.getId(), "platform.execute_sql",
+                Map.of("sql", "SELECT code FROM ab_meta_model WHERE code IS NOT NULL"));
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).containsKeys("success", "columns", "records", "total", "sql");
+        assertThat(result.getData().get("sql").toString())
+                .contains("tenant_id = #{params.tenantId}")
+                .contains("code IS NOT NULL");
+    }
+
     // ========== execute() - unknown tool code ==========
 
     @Test

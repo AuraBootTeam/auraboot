@@ -160,12 +160,11 @@ else
   echo "[ga-e2e-bootstrap] seeding showcase records..."
   cd web-admin
 
-  if [ ! -f tests/storage/admin.json ]; then
-    echo "  No admin.json found — running auth.setup to generate it..."
-    PLAYWRIGHT_BASE_URL=http://localhost:5174 PW_SKIP_WEBSERVER=1 NO_PROXY=localhost \
-      npx playwright test tests/auth.setup.ts -g "authenticate as admin" \
-      --reporter=line >/dev/null 2>&1 || true
-  fi
+  echo "  Refreshing Playwright storage for the current GA stack..."
+  rm -f tests/storage/admin.json tests/storage/operator.json tests/storage/viewer.json
+  PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 PW_SKIP_WEBSERVER=1 NO_PROXY=localhost,127.0.0.1 \
+    npx playwright test tests/auth.setup.ts \
+    --reporter=line >/dev/null 2>&1 || true
 
   if [ ! -f tests/storage/admin.json ]; then
     echo "  WARNING: admin.json still missing — skipping seed (auth.setup failed)" >&2
@@ -173,7 +172,7 @@ else
     seed_failures=()
     for seed in data extended workflow ai arsenal supplement commercial; do
       printf '  seed-showcase-%s ... ' "$seed"
-      if PLAYWRIGHT_BASE_URL=http://localhost:5174 NO_PROXY=localhost \
+      if PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 NO_PROXY=localhost,127.0.0.1 \
            npx playwright test --config=playwright.seed.config.ts \
              -g "seed-showcase-$seed" --reporter=line \
              > "/tmp/ga-e2e-seed-$seed.log" 2>&1; then

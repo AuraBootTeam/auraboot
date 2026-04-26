@@ -66,7 +66,7 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
                         td.getToolName(),
                         enhanceDescription(td.getToolCode(), td.getDescription()),
                         td.getParameterSchema() != null ? td.getParameterSchema() : Map.of(),
-                        isReadOnlyToolCode(td.getToolCode())
+                        isReadOnlyToolDefinition(td)
                 ))
                 // For query intent: only keep read-only tools (nq, list, get, platform.execute_sql, platform.list_models)
                 .filter(td -> !queryOnly || td.readOnly())
@@ -110,6 +110,15 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
         if (toolCode == null) return false;
         return toolCode.startsWith("nq:") || toolCode.startsWith("list:") || toolCode.startsWith("get:")
                 || "platform.execute_sql".equals(toolCode) || "platform.list_models".equals(toolCode);
+    }
+
+    private boolean isReadOnlyToolDefinition(ToolDefinition td) {
+        if (td == null) return false;
+        if (isReadOnlyToolCode(td.getToolCode())) return true;
+        String toolType = td.getToolType();
+        return toolType != null && (toolType.contains("query")
+                || toolType.contains("read")
+                || toolType.contains("list"));
     }
 
     private boolean isReadIntent(String intent) {

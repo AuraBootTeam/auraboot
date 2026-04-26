@@ -6,6 +6,7 @@ import federation from '@originjs/vite-plugin-federation';
 import istanbul from 'vite-plugin-istanbul';
 
 const e2eCoverageEnabled = process.env.E2E_COVERAGE === '1';
+const bffProxyTarget = `http://127.0.0.1:${process.env.BFF_PORT || '3500'}`;
 
 // @originjs/vite-plugin-federation 1.4.x does not support SSR — its virtual
 // imports (`__federation_fn_satisfy`, etc.) are emitted unconditionally and
@@ -72,6 +73,12 @@ export default defineConfig({
         '**/ios/**',
         '**/android/**',
         '**/docs/**',
+        '**/tests/**',
+        'tests/**',
+        './tests/**',
+        '**/test-results/**',
+        'test-results/**',
+        './test-results/**',
         '/plugins/**',
         '../plugins/**',
         '../../plugins/**',
@@ -82,7 +89,7 @@ export default defineConfig({
     },
     proxy: {
       '/api/notifications/stream': {
-        target: `http://localhost:${process.env.BFF_PORT || '3500'}`,
+        target: bffProxyTarget,
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {
@@ -98,12 +105,12 @@ export default defineConfig({
         },
       },
       '^/api/': {
-        target: `http://localhost:${process.env.BFF_PORT || '3500'}`,
+        target: bffProxyTarget,
         changeOrigin: true,
         secure: false,
         configure: (_proxy, _options) => {
           console.log(
-            `🔗 Proxying /api/* requests to BFF server at http://localhost:${process.env.BFF_PORT || '3500'}`,
+            `🔗 Proxying /api/* requests to BFF server at ${bffProxyTarget}`,
           );
         },
       },

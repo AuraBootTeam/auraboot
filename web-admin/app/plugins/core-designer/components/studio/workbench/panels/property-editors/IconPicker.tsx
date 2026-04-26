@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { BaseEditorProps, IconCategory, IconDefinition } from './types';
 
 interface IconPickerProps extends BaseEditorProps<string> {
@@ -340,13 +341,50 @@ export const IconPicker: React.FC<IconPickerProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<IconCategory | 'all'>('all');
   const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
+
+  const updatePopoverPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger || typeof window === 'undefined') return;
+    const rect = trigger.getBoundingClientRect();
+    const width = 320;
+    const margin = 8;
+    const estimatedHeight = 360;
+    const belowTop = rect.bottom + margin;
+    const top =
+      belowTop + estimatedHeight > window.innerHeight
+        ? Math.max(margin, rect.top - estimatedHeight - margin)
+        : belowTop;
+    setPopoverPosition({
+      top,
+      left: Math.min(Math.max(margin, rect.left), Math.max(margin, window.innerWidth - width - margin)),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePopoverPosition();
+    window.addEventListener('resize', updatePopoverPosition);
+    window.addEventListener('scroll', updatePopoverPosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePopoverPosition);
+      window.removeEventListener('scroll', updatePopoverPosition, true);
+    };
+  }, [isOpen, updatePopoverPosition]);
 
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -413,14 +451,20 @@ export const IconPicker: React.FC<IconPickerProps> = ({
   };
 
   return (
-    <div className={`relative ${className}`} ref={pickerRef}>
+    <div className={`relative z-[1000] ${className}`} ref={pickerRef}>
       {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
 
       {/* Trigger button */}
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => {
+          if (disabled) return;
+          updatePopoverPosition();
+          setIsOpen(!isOpen);
+        }}
         disabled={disabled}
+        data-testid="icon-picker-trigger"
         className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 ${disabled ? 'cursor-not-allowed bg-gray-100' : 'bg-white hover:border-gray-400'} ${error ? 'border-red-300' : 'border-gray-200'} `}
       >
         <div
@@ -470,8 +514,12 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       </button>
 
       {/* Popover */}
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-80 rounded-lg border border-gray-200 bg-white shadow-lg">
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popoverRef}
+          className="fixed z-[1000] w-80 rounded-lg border border-gray-200 bg-white shadow-lg"
+          style={{ top: popoverPosition.top, left: popoverPosition.left }}
+        >
           {/* Search */}
           <div className="border-b border-gray-100 p-2">
             <div className="relative">
@@ -539,12 +587,21 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                 style={{ gridTemplateColumns: `repeat(${iconsPerRow}, minmax(0, 1fr))` }}
               >
                 {filteredIcons.map((icon) => (
-                  <button
-                    key={icon.name}
-                    type="button"
-                    onClick={() => handleIconSelect(icon.name)}
-                    className={` ${buttonSizeClasses[iconSize]} flex items-center justify-center rounded transition-colors hover:bg-gray-100 ${value === icon.name ? 'bg-blue-100 ring-2 ring-blue-500' : ''} `}
-                    title={icon.label}
+	                  <button
+	                    key={icon.name}
+	                    type="button"
+	                    onMouseDown={(event) => {
+	                      event.preventDefault();
+	                      event.stopPropagation();
+	                      handleIconSelect(icon.name);
+	                    }}
+	                    onClick={(event) => {
+	                      event.stopPropagation();
+	                      handleIconSelect(icon.name);
+	                    }}
+	                    data-testid={`icon-picker-option-${icon.name}`}
+	                    className={` ${buttonSizeClasses[iconSize]} flex items-center justify-center rounded transition-colors hover:bg-gray-100 ${value === icon.name ? 'bg-blue-100 ring-2 ring-blue-500' : ''} `}
+	                    title={icon.label}
                   >
                     <svg
                       className={`${sizeClasses[iconSize]} text-gray-600`}
@@ -577,7 +634,8 @@ export const IconPicker: React.FC<IconPickerProps> = ({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
 
       {error && <div className="mt-1 text-xs text-red-500">{error}</div>}

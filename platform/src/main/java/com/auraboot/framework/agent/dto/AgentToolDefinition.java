@@ -23,6 +23,8 @@ public class AgentToolDefinition {
     private String toolType;
     private String sourceCode;
     private boolean requiresApproval;
+    private boolean requiresConfirmation;
     private String riskLevel;
+    private String confirmationPolicy;
     private String nativeToolConfig; // JSON string, e.g. {"type":"web_search_preview"}
 }

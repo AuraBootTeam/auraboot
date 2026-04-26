@@ -84,10 +84,10 @@ services:
       # SSR-side fetch base URL. Without this, app/shared/services/http-client
       # falls back to "use the incoming request origin", which becomes the
       # host port (5174) — unreachable from inside the container — so SSR
-      # actions like the /login form submit fail with ECONNREFUSED. Pinning
-      # BFF_INTERNAL_URL to in-container localhost:3500 keeps SSR fetches
-      # on the loopback inside the same container that runs vite + BFF.
-      BFF_INTERNAL_URL: http://localhost:3500
+      # actions like the /login form submit fail with ECONNREFUSED. Use
+      # 127.0.0.1 instead of localhost because Alpine resolves localhost to
+      # ::1 first while the dev BFF binds IPv4.
+      BFF_INTERNAL_URL: http://127.0.0.1:3500
       PUPPETEER_SKIP_DOWNLOAD: "true"
     volumes:
       # Bind-mount the whole repo so workspace deps + plugins resolve and
@@ -117,7 +117,7 @@ services:
     # Generous start period — first install can take a few minutes when the
     # node_modules volume is empty.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://localhost:5173 >/dev/null 2>&1 && wget -q -O- http://localhost:3500/health >/dev/null 2>&1 || wget -q -O- http://localhost:3500 >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5173 >/dev/null 2>&1 && wget -q -O- http://127.0.0.1:3500/health >/dev/null 2>&1 || wget -q -O- http://127.0.0.1:3500 >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 30

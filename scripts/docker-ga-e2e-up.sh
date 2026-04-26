@@ -82,9 +82,9 @@ done
 echo "[ga-e2e] waiting for frontend (vite+BFF) — first run installs deps, allow ~5min..."
 deadline=$(( $(date +%s) + 360 ))
 while :; do
-  # vite first (fast TLS-free 200), then BFF as a sanity check
+  # vite first, then BFF via a real health-adjacent API. BFF root returns 404.
   if curl -fsS -o /dev/null http://localhost:5174 2>/dev/null \
-     && curl -fsS -o /dev/null http://localhost:3501 2>/dev/null; then
+     && curl -fsS -o /dev/null http://localhost:3501/api/bootstrap/status 2>/dev/null; then
     echo "[ga-e2e] frontend up: vite :5174, BFF :3501"
     break
   fi

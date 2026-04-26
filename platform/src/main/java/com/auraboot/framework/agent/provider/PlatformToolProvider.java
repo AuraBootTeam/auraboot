@@ -52,6 +52,9 @@ public class PlatformToolProvider implements ToolProvider {
             .description("Execute a read-only SQL SELECT query with safety validation and tenant isolation")
             .providerCode("platform")
             .toolType("platform")
+            .sourceCode("platform.execute_sql")
+            .riskLevel("L1")
+            .confirmationPolicy("none")
             .build(),
         ToolDefinition.builder()
             .toolCode("platform.list_models")
@@ -59,6 +62,9 @@ public class PlatformToolProvider implements ToolProvider {
             .description("List available data models with optional field details for schema discovery")
             .providerCode("platform")
             .toolType("platform")
+            .sourceCode("platform.list_models")
+            .riskLevel("L0")
+            .confirmationPolicy("none")
             .build(),
         ToolDefinition.builder()
             .toolCode("platform.model_suggest")
@@ -66,6 +72,9 @@ public class PlatformToolProvider implements ToolProvider {
             .description("AI-powered model suggestion from a natural language description")
             .providerCode("platform")
             .toolType("platform")
+            .sourceCode("platform.model_suggest")
+            .riskLevel("L1")
+            .confirmationPolicy("none")
             .build(),
         ToolDefinition.builder()
             .toolCode("platform.create_model")
@@ -76,6 +85,10 @@ public class PlatformToolProvider implements ToolProvider {
                     + "then call this tool to actually create the model.")
             .providerCode("platform")
             .toolType("platform")
+            .sourceCode("platform.create_model")
+            .riskLevel("L3")
+            .confirmationPolicy("approval_required")
+            .requiresApproval(true)
             .parameterSchema(Map.of(
                     "type", "object",
                     "properties", Map.of(
@@ -140,17 +153,13 @@ public class PlatformToolProvider implements ToolProvider {
             return errorResult("sql is required for platform.execute_sql");
         }
 
+        sql = sql.trim().replaceAll(";+$", "");
+
         // Safety: validate SELECT-only (no DML/DDL)
         try {
-            SqlSafetyUtils.validateSelectOnlySql(sql.trim());
+            SqlSafetyUtils.validateSelectOnlySql(sql);
         } catch (IllegalArgumentException e) {
             return errorResult("SQL validation failed: " + e.getMessage());
-        }
-
-        // Enforce LIMIT to prevent unbounded queries
-        String sqlUpper = sql.trim().toUpperCase();
-        if (!sqlUpper.contains("LIMIT")) {
-            sql = sql.trim() + " LIMIT " + MAX_QUERY_ROWS;
         }
 
         // Build params with tenantId for #{params.tenantId} placeholders
@@ -161,12 +170,18 @@ public class PlatformToolProvider implements ToolProvider {
         }
         queryParams.put("tenantId", effectiveTenantId);
 
-        // Tenant isolation enforcement: reject SQL that doesn't reference tenant_id.
-        // LLM-generated SQL may omit tenant filtering (accidentally or via prompt injection),
-        // which would expose cross-tenant data since we use selectByQueryWithoutTenant.
-        if (!sql.contains("tenant_id")) {
-            return errorResult("SQL must include tenant_id filter for data isolation. "
-                    + "Use: WHERE tenant_id = #{params.tenantId}");
+        // Tenant isolation enforcement: inject the runtime tenant for simple
+        // read-only SELECT statements instead of asking the LLM/user for tenant_id.
+        String isolatedSql = injectTenantFilterIfMissing(sql);
+        if (isolatedSql == null) {
+            return errorResult("SQL requires tenant isolation. Prefer the available DSL/list/named-query tools, "
+                    + "or use a SELECT with a clear top-level FROM/WHERE clause so tenant_id can be injected.");
+        }
+        sql = isolatedSql;
+
+        // Enforce LIMIT to prevent unbounded queries
+        if (!LIMIT_REFERENCE.matcher(sql).find()) {
+            sql = sql + " LIMIT " + MAX_QUERY_ROWS;
         }
 
         log.info("platform.execute_sql SQL: {}", sql);
@@ -408,6 +423,9 @@ public class PlatformToolProvider implements ToolProvider {
     private static final Pattern FROM_TABLE = Pattern.compile(
             "\\bfrom\\s+(mt_\\w+)",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern TENANT_ID_REFERENCE = Pattern.compile("\\btenant_id\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FROM_REFERENCE = Pattern.compile("\\bfrom\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern LIMIT_REFERENCE = Pattern.compile("\\blimit\\b", Pattern.CASE_INSENSITIVE);
 
     /**
      * Turn opaque SQL errors into actionable guidance for the LLM.
@@ -498,5 +516,49 @@ public class PlatformToolProvider implements ToolProvider {
         if (val instanceof Boolean b) return b;
         if (val instanceof Number n) return n.intValue() != 0;
         return "true".equalsIgnoreCase(val.toString().trim());
+    }
+
+    private static String injectTenantFilterIfMissing(String sql) {
+        if (TENANT_ID_REFERENCE.matcher(sql).find()) {
+            return sql;
+        }
+        if (!FROM_REFERENCE.matcher(sql).find()) {
+            return sql;
+        }
+
+        int boundary = firstClauseBoundary(sql);
+        int whereIndex = indexOfKeywordBefore(sql, "\\bwhere\\b", boundary);
+        String predicate = "tenant_id = #{params.tenantId}";
+
+        if (whereIndex >= 0) {
+            int afterWhere = whereIndex + "where".length();
+            return sql.substring(0, afterWhere) + " " + predicate + " AND " + sql.substring(afterWhere).trim();
+        }
+
+        String head = boundary >= 0 ? sql.substring(0, boundary).trim() : sql.trim();
+        String tail = boundary >= 0 ? " " + sql.substring(boundary).trim() : "";
+        if (head.isBlank()) {
+            return null;
+        }
+        return head + " WHERE " + predicate + tail;
+    }
+
+    private static int firstClauseBoundary(String sql) {
+        return List.of("\\bgroup\\s+by\\b", "\\bhaving\\b", "\\border\\s+by\\b",
+                        "\\blimit\\b", "\\boffset\\b", "\\bfetch\\b")
+                .stream()
+                .map(pattern -> indexOfKeywordBefore(sql, pattern, -1))
+                .filter(index -> index >= 0)
+                .min(Integer::compareTo)
+                .orElse(-1);
+    }
+
+    private static int indexOfKeywordBefore(String sql, String pattern, int boundary) {
+        Matcher matcher = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(sql);
+        if (!matcher.find()) {
+            return -1;
+        }
+        int index = matcher.start();
+        return boundary < 0 || index < boundary ? index : -1;
     }
 }
