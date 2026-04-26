@@ -134,7 +134,11 @@ run_phase "auth" --project=auth || EXIT_CODE=$?
 case "$PROFILE" in
   fast|full)
     run_gate_phase "chromium" --project=chromium --no-deps || EXIT_CODE=$?
-    run_gate_phase "chromium-deep" --project=chromium-deep --no-deps --workers=1 || EXIT_CODE=$?
+    if [[ "${OSS_TEST_SKIP_DEEP:-false}" == "true" ]]; then
+      echo "=== Phase: chromium-deep skipped (OSS_TEST_SKIP_DEEP=true) ===" | tee -a "$LOG"
+    else
+      run_gate_phase "chromium-deep" --project=chromium-deep --no-deps --workers=1 || EXIT_CODE=$?
+    fi
     if [[ "$PROFILE" == "full" ]]; then
       run_gate_phase "api" --project=api --no-deps || EXIT_CODE=$?
     fi

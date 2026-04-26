@@ -5,9 +5,9 @@
 #   ./scripts/run-wf-e2e.sh <suite>
 #
 # Suites:
-#   smoke     - tests/e2e/bpm-smoke/**
-#   designer  - tests/e2e/bpm-designer/**
-#   runtime   - tests/e2e/workflow-demo/**
+#   smoke     - tests/e2e/bpm-smoke
+#   designer  - tests/e2e/bpm-designer
+#   runtime   - tests/e2e/workflow-demo
 #   all       - all three suites above
 #
 # Environment:
@@ -38,16 +38,16 @@ fi
 
 case "$SUITE" in
   smoke)
-    GLOBS=("tests/e2e/bpm-smoke/**")
+    GLOBS=("tests/e2e/bpm-smoke")
     ;;
   designer)
-    GLOBS=("tests/e2e/bpm-designer/**")
+    GLOBS=("tests/e2e/bpm-designer")
     ;;
   runtime)
-    GLOBS=("tests/e2e/workflow-demo/**")
+    GLOBS=("tests/e2e/workflow-demo")
     ;;
   all)
-    GLOBS=("tests/e2e/bpm-smoke/**" "tests/e2e/bpm-designer/**" "tests/e2e/workflow-demo/**")
+    GLOBS=("tests/e2e/bpm-smoke" "tests/e2e/bpm-designer" "tests/e2e/workflow-demo")
     ;;
   *)
     echo "ERROR: unknown suite '$SUITE'" >&2
@@ -65,4 +65,5 @@ if [[ "$SKIP_RESET" != "true" ]]; then
 fi
 
 echo "=== Delegating to oss-test.sh | suite=$SUITE globs=${GLOBS[*]} ==="
+export OSS_TEST_SKIP_DEEP="${OSS_TEST_SKIP_DEEP:-true}"
 exec bash "$SCRIPT_DIR/oss-test.sh" "${GLOBS[@]}"

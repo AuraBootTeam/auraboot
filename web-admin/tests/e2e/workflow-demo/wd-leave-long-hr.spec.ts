@@ -9,8 +9,6 @@ import {
   processTask,
 } from '../../helpers/wd-fixtures';
 
-const BACKEND = 'http://localhost:6443';
-
 /**
  * R2 — Long leave (days=10) → Drools routes to wd_hr → HR approves
  *      → process completed, business record status = approved.

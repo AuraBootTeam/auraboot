@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:smart="http://smartengine.org/schema/process" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://auraboot.com/bpm">
+
+  <process id="e2e_designer_ca_parent_1777185115781" name="D5 Parent e2e_designer_ca_parent_1777185115781" isExecutable="true">
+
+    <startEvent id="start_1" name="Start"/>
+
+    <callActivity id="call_1" name="Call Child" calledElement="e2e_designer_ca_child_1777185115781" smart:calledElementVersion="1.0.0">
+      <extensionElements>
+      <smart:properties>
+        <smart:property name="aura.callMappings" value="{&quot;inputs&quot;:{&quot;applicantId&quot;:&quot;childApplicantId&quot;},&quot;outputs&quot;:{&quot;childResult&quot;:&quot;parentResult&quot;}}"/>
+      </smart:properties>
+      </extensionElements>
+    </callActivity>
+    <endEvent id="end_1" name="End"/>
+
+    <sequenceFlow id="edge-start_1-call_1" sourceRef="start_1" targetRef="call_1"/>
+
+    <sequenceFlow id="edge-call_1-end_1" sourceRef="call_1" targetRef="end_1"/>
+  </process>
+
+</definitions>

@@ -10,19 +10,10 @@
  *   L2 — BPMN XML: userTask flow element present, formKey attribute matches formRef
  *   L3 — runtime: start instance, advance through task_manager_approve, final status = completed
  *
- * L3-extended (runtime form schema via GET /api/bpm/forms/task/{taskId}) is in a
- * separate test.fixme because of a product gap: the frontend save path stores
- * formBinding only inside designerJson.nodes[*].data.formBinding but never
- * extracts it into the top-level form_bindings column. BpmFormService.loadFormBindings()
- * reads from the form_bindings column (not designerJson), so getFormBindingForNode()
- * always returns null for designer-configured processes until
- * ProcessDeploymentService.deploy() is wired to materialise node-level formBinding
- * configs into form_bindings: { [nodeId]: FormBindingConfig }.
- *
- * CONCERN: startInstanceAndAdvance helper (bpm-assertions.ts line 415) calls
- *   POST /api/bpm/tasks/{taskId}/complete — but task spec says real endpoint is
- *   /approve. If the backend only accepts /approve, L3 will fail at runtime.
- *   The helper is NOT modified in this task per red-line rules; surface here for follow-up.
+ * L3-extended verifies runtime form schema via
+ * GET /api/bpm/forms/task/{taskId}. ProcessDeploymentService.deploy()
+ * materialises node-level formBinding configs into form_bindings so
+ * BpmFormService can resolve task form metadata at runtime.
  *
  * Red lines honoured:
  *   - page.goto only for /login
@@ -149,9 +140,8 @@ test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => 
     // -------------------------------------------------------------------------
     // L3 — Runtime: start instance, advance, assert completed
     //
-    // CONCERN: startInstanceAndAdvance posts to /complete (line 415 in bpm-assertions.ts).
-    // Task spec states real endpoint is /approve. If backend rejects /complete,
-    // this step will fail. Do NOT modify the helper — flag for follow-up.
+    // startInstanceAndAdvance drives the backend task completion endpoint and
+    // verifies the process reaches completed status.
     // -------------------------------------------------------------------------
     const { instanceId, finalStatus } = await startInstanceAndAdvance(
       request,
@@ -167,19 +157,9 @@ test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => 
   // ---------------------------------------------------------------------------
   // L3-extended — Runtime form schema via GET /api/bpm/forms/task/{taskId}
   //
-  // FIXME: Product gap — BpmFormService.loadFormBindings() reads from the
-  // form_bindings DB column (ab_bpm_process_definition.form_bindings). The
-  // frontend designer save path (bpmnService.createProcessDefinition) stores
-  // formBinding only inside designerJson.nodes[*].data.formBinding and never
-  // extracts it into the top-level formBindings request field. As a result,
-  // form_bindings is always {} and getFormBindingForNode() always returns null.
-  //
-  // Fix required: in ProcessDeploymentService.deploy() (or in the save handler),
-  // parse designerJson.nodes, extract each userTask's data.formBinding, and
-  // write them into form_bindings as { [nodeId]: FormBindingConfig }.
-  //
-  // Until then, GET /api/bpm/forms/task/{taskId} returns formBinding: null for
-  // all processes configured via the designer, so this assertion cannot pass.
+  // ProcessDeploymentService.deploy() materialises designerJson node-level
+  // formBinding into form_bindings, allowing BpmFormService to resolve
+  // task form metadata at runtime.
   // ---------------------------------------------------------------------------
   test(
     'L3-extended: runtime GET /api/bpm/forms/task/{taskId} returns fieldPermissions',

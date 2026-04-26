@@ -4,6 +4,7 @@ import { test, expect, type Page } from '../../fixtures';
 import { loginAs, loginViaUI } from '../../helpers/wd-fixtures';
 
 const LICENSE_FILE = fileURLToPath(new URL('../../../../LICENSE.txt', import.meta.url));
+const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
 
 test.setTimeout(60_000);
 
@@ -95,7 +96,7 @@ test.describe('workflow-demo — leave request form page', () => {
     const { context, page } = await createAdminSession(browser);
 
     const ccAdminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
-    const meResp = await request.get('http://localhost:6443/api/auth/me', {
+    const meResp = await request.get(`${BACKEND}/api/auth/me`, {
       headers: { Authorization: `Bearer ${ccAdminToken}` },
     });
     expect(meResp.ok()).toBeTruthy();

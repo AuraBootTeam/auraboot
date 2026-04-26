@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:smart="http://smartengine.org/schema/process" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://auraboot.com/bpm">
+
+  <process id="e2e_designer_svc_1777185164433" name="D3 SvcTask e2e_designer_svc_1777185164433" isExecutable="true">
+
+    <startEvent id="start_1" name="Start"/>
+
+    <serviceTask id="svc_1" name="Echo Command" smart:class="commandServiceTaskDelegate"/>
+
+    <endEvent id="end_1" name="End"/>
+
+    <sequenceFlow id="edge-start_1-svc_1" sourceRef="start_1" targetRef="svc_1"/>
+
+    <sequenceFlow id="edge-svc_1-end_1" sourceRef="svc_1" targetRef="end_1"/>
+  </process>
+
+</definitions>

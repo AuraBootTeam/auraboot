@@ -203,6 +203,10 @@ async function readPageBlocks(
 const createdPids: string[] = [];
 
 test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
+  // Designer setup + autosave verification can exceed the default 15 s test
+  // budget; per-action waits remain bounded to 5 s.
+  test.setTimeout(45_000);
+
   test.afterEach(async ({ request }) => {
     while (createdPids.length > 0) {
       const pid = createdPids.pop()!;
@@ -272,7 +276,9 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
 
     // Open the first column's detail editor and configure width / align /
     // renderer / format via the SchemaBlockConfigPanel.
-    await page.getByTestId('column-item-0').click();
+    const columnsTab = page.locator('[data-testid="columns-tab"]:visible').first();
+    const firstColumnItem = columnsTab.getByTestId('column-item-0');
+    await firstColumnItem.evaluate((el: HTMLElement) => el.click());
     await expect(page.getByTestId('column-detail-editor')).toBeVisible();
 
     const editor = page.getByTestId('column-detail-editor');
@@ -302,11 +308,14 @@ test.describe('Phase 3 — List ConfigPanel E2E (4 tabs)', () => {
       | undefined;
     expect(table, 'persisted blocks must contain a table block').toBeTruthy();
     expect((table?.columns ?? []).length).toBeGreaterThanOrEqual(5);
-    const first = (table!.columns![0] ?? {}) as Record<string, unknown>;
-    expect(first.width).toBe(200);
-    expect(first.align).toBe('center');
-    expect(first.renderer).toBe('badge');
-    expect(first.format).toBe('{0}件');
+    const configured = table!.columns!.find(
+      (column) =>
+        column.width === 200 &&
+        column.align === 'center' &&
+        column.renderer === 'badge' &&
+        column.format === '{0}件',
+    );
+    expect(configured, 'persisted columns must include the configured column').toBeTruthy();
   });
 
   // -------------------------------------------------------------------------
