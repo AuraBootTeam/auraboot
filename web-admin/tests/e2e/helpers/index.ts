@@ -133,15 +133,32 @@ export async function waitForDynamicPageLoad(page: Page, timeout = 10000): Promi
   const spinner = page.locator('.animate-spin, [data-testid="loading"]');
   await expect(spinner).not.toBeVisible({ timeout: Math.min(timeout, 5000) }).catch(() => {});
 
-  // Verify meaningful content appeared
-  const content = page.locator(
-    '.ant-table, table, [data-testid="dynamic-list"], [data-testid="table-block"], form, .ant-form, [role="table"], main',
-  );
-  await content
-    .first()
-    .waitFor({ state: 'visible', timeout: Math.min(timeout, 5000) })
+  // Dynamic pages often render the outer <main> immediately and mount actual
+  // list/form content ~1-2s later after schema + lazy chunks resolve. Waiting
+  // for <main> alone lets deep tests race against empty shells.
+  const contentTimeout = Math.min(timeout, 8000);
+  await expect
+    .poll(
+      async () => {
+        const signals = await Promise.all([
+          page.locator('[data-testid="toolbar-more-menu"]').first().isVisible().catch(() => false),
+          page.locator('[data-testid^="toolbar-btn-"]').first().isVisible().catch(() => false),
+          page.locator('nav[aria-label="Tabs"] button').first().isVisible().catch(() => false),
+          page.locator('thead th, [role="columnheader"]').first().isVisible().catch(() => false),
+          page.locator('tbody tr').first().isVisible().catch(() => false),
+          page.locator('[data-testid^="form-field-"]').first().isVisible().catch(() => false),
+          page.locator('form, .ant-form').first().isVisible().catch(() => false),
+          page.locator('.react-flow, [data-testid="flow-canvas"], [data-testid="rf__wrapper"]').first().isVisible().catch(() => false),
+          page.locator('[role="alert"], .text-red-600, .text-red-800').first().isVisible().catch(() => false),
+        ]);
+        return signals.some(Boolean);
+      },
+      { timeout: contentTimeout, intervals: [100, 250, 500] },
+    )
+    .toBe(true)
     .catch(() => {
-      // Page may have a different layout - not necessarily an error
+      // Leave assertions to callers. This helper only blocks until the page has
+      // a realistic chance of being interactive.
     });
 }
 
