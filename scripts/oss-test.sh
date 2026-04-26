@@ -10,6 +10,15 @@
 #
 # Reads:  oss-scope.json (at repo root)
 # Invokes: web-admin/npx playwright test <paths...>
+#
+# Strategy:
+#   - auth / regular / deep are all part of the OSS full gate
+#   - regular and deep run sequentially, not in one mixed invocation
+#   - deep correctness matters, but heavy specs must not contend with the main
+#     suite for browser/dev-server resources
+#   - this script assumes reset-and-init (or an equivalent manual start) has
+#     already brought backend + web + bff online, so Playwright should reuse
+#     the running services instead of starting another webServer per phase
 
 set -euo pipefail
 
@@ -64,11 +73,13 @@ while IFS= read -r entry; do
 done < <(jq -r '.test_paths[]' "$SCOPE_FILE")
 
 PW_CONFIG="${CONFIG_OVERRIDE:-playwright.oss.config.ts}"
+export PW_SKIP_WEBSERVER="${PW_SKIP_WEBSERVER:-1}"
 
 echo "=== AuraBoot OSS Test Runner ==="
 echo "Scope file:    $SCOPE_FILE"
 echo "Spec files:    $COUNT"
 echo "Playwright config: $PW_CONFIG"
+echo "Reuse running web server: PW_SKIP_WEBSERVER=$PW_SKIP_WEBSERVER"
 if [[ -n "$SUITE_LABEL" ]]; then
   echo "Suite:         $SUITE_LABEL"
 fi
@@ -94,4 +105,43 @@ LOG="/tmp/pw-oss-$(date +%Y%m%d-%H%M%S).log"
 echo "Log: $LOG"
 echo ""
 
-NO_PROXY=localhost npx playwright test -c "$PW_CONFIG" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} 2>&1 | tee "$LOG"
+run_phase() {
+  local label="$1"
+  shift
+
+  echo "=== Phase: $label ===" | tee -a "$LOG"
+  NO_PROXY=localhost npx playwright test -c "$PW_CONFIG" "$@" 2>&1 | tee -a "$LOG"
+}
+
+run_gate_phase() {
+  local label="$1"
+  shift
+
+  echo "=== Phase: $label ===" | tee -a "$LOG"
+  NO_PROXY=localhost npx playwright test -c "$PW_CONFIG" "$@" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"} 2>&1 | tee -a "$LOG"
+}
+
+if [[ "$PW_CONFIG" != "playwright.oss.config.ts" ]]; then
+  run_gate_phase "suite"
+  exit ${PIPESTATUS[0]}
+fi
+
+PROFILE="${PW_PROFILE:-fast}"
+EXIT_CODE=0
+
+run_phase "auth" --project=auth || EXIT_CODE=$?
+
+case "$PROFILE" in
+  fast|full)
+    run_gate_phase "chromium" --project=chromium --no-deps || EXIT_CODE=$?
+    run_gate_phase "chromium-deep" --project=chromium-deep --no-deps --workers=1 || EXIT_CODE=$?
+    if [[ "$PROFILE" == "full" ]]; then
+      run_gate_phase "api" --project=api --no-deps || EXIT_CODE=$?
+    fi
+    ;;
+  *)
+    run_gate_phase "$PROFILE" || EXIT_CODE=$?
+    ;;
+esac
+
+exit "$EXIT_CODE"
