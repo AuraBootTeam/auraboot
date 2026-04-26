@@ -12,5 +12,19 @@
       "titleField": "sc_name",
       "subtitleField": "sc_code"
     }
+  },
+  {
+    "code": "sc_monthly_metric",
+    "displayName:zh-CN": "月度指标",
+    "displayName:en": "Monthly Metric",
+    "description": "Child model of showcase_all_fields. One row per (showcase, month). Drives the MonthlyGrid detail block (parentModel = showcase_all_fields, parentField = pid, childModel = sc_monthly_metric, childParentField = sc_showcase_pid, monthField = sc_month).",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "BarChart",
+      "category": "showcase",
+      "parentModel": "showcase_all_fields",
+      "parentField": "sc_showcase_pid"
+    }
   }
 ]
