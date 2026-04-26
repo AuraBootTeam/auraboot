@@ -1,12 +1,43 @@
 # ConversationTurnService Phase A 执行方案 v4（定稿）
 
-**状态**：execution plan v4 — owner 已定 Q-A.4-Q-A.7 决策，可开干
-**日期**：2026-04-26（v1 → v2 → v3 → v4 同日四轮）
-**分支**：`feat/conversation-turn-service-phase-a`（A.1 SPI 已 push）
+**状态**：execution plan v4.1 — A.1 + A.2 + A.2b 已落地；**A.3 起在新 session 续做**
+**日期**：2026-04-26 起稿 / 2026-04-27 进度更新
+**分支**：`feat/conversation-turn-service-phase-a`
 **关联**：
 - `auraboot/docs/plans/2026-04/2026-04-26-conversation-turn-service-design.md` v3.3
 - `feedback_verify_source_before_arch_decision.md`
 - AGENTS.md `### 长期演进视角`（owner 决策应用此规则）
+
+---
+
+## 0. 进度（截至 2026-04-27 session 1）
+
+| 步骤 | 状态 | Commit |
+|------|------|--------|
+| A.1 SPI + DTOs | ✅ DONE | `36715e55` (feature branch) |
+| A.2 SseResponseSink + ResponseSink SPI v4 update + TurnRequest.legacyRequest | ✅ DONE | `7234fce2` (feature branch) |
+| A.2b SSE pre-refactor baseline lock (sha256) | ✅ DONE | `d0766d79` (OSS main) |
+| **A.3 chatService split sync core** | ⏸️ **下次 session 起做** | — |
+| A.4 ConversationTurnServiceImpl 真 runTurn | ⏸️ | — |
+| A.5 AuraBotController cutover | ⏸️ | — |
+| A.6 Spring config | ⏸️ | — |
+| A.7 验证 + baseline diff | ⏸️ | — |
+
+### Session 1 真实交付
+
+- **2 个 OSS main commit**（v4 plan + baseline sha256）
+- **1 个 feature branch commit**（A.2 SPI 实施）
+- **1 个 enterprise main commit**（AGENTS.md 长期演进视角硬约束规则，由 owner 在 `19db3eac5` 一并提交）
+- **30+ send* call site inventory** 已 grep 完成（详见 §2.b1）
+- **A.3 真实 scope** 评估：从 v4 plan 估算的 13 处升至 **30+ 处** + 5 helper methods + Anthropic/OpenAI streaming 内嵌 send + 6 处直 `emitter.send/complete` —— 单 session 推 A.3 风险高，停在 A.2b
+
+### Session 1 关键反思（影响后续 session）
+
+1. **每次 review 都要 grep 真实源码**（已写入 `feedback_verify_source_before_arch_decision.md`，同 session 第 4 次违反此规则才在 v4 plan 收敛）
+2. **AGENTS.md 长期演进视角已硬约束**：被问"建议 / 推荐 / 倾向"时默认长期视角，不是短期 risk-averse —— 若 v4 plan 决策（Q-A.4=A'）是这条规则的首次应用案例
+3. **scope 估算错失败**：v4 plan §6 "13 个 send* call site"是基于 grep 早期段的 sample，实际全文有 30+ 处。下次 session A.3 起步前必须先全量 grep 重新估算工时
+
+---
 
 ---
 
@@ -786,11 +817,161 @@ cd /Users/ghj/work/auraboot-worktrees/conv-turn-svc-phase-a/platform
 
 ---
 
+## 14. Next Session Checklist（A.3 起步必查）
+
+新 session 开 A.3 前**必须**走完这一节，避免本 session 已踩过的坑。
+
+### 14.1 Worktree + 分支验证
+
+```bash
+# worktree 还在
+ls /Users/ghj/work/auraboot-worktrees/conv-turn-svc-phase-a/ | head -3
+
+# 分支正确
+cd /Users/ghj/work/auraboot-worktrees/conv-turn-svc-phase-a
+git branch --show-current  # 应为 feat/conversation-turn-service-phase-a
+git log --oneline -5       # 应见 7234fce2 (A.2) + 36715e55 (A.1)
+
+# 拉远端最新（其他 session 可能 push 过）
+git fetch origin
+git status -sb  # 与 origin 应 in sync
+```
+
+### 14.2 SSE baseline 文件状态（CRITICAL）
+
+`/tmp/sse-pre-refactor/*` 是 machine-local，**机器重启会丢失**。新 session 开 A.3 前必查：
+
+```bash
+# 检查 baseline 是否还在
+ls /tmp/sse-pre-refactor/ 2>&1
+# 期望见: 4 .raw + 4 .events + 4 .shape
+
+# 如还在 → 验证 sha256 与 repo 一致
+sha256sum /tmp/sse-pre-refactor/*.events /tmp/sse-pre-refactor/*.shape \
+  | diff - /Users/ghj/work/auraboot/auraboot/docs/plans/2026-04/sse-baseline-2026-04-26.sha256
+
+# 如 sha256 不一致 → baseline 已被污染（可能后端跑了 A.3+ 代码后录的），STOP，按下方 14.3 重录
+# 如完全丢失 → 按 14.3 重录
+```
+
+### 14.3 Baseline 重录恢复程序（如丢失）
+
+**关键前置**：必须确认后端跑的是 **pre-A.3 的 OSS jar**。
+
+```bash
+# 1. 验证后端进程不来自 worktree
+ps -ef | grep -E "MetaApplication|java.*platform" | grep -v grep | head -1
+# 如包含 "conv-turn-svc-phase-a" → STOP，后端是 worktree 跑的，不能录 baseline
+
+# 2. 确认 mavenLocal 的 auraboot-core 是 pre-A.3
+ls -la ~/.m2/repository/com/auraboot/auraboot-core/1.0.0-SNAPSHOT/auraboot-core-1.0.0-SNAPSHOT.jar
+# 如 last-modified 在 A.2 commit (2026-04-26) 之后 → mavenLocal 已被污染，需 owner 协助恢复
+
+# 3. 重录（用 v4 plan §5 A.2b 的脚本）
+TOKEN=$(curl -s -X POST http://localhost:6443/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"Test2026x"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['jwt'])")
+
+mkdir -p /tmp/sse-pre-refactor
+for SCENARIO in "trivial-greeting:你好" "explain-with-context:这个表单有哪些字段" "platform-query:查询本月销售" "general-question:介绍一下AuraBot"; do
+    NAME="${SCENARIO%%:*}"; MSG="${SCENARIO#*:}"
+    BODY=$(python3 -c "import json; print(json.dumps({'message': '$MSG', 'agentCode': 'aurabot'}))")
+    NO_PROXY=localhost curl -s -N \
+        -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+        -d "$BODY" --max-time 30 \
+        http://localhost:6443/api/ai/aurabot/chat/stream \
+        > /tmp/sse-pre-refactor/${NAME}.raw
+
+    grep "^event:" /tmp/sse-pre-refactor/${NAME}.raw | sort -u > /tmp/sse-pre-refactor/${NAME}.events
+    grep "^data:" /tmp/sse-pre-refactor/${NAME}.raw | sed 's/^data://' | python3 -c "
+import sys, json
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    try:
+        obj = json.loads(line)
+        keys = sorted(obj.keys()) if isinstance(obj, dict) else []
+        print(json.dumps({'top_keys': keys}))
+    except: pass
+" > /tmp/sse-pre-refactor/${NAME}.shape
+done
+
+# 4. 验证 sha256 与 repo 一致
+sha256sum /tmp/sse-pre-refactor/*.events /tmp/sse-pre-refactor/*.shape \
+  | diff - /Users/ghj/work/auraboot/auraboot/docs/plans/2026-04/sse-baseline-2026-04-26.sha256
+# 如 diff 不为空 → baseline 与 repo 漂移，需调查（可能 LLM 输出影响了 shape，或新 model）
+```
+
+### 14.4 A.3 真实 scope 重新评估
+
+v4 plan §6 估"13 send* call sites"是错的。新 session 必须先：
+
+```bash
+cd /Users/ghj/work/auraboot-worktrees/conv-turn-svc-phase-a/platform/src/main/java/com/auraboot/framework/aurabot/service
+
+# 完整 inventory
+echo "===== send* call sites ====="
+grep -nE 'send(Chunk|Done|Error|ToolStart|ToolResult|ConfirmRequired|Event)\(emitter' AuraBotChatService.java | wc -l
+# 期望 30+
+
+echo "===== streamFinalResponse / streamTextContent / sendEvent ====="
+grep -nE 'stream(FinalResponse|TextContent)\(' AuraBotChatService.java
+
+echo "===== emitter.complete / emitter.send 直调 ====="
+grep -nE 'emitter\.(complete|send)' AuraBotChatService.java | wc -l
+# 期望 6+
+
+echo "===== Anthropic + OpenAI streaming 内嵌 ====="
+grep -nE 'sendChunk\(emitter|sendDone\(emitter|sendError\(emitter' AuraBotChatService.java | awk -F: '$2 > 1100'
+# 应见 line 1239/1246/1253 等
+```
+
+### 14.5 A.3 实施顺序建议（避免漏点）
+
+按这个顺序操作可降低漏 send* 替换的风险：
+
+1. **新增 sync core 入口签名**：`executeAuraBotTurn(TurnContext, ChatRequest, ResponseSink): TurnOutcome`，body 暂时调旧 doStreamChatInner 适配（先编译过）
+2. **改 doStreamChat 入口分支**：agentCode != aurabot 早 return；aurabot 路径调 doStreamChatInnerSinkAware
+3. **doStreamChatInner → doStreamChatInnerSinkAware 重命名 + 改签名收 sink 返 TurnOutcome**：先改方法签名，再改内部 send → sink
+4. **逐个 send* 替换**（按 §6 的 13+ 替换映射表 + 全量 inventory）：每替换 5 处 → compile + 跑 grep gate 检查残留
+5. **streamFinalResponse 改签名收 sink 返 TurnOutcome**：4 个 caller 同步改
+6. **streamTextContent inline 删除**（只 1 处用，inline `sink.onTextChunk + sink.onDone`）
+7. **doResumeAfterConfirmation 同样路径改造**
+8. **Anthropic + OpenAI streaming 内嵌 send 替换**（line 1239/1246/1253，line 1391/1414 等直 emitter.send/complete）
+9. **streamChat legacy wrapper**：构造 SseResponseSink + TurnContext.legacyDefault + 调 executeAuraBotTurn
+10. **grep gate 通过**：严格 pattern + 白名单
+11. **SSE baseline diff**（A.7 step 简版，每改完一段就跑一次防漂移）
+12. **commit + push**
+
+### 14.6 A.4-A.7 概览（A.3 完成后才进）
+
+- **A.4** ConversationTurnServiceImpl 真 runTurn —— 30 行新 service 代码 + 单测
+- **A.5** AuraBotController cutover —— 70 行 controller 改 + named agent 路由保留
+- **A.6** Spring config —— 30 行 config + Micrometer counter
+- **A.7** 完整验收 —— SSE diff + sender_type + worktree 前端 E2E + 后端身份校验
+
+### 14.7 反思应用（避免本 session 错误）
+
+新 session 必须遵守的（per AGENTS.md `### 长期演进视角`）：
+
+1. **改大文件前先全量 grep**——A.3 不要假设"v4 plan 估的 13 处"是对的，必须重新 inventory
+2. **每改 5 处 → 编译 + grep 残留**——不要堆 50 处一起改再编译
+3. **被问"建议"时默认长期视角**——不要再返回到 v2 那种 risk-averse 短期立场
+4. **scope 严重低估时停下报告**——本 session 在 grep 出 30+ call sites 后停 A.3 是正确选择，新 session 再开
+
+---
+
 ## CHANGELOG
 
 - 2026-04-26 v1 初始化（被否决：6 P0/P1 + 4 P2）
 - 2026-04-26 v2 重写：scope 收敛"不重构"+ shadow endpoint
 - 2026-04-26 v3 反思：长期演进推翻 v2，重构 aurabot 主路径但保留 shadow
+- 2026-04-27 v4.1 session 1 收尾 + handover for next session：
+  - A.1 / A.2 / A.2b 落地，commits 锁定（feature branch 7234fce2 + OSS main d0766d79）
+  - 新增 §0 进度 + §14 Next Session Checklist（worktree 验证 / baseline 恢复 / A.3 真实 scope inventory / 实施顺序 / 反思应用）
+  - 关键发现：v4 plan §6 "13 send* call sites" 严重低估（实际 30+ + 5 helper methods + Anthropic/OpenAI 内嵌 send），A.3 不能在已耗大量上下文的 session 推完，停在 A.2b 是正确选择
+  - 反思入档：每改大文件前必须全量 grep 重新估算 scope（本 session 第 4 次违反 verify-source 规则才在 v4 plan 收敛）
 - 2026-04-26 v4 owner 拍板 Q-A.4=A'：sync core + async only at controller boundary
   - chatService split: 新 sync core executeAuraBotTurn(...): TurnOutcome
   - runTurn 真实现 SPI（不 cast）
