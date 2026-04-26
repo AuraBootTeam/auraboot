@@ -150,7 +150,57 @@ echo "[ga-e2e-bootstrap] provisioning test users..."
 provision_user "e2e-operator@test.com" "Test2026x" "operator"
 provision_user "e2e-viewer@test.com"   "Test2026x" "viewer"
 
+# 4. Seed showcase records via the OSS playwright seed config.
+# Skip with SKIP_SEED=1 if the operator has already seeded (e.g. during a
+# tight rerun loop). The seed run uses tests/storage/admin.json from a
+# prior auth.setup; if missing, generate it via a quick auth-only run.
+if [ "${SKIP_SEED:-0}" = "1" ]; then
+  echo "[ga-e2e-bootstrap] SKIP_SEED=1 — skipping showcase data seed"
+else
+  echo "[ga-e2e-bootstrap] seeding showcase records..."
+  cd web-admin
+
+  if [ ! -f tests/storage/admin.json ]; then
+    echo "  No admin.json found — running auth.setup to generate it..."
+    PLAYWRIGHT_BASE_URL=http://localhost:5174 PW_SKIP_WEBSERVER=1 NO_PROXY=localhost \
+      npx playwright test tests/auth.setup.ts -g "authenticate as admin" \
+      --reporter=line >/dev/null 2>&1 || true
+  fi
+
+  if [ ! -f tests/storage/admin.json ]; then
+    echo "  WARNING: admin.json still missing — skipping seed (auth.setup failed)" >&2
+  else
+    seed_failures=()
+    for seed in data extended workflow ai arsenal supplement commercial; do
+      printf '  seed-showcase-%s ... ' "$seed"
+      if PLAYWRIGHT_BASE_URL=http://localhost:5174 NO_PROXY=localhost \
+           npx playwright test --config=playwright.seed.config.ts \
+             -g "seed-showcase-$seed" --reporter=line \
+             > "/tmp/ga-e2e-seed-$seed.log" 2>&1; then
+        passed=$(grep -oE "[0-9]+ passed" "/tmp/ga-e2e-seed-$seed.log" | head -1)
+        echo "OK ($passed)"
+      else
+        # commercial currently has a pre-existing Quote model gap that fails
+        # one phase even on enterprise; do not block the bootstrap on it.
+        if [ "$seed" = "commercial" ]; then
+          echo "PARTIAL (Quote gap, see /tmp/ga-e2e-seed-$seed.log)"
+        else
+          echo "FAIL (see /tmp/ga-e2e-seed-$seed.log)"
+          seed_failures+=("$seed")
+        fi
+      fi
+    done
+
+    if [ "${#seed_failures[@]}" -gt 0 ]; then
+      echo "[ga-e2e-bootstrap] WARNING: ${#seed_failures[@]} seed run(s) failed:" >&2
+      printf '  - %s\n' "${seed_failures[@]}" >&2
+    fi
+  fi
+  cd ..
+fi
+
+echo
 echo "[ga-e2e-bootstrap] done. Run Playwright with:"
 echo "  cd web-admin"
-echo "  PLAYWRIGHT_BASE_URL=http://localhost:5174 PW_SKIP_WEBSERVER=1 \\"
+echo "  PLAYWRIGHT_BASE_URL=http://localhost:5174 PW_SKIP_WEBSERVER=1 NO_PROXY=localhost \\"
 echo "    npx playwright test ..."
