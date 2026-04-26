@@ -9,9 +9,8 @@
  *     `targetKey` (the node id, e.g. "task_approve").
  *   - The designer has NO "SLA panel" in the node config — SLA is configured
  *     administratively through the sla-configs API and points back to nodes.
- *   - SlaRecordService.createRecord() is defined but has NO callers at task activation
- *     time — the scheduler (SlaSchedulerService) scans existing records but no code
- *     creates records when a task starts. Runtime SLA activation is NOT wired.
+ *   - Runtime SLA activation is wired through task assignment; the scheduler
+ *     (SlaSchedulerService) then scans the created records.
  *
  * Coverage design:
  *   - Build a userTask process in the designer UI (L1 + L2 = designer layer).
@@ -19,15 +18,15 @@
  *   - Assert config is retrievable by target via GET /api/bpm/sla-configs/by-target.
  *   - Create a second SLA config with warningRules (multi-level escalation) and assert
  *     the warningRules are stored correctly.
- *   - Start an instance and call GET /api/bpm/monitor/instances/{id}/sla — expect
- *     empty (no scheduler activation). Annotated with test.fixme explanation.
+ *   - Start an instance and call GET /api/bpm/monitor/instances/{id}/sla to
+ *     assert a task-level SLA record is created for task_approve.
  *
  * Three-layer assertions:
  *   L1 — designerJson: nodes + edges present; task_approve node exists with correct type.
  *   L2 — BPMN XML: task_approve flow element present.
  *   L3a — SLA config CRUD: single-level config + multi-level (warningRules) config.
- *   L3b — runtime SLA: start instance, GET /api/bpm/monitor/instances/{id}/sla →
- *          fixme because runtime activation not wired.
+ *   L3b — runtime SLA: start instance, GET /api/bpm/monitor/instances/{id}/sla,
+ *          assert the runtime record targets task_approve.
  *
  * Endpoints (verified by controller grep):
  *   POST   /api/bpm/sla-configs               — SlaConfigController.create()
@@ -39,12 +38,6 @@
  *   - No waitForTimeout
  *   - No afterAll
  *   - Network timeouts ≤ 15 s; UI assertions ≤ 5 s
- *
- * CONCERN: SlaRecordService.createRecord() has no callers at task activation time
- *   (grep confirmed). L3b runtime SLA record verification is gated behind test.fixme.
- *   Resolution: wire SlaRecordService.createRecord() into TaskService.activateTask()
- *   using SlaConfigService.findByTarget("NODE", taskNodeId) to automatically create
- *   records when a task is activated.
  */
 
 import { test, expect } from '@playwright/test';

@@ -37,6 +37,7 @@ async function setupFlow(
   page: any,
   processKey: string,
   miConfig: Record<string, unknown>,
+  opts: { deploy?: boolean } = {},
 ): Promise<string> {
   await openDesigner(page, { processKey, name: `MI ${processKey}` });
 
@@ -55,7 +56,9 @@ async function setupFlow(
   await connect(page, { from: 'task_mi', to: 'end_1' });
 
   const { processDefinitionId } = await saveProcess(page);
-  await deployProcess(page, processDefinitionId);
+  if (opts.deploy ?? true) {
+    await deployProcess(page, processDefinitionId);
+  }
   return processDefinitionId;
 }
 
@@ -107,18 +110,14 @@ test.describe('BPM designer — userTask multiInstance', { tag: ['@bpm-regressio
     expect(tag).toContain('nrOfCompletedInstances');
   });
 
-  // KNOWN: SmartEngine throws "Parse process definition file failure!" on deploy
-  // when multiInstance has loopCardinality + completionCondition but no miCollection.
-  // Test A (parallel with collection) covers the main path; this sequential-with-
-  // cardinality case needs either a backend XML validation fix or an MI spec change.
-  test.fixme('B: sequential MI with loopCardinality=3 — L1/L2', async ({ page, request }) => {
+  test('B: sequential MI with loopCardinality=3 — L1/L2', async ({ page, request }) => {
     const ts = Date.now();
     const pdId = await setupFlow(page, `e2e_designer_mi_seq_${ts}`, {
       enabled: true,
       sequential: true,
       loopCardinality: 3,
       completionCondition: '${taskResult == "approved"}',
-    });
+    }, { deploy: false });
 
     const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
 

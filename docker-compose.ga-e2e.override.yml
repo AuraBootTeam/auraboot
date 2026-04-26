@@ -88,6 +88,7 @@ services:
       # BFF_INTERNAL_URL to in-container localhost:3500 keeps SSR fetches
       # on the loopback inside the same container that runs vite + BFF.
       BFF_INTERNAL_URL: http://localhost:3500
+      PUPPETEER_SKIP_DOWNLOAD: "true"
     volumes:
       # Bind-mount the whole repo so workspace deps + plugins resolve and
       # hot-reload works the same way as host-mode dev.

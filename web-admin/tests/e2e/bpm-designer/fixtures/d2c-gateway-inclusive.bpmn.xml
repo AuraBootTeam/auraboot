@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             targetNamespace="http://auraboot.com/bpm"
+             id="def_e2e_designer_gw_incl_1777185125990">
+  <process id="e2e_designer_gw_incl_1777185125990" name="D2 Incl GW 1777185125990" isExecutable="true">
+    <startEvent id="start_1"/>
+    <inclusiveGateway id="gw_incl" name="Which flags?"/>
+    <userTask id="task_x" name="Task X"/>
+    <userTask id="task_y" name="Task Y"/>
+    <inclusiveGateway id="gw_incl_join" name="Join"/>
+    <endEvent id="end_1"/>
+    <sequenceFlow id="e_start_incl" sourceRef="start_1" targetRef="gw_incl"/>
+    <sequenceFlow id="e_incl_x" sourceRef="gw_incl" targetRef="task_x">
+      <conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:type="tFormalExpression">${flags.x==true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="e_incl_y" sourceRef="gw_incl" targetRef="task_y">
+      <conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:type="tFormalExpression">${flags.y==true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="e_x_join" sourceRef="task_x" targetRef="gw_incl_join"/>
+    <sequenceFlow id="e_y_join" sourceRef="task_y" targetRef="gw_incl_join"/>
+    <sequenceFlow id="e_join_end" sourceRef="gw_incl_join" targetRef="end_1"/>
+  </process>
+</definitions>
