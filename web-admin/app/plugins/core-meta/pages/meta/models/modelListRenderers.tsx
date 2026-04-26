@@ -82,6 +82,7 @@ function ModelActionsCell({ record }: { record: Record<string, any> }) {
     <div className="flex items-center gap-2">
       <button
         type="button"
+        data-testid="row-action-view"
         onClick={(event) => {
           event.stopPropagation();
           navigate(`/meta/models/${record.pid}`);
@@ -92,6 +93,7 @@ function ModelActionsCell({ record }: { record: Record<string, any> }) {
       </button>
       <button
         type="button"
+        data-testid="row-action-edit"
         onClick={(event) => {
           event.stopPropagation();
           navigate(`/meta/models/${record.pid}/edit`);
@@ -102,6 +104,7 @@ function ModelActionsCell({ record }: { record: Record<string, any> }) {
       </button>
       <button
         type="button"
+        data-testid="row-action-delete"
         onClick={(event) => {
           event.stopPropagation();
           void handleDelete();
