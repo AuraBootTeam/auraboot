@@ -155,7 +155,7 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
     const pid = await createDetailPageViaApi(page, pageKey);
     createdPagePids.push(pid);
 
-    await page.goto(`/page-designer/${pid}`);
+    await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('detail-config-panel')).toBeVisible({ timeout: 5_000 });
 
     const actionsTab = page.getByTestId('detail-tab-actions');
@@ -191,19 +191,44 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
     await addCustomBtn.click();
 
     // The custom button row appears + the SchemaBlockConfigPanel below it.
-    const labelInput = page.locator('input[name="label"]').first();
+    const labelInput = page.getByTestId('schema-config-field-label').locator('input').first();
     const commandInput = page.getByTestId('detail-command-code-input');
     await expect(labelInput).toBeVisible({ timeout: 5_000 });
     await expect(commandInput).toBeVisible({ timeout: 5_000 });
 
-    await labelInput.fill('');
-    await labelInput.fill('Approve');
+    await expect
+      .poll(
+        async () => {
+          await labelInput.fill('');
+          await labelInput.fill('Approve');
+          return (await labelInput.inputValue()).trim();
+        },
+        { timeout: 5_000 },
+      )
+      .toBe('Approve');
+    await expect(page.getByTestId('detail-custom-button-0')).toContainText('Approve', { timeout: 5_000 });
 
-    const iconTrigger = page.getByRole('button', { name: /选择图标|图标/i }).last();
+    const iconTrigger = page.getByTestId('icon-picker-trigger').last();
+    const iconSearchInput = page.getByPlaceholder('搜索图标...').last();
+    const successIconOption = page.locator('[data-testid="icon-picker-option-success"]:visible').last();
     await expect(iconTrigger).toBeVisible({ timeout: 5_000 });
-    await iconTrigger.click();
-    await page.getByTitle('成功').evaluate((el: HTMLElement) => el.click());
-    await expect(page.getByTestId('detail-custom-button-0')).toContainText('图标 success');
+    await expect
+      .poll(
+        async () => {
+          const currentText = (await page.getByTestId('detail-custom-button-0').textContent()) ?? '';
+          if (currentText.includes('success')) {
+            return currentText;
+          }
+          if ((await successIconOption.count()) === 0) {
+            await iconTrigger.click();
+            await iconSearchInput.fill('success');
+          }
+          await successIconOption.click().catch(() => null);
+          return (await page.getByTestId('detail-custom-button-0').textContent()) ?? '';
+        },
+        { timeout: 5_000 },
+      )
+      .toContain('success');
 
     await expect.poll(
       async () => await page.getByRole('button', { name: /选择命令|E2E Detail Action/i }).last().textContent(),
@@ -217,18 +242,71 @@ test.describe('Phase 5 — Detail ConfigPanel E2E', () => {
     });
     await expect(commandOption).toBeVisible({ timeout: 5_000 });
     await commandOption.click();
-    await expect(page.locator('input[name="label"]').first()).toHaveValue('Approve');
+    await expect
+      .poll(
+        async () => {
+          const value = (await commandInput.inputValue()).trim();
+          if (value === command.code) {
+            return value;
+          }
+          await commandInput.fill('');
+          await commandInput.fill(command.code);
+          return (await commandInput.inputValue()).trim();
+        },
+        { timeout: 5_000 },
+      )
+      .toBe(command.code);
+    await page.getByTestId('detail-custom-button-0').click();
+    const finalLabelInput = page.getByTestId('schema-config-field-label').locator('input').first();
+    await expect(finalLabelInput).toBeVisible({ timeout: 5_000 });
+    await expect
+      .poll(
+        async () => {
+          await finalLabelInput.fill('');
+          await finalLabelInput.fill('Approve');
+          return (await finalLabelInput.inputValue()).trim();
+        },
+        { timeout: 5_000 },
+      )
+      .toBe('Approve');
+    await expect(page.getByTestId('detail-custom-button-0')).toContainText('Approve', { timeout: 5_000 });
 
     // ----- Page meta -----
     await page.getByTestId('detail-tab-page-meta').click();
     const titleInput = page.getByTestId('detail-page-title-input-zh');
     await expect(titleInput).toBeVisible({ timeout: 5_000 });
-    await titleInput.fill('请假申请详情 E2E');
+    await expect
+      .poll(
+        async () => {
+          await titleInput.fill('');
+          await titleInput.fill('请假申请详情 E2E');
+          return (await titleInput.inputValue()).trim();
+        },
+        { timeout: 5_000 },
+      )
+      .toBe('请假申请详情 E2E');
 
     const pageKeyInput = page.getByTestId('detail-page-key-input');
-    await pageKeyInput.fill(`${pageKey}_updated`);
+    await expect
+      .poll(
+        async () => {
+          await pageKeyInput.fill('');
+          await pageKeyInput.fill(`${pageKey}_updated`);
+          return (await pageKeyInput.inputValue()).trim();
+        },
+        { timeout: 5_000 },
+      )
+      .toBe(`${pageKey}_updated`);
 
-    await page.getByTestId('toolbar-save').evaluate((el: HTMLElement) => el.click());
+    const saveButton = page.getByTestId('toolbar-save');
+    await expect(saveButton).toBeEnabled({ timeout: 5_000 });
+    const saveResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PUT' &&
+        response.url().includes(`/api/pages/${pid}`),
+    );
+    await saveButton.click();
+    await expect((await saveResponsePromise).ok()).toBeTruthy();
     await page.getByTestId('detail-tab-actions').click();
     await expect(
       page

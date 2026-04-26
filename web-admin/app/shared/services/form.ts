@@ -119,7 +119,11 @@ export async function getI18nData(locale: string, request: Request) {
     }
 
     const finalLocale = locale || 'zh-CN';
-    const url = new URL(`/api/i18n/${finalLocale}`, request.url).toString();
+    const baseUrl =
+      typeof process !== 'undefined' && process.env?.BFF_INTERNAL_URL
+        ? process.env.BFF_INTERNAL_URL
+        : request.url;
+    const url = new URL(`/api/i18n/${finalLocale}`, baseUrl).toString();
 
     const response = await fetch(url, {
       headers: {

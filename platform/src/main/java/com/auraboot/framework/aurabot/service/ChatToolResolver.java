@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Resolves available tools for AuraBot chat based on user intent and model context.
@@ -39,6 +40,8 @@ public class ChatToolResolver {
     private final GroundingPort groundingPort;
     private final ToolDiscoveryPort toolDiscoveryPort;
     private final SkillPackActivator skillPackActivator;
+    private final Map<String, Boolean> discoveredToolReadOnlyByName = new ConcurrentHashMap<>();
+    private final Map<String, String> discoveredProviderToolCodeByName = new ConcurrentHashMap<>();
 
     @Autowired
     public ChatToolResolver(
@@ -120,7 +123,9 @@ public class ChatToolResolver {
                     .map(this::convertToolDef)
                     .toList());
 
-            // Ensure platform tools are always available (grounding may filter them out)
+            removeSqlFallbackWhenDomainReadToolAvailable(llmTools);
+
+            // Ensure safe platform tools are available (grounding may filter them out)
             ensurePlatformTools(llmTools);
 
             log.info("AuraBot D1: resolved {} tools via ToolDiscoveryPort", llmTools.size());
@@ -139,6 +144,8 @@ public class ChatToolResolver {
      */
     public boolean isReadOnly(String toolName) {
         if (toolName == null) return true;
+        Boolean discoveredReadOnly = discoveredToolReadOnlyByName.get(toolName);
+        if (discoveredReadOnly != null) return discoveredReadOnly;
         // Provider naming (from ToolDiscoveryPort, sanitized)
         if (toolName.startsWith("nq_") || toolName.startsWith("list_") || toolName.startsWith("get_")) return true;
         // Platform tools: all read-only EXCEPT create_model
@@ -148,10 +155,18 @@ public class ChatToolResolver {
         return false;
     }
 
+    /**
+     * Return the exact provider tool code for a sanitized LLM tool name.
+     */
+    public String getProviderToolCode(String toolName) {
+        if (toolName == null) return null;
+        return discoveredProviderToolCodeByName.get(toolName);
+    }
+
     // ==================== Platform Tool Injection ====================
 
-    /** Platform tools that should always be available regardless of grounding result */
-    private static final List<LlmChatRequest.Tool> ALWAYS_AVAILABLE_PLATFORM_TOOLS = List.of(
+    /** Platform form extraction should always be available regardless of grounding result. */
+    private static final LlmChatRequest.Tool PLATFORM_FILL_FORM_TOOL =
             LlmChatRequest.Tool.builder()
                     .name("platform_fill_form")
                     .description("Extract structured data from text (chat transcript, email, notes) "
@@ -167,7 +182,10 @@ public class ChatToolResolver {
                                     "confidence", Map.of("type", "number",
                                             "description", "Overall confidence 0.0-1.0")),
                             "required", List.of("fields")))
-                    .build(),
+                    .build();
+
+    /** SQL remains a fallback only when no domain read tool is available. */
+    private static final LlmChatRequest.Tool PLATFORM_EXECUTE_SQL_TOOL =
             LlmChatRequest.Tool.builder()
                     .name("platform_execute_sql")
                     .description("Execute a read-only SQL SELECT query with safety validation and tenant isolation. "
@@ -181,23 +199,40 @@ public class ChatToolResolver {
                                     "interpretation", Map.of("type", "string",
                                             "description", "Brief interpretation")),
                             "required", List.of("sql")))
-                    .build()
-    );
+                    .build();
 
     /**
      * Ensure platform tools are present in the tool list.
-     * Grounding may filter them out based on intent, but these should always be available.
+     * SQL is not exposed when a model-specific read tool exists, so CRM/list/NQ
+     * tools remain the primary path and SQL cannot bypass their safer contracts.
      */
     private void ensurePlatformTools(List<LlmChatRequest.Tool> tools) {
         Set<String> existing = tools.stream()
                 .map(LlmChatRequest.Tool::getName)
                 .collect(java.util.stream.Collectors.toSet());
 
-        for (LlmChatRequest.Tool pt : ALWAYS_AVAILABLE_PLATFORM_TOOLS) {
-            if (!existing.contains(pt.getName())) {
-                tools.add(pt);
-            }
+        if (!existing.contains(PLATFORM_FILL_FORM_TOOL.getName())) {
+            tools.add(PLATFORM_FILL_FORM_TOOL);
         }
+        if (!hasDomainReadTool(tools) && !existing.contains(PLATFORM_EXECUTE_SQL_TOOL.getName())) {
+            tools.add(PLATFORM_EXECUTE_SQL_TOOL);
+        }
+    }
+
+    private void removeSqlFallbackWhenDomainReadToolAvailable(List<LlmChatRequest.Tool> tools) {
+        if (!hasDomainReadTool(tools)) {
+            return;
+        }
+        tools.removeIf(tool -> "platform_execute_sql".equals(tool.getName()));
+    }
+
+    private boolean hasDomainReadTool(List<LlmChatRequest.Tool> tools) {
+        return tools.stream()
+                .map(LlmChatRequest.Tool::getName)
+                .anyMatch(name -> name.startsWith("nq_")
+                        || name.startsWith("list_")
+                        || name.startsWith("get_")
+                        || (name.startsWith("cmd_") && isReadOnly(name)));
     }
 
     // ==================== Tool Conversion ====================
@@ -209,6 +244,8 @@ public class ChatToolResolver {
         // Use code as tool name — LLM returns this in tool_use calls.
         // Sanitize: replace colons/dots with underscores for LLM function-name compatibility.
         String llmName = toolDef.code().replace(':', '_').replace('.', '_');
+        discoveredToolReadOnlyByName.put(llmName, toolDef.readOnly());
+        discoveredProviderToolCodeByName.put(llmName, toolDef.code());
         String desc = toolDef.description();
         if (toolDef.name() != null && !toolDef.name().isBlank() && !toolDef.name().equals(toolDef.code())) {
             desc = desc + " (" + toolDef.name() + ")";

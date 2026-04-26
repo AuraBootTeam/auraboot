@@ -126,6 +126,43 @@ public class ResultContractEmitter {
         send(emitter, b.build());
     }
 
+    /**
+     * Emit a non-executing action proposal for tools that require explicit
+     * user confirmation before side effects are allowed.
+     */
+    public void emitConfirmationRequired(String toolName, AgentToolDefinition toolDef,
+                                         Map<String, Object> input, long durationMs) {
+        SseEmitter emitter = ChatSseContext.getEmitter();
+        if (emitter == null) return;
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("toolCode", toolName);
+        data.put("riskLevel", toolDef != null ? toolDef.getRiskLevel() : null);
+        data.put("confirmationPolicy", toolDef != null ? toolDef.getConfirmationPolicy() : null);
+        data.put("prefillInput", input != null ? input : Map.of());
+
+        ResultContract.SuggestedAction action = ResultContract.SuggestedAction.builder()
+                .label("Confirm and execute")
+                .skillCode(toolName)
+                .prefillInput(input != null ? input : Map.of())
+                .build();
+
+        ResultContract contract = ResultContract.builder()
+                .skillCode(toolName)
+                .durationMs(durationMs)
+                .status("partial_success")
+                .actionability("propose")
+                .outputType("action_proposal")
+                .renderHint("card")
+                .data(data)
+                .textSummary("Confirmation required before execution")
+                .suggestedActions(List.of(action))
+                .canContinueFrom(true)
+                .build();
+
+        send(emitter, contract);
+    }
+
     private String resolveActionability() {
         BusinessIntentFrame bif = BifContext.getCurrentBif();
         if (bif != null && bif.getActionability() != null) return bif.getActionability();

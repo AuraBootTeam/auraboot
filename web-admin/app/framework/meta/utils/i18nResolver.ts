@@ -276,6 +276,12 @@ const CONFIRM_DIALOG_FALLBACKS: Record<string, { title: string; content: string 
   'confirm.delete': { title: '确认删除', content: '此操作不可撤销，确定要删除吗？' },
   'confirm.archive': { title: '确认归档', content: '归档后将无法编辑，确定要归档吗？' },
   'confirm.submit': { title: '确认提交', content: '提交后将进入审批流程，确定要提交吗？' },
+  'confirm.cancel': { title: '确认取消', content: '取消后当前业务状态将终止，确定继续吗？' },
+  'confirm.finalize': { title: '确认定稿', content: '定稿后需求将锁定，确定继续吗？' },
+  'confirm.convert': {
+    title: '确认转换',
+    content: '系统将基于当前记录生成下一环节业务单据，确定继续吗？',
+  },
 };
 
 export function resolveConfirmDialog(
