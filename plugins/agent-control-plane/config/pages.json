@@ -69,7 +69,8 @@
               "type": "navigate",
               "to": "agent_definition_form",
               "command": "acp:update_agent_definition"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "delete",
@@ -79,7 +80,8 @@
             "action": {
               "type": "command",
               "command": "acp:delete_agent_definition"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -400,7 +402,8 @@
               "type": "navigate",
               "to": "mission_form",
               "command": "acp:update_mission"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "pause",
@@ -410,7 +413,8 @@
             "action": {
               "type": "command",
               "command": "acp:pause_mission"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "resume",
@@ -421,7 +425,8 @@
             "action": {
               "type": "command",
               "command": "acp:resume_mission"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "complete",
@@ -432,7 +437,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:complete_mission"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "archive",
@@ -442,7 +448,8 @@
             "action": {
               "type": "command",
               "command": "acp:archive_mission"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "delete",
@@ -452,7 +459,8 @@
             "action": {
               "type": "command",
               "command": "acp:delete_mission"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -611,7 +619,8 @@
               "type": "navigate",
               "to": "agent_task_form",
               "command": "acp:update_agent_task"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "dispatch",
@@ -632,7 +641,8 @@
                   "successMessage": "Task dispatched successfully"
                 }
               ]
-            }
+            },
+            "type": "system"
           },
           {
             "code": "start",
@@ -643,7 +653,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:start_task"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "complete",
@@ -654,7 +665,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:complete_task"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "block",
@@ -665,7 +677,8 @@
             "action": {
               "type": "command",
               "command": "acp:block_task"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "cancel",
@@ -676,7 +689,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:cancel_task"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "delete",
@@ -686,7 +700,8 @@
             "action": {
               "type": "command",
               "command": "acp:delete_agent_task"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -903,7 +918,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:cancel_run"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -1074,7 +1090,8 @@
               "type": "navigate",
               "to": "agent_artifact_form",
               "command": "acp:update_agent_artifact"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "delete",
@@ -1084,7 +1101,8 @@
             "action": {
               "type": "command",
               "command": "acp:delete_agent_artifact"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -1251,7 +1269,8 @@
               "type": "navigate",
               "to": "agent_schedule_form",
               "command": "acp:update_agent_schedule"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "pause",
@@ -1261,7 +1280,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:pause_schedule"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "activate",
@@ -1272,7 +1292,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:activate_schedule"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "delete",
@@ -1282,7 +1303,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:delete_agent_schedule"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -1367,7 +1389,7 @@
             "primary": true,
             "label": "save",
             "action": {
-              "type": "state_transition",
+              "type": "command",
               "command": "acp:update_agent_schedule"
             }
           },
@@ -1451,7 +1473,8 @@
               "type": "navigate",
               "to": "approval_policy_form",
               "command": "acp:update_approval_policy"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "delete",
@@ -1461,7 +1484,8 @@
             "action": {
               "type": "command",
               "command": "acp:delete_approval_policy"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -1610,7 +1634,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:approve_request"
-            }
+            },
+            "type": "command"
           },
           {
             "code": "reject",
@@ -1621,7 +1646,8 @@
             "action": {
               "type": "state_transition",
               "command": "acp:reject_request"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -1789,7 +1815,8 @@
               "type": "navigate",
               "to": "agent_memory_form",
               "command": "acp:update_agent_memory"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "delete",
@@ -1799,7 +1826,8 @@
             "action": {
               "type": "command",
               "command": "acp:delete_agent_memory"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -2121,7 +2149,8 @@
               "type": "navigate",
               "to": "agent_tool_form",
               "command": "acp:update_agent_tool"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "delete",
@@ -2131,7 +2160,8 @@
             "action": {
               "type": "command",
               "command": "acp:delete_agent_tool"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {
@@ -2318,7 +2348,8 @@
               "type": "navigate",
               "to": "agent_skill_form",
               "command": "acp:update_agent_skill"
-            }
+            },
+            "type": "navigate"
           },
           {
             "code": "delete",
@@ -2328,7 +2359,8 @@
             "action": {
               "type": "command",
               "command": "acp:delete_agent_skill"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {

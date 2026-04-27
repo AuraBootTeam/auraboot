@@ -2,6 +2,7 @@ package com.auraboot.framework.agent.port;
 
 import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
@@ -51,4 +52,17 @@ public interface AgentChatPort {
      * @param emitter   SSE emitter to stream chunks to
      */
     void streamAgentChat(Long tenantId, String agentCode, ChatRequest request, SseEmitter emitter);
+
+    /**
+     * Resume a pending custom-agent tool after the user confirms or cancels it.
+     *
+     * @return true when this port handled the pending tool, false to let the caller
+     *         fall back to the default AuraBot confirmation path.
+     */
+    default boolean resumeAgentToolAfterConfirmation(Long tenantId,
+                                                     ChatSessionStore.PendingTool pending,
+                                                     boolean confirmed,
+                                                     SseEmitter emitter) {
+        return false;
+    }
 }

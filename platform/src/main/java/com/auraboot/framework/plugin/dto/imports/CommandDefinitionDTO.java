@@ -64,6 +64,13 @@ public class CommandDefinitionDTO {
     private Map<String, Object> inputSchema;
 
     /**
+     * Agent command risk level: L0-L4.
+     */
+    @JsonProperty("cmd_risk_level")
+    @JsonAlias({"cmdRiskLevel", "riskLevel"})
+    private String cmdRiskLevel;
+
+    /**
      * Target models affected by this command.
      */
     private List<String> targetModels;

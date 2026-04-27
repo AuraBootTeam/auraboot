@@ -5,8 +5,10 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -155,6 +157,120 @@ class DslToolProviderTest extends BaseIntegrationTest {
         }
     }
 
+    @Test
+    void discover_buildsCommandParameterSchemaAndRiskLevelFromDslMetadata() {
+        Long tenantId = getTestTenant().getId();
+        String suffix = "agent_schema_" + System.nanoTime();
+        String modelCode = suffix + "_model";
+        String codeField = suffix + "_code";
+        String qtyField = suffix + "_qty";
+        String dateField = suffix + "_need_date";
+        String commandCode = suffix + ":create";
+
+        dynamicDataMapper.insertWithJsonb("ab_meta_model", Map.of(
+                "pid", suffix + "_model_pid",
+                "tenant_id", tenantId,
+                "code", modelCode,
+                "table_name", "mt_" + modelCode,
+                "extension", "{}",
+                "capabilities", "{}",
+                "version", 1,
+                "is_current", true,
+                "status", "published",
+                "deleted_flag", false
+        ), Set.of("extension", "capabilities"));
+        Long modelId = ((Number) dynamicDataMapper.selectByQuery(
+                "SELECT id FROM ab_meta_model WHERE tenant_id = #{params.tenantId} AND code = #{params.code}",
+                Map.of("tenantId", tenantId, "code", modelCode)).get(0).get("id")).longValue();
+
+        insertField(tenantId, suffix + "_field_pid_1", codeField, "text");
+        insertField(tenantId, suffix + "_field_pid_2", qtyField, "decimal");
+        insertField(tenantId, suffix + "_field_pid_3", dateField, "date");
+        bindField(tenantId, modelId, codeField, 1, true);
+        bindField(tenantId, modelId, qtyField, 2, true);
+        bindField(tenantId, modelId, dateField, 3, false);
+
+        Map<String, Object> command = new LinkedHashMap<>();
+        command.put("pid", suffix + "_cmd_pid");
+        command.put("tenant_id", tenantId);
+        command.put("code", commandCode);
+        command.put("display_name", "Create schema fixture");
+        command.put("description", "Create a schema fixture record");
+        command.put("model_code", modelCode);
+        command.put("input_schema", "{}");
+        command.put("target_models", "[]");
+        command.put("execution_config", "{\"type\":\"create\",\"inputFields\":[\"" + codeField + "\",\"" + qtyField + "\",\"" + dateField + "\"]}");
+        command.put("extension", "{}");
+        command.put("cmd_risk_level", "L2");
+        command.put("version", 1);
+        command.put("is_current", true);
+        command.put("status", "published");
+        command.put("deleted_flag", false);
+        dynamicDataMapper.insertWithJsonb("ab_command_definition", command,
+                Set.of("input_schema", "target_models", "execution_config", "extension"));
+
+        var tools = dslToolProvider.discover(ToolDiscoveryContext.builder()
+                .tenantId(tenantId)
+                .modelHint(modelCode)
+                .maxResults(20)
+                .build());
+
+        ToolDefinition commandTool = tools.stream()
+                .filter(tool -> ("cmd:" + commandCode).equals(tool.getToolCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(commandTool.getRiskLevel()).isEqualTo("L2");
+        assertThat(commandTool.isRequiresConfirmation()).isTrue();
+
+        Map<String, Object> schema = commandTool.getParameterSchema();
+        assertThat(schema).containsEntry("type", "object");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        assertThat(properties).containsKeys(codeField, qtyField, dateField);
+        assertThat(properties.get(codeField).toString()).contains("minLength=1");
+        assertThat(properties.get(qtyField).toString()).contains("number");
+        assertThat(properties.get(dateField).toString()).contains("date");
+        List<String> required = ((List<?>) schema.get("required")).stream()
+                .map(String::valueOf)
+                .toList();
+        assertThat(required).containsExactly(codeField, qtyField);
+    }
+
+    @Test
+    void discover_buildsNamedQueryParameterSchemaFromSqlParams() {
+        Long tenantId = getTestTenant().getId();
+        String suffix = "agent_nq_" + System.nanoTime();
+        String queryCode = suffix + "_supplier_options";
+
+        dynamicDataMapper.insertWithJsonb("ab_named_query", Map.of(
+                "pid", suffix + "_nq_pid",
+                "tenant_id", tenantId,
+                "code", queryCode,
+                "title", "Supplier options",
+                "description", "Supplier options by product",
+                "from_sql", "SELECT 1 WHERE tenant_id = #{params.tenantId} AND product_id = #{params.productId} AND status = #{params.status}",
+                "base_where", "[]",
+                "policy", "{}",
+                "status", "published"
+        ), Set.of("base_where", "policy"));
+
+        var tools = dslToolProvider.discover(ToolDiscoveryContext.builder()
+                .tenantId(tenantId)
+                .modelHint(suffix)
+                .maxResults(20)
+                .build());
+
+        ToolDefinition queryTool = tools.stream()
+                .filter(tool -> ("nq:" + queryCode).equals(tool.getToolCode()))
+                .findFirst()
+                .orElseThrow();
+        Map<String, Object> schema = queryTool.getParameterSchema();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        assertThat(properties).containsKeys("productId", "status");
+        assertThat(properties).doesNotContainKey("tenantId");
+    }
+
     // ========== Discover with real tenant data ==========
 
     @Test
@@ -233,5 +349,40 @@ class DslToolProviderTest extends BaseIntegrationTest {
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getData()).containsKey("records");
         assertThat(result.getData()).containsKey("total");
+    }
+
+    private void insertField(Long tenantId, String pid, String code, String dataType) {
+        Map<String, Object> field = new LinkedHashMap<>();
+        field.put("pid", pid);
+        field.put("tenant_id", tenantId);
+        field.put("version", 1);
+        field.put("is_current", true);
+        field.put("status", "published");
+        field.put("deleted_flag", false);
+        field.put("code", code);
+        field.put("data_type", dataType);
+        field.put("extension", "{}");
+        field.put("index_hint", "{}");
+        field.put("ui_schema", "{}");
+        field.put("query_schema", "{}");
+        dynamicDataMapper.insertWithJsonb("ab_meta_field", field,
+                Set.of("extension", "index_hint", "ui_schema", "query_schema"));
+    }
+
+    private void bindField(Long tenantId, Long modelId, String fieldCode, int order, boolean required) {
+        Long fieldId = ((Number) dynamicDataMapper.selectByQuery(
+                "SELECT id FROM ab_meta_field WHERE tenant_id = #{params.tenantId} AND code = #{params.code}",
+                Map.of("tenantId", tenantId, "code", fieldCode)).get(0).get("id")).longValue();
+        dynamicDataMapper.insert("ab_meta_model_field_binding", Map.of(
+                "pid", fieldCode + "_binding",
+                "tenant_id", tenantId,
+                "model_id", modelId,
+                "field_id", fieldId,
+                "field_order", order,
+                "required", required,
+                "visible", true,
+                "editable", true,
+                "deleted_flag", false
+        ));
     }
 }

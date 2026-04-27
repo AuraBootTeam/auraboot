@@ -402,7 +402,7 @@ function collectFieldOverrides(blocks: any[]): Map<string, any> {
 const createdPagePids: string[] = [];
 
 test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(90_000);
 
   test.afterEach(async ({ page }) => {
