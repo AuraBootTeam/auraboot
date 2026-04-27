@@ -5,36 +5,128 @@ import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.aurabot.service.ChatToolResolver;
 import com.auraboot.framework.application.tenant.MetaContext;
-import lombok.RequiredArgsConstructor;
+import com.auraboot.framework.conversation.ConversationTurnService;
+import com.auraboot.framework.conversation.InboundMode;
+import com.auraboot.framework.conversation.SseResponseSink;
+import com.auraboot.framework.conversation.TurnRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.*;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/ai/aurabot")
-@RequiredArgsConstructor
 public class AuraBotController {
 
     private final AuraBotChatService chatService;
     private final ChatToolResolver chatToolResolver;
+    private final ConversationTurnService turnService;
+    private final ObjectMapper objectMapper;
+    private final Executor asyncExecutor;
+
+    public AuraBotController(AuraBotChatService chatService,
+                              ChatToolResolver chatToolResolver,
+                              ConversationTurnService turnService,
+                              ObjectMapper objectMapper,
+                              @Qualifier("asyncTaskExecutor") Executor asyncExecutor) {
+        this.chatService = chatService;
+        this.chatToolResolver = chatToolResolver;
+        this.turnService = turnService;
+        this.objectMapper = objectMapper;
+        this.asyncExecutor = asyncExecutor;
+    }
 
     /**
-     * Stream chat via SSE — main endpoint.
+     * Phase A.5 cutover (Q-A.5: direct cut, no shadow endpoint).
+     *
+     * <p>Routing performed in this controller (was previously inside
+     * {@code AuraBotChatService.streamChat}):
+     * <ul>
+     *     <li>Named agent ({@code agentCode != null && != "aurabot"}): delegate to
+     *         legacy {@code chatService.streamChat} which routes through
+     *         {@code AgentChatPort}. Phase B+ migrates this via a group-chat
+     *         adapter; Phase A keeps it untouched.</li>
+     *     <li>Aurabot main path: build {@link SseResponseSink} + {@link TurnRequest}
+     *         carrying the original {@link ChatRequest} (Q-A.6 legacyRequest field)
+     *         and call {@code turnService.runTurn} on the worker thread.</li>
+     * </ul>
+     *
+     * <p>Async only at this transport boundary; {@code turnService.runTurn} is
+     * synchronous internally per Q-A.4=A'. SSE termination
+     * ({@code emitter.complete()}) is owned by {@code SseResponseSink} via
+     * {@code onDone} / {@code onError}, so this method does not call
+     * {@code emitter.complete()} explicitly.
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody ChatRequest request) {
+        SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
+
+        // Snapshot identity BEFORE the async hop — MetaContext is a ThreadLocal that
+        // does not propagate into asyncTaskExecutor's worker thread.
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
         String userPid = MetaContext.getCurrentUserPid();
         String username = MetaContext.getCurrentUsername();
         Long memberId = MetaContext.getCurrentMemberId();
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
-        chatService.streamChat(tenantId, userId, userPid, username, memberId, request, emitter);
+
+        asyncExecutor.execute(() -> {
+            SseResponseSink sink = new SseResponseSink(emitter, objectMapper);
+            try {
+                MetaContext.setContext(tenantId, userId, userPid, username);
+                if (memberId != null) {
+                    MetaContext.setMemberId(memberId);
+                }
+
+                String agentCode = request.getAgentCode();
+                if (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode)) {
+                    // Phase A: named-agent path stays on the legacy entry which still owns
+                    // AgentChatPort routing + its own async dispatch + emitter management.
+                    // Note: chatService.streamChat does asyncTaskExecutor.execute again
+                    // internally — the double-async is intentional Phase A scaffold; Phase
+                    // B+ collapses both via a group-chat-adapter design.
+                    chatService.streamChat(tenantId, userId, userPid, username, memberId,
+                            request, emitter);
+                    return;
+                }
+
+                TurnRequest turnReq = new TurnRequest(
+                        tenantId,
+                        userId,
+                        memberId,
+                        "web",
+                        agentCode,
+                        null,                                 // conversationId — Phase B
+                        null,                                 // clientMsgId — Phase B
+                        request.getMessage(),
+                        null,                                 // pageContext — carried in legacyRequest
+                        null,                                 // options — carried in legacyRequest
+                        InboundMode.NEW_FROM_REQUEST,
+                        null,                                 // precomputedBucket — Phase B+
+                        request);                             // legacyRequest (Q-A.6)
+
+                turnService.runTurn(turnReq, sink);
+                // Outcome is observed by sideEffects.eventEmitter (NOOP in Phase A); no
+                // explicit emitter.complete() — sink.onDone/onError already terminated the SSE.
+            } catch (Exception e) {
+                log.error("chat stream failed: {}", e.getMessage(), e);
+                try {
+                    sink.onError(e.getMessage(), null);
+                } catch (Exception ignore) {
+                    // Last resort if the sink itself is broken — close the SSE so the client
+                    // does not hang on a half-open stream.
+                    try { emitter.completeWithError(e); } catch (Exception ignore2) {}
+                }
+            } finally {
+                MetaContext.clear();
+            }
+        });
         return emitter;
     }
 
