@@ -45,6 +45,23 @@ public class ChatRequest {
     private String agentCode;
 
     /**
+     * Phase B.1: target conversation row in {@code ab_im_message}. Required for
+     * server-side persistence (TurnSideEffects.Persistence). When null the server
+     * falls back to legacy non-persisting behavior so the API stays binary-compat
+     * with frontends that have not yet migrated.
+     */
+    private Long conversationId;
+
+    /**
+     * Phase B.1: client-side dedup key for the inbound message. Maps to
+     * {@code ab_im_message.client_msg_id}; deduped via
+     * {@code idx_ab_im_message_dedup (conversation_id, client_msg_id)}.
+     * Resending the same {@code clientMsgId} for the same {@code conversationId}
+     * returns the previously persisted row instead of inserting a duplicate.
+     */
+    private String clientMsgId;
+
+    /**
      * Knowledge base PIDs for RAG context augmentation.
      * If set, the system prompt will include relevant chunks from these KBs.
      */

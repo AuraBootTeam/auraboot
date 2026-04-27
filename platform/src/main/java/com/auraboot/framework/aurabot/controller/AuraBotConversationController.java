@@ -50,32 +50,13 @@ public class AuraBotConversationController {
         ));
     }
 
-    @PostMapping("/{conversationId}/messages/user")
-    public ApiResponse<AuraBotConversationMessage> appendUserMessage(
-            @PathVariable Long conversationId,
-            @RequestBody AuraBotMessageCreateRequest request) {
-        return ApiResponse.success(conversationService.appendUserMessage(
-                conversationId,
-                MetaContext.getCurrentTenantId(),
-                currentHumanMemberId(),
-                request.getContent(),
-                request.getClientMsgId()
-        ));
-    }
-
-    @PostMapping("/{conversationId}/messages/assistant")
-    public ApiResponse<AuraBotConversationMessage> appendAssistantMessage(
-            @PathVariable Long conversationId,
-            @RequestBody AuraBotMessageCreateRequest request) {
-        return ApiResponse.success(conversationService.appendAssistantMessage(
-                conversationId,
-                MetaContext.getCurrentTenantId(),
-                currentHumanMemberId(),
-                request.getContent(),
-                request.getTraceId(),
-                Boolean.TRUE.equals(request.getError())
-        ));
-    }
+    // Phase B.1 deletion: POST /{id}/messages/user and POST /{id}/messages/assistant
+    // were the frontend-driven persistence detour the design called out as the
+    // anti-pattern fix point (design §1.4). With AuraBotTurnPersistence in place
+    // the server now writes both inbound + outbound rows from /chat/stream itself,
+    // so these endpoints have no reason to exist. Per dev-stage rule
+    // (feedback_dev_stage_breaking_ok) we delete them outright instead of keeping
+    // a deprecated stub.
 
     private Long currentHumanMemberId() {
         Long memberId = MetaContext.getCurrentMemberId();

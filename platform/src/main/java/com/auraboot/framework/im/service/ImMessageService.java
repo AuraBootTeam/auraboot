@@ -38,6 +38,32 @@ public interface ImMessageService {
                                  String cardPayload, String clientMsgId);
 
     /**
+     * Send an agent (AuraBot / ACP) outbound message. Bypasses membership check
+     * (the agent is not a regular conversation member). Sets
+     * {@code sender_type='agent'} + {@code sender_id=agentId} so cross-channel
+     * sync paths and group-chat paths see the same shape (per Q8 / Q-B1.1=A
+     * decision; see {@code 2026-04-26-conversation-turn-service-design.md} §3.6).
+     *
+     * <p>Idempotent on {@code (conversation_id, client_msg_id)} via
+     * {@code idx_ab_im_message_dedup} (returns the existing row when the same
+     * clientMsgId is supplied twice for the same conversation).
+     *
+     * @param conversationId target conversation
+     * @param tenantId       current tenant ID
+     * @param agentId        the {@code ab_agent_definition.id} (resolved by
+     *                       {@code AuraBotAgentResolver})
+     * @param messageType    e.g. {@code "ai_response"} for normal turns or
+     *                       {@code "system"} for failure outcomes
+     * @param content        text content; pass null for non-text messages
+     * @param cardPayload    optional JSON-encoded metadata (e.g. trace links)
+     * @param clientMsgId    optional dedup key
+     * @return the saved or pre-existing message
+     */
+    ImMessage sendAgentMessage(Long conversationId, Long tenantId, Long agentId,
+                                String messageType, String content,
+                                String cardPayload, String clientMsgId);
+
+    /**
      * Recall a message. Only the original sender can recall.
      * Sets recalled=true and clears content/payload fields.
      * Returns the recalled message, or null if not found / not authorized.

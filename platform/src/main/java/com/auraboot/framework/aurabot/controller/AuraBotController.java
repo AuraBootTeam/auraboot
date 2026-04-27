@@ -81,8 +81,8 @@ public class AuraBotController {
                         memberId,
                         "web",
                         request.getAgentCode(),
-                        null,                                 // conversationId — Phase B
-                        null,                                 // clientMsgId — Phase B
+                        request.getConversationId(),          // Phase B.1: persistence target
+                        request.getClientMsgId(),             // Phase B.1: dedup key
                         request.getMessage(),
                         null,                                 // pageContext — carried in legacyRequest
                         null,                                 // options — carried in legacyRequest
