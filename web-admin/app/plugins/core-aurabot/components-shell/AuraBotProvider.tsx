@@ -49,6 +49,12 @@ interface SimpleMessage {
   toolResult?: Record<string, any>;
   resultContract?: import('../types/ResultContract').ResultContract;
   traceId?: string;
+  /**
+   * Phase B.6: persisted on confirm_card so confirmTool / cancelTool can echo
+   * it back to /execute. Frontend reads this from the SSE confirm_required
+   * payload and stores it on the corresponding tool message.
+   */
+  pendingTurnId?: string;
 }
 
 interface KnowledgeBaseInfo {
@@ -732,7 +738,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               toolName: string,
               description: string,
               input: Record<string, any>,
+              pendingTurnId: string,
             ) => {
+              // Phase B.6: capture pendingTurnId on the confirm card so
+              // confirmTool / cancelTool can echo it back to /execute.
               dispatch({
                 type: 'add_tool_message',
                 payload: {
@@ -744,6 +753,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   toolId,
                   toolName,
                   toolInput: input,
+                  pendingTurnId,
                 },
               });
               dispatch({ type: 'set_loading', payload: false });
@@ -791,9 +801,27 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
         payload: { id: botMsgId, type: 'text', sender: 'bot', timestamp: Date.now(), content: '' },
       });
 
+      // Phase B.6: pendingTurnId was stored on the confirm_card message when
+      // the SSE confirm_required event arrived. Look it up by toolId so the
+      // /execute call can target the correct suspended turn.
+      const confirmCard = state.messages.find(
+        (m) => m.type === 'confirm_card' && m.toolId === toolId,
+      );
+      const pendingTurnId = confirmCard?.pendingTurnId ?? '';
+      if (!pendingTurnId) {
+        // Defensive: should never happen because the card was just rendered
+        // by the SSE handler that set pendingTurnId.
+        dispatch({
+          type: 'update_message',
+          payload: { id: botMsgId, type: 'error', content: 'Missing pendingTurnId for confirmTool' },
+        });
+        dispatch({ type: 'set_loading', payload: false });
+        return;
+      }
+
       try {
         await auraBotApi.executeStream(
-          { sessionId: state.sessionId, toolId, confirmed: true },
+          { pendingTurnId, toolId, confirmed: true },
           {
             onChunk: (chunk: string) => {
               dispatch({ type: 'append_message_content', payload: { id: botMsgId, chunk } });
@@ -831,6 +859,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               tname: string,
               desc: string,
               input: Record<string, any>,
+              pendingTurnId: string,
             ) => {
               dispatch({
                 type: 'add_tool_message',
@@ -843,6 +872,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   toolId: tid,
                   toolName: tname,
                   toolInput: input,
+                  pendingTurnId,
                 },
               });
               dispatch({ type: 'set_loading', payload: false });
@@ -881,7 +911,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
         dispatch({ type: 'set_loading', payload: false });
       }
     },
-    [state.currentConversationId, state.sessionId],
+    [state.currentConversationId, state.sessionId, state.messages],
   );
 
   // Cancel a tool execution (user rejected)
@@ -891,13 +921,21 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
         type: 'update_tool_message',
         payload: { toolId, updates: { type: 'tool_cancelled', content: '操作已取消' } },
       });
-      // Fire and forget — tell backend user cancelled
+      // Phase B.6: same pendingTurnId lookup pattern as confirmTool.
+      const confirmCard = state.messages.find(
+        (m) => m.type === 'confirm_card' && m.toolId === toolId,
+      );
+      const pendingTurnId = confirmCard?.pendingTurnId ?? '';
+      if (!pendingTurnId) {
+        return; // Already-handled or missing card; nothing to cancel server-side.
+      }
+      // Fire and forget — tell backend user cancelled (DENIED).
       auraBotApi.executeStream(
-        { sessionId: state.sessionId, toolId, confirmed: false },
+        { pendingTurnId, toolId, confirmed: false },
         { onChunk: () => {}, onDone: () => {}, onError: () => {} },
       );
     },
-    [state.sessionId],
+    [state.messages],
   );
 
   // Keyboard shortcuts

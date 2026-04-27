@@ -102,6 +102,7 @@ export interface ChatStreamOptions {
     toolName: string,
     description: string,
     input: Record<string, any>,
+    pendingTurnId: string,
   ) => void;
 }
 
@@ -506,11 +507,14 @@ export const auraBotApi = {
   },
 
   /**
-   * Execute a tool call (confirm or cancel) and receive SSE streaming response.
-   * Used after a confirm_required event to tell the backend whether the user approved.
+   * Phase B.6: execute a tool call (confirm / deny) and receive SSE streaming
+   * response. Used after a {@code confirm_required} event to tell the backend
+   * whether the user approved. The frontend reads {@code pendingTurnId} from
+   * the SSE event payload and echoes it back here so the server looks up the
+   * suspended turn state by turnId (per design v3.3 §3.10 step 3).
    */
   async executeStream(
-    request: { sessionId: string; toolId: string; confirmed: boolean },
+    request: { pendingTurnId: string; toolId: string; confirmed: boolean },
     callbacks: ChatStreamOptions,
   ): Promise<void> {
     try {
@@ -604,6 +608,7 @@ async function processSSEStream(
                   data.toolName,
                   data.description || '',
                   data.input || {},
+                  data.pendingTurnId || '',
                 );
                 break;
               case 'done':

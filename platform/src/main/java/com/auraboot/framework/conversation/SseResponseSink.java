@@ -90,12 +90,19 @@ public class SseResponseSink implements ResponseSink {
     }
 
     @Override
-    public void onConfirmRequired(String toolId, String toolName, String description, Map<String, Object> input) {
-        sendJsonString("confirm_required", Map.of(
-                "toolId", toolId,
-                "toolName", toolName,
-                "description", description != null ? description : "",
-                "input", input != null ? input : Map.of()));
+    public void onConfirmRequired(String toolId, String toolName, String description,
+                                    Map<String, Object> input, String pendingTurnId) {
+        // pendingTurnId is conditionally included only when non-null (Map.of
+        // disallows null values; matches SseResponseSink's traceId pattern).
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("toolId", toolId);
+        payload.put("toolName", toolName);
+        payload.put("description", description != null ? description : "");
+        payload.put("input", input != null ? input : Map.of());
+        if (pendingTurnId != null) {
+            payload.put("pendingTurnId", pendingTurnId);
+        }
+        sendJsonString("confirm_required", payload);
     }
 
     private void sendRaw(String name, Map<String, Object> data) {

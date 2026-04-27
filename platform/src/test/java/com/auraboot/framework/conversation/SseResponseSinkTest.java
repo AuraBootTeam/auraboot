@@ -224,9 +224,9 @@ class SseResponseSinkTest {
     }
 
     @Test
-    @DisplayName("9) onConfirmRequired -> JSON-string {toolId, toolName, description, input}; null desc -> ''")
+    @DisplayName("9) onConfirmRequired -> JSON-string {toolId, toolName, description, input, pendingTurnId}; null desc -> ''")
     void onConfirmRequired_nullDescriptionFallsBackToEmpty() throws Exception {
-        sink.onConfirmRequired("tool-2", "cmd_delete_record", null, Map.of("id", 99));
+        sink.onConfirmRequired("tool-2", "cmd_delete_record", null, Map.of("id", 99), "01HW3KTURN");
 
         SseEmitter.SseEventBuilder b = captureBuilder();
         assertThat(eventName(b)).isEqualTo("confirm_required");
@@ -235,9 +235,21 @@ class SseResponseSinkTest {
         assertThat(parsed)
                 .containsEntry("toolId", "tool-2")
                 .containsEntry("toolName", "cmd_delete_record")
-                .containsEntry("description", "");
+                .containsEntry("description", "")
+                .containsEntry("pendingTurnId", "01HW3KTURN");
         assertThat((Map<String, Object>) parsed.get("input")).containsEntry("id", 99);
         verify(emitter, never()).complete();
+    }
+
+    @Test
+    @DisplayName("9b) onConfirmRequired w/ null pendingTurnId -> field omitted from payload")
+    void onConfirmRequired_nullPendingTurnId_fieldOmitted() throws Exception {
+        sink.onConfirmRequired("tool-3", "cmd_x", "do x", Map.of(), null);
+
+        SseEmitter.SseEventBuilder b = captureBuilder();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parsed = objectMapper.readValue((String) firstDataPayload(b), Map.class);
+        assertThat(parsed).doesNotContainKey("pendingTurnId");
     }
 
     @Test
@@ -251,7 +263,7 @@ class SseResponseSinkTest {
         sink.onError("err", null);
         sink.onToolStart("t1", "n", Map.of());
         sink.onToolResult("t1", Map.of(), false);
-        sink.onConfirmRequired("t1", "n", "d", Map.of());
+        sink.onConfirmRequired("t1", "n", "d", Map.of(), "turn-1");
 
         // We expect 6 send attempts (one per method) — all swallowed.
         verify(emitter, times(6)).send(any(SseEmitter.SseEventBuilder.class));
