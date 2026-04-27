@@ -1,17 +1,26 @@
 package com.auraboot.framework.integration.test;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.util.JwtUtil;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.Filter;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -19,6 +28,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+
+import java.util.Map;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -52,6 +63,12 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private TenantMemberService tenantMemberService;
+
+    @Autowired
+    private UserPermissionService userPermissionService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private MockMvc mockMvc;
 
@@ -228,6 +245,198 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.testRunId", org.hamcrest.Matchers.startsWith("api_")));
 
         log.info("TS-08: run-id endpoint returns valid format");
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("TS-09: POST /api/test/seed grants dynamic model permissions required by mobile E2E")
+    void seed_grantsDynamicModelPermissionsForMobileE2e() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/test/seed")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+        long tenantId = body.get("tenantId").asLong();
+        long userId = body.get("userId").asLong();
+        TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+        Assertions.assertNotNull(member, "seeded user must have a tenant member");
+
+        MetaContext.setContext(tenantId, userId, "test-user-pid", "e2e@test.local");
+        MetaContext.setMemberId(member.getId());
+        try {
+            Integer permissionCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM ab_permission
+                    WHERE tenant_id = ?
+                      AND code = 'model.e2et_order.create'
+                      AND deleted_flag = FALSE
+                    """, Integer.class, tenantId);
+            Integer globalPermissionCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM ab_permission
+                    WHERE code = 'model.e2et_order.create'
+                    """, Integer.class);
+            Integer userRoleCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM ab_user_role ur
+                    JOIN ab_role r ON r.id = ur.role_id
+                    WHERE ur.tenant_id = ?
+                      AND ur.member_id = ?
+                      AND r.code = 'tenant_admin'
+                      AND ur.status = 'active'
+                      AND ur.deleted_flag = FALSE
+                    """, Integer.class, tenantId, member.getId());
+            Integer bindingCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM ab_role_permission rp
+                    JOIN ab_permission p ON p.id = rp.permission_id
+                    JOIN ab_role r ON r.id = rp.role_id
+                    WHERE rp.tenant_id = ?
+                      AND r.code = 'tenant_admin'
+                      AND p.code = 'model.e2et_order.create'
+                      AND rp.status = 'active'
+                      AND rp.deleted_flag = FALSE
+                    """, Integer.class, tenantId);
+            Assertions.assertTrue(
+                    userPermissionService.hasPermission(userId, "model.e2et_order.create"),
+                    "mobile E2E seed user must be able to create e2et_order records; " +
+                            "permissionCount=" + permissionCount +
+                            ", globalPermissionCount=" + globalPermissionCount +
+                            ", userRoleCount=" + userRoleCount +
+                            ", bindingCount=" + bindingCount
+            );
+            Assertions.assertTrue(
+                    userPermissionService.hasPermission(userId, "model.e2et_order.read"),
+                    "mobile E2E seed user must be able to read e2et_order records"
+            );
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("TS-10: POST /api/test/seed repairs dynamic table identity sequences for mobile E2E creates")
+    void seed_repairsDynamicTableIdentitySequenceForMobileE2eCreate() throws Exception {
+        MvcResult resetResult = mockMvc.perform(post("/api/test/reset")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode resetBody = objectMapper.readTree(resetResult.getResponse().getContentAsString());
+        long tenantId = resetBody.get("tenantId").asLong();
+        long userId = resetBody.get("userId").asLong();
+
+        String sequenceName = jdbcTemplate.queryForObject(
+                "SELECT pg_get_serial_sequence('public.mt_e2et_order', 'id')",
+                String.class
+        );
+        Assertions.assertNotNull(sequenceName, "mt_e2et_order.id must have a PostgreSQL identity sequence");
+
+        Long maxId = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(id), 0) FROM mt_e2et_order",
+                Long.class
+        );
+        long explicitId = maxId + 1000;
+        String explicitOrderNo = "SEQ_STALE_" + explicitId;
+        jdbcTemplate.update("""
+                INSERT INTO mt_e2et_order (
+                    id, pid, tenant_id, created_at, updated_at, created_by, updated_by,
+                    e2et_order_no, e2et_order_title, e2et_order_status
+                )
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, 'draft')
+                """,
+                explicitId,
+                UniqueIdGenerator.generate(),
+                tenantId,
+                userId,
+                userId,
+                explicitOrderNo,
+                "Stale sequence fixture " + explicitId
+        );
+        jdbcTemplate.queryForObject(
+                "SELECT setval(to_regclass(?), 1, false)",
+                Long.class,
+                sequenceName
+        );
+
+        MvcResult repairedSeed = mockMvc.perform(post("/api/test/seed")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode repairedSeedBody = objectMapper.readTree(repairedSeed.getResponse().getContentAsString());
+        tenantId = repairedSeedBody.get("tenantId").asLong();
+        userId = repairedSeedBody.get("userId").asLong();
+
+        String createdOrderNo = "SEQ_REPAIR_" + UniqueIdGenerator.generate();
+        String payload = objectMapper.writeValueAsString(Map.of(
+                "e2et_order_no", createdOrderNo,
+                "e2et_order_title", "Sequence repair regression order",
+                "e2et_order_status", "draft"
+        ));
+
+        MvcResult createResult = authenticatedMvc(tenantId, userId).perform(post("/api/dynamic/e2et_order/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andReturn();
+        String createResponse = createResult.getResponse().getContentAsString();
+        Assertions.assertEquals(200, createResult.getResponse().getStatus(),
+                "dynamic create response status must be 200; body=" + createResponse);
+        JsonNode createBody = objectMapper.readTree(createResponse);
+        Assertions.assertEquals("0", createBody.path("code").asText(),
+                "dynamic create must return ApiResponse OK; body=" + createResponse);
+        Assertions.assertEquals(createdOrderNo, createBody.path("data").path("e2et_order_no").asText(),
+                "dynamic create response must include the created order number; body=" + createResponse);
+        Assertions.assertTrue(createBody.path("data").path("id").isNumber(),
+                "dynamic create response must include a numeric id; body=" + createResponse);
+        long createdId = createBody.path("data").path("id").asLong();
+        Assertions.assertTrue(createdId > explicitId,
+                "dynamic create must allocate an id after the explicit high-id fixture; createdId=" +
+                        createdId + ", explicitId=" + explicitId);
+
+        Integer persistedRows = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM mt_e2et_order
+                WHERE tenant_id = ?
+                  AND e2et_order_no = ?
+                """, Integer.class, tenantId, createdOrderNo);
+        Assertions.assertEquals(1, persistedRows,
+                "dynamic create after seed repair must persist exactly one E2E order row");
+    }
+
+    private MockMvc authenticatedMvc(long tenantId, long userId) {
+        TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+        Assertions.assertNotNull(member, "seeded user must have tenant member before authenticated API calls");
+
+        Filter contextFilter = (request, response, chain) -> {
+            try {
+                MetaContext.setContext(tenantId, userId, "e2e-test-user", "e2e@test.local");
+                MetaContext.setMemberId(member.getId());
+                CustomUserDetails userDetails = new CustomUserDetails(
+                        "e2e@test.local",
+                        "test-password",
+                        userId,
+                        "e2e-test-user",
+                        AuthorityUtils.createAuthorityList("role_admin"),
+                        true,
+                        true,
+                        true,
+                        true
+                );
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                SecurityContextHolder.getContext().setAuthentication(auth);
+                chain.doFilter(request, response);
+            } finally {
+                MetaContext.clear();
+                SecurityContextHolder.clearContext();
+            }
+        };
+
+        return MockMvcBuilders
+                .webAppContextSetup(webApplicationContext)
+                .addFilter(contextFilter, "/*")
+                .build();
     }
 
     private void assertJwtIncludesMemberId(JsonNode body) {
