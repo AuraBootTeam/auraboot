@@ -607,18 +607,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     };
   }, [state.currentConversationId, state.selectedAgentCode]);
 
-  const persistAssistantMessage = useCallback(
-    async (conversationId: number, content: string, traceId?: string, error?: boolean) => {
-      if (!content.trim()) return;
-      try {
-        await auraBotApi.appendAssistantMessage(conversationId, content, traceId, error);
-        await refreshConversations();
-      } catch {
-        // Ignore persistence failures so chat UX remains responsive
-      }
-    },
-    [refreshConversations],
-  );
+  // Phase B.1: persistAssistantMessage and the appendUserMessage path were
+  // deleted. The server now writes both inbound (sender_type=human) and
+  // outbound (sender_type=agent) rows from /chat/stream itself via
+  // AuraBotTurnPersistence. We just refresh the conversation list after the
+  // stream so the new rows render.
 
   // Send message — wired to SSE streaming
   const sendMessage = useCallback(
@@ -627,18 +620,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
       const { conversationId } = await ensureConversation();
 
-      // Add user message
+      // userMsgId doubles as the server-side dedup key (clientMsgId on
+      // ChatRequest) so retrying a failed POST does not insert duplicate rows.
       const userMsgId = generateMessageId();
-      try {
-        await auraBotApi.appendUserMessage(conversationId, content, userMsgId);
-      } catch {
-        // Ignore persistence failures — keep chat usable
-      }
       dispatch({
         type: 'add_message',
         payload: { id: userMsgId, type: 'text', sender: 'user', timestamp: Date.now(), content },
       });
-      refreshConversations().catch(() => {});
       dispatch({ type: 'set_input_value', payload: '' });
       dispatch({ type: 'set_loading', payload: true });
 
@@ -656,6 +644,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             message: content,
             agentCode: state.selectedAgentCode,
             pageContext: state.pageContext,
+            // Phase B.1: server-side persistence wiring.
+            conversationId,
+            clientMsgId: userMsgId,
             knowledgeBaseIds:
               state.selectedKnowledgeBaseIds.length > 0
                 ? state.selectedKnowledgeBaseIds
@@ -678,19 +669,21 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   type: 'update_message',
                   payload: { id: botMsgId, content: fullContent, traceId },
                 });
-                persistAssistantMessage(conversationId, fullContent, traceId).catch(() => {});
               } else if (traceId) {
                 dispatch({ type: 'update_message', payload: { id: botMsgId, traceId } });
               }
               dispatch({ type: 'set_loading', payload: false });
+              // Phase B.1: server already persisted the outbound row; just
+              // refresh the conversation list so the UI sees the new rows.
+              refreshConversations().catch(() => {});
             },
             onError: (error: string, traceId?: string) => {
               dispatch({
                 type: 'update_message',
                 payload: { id: botMsgId, type: 'error', content: error, traceId },
               });
-              persistAssistantMessage(conversationId, error, traceId, true).catch(() => {});
               dispatch({ type: 'set_loading', payload: false });
+              refreshConversations().catch(() => {});
             },
             onToolStart: (toolId: string, toolName: string, input: Record<string, any>) => {
               dispatch({
@@ -762,15 +755,15 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
           type: 'update_message',
           payload: { id: botMsgId, type: 'error', content: e.message || 'Chat failed' },
         });
-        persistAssistantMessage(conversationId, e.message || 'Chat failed', undefined, true).catch(
-          () => {},
-        );
         dispatch({ type: 'set_loading', payload: false });
+        // Phase B.1: server already attempted to persist; on transport failure
+        // the row may not have been written, but we don't double-write from
+        // the frontend. Refresh so any partial state shows up.
+        refreshConversations().catch(() => {});
       }
     },
     [
       ensureConversation,
-      persistAssistantMessage,
       refreshConversations,
       state.isLoading,
       state.sessionId,
@@ -784,8 +777,6 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   // Confirm a tool execution (user approved)
   const confirmTool = useCallback(
     async (toolId: string) => {
-      const conversationId = state.currentConversationId;
-
       // Update confirm card to show "executing"
       dispatch({
         type: 'update_tool_message',
@@ -857,14 +848,17 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               dispatch({ type: 'set_loading', payload: false });
             },
             onDone: (full: string, traceId?: string) => {
+              // Phase B.1 + Q-B1.3=β: /execute (resume) outbound persistence is
+              // deferred to B.6, where /execute will go through
+              // turnService.resumeTurn and AuraBotTurnPersistence will handle
+              // the outbound row. Until then the resume path matches the Phase A
+              // invariant of zero server-side persistence — frontend just
+              // updates UI state.
               if (full) {
                 dispatch({
                   type: 'update_message',
                   payload: { id: botMsgId, content: full, traceId },
                 });
-                if (conversationId != null) {
-                  persistAssistantMessage(conversationId, full, traceId).catch(() => {});
-                }
               } else if (traceId) {
                 dispatch({ type: 'update_message', payload: { id: botMsgId, traceId } });
               }
@@ -875,9 +869,6 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                 type: 'update_message',
                 payload: { id: botMsgId, content: err, type: 'error', traceId },
               });
-              if (conversationId != null) {
-                persistAssistantMessage(conversationId, err, traceId, true).catch(() => {});
-              }
               dispatch({ type: 'set_loading', payload: false });
             },
           },
@@ -887,15 +878,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
           type: 'update_message',
           payload: { id: botMsgId, type: 'error', content: e.message || 'Execute failed' },
         });
-        if (conversationId != null) {
-          persistAssistantMessage(conversationId, e.message || 'Execute failed', undefined, true).catch(
-            () => {},
-          );
-        }
         dispatch({ type: 'set_loading', payload: false });
       }
     },
-    [persistAssistantMessage, state.currentConversationId, state.sessionId],
+    [state.currentConversationId, state.sessionId],
   );
 
   // Cancel a tool execution (user rejected)

@@ -145,7 +145,7 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
 
             assertThat(outcome).isSameAs(success);
             verify(metricsRecorder, times(1)).recordTurnBegin(any());
-            verify(persistence, times(1)).persistInbound(any(), eq("hi"), any());
+            verify(persistence, times(1)).persistInbound(argThat(req -> "hi".equals(req.userMessage())));
             verify(persistence, times(1)).persistOutbound(any(), same(success));
             verify(eventEmitter, times(1)).emit(isA(TurnCompletedEvent.class));
             verify(auditWriter, never()).writeFailure(any(), any());

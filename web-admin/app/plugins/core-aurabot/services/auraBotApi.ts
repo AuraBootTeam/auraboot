@@ -167,38 +167,10 @@ export const auraBotApi = {
     return result.data || [];
   },
 
-  async appendUserMessage(
-    conversationId: number,
-    content: string,
-    clientMsgId: string,
-  ): Promise<AuraBotConversationMessage> {
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/user`, {
-      method: 'post',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ content, clientMsgId }),
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const result = await response.json();
-    return result.data;
-  },
-
-  async appendAssistantMessage(
-    conversationId: number,
-    content: string,
-    traceId?: string,
-    error?: boolean,
-  ): Promise<AuraBotConversationMessage> {
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/assistant`, {
-      method: 'post',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ content, traceId, error }),
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const result = await response.json();
-    return result.data;
-  },
+  // Phase B.1: appendUserMessage and appendAssistantMessage removed. Server now
+  // persists both inbound + outbound rows from /chat/stream itself (via
+  // AuraBotTurnPersistence). Pass conversationId + clientMsgId on ChatRequest
+  // so server can write the inbound row keyed by clientMsgId for dedup.
 
   /**
    * Send a chat message and receive streaming response
