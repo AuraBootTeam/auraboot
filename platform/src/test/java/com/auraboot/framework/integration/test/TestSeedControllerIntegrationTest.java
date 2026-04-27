@@ -1,7 +1,10 @@
 package com.auraboot.framework.integration.test;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +47,12 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private TenantMemberService tenantMemberService;
+
     private MockMvc mockMvc;
 
     // Cross-test state captured from seed response
@@ -77,6 +86,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         seededTenantId = body.get("tenantId").asLong();
         seededUserId = body.get("userId").asLong();
+        assertJwtIncludesMemberId(body);
 
         log.info("TS-01: seed returned tenantId={}, userId={}", seededTenantId, seededUserId);
     }
@@ -100,6 +110,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                 "Second seed must return same tenantId");
         Assertions.assertEquals(seededUserId, body.get("userId").asLong(),
                 "Second seed must return same userId");
+        assertJwtIncludesMemberId(body);
 
         log.info("TS-02: second seed returned same tenantId={}, userId={}", seededTenantId, seededUserId);
     }
@@ -124,6 +135,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                 "context must return same tenantId as seed");
         Assertions.assertEquals(seededUserId, body.get("userId").asLong(),
                 "context must return same userId as seed");
+        assertJwtIncludesMemberId(body);
 
         log.info("TS-03: context returned seeded=true, tenantId={}", seededTenantId);
     }
@@ -147,6 +159,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
 
         // After reset, tenantId may differ (old tenant deleted, new one created)
         Assertions.assertNotNull(newTenantId);
+        assertJwtIncludesMemberId(body);
         log.info("TS-04: reset returned tenantId={} (previous was {})", newTenantId, seededTenantId);
     }
 
@@ -215,5 +228,16 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.testRunId", org.hamcrest.Matchers.startsWith("api_")));
 
         log.info("TS-08: run-id endpoint returns valid format");
+    }
+
+    private void assertJwtIncludesMemberId(JsonNode body) {
+        Long tenantId = body.get("tenantId").asLong();
+        Long userId = body.get("userId").asLong();
+        String jwt = body.get("jwt").asText();
+        TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+
+        Assertions.assertNotNull(member, "seeded user must have tenant member");
+        Assertions.assertEquals(member.getId(), jwtUtil.extractMemberId(jwt),
+                "seed JWT must include memberId for permission resolution");
     }
 }
