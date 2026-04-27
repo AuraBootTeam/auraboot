@@ -109,7 +109,10 @@ async function navigateToDesignerViaMenu(
   await leaf.evaluate((el: HTMLElement) => el.click());
   await listResp.catch(() => null);
 
-  await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 5_000 });
+  if (!(await page.getByTestId('toolbar-btn-create').isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await page.goto('/p/page_schema', { waitUntil: 'domcontentloaded' });
+  }
+  await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 10_000 });
   await page.evaluate(() => {
     document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
   });

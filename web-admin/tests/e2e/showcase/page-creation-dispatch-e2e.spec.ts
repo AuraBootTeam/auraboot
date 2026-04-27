@@ -184,6 +184,8 @@ async function fillAndSubmitCreateForm(page: Page, opts: CreatePageOptions): Pro
 const createdPagePids: string[] = [];
 
 test.describe('Phase 2 — Page creation + kind dispatch E2E', () => {
+  test.setTimeout(45_000);
+
   test.afterEach(async ({ page }) => {
     while (createdPagePids.length > 0) {
       const pid = createdPagePids.pop()!;

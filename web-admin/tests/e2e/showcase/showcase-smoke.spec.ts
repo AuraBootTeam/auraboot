@@ -18,7 +18,7 @@ import { test, expect } from '@playwright/test';
 import { navigateToMenuByClick } from '../helpers';
 
 test.describe('Showcase Smoke Tests', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(60_000);
 
   test('CRM Account list has data', async ({ page }) => {

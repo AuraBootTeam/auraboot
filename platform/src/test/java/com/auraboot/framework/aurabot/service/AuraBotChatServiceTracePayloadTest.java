@@ -96,4 +96,16 @@ class AuraBotChatServiceTracePayloadTest {
         assertThat(payload).containsEntry("output_tokens", 654);
         assertThat((List<?>) payload.get("content")).hasSize(2);
     }
+
+    @Test
+    @DisplayName("tool execution allowlist rejects names that were not exposed to the LLM")
+    void isToolOffered_rejectsUnavailableToolName() {
+        List<LlmChatRequest.Tool> tools = List.of(
+                LlmChatRequest.Tool.builder().name("nq_crm_lead_pipeline_stats").build(),
+                LlmChatRequest.Tool.builder().name("platform_fill_form").build());
+
+        assertThat(AuraBotChatService.isToolOffered(tools, "nq_crm_lead_pipeline_stats")).isTrue();
+        assertThat(AuraBotChatService.isToolOffered(tools, "platform_execute_sql")).isFalse();
+        assertThat(AuraBotChatService.isToolOffered(tools, null)).isFalse();
+    }
 }

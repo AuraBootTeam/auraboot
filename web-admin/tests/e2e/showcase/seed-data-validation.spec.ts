@@ -10,7 +10,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Seed Data Validation', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(60_000);
 
   // Helper to query list API and return total count

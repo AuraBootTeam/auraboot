@@ -77,6 +77,17 @@ const CONTEXT_SUGGESTIONS: Record<string, Suggestion[]> = {
     },
   ],
 
+  // PCBA Procurement
+  'list:pe_procurement_comparison': [
+    {
+      icon: '📊',
+      label: 'Compare suppliers',
+      labelZh: '生成供应商比价建议',
+      prompt:
+        '请使用 pe_procurement_comparison_supplier_options 查询 PCBA-DEMO-RM-001 的供应商价格、交期、评分和资质证据，先给出推荐和风险说明，确认后再生成采购比价草稿，不要自动提交复核。',
+    },
+  ],
+
   // Project Management
   'detail:pm_project': [
     {

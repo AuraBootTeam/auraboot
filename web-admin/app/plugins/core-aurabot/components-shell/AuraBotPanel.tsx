@@ -21,10 +21,29 @@ interface AgentOption {
   agent_status?: string;
 }
 
+interface AgentDefinitionRecord {
+  agent_code?: string;
+  agent_name?: string;
+  name?: string;
+  agent_status?: string;
+  status?: string;
+}
+
 const AURABOT_DEFAULT: AgentOption = {
   agent_code: 'aurabot',
   agent_name: 'AuraBot',
 };
+
+export function normalizeAgentOptions(records: AgentDefinitionRecord[]): AgentOption[] {
+  return records
+    .map((record) => ({
+      agent_code: record.agent_code || '',
+      agent_name: record.agent_name || record.name || record.agent_code || '',
+      agent_status: record.agent_status || record.status,
+    }))
+    .filter((agent) => agent.agent_code && agent.agent_code !== AURABOT_DEFAULT.agent_code)
+    .filter((agent) => agent.agent_status === 'active' || agent.agent_status === 'published');
+}
 
 export function AuraBotPanel() {
   const { state, sessions, closePanel, sendMessage, setSelectedAgent, newSession, selectSession, deleteSession } =
@@ -51,11 +70,8 @@ export function AuraBotPanel() {
         );
         if (!res.ok) return;
         const json = await res.json();
-        const records: AgentOption[] = json?.data?.records || [];
-        const activeAgents = records.filter(
-          (a) => a.agent_status === 'active' || a.agent_status === 'published',
-        );
-        setAgents([AURABOT_DEFAULT, ...activeAgents]);
+        const records: AgentDefinitionRecord[] = json?.data?.records || [];
+        setAgents([AURABOT_DEFAULT, ...normalizeAgentOptions(records)]);
       } catch {
         // Silently ignore — keep default AuraBot only
       }

@@ -769,6 +769,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             String targetModelsJson = dto.getTargetModels() != null ? toJson(dto.getTargetModels()) : "[]";
             String executionConfigJson = consolidatedConfig != null ? toJson(consolidatedConfig) : "{}";
             String extensionJson = dto.getExtension() != null ? toJson(dto.getExtension()) : "{}";
+            String cmdRiskLevel = resolveCommandRiskLevel(dto, consolidatedConfig);
 
             commandDefinitionMapper.updateForPluginImport(
                 dto.getEffectiveDisplayName(),
@@ -778,6 +779,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 targetModelsJson,
                 executionConfigJson,
                 extensionJson,
+                cmdRiskLevel,
                 pluginPid,
                 existingCmd.getPid(),
                 tenantId);
@@ -806,6 +808,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Use consolidated config that merges structured ExecutionConfig with DSL extended fields
             Map<String, Object> consolidatedConfig = dto.getConsolidatedExecutionConfig();
             request.setExecutionConfig(consolidatedConfig != null ? toJson(consolidatedConfig) : null);
+            request.setCmdRiskLevel(resolveCommandRiskLevel(dto, consolidatedConfig));
             request.setPluginPid(pluginPid);  // Set plugin_pid via request
             request.setExtension(dto.getExtension() != null ? toJson(dto.getExtension()) : "{}");
 
@@ -820,6 +823,19 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     created.getPid(), null, dto.getCode(), dto.getEffectiveDisplayName(),
                     ResourceAction.CREATE, null, null);
         }
+    }
+
+    private String resolveCommandRiskLevel(CommandDefinitionDTO dto, Map<String, Object> consolidatedConfig) {
+        if (dto.getCmdRiskLevel() != null && !dto.getCmdRiskLevel().isBlank()) {
+            return dto.getCmdRiskLevel();
+        }
+        if (consolidatedConfig != null) {
+            Object riskLevel = consolidatedConfig.get("riskLevel");
+            if (riskLevel != null && !String.valueOf(riskLevel).isBlank()) {
+                return String.valueOf(riskLevel);
+            }
+        }
+        return "L1";
     }
 
     @Override

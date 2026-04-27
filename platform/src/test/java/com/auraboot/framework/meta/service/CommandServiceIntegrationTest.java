@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 3. Command publishing and version control
  * 4. Code uniqueness constraints
  * 5. Model association
- * 
+ *
  * Each test is self-contained and creates its own test data.
  */
 @Slf4j
@@ -70,6 +70,25 @@ class CommandServiceIntegrationTest extends BaseIntegrationTest {
         assertNotNull(result.getStatus());
 
         log.info("Created command: pid={}, code={}", result.getPid(), code);
+    }
+
+    @Test
+    @Order(1)
+    @DisplayName("P1-1.1: Create command preserves agent risk level")
+    void test01b_createCommandPreservesRiskLevel() {
+        String code = "cmd_risk_" + System.currentTimeMillis();
+        CommandDefinitionCreateRequest request = new CommandDefinitionCreateRequest();
+        request.setCode(code);
+        request.setDisplayName("Risk Command");
+        request.setDescription("Integration test command with risk level");
+        request.setModelCode(TEST_MODEL_CODE);
+        request.setInputSchema("{\"type\":\"object\",\"properties\":{}}");
+        request.setCmdRiskLevel("L3");
+
+        CommandDefinitionDTO created = commandService.create(request);
+        CommandDefinitionDTO result = commandService.findByCode(created.getCode());
+
+        assertEquals("L3", result.getCmdRiskLevel());
     }
 
     @Test

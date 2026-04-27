@@ -20,9 +20,13 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * ToolProvider implementation for DSL-based tools (commands, named queries, list, get-by-id).
@@ -45,6 +49,9 @@ public class DslToolProvider implements ToolProvider {
     private static final String PREFIX_NQ = "nq:";
     private static final String PREFIX_LIST = "list:";
     private static final String PREFIX_GET = "get:";
+    private static final Pattern PARAM_PATTERN = Pattern.compile("#\\{params\\.([A-Za-z0-9_]+)}");
+    private static final Set<String> SYSTEM_QUERY_PARAMS = Set.of(
+            "tenantId", "currentUserId", "currentUserPid", "page", "pageSize", "offset", "limit");
 
     private final CommandExecutor commandExecutor;
     private final DynamicDataService dynamicDataService;
@@ -77,7 +84,7 @@ public class DslToolProvider implements ToolProvider {
 
         // 1. Discover commands for this model
         try {
-            String sql = "SELECT code, display_name, description, agent_hint, execution_config, cmd_risk_level " +
+            String sql = "SELECT code, display_name, description, agent_hint, input_schema, execution_config, cmd_risk_level " +
                     "FROM ab_command_definition " +
                     "WHERE tenant_id = #{params.tenantId} " +
                     "AND model_code = #{params.modelCode} " +
@@ -95,6 +102,8 @@ public class DslToolProvider implements ToolProvider {
                 Map<String, Object> executionConfig = parseExecutionConfig(row.get("execution_config"));
                 boolean readQuery = isReadQueryCommand(code, executionConfig, row.get("cmd_risk_level"));
                 String riskLevel = readQuery ? "L0" : normalizeRiskLevel(row.get("cmd_risk_level"), "L1");
+                Map<String, Object> parameterSchema = buildCommandParameterSchema(
+                        ctx.getTenantId(), modelHint, row.get("input_schema"), executionConfig);
                 tools.add(ToolDefinition.builder()
                         .toolCode(PREFIX_CMD + code)
                         .toolName(displayName != null ? displayName : code)
@@ -106,6 +115,7 @@ public class DslToolProvider implements ToolProvider {
                         .confirmationPolicy(confirmationPolicy(riskLevel))
                         .requiresApproval(isApprovalRisk(riskLevel))
                         .requiresConfirmation(isConfirmationRisk(riskLevel))
+                        .parameterSchema(parameterSchema)
                         .build());
             }
         } catch (Exception e) {
@@ -114,7 +124,7 @@ public class DslToolProvider implements ToolProvider {
 
         // 2. Discover named queries matching this model
         try {
-            String sql = "SELECT code, title, description, purpose " +
+            String sql = "SELECT code, title, description, purpose, from_sql, parameter_schema " +
                     "FROM ab_named_query " +
                     "WHERE tenant_id = #{params.tenantId} " +
                     "AND code LIKE #{params.codePattern} " +
@@ -139,6 +149,8 @@ public class DslToolProvider implements ToolProvider {
                             .sourceCode(code)
                             .riskLevel("L0")
                             .confirmationPolicy("none")
+                            .parameterSchema(buildNamedQueryParameterSchema(
+                                    row.get("parameter_schema"), row.get("from_sql")))
                             .build());
                 }
             }
@@ -157,6 +169,7 @@ public class DslToolProvider implements ToolProvider {
                     .sourceCode(modelHint)
                     .riskLevel("L0")
                     .confirmationPolicy("none")
+                    .parameterSchema(listParameterSchema())
                     .build());
         }
         if (tools.size() < maxResults) {
@@ -169,11 +182,195 @@ public class DslToolProvider implements ToolProvider {
                     .sourceCode(modelHint)
                     .riskLevel("L0")
                     .confirmationPolicy("none")
+                    .parameterSchema(getParameterSchema())
                     .build());
         }
 
         return tools;
     }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> buildCommandParameterSchema(Long tenantId, String modelCode,
+                                                             Object rawInputSchema,
+                                                             Map<String, Object> executionConfig) {
+        Map<String, Object> explicitSchema = parseMap(rawInputSchema);
+        if (isUsableSchema(explicitSchema)) {
+            return explicitSchema;
+        }
+
+        Object inputFieldsObj = executionConfig != null ? executionConfig.get("inputFields") : null;
+        if (!(inputFieldsObj instanceof List<?> inputFields) || inputFields.isEmpty()) {
+            Object type = executionConfig != null ? executionConfig.get("type") : null;
+            if (type != null && "state_transition".equalsIgnoreCase(String.valueOf(type))) {
+                return objectSchema(
+                        Map.of("recordId", Map.of("type", "string", "description", "Record pid to transition")),
+                        List.of("recordId"));
+            }
+            return objectSchema(Map.of(), List.of());
+        }
+
+        Set<String> fieldCodes = new LinkedHashSet<>();
+        for (Object field : inputFields) {
+            if (field != null && !String.valueOf(field).isBlank()) {
+                fieldCodes.add(String.valueOf(field));
+            }
+        }
+
+        Map<String, FieldSchemaInfo> fieldInfo = loadModelFieldInfo(tenantId, modelCode);
+        Map<String, Object> properties = new LinkedHashMap<>();
+        List<String> required = new ArrayList<>();
+        for (String fieldCode : fieldCodes) {
+            FieldSchemaInfo info = fieldInfo.get(fieldCode);
+            Map<String, Object> propertySchema = jsonTypeFor(info != null ? info.dataType() : "text", fieldCode);
+            if (info != null && info.required() && info.editable()) {
+                required.add(fieldCode);
+                if ("string".equals(propertySchema.get("type"))) {
+                    propertySchema.put("minLength", 1);
+                }
+            }
+            properties.put(fieldCode, propertySchema);
+        }
+        return objectSchema(properties, required);
+    }
+
+    private Map<String, Object> buildNamedQueryParameterSchema(Object rawParameterSchema, Object fromSql) {
+        Map<String, Object> explicitSchema = parseMap(rawParameterSchema);
+        if (isUsableSchema(explicitSchema)) {
+            return explicitSchema;
+        }
+
+        Set<String> params = new LinkedHashSet<>();
+        Matcher matcher = PARAM_PATTERN.matcher(fromSql != null ? String.valueOf(fromSql) : "");
+        while (matcher.find()) {
+            String param = matcher.group(1);
+            if (!SYSTEM_QUERY_PARAMS.contains(param)) {
+                params.add(param);
+            }
+        }
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        for (String param : params) {
+            properties.put(param, Map.of("type", "string", "description", "NamedQuery parameter " + param));
+        }
+        return objectSchema(properties, List.of());
+    }
+
+    private Map<String, Object> listParameterSchema() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("pageNum", Map.of("type", "integer", "minimum", 1));
+        properties.put("pageSize", Map.of("type", "integer", "minimum", 1, "maximum", 1000));
+        properties.put("keyword", Map.of("type", "string"));
+        properties.put("filters", Map.of("type", "array", "items", Map.of("type", "object")));
+        return objectSchema(properties, List.of());
+    }
+
+    private Map<String, Object> getParameterSchema() {
+        return objectSchema(
+                Map.of("recordId", Map.of("type", "string", "description", "Record pid to fetch")),
+                List.of("recordId"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseMap(Object value) {
+        if (value == null) {
+            return Map.of();
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (entry.getKey() != null) {
+                    result.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+            }
+            return result;
+        }
+        String text = String.valueOf(value);
+        if (text.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(text, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.debug("Failed to parse DSL tool parameter schema: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private boolean isUsableSchema(Map<String, Object> schema) {
+        Object properties = schema.get("properties");
+        return "object".equals(schema.get("type"))
+                && properties instanceof Map<?, ?> map
+                && !map.isEmpty();
+    }
+
+    private Map<String, FieldSchemaInfo> loadModelFieldInfo(Long tenantId, String modelCode) {
+        try {
+            String sql = "SELECT f.code, f.data_type, b.required, b.editable " +
+                    "FROM ab_meta_field f " +
+                    "JOIN ab_meta_model_field_binding b ON b.field_id = f.id " +
+                    "JOIN ab_meta_model m ON m.id = b.model_id " +
+                    "WHERE m.tenant_id = #{params.tenantId} " +
+                    "AND m.code = #{params.modelCode} " +
+                    "AND (m.deleted_flag = FALSE OR m.deleted_flag IS NULL) " +
+                    "AND (f.deleted_flag = FALSE OR f.deleted_flag IS NULL) " +
+                    "AND (b.deleted_flag = FALSE OR b.deleted_flag IS NULL) " +
+                    "AND (m.is_current = TRUE OR m.is_current IS NULL) " +
+                    "AND (f.is_current = TRUE OR f.is_current IS NULL) " +
+                    "ORDER BY b.field_order";
+            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
+                    Map.of("tenantId", tenantId, "modelCode", modelCode));
+            Map<String, FieldSchemaInfo> result = new LinkedHashMap<>();
+            for (Map<String, Object> row : rows) {
+                String code = String.valueOf(row.get("code"));
+                result.put(code, new FieldSchemaInfo(
+                        String.valueOf(row.getOrDefault("data_type", "text")),
+                        Boolean.TRUE.equals(row.get("required")),
+                        !Boolean.FALSE.equals(row.get("editable"))));
+            }
+            return result;
+        } catch (Exception e) {
+            log.debug("Failed to load field metadata for DSL tool schema {}: {}", modelCode, e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private Map<String, Object> jsonTypeFor(String dataType, String fieldCode) {
+        String normalized = dataType != null ? dataType.toLowerCase(Locale.ROOT) : "text";
+        Map<String, Object> schema = new LinkedHashMap<>();
+        if (normalized.contains("int")) {
+            schema.put("type", "integer");
+        } else if (normalized.contains("decimal") || normalized.contains("number")
+                || normalized.contains("double") || normalized.contains("float")
+                || normalized.contains("currency")) {
+            schema.put("type", "number");
+        } else if (normalized.contains("bool")) {
+            schema.put("type", "boolean");
+        } else if (normalized.equals("date")) {
+            schema.put("type", "string");
+            schema.put("format", "date");
+        } else if (normalized.contains("time")) {
+            schema.put("type", "string");
+            schema.put("format", "date-time");
+        } else if (normalized.contains("json")) {
+            schema.put("type", "object");
+        } else {
+            schema.put("type", "string");
+        }
+        schema.put("description", "DSL field " + fieldCode);
+        return schema;
+    }
+
+    private Map<String, Object> objectSchema(Map<String, Object> properties, List<String> required) {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", properties != null ? properties : Map.of());
+        if (required != null && !required.isEmpty()) {
+            schema.put("required", required);
+        }
+        return schema;
+    }
+
+    private record FieldSchemaInfo(String dataType, boolean required, boolean editable) {}
 
     @Override
     public ProviderExecutionResult execute(Long tenantId, String toolCode, Map<String, Object> params) {
