@@ -64,6 +64,9 @@ public class CommandServiceImpl implements CommandService {
         entity.setInputSchema(request.getInputSchema() != null ? request.getInputSchema() : "{}");
         entity.setTargetModels(request.getTargetModels() != null ? request.getTargetModels() : "[]");
         entity.setExecutionConfig(request.getExecutionConfig() != null ? request.getExecutionConfig() : "{}");
+        entity.setCmdRiskLevel(request.getCmdRiskLevel() != null && !request.getCmdRiskLevel().isBlank()
+                ? request.getCmdRiskLevel()
+                : "L1");
         entity.setExtension(new com.auraboot.framework.meta.entity.payload.ExtensionBean());
         entity.setVersion(1);
         entity.setIsCurrent(true);
@@ -109,6 +112,9 @@ public class CommandServiceImpl implements CommandService {
         }
         if (request.getExecutionConfig() != null) {
             entity.setExecutionConfig(request.getExecutionConfig());
+        }
+        if (request.getCmdRiskLevel() != null && !request.getCmdRiskLevel().isBlank()) {
+            entity.setCmdRiskLevel(request.getCmdRiskLevel());
         }
         entity.setUpdatedAt(Instant.now());
 
@@ -278,6 +284,7 @@ public class CommandServiceImpl implements CommandService {
         dto.setInputSchema(entity.getInputSchema());
         dto.setTargetModels(entity.getTargetModels());
         dto.setExecutionConfig(entity.getExecutionConfig());
+        dto.setCmdRiskLevel(entity.getCmdRiskLevel());
         dto.setVersion(entity.getVersion());
         dto.setSemver(entity.getSemver());
         dto.setIsCurrent(entity.getIsCurrent());

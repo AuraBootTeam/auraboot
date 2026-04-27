@@ -24,6 +24,7 @@ public class CommandDefinitionCreateRequest {
     private String inputSchema;
     private String targetModels;
     private String executionConfig;
+    private String cmdRiskLevel;
 
     /**
      * 插件PID（用于标识资源来源的插件）

@@ -231,7 +231,7 @@ function buildTabsBlock(innerBlocks: any[], tabKey = 'd_tab') {
 }
 
 test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments)', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(90_000);
 
   test.afterEach(async ({ request }) => {

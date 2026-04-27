@@ -99,7 +99,7 @@ async function navigateToListViaMenu(
 }
 
 test.describe('Showcase UX Regression', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(60_000);
 
   test('A0: Showcase sidebar hides widget dashboard entry', async ({ page }) => {

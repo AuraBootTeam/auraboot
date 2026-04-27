@@ -169,6 +169,15 @@ public class AuraBotChatService {
         );
     }
 
+    static boolean isToolOffered(List<LlmChatRequest.Tool> tools, String toolName) {
+        if (tools == null || tools.isEmpty() || toolName == null || toolName.isBlank()) {
+            return false;
+        }
+        return tools.stream()
+                .map(LlmChatRequest.Tool::getName)
+                .anyMatch(toolName::equals);
+    }
+
     /**
      * Build an intent-aware tool hint based on the resolved tools metadata.
      * Replaces the old static TOOL_HINT constant with dynamic guidance.
@@ -180,17 +189,22 @@ public class AuraBotChatService {
         hint.append("\n\nYou have access to tools. Follow this strategy:\n");
 
         if (resolved.isReadOnly()) {
+            boolean sqlAvailable = isToolOffered(resolved.tools(), "platform_execute_sql");
             hint.append("- The user wants to QUERY data. Prefer nq_* (named query) tools — they are pre-built and optimized.\n");
-            hint.append("- Use platform_execute_sql ONLY if no named query matches the question.\n");
-            hint.append("- Before calling platform_execute_sql on a table you have NOT already seen the schema for,\n");
-            hint.append("  FIRST call platform_list_models with includeFields=true AND a keyword narrowing the scope\n");
-            hint.append("  (e.g. keyword='crm_account' — NOT empty). Do NOT guess Chinese-to-English field names\n");
-            hint.append("  (e.g. '行业' is not guaranteed to be 'industry'; it may be 'industry_type', 'trade',\n");
-            hint.append("  'category', or absent). One schema call is enough — the response will contain the fields.\n");
-            hint.append("- If platform_execute_sql returns an error with 'availableFields' and 'recovery', you MUST\n");
-            hint.append("  read availableFields, pick the closest semantic match, and retry ONCE with the corrected\n");
-            hint.append("  column. Only tell the user the dimension is unavailable if no field is a reasonable match,\n");
-            hint.append("  and in that case suggest 2-3 alternative dimensions from availableFields.\n");
+            if (sqlAvailable) {
+                hint.append("- Use platform_execute_sql ONLY if no named query or domain list/get tool matches the question.\n");
+                hint.append("- Before calling platform_execute_sql on a table you have NOT already seen the schema for,\n");
+                hint.append("  FIRST call platform_list_models with includeFields=true AND a keyword narrowing the scope\n");
+                hint.append("  (e.g. keyword='crm_account' — NOT empty). Do NOT guess Chinese-to-English field names\n");
+                hint.append("  (e.g. '行业' is not guaranteed to be 'industry'; it may be 'industry_type', 'trade',\n");
+                hint.append("  'category', or absent). One schema call is enough — the response will contain the fields.\n");
+                hint.append("- If platform_execute_sql returns an error with 'availableFields' and 'recovery', you MUST\n");
+                hint.append("  read availableFields, pick the closest semantic match, and retry ONCE with the corrected\n");
+                hint.append("  column. Only tell the user the dimension is unavailable if no field is a reasonable match,\n");
+                hint.append("  and in that case suggest 2-3 alternative dimensions from availableFields.\n");
+            } else {
+                hint.append("- platform_execute_sql is not available in this context. Use only the listed domain tools.\n");
+            }
         } else {
             hint.append("- The user wants to MODIFY data. Use the cmd_* tools to execute the operation.\n");
             hint.append("- Describe what you will do BEFORE calling the tool.\n");
@@ -202,11 +216,13 @@ public class AuraBotChatService {
         hint.append("- NEVER call the same tool with identical parameters twice.\n");
         hint.append("- Present results as tables in Chinese.\n");
         hint.append("- If a tool fails, explain the error clearly.\n");
-        hint.append("- When using platform_execute_sql for analytics/statistics, ALWAYS set chartType:\n");
-        hint.append("  - 'pie' for distribution/proportion queries (e.g., group by category)\n");
-        hint.append("  - 'bar' for comparison/ranking queries (e.g., top N, amount by stage)\n");
-        hint.append("  - 'line' for time-series/trend queries (e.g., monthly revenue)\n");
-        hint.append("  - 'table' only for raw detail listings\n");
+        if (isToolOffered(resolved.tools(), "platform_execute_sql")) {
+            hint.append("- When using platform_execute_sql for analytics/statistics, ALWAYS set chartType:\n");
+            hint.append("  - 'pie' for distribution/proportion queries (e.g., group by category)\n");
+            hint.append("  - 'bar' for comparison/ranking queries (e.g., top N, amount by stage)\n");
+            hint.append("  - 'line' for time-series/trend queries (e.g., monthly revenue)\n");
+            hint.append("  - 'table' only for raw detail listings\n");
+        }
 
         return hint.toString();
     }
@@ -542,6 +558,12 @@ public class AuraBotChatService {
                     String toolName = block.getName();
                     Map<String, Object> input = block.getInput() != null ? block.getInput() : Map.of();
 
+                    if (!isToolOffered(tools, toolName)) {
+                        log.warn("LLM requested unavailable tool {}; rejecting without execution", toolName);
+                        toolResultBlocks.add(buildToolResultBlock(toolId, unavailableToolResult(toolName)));
+                        continue;
+                    }
+
                     // Per-tool rate limit: max 5 calls per tool (industry norm for agent loops)
                     int callCount = toolCallCounts.merge(toolName, 1, Integer::sum);
                     if (callCount > 5) {
@@ -648,6 +670,12 @@ public class AuraBotChatService {
             return;
         }
 
+        if (pending.getAgentCode() != null && !pending.getAgentCode().isBlank()
+                && agentChatPort != null
+                && agentChatPort.resumeAgentToolAfterConfirmation(tenantId, pending, confirmed, emitter)) {
+            return;
+        }
+
         // --- Trace: find active trace for this session ---
         TraceContext trace = aiTraceService.findActiveTrace(sessionId);
 
@@ -749,6 +777,12 @@ public class AuraBotChatService {
                     String newToolId = block.getId();
                     String toolName = block.getName();
                     Map<String, Object> input = block.getInput() != null ? block.getInput() : Map.of();
+
+                    if (!isToolOffered(tools, toolName)) {
+                        log.warn("LLM requested unavailable tool during resume {}; rejecting without execution", toolName);
+                        toolResultBlocks.add(buildToolResultBlock(newToolId, unavailableToolResult(toolName)));
+                        continue;
+                    }
 
                     if (chatToolResolver.isReadOnly(toolName)) {
                         SpanContext toolSpan = aiTraceService.startSpan(trace,
@@ -872,6 +906,13 @@ public class AuraBotChatService {
             block.setResult(result.toString());
         }
         return block;
+    }
+
+    private Map<String, Object> unavailableToolResult(String toolName) {
+        return Map.of(
+                "success", false,
+                "error", "Tool is not available in this turn: " + (toolName != null ? toolName : "")
+        );
     }
 
     /**
