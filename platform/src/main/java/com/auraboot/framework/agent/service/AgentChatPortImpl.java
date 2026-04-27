@@ -10,12 +10,14 @@ import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.conversation.ResponseSink;
+import com.auraboot.framework.conversation.TurnContext;
+import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.*;
 
@@ -33,9 +35,6 @@ import java.util.*;
 public class AgentChatPortImpl implements AgentChatPort {
 
     private static final int MAX_TOOL_ROUNDS = 5;
-    private static final String EVENT_CHUNK = "chunk";
-    private static final String EVENT_DONE  = "done";
-    private static final String EVENT_ERROR = "error";
 
     private final DynamicDataMapper dynamicDataMapper;
     private final LlmProviderFactory providerFactory;
@@ -62,25 +61,31 @@ public class AgentChatPortImpl implements AgentChatPort {
     }
 
     @Override
-    public void streamAgentChat(Long tenantId, String agentCode, ChatRequest request, SseEmitter emitter) {
+    public TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink) {
+        Long tenantId = ctx.tenantId();
+        String agentCode = request.getAgentCode();
+
         Map<String, Object> agentDef = loadAgentDefinition(tenantId, agentCode);
         if (agentDef == null) {
-            sendError(emitter, "Agent not found or inactive: " + agentCode);
-            return;
+            String msg = "Agent not found or inactive: " + agentCode;
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
         }
 
         // Resolve provider + model from agent definition
         String providerCode = resolveProviderCode(agentDef);
         LlmProviderFactory.ProviderConfig config = resolveProviderConfig(tenantId, agentDef, providerCode);
         if (config == null) {
-            sendError(emitter, "No LLM provider configured for agent: " + agentCode +
-                    ". Please configure an API key in Cloud Config.");
-            return;
+            String msg = "No LLM provider configured for agent: " + agentCode +
+                    ". Please configure an API key in Cloud Config.";
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
         }
         LlmProvider provider = providerFactory.getProvider(providerCode);
         if (provider == null) {
-            sendError(emitter, "LLM provider not available: " + providerCode);
-            return;
+            String msg = "LLM provider not available: " + providerCode;
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
         }
 
         String model = resolveModel(agentDef, providerCode);
@@ -102,18 +107,18 @@ public class AgentChatPortImpl implements AgentChatPort {
                 agentCode, providerCode, model, tools.size());
 
         // Run tool loop
-        doToolLoop(provider, config, model, systemPrompt, maxTokens, messages, tools, emitter);
+        return doToolLoop(provider, config, model, systemPrompt, maxTokens, messages, tools, sink);
     }
 
     // =========================================================================
     // Tool loop
     // =========================================================================
 
-    private void doToolLoop(LlmProvider provider, LlmProviderFactory.ProviderConfig config,
-                             String model, String systemPrompt, int maxTokens,
-                             List<LlmChatRequest.Message> messages,
-                             List<LlmChatRequest.Tool> tools,
-                             SseEmitter emitter) {
+    private TurnOutcome doToolLoop(LlmProvider provider, LlmProviderFactory.ProviderConfig config,
+                                    String model, String systemPrompt, int maxTokens,
+                                    List<LlmChatRequest.Message> messages,
+                                    List<LlmChatRequest.Tool> tools,
+                                    ResponseSink sink) {
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             LlmChatRequest req = LlmChatRequest.builder()
                     .model(model)
@@ -128,20 +133,21 @@ public class AgentChatPortImpl implements AgentChatPort {
                 response = provider.chat(req, config.getApiKey(), config.getBaseUrl());
             } catch (Exception e) {
                 log.error("Agent chat LLM call failed (round {}): {}", round, e.getMessage(), e);
-                sendError(emitter, "LLM request failed: " + e.getMessage());
-                return;
+                String msg = "LLM request failed: " + e.getMessage();
+                sink.onError(msg, null);
+                return new TurnOutcome.Failed(msg, e);
             }
 
             if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
-                sendError(emitter, "Empty response from LLM");
-                return;
+                String msg = "Empty response from LLM";
+                sink.onError(msg, null);
+                return new TurnOutcome.Failed(msg, null);
             }
 
             String stopReason = response.getStopReason();
 
             if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null) {
-                streamFinalResponse(response, emitter);
-                return;
+                return streamFinalResponse(response, sink);
             }
 
             if ("tool_use".equals(stopReason)) {
@@ -160,11 +166,12 @@ public class AgentChatPortImpl implements AgentChatPort {
             }
 
             // Unknown stop reason — treat as final
-            streamFinalResponse(response, emitter);
-            return;
+            return streamFinalResponse(response, sink);
         }
 
-        sendError(emitter, "Agent tool loop exceeded maximum rounds (" + MAX_TOOL_ROUNDS + ")");
+        String exhaustedMsg = "Agent tool loop exceeded maximum rounds (" + MAX_TOOL_ROUNDS + ")";
+        sink.onError(exhaustedMsg, null);
+        return new TurnOutcome.Failed(exhaustedMsg, null);
     }
 
     // =========================================================================
@@ -360,10 +367,12 @@ public class AgentChatPortImpl implements AgentChatPort {
     }
 
     // =========================================================================
-    // SSE helpers — same event format as AuraBotChatService
+    // (SSE writes go through the ResponseSink — byte stream parity with the
+    //  aurabot path is enforced by SseResponseSink, locked at A.2b sha256
+    //  baseline. No emitter helpers live here.)
     // =========================================================================
 
-    private void streamFinalResponse(LlmChatResponse response, SseEmitter emitter) {
+    private TurnOutcome streamFinalResponse(LlmChatResponse response, ResponseSink sink) {
         StringBuilder sb = new StringBuilder();
         for (LlmChatResponse.ContentBlock block : response.getContent()) {
             if ("text".equals(block.getType()) && block.getText() != null) {
@@ -372,40 +381,9 @@ public class AgentChatPortImpl implements AgentChatPort {
         }
         String text = sb.toString();
         if (!text.isEmpty()) {
-            sendChunk(emitter, text);
+            sink.onTextChunk(text);
         }
-        sendDone(emitter, text);
-    }
-
-    private void sendChunk(SseEmitter emitter, String content) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name(EVENT_CHUNK)
-                    .data(Map.of("content", content)));
-        } catch (Exception e) {
-            log.debug("Failed to send SSE chunk: {}", e.getMessage());
-        }
-    }
-
-    private void sendDone(SseEmitter emitter, String fullContent) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name(EVENT_DONE)
-                    .data(Map.of("content", fullContent)));
-            emitter.complete();
-        } catch (Exception e) {
-            log.debug("Failed to send SSE done: {}", e.getMessage());
-        }
-    }
-
-    private void sendError(SseEmitter emitter, String errorMessage) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name(EVENT_ERROR)
-                    .data(Map.of("error", errorMessage)));
-            emitter.complete();
-        } catch (Exception e) {
-            log.debug("Failed to send SSE error: {}", e.getMessage());
-        }
+        sink.onDone(text, null);
+        return new TurnOutcome.Success(text, java.util.Map.of());
     }
 }
