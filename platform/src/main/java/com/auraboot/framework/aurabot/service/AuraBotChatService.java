@@ -12,6 +12,10 @@ import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.conversation.ResponseSink;
+import com.auraboot.framework.conversation.SseResponseSink;
+import com.auraboot.framework.conversation.TurnContext;
+import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -212,7 +216,11 @@ public class AuraBotChatService {
     }
 
     /**
-     * Stream a chat response to the given SSE emitter.
+     * Legacy async wrapper that bridges the existing {@code /chat/stream} controller surface
+     * into the Phase A.3 sync core ({@link #executeAuraBotTurn}). Phase A.5 cuts the controller
+     * over to {@code ConversationTurnService.runTurn} directly; this wrapper stays around for
+     * (a) the named-agent path which still routes through {@code AgentChatPort} until Phase B+
+     * and (b) callers that have not yet migrated to the new SPI.
      *
      * @param tenantId the current tenant ID
      * @param request  the chat request with message, history, page context, and options
@@ -222,15 +230,35 @@ public class AuraBotChatService {
     public void streamChat(Long tenantId, Long userId, String userPid, String username,
                            Long memberId, ChatRequest request, SseEmitter emitter) {
         asyncTaskExecutor.execute(() -> {
+            SseResponseSink sink = new SseResponseSink(emitter, objectMapper);
             try {
                 MetaContext.setContext(tenantId, userId, userPid, username);
                 if (memberId != null) {
                     MetaContext.setMemberId(memberId);
                 }
-                doStreamChat(tenantId, request, emitter);
+
+                String agentCode = request.getAgentCode();
+                if (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode)) {
+                    if (agentChatPort == null) {
+                        log.warn("agentCode='{}' requested but AgentChatPort is not available in the current runtime. " +
+                                "Falling back to AuraBot.", agentCode);
+                        // fall through to aurabot path below
+                    } else if (!agentChatPort.agentExists(tenantId, agentCode)) {
+                        sink.onError("Agent not found or inactive: " + agentCode, null);
+                        return;
+                    } else {
+                        log.info("Chat request delegated to ACP Agent: agentCode={}, tenantId={}", agentCode, tenantId);
+                        agentChatPort.streamAgentChat(tenantId, agentCode, request, emitter);
+                        return;
+                    }
+                }
+
+                TurnContext ctx = TurnContext.legacyDefault(tenantId, userId, memberId);
+                executeAuraBotTurn(ctx, request, sink);
+                // outcome ignored on this legacy path — turnService.runTurn (A.4+) is the outcome consumer.
             } catch (Exception e) {
                 log.error("Chat stream failed: {}", e.getMessage(), e);
-                sendError(emitter, e.getMessage());
+                sink.onError(e.getMessage(), null);
             } finally {
                 MetaContext.clear();
             }
@@ -252,58 +280,82 @@ public class AuraBotChatService {
                                          String sessionId, String toolId,
                                          boolean confirmed, SseEmitter emitter) {
         asyncTaskExecutor.execute(() -> {
+            SseResponseSink sink = new SseResponseSink(emitter, objectMapper);
+            com.auraboot.framework.agent.service.ChatSseContext.setEmitter(emitter);
             try {
                 MetaContext.setContext(tenantId, userId, userPid, username);
                 if (memberId != null) {
                     MetaContext.setMemberId(memberId);
                 }
-                doResumeAfterConfirmation(tenantId, sessionId, toolId, confirmed, emitter);
+                doResumeAfterConfirmationSinkAware(tenantId, sessionId, toolId, confirmed, sink);
             } catch (Exception e) {
                 log.error("Resume after confirmation failed: {}", e.getMessage(), e);
-                sendError(emitter, e.getMessage());
+                sink.onError(e.getMessage(), null);
             } finally {
+                com.auraboot.framework.agent.service.BifContext.clear();
+                com.auraboot.framework.agent.service.ChatSseContext.clear();
                 MetaContext.clear();
             }
         });
     }
 
     // =========================================================================
-    // Core streaming logic
+    // Core sync entry (Phase A.3 — Q-A.4=A')
     // =========================================================================
 
-    private void doStreamChat(Long tenantId, ChatRequest request, SseEmitter emitter) {
-        com.auraboot.framework.agent.service.ChatSseContext.setEmitter(emitter);
+    /**
+     * Phase A.3 sync core. Handles the {@code aurabot} main path only — the named-agent
+     * path stays in {@link #streamChat} until Phase B+ adds a group-chat adapter.
+     *
+     * <p>Returns a real {@link TurnOutcome} reflecting actual completion; never returns null.
+     * Sync internally — the caller (legacy {@code streamChat} or
+     * {@code ConversationTurnService.runTurn} in A.4) owns the async boundary.
+     *
+     * <p>Side effects this method does NOT manage:
+     * <ul>
+     *     <li>{@link MetaContext} — caller's responsibility</li>
+     *     <li>{@code asyncTaskExecutor.execute} — caller is already on a worker thread</li>
+     *     <li>named-agent {@code AgentChatPort} routing — caller handles</li>
+     * </ul>
+     *
+     * <p>What this method DOES manage internally:
+     * <ul>
+     *     <li>{@code ChatSseContext.setEmitter} compat for {@link com.auraboot.framework.agent.service.ResultContractEmitter}
+     *         (only when the sink is an {@link SseResponseSink})</li>
+     *     <li>{@code BifContext.clear} + {@code ChatSseContext.clear} in finally</li>
+     *     <li>Top-level exception barrier — translates uncaught throws to {@link TurnOutcome.Failed}
+     *         and surfaces them on the sink</li>
+     * </ul>
+     */
+    public TurnOutcome executeAuraBotTurn(TurnContext ctx, ChatRequest request, ResponseSink sink) {
+        if (sink instanceof SseResponseSink ssr) {
+            com.auraboot.framework.agent.service.ChatSseContext.setEmitter(ssr.getEmitter());
+        }
         try {
-            doStreamChatInner(tenantId, request, emitter);
+            return doStreamChatInnerSinkAware(ctx, request, sink);
+        } catch (Exception e) {
+            log.error("executeAuraBotTurn failed: {}", e.getMessage(), e);
+            sink.onError(e.getMessage(), null);
+            return new TurnOutcome.Failed(e.getMessage(), e);
         } finally {
             com.auraboot.framework.agent.service.BifContext.clear();
             com.auraboot.framework.agent.service.ChatSseContext.clear();
         }
     }
 
-    private void doStreamChatInner(Long tenantId, ChatRequest request, SseEmitter emitter) {
-        // 0. Route to ACP Agent if agentCode is set and not the default "aurabot"
-        String agentCode = request.getAgentCode();
-        if (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode)) {
-            if (agentChatPort == null) {
-                log.warn("agentCode='{}' requested but AgentChatPort is not available in the current runtime. " +
-                        "Falling back to AuraBot.", agentCode);
-            } else if (!agentChatPort.agentExists(tenantId, agentCode)) {
-                sendError(emitter, "Agent not found or inactive: " + agentCode);
-                return;
-            } else {
-                log.info("Chat request delegated to ACP Agent: agentCode={}, tenantId={}", agentCode, tenantId);
-                agentChatPort.streamAgentChat(tenantId, agentCode, request, emitter);
-                return;
-            }
-        }
+    private TurnOutcome doStreamChatInnerSinkAware(TurnContext ctx, ChatRequest request, ResponseSink sink) {
+        // Phase A.3: aurabot-only path. Named-agent routing has been hoisted to the caller
+        // (legacy streamChat in this service, AuraBotController in A.5+). This method assumes
+        // agentCode is null/blank/"aurabot".
+        Long tenantId = ctx.tenantId();
 
         // 1. Resolve provider and config
         String providerCode = resolveProvider(tenantId, request);
         ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, providerCode);
         if (config == null) {
-            sendError(emitter, "No LLM provider configured. Please configure an API key in Cloud Config.");
-            return;
+            String msg = "No LLM provider configured. Please configure an API key in Cloud Config.";
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
         }
         // Use the resolved provider code (may differ from input when auto-discovered)
         providerCode = config.getProviderCode();
@@ -332,10 +384,10 @@ public class AuraBotChatService {
         // 3. Resolve tools from model context
         String modelCode = null;
         String recordPid = null;
-        ChatRequest.PageContext ctx = request.getPageContext();
-        if (ctx != null) {
-            modelCode = ctx.getModelCode();
-            recordPid = ctx.getRecordPid();
+        ChatRequest.PageContext pageCtx = request.getPageContext();
+        if (pageCtx != null) {
+            modelCode = pageCtx.getModelCode();
+            recordPid = pageCtx.getRecordPid();
         }
 
         // --- D1 Grounding: compile user message → BIF, constrain tools, persist ---
@@ -413,26 +465,31 @@ public class AuraBotChatService {
 
         // 5. Route: tool loop (sync) vs text-only streaming
         if (!tools.isEmpty()) {
-            doToolLoop(tenantId, providerCode, config, model, systemPrompt, maxTokens,
+            return doToolLoop(tenantId, providerCode, config, model, systemPrompt, maxTokens,
                     request.getHistory(), request.getMessage(), tools,
-                    modelCode, request.getSessionId(), emitter, trace);
-        } else {
-            // No tools — use existing streaming path
-            String apiFormat = resolveApiFormat(providerCode);
-            try {
-                if ("messages".equals(apiFormat)) {
-                    streamAnthropic(config.getBaseUrl(), config.getApiKey(), model, systemPrompt,
-                            request.getHistory(), request.getMessage(), maxTokens, temperature, emitter);
-                } else {
-                    streamOpenAiCompatible(config.getBaseUrl(), config.getApiKey(), model, systemPrompt,
-                            request.getHistory(), request.getMessage(), maxTokens, temperature, emitter);
-                }
-                aiTraceService.endTrace(trace, "[streamed]", "success");
-            } catch (Exception e) {
-                log.error("LLM streaming error for provider={}: {}", providerCode, e.getMessage(), e);
-                aiTraceService.endTraceWithError(trace, e.getMessage());
-                sendError(emitter, "LLM request failed: " + e.getMessage(), trace != null ? trace.getTraceId() : null);
+                    modelCode, request.getSessionId(), sink, trace);
+        }
+
+        // No tools — use existing streaming path
+        String apiFormat = resolveApiFormat(providerCode);
+        try {
+            TurnOutcome streamOutcome;
+            if ("messages".equals(apiFormat)) {
+                streamOutcome = streamAnthropic(config.getBaseUrl(), config.getApiKey(), model, systemPrompt,
+                        request.getHistory(), request.getMessage(), maxTokens, temperature, sink);
+            } else {
+                streamOutcome = streamOpenAiCompatible(config.getBaseUrl(), config.getApiKey(), model, systemPrompt,
+                        request.getHistory(), request.getMessage(), maxTokens, temperature, sink);
             }
+            aiTraceService.endTrace(trace, "[streamed]", "success");
+            return streamOutcome;
+        } catch (Exception e) {
+            log.error("LLM streaming error for provider={}: {}", providerCode, e.getMessage(), e);
+            aiTraceService.endTraceWithError(trace, e.getMessage());
+            String tid = trace != null ? trace.getTraceId() : null;
+            String errMsg = "LLM request failed: " + e.getMessage();
+            sink.onError(errMsg, tid);
+            return new TurnOutcome.Failed(errMsg, e);
         }
     }
 
@@ -440,16 +497,18 @@ public class AuraBotChatService {
     // Tool loop (synchronous LlmProvider.chat)
     // =========================================================================
 
-    private void doToolLoop(Long tenantId, String providerCode, ProviderConfig config, String model,
-                            String systemPrompt, int maxTokens,
-                            List<ChatMessage> history, String userMessage,
-                            List<LlmChatRequest.Tool> tools, String modelCode,
-                            String sessionId, SseEmitter emitter, TraceContext trace) {
+    private TurnOutcome doToolLoop(Long tenantId, String providerCode, ProviderConfig config, String model,
+                                    String systemPrompt, int maxTokens,
+                                    List<ChatMessage> history, String userMessage,
+                                    List<LlmChatRequest.Tool> tools, String modelCode,
+                                    String sessionId, ResponseSink sink, TraceContext trace) {
+        String tid = trace != null ? trace.getTraceId() : null;
         LlmProvider provider = llmProviderFactory.getProvider(providerCode);
         if (provider == null) {
             aiTraceService.endTraceWithError(trace, "LLM provider not available: " + providerCode);
-            sendError(emitter, "LLM provider not available: " + providerCode, trace != null ? trace.getTraceId() : null);
-            return;
+            String msg = "LLM provider not available: " + providerCode;
+            sink.onError(msg, tid);
+            return new TurnOutcome.Failed(msg, null);
         }
 
         // Persist run record
@@ -485,11 +544,11 @@ public class AuraBotChatService {
                 log.error("Tool loop LLM call failed (round {}): {}", round, e.getMessage(), e);
                 if (chatRunPersistencePort != null && runPid != null) {
                     chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                            0, null, "LLM request failed: " + e.getMessage(),
-                            trace != null ? trace.getTraceId() : null);
+                            0, null, "LLM request failed: " + e.getMessage(), tid);
                 }
-                sendError(emitter, "LLM request failed: " + e.getMessage(), trace != null ? trace.getTraceId() : null);
-                return;
+                String msg = "LLM request failed: " + e.getMessage();
+                sink.onError(msg, tid);
+                return new TurnOutcome.Failed(msg, e);
             }
 
             // --- Trace: record generation ---
@@ -506,11 +565,11 @@ public class AuraBotChatService {
                 aiTraceService.endTraceWithError(trace, "Empty response from LLM");
                 if (chatRunPersistencePort != null && runPid != null) {
                     chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                            0, null, "Empty response from LLM",
-                            trace != null ? trace.getTraceId() : null);
+                            0, null, "Empty response from LLM", tid);
                 }
-                sendError(emitter, "Empty response from LLM", trace != null ? trace.getTraceId() : null);
-                return;
+                String msg = "Empty response from LLM";
+                sink.onError(msg, tid);
+                return new TurnOutcome.Failed(msg, null);
             }
 
             String stopReason = response.getStopReason();
@@ -521,10 +580,9 @@ public class AuraBotChatService {
                 aiTraceService.endTrace(trace, finalText, "success");
                 if (chatRunPersistencePort != null && runPid != null) {
                     chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
-                            0, finalText, null, trace != null ? trace.getTraceId() : null);
+                            0, finalText, null, tid);
                 }
-                streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
-                return;
+                return streamFinalResponse(response, sink, tid);
             }
 
             if ("tool_use".equals(stopReason)) {
@@ -534,6 +592,7 @@ public class AuraBotChatService {
                 // Process each tool_use block
                 List<LlmChatRequest.ContentBlock> toolResultBlocks = new ArrayList<>();
                 boolean confirmationRequired = false;
+                String pendingToolId = null;
 
                 for (LlmChatResponse.ContentBlock block : response.getContent()) {
                     if (!"tool_use".equals(block.getType())) continue;
@@ -557,7 +616,7 @@ public class AuraBotChatService {
                         // Auto-execute read-only tools
                         SpanContext toolSpan = aiTraceService.startSpan(trace,
                                 llmSpan != null ? llmSpan.getSpanId() : null, "tool", toolName, input);
-                        sendToolStart(emitter, toolId, toolName, input);
+                        sink.onToolStart(toolId, toolName, input);
 
                         Map<String, Object> result = chatToolExecutor.execute(toolName, input, modelCode);
                         boolean success = Boolean.TRUE.equals(result.get("success"));
@@ -566,7 +625,7 @@ public class AuraBotChatService {
                             chatRunPersistencePort.recordToolCall(runPid, toolName, input, result, success);
                         }
 
-                        sendToolResult(emitter, toolId, result, success);
+                        sink.onToolResult(toolId, result, success);
 
                         // Add tool_result to conversation
                         toolResultBlocks.add(buildToolResultBlock(toolId, result));
@@ -577,7 +636,7 @@ public class AuraBotChatService {
                         aiTraceService.endSpan(toolSpan, null, "pending");
 
                         String description = buildToolDescription(toolName, input);
-                        sendConfirmRequired(emitter, toolId, toolName, description, input);
+                        sink.onConfirmRequired(toolId, toolName, description, input);
 
                         // Store pending tool with full conversation context for resumption
                         chatSessionStore.storePending(sessionId, ChatSessionStore.PendingTool.builder()
@@ -598,14 +657,16 @@ public class AuraBotChatService {
                                 .build());
 
                         confirmationRequired = true;
+                        pendingToolId = toolId;
                         break; // Stop processing further tool calls — wait for confirmation
                     }
                 }
 
                 if (confirmationRequired) {
-                    // Complete this SSE stream; frontend will call /execute to resume
-                    sendDone(emitter, "", trace != null ? trace.getTraceId() : null);
-                    return;
+                    // Complete this SSE stream; frontend will call /execute to resume.
+                    // Empty done event is sent to gracefully close SSE — pre-baseline parity.
+                    sink.onDone("", tid);
+                    return new TurnOutcome.PendingConfirmation(sessionId, "", pendingToolId);
                 }
 
                 // All tool results collected — add user message with tool_results and continue loop
@@ -619,37 +680,39 @@ public class AuraBotChatService {
             aiTraceService.endTrace(trace, unknownText, "success");
             if (chatRunPersistencePort != null && runPid != null) {
                 chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
-                        0, unknownText, null, trace != null ? trace.getTraceId() : null);
+                        0, unknownText, null, tid);
             }
-            streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
-            return;
+            return streamFinalResponse(response, sink, tid);
         }
 
         // Exceeded max rounds — send what we have
         aiTraceService.endTraceWithError(trace, "Tool loop exceeded maximum rounds");
         if (chatRunPersistencePort != null && runPid != null) {
             chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                    0, null, "Tool loop exceeded maximum rounds",
-                    trace != null ? trace.getTraceId() : null);
+                    0, null, "Tool loop exceeded maximum rounds", tid);
         }
-        sendError(emitter, "Tool loop exceeded maximum rounds (" + maxToolRounds + ")", trace != null ? trace.getTraceId() : null);
+        String exhaustedMsg = "Tool loop exceeded maximum rounds (" + maxToolRounds + ")";
+        sink.onError(exhaustedMsg, tid);
+        return new TurnOutcome.Failed(exhaustedMsg, null);
     }
 
     // =========================================================================
     // Resume after confirmation
     // =========================================================================
 
-    private void doResumeAfterConfirmation(Long tenantId, String sessionId, String toolId,
-                                            boolean confirmed, SseEmitter emitter) {
+    private TurnOutcome doResumeAfterConfirmationSinkAware(Long tenantId, String sessionId, String toolId,
+                                                            boolean confirmed, ResponseSink sink) {
         // 1. Consume pending tool
         ChatSessionStore.PendingTool pending = chatSessionStore.consumePending(sessionId, toolId);
         if (pending == null) {
-            sendError(emitter, "No pending tool found (expired or already processed)", null);
-            return;
+            String msg = "No pending tool found (expired or already processed)";
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
         }
 
         // --- Trace: find active trace for this session ---
         TraceContext trace = aiTraceService.findActiveTrace(sessionId);
+        String tid = trace != null ? trace.getTraceId() : null;
 
         // 2. Reconstruct conversation messages
         List<LlmChatRequest.Message> messages = deserializeMessages(pending.getMessages());
@@ -658,13 +721,13 @@ public class AuraBotChatService {
         LlmChatRequest.ContentBlock toolResultBlock;
         if (confirmed) {
             aiTraceService.updateSpanStatus(pending.getToolSpanId(), "confirmed");
-            sendToolStart(emitter, toolId, pending.getToolName(), pending.getInput());
+            sink.onToolStart(toolId, pending.getToolName(), pending.getInput());
 
             Map<String, Object> result = chatToolExecutor.execute(
                     pending.getToolName(), pending.getInput(), pending.getModelCode());
             boolean success = Boolean.TRUE.equals(result.get("success"));
 
-            sendToolResult(emitter, toolId, result, success);
+            sink.onToolResult(toolId, result, success);
             toolResultBlock = buildToolResultBlock(toolId, result);
         } else {
             aiTraceService.updateSpanStatus(pending.getToolSpanId(), "cancelled");
@@ -681,8 +744,9 @@ public class AuraBotChatService {
         LlmProvider provider = llmProviderFactory.getProvider(pending.getProviderCode());
         if (provider == null) {
             aiTraceService.endTraceWithError(trace, "LLM provider not available");
-            sendError(emitter, "LLM provider not available: " + pending.getProviderCode(), trace != null ? trace.getTraceId() : null);
-            return;
+            String msg = "LLM provider not available: " + pending.getProviderCode();
+            sink.onError(msg, tid);
+            return new TurnOutcome.Failed(msg, null);
         }
 
         // Resolve tools again for potential further rounds
@@ -712,8 +776,9 @@ public class AuraBotChatService {
                 aiTraceService.endSpan(llmSpan, Map.of("error", e.getMessage()), "error");
                 aiTraceService.endTraceWithError(trace, e.getMessage());
                 log.error("Resume LLM call failed: {}", e.getMessage(), e);
-                sendError(emitter, "LLM request failed: " + e.getMessage(), trace != null ? trace.getTraceId() : null);
-                return;
+                String msg = "LLM request failed: " + e.getMessage();
+                sink.onError(msg, tid);
+                return new TurnOutcome.Failed(msg, e);
             }
 
             // --- Trace: record generation ---
@@ -724,8 +789,9 @@ public class AuraBotChatService {
 
             if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
                 aiTraceService.endTraceWithError(trace, "Empty response from LLM");
-                sendError(emitter, "Empty response from LLM", trace != null ? trace.getTraceId() : null);
-                return;
+                String msg = "Empty response from LLM";
+                sink.onError(msg, tid);
+                return new TurnOutcome.Failed(msg, null);
             }
 
             String stopReason = response.getStopReason();
@@ -733,8 +799,7 @@ public class AuraBotChatService {
             if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason)) {
                 String finalText = extractTextFromResponse(response);
                 aiTraceService.endTrace(trace, finalText, "success");
-                streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
-                return;
+                return streamFinalResponse(response, sink, tid);
             }
 
             if ("tool_use".equals(stopReason)) {
@@ -742,6 +807,7 @@ public class AuraBotChatService {
 
                 List<LlmChatRequest.ContentBlock> toolResultBlocks = new ArrayList<>();
                 boolean needsConfirmation = false;
+                String pendingToolId = null;
 
                 for (LlmChatResponse.ContentBlock block : response.getContent()) {
                     if (!"tool_use".equals(block.getType())) continue;
@@ -753,12 +819,12 @@ public class AuraBotChatService {
                     if (chatToolResolver.isReadOnly(toolName)) {
                         SpanContext toolSpan = aiTraceService.startSpan(trace,
                                 llmSpan != null ? llmSpan.getSpanId() : null, "tool", toolName, input);
-                        sendToolStart(emitter, newToolId, toolName, input);
+                        sink.onToolStart(newToolId, toolName, input);
                         Map<String, Object> result = chatToolExecutor.execute(
                                 toolName, input, pending.getModelCode());
                         boolean success = Boolean.TRUE.equals(result.get("success"));
                         aiTraceService.endSpan(toolSpan, result, success ? "success" : "error");
-                        sendToolResult(emitter, newToolId, result, success);
+                        sink.onToolResult(newToolId, result, success);
                         toolResultBlocks.add(buildToolResultBlock(newToolId, result));
                     } else {
                         // Another write tool — need confirmation again
@@ -767,7 +833,7 @@ public class AuraBotChatService {
                         aiTraceService.endSpan(toolSpan, null, "pending");
 
                         String description = buildToolDescription(toolName, input);
-                        sendConfirmRequired(emitter, newToolId, toolName, description, input);
+                        sink.onConfirmRequired(newToolId, toolName, description, input);
 
                         chatSessionStore.storePending(sessionId, ChatSessionStore.PendingTool.builder()
                                 .toolId(newToolId)
@@ -787,13 +853,14 @@ public class AuraBotChatService {
                                 .build());
 
                         needsConfirmation = true;
+                        pendingToolId = newToolId;
                         break;
                     }
                 }
 
                 if (needsConfirmation) {
-                    sendDone(emitter, "", trace != null ? trace.getTraceId() : null);
-                    return;
+                    sink.onDone("", tid);
+                    return new TurnOutcome.PendingConfirmation(sessionId, "", pendingToolId);
                 }
 
                 messages.add(buildToolResultMessage(toolResultBlocks));
@@ -802,12 +869,13 @@ public class AuraBotChatService {
 
             // Unknown stop reason
             aiTraceService.endTrace(trace, extractTextFromResponse(response), "success");
-            streamFinalResponse(response, emitter, trace != null ? trace.getTraceId() : null);
-            return;
+            return streamFinalResponse(response, sink, tid);
         }
 
         aiTraceService.endTraceWithError(trace, "Tool loop exceeded maximum rounds");
-        sendError(emitter, "Tool loop exceeded maximum rounds", trace != null ? trace.getTraceId() : null);
+        String exhaustedMsg = "Tool loop exceeded maximum rounds";
+        sink.onError(exhaustedMsg, tid);
+        return new TurnOutcome.Failed(exhaustedMsg, null);
     }
 
     // =========================================================================
@@ -948,18 +1016,21 @@ public class AuraBotChatService {
     }
 
     /**
-     * Stream the final text from an LLM response as SSE chunks + done.
+     * Stream the final text from an LLM response as a single chunk + done. Returns
+     * {@link TurnOutcome.Success} so the sync core can propagate completion to
+     * {@code ConversationTurnService.runTurn}'s finalize dispatch.
      */
-    private void streamFinalResponse(LlmChatResponse response, SseEmitter emitter, String traceId) {
+    private TurnOutcome streamFinalResponse(LlmChatResponse response, ResponseSink sink, String traceId) {
         String text = extractTextFromResponse(response);
         if (text == null) {
             text = "";
         }
         if (!text.isEmpty()) {
             // Send as a single chunk (sync response, no streaming needed)
-            sendChunk(emitter, text);
+            sink.onTextChunk(text);
         }
-        sendDone(emitter, text, traceId);
+        sink.onDone(text, traceId);
+        return new TurnOutcome.Success(text, java.util.Map.of());
     }
 
     // =========================================================================
@@ -1168,9 +1239,9 @@ public class AuraBotChatService {
     // =========================================================================
 
     @SuppressWarnings("unchecked")
-    private void streamAnthropic(String baseUrl, String apiKey, String model, String systemPrompt,
-                                  List<ChatMessage> history, String userMessage,
-                                  int maxTokens, double temperature, SseEmitter emitter) throws Exception {
+    private TurnOutcome streamAnthropic(String baseUrl, String apiKey, String model, String systemPrompt,
+                                         List<ChatMessage> history, String userMessage,
+                                         int maxTokens, double temperature, ResponseSink sink) throws Exception {
         // Build URL
         String url = normalizeBaseUrl(baseUrl) + "/v1/messages";
 
@@ -1211,8 +1282,9 @@ public class AuraBotChatService {
         if (response.statusCode() != 200) {
             String errorBody = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
             log.error("Anthropic API error {}: {}", response.statusCode(), errorBody);
-            sendError(emitter, "Anthropic API error: " + response.statusCode());
-            return;
+            String msg = "Anthropic API error: " + response.statusCode();
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
         }
 
         StringBuilder accumulated = new StringBuilder();
@@ -1236,25 +1308,27 @@ public class AuraBotChatService {
                                 String text = (String) delta.get("text");
                                 if (text != null) {
                                     accumulated.append(text);
-                                    sendChunk(emitter, text);
+                                    sink.onTextChunk(text);
                                 }
                             }
                         } catch (Exception e) {
                             log.debug("Failed to parse Anthropic delta: {}", data);
                         }
                     } else if ("message_stop".equals(eventType)) {
-                        sendDone(emitter, accumulated.toString());
-                        return;
+                        String full = accumulated.toString();
+                        sink.onDone(full, null);
+                        return new TurnOutcome.Success(full, java.util.Map.of());
                     } else if ("error".equals(eventType)) {
+                        String msg;
                         try {
                             Map<String, Object> parsed = objectMapper.readValue(data, Map.class);
                             Map<String, Object> error = (Map<String, Object>) parsed.get("error");
-                            String msg = error != null ? (String) error.get("message") : data;
-                            sendError(emitter, msg);
+                            msg = error != null ? (String) error.get("message") : data;
                         } catch (Exception e) {
-                            sendError(emitter, data);
+                            msg = data;
                         }
-                        return;
+                        sink.onError(msg, null);
+                        return new TurnOutcome.Failed(msg, null);
                     }
                 } else if (line.startsWith("data: ")) {
                     // Some Anthropic responses may not have explicit event: lines
@@ -1268,12 +1342,13 @@ public class AuraBotChatService {
                                 String text = (String) delta.get("text");
                                 if (text != null) {
                                     accumulated.append(text);
-                                    sendChunk(emitter, text);
+                                    sink.onTextChunk(text);
                                 }
                             }
                         } else if ("message_stop".equals(type)) {
-                            sendDone(emitter, accumulated.toString());
-                            return;
+                            String full = accumulated.toString();
+                            sink.onDone(full, null);
+                            return new TurnOutcome.Success(full, java.util.Map.of());
                         }
                     } catch (Exception e) {
                         log.debug("Failed to parse Anthropic data line: {}", data);
@@ -1284,10 +1359,13 @@ public class AuraBotChatService {
 
         // Stream ended without message_stop — send done with what we have
         if (!accumulated.isEmpty()) {
-            sendDone(emitter, accumulated.toString());
-        } else {
-            sendError(emitter, "Stream ended without response");
+            String full = accumulated.toString();
+            sink.onDone(full, null);
+            return new TurnOutcome.Success(full, java.util.Map.of());
         }
+        String msg = "Stream ended without response";
+        sink.onError(msg, null);
+        return new TurnOutcome.Failed(msg, null);
     }
 
     // =========================================================================
@@ -1295,9 +1373,9 @@ public class AuraBotChatService {
     // =========================================================================
 
     @SuppressWarnings("unchecked")
-    private void streamOpenAiCompatible(String baseUrl, String apiKey, String model, String systemPrompt,
-                                         List<ChatMessage> history, String userMessage,
-                                         int maxTokens, double temperature, SseEmitter emitter) throws Exception {
+    private TurnOutcome streamOpenAiCompatible(String baseUrl, String apiKey, String model, String systemPrompt,
+                                                List<ChatMessage> history, String userMessage,
+                                                int maxTokens, double temperature, ResponseSink sink) throws Exception {
         // Build URL
         String url = normalizeBaseUrl(baseUrl) + "/chat/completions";
 
@@ -1337,8 +1415,9 @@ public class AuraBotChatService {
         if (response.statusCode() != 200) {
             String errorBody = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
             log.error("OpenAI-compatible API error {}: {}", response.statusCode(), errorBody);
-            sendError(emitter, "LLM API error: " + response.statusCode());
-            return;
+            String msg = "LLM API error: " + response.statusCode();
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
         }
 
         StringBuilder accumulated = new StringBuilder();
@@ -1351,8 +1430,9 @@ public class AuraBotChatService {
 
                 String data = line.substring(6).trim();
                 if ("[DONE]".equals(data)) {
-                    sendDone(emitter, accumulated.toString());
-                    return;
+                    String full = accumulated.toString();
+                    sink.onDone(full, null);
+                    return new TurnOutcome.Success(full, java.util.Map.of());
                 }
 
                 try {
@@ -1364,7 +1444,7 @@ public class AuraBotChatService {
                             String content = (String) delta.get("content");
                             if (content != null) {
                                 accumulated.append(content);
-                                sendChunk(emitter, content);
+                                sink.onTextChunk(content);
                             }
                         }
                     }
@@ -1376,100 +1456,20 @@ public class AuraBotChatService {
 
         // Stream ended without [DONE] — send done with what we have
         if (!accumulated.isEmpty()) {
-            sendDone(emitter, accumulated.toString());
-        } else {
-            sendError(emitter, "Stream ended without response");
+            String full = accumulated.toString();
+            sink.onDone(full, null);
+            return new TurnOutcome.Success(full, java.util.Map.of());
         }
+        String msg = "Stream ended without response";
+        sink.onError(msg, null);
+        return new TurnOutcome.Failed(msg, null);
     }
 
     // =========================================================================
-    // SSE helpers
+    // (SSE helpers removed in A.3 — all SSE writes go through ResponseSink /
+    //  SseResponseSink. byte stream parity is verified by the pre-refactor
+    //  baseline at docs/plans/2026-04/sse-baseline-2026-04-26.sha256.)
     // =========================================================================
-
-    private void sendChunk(SseEmitter emitter, String content) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name("chunk")
-                    .data(Map.of("content", content)));
-        } catch (Exception e) {
-            log.debug("Failed to send SSE chunk: {}", e.getMessage());
-        }
-    }
-
-    /** Stream plain text content as chunk + done (no LlmChatResponse needed). */
-    private void streamTextContent(String text, SseEmitter emitter, String traceId) {
-        sendChunk(emitter, text);
-        sendDone(emitter, text, traceId);
-    }
-
-    private void sendDone(SseEmitter emitter, String fullContent) {
-        sendDone(emitter, fullContent, null);
-    }
-
-    private void sendDone(SseEmitter emitter, String fullContent, String traceId) {
-        try {
-            Map<String, Object> data = new HashMap<>();
-            data.put("content", fullContent);
-            if (traceId != null) data.put("traceId", traceId);
-            emitter.send(SseEmitter.event()
-                    .name("done")
-                    .data(data));
-            emitter.complete();
-        } catch (Exception e) {
-            log.debug("Failed to send SSE done: {}", e.getMessage());
-        }
-    }
-
-    private void sendError(SseEmitter emitter, String errorMessage) {
-        sendError(emitter, errorMessage, null);
-    }
-
-    private void sendError(SseEmitter emitter, String errorMessage, String traceId) {
-        try {
-            Map<String, Object> data = new HashMap<>();
-            data.put("error", errorMessage != null ? errorMessage : "Unknown error");
-            if (traceId != null) data.put("traceId", traceId);
-            emitter.send(SseEmitter.event()
-                    .name("error")
-                    .data(data));
-            emitter.complete();
-        } catch (Exception e) {
-            log.debug("Failed to send SSE error: {}", e.getMessage());
-        }
-    }
-
-    private void sendToolStart(SseEmitter emitter, String toolId, String toolName, Map<String, Object> input) {
-        sendEvent(emitter, "tool_start", Map.of(
-                "toolId", toolId,
-                "toolName", toolName,
-                "input", input != null ? input : Map.of()));
-    }
-
-    private void sendToolResult(SseEmitter emitter, String toolId, Map<String, Object> result, boolean success) {
-        sendEvent(emitter, "tool_result", Map.of(
-                "toolId", toolId,
-                "result", result != null ? result : Map.of(),
-                "success", success));
-    }
-
-    private void sendConfirmRequired(SseEmitter emitter, String toolId, String toolName,
-                                      String description, Map<String, Object> input) {
-        sendEvent(emitter, "confirm_required", Map.of(
-                "toolId", toolId,
-                "toolName", toolName,
-                "description", description != null ? description : "",
-                "input", input != null ? input : Map.of()));
-    }
-
-    private void sendEvent(SseEmitter emitter, String eventName, Map<String, Object> data) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name(eventName)
-                    .data(objectMapper.writeValueAsString(data)));
-        } catch (Exception e) {
-            log.warn("Failed to send SSE event {}: {}", eventName, e.getMessage());
-        }
-    }
 
     /**
      * Constrain the tool list based on the BIF's candidateSkillsMode.

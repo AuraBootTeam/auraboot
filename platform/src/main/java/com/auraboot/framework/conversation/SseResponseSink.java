@@ -38,8 +38,15 @@ public class SseResponseSink implements ResponseSink {
         this.objectMapper = objectMapper;
     }
 
-    /** Package-private accessor so executeAuraBotTurn can wire ChatSseContext.setEmitter compat. */
-    SseEmitter getEmitter() {
+    /**
+     * Internal accessor used by {@code AuraBotChatService.executeAuraBotTurn} to wire the
+     * {@code ChatSseContext} ThreadLocal compat path so {@code ResultContractEmitter} (which
+     * still reads the emitter directly) keeps working through Phase A. Public visibility is
+     * required because {@code AuraBotChatService} lives in a different package; the surface
+     * remains conceptually internal — do not call this from new code, write through the
+     * {@link ResponseSink} interface instead.
+     */
+    public SseEmitter getEmitter() {
         return emitter;
     }
 
