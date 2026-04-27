@@ -145,44 +145,11 @@ public class AuraBotConversationService {
                 .toList();
     }
 
-    @Transactional
-    public AuraBotConversationMessage appendUserMessage(
-            Long conversationId, Long tenantId, Long memberId, String content, String clientMsgId) {
-        ensureMember(conversationId, tenantId, memberId);
-        maybePromoteConversationTitle(conversationId, tenantId, content);
-        SendMessageRequest request = new SendMessageRequest();
-        request.setConversationId(conversationId);
-        request.setMessageType("text");
-        request.setContent(content);
-        request.setClientMsgId(clientMsgId);
-        return toMessage(imMessageService.sendMessage(request, memberId, tenantId));
-    }
-
-    @Transactional
-    public AuraBotConversationMessage appendAssistantMessage(
-            Long conversationId,
-            Long tenantId,
-            Long memberId,
-            String content,
-            String traceId,
-            boolean error
-    ) {
-        ensureMember(conversationId, tenantId, memberId);
-        String cardPayload = null;
-        if (traceId != null && !traceId.isBlank()) {
-            cardPayload = writeMetadata(Map.of("traceId", traceId));
-        }
-        String messageType = error ? "system" : "ai_response";
-        ImMessage message = imMessageService.sendSystemMessage(
-                conversationId,
-                tenantId,
-                messageType,
-                content,
-                cardPayload,
-                "aurabot-" + messageType + "-" + System.currentTimeMillis()
-        );
-        return toMessage(message);
-    }
+    // Phase B.1: appendUserMessage / appendAssistantMessage removed. Server now
+    // writes both inbound + outbound rows from /chat/stream via
+    // AuraBotTurnPersistence — eliminating the frontend-driven persistence
+    // detour design §1.4 called out. The corresponding controller endpoints
+    // under /{id}/messages/user and /{id}/messages/assistant are also gone.
 
     private void ensureMember(Long conversationId, Long tenantId, Long memberId) {
         if (!imConversationService.isMember(conversationId, ImConstants.MEMBER_TYPE_HUMAN, memberId, tenantId)) {

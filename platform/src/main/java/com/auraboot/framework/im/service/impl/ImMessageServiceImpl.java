@@ -178,6 +178,41 @@ public class ImMessageServiceImpl implements ImMessageService {
     }
 
     @Override
+    @Transactional
+    public ImMessage sendAgentMessage(Long conversationId, Long tenantId, Long agentId,
+                                        String messageType, String content,
+                                        String cardPayload, String clientMsgId) {
+        // Dedup by clientMsgId — same idempotency contract as sendSystemMessage.
+        if (clientMsgId != null) {
+            ImMessage existing = messageMapper.findByClientMsgId(conversationId, tenantId, clientMsgId);
+            if (existing != null) {
+                return existing;
+            }
+        }
+
+        // Increment seq atomically
+        conversationMapper.incrementSeq(conversationId, tenantId);
+        ImConversation conv = conversationMapper.selectById(conversationId);
+        long newSeq = conv.getMaxSeq();
+
+        ImMessage message = new ImMessage();
+        message.setConversationId(conversationId);
+        message.setTenantId(tenantId);
+        message.setSenderId(agentId != null ? agentId : 0L);
+        message.setSenderType(ImConstants.SENDER_TYPE_AGENT);
+        message.setSeq(newSeq);
+        message.setMessageType(messageType != null ? messageType : "ai_response");
+        message.setContent(content);
+        message.setCardPayload(cardPayload);
+        message.setClientMsgId(clientMsgId);
+        message.setRecalled(false);
+        message.setCreatedAt(Instant.now());
+
+        messageMapper.insert(message);
+        return message;
+    }
+
+    @Override
     public List<MessageSearchResult> searchMessages(String keyword, Long conversationId, Long userId, Long tenantId, int limit) {
         List<Long> targetConvIds;
         if (conversationId != null) {

@@ -6,19 +6,18 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Phase A.6 wiring for {@link ConversationTurnService}. Provides:
- * <ul>
- *     <li>{@link TurnSideEffects.MetricsRecorder} backed by Micrometer counters
- *         {@code aurabot.turn.begin} / {@code aurabot.turn.end} tagged with
- *         {@code phase=A} so the dashboard can attribute Phase A traffic.</li>
- *     <li>{@link TurnSideEffects} bean named {@code turnSideEffects} configured
- *         as {@link TurnSideEffects#observeOnly} — persistence/event/audit are
- *         NOOP so behavior matches pre-refactor exactly; only metrics fire.</li>
- * </ul>
+ * Wiring for {@link ConversationTurnService} side-effect bundle.
  *
- * <p>Phase B replaces this config with one that wires real
- * {@link TurnSideEffects.Persistence} / {@link TurnSideEffects.EventEmitter} /
- * {@link TurnSideEffects.AuditWriter}.
+ * <p>Phase A.6 (initial): all side effects NOOP except Micrometer metrics
+ * (counters {@code aurabot.turn.begin} / {@code aurabot.turn.end} tagged
+ * {@code phase=A}).
+ *
+ * <p>Phase B.1 (2026-04-27): {@link TurnSideEffects.Persistence} switched to
+ * the real {@link AuraBotTurnPersistence} implementation that writes both
+ * inbound (sender_type=human) and outbound (sender_type=agent) rows into
+ * {@code ab_im_message}. {@link TurnSideEffects.EventEmitter} and
+ * {@link TurnSideEffects.AuditWriter} stay NOOP for now — Phase B.2 / B.3
+ * wire those next.
  */
 @Configuration
 public class ConversationTurnConfig {
@@ -47,7 +46,15 @@ public class ConversationTurnConfig {
     }
 
     @Bean(name = "turnSideEffects")
-    public TurnSideEffects turnSideEffects(TurnSideEffects.MetricsRecorder metricsRecorder) {
-        return TurnSideEffects.observeOnly(metricsRecorder);
+    public TurnSideEffects turnSideEffects(TurnSideEffects.MetricsRecorder metricsRecorder,
+                                             TurnSideEffects.Persistence persistence) {
+        // Phase B.1: persistence is real (AuraBotTurnPersistence); event + audit
+        // remain NOOP until B.2 / B.3 swap them in.
+        return new TurnSideEffects() {
+            @Override public Persistence persistence() { return persistence; }
+            @Override public EventEmitter eventEmitter() { return EventEmitter.NOOP; }
+            @Override public AuditWriter auditWriter() { return AuditWriter.NOOP; }
+            @Override public MetricsRecorder metricsRecorder() { return metricsRecorder; }
+        };
     }
 }

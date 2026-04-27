@@ -395,6 +395,18 @@ export interface ChatRequest {
   message: string;
   context: Partial<AuraBotContext>;
   options?: ChatOptions;
+  /**
+   * Phase B.1: target conversation row in ab_im_message. Server uses this to
+   * persist both inbound (sender_type=human) + outbound (sender_type=agent)
+   * rows, eliminating the legacy frontend-driven append* detour.
+   */
+  conversationId?: number;
+  /**
+   * Phase B.1: client-side dedup key for the inbound message; deduped via
+   * idx_ab_im_message_dedup. Resending the same clientMsgId for the same
+   * conversation returns the persisted row instead of inserting a duplicate.
+   */
+  clientMsgId?: string;
 }
 
 /**

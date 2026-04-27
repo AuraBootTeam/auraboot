@@ -46,11 +46,23 @@ public interface TurnSideEffects {
 
     /** Persistence of inbound + outbound messages. Phase B implements; Phase A NOOP. */
     interface Persistence {
-        Long persistInbound(TurnContext ctx, String userMessage, String clientMsgId);
+        /**
+         * Persist the inbound (user) message. Phase B.0 signature change: called
+         * from {@code beginTurn} BEFORE the {@link TurnContext} is constructed —
+         * the returned message id is what populates
+         * {@code TurnContext.inboundMessageId}. The {@link TurnRequest} carries
+         * every field we have at that moment (tenantId, userId, humanMemberId,
+         * conversationId, clientMsgId, userMessage).
+         *
+         * @return the persisted message id, or null when persistence skipped /
+         *         disabled (NOOP profile or missing required fields)
+         */
+        Long persistInbound(TurnRequest request);
+
         Long persistOutbound(TurnContext ctx, TurnOutcome outcome);
 
         Persistence NOOP = new Persistence() {
-            public Long persistInbound(TurnContext ctx, String m, String c) { return null; }
+            public Long persistInbound(TurnRequest request) { return null; }
             public Long persistOutbound(TurnContext ctx, TurnOutcome o) { return null; }
         };
     }

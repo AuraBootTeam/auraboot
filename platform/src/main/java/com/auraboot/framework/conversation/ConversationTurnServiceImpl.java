@@ -122,9 +122,10 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     }
 
     private TurnContext beginTurn(TurnRequest request) {
-        // Phase A: persistence is NOOP, returns null inboundMessageId.
-        Long inboundMessageId = sideEffects.persistence()
-                .persistInbound(null, request.userMessage(), request.clientMsgId());
+        // Phase B.1: Persistence.persistInbound takes the TurnRequest directly —
+        // TurnContext is not yet built (its inboundMessageId field is exactly
+        // what we are about to populate from the persistence return).
+        Long inboundMessageId = sideEffects.persistence().persistInbound(request);
         return new TurnContext(
                 com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
                 request.tenantId(),
