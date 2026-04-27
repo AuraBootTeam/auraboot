@@ -304,6 +304,11 @@ public class TestSeedController {
      * Generate a JWT token for the given user and tenant.
      */
     private String generateJwt(User user, Long tenantId) {
+        TenantMember tenantMember = tenantMemberService.findByTenantIdAndUserId(tenantId, user.getId());
+        if (tenantMember == null) {
+            throw new IllegalStateException("Test seed user is not a member of tenant " + tenantId);
+        }
+
         CustomUserDetails userDetails = new CustomUserDetails(
                 user.getEmail(),
                 user.getPassword() != null ? user.getPassword() : "",
@@ -317,7 +322,13 @@ public class TestSeedController {
         );
 
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
-        String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, securityVersion);
+        String jwt = jwtUtil.generateTokenWithTenantId(
+                userDetails,
+                user.getPid(),
+                tenantId,
+                tenantMember.getId(),
+                securityVersion
+        );
 
         // Register server-side session so the JWT passes session validation
         try {
