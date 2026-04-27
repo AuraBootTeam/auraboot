@@ -88,10 +88,21 @@ public class ChatRequest {
         private List<String> breadcrumb;
     }
 
+    /**
+     * Phase B.6: payload for {@code POST /api/ai/aurabot/execute}. Replaces the
+     * legacy {@code sessionId} key with {@code pendingTurnId} (per design v3.3
+     * §3.10 step 3) so the resume entry looks up suspended state by turnId
+     * rather than sessionId, eliminating cross-turn key conflicts.
+     */
     @Data
     public static class ExecuteRequest {
-        private String sessionId;
+        /** {@code TurnContext.turnId()} of the suspended turn — frontend
+         *  receives it on the {@code confirm_required} SSE event. */
+        private String pendingTurnId;
+        /** The pending tool's id (mirror of the suspended {@code tool_use} block). */
         private String toolId;
+        /** {@code true} = APPROVED; {@code false} = DENIED.
+         *  CANCELLED (frontend abort / timeout) is a future extension. */
         private boolean confirmed;
     }
 

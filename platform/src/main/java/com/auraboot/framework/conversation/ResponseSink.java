@@ -25,8 +25,16 @@ public interface ResponseSink {
 
     void onToolResult(String toolId, Map<String, Object> result, boolean success);
 
-    /** v4: 4 params aligned with sendConfirmRequired (description is independent field). */
-    void onConfirmRequired(String toolId, String toolName, String description, Map<String, Object> input);
+    /**
+     * v4: 4-arg sendConfirmRequired alignment + B.6: {@code pendingTurnId}
+     * (the {@code TurnContext.turnId()} of the suspended turn). The frontend
+     * receives this value on the {@code confirm_required} SSE event payload
+     * and echoes it back in {@code POST /execute} so {@code resumeTurn}
+     * looks up the suspended turn state by turnId rather than sessionId
+     * (per design v3.3 §3.10 step 1).
+     */
+    void onConfirmRequired(String toolId, String toolName, String description,
+                            Map<String, Object> input, String pendingTurnId);
 
     /** v4: traceId passed on terminal event (sink does not pre-hold traceId). */
     void onError(String message, String traceId);

@@ -118,20 +118,49 @@ public class AuraBotController {
     }
 
     /**
-     * Execute a tool/command action from the AI Panel.
-     * Resumes the chat session after user confirms or cancels a pending tool call.
+     * Phase B.6: resume a suspended turn after user confirms / denies a pending
+     * tool. Goes through {@code turnService.resumeTurn} so the same chokepoint
+     * pipeline (persistence + event + audit + metrics) covers both initial and
+     * resume paths.
      */
     @PostMapping(value = "/execute", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter executeAction(@RequestBody ChatRequest.ExecuteRequest request) {
+        SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
+
+        // Snapshot identity BEFORE the async hop (MetaContext is ThreadLocal).
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
         String userPid = MetaContext.getCurrentUserPid();
         String username = MetaContext.getCurrentUsername();
         Long memberId = MetaContext.getCurrentMemberId();
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
-        chatService.resumeAfterConfirmation(tenantId, userId, userPid, username, memberId,
-                request.getSessionId(),
-                request.getToolId(), request.isConfirmed(), emitter);
+
+        ConversationTurnService.ConfirmDecision decision = request.isConfirmed()
+                ? ConversationTurnService.ConfirmDecision.APPROVED
+                : ConversationTurnService.ConfirmDecision.DENIED;
+
+        asyncExecutor.execute(() -> {
+            SseResponseSink sink = new SseResponseSink(emitter, objectMapper);
+            try {
+                MetaContext.setContext(tenantId, userId, userPid, username);
+                if (memberId != null) {
+                    MetaContext.setMemberId(memberId);
+                }
+                // Phase B.6: ChatSessionStore is keyed solely by turnId so the
+                // resumeTurn SPI signature {pendingTurnId, decision, sink}
+                // (per design v3.3 §3.4) is sufficient — toolId in the request
+                // is informational (the persisted PendingTool already carries it).
+                turnService.resumeTurn(request.getPendingTurnId(), decision, sink);
+            } catch (Exception e) {
+                log.error("execute resume failed: {}", e.getMessage(), e);
+                try {
+                    sink.onError(e.getMessage(), null);
+                } catch (Exception ignore) {
+                    try { emitter.completeWithError(e); } catch (Exception ignore2) {}
+                }
+            } finally {
+                MetaContext.clear();
+            }
+        });
         return emitter;
     }
 
