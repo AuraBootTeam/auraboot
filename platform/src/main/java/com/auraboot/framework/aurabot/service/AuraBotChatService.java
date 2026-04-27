@@ -228,39 +228,16 @@ public class AuraBotChatService {
     // `AgentChatPort.runAgentTurn`. The named-agent fallback when AgentChatPort
     // bean is missing now lives in `ConversationTurnServiceImpl.runTurn`.
 
-    /**
-     * Resume conversation after user confirms or cancels a pending write tool.
-     * Called by the /execute endpoint which opens a new SSE stream.
-     *
-     * @param tenantId  the current tenant ID
-     * @param sessionId the chat session ID
-     * @param toolId    the pending tool ID
-     * @param confirmed true if user confirmed, false if cancelled
-     * @param emitter   the SSE emitter for the new stream
-     */
-    public void resumeAfterConfirmation(Long tenantId, Long userId, String userPid,
-                                         String username, Long memberId,
-                                         String sessionId, String toolId,
-                                         boolean confirmed, SseEmitter emitter) {
-        asyncTaskExecutor.execute(() -> {
-            SseResponseSink sink = new SseResponseSink(emitter, objectMapper);
-            com.auraboot.framework.agent.service.ChatSseContext.setEmitter(emitter);
-            try {
-                MetaContext.setContext(tenantId, userId, userPid, username);
-                if (memberId != null) {
-                    MetaContext.setMemberId(memberId);
-                }
-                doResumeAfterConfirmationSinkAware(tenantId, sessionId, toolId, confirmed, sink);
-            } catch (Exception e) {
-                log.error("Resume after confirmation failed: {}", e.getMessage(), e);
-                sink.onError(e.getMessage(), null);
-            } finally {
-                com.auraboot.framework.agent.service.BifContext.clear();
-                com.auraboot.framework.agent.service.ChatSseContext.clear();
-                MetaContext.clear();
-            }
-        });
-    }
+    // Phase B.6 deletion: the legacy `resumeAfterConfirmation(...)` public async
+    // wrapper has been removed. After B.6 the AuraBotController routes /execute
+    // through `turnService.resumeTurn(pendingTurnId, decision, sink)` which:
+    //   1. consumes the pending state from ChatSessionStore (turnId-keyed),
+    //   2. validates the requesting user owns the suspended turn,
+    //   3. dispatches APPROVED to `resumeApprovedTurnFromPending` below, or
+    //      DENIED / CANCELLED to a TurnOutcome.Interrupted directly,
+    //   4. fires the regular finalizeTurn -> persistence + event + audit pipeline.
+    //
+    // The public entry is now a single chokepoint just like `/chat/stream`.
 
     // =========================================================================
     // Core sync entry (Phase A.3 — Q-A.4=A')
@@ -428,7 +405,8 @@ public class AuraBotChatService {
 
         // 5. Route: tool loop (sync) vs text-only streaming
         if (!tools.isEmpty()) {
-            return doToolLoop(tenantId, providerCode, config, model, systemPrompt, maxTokens,
+            return doToolLoop(ctx, request.getAgentCode(),
+                    providerCode, config, model, systemPrompt, maxTokens,
                     request.getHistory(), request.getMessage(), tools,
                     modelCode, request.getSessionId(), sink, trace);
         }
@@ -460,11 +438,13 @@ public class AuraBotChatService {
     // Tool loop (synchronous LlmProvider.chat)
     // =========================================================================
 
-    private TurnOutcome doToolLoop(Long tenantId, String providerCode, ProviderConfig config, String model,
+    private TurnOutcome doToolLoop(TurnContext ctx, String agentCode,
+                                    String providerCode, ProviderConfig config, String model,
                                     String systemPrompt, int maxTokens,
                                     List<ChatMessage> history, String userMessage,
                                     List<LlmChatRequest.Tool> tools, String modelCode,
                                     String sessionId, ResponseSink sink, TraceContext trace) {
+        Long tenantId = ctx.tenantId();
         String tid = trace != null ? trace.getTraceId() : null;
         LlmProvider provider = llmProviderFactory.getProvider(providerCode);
         if (provider == null) {
@@ -599,10 +579,21 @@ public class AuraBotChatService {
                         aiTraceService.endSpan(toolSpan, null, "pending");
 
                         String description = buildToolDescription(toolName, input);
-                        sink.onConfirmRequired(toolId, toolName, description, input);
+                        // B.6: pendingTurnId is the suspended TurnContext.turnId(); the
+                        // frontend echoes it in /execute so resumeTurn looks up by turnId.
+                        sink.onConfirmRequired(toolId, toolName, description, input, ctx.turnId());
 
-                        // Store pending tool with full conversation context for resumption
-                        chatSessionStore.storePending(sessionId, ChatSessionStore.PendingTool.builder()
+                        // B.6: pending entry now keyed by ctx.turnId() (was sessionId);
+                        // identity tuple is captured so resumeTurn can rebuild TurnContext
+                        // and validate ownership when the user comes back via /execute.
+                        chatSessionStore.storePending(ctx.turnId(), ChatSessionStore.PendingTool.builder()
+                                .turnId(ctx.turnId())
+                                .tenantId(ctx.tenantId())
+                                .userId(ctx.userId())
+                                .humanMemberId(ctx.humanMemberId())
+                                .conversationId(ctx.conversationId())
+                                .agentCode(agentCode)
+                                .sessionId(sessionId)
                                 .toolId(toolId)
                                 .toolName(toolName)
                                 .toolSpanId(toolSpan != null ? toolSpan.getSpanId() : null)
@@ -629,7 +620,10 @@ public class AuraBotChatService {
                     // Complete this SSE stream; frontend will call /execute to resume.
                     // Empty done event is sent to gracefully close SSE — pre-baseline parity.
                     sink.onDone("", tid);
-                    return new TurnOutcome.PendingConfirmation(sessionId, "", pendingToolId);
+                    // B.6: PendingConfirmation.pendingTurnId = ctx.turnId() so
+                    // ConversationTurnServiceImpl can store it consistently with
+                    // ChatSessionStore's turnId-keyed entries.
+                    return new TurnOutcome.PendingConfirmation(ctx.turnId(), "", pendingToolId);
                 }
 
                 // All tool results collected — add user message with tool_results and continue loop
@@ -663,15 +657,38 @@ public class AuraBotChatService {
     // Resume after confirmation
     // =========================================================================
 
-    private TurnOutcome doResumeAfterConfirmationSinkAware(Long tenantId, String sessionId, String toolId,
-                                                            boolean confirmed, ResponseSink sink) {
-        // 1. Consume pending tool
-        ChatSessionStore.PendingTool pending = chatSessionStore.consumePending(sessionId, toolId);
-        if (pending == null) {
-            String msg = "No pending tool found (expired or already processed)";
-            sink.onError(msg, null);
-            return new TurnOutcome.Failed(msg, null);
+    /**
+     * Phase B.6: resume an APPROVED pending tool. Caller
+     * ({@code ConversationTurnServiceImpl.resumeTurn}) has already consumed the
+     * {@link ChatSessionStore.PendingTool} from the store and validated identity,
+     * so this method takes the pending state directly. DENIED / CANCELLED
+     * branches do not reach this method — {@code resumeTurn} short-circuits
+     * those into {@link TurnOutcome.Interrupted} without touching the chat impl.
+     */
+    public TurnOutcome resumeApprovedTurnFromPending(TurnContext ctx,
+                                                      ChatSessionStore.PendingTool pending,
+                                                      ResponseSink sink) {
+        if (sink instanceof SseResponseSink ssr) {
+            com.auraboot.framework.agent.service.ChatSseContext.setEmitter(ssr.getEmitter());
         }
+        try {
+            return doResumeApprovedInner(ctx, pending, sink);
+        } catch (Exception e) {
+            log.error("resumeApprovedTurnFromPending failed: {}", e.getMessage(), e);
+            sink.onError(e.getMessage(), null);
+            return new TurnOutcome.Failed(e.getMessage(), e);
+        } finally {
+            com.auraboot.framework.agent.service.BifContext.clear();
+            com.auraboot.framework.agent.service.ChatSseContext.clear();
+        }
+    }
+
+    private TurnOutcome doResumeApprovedInner(TurnContext ctx,
+                                                ChatSessionStore.PendingTool pending,
+                                                ResponseSink sink) {
+        Long tenantId = ctx.tenantId();
+        String toolId = pending.getToolId();
+        String sessionId = pending.getSessionId();
 
         // --- Trace: find active trace for this session ---
         TraceContext trace = aiTraceService.findActiveTrace(sessionId);
@@ -680,26 +697,17 @@ public class AuraBotChatService {
         // 2. Reconstruct conversation messages
         List<LlmChatRequest.Message> messages = deserializeMessages(pending.getMessages());
 
-        // 3. Execute or cancel
-        LlmChatRequest.ContentBlock toolResultBlock;
-        if (confirmed) {
-            aiTraceService.updateSpanStatus(pending.getToolSpanId(), "confirmed");
-            sink.onToolStart(toolId, pending.getToolName(), pending.getInput());
+        // 3. Execute the tool — caller already filtered out DENIED / CANCELLED
+        //    (those become TurnOutcome.Interrupted directly in resumeTurn).
+        aiTraceService.updateSpanStatus(pending.getToolSpanId(), "confirmed");
+        sink.onToolStart(toolId, pending.getToolName(), pending.getInput());
 
-            Map<String, Object> result = chatToolExecutor.execute(
-                    pending.getToolName(), pending.getInput(), pending.getModelCode());
-            boolean success = Boolean.TRUE.equals(result.get("success"));
+        Map<String, Object> result = chatToolExecutor.execute(
+                pending.getToolName(), pending.getInput(), pending.getModelCode());
+        boolean success = Boolean.TRUE.equals(result.get("success"));
 
-            sink.onToolResult(toolId, result, success);
-            toolResultBlock = buildToolResultBlock(toolId, result);
-        } else {
-            aiTraceService.updateSpanStatus(pending.getToolSpanId(), "cancelled");
-            Map<String, Object> cancelResult = Map.of(
-                    "success", false,
-                    "error", "User cancelled the operation"
-            );
-            toolResultBlock = buildToolResultBlock(toolId, cancelResult);
-        }
+        sink.onToolResult(toolId, result, success);
+        LlmChatRequest.ContentBlock toolResultBlock = buildToolResultBlock(toolId, result);
 
         // 4. Add tool_result to messages and call LLM for final response
         messages.add(buildToolResultMessage(List.of(toolResultBlock)));
@@ -783,12 +791,12 @@ public class AuraBotChatService {
                         SpanContext toolSpan = aiTraceService.startSpan(trace,
                                 llmSpan != null ? llmSpan.getSpanId() : null, "tool", toolName, input);
                         sink.onToolStart(newToolId, toolName, input);
-                        Map<String, Object> result = chatToolExecutor.execute(
+                        Map<String, Object> innerResult = chatToolExecutor.execute(
                                 toolName, input, pending.getModelCode());
-                        boolean success = Boolean.TRUE.equals(result.get("success"));
-                        aiTraceService.endSpan(toolSpan, result, success ? "success" : "error");
-                        sink.onToolResult(newToolId, result, success);
-                        toolResultBlocks.add(buildToolResultBlock(newToolId, result));
+                        boolean innerSuccess = Boolean.TRUE.equals(innerResult.get("success"));
+                        aiTraceService.endSpan(toolSpan, innerResult, innerSuccess ? "success" : "error");
+                        sink.onToolResult(newToolId, innerResult, innerSuccess);
+                        toolResultBlocks.add(buildToolResultBlock(newToolId, innerResult));
                     } else {
                         // Another write tool — need confirmation again
                         SpanContext toolSpan = aiTraceService.startSpan(trace,
@@ -796,9 +804,19 @@ public class AuraBotChatService {
                         aiTraceService.endSpan(toolSpan, null, "pending");
 
                         String description = buildToolDescription(toolName, input);
-                        sink.onConfirmRequired(newToolId, toolName, description, input);
+                        // B.6: pendingTurnId continues to be ctx.turnId() across the
+                        // resume loop — the SAME turn can suspend multiple times
+                        // (each resume cycle re-emits TurnSuspendedEvent).
+                        sink.onConfirmRequired(newToolId, toolName, description, input, ctx.turnId());
 
-                        chatSessionStore.storePending(sessionId, ChatSessionStore.PendingTool.builder()
+                        chatSessionStore.storePending(ctx.turnId(), ChatSessionStore.PendingTool.builder()
+                                .turnId(ctx.turnId())
+                                .tenantId(ctx.tenantId())
+                                .userId(ctx.userId())
+                                .humanMemberId(ctx.humanMemberId())
+                                .conversationId(ctx.conversationId())
+                                .agentCode(pending.getAgentCode())
+                                .sessionId(sessionId)
                                 .toolId(newToolId)
                                 .toolName(toolName)
                                 .toolSpanId(toolSpan != null ? toolSpan.getSpanId() : null)
@@ -823,7 +841,7 @@ public class AuraBotChatService {
 
                 if (needsConfirmation) {
                     sink.onDone("", tid);
-                    return new TurnOutcome.PendingConfirmation(sessionId, "", pendingToolId);
+                    return new TurnOutcome.PendingConfirmation(ctx.turnId(), "", pendingToolId);
                 }
 
                 messages.add(buildToolResultMessage(toolResultBlocks));
