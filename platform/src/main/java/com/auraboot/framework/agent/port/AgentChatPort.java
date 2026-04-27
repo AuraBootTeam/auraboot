@@ -1,19 +1,25 @@
 package com.auraboot.framework.agent.port;
 
-import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.List;
+import com.auraboot.framework.conversation.ResponseSink;
+import com.auraboot.framework.conversation.TurnContext;
+import com.auraboot.framework.conversation.TurnOutcome;
 
 /**
- * Port interface for ACP agent chat streaming.
- * <p>
- * Allows AuraBotChatService to delegate streaming chat to a named ACP agent
- * without compile-time coupling to a specific runtime implementation.
- * <p>
- * AgentChatPortImpl is the primary implementation. When unavailable, AuraBot falls through
- * to the default chat path.
+ * Port interface for named-agent (ACP) chat execution.
+ *
+ * <p>Phase B.0 evolution (2026-04-27): the legacy SSE-bound entry
+ * {@code streamAgentChat(emitter)} has been replaced with the chokepoint-aligned
+ * {@code runAgentTurn(TurnContext, ChatRequest, ResponseSink): TurnOutcome} so
+ * that the named-agent path goes through the same {@link com.auraboot.framework.conversation.ConversationTurnService}
+ * lifecycle as the aurabot main path. This eliminates the dual-path scaffold
+ * left behind by Phase A.5 and lets Phase B's persistence / event / audit
+ * features apply uniformly to both paths through one chokepoint.
+ *
+ * <p>{@code AgentChatPortImpl} is the primary implementation. When unavailable
+ * (bean not registered in the current runtime), {@code ConversationTurnServiceImpl}
+ * surfaces a {@link TurnOutcome.Failed} via the sink — same observability surface
+ * as any other failure outcome.
  */
 public interface AgentChatPort {
 
@@ -36,19 +42,31 @@ public interface AgentChatPort {
     String resolveAgentName(Long tenantId, String agentCode);
 
     /**
-     * Stream a chat response from a named ACP Agent via SSE.
-     * <p>
-     * The implementation should:
-     * 1. Load the agent definition (system prompt, provider, model).
-     * 2. Build LLM messages from history + current message.
-     * 3. Resolve and bind agent tools.
-     * 4. Run the tool loop and stream text chunks via the emitter.
-     * 5. Complete or error the emitter when done.
+     * Phase B.0 sync entry. Mirrors {@link com.auraboot.framework.aurabot.service.AuraBotChatService#executeAuraBotTurn}
+     * for the named-agent path.
      *
-     * @param tenantId  current tenant ID
-     * @param agentCode agent code to use
-     * @param request   original chat request (message, history, pageContext, options)
-     * @param emitter   SSE emitter to stream chunks to
+     * <p>The implementation should:
+     * <ol>
+     *     <li>Load the agent definition (system prompt, provider, model) for the
+     *         {@code agentCode} carried by {@code request}</li>
+     *     <li>Build LLM messages from history + current message</li>
+     *     <li>Resolve and bind agent tools</li>
+     *     <li>Run the tool loop, writing chunks / tool events through {@code sink}</li>
+     *     <li>Return a {@link TurnOutcome} reflecting actual completion
+     *         ({@link TurnOutcome.Success} on normal end,
+     *         {@link TurnOutcome.Failed} on any error path)</li>
+     * </ol>
+     *
+     * <p>The implementation MUST NOT manage the SSE emitter lifecycle directly
+     * (write through {@code sink} only) and MUST NOT spawn its own async worker
+     * (the caller — {@code ConversationTurnServiceImpl.runTurn} — is already on
+     * the controller's worker thread per Q-A.4=A').
+     *
+     * @param ctx     materialized turn context (turnId, tenantId, userId, agentId, etc.)
+     * @param request the original {@link ChatRequest} (message, history, pageContext,
+     *                options, agentCode); equivalent to {@code TurnRequest.legacyRequest()}
+     * @param sink    transport-agnostic response sink (typically {@code SseResponseSink})
+     * @return the outcome reflecting how the turn ended
      */
-    void streamAgentChat(Long tenantId, String agentCode, ChatRequest request, SseEmitter emitter);
+    TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink);
 }

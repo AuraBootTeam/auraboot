@@ -44,25 +44,16 @@ public class AuraBotController {
     }
 
     /**
-     * Phase A.5 cutover (Q-A.5: direct cut, no shadow endpoint).
+     * Phase A.5 + B.0: every chat turn (aurabot and named-agent) flows through
+     * {@code turnService.runTurn} — the controller is purely a transport adapter.
      *
-     * <p>Routing performed in this controller (was previously inside
-     * {@code AuraBotChatService.streamChat}):
-     * <ul>
-     *     <li>Named agent ({@code agentCode != null && != "aurabot"}): delegate to
-     *         legacy {@code chatService.streamChat} which routes through
-     *         {@code AgentChatPort}. Phase B+ migrates this via a group-chat
-     *         adapter; Phase A keeps it untouched.</li>
-     *     <li>Aurabot main path: build {@link SseResponseSink} + {@link TurnRequest}
-     *         carrying the original {@link ChatRequest} (Q-A.6 legacyRequest field)
-     *         and call {@code turnService.runTurn} on the worker thread.</li>
-     * </ul>
-     *
-     * <p>Async only at this transport boundary; {@code turnService.runTurn} is
-     * synchronous internally per Q-A.4=A'. SSE termination
-     * ({@code emitter.complete()}) is owned by {@code SseResponseSink} via
-     * {@code onDone} / {@code onError}, so this method does not call
-     * {@code emitter.complete()} explicitly.
+     * <p>Async only at this boundary; {@code turnService.runTurn} is synchronous
+     * internally per Q-A.4=A'. SSE termination ({@code emitter.complete()}) is
+     * owned by {@code SseResponseSink} via {@code onDone} / {@code onError}, so
+     * this method does not call {@code emitter.complete()} explicitly. Dispatch
+     * by {@code agentCode} (aurabot vs named agent) lives in
+     * {@code ConversationTurnServiceImpl.runTurn} so all chokepoint features
+     * (metrics, persistence, audit, events) cover both paths uniformly.
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody ChatRequest request) {
@@ -84,24 +75,12 @@ public class AuraBotController {
                     MetaContext.setMemberId(memberId);
                 }
 
-                String agentCode = request.getAgentCode();
-                if (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode)) {
-                    // Phase A: named-agent path stays on the legacy entry which still owns
-                    // AgentChatPort routing + its own async dispatch + emitter management.
-                    // Note: chatService.streamChat does asyncTaskExecutor.execute again
-                    // internally — the double-async is intentional Phase A scaffold; Phase
-                    // B+ collapses both via a group-chat-adapter design.
-                    chatService.streamChat(tenantId, userId, userPid, username, memberId,
-                            request, emitter);
-                    return;
-                }
-
                 TurnRequest turnReq = new TurnRequest(
                         tenantId,
                         userId,
                         memberId,
                         "web",
-                        agentCode,
+                        request.getAgentCode(),
                         null,                                 // conversationId — Phase B
                         null,                                 // clientMsgId — Phase B
                         request.getMessage(),

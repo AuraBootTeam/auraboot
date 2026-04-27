@@ -73,9 +73,10 @@ public class AuraBotChatService {
     @Autowired(required = false)
     private RagContextProvider ragContextProvider;
 
-    /** Optional ACP agent chat port from the shared AI runtime. */
-    @Autowired(required = false)
-    private com.auraboot.framework.agent.port.AgentChatPort agentChatPort;
+    // Phase B.0: AgentChatPort was previously injected here so the legacy
+    // streamChat() wrapper could route named-agent traffic. After B.0 the
+    // wrapper is gone and AgentChatPort lives in ConversationTurnServiceImpl
+    // where dispatch on agentCode happens — chat service is aurabot-only.
 
     /** Optional D1 Grounding service (computes BIF per turn). */
     @Autowired(required = false)
@@ -215,55 +216,17 @@ public class AuraBotChatService {
         return hint.toString();
     }
 
-    /**
-     * Legacy async wrapper that bridges the existing {@code /chat/stream} controller surface
-     * into the Phase A.3 sync core ({@link #executeAuraBotTurn}). Phase A.5 cuts the controller
-     * over to {@code ConversationTurnService.runTurn} directly; this wrapper stays around for
-     * (a) the named-agent path which still routes through {@code AgentChatPort} until Phase B+
-     * and (b) callers that have not yet migrated to the new SPI.
-     *
-     * @param tenantId the current tenant ID
-     * @param request  the chat request with message, history, page context, and options
-     * @param emitter  the SSE emitter to stream events to
-     */
-    @Observed(name = "aurabot.stream_chat", contextualName = "aurabot-stream-chat")
-    public void streamChat(Long tenantId, Long userId, String userPid, String username,
-                           Long memberId, ChatRequest request, SseEmitter emitter) {
-        asyncTaskExecutor.execute(() -> {
-            SseResponseSink sink = new SseResponseSink(emitter, objectMapper);
-            try {
-                MetaContext.setContext(tenantId, userId, userPid, username);
-                if (memberId != null) {
-                    MetaContext.setMemberId(memberId);
-                }
-
-                String agentCode = request.getAgentCode();
-                if (agentCode != null && !agentCode.isBlank() && !"aurabot".equals(agentCode)) {
-                    if (agentChatPort == null) {
-                        log.warn("agentCode='{}' requested but AgentChatPort is not available in the current runtime. " +
-                                "Falling back to AuraBot.", agentCode);
-                        // fall through to aurabot path below
-                    } else if (!agentChatPort.agentExists(tenantId, agentCode)) {
-                        sink.onError("Agent not found or inactive: " + agentCode, null);
-                        return;
-                    } else {
-                        log.info("Chat request delegated to ACP Agent: agentCode={}, tenantId={}", agentCode, tenantId);
-                        agentChatPort.streamAgentChat(tenantId, agentCode, request, emitter);
-                        return;
-                    }
-                }
-
-                TurnContext ctx = TurnContext.legacyDefault(tenantId, userId, memberId);
-                executeAuraBotTurn(ctx, request, sink);
-                // outcome ignored on this legacy path — turnService.runTurn (A.4+) is the outcome consumer.
-            } catch (Exception e) {
-                log.error("Chat stream failed: {}", e.getMessage(), e);
-                sink.onError(e.getMessage(), null);
-            } finally {
-                MetaContext.clear();
-            }
-        });
-    }
+    // Phase B.0 deletion: the legacy `streamChat(Long, Long, String, String, Long,
+    // ChatRequest, SseEmitter)` public async wrapper has been removed. After A.5
+    // the AuraBotController went through `turnService.runTurn` for aurabot turns
+    // while still calling this wrapper for named-agent turns; B.0 collapses both
+    // paths through `ConversationTurnServiceImpl.runTurn`'s dispatch on agentCode,
+    // so this wrapper has no callers and is gone.
+    //
+    // The sync core `executeAuraBotTurn(TurnContext, ChatRequest, ResponseSink)`
+    // below is the canonical aurabot entry; named-agent goes through
+    // `AgentChatPort.runAgentTurn`. The named-agent fallback when AgentChatPort
+    // bean is missing now lives in `ConversationTurnServiceImpl.runTurn`.
 
     /**
      * Resume conversation after user confirms or cancels a pending write tool.
