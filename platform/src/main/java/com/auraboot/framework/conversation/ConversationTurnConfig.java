@@ -47,13 +47,20 @@ public class ConversationTurnConfig {
 
     @Bean(name = "turnSideEffects")
     public TurnSideEffects turnSideEffects(TurnSideEffects.MetricsRecorder metricsRecorder,
-                                             TurnSideEffects.Persistence persistence) {
-        // Phase B.1: persistence is real (AuraBotTurnPersistence); event + audit
-        // remain NOOP until B.2 / B.3 swap them in.
+                                             TurnSideEffects.Persistence persistence,
+                                             TurnSideEffects.EventEmitter eventEmitter,
+                                             TurnSideEffects.AuditWriter auditWriter) {
+        // Phase B.1+B.2+B.3: every chokepoint side effect is now a real impl.
+        // Persistence -> AuraBotTurnPersistence (B.1)
+        // EventEmitter -> SpringEventEmitter publishing TurnCompletedEvent /
+        //                 TurnSuspendedEvent so listeners can subscribe (B.2)
+        // AuditWriter  -> LoggingAuditWriter structured WARN log on failed
+        //                 turns (B.3)
+        // MetricsRecorder -> Micrometer counters (A.6)
         return new TurnSideEffects() {
             @Override public Persistence persistence() { return persistence; }
-            @Override public EventEmitter eventEmitter() { return EventEmitter.NOOP; }
-            @Override public AuditWriter auditWriter() { return AuditWriter.NOOP; }
+            @Override public EventEmitter eventEmitter() { return eventEmitter; }
+            @Override public AuditWriter auditWriter() { return auditWriter; }
             @Override public MetricsRecorder metricsRecorder() { return metricsRecorder; }
         };
     }
