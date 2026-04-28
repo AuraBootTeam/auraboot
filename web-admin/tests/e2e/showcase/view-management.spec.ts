@@ -42,8 +42,7 @@ let createdKanbanViewName = '';
 /** Navigate to showcase list and wait for table to render with data. */
 async function gotoShowcaseList(page: Page) {
   await page.goto(SHOWCASE_LIST_URL, { waitUntil: 'domcontentloaded' });
-  await page.locator('[data-testid="dynamic-list"] table tbody tr').first()
-    .waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 20_000 });
 }
 
 /** Open the View Management panel by clicking the ViewSelector button. */
@@ -60,10 +59,12 @@ async function openViewManagePanel(page: Page) {
   return panel;
 }
 
-/** Close the panel by pressing Escape */
+/** Close the panel through the explicit close control. */
 async function closePanel(page: Page) {
-  await page.keyboard.press('Escape');
   const panel = page.locator('[role="dialog"][aria-modal="true"]');
+  const closeButton = panel.getByRole('button', { name: /Close panel/i });
+  await expect(closeButton).toBeVisible({ timeout: 5_000 });
+  await closeButton.click();
   await panel.waitFor({ state: 'hidden', timeout: 5_000 });
 }
 
@@ -81,7 +82,7 @@ async function openTypePicker(page: Page) {
 // ---------------------------------------------------------------------------
 
 test.describe('View Management Panel', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
   test('Panel opens with View Management heading and shows existing views', async ({ page }) => {
     test.setTimeout(60_000);
@@ -202,8 +203,11 @@ test.describe('View Management Panel', () => {
     // "Done" button should now be enabled
     await expect(doneBtn).toBeEnabled();
 
+    const kanbanNavigation = page.waitForURL(/(?:\?|&)view=/, { timeout: 10_000 });
+
     // Click Done
     await doneBtn.click();
+    await kanbanNavigation;
 
     // Panel should close after saving config
     const panelLoc = page.locator('[role="dialog"][aria-modal="true"]');
@@ -301,7 +305,9 @@ test.describe('View Management Panel', () => {
 
     // Done should be enabled now
     await expect(doneBtn).toBeEnabled();
+    const calendarNavigation = page.waitForURL(/(?:\?|&)view=/, { timeout: 10_000 });
     await doneBtn.click();
+    await calendarNavigation;
 
     // Panel closes
     const panelLoc = page.locator('[role="dialog"][aria-modal="true"]');
@@ -391,8 +397,11 @@ test.describe('View Management Panel', () => {
       }
     }
 
+    const galleryNavigation = page.waitForURL(/(?:\?|&)view=/, { timeout: 10_000 }).catch(() => null);
+
     // Click Done
     await doneBtn.click();
+    await galleryNavigation;
 
     // Panel closes
     const panelLoc = page.locator('[role="dialog"][aria-modal="true"]');
@@ -400,6 +409,7 @@ test.describe('View Management Panel', () => {
 
     // View name should mention "Gallery"
     const viewBtn = page.locator('button[aria-haspopup="listbox"]').first();
+    await expect.poll(async () => (await viewBtn.innerText()).trim(), { timeout: 10_000 }).not.toBe('Loading...');
     const viewName = (await viewBtn.innerText()).trim();
     expect(viewName).toMatch(/gallery|view|default/i);
   });

@@ -166,8 +166,9 @@ public class TestFixtureController {
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private String executeCreateCommand(String modelCode, Map<String, Object> payload) {
+        Map<String, Object> normalizedPayload = normalizeDynamicPayload(modelCode, payload);
         try {
-            Map<String, Object> created = dynamicDataService.create(modelCode, payload);
+            Map<String, Object> created = dynamicDataService.create(modelCode, normalizedPayload);
             if (created != null) {
                 Object id = created.get("pid");
                 if (id == null) {
@@ -185,7 +186,7 @@ public class TestFixtureController {
         }
 
         if ("e2et_order".equals(modelCode)) {
-            String insertedId = insertE2etOrderRecord(payload);
+            String insertedId = insertE2etOrderRecord(normalizedPayload);
             if (insertedId != null) {
                 return insertedId;
             }
@@ -193,7 +194,7 @@ public class TestFixtureController {
 
         String commandCode = resolveCreateCommandCode(modelCode);
         CommandExecuteRequest request = new CommandExecuteRequest();
-        request.setPayload(payload);
+        request.setPayload(normalizedPayload);
         request.setOperationType("CREATE");
         CommandExecuteResult result = commandExecutor.execute(commandCode, request);
         if (result.getData() != null) {
@@ -206,6 +207,16 @@ public class TestFixtureController {
             }
         }
         return null;
+    }
+
+    private Map<String, Object> normalizeDynamicPayload(String modelCode, Map<String, Object> payload) {
+        if (!"e2et_order".equals(modelCode) || payload.containsKey("e2et_order_title")) {
+            return payload;
+        }
+
+        Map<String, Object> normalized = new HashMap<>(payload);
+        normalized.put("e2et_order_title", stringValue(payload, "e2et_order_no", "E2E Order"));
+        return normalized;
     }
 
     private String insertE2etOrderRecord(Map<String, Object> payload) {

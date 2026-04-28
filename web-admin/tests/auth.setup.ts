@@ -24,7 +24,9 @@ import { DEFAULT_TEST_ACCOUNT } from './helpers/test-accounts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const STORAGE_DIR = path.join(__dirname, 'storage');
+const STORAGE_DIR = process.env.PW_STORAGE_DIR
+  ? path.resolve(process.env.PW_STORAGE_DIR)
+  : path.join(__dirname, 'storage');
 const ENABLE_ROLE_AUTH = process.env.PW_ROLE_PROJECTS === '1';
 
 /**
@@ -286,7 +288,7 @@ function isStorageExpired(storagePath: string): boolean {
 
 /**
  * Verify the stored session actually works against the backend.
- * Calls /api/meta/current-user — returns true only if the JWT is accepted.
+ * Calls /api/auth/me — returns true only if the JWT is accepted.
  * This handles the case where reset-and-init.sh changed user PIDs.
  */
 async function verifyStorageStateWorks(
@@ -301,7 +303,7 @@ async function verifyStorageStateWorks(
       state.cookies || [];
     if (cookies.length === 0) return false;
     // Make a request using the stored cookies to verify the session works
-    const resp = await page.request.get(`${baseURL}/api/meta/current-user`, {
+    const resp = await page.request.get(`${baseURL}/api/auth/me`, {
       headers: {
         Cookie: cookies
           .filter((c) => c.name === '__session')

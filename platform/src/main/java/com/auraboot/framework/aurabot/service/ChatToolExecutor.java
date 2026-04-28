@@ -31,11 +31,15 @@ import java.util.Map;
 public class ChatToolExecutor {
 
     private final ToolDiscoveryPort toolDiscoveryPort;
+    private final ChatToolResolver chatToolResolver;
 
     public ChatToolExecutor(
             @org.springframework.beans.factory.annotation.Autowired(required = false)
-            ToolDiscoveryPort toolDiscoveryPort) {
+            ToolDiscoveryPort toolDiscoveryPort,
+            @org.springframework.beans.factory.annotation.Autowired(required = false)
+            ChatToolResolver chatToolResolver) {
         this.toolDiscoveryPort = toolDiscoveryPort;
+        this.chatToolResolver = chatToolResolver;
     }
 
     /**
@@ -62,7 +66,12 @@ public class ChatToolExecutor {
 
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
-            String providerToolCode = toProviderToolCode(toolName, modelCode);
+            String providerToolCode = chatToolResolver != null
+                    ? chatToolResolver.getProviderToolCode(toolName)
+                    : null;
+            if (providerToolCode == null) {
+                providerToolCode = toProviderToolCode(toolName, modelCode);
+            }
             log.debug("Routing tool {} -> provider code {}", toolName, providerToolCode);
             return toolDiscoveryPort.executeTool(tenantId, providerToolCode, input);
         } catch (Exception e) {

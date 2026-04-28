@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BoltIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
@@ -38,6 +38,11 @@ export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
   const [activeTab, setActiveTab] = useState<'actions' | 'page-meta'>('actions');
   const [vm, setVm] = useState<DetailViewModel>(() => blocksToDetailVm(schema.blocks ?? []));
   const lastPushedRef = useRef<string>(JSON.stringify(schema.blocks ?? []));
+  const latestSchemaRef = useRef(schema);
+
+  useEffect(() => {
+    latestSchemaRef.current = schema;
+  }, [schema]);
 
   useEffect(() => {
     const currentSerialized = JSON.stringify(schema.blocks ?? []);
@@ -51,10 +56,32 @@ export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
     const currentSerialized = JSON.stringify(schema.blocks ?? []);
     if (nextSerialized !== currentSerialized && nextSerialized !== lastPushedRef.current) {
       lastPushedRef.current = nextSerialized;
-      onSchemaChange({ ...schema, blocks: nextBlocks });
+      const nextSchema = { ...latestSchemaRef.current, blocks: nextBlocks };
+      latestSchemaRef.current = nextSchema;
+      onSchemaChange(nextSchema);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vm]);
+  const setVmAndPushSchema = useCallback<React.Dispatch<React.SetStateAction<DetailViewModel>>>(
+    (action) => {
+      setVm((prev) => {
+        const nextVm = typeof action === 'function'
+          ? (action as (prevState: DetailViewModel) => DetailViewModel)(prev)
+          : action;
+        const nextBlocks = detailVmToBlocks(nextVm);
+        const nextSchema = { ...latestSchemaRef.current, blocks: nextBlocks };
+        lastPushedRef.current = JSON.stringify(nextBlocks);
+        latestSchemaRef.current = nextSchema;
+        onSchemaChange(nextSchema);
+        return nextVm;
+      });
+    },
+    [onSchemaChange],
+  );
+  const schemaWithLatestBlocks = useMemo(
+    () => ({ ...schema, blocks: detailVmToBlocks(vm) }),
+    [schema, vm],
+  );
 
   const errors: ValidationError[] = validateDetailVm(vm, capabilities);
   const activeItem = NAV_ITEMS.find((item) => item.id === activeTab) ?? NAV_ITEMS[0];
@@ -233,13 +260,20 @@ export const DetailConfigPanel: React.FC<DetailConfigPanelProps> = ({
           {activeTab === 'actions' ? (
             <ActionsTab
               vm={vm}
-              setVm={setVm}
+              setVm={setVmAndPushSchema}
               capabilities={capabilities}
               modelCode={effectiveModelCode}
               readonly={readonly}
             />
           ) : (
-            <PageMetaTab schema={schema} onSchemaChange={onSchemaChange} readonly={readonly} />
+            <PageMetaTab
+              schema={schemaWithLatestBlocks}
+              onSchemaChange={(nextSchema) => {
+                latestSchemaRef.current = nextSchema;
+                onSchemaChange(nextSchema);
+              }}
+              readonly={readonly}
+            />
           )}
         </div>
       </main>

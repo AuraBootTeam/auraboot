@@ -149,16 +149,15 @@ async function gotoShowcaseListViaMenu(page: Page): Promise<void> {
   await parent.waitFor({ state: 'visible', timeout: 10_000 });
   await parent.evaluate((el: HTMLElement) => el.click());
 
-  const listResp = page.waitForResponse(
-    (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
-    { timeout: 10_000 },
-  );
   const leaf = page.locator(`a[href="${LIST_URL}"], a[href*="${LIST_URL}"]`).first();
   await leaf.waitFor({ state: 'attached', timeout: 5_000 });
-  await leaf.evaluate((el: HTMLElement) => el.click());
-  await listResp;
+  await Promise.all([
+    page.waitForURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 10_000 }),
+    leaf.evaluate((el: HTMLElement) => el.click()),
+  ]);
 
   await expect(page).toHaveURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 5_000 });
+  await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 10_000 });
   await page.evaluate(() => {
     document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
   });
@@ -172,22 +171,32 @@ async function openDetailViaListRow(page: Page, recordPid: string): Promise<void
   const hasLink = await rowByLink.first().isVisible({ timeout: 3_000 }).catch(() => false);
 
   if (hasLink) {
-    await rowByLink.first().evaluate((tr) => {
-      const a = tr.querySelector('a[href*="/view/"]') as HTMLAnchorElement | null;
-      if (a) a.click();
-    });
+    await Promise.all([
+      page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
+      rowByLink.first().evaluate((tr) => {
+        const a = tr.querySelector('a[href*="/view/"]') as HTMLAnchorElement | null;
+        if (a) a.click();
+      }),
+    ]);
   } else {
     const firstRow = rows.first();
     await firstRow.hover();
     const viewBtn = firstRow.locator('[data-testid="row-action-view"]').first();
     if (await viewBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await viewBtn.click();
+      await Promise.all([
+        page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
+        viewBtn.click(),
+      ]);
     } else {
-      await firstRow.locator('td').nth(1).click({ force: true });
+      await Promise.all([
+        page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
+        firstRow.locator('td').nth(1).click({ force: true }),
+      ]);
     }
   }
 
   await expect(page).toHaveURL(DETAIL_URL_RE, { timeout: 8_000 });
+  await page.waitForLoadState('domcontentloaded').catch(() => null);
   await page
     .waitForResponse(
       (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/`) && r.status() === 200,
@@ -222,7 +231,7 @@ function buildTabsBlock(innerBlocks: any[], tabKey = 'd_tab') {
 }
 
 test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments)', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(90_000);
 
   test.afterEach(async ({ request }) => {
@@ -560,25 +569,132 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
   });
 
   // ---------------------------------------------------------------------------
-  // D.monthly-grid — skipped due to fixture gap.
+  // D.monthly-grid — real runtime render with parent/child fixture.
   //
-  // MonthlyGridConfig requires parentModel + childModel + monthField (1-12
-  // integer). Showcase ships a single model (showcase_all_fields) with no
-  // month field and no child model. Wiring a synthetic parent/child pair here
-  // would require importing a second model JSON — out of scope for this
-  // single-file gap-fix.
+  // FIXTURE-001 (2026-04-26): showcase plugin ships sc_monthly_metric child
+  // model with sc_showcase_pid (FK back to showcase_all_fields.pid),
+  // sc_month (1-12), sc_revenue, sc_cost, sc_units. The MonthlyGridConfig
+  // wires parentModel = showcase_all_fields itself (parentField = pid →
+  // returns the current detail record), then childModel = sc_monthly_metric
+  // joined on sc_showcase_pid = parent.pid, pivoted by sc_month.
+  //
+  // The test seeds 12 monthly_metric rows for the parent showcase record and
+  // asserts the grid container renders with one parent row and 12 month
+  // columns × 2 metrics, plus a non-zero overall total — proving the join
+  // and the metric aggregation, not just visibility.
   // ---------------------------------------------------------------------------
-  test('D.monthly-grid: skip — showcase fixture lacks parent/child month-pivot', async () => {
-    test.skip(
-      true,
-      'MonthlyGridConfig requires parentModel + childModel + monthField. ' +
-        'Showcase ships only showcase_all_fields with no month field or child ' +
-        'model. Wiring a synthetic parent/child pair requires a dedicated ' +
-        'plugin import (e.g. APM-style ap_work_package + ap_monthly_budget). ' +
-        'Tracked as a followup; the viewer code path at ' +
-        'web-admin/app/framework/meta/rendering/blocks/MonthlyGridViewer.tsx ' +
-        'is already covered by unit tests.',
+  test('D.monthly-grid: renders 12-month pivot with parent/child fixture', async ({
+    page,
+    request,
+  }) => {
+    const seed = await seedRecord(request);
+    createdPids.push(seed.pid);
+
+    // Seed 12 child rows — one per month — with deterministic numbers we
+    // can assert against. revenue = month * 1000, cost = month * 400.
+    const createdMetricIds: string[] = [];
+    for (let month = 1; month <= 12; month++) {
+      const resp = await request.post(
+        '/api/meta/commands/execute/sc:create_monthly_metric',
+        {
+          data: {
+            operationType: 'create',
+            payload: {
+              sc_showcase_pid: seed.pid,
+              sc_month: month,
+              sc_revenue: month * 1000,
+              sc_cost: month * 400,
+              sc_units: month * 10,
+              sc_metric_remark: `month ${month} seed`,
+            },
+          },
+        },
+      );
+      expect(resp.ok(), `monthly seed M${month} status=${resp.status()}`).toBe(true);
+      const body = await resp.json();
+      expect(body?.code).toBe('0');
+      const pid = body?.data?.data?.recordId;
+      if (pid) createdMetricIds.push(pid);
+    }
+    expect(createdMetricIds.length, 'all 12 monthly seeds should return a pid').toBe(12);
+
+    detailSnapshot = await snapshotDetailPage(request, DETAIL_PAGE_KEY);
+    const keep = detailSnapshot.blocks.filter(
+      (b: any) => b?.blockType !== 'tabs' && b?.blockType !== 'toolbar',
     );
+    const nextBlocks = [
+      ...keep,
+      {
+        id: 'd_identity',
+        blockType: 'detail-section',
+        title: 'D Detail Identity',
+        columns: 2,
+        fields: [{ field: 'sc_name' }, { field: 'sc_code' }],
+      },
+      {
+        id: 'd_monthly_grid',
+        blockType: 'monthly-grid',
+        monthlyGrid: {
+          parentModel: MODEL_CODE,
+          parentField: 'pid',
+          parentDisplayField: 'sc_name',
+          childModel: 'sc_monthly_metric',
+          childParentField: 'sc_showcase_pid',
+          monthField: 'sc_month',
+          metrics: [
+            { field: 'sc_revenue', label: 'Revenue' },
+            { field: 'sc_cost', label: 'Cost' },
+          ],
+        },
+      },
+    ];
+    await replacePageBlocks(request, detailSnapshot, nextBlocks);
+
+    await gotoShowcaseListViaMenu(page);
+    await openDetailViaListRow(page, seed.pid);
+
+    // Wait for the child-list fetch to land.
+    await page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/dynamic/sc_monthly_metric/list') && r.status() === 200,
+        { timeout: 10_000 },
+      )
+      .catch(() => null);
+
+    const grid = page.locator('[data-testid="monthly-grid-viewer"]').first();
+    await expect(grid, 'monthly-grid container should render').toBeVisible({
+      timeout: 10_000,
+    });
+
+    // One parent row (the current showcase record) — assert the grid actually
+    // joined the child rows, not just rendered the empty/loading shell.
+    const parentRow = page.locator('[data-testid="monthly-grid-row-0"]').first();
+    await expect(parentRow, 'monthly-grid should have one parent row').toBeVisible({
+      timeout: 10_000,
+    });
+
+    // Each parent row has: 1 label cell + 12 months × 2 metrics + 2 row totals
+    // = 27 td. We assert ≥ 27 to absorb any future cosmetic columns.
+    const cellCount = await parentRow.locator('td').count();
+    expect(cellCount, 'parent row should have 27 cells (1 + 12×2 + 2)').toBeGreaterThanOrEqual(27);
+
+    // Overall revenue total: sum_{m=1..12} m * 1000 = 78000.
+    // formatNumber renders 78,000 in zh-CN locale. Assert the localized
+    // string is present in the tfoot to prove the aggregation actually ran.
+    const footer = grid.locator('tfoot').first();
+    await expect(footer, 'monthly-grid tfoot should render').toBeVisible({ timeout: 5_000 });
+    await expect(footer, 'overall revenue total 78,000 should appear').toContainText('78,000');
+    await expect(footer, 'overall cost total 31,200 should appear').toContainText('31,200');
+
+    // Cleanup seeded child rows so the model can be repeated by other tests.
+    for (const metricPid of createdMetricIds) {
+      await request
+        .post('/api/meta/commands/execute/sc:delete_monthly_metric', {
+          data: { operationType: 'delete', targetRecordId: metricPid },
+        })
+        .catch(() => null);
+    }
   });
 
   // ---------------------------------------------------------------------------
