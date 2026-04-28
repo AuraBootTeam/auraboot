@@ -473,7 +473,21 @@ export const ActionsTab: React.FC<ActionsTabProps> = ({
                 <SchemaBlockConfigPanel
                   schemas={detailCustomButtonSchemas}
                   value={selectedBtn as unknown as Record<string, unknown>}
-                  onChange={(next) => updateButton(selectedBtnIdx, next as Partial<CustomButton>)}
+                  onChange={(next, changedKey) => {
+                    if (!changedKey) {
+                      updateButton(selectedBtnIdx, next as Partial<CustomButton>);
+                      return;
+                    }
+                    setVm((prev) => ({
+                      ...prev,
+                      actions: {
+                        ...prev.actions,
+                        customButtons: prev.actions.customButtons.map((button, i) =>
+                          i === selectedBtnIdx ? { ...button, [changedKey]: next[changedKey] } : button,
+                        ),
+                      },
+                    }));
+                  }}
                   readonly={readonly}
                   className="[&>section]:rounded-xl [&>section]:border [&>section]:border-slate-200 [&>section]:bg-slate-50/50 [&>section]:p-4 [&>section>h3]:mb-4 [&>section>h3]:text-[11px] [&>section>h3]:font-semibold [&>section>h3]:uppercase [&>section>h3]:tracking-[0.16em] [&>section>h3]:text-slate-400 [&>section>div]:space-y-4 [&_.field-label]:text-sm [&_.field-label]:font-medium [&_.field-label]:text-slate-700"
                 />

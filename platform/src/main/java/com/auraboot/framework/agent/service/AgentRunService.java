@@ -916,6 +916,11 @@ public class AgentRunService {
                         .description(td.getDescription())
                         .inputSchema(td.getParameterSchema())
                         .toolType(td.getToolType())
+                        .sourceCode(td.getSourceCode())
+                        .requiresApproval(td.isRequiresApproval())
+                        .requiresConfirmation(td.isRequiresConfirmation())
+                        .riskLevel(td.getRiskLevel())
+                        .confirmationPolicy(td.getConfirmationPolicy())
                         .build())
                 .toList();
     }

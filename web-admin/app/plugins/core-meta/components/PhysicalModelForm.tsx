@@ -204,6 +204,7 @@ export function PhysicalModelForm({ onCancel }: PhysicalModelFormProps) {
               </label>
               <input
                 type="text"
+                data-testid="model-code-input"
                 value={formData.code}
                 onChange={(e) => handleChange('code', e.target.value)}
                 onBlur={handleCodeBlur}
@@ -227,6 +228,7 @@ export function PhysicalModelForm({ onCancel }: PhysicalModelFormProps) {
               </label>
               <input
                 type="text"
+                data-testid="model-display-name-input"
                 value={formData.displayName}
                 onChange={(e) => handleChange('displayName', e.target.value)}
                 placeholder="例如: 用户订单"
@@ -280,6 +282,7 @@ export function PhysicalModelForm({ onCancel }: PhysicalModelFormProps) {
           </button>
           <button
             type="submit"
+            data-testid="model-create-submit"
             className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             disabled={submitting || checkingCode}
           >

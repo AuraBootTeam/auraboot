@@ -185,7 +185,8 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                 StringBuilder textParts = new StringBuilder();
 
                 for (Object block : blocks) {
-                    if (block instanceof Map<?, ?> bMap) {
+                    Map<String, Object> bMap = toBlockMap(block);
+                    if (bMap != null) {
                         String type = (String) bMap.get("type");
                         if ("tool_use".equals(type)) {
                             Map<String, Object> tc = new LinkedHashMap<>();
@@ -194,7 +195,7 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                             Map<String, Object> fn = new LinkedHashMap<>();
                             fn.put("name", bMap.get("name"));
                             try {
-                                fn.put("arguments", new ObjectMapper().writeValueAsString(bMap.get("input")));
+                                fn.put("arguments", objectMapper.writeValueAsString(bMap.get("input")));
                             } catch (Exception e) {
                                 fn.put("arguments", "{}");
                             }
@@ -217,12 +218,15 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             // OpenAI expects separate messages per tool result
             // Return the first tool result; caller handles multi-tool via message splitting
             for (Object block : blocks) {
-                if (block instanceof Map<?, ?> bMap) {
+                Map<String, Object> bMap = toBlockMap(block);
+                if (bMap != null) {
                     String type = (String) bMap.get("type");
                     if ("tool_result".equals(type)) {
                         result.put("role", "tool");
-                        result.put("tool_call_id", bMap.get("tool_use_id"));
-                        result.put("content", String.valueOf(bMap.get("content")));
+                        Object toolUseId = bMap.get("tool_use_id") != null ? bMap.get("tool_use_id") : bMap.get("toolUseId");
+                        result.put("tool_call_id", toolUseId);
+                        Object toolContent = bMap.get("content") != null ? bMap.get("content") : bMap.get("result");
+                        result.put("content", serializeToolContent(toolContent));
                         return result;
                     }
                 }
@@ -231,6 +235,45 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
 
         result.put("content", String.valueOf(content));
         return result;
+    }
+
+    private String serializeToolContent(Object toolContent) {
+        if (toolContent == null) {
+            return "";
+        }
+        if (toolContent instanceof String text) {
+            return text;
+        }
+        try {
+            return objectMapper.writeValueAsString(toolContent);
+        } catch (Exception ignored) {
+            return String.valueOf(toolContent);
+        }
+    }
+
+    private Map<String, Object> toBlockMap(Object block) {
+        if (block instanceof Map<?, ?> raw) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : raw.entrySet()) {
+                if (entry.getKey() != null) {
+                    result.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+            }
+            return result;
+        }
+        if (block instanceof LlmChatRequest.ContentBlock cb) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("type", cb.getType());
+            result.put("text", cb.getText());
+            result.put("id", cb.getId());
+            result.put("name", cb.getName());
+            result.put("input", cb.getInput());
+            result.put("tool_use_id", cb.getToolUseId());
+            result.put("toolUseId", cb.getToolUseId());
+            result.put("result", cb.getResult());
+            return result;
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

@@ -254,6 +254,7 @@ export default function ModelEditPage() {
               </label>
               <input
                 type="text"
+                data-testid="model-display-name-input"
                 value={formData.displayName}
                 onChange={(e) => handleChange('displayName', e.target.value)}
                 placeholder="例如: 用户订单"
@@ -336,6 +337,7 @@ export default function ModelEditPage() {
           </button>
           <button
             type="submit"
+            data-testid="form-save-submit"
             className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             disabled={submitting || !hasChanges}
           >

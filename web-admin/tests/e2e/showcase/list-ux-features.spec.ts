@@ -22,7 +22,7 @@ async function gotoShowcaseList(page: import('@playwright/test').Page) {
 }
 
 test.describe('List Page UX Features', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
   test('Sort Popover opens, adds a rule, and shows badge count', async ({ page }) => {
     test.setTimeout(60_000);

@@ -1,11 +1,42 @@
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import federation from '@originjs/vite-plugin-federation';
 import istanbul from 'vite-plugin-istanbul';
 
 const e2eCoverageEnabled = process.env.E2E_COVERAGE === '1';
+const bffProxyTarget = `http://127.0.0.1:${process.env.BFF_PORT || '3500'}`;
+
+// @originjs/vite-plugin-federation 1.4.x does not support SSR — its virtual
+// imports (`__federation_fn_satisfy`, etc.) are emitted unconditionally and
+// fail to resolve during the SSR Rollup pass. The host runtime
+// (FederationManager.ts) is browser-only (uses `document.createElement`), so
+// the SSR bundle never invokes federation anyway. Override the plugin's
+// `apply` so it only activates during dev or the client production build,
+// and stays out of the SSR Rollup pass entirely.
+const federationPlugin = federation({
+  name: 'aura-host',
+  remotes: {},
+  shared: {
+    react: { requiredVersion: '^19.0.0' },
+    'react-dom': { requiredVersion: '^19.0.0' },
+    'react-router': { requiredVersion: '7.5.0' },
+    zustand: { requiredVersion: '^5.0.8' },
+    '@reduxjs/toolkit': {},
+    'lucide-react': {},
+  },
+}) as Plugin;
+
+const clientOnlyFederationPlugin: Plugin = {
+  ...federationPlugin,
+  apply(_config, env) {
+    // Always run during dev (`serve`). For production (`build`), skip the
+    // SSR pass — that is when federation's virtual imports fail to resolve.
+    if (env.command === 'serve') return true;
+    return !env.isSsrBuild;
+  },
+};
 
 export default defineConfig({
   plugins: [
@@ -19,29 +50,7 @@ export default defineConfig({
     tailwindcss(),
     reactRouter(),
     tsconfigPaths(),
-    // Module Federation for plugin hot-loading
-    federation({
-      name: 'aura-host',
-      // Remote plugins will be configured dynamically
-      remotes: {},
-      // Shared dependencies for plugins
-      shared: {
-        react: {
-          requiredVersion: '^19.0.0',
-        },
-        'react-dom': {
-          requiredVersion: '^19.0.0',
-        },
-        'react-router': {
-          requiredVersion: '7.5.0',
-        },
-        zustand: {
-          requiredVersion: '^5.0.8',
-        },
-        '@reduxjs/toolkit': {},
-        'lucide-react': {},
-      },
-    }),
+    clientOnlyFederationPlugin,
   ].filter(Boolean),
   server: {
     host: '0.0.0.0',
@@ -64,6 +73,12 @@ export default defineConfig({
         '**/ios/**',
         '**/android/**',
         '**/docs/**',
+        '**/tests/**',
+        'tests/**',
+        './tests/**',
+        '**/test-results/**',
+        'test-results/**',
+        './test-results/**',
         '/plugins/**',
         '../plugins/**',
         '../../plugins/**',
@@ -74,7 +89,7 @@ export default defineConfig({
     },
     proxy: {
       '/api/notifications/stream': {
-        target: `http://localhost:${process.env.BFF_PORT || '3500'}`,
+        target: bffProxyTarget,
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {
@@ -90,12 +105,12 @@ export default defineConfig({
         },
       },
       '^/api/': {
-        target: `http://localhost:${process.env.BFF_PORT || '3500'}`,
+        target: bffProxyTarget,
         changeOrigin: true,
         secure: false,
         configure: (_proxy, _options) => {
           console.log(
-            `🔗 Proxying /api/* requests to BFF server at http://localhost:${process.env.BFF_PORT || '3500'}`,
+            `🔗 Proxying /api/* requests to BFF server at ${bffProxyTarget}`,
           );
         },
       },

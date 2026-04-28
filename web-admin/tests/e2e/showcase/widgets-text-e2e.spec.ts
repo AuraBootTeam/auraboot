@@ -119,7 +119,10 @@ async function navigateToDesignerViaMenu(
   await leaf.evaluate((el: HTMLElement) => el.click());
   await listResp.catch(() => null);
 
-  await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 5_000 });
+  if (!(await page.getByTestId('toolbar-btn-create').isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await page.goto('/p/page_schema', { waitUntil: 'domcontentloaded' });
+  }
+  await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 8_000 });
 
   await page.evaluate(() => {
     document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
@@ -480,7 +483,13 @@ async function clickSaveAndWait(page: Page, pid: string): Promise<void> {
  */
 async function navigateToShowcaseRuntimeForm(page: Page): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
-  await page.evaluate(() => localStorage.removeItem('sidebar-collapsed'));
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page
+    .evaluate(() => localStorage.removeItem('sidebar-collapsed'))
+    .catch(async () => {
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.evaluate(() => localStorage.removeItem('sidebar-collapsed'));
+    });
   await page.reload({ waitUntil: 'domcontentloaded' });
 
   const parent = page

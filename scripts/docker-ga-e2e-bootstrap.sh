@@ -160,12 +160,11 @@ else
   echo "[ga-e2e-bootstrap] seeding showcase records..."
   cd web-admin
 
-  if [ ! -f tests/storage/admin.json ]; then
-    echo "  No admin.json found — running auth.setup to generate it..."
-    PLAYWRIGHT_BASE_URL=http://localhost:5174 PW_SKIP_WEBSERVER=1 NO_PROXY=localhost \
-      npx playwright test tests/auth.setup.ts -g "authenticate as admin" \
-      --reporter=line >/dev/null 2>&1 || true
-  fi
+  echo "  Refreshing Playwright storage for the current GA stack..."
+  rm -f tests/storage/admin.json tests/storage/operator.json tests/storage/viewer.json
+  PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 PW_SKIP_WEBSERVER=1 NO_PROXY=localhost,127.0.0.1 \
+    npx playwright test tests/auth.setup.ts \
+    --reporter=line >/dev/null 2>&1 || true
 
   if [ ! -f tests/storage/admin.json ]; then
     echo "  WARNING: admin.json still missing — skipping seed (auth.setup failed)" >&2
@@ -173,7 +172,7 @@ else
     seed_failures=()
     for seed in data extended workflow ai arsenal supplement commercial; do
       printf '  seed-showcase-%s ... ' "$seed"
-      if PLAYWRIGHT_BASE_URL=http://localhost:5174 NO_PROXY=localhost \
+      if PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 NO_PROXY=localhost,127.0.0.1 \
            npx playwright test --config=playwright.seed.config.ts \
              -g "seed-showcase-$seed" --reporter=line \
              > "/tmp/ga-e2e-seed-$seed.log" 2>&1; then
@@ -184,6 +183,16 @@ else
         # one phase even on enterprise; do not block the bootstrap on it.
         if [ "$seed" = "commercial" ]; then
           echo "PARTIAL (Quote gap, see /tmp/ga-e2e-seed-$seed.log)"
+          # Surface the failing seed step + last error line so operators don't
+          # have to open the log file manually to know which phase failed.
+          failed_phase=$(grep -oE "seed-showcase-commercial[^[:space:]]*" \
+                          "/tmp/ga-e2e-seed-$seed.log" | head -1)
+          last_error=$(grep -E "Error:|FAIL|✘|×|expect\(" \
+                          "/tmp/ga-e2e-seed-$seed.log" | tail -1)
+          echo "    [ga-e2e-bootstrap] commercial PARTIAL detail:" >&2
+          echo "      phase: ${failed_phase:-unknown}" >&2
+          echo "      cause: ${last_error:-Quote model not seeded — see full log}" >&2
+          echo "      log:   /tmp/ga-e2e-seed-$seed.log" >&2
         else
           echo "FAIL (see /tmp/ga-e2e-seed-$seed.log)"
           seed_failures+=("$seed")

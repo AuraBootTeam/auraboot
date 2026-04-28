@@ -83,5 +83,15 @@
   { "key": "sc.action.cancel", "zh-CN": "取消", "en-US": "Cancel", "source": "import", "refType": "ui" },
   { "key": "sc.action.activate", "zh-CN": "激活", "en-US": "Activate", "source": "import", "refType": "ui" },
   { "key": "sc.action.submit_review", "zh-CN": "提交审核", "en-US": "Submit Review", "source": "import", "refType": "ui" },
-  { "key": "sc.action.archive", "zh-CN": "归档", "en-US": "Archive", "source": "import", "refType": "ui" }
+  { "key": "sc.action.archive", "zh-CN": "归档", "en-US": "Archive", "source": "import", "refType": "ui" },
+
+  { "key": "model.sc_monthly_metric._meta.label", "zh-CN": "月度指标", "en-US": "Monthly Metric", "source": "import", "refType": "model" },
+  { "key": "model.sc_monthly_metric.sc_showcase_pid.label", "zh-CN": "关联展示记录", "en-US": "Showcase Record", "source": "import", "refType": "field" },
+  { "key": "model.sc_monthly_metric.sc_month.label", "zh-CN": "月份", "en-US": "Month", "source": "import", "refType": "field" },
+  { "key": "model.sc_monthly_metric.sc_revenue.label", "zh-CN": "收入", "en-US": "Revenue", "source": "import", "refType": "field" },
+  { "key": "model.sc_monthly_metric.sc_cost.label", "zh-CN": "成本", "en-US": "Cost", "source": "import", "refType": "field" },
+  { "key": "model.sc_monthly_metric.sc_units.label", "zh-CN": "数量", "en-US": "Units", "source": "import", "refType": "field" },
+  { "key": "model.sc_monthly_metric.sc_metric_remark.label", "zh-CN": "备注", "en-US": "Remark", "source": "import", "refType": "field" },
+  { "key": "command.sc:create_monthly_metric.label", "zh-CN": "新建月度指标", "en-US": "Create Monthly Metric", "source": "import", "refType": "command" },
+  { "key": "command.sc:delete_monthly_metric.label", "zh-CN": "删除月度指标", "en-US": "Delete Monthly Metric", "source": "import", "refType": "command" }
 ]

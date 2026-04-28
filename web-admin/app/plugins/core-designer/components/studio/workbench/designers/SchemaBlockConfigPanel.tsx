@@ -27,7 +27,7 @@ export interface ExtendedPropertySchema<TLabel = string>
 export interface SchemaBlockConfigPanelProps<T extends Record<string, unknown>> {
   schemas: ExtendedPropertySchema<string>[];
   value: T;
-  onChange: (next: T) => void;
+  onChange: (next: T, changedKey?: string) => void;
   readonly?: boolean;
   className?: string;
 }
@@ -76,8 +76,11 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
               {visible.map((schema) => {
                 const adapter: FieldAdapter<unknown> = {
                   value: value[schema.key],
-                  setValue: (v: unknown) =>
-                    onChange({ ...latestValueRef.current, [schema.key]: v }),
+                  setValue: (v: unknown) => {
+                    const next = { ...latestValueRef.current, [schema.key]: v };
+                    latestValueRef.current = next;
+                    onChange(next, schema.key);
+                  },
                   disabled: readonly,
                   required: schema.required,
                 };

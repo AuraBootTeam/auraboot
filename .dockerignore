@@ -1,0 +1,49 @@
+# Repo-root .dockerignore — keeps the build context lean when the docker
+# build runs from the repo root (e.g. `docker build -f web-admin/Dockerfile .`).
+# COPY directives in Dockerfiles still reference the original paths.
+
+# ── Dependencies (always rebuilt inside the image) ──
+**/node_modules
+
+# ── Build outputs ──
+**/build
+**/dist
+**/.react-router
+platform/build
+platform/.gradle
+
+# ── Test artifacts ──
+**/test-results
+**/playwright-report
+**/coverage
+**/.nyc_output
+web-admin/tests
+web-admin/playwright.*.ts
+web-admin/vitest.config.ts
+web-admin/vitest.setup.ts
+
+# ── Worktrees + git internals ──
+.worktrees
+.git
+
+# ── IDE / OS ──
+.idea
+.vscode
+**/.DS_Store
+
+# ── Logs ──
+*.log
+
+# ── Environment files ──
+.env
+.env.local
+.env.*.local
+.env.*
+
+# ── Docs (not needed at runtime) ──
+**/docs
+**/*.md
+
+# ── Python venv / misc ──
+.venv
+__pycache__

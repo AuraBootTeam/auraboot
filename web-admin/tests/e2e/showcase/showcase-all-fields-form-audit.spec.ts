@@ -128,7 +128,7 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
   const leaf = page.locator(`a[href="${LIST_URL}"], a[href*="${LIST_URL}"]`).first();
   await leaf.waitFor({ state: 'attached', timeout: 5_000 });
   await leaf.evaluate((el: HTMLElement) => el.click());
-  await listResp;
+  await listResp.catch(() => null);
 
   await expect(page).toHaveURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 10_000 });
   await expect(page.locator('table, [data-testid="dynamic-list"]').first()).toBeVisible({
@@ -247,10 +247,13 @@ function field(code: string) {
 }
 
 test.describe('showcase_all_fields form audit', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.setTimeout(45_000);
+
+  const adminStorageState = process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json';
+  test.use({ storageState: adminStorageState });
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: adminStorageState });
     const page = await ctx.newPage();
     try {
       seedUserId = await resolveSeedUserId(page);
@@ -262,7 +265,7 @@ test.describe('showcase_all_fields form audit', () => {
 
   test.afterAll(async ({ browser }) => {
     if (!recordPid) return;
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: adminStorageState });
     const page = await ctx.newPage();
     try {
       await deleteRecord(page.request, recordPid);

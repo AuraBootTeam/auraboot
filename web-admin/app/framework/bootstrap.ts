@@ -14,6 +14,8 @@ import { PluginLoader, type LoaderOptions } from './plugins/loader.js'
 import { SlotRegistry } from './extensions/slot-registry.js'
 import { WidgetRegistry, ColumnRendererRegistry } from './widgets/widget-registry.js'
 import { DataSourceRegistry } from './data-source/registry.js'
+import { initBlockRegistry } from '~/ui/schema-renderer/BlockRegistry'
+import { initViewRegistry } from '~/ui/schema-renderer/ViewRegistry'
 
 export interface Kernel {
   routeRegistry: RouteRegistryImpl
@@ -37,6 +39,12 @@ export interface KernelOptions {
  * use the `kernel` singleton exported below.
  */
 export function createKernel(opts: KernelOptions = {}): Kernel {
+  // Eager registry init — lazy registration silently breaks schema-driven
+  // panels (memory: feedback_g1_init_registry_bootstrap). Both calls are
+  // idempotent.
+  initBlockRegistry()
+  initViewRegistry()
+
   const routeRegistry = new RouteRegistryImpl()
   const slotRegistry = new SlotRegistry()
   const widgetRegistry = new WidgetRegistry()

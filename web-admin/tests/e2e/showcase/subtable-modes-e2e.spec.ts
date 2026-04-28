@@ -284,7 +284,7 @@ const DETAIL_PAGE_KEY = `${MODEL_CODE}_detail`;
 let detailSnapshot: DetailPageSnapshot | null = null;
 
 test.describe('D5 — Sub-table block: 3 data-source modes', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(60_000);
 
   test.afterEach(async ({ request }) => {

@@ -25,6 +25,7 @@ public class CommandDefinitionDTO {
     private String inputSchema;
     private String targetModels;
     private String executionConfig;
+    private String cmdRiskLevel;
     private Integer version;
     private String semver;
     private Boolean isCurrent;

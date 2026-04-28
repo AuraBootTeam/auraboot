@@ -1,12 +1,11 @@
 /**
  * BlockRenderer - Profile-aware block dispatcher
  *
- * Resolves block renderers from the current RenderProfile context.
- * Falls back to the hardcoded switch-case for backward compatibility
- * when no profile is available (e.g., route components that haven't
- * been migrated to DynamicPageRenderer yet).
- *
- * Each block is wrapped in BlockErrorBoundary for crash isolation.
+ * Resolves block renderers from the current RenderProfile context, then falls
+ * back to the runtime BlockRegistry (DESIGNER-001). The registry is the single
+ * source of truth for blockType → component mapping; profiles override
+ * specific entries at runtime. Each block is wrapped in BlockErrorBoundary for
+ * crash isolation.
  */
 
 import React, { Suspense, useMemo } from 'react';
@@ -15,76 +14,7 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { useProfileSafe } from '~/framework/meta/profiles/ProfileContext';
 import { BlockErrorBoundary } from '~/framework/meta/rendering/BlockErrorBoundary';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
-
-/**
- * Fallback renderer map — used when no profile context is available.
- * Lazily initialized via dynamic import to avoid pulling block renderers
- * into the main bundle when the profile path (primary) is used.
- */
-let _fallbackRenderers: Map<string, React.ComponentType<any>> | null = null;
-async function loadFallbackRenderers(): Promise<Map<string, React.ComponentType<any>>> {
-  if (_fallbackRenderers) return _fallbackRenderers;
-  const [
-    form,
-    formSection,
-    formButtons,
-    formWizard,
-    table,
-    filters,
-    toolbar,
-    description,
-    chart,
-    tabs,
-    richText,
-    divider,
-    statCard,
-  ] = await Promise.all([
-    import('~/framework/meta/rendering/blocks/FormBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/FormSectionBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/FormButtonsBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/FormWizardBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/TableBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/FiltersBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/ToolbarBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/DescriptionBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/ChartBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/TabsBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/RichTextBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/DividerBlockRenderer'),
-    import('~/framework/meta/rendering/blocks/StatCardBlockRenderer'),
-  ]);
-  _fallbackRenderers = new Map([
-    ['form', form.FormBlockRenderer],
-    ['form-section', formSection.FormSectionBlockRenderer],
-    ['form-buttons', formButtons.FormButtonsBlockRenderer],
-    ['form-wizard', formWizard.FormWizardBlockRenderer],
-    ['table', table.TableBlockRenderer],
-    ['filters', filters.FiltersBlockRenderer],
-    ['toolbar', toolbar.ToolbarBlockRenderer],
-    ['description', description.DescriptionBlockRenderer],
-    ['chart', chart.ChartBlockRenderer],
-    ['tabs', tabs.TabsBlockRenderer],
-    ['rich-text', richText.RichTextBlockRenderer],
-    ['divider', divider.DividerBlockRenderer],
-    ['stat-card', statCard.StatCardBlockRenderer],
-  ]);
-  return _fallbackRenderers;
-}
-
-function getFallbackRenderers(): Map<string, React.ComponentType<any>> {
-  if (!_fallbackRenderers) {
-    // Trigger async load; will be available on next render
-    loadFallbackRenderers();
-    return new Map();
-  }
-  return _fallbackRenderers;
-}
-
-// Kick off fallback renderer module loading at import time so list/detail
-// pages that depend on the fallback dispatch path have renderers ready on the
-// first render pass (not the second). This is a no-op when the registry is
-// already populated.
-void loadFallbackRenderers();
+import { BlockRegistry } from '~/ui/schema-renderer/BlockRegistry';
 
 export interface BlockRendererProps {
   block: BlockConfig;
@@ -124,28 +54,20 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, ar
     );
   }
 
-  // Resolve renderer: profile-aware → fallback map
+  // Resolve renderer: profile-aware → BlockRegistry
   const resolveRenderer = (): React.ComponentType<any> | null => {
-    // 1. Try profile's blockRenderers
+    // 1. Profile override wins (per-route or per-tenant customization)
     if (profile) {
       const Renderer = profile.blockRenderers.get(blockType);
       if (Renderer) return Renderer;
     }
 
-    // 2. Try fallback map (lazy to avoid circular dep TDZ)
-    const FallbackRenderer = getFallbackRenderers().get(blockType);
-    if (FallbackRenderer) return FallbackRenderer;
+    // 2. Runtime registry (DESIGNER-001 single source of truth)
+    const spec = BlockRegistry.get(blockType);
+    if (spec) return spec.component;
 
-    // 3. Special block types handled by page renderers
-    if (blockType === 'tabs' || blockType === 'sub-table' || blockType === 'monthly-grid') {
-      return null;
-    }
-
-    // 4. Custom blocks
-    if (blockType === 'custom') {
-      return null; // handled separately below
-    }
-
+    // 3. `custom` is handled below; structural types (`monthly-grid`) are
+    //    handled by enclosing page renderers (detail / list).
     return null;
   };
 
@@ -172,13 +94,15 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({ block, runtime, ar
     );
   }
 
-  // Block types handled by page renderers (not BlockRenderer)
+  // Block types handled by enclosing page renderers (not BlockRenderer)
   if (!Renderer) {
-    if (blockType === 'tabs' || blockType === 'sub-table' || blockType === 'monthly-grid') {
+    if (blockType === 'monthly-grid') {
       return null;
     }
 
-    // Unknown block type
+    // Unknown block type — visible warning, NEVER silent null. Missing
+    // registrations must surface immediately in dev (memory:
+    // feedback_g1_init_registry_bootstrap).
     console.warn(`[BlockRenderer] Unknown block type: ${blockType}`);
     return (
       <div className="rounded border border-yellow-300 bg-yellow-50 p-4">

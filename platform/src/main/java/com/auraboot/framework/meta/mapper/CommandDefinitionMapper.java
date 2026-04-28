@@ -19,6 +19,7 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
         INSERT INTO ab_command_definition
         (pid, tenant_id, code, display_name, description, model_code,
          input_schema, target_models, execution_config, extension,
+         cmd_risk_level,
          version, semver, is_current, row_version, status, deleted_flag,
          created_at, updated_at)
         VALUES
@@ -27,6 +28,7 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
          #{targetModels, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{executionConfig, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{extension, typeHandler=com.auraboot.framework.application.database.mybatis.ExtensionTypeHandler},
+         #{cmdRiskLevel},
          #{version}, #{semver}, #{isCurrent}, #{rowVersion}, #{status}, #{deletedFlag},
          #{createdAt}, #{updatedAt})
         ON CONFLICT (tenant_id, code, version) DO NOTHING
@@ -69,6 +71,7 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
             target_models = #{targetModels}::jsonb,
             execution_config = #{executionConfig}::jsonb,
             extension = #{extension}::jsonb,
+            cmd_risk_level = #{cmdRiskLevel},
             plugin_pid = #{pluginPid},
             updated_at = NOW()
         WHERE pid = #{pid} AND tenant_id = #{tenantId}
@@ -80,6 +83,7 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
                               @Param("targetModels") String targetModels,
                               @Param("executionConfig") String executionConfig,
                               @Param("extension") String extension,
+                              @Param("cmdRiskLevel") String cmdRiskLevel,
                               @Param("pluginPid") String pluginPid,
                               @Param("pid") String pid,
                               @Param("tenantId") Long tenantId);

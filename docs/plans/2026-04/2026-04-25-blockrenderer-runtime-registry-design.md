@@ -1,11 +1,27 @@
 # BlockRenderer Runtime Registry — Design
 
-**Status:** draft (pending review)
+**Status:** ✅ implemented (2026-04-26 — Phase 1 + Phase 2)
 **Owner:** rendering team
 **Closes:** BACKLOG-DESIGNER-001 (P2)
-**Date:** 2026-04-25
+**Date:** 2026-04-25 (design) / 2026-04-26 (implementation)
+**Implementation PRs:** OSS PR #38 (commits `5b277dbd` Phase 1, `0219c0c9` Phase 2) — merged into `main` at `37e3e959`
 
-## Context
+## ⚠️ Implementation correction (2026-04-26)
+
+The original design listed three "runtime switch sites" intended for unification. During Phase 1 implementation we discovered all three dispatch on **different keys**, not `blockType`:
+
+| File | Switch key (actual) | Status |
+|------|---------------------|--------|
+| `web-admin/app/ui/schema-renderer/SchemaRenderer.tsx:117-141` | `region.type` (3 values: filters/action/table) | NOT a `blockType` switch — left untouched, file later deleted in PR #39 (dead code) |
+| `web-admin/app/framework/meta/runtime/data-pipeline/DataSourceManager.ts:390+` | `config.adaptor` (optionList/dictData/table) | NOT a `blockType` switch — left untouched |
+| `web-admin/app/framework/smart/components/view/SmartViewRenderer.tsx:127+` | `viewType` (kanban/calendar/gallery/gantt/...) | NOT `blockType`; heterogeneous view-callback signature; out-of-scope for Phase 2 |
+
+The **real** `blockType` runtime dispatch lived in a fourth file the original design didn't list:
+- `web-admin/app/framework/meta/rendering/BlockRenderer.tsx` — held a `_fallbackRenderers` Map (13 entries)
+
+Phase 2 swapped that Map's lookup for `BlockRegistry.get(blockType)?.component` (`framework/meta/rendering/BlockRenderer.tsx` 202 → 125 LOC). 14 block types now register through `initBlockRegistry()`: 13 originals + `sub-table` (the 13 + sub-table covers all production paths; `monthly-grid` is intentionally not registered — it's a structural marker handled by the enclosing detail page renderer's `directMonthlyGridBlocks` branch, not a generic block).
+
+## Context (original design)
 
 The runtime path that decides "which React component / data loader to use for a given `blockType`" is currently a hand-maintained `switch (blockType)` chain in three independent files:
 
@@ -14,6 +30,8 @@ The runtime path that decides "which React component / data loader to use for a 
 - `web-admin/app/framework/meta/runtime/data-pipeline/DataSourceManager.ts:390`
 
 Adding a new `blockType` requires editing every site, and missing one results in a silent fallthrough that renders `null` (see also: G7 fallback dispatch added in 2026-04 to mitigate this).
+
+> Note (2026-04-26): see "Implementation correction" above. The premise that all three sites switched on `blockType` turned out to be incorrect — only `framework/meta/rendering/BlockRenderer.tsx` did.
 
 This document describes a single registry that the three runtime sites consult, scoped narrowly to the runtime layer to avoid premature unification with the seven designer-internal switches (palette, drop-zone, settings panel, preview, exporter — each with distinct semantics).
 
