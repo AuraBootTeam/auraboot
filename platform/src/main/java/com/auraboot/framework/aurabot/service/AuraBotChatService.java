@@ -712,11 +712,14 @@ public class AuraBotChatService {
         String toolId = pending.getToolId();
         String sessionId = pending.getSessionId();
 
-        if (pending.getAgentCode() != null && !pending.getAgentCode().isBlank()
-                && agentChatPort != null
-                && agentChatPort.resumeAgentToolAfterConfirmation(tenantId, pending, confirmed, emitter)) {
-            return;
-        }
+        // Note: pending.getAgentCode() may be a named-agent code. The pre-merge
+        // route was AgentChatPort.resumeAgentToolAfterConfirmation, but B.6
+        // collapsed resume routing into ConversationTurnService.resumeTurn —
+        // that entry is responsible for dispatching named-agent resume to
+        // AgentChatPort if/when a real implementation lands. Until then the
+        // generic tool-execution flow below works for both aurabot and named
+        // agents because PendingTool.{providerCode/apiKey/baseUrl/model/
+        // systemPrompt} are captured at suspend time regardless of port.
 
         // --- Trace: find active trace for this session ---
         TraceContext trace = aiTraceService.findActiveTrace(sessionId);

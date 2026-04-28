@@ -58,4 +58,20 @@ public class ImMessage {
 
     @TableField("created_at")
     private Instant createdAt;
+
+    /**
+     * Phase C.1: Pre-Grounding Triage Stage 2.5 verdict snapshot persisted on
+     * inbound rows so downstream analytics / audit can reconstruct the routing
+     * decision the chokepoint took. Storage shape matches the
+     * {@code ab_im_message_triage_bucket_check} CHECK constraint
+     * (light_chat / contextual_answer / acp_run, lowercase).
+     */
+    @TableField("triage_bucket")
+    private String triageBucket;
+
+    @TableField("triage_confidence")
+    private java.math.BigDecimal triageConfidence;
+
+    @TableField(value = "triage_reason_codes", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
+    private String triageReasonCodes;
 }
