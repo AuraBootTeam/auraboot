@@ -94,6 +94,14 @@ public class ImMessageServiceImpl implements ImMessageService {
             message.setMentions(toJson(request.getMentions()));
         }
 
+        // Phase C.1: persist Pre-Grounding Triage verdict (Stage 2.5) on the
+        // inbound row so analytics + audit can reconstruct the routing decision.
+        if (request.getTriageBucket() != null) {
+            message.setTriageBucket(request.getTriageBucket());
+            message.setTriageConfidence(request.getTriageConfidence());
+            message.setTriageReasonCodes(request.getTriageReasonCodes());
+        }
+
         messageMapper.insert(message);
 
         // Unhide conversation for all members (in case any hid it)

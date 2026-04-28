@@ -61,9 +61,11 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
 
     private final ImMessageService imMessageService;
     private final AuraBotAgentResolver agentResolver;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Override
-    public Long persistInbound(TurnRequest request) {
+    public Long persistInbound(TurnRequest request,
+                                 com.auraboot.framework.agent.triage.TriageVerdict triageVerdict) {
         if (request == null || request.conversationId() == null) {
             log.debug("persistInbound: missing conversationId on TurnRequest, skipping "
                     + "(legacy frontend path that has not migrated to Phase B.1 contract yet)");
@@ -81,6 +83,22 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
             req.setMessageType("text");
             req.setContent(request.userMessage());
             req.setClientMsgId(request.clientMsgId());
+            // Phase C.1: forward triage verdict onto the inbound row. Bucket goes
+            // in lowercase to match the table CHECK constraint
+            // (light_chat / contextual_answer / acp_run).
+            if (triageVerdict != null && triageVerdict.bucket() != null) {
+                req.setTriageBucket(triageVerdict.bucket().name().toLowerCase());
+                req.setTriageConfidence(java.math.BigDecimal.valueOf(triageVerdict.confidence()));
+                if (triageVerdict.reasonCodes() != null && !triageVerdict.reasonCodes().isEmpty()) {
+                    try {
+                        req.setTriageReasonCodes(
+                                objectMapper.writeValueAsString(triageVerdict.reasonCodes()));
+                    } catch (Exception jsonEx) {
+                        log.warn("Failed to serialize triage reasonCodes, dropping: {}",
+                                jsonEx.getMessage());
+                    }
+                }
+            }
             ImMessage saved = imMessageService.sendMessage(
                     req, request.humanMemberId(), request.tenantId());
             return saved != null ? saved.getId() : null;
