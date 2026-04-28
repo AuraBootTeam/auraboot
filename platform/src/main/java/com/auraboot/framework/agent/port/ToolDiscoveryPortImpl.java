@@ -27,27 +27,32 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
     @Override
     public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
                                        String modelHint, String intentHint, int maxTools) {
-        // Phase 1: Try skill-based discovery for each candidate skill
+        boolean queryOnly = isReadIntent(intentHint);
+
+        // Phase 1: Try skill-based discovery for each candidate skill.
         List<ToolDef> skillTools = new ArrayList<>();
         if (candidateSkills != null && !candidateSkills.isEmpty()) {
             for (String skillCode : candidateSkills) {
                 List<AgentToolDefinition> resolved = agentSkillService.resolveSkillTools(tenantId, skillCode);
                 for (AgentToolDefinition atd : resolved) {
-                    skillTools.add(new ToolDef(
+                    ToolDef toolDef = new ToolDef(
                             atd.getName(),
                             atd.getName(),
                             atd.getDescription(),
                             atd.getInputSchema() != null ? atd.getInputSchema() : Map.of(),
                             isReadOnlyTool(atd)
-                    ));
+                    );
+                    if (!queryOnly || toolDef.readOnly()) {
+                        skillTools.add(toolDef);
+                    }
                 }
                 if (skillTools.size() >= maxTools) break;
             }
         }
 
-        if (!skillTools.isEmpty()) {
+        if (!skillTools.isEmpty() && (modelHint == null || modelHint.isBlank())) {
             log.debug("ToolDiscoveryPort: found {} tools from skill resolution", skillTools.size());
-            return skillTools.size() > maxTools ? skillTools.subList(0, maxTools) : skillTools;
+            return limitTools(skillTools, maxTools);
         }
 
         // Phase 2: Fallback to ToolProviderRegistry discovery, filtered by intent
@@ -58,22 +63,32 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
                 .maxResults(maxTools * 2) // over-fetch, then filter
                 .build();
 
-        boolean queryOnly = isReadIntent(intentHint);
         List<ToolDefinition> discovered = toolProviderRegistry.discoverAll(ctx);
-        List<ToolDef> result = discovered.stream()
+        List<ToolDef> providerTools = discovered.stream()
                 .map(td -> new ToolDef(
                         td.getToolCode(),
                         td.getToolName(),
                         enhanceDescription(td.getToolCode(), td.getDescription()),
                         td.getParameterSchema() != null ? td.getParameterSchema() : Map.of(),
-                        isReadOnlyToolCode(td.getToolCode())
+                        isReadOnlyToolDefinition(td)
                 ))
                 // For query intent: only keep read-only tools (nq, list, get, platform.execute_sql, platform.list_models)
                 .filter(td -> !queryOnly || td.readOnly())
                 .limit(maxTools)
                 .toList();
 
-        log.debug("ToolDiscoveryPort: found {} tools from provider registry (queryOnly={})", result.size(), queryOnly);
+        if (skillTools.isEmpty()) {
+            log.debug("ToolDiscoveryPort: found {} tools from provider registry (queryOnly={})",
+                    providerTools.size(), queryOnly);
+            return providerTools;
+        }
+
+        List<ToolDef> result = new ArrayList<>();
+        addUnique(result, providerTools, maxTools);
+        addUnique(result, skillTools, maxTools);
+
+        log.debug("ToolDiscoveryPort: merged {} provider tools with {} skill tools (queryOnly={})",
+                providerTools.size(), skillTools.size(), queryOnly);
         return result;
     }
 
@@ -112,8 +127,39 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
                 || "platform.execute_sql".equals(toolCode) || "platform.list_models".equals(toolCode);
     }
 
+    private boolean isReadOnlyToolDefinition(ToolDefinition td) {
+        if (td == null) return false;
+        if (isReadOnlyToolCode(td.getToolCode())) return true;
+        String toolType = td.getToolType();
+        return toolType != null && (toolType.contains("query")
+                || toolType.contains("read")
+                || toolType.contains("list"));
+    }
+
     private boolean isReadIntent(String intent) {
         return intent != null && Set.of("query", "analyze", "summarize", "compare",
                 "explain", "export", "report", "recommend", "list").contains(intent);
+    }
+
+    private List<ToolDef> limitTools(List<ToolDef> tools, int maxTools) {
+        if (tools == null) return List.of();
+        if (maxTools <= 0 || tools.size() <= maxTools) return tools;
+        return tools.subList(0, maxTools);
+    }
+
+    private void addUnique(List<ToolDef> target, List<ToolDef> source, int maxTools) {
+        if (source == null || source.isEmpty()) return;
+        Set<String> existing = new HashSet<>();
+        for (ToolDef tool : target) {
+            existing.add(tool.code());
+        }
+        for (ToolDef tool : source) {
+            if (maxTools > 0 && target.size() >= maxTools) {
+                return;
+            }
+            if (tool != null && existing.add(tool.code())) {
+                target.add(tool);
+            }
+        }
     }
 }

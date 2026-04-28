@@ -96,7 +96,7 @@ async function openCreateForm(page: Page): Promise<void> {
 }
 
 test.describe('D8 — showcase_all_fields validation runtime', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
   test.afterEach(async ({ request }) => {
     while (createdPids.length > 0) {

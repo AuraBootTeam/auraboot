@@ -25,6 +25,14 @@ class OpenAiCompatibleLlmProviderTest {
         return (boolean) m.invoke(provider, model);
     }
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> convertMessage(OpenAiCompatibleLlmProvider provider, LlmChatRequest.Message message)
+            throws Exception {
+        Method m = OpenAiCompatibleLlmProvider.class.getDeclaredMethod("convertMessageToOpenAi", LlmChatRequest.Message.class);
+        m.setAccessible(true);
+        return (Map<String, Object>) m.invoke(provider, message);
+    }
+
     private OpenAiCompatibleLlmProvider createProvider() {
         // WebClient is not needed for the method under test; pass null (won't be called)
         return new OpenAiCompatibleLlmProvider(null, new ObjectMapper());
@@ -69,5 +77,70 @@ class OpenAiCompatibleLlmProviderTest {
         // MiniMax rates: input=1.0, output=4.0 per 1M tokens
         // (1000 * 1.0 + 500 * 4.0) / 1_000_000 = 3000 / 1_000_000 = 0.003
         assertThat(cost).isEqualTo(0.003);
+    }
+
+    @Test
+    void assistantContentBlocksSerializeOpenAiToolCalls() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+
+        LlmChatRequest.ContentBlock block = LlmChatRequest.ContentBlock.builder()
+                .type("tool_use")
+                .id("call-1")
+                .name("nq_supplier_options")
+                .input(Map.of("productId", "P-100"))
+                .build();
+
+        Map<String, Object> message = convertMessage(provider, LlmChatRequest.Message.builder()
+                .role("assistant")
+                .content(List.of(block))
+                .build());
+
+        assertThat(message).containsEntry("role", "assistant");
+        assertThat(message).containsKey("tool_calls");
+        assertThat(message.get("tool_calls").toString()).contains("call-1", "nq_supplier_options", "P-100");
+    }
+
+    @Test
+    void toolResultContentBlockUsesResultPayloadForOpenAiToolMessage() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+
+        LlmChatRequest.ContentBlock block = LlmChatRequest.ContentBlock.builder()
+                .type("tool_result")
+                .toolUseId("call-1")
+                .result("{\"success\":true,\"records\":[{\"supplier\":\"Acme\"}]}")
+                .build();
+
+        Map<String, Object> message = convertMessage(provider, LlmChatRequest.Message.builder()
+                .role("user")
+                .content(List.of(block))
+                .build());
+
+        assertThat(message).containsEntry("role", "tool");
+        assertThat(message).containsEntry("tool_call_id", "call-1");
+        assertThat(message.get("content").toString()).contains("Acme");
+    }
+
+    @Test
+    void toolResultObjectPayloadSerializesAsJsonForOpenAiToolMessage() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+
+        LlmChatRequest.ContentBlock block = LlmChatRequest.ContentBlock.builder()
+                .type("tool_result")
+                .toolUseId("call-1")
+                .result(Map.of(
+                        "success", true,
+                        "records", List.of(Map.of("supplier", "Acme"))))
+                .build();
+
+        Map<String, Object> message = convertMessage(provider, LlmChatRequest.Message.builder()
+                .role("user")
+                .content(List.of(block))
+                .build());
+
+        assertThat(message).containsEntry("role", "tool");
+        assertThat(message).containsEntry("tool_call_id", "call-1");
+        assertThat(message.get("content").toString())
+                .contains("\"success\":true")
+                .contains("\"supplier\":\"Acme\"");
     }
 }

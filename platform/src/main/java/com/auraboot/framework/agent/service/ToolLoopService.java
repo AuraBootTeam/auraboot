@@ -114,6 +114,11 @@ public class ToolLoopService implements ToolExecutionPort {
             }
         }
 
+        if (toolDef.isRequiresConfirmation()) {
+            resultContractEmitter.emitConfirmationRequired(toolName, toolDef, input, 0);
+            return "Error: This tool requires user confirmation before execution. No data was changed.";
+        }
+
         // Start trace span
         SpanContext spanCtx = null;
         try {
@@ -310,9 +315,10 @@ public class ToolLoopService implements ToolExecutionPort {
 
     // ========== Helpers ==========
 
-    /** Risk levels L3 and L4 trigger mandatory Approval Gate routing. */
+    /** Risk levels L3/L4 (and R3/R4 aliases) trigger mandatory Approval Gate routing. */
     private boolean isHighRisk(String riskLevel) {
-        return "L3".equals(riskLevel) || "L4".equals(riskLevel);
+        String normalized = normalizeRiskLevel(riskLevel, "L0");
+        return "L3".equals(normalized) || "L4".equals(normalized);
     }
 
     /**
@@ -325,7 +331,21 @@ public class ToolLoopService implements ToolExecutionPort {
             if ("dsl_query".equals(type) || "llm_native".equals(type)) return false;
             if ("dsl_command".equals(type) || "api_call".equals(type)) return true;
         }
-        return toolName != null && toolName.startsWith("cmd_");
+        return toolName != null && (toolName.startsWith("cmd_") || toolName.startsWith("cmd:"));
+    }
+
+    private String normalizeRiskLevel(String riskLevel, String fallback) {
+        if (riskLevel == null || riskLevel.isBlank()) {
+            return fallback;
+        }
+        String normalized = riskLevel.trim().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("R") && normalized.length() == 2) {
+            normalized = "L" + normalized.substring(1);
+        }
+        return switch (normalized) {
+            case "L0", "L1", "L2", "L3", "L4" -> normalized;
+            default -> fallback;
+        };
     }
 
     private String resolveModelCodeForCommand(Long tenantId, String commandCode) {

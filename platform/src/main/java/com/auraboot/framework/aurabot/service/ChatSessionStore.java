@@ -1,5 +1,6 @@
 package com.auraboot.framework.aurabot.service;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
@@ -47,11 +48,14 @@ import java.util.concurrent.TimeUnit;
 public class ChatSessionStore {
 
     private static final String PENDING_KEY_PREFIX = "aurabot:pending:";
+    private static final String MESSAGES_KEY_PREFIX = "aurabot:messages:";
     private static final long PENDING_TTL_MINUTES = 10;
+    private static final long MESSAGES_TTL_MINUTES = 60;
 
     // Fallback in-memory store (used only when Redis is unavailable)
     private static final long IN_MEMORY_TTL_MILLIS = PENDING_TTL_MINUTES * 60 * 1000L;
     private final ConcurrentHashMap<String, PendingTool> inMemoryFallback = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, StoredMessages> inMemoryMessagesFallback = new ConcurrentHashMap<>();
 
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
@@ -134,8 +138,77 @@ public class ChatSessionStore {
         return tool;
     }
 
+    /**
+     * Phase B.6: pending key uses turnId only (one pending per turn at a time —
+     * the chat-impl tool loop breaks the moment one tool is queued for confirm).
+     */
     private String pendingKey(String turnId) {
         return PENDING_KEY_PREFIX + turnId;
+    }
+
+    /**
+     * Store structured LLM messages for the chat session.
+     * This preserves assistant tool_use and user tool_result blocks across HTTP turns.
+     * Independent from pending-tool storage — uses the {@code aurabot:messages:}
+     * key prefix and a longer TTL so message history is retrievable across the
+     * tool-loop continuation cycle introduced on main.
+     */
+    public void storeConversationMessages(String sessionId, List<Map<String, Object>> messages) {
+        if (sessionId == null || sessionId.isBlank() || messages == null) {
+            return;
+        }
+        if (redisAvailable) {
+            try {
+                String json = objectMapper.writeValueAsString(messages);
+                redisTemplate.opsForValue().set(messagesKey(sessionId), json, MESSAGES_TTL_MINUTES, TimeUnit.MINUTES);
+                log.debug("Stored {} conversation messages for session [{}] in Redis (TTL={}min)",
+                        messages.size(), sessionId, MESSAGES_TTL_MINUTES);
+                return;
+            } catch (JsonProcessingException e) {
+                log.error("Failed to serialize conversation messages, falling back to in-memory", e);
+            } catch (Exception e) {
+                log.error("Redis write failed for conversation messages [{}], falling back to in-memory",
+                        sessionId, e);
+            }
+        }
+        inMemoryMessagesFallback.put(sessionId, new StoredMessages(messages));
+        log.debug("Stored {} conversation messages for session [{}] in memory", messages.size(), sessionId);
+    }
+
+    /**
+     * Load structured LLM messages for a chat session.
+     */
+    public List<Map<String, Object>> loadConversationMessages(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return List.of();
+        }
+        if (redisAvailable) {
+            try {
+                String json = redisTemplate.opsForValue().get(messagesKey(sessionId));
+                if (json == null || json.isBlank()) {
+                    return List.of();
+                }
+                return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            } catch (JsonProcessingException e) {
+                log.error("Failed to deserialize conversation messages from Redis", e);
+                return List.of();
+            } catch (Exception e) {
+                log.error("Redis read failed for conversation messages [{}], trying in-memory fallback", sessionId, e);
+            }
+        }
+        StoredMessages stored = inMemoryMessagesFallback.get(sessionId);
+        if (stored == null) {
+            return List.of();
+        }
+        if (Instant.now().toEpochMilli() - stored.createdAt() > MESSAGES_TTL_MINUTES * 60 * 1000L) {
+            inMemoryMessagesFallback.remove(sessionId);
+            return List.of();
+        }
+        return stored.messages();
+    }
+
+    private String messagesKey(String sessionId) {
+        return MESSAGES_KEY_PREFIX + sessionId;
     }
 
     @Data
@@ -162,6 +235,10 @@ public class ChatSessionStore {
         private String description;
         private String modelCode;
         private String toolSpanId;  // for trace: span ID of the pending tool
+        private String agentCode;
+        private String runPid;
+        private String taskPid;
+        private List<AgentToolDefinition> agentToolDefinitions;
 
         // --- Conversation context needed to resume LLM after confirmation ---
         private List<Map<String, Object>> messages;
@@ -176,5 +253,11 @@ public class ChatSessionStore {
         // --- Metadata ---
         @Builder.Default
         private long createdAt = Instant.now().toEpochMilli();
+    }
+
+    private record StoredMessages(List<Map<String, Object>> messages, long createdAt) {
+        StoredMessages(List<Map<String, Object>> messages) {
+            this(messages, Instant.now().toEpochMilli());
+        }
     }
 }

@@ -1,0 +1,50 @@
+[
+  {
+    "modelCode": "sc_monthly_metric",
+    "fieldCode": "sc_showcase_pid",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "sc_monthly_metric",
+    "fieldCode": "sc_month",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "sc_monthly_metric",
+    "fieldCode": "sc_revenue",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "sc_monthly_metric",
+    "fieldCode": "sc_cost",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "sc_monthly_metric",
+    "fieldCode": "sc_units",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "sc_monthly_metric",
+    "fieldCode": "sc_metric_remark",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true
+  }
+]

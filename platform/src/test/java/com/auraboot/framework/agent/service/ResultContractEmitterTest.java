@@ -132,6 +132,31 @@ class ResultContractEmitterTest {
     }
 
     @Test
+    @DisplayName("confirmation required emits action proposal without execution result")
+    void confirmation_required_emits_action_proposal() throws Exception {
+        AgentToolDefinition tool = commandTool("cmd_create_quote");
+        tool.setRiskLevel("L2");
+        tool.setConfirmationPolicy("confirm");
+        Map<String, Object> input = Map.of("name", "Quote A");
+
+        emitter.emitConfirmationRequired("cmd_create_quote", tool, input, 7);
+
+        Map<String, Object> data = mapper.readValue(sse.events.get(0).data, Map.class);
+        assertThat(data.get("status")).isEqualTo("partial_success");
+        assertThat(data.get("outputType")).isEqualTo("action_proposal");
+        assertThat(data.get("renderHint")).isEqualTo("card");
+        assertThat(data.get("actionability")).isEqualTo("propose");
+        assertThat(data.get("canContinueFrom")).isEqualTo(true);
+        Map<?, ?> payload = (Map<?, ?>) data.get("data");
+        assertThat(payload.get("toolCode")).isEqualTo("cmd_create_quote");
+        assertThat(payload.get("riskLevel")).isEqualTo("L2");
+        assertThat(payload.get("confirmationPolicy")).isEqualTo("confirm");
+        List<?> actions = (List<?>) data.get("suggestedActions");
+        assertThat(actions).hasSize(1);
+        assertThat(((Map<?, ?>) actions.get(0)).get("skillCode")).isEqualTo("cmd_create_quote");
+    }
+
+    @Test
     @DisplayName("no emitter in context → silent no-op (never throws)")
     void no_emitter_is_silent() {
         ChatSseContext.clear();

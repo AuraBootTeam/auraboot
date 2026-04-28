@@ -16,7 +16,7 @@
 
 import type { FullConfig } from '@playwright/test';
 
-const ADMIN_STORAGE = './tests/storage/admin.json';
+const ADMIN_STORAGE = process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json';
 
 async function globalTeardown(config: FullConfig): Promise<void> {
   // Resolve baseURL from Playwright config (native fetch requires absolute URLs)

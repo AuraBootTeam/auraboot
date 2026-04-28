@@ -126,34 +126,82 @@ function generatePublicRoutes(plugins) {
   return lines.join('\n');
 }
 
-// Update routes.ts — replace content between markers
+// Update routes.ts — replace content between markers.
+//
+// Header format (single canonical block, idempotent on re-runs):
+//
+//     // >>> AUTO-GENERATED: Platform Plugin Routes (DO NOT EDIT) >>>
+//     // Managed by scripts/generate-plugin-routes.mjs
+//     <generated route entries>
+//     // <<< END AUTO-GENERATED <<<
+//
+// The previous implementation used the same `══...` separator string as both
+// the opening and closing of the start block AND as the closing line of the
+// end block. `indexOf` therefore matched the first separator anywhere in the
+// file, which made the markers vulnerable to accidental matches when route
+// entries (or unrelated comments) reused the separator glyphs. The replacement
+// uses two distinct, directional sentinels (`>>> ... >>>` for begin,
+// `<<< ... <<<` for end) so each marker appears exactly once and matches
+// unambiguously.
 function updateRoutesFile(routeEntries) {
-  const START_MARKER = '    // ══════════════════════════════════════════════';
-  const START_LABEL = '    // AUTO-GENERATED: Platform Plugin Routes';
-  const START_WARNING = '    // DO NOT EDIT — managed by generate-plugin-routes.mjs';
-  const END_MARKER = '    // END AUTO-GENERATED';
-  const END_LINE = '    // ══════════════════════════════════════════════';
+  const BEGIN_MARKER = '    // >>> AUTO-GENERATED: Platform Plugin Routes (DO NOT EDIT) >>>';
+  const BEGIN_NOTE   = '    // Managed by scripts/generate-plugin-routes.mjs';
+  const END_MARKER   = '    // <<< END AUTO-GENERATED <<<';
+
+  // Legacy markers from the previous header format — still recognised so that
+  // the first run after this change rewrites the block in place instead of
+  // appending a second one.
+  const LEGACY_LABEL    = '    // AUTO-GENERATED: Platform Plugin Routes';
+  const LEGACY_END_TAG  = '    // END AUTO-GENERATED';
+  const LEGACY_SEP      = '    // ══════════════════════════════════════════════';
 
   let content = fs.readFileSync(ROUTES_FILE, 'utf-8');
 
-  const startBlock = `${START_MARKER}\n${START_LABEL}\n${START_WARNING}\n${START_MARKER}\n\n`;
-  const endBlock = `\n${END_MARKER}\n${END_LINE}`;
+  const startBlock = `${BEGIN_MARKER}\n${BEGIN_NOTE}\n`;
+  const endBlock = `${END_MARKER}\n`;
 
-  // Check if markers already exist
-  if (content.includes('AUTO-GENERATED: Platform Plugin Routes')) {
-    // Find the start and end markers to replace
-    const startIdx = content.indexOf(START_MARKER);
-    // Find END AUTO-GENERATED after the start
-    const endMarkerIdx = content.indexOf(END_MARKER, startIdx);
-    if (startIdx !== -1 && endMarkerIdx !== -1) {
-      // Find end of the END_LINE after END_MARKER
-      const endLineIdx = content.indexOf('\n', content.indexOf(END_LINE, endMarkerIdx));
-      const before = content.substring(0, startIdx);
-      const after = content.substring(endLineIdx !== -1 ? endLineIdx + 1 : content.length);
-      content = before + startBlock + routeEntries + endBlock + '\n' + after;
+  const hasCanonical = content.includes(BEGIN_MARKER) && content.includes(END_MARKER);
+  const hasLegacy = !hasCanonical && content.includes(LEGACY_LABEL);
+
+  if (hasCanonical) {
+    // Replace existing canonical block.
+    const startIdx = content.indexOf(BEGIN_MARKER);
+    const endIdx = content.indexOf(END_MARKER, startIdx);
+    if (startIdx === -1 || endIdx === -1) {
+      console.error('Canonical markers detected but could not be located cleanly.');
+      process.exit(1);
     }
+    const endLineEnd = content.indexOf('\n', endIdx);
+    const before = content.substring(0, startIdx);
+    const after = content.substring(endLineEnd !== -1 ? endLineEnd + 1 : content.length);
+    content = before + startBlock + routeEntries + endBlock + after;
+  } else if (hasLegacy) {
+    // Migrate from legacy format: locate the first legacy separator that
+    // immediately precedes the legacy label, find the legacy end, and replace
+    // the whole region with the canonical block.
+    const labelIdx = content.indexOf(LEGACY_LABEL);
+    // Walk back to the separator line that opens the legacy block.
+    const sepIdx = content.lastIndexOf(LEGACY_SEP, labelIdx);
+    const startIdx = sepIdx !== -1 ? sepIdx : labelIdx;
+    const endTagIdx = content.indexOf(LEGACY_END_TAG, labelIdx);
+    if (endTagIdx === -1) {
+      console.error('Legacy AUTO-GENERATED block found but END marker missing.');
+      process.exit(1);
+    }
+    // Legacy end was followed by another separator line; consume it too.
+    const afterEndTag = content.indexOf('\n', endTagIdx) + 1;
+    const trailingSepIdx = content.indexOf(LEGACY_SEP, afterEndTag);
+    let endLineEnd;
+    if (trailingSepIdx !== -1 && trailingSepIdx < afterEndTag + 200) {
+      endLineEnd = content.indexOf('\n', trailingSepIdx);
+    } else {
+      endLineEnd = afterEndTag - 1;
+    }
+    const before = content.substring(0, startIdx);
+    const after = content.substring(endLineEnd !== -1 ? endLineEnd + 1 : content.length);
+    content = before + startBlock + routeEntries + endBlock + after;
   } else {
-    // Insert after "export default ["
+    // Fresh insertion: place the block right after `export default [`.
     const exportIdx = content.indexOf('export default [');
     if (exportIdx === -1) {
       console.error('Could not find "export default [" in routes.ts');
@@ -162,7 +210,7 @@ function updateRoutesFile(routeEntries) {
     const insertIdx = content.indexOf('\n', exportIdx) + 1;
     const before = content.substring(0, insertIdx);
     const after = content.substring(insertIdx);
-    content = before + startBlock + routeEntries + endBlock + '\n\n' + after;
+    content = before + startBlock + routeEntries + endBlock + '\n' + after;
   }
 
   fs.writeFileSync(ROUTES_FILE, content, 'utf-8');
