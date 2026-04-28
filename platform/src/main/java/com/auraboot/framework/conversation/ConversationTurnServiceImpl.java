@@ -1,10 +1,15 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.port.AgentChatPort;
+import com.auraboot.framework.agent.triage.PreGroundingTriage;
+import com.auraboot.framework.agent.triage.TriageBucket;
+import com.auraboot.framework.agent.triage.TriageRequest;
+import com.auraboot.framework.agent.triage.TriageVerdict;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.aurabot.service.ChatSessionStore;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -34,6 +39,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     private final AuraBotChatService chatService;
     private final TurnSideEffects sideEffects;
     private final ChatSessionStore chatSessionStore;
+    private final ObjectMapper objectMapper;
 
     /** Optional named-agent port. When the bean is absent, named-agent traffic
      *  surfaces a Failed outcome through the sink — same observability surface
@@ -41,12 +47,23 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     @Autowired(required = false)
     private AgentChatPort agentChatPort;
 
+    /**
+     * Phase C.1: Stage 2.5 Pre-Grounding Triage. Optional bean — when absent
+     * (OSS without the triage SPI wired), every turn defaults to ACP_RUN
+     * which preserves Phase B behavior. {@link DefaultPreGroundingTriage} is
+     * the rule-based default impl that ships with the platform.
+     */
+    @Autowired(required = false)
+    private PreGroundingTriage preGroundingTriage;
+
     public ConversationTurnServiceImpl(AuraBotChatService chatService,
                                         @Qualifier("turnSideEffects") TurnSideEffects sideEffects,
-                                        ChatSessionStore chatSessionStore) {
+                                        ChatSessionStore chatSessionStore,
+                                        ObjectMapper objectMapper) {
         this.chatService = chatService;
         this.sideEffects = sideEffects;
         this.chatSessionStore = chatSessionStore;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -238,10 +255,20 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     }
 
     private TurnContext beginTurn(TurnRequest request) {
+        // Phase C.1: Stage 2.5 Pre-Grounding Triage runs BEFORE persistence so the
+        // verdict can be written onto the inbound row + carried in TurnContext.
+        // Caller-supplied precomputedBucket (set by webhook / event adapters) wins
+        // over the SPI verdict per design — same semantic as channel override
+        // in DefaultPreGroundingTriage.
+        TriageVerdict verdict = runTriage(request);
+        TriageBucket effectiveBucket = request.precomputedBucket() != null
+                ? request.precomputedBucket()
+                : (verdict != null ? verdict.bucket() : null);
+
         // Phase B.1: Persistence.persistInbound takes the TurnRequest directly —
         // TurnContext is not yet built (its inboundMessageId field is exactly
         // what we are about to populate from the persistence return).
-        Long inboundMessageId = sideEffects.persistence().persistInbound(request);
+        Long inboundMessageId = sideEffects.persistence().persistInbound(request, verdict);
         return new TurnContext(
                 com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
                 request.tenantId(),
@@ -251,9 +278,56 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 null,                                // channelSessionId — Phase B's ChannelSessionResolver
                 request.conversationId(),
                 inboundMessageId,
-                request.precomputedBucket(),
+                effectiveBucket,
                 null,                                // traceId — set inside chat impl (kept null on TurnContext for Phase A)
                 java.time.Instant.now());
+    }
+
+    /**
+     * Phase C.1: invoke the Pre-Grounding Triage SPI. Fail-closed to ACP_RUN
+     * (per the SPI contract: "Failure must fall back to ACP_RUN, never
+     * LIGHT_CHAT") so a misbehaving classifier cannot accidentally route a
+     * platform-action turn to the no-platform light path.
+     *
+     * @return the verdict, or null when the SPI bean is absent (preserves
+     *         pre-C.1 behavior — no triage_bucket column write, TurnContext
+     *         falls back to caller-supplied precomputedBucket)
+     */
+    private TriageVerdict runTriage(TurnRequest request) {
+        if (preGroundingTriage == null) {
+            return null;
+        }
+        TriageRequest tr = new TriageRequest(
+                request.tenantId(),
+                request.userId(),
+                request.channel(),
+                null,                                // profileId — Phase C+ tenant-profile policy hook
+                request.userMessage(),
+                request.pageContext() != null && !request.pageContext().isEmpty(),
+                hasRecordContext(request),
+                0                                    // recentLightTurnCount — Phase C+ history-hotness query
+        );
+        try {
+            return preGroundingTriage.triage(tr);
+        } catch (Exception e) {
+            log.warn("PreGroundingTriage threw, falling back to ACP_RUN: {}", e.getMessage());
+            return new TriageVerdict(
+                    TriageBucket.ACP_RUN,
+                    0.0,
+                    java.util.List.of("triage_exception"),
+                    java.util.Set.of());
+        }
+    }
+
+    /** {@code request.legacyRequest()} carries a {@code recordPid} on
+     *  {@code ChatRequest.PageContext} — when present we have record context. */
+    private static boolean hasRecordContext(TurnRequest request) {
+        ChatRequest legacy = request.legacyRequest();
+        if (legacy == null || legacy.getPageContext() == null) {
+            return false;
+        }
+        String recordPid = legacy.getPageContext().getRecordPid();
+        return recordPid != null && !recordPid.isBlank();
     }
 
     private void finalizeTurn(TurnContext ctx, TurnOutcome outcome) {

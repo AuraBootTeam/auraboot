@@ -54,15 +54,24 @@ public interface TurnSideEffects {
          * every field we have at that moment (tenantId, userId, humanMemberId,
          * conversationId, clientMsgId, userMessage).
          *
+         * <p>Phase C.1: triage verdict (Stage 2.5 Pre-Grounding) is propagated
+         * here so the persisted row can carry the routing decision (bucket /
+         * confidence / reasonCodes). Pass null when no triage SPI is wired —
+         * downstream impls treat null as "skip triage column write".
+         *
          * @return the persisted message id, or null when persistence skipped /
          *         disabled (NOOP profile or missing required fields)
          */
-        Long persistInbound(TurnRequest request);
+        Long persistInbound(TurnRequest request,
+                             com.auraboot.framework.agent.triage.TriageVerdict triageVerdict);
 
         Long persistOutbound(TurnContext ctx, TurnOutcome outcome);
 
         Persistence NOOP = new Persistence() {
-            public Long persistInbound(TurnRequest request) { return null; }
+            public Long persistInbound(TurnRequest request,
+                                         com.auraboot.framework.agent.triage.TriageVerdict triageVerdict) {
+                return null;
+            }
             public Long persistOutbound(TurnContext ctx, TurnOutcome o) { return null; }
         };
     }

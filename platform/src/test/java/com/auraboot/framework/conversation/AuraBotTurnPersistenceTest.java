@@ -133,7 +133,7 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
     void persistInbound_writesHumanRow() {
         String clientMsgId = "test-inbound-" + System.nanoTime();
 
-        Long messageId = persistence.persistInbound(newTurnRequest("Hello AuraBot", clientMsgId));
+        Long messageId = persistence.persistInbound(newTurnRequest("Hello AuraBot", clientMsgId), null);
 
         assertThat(messageId).as("inbound message id").isNotNull();
         ImMessage saved = messageMapper.selectById(messageId);
@@ -151,8 +151,8 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
     void persistInbound_idempotentByClientMsgId() {
         String clientMsgId = "dedup-test-" + System.nanoTime();
 
-        Long firstId = persistence.persistInbound(newTurnRequest("Same message", clientMsgId));
-        Long secondId = persistence.persistInbound(newTurnRequest("Same message", clientMsgId));
+        Long firstId = persistence.persistInbound(newTurnRequest("Same message", clientMsgId), null);
+        Long secondId = persistence.persistInbound(newTurnRequest("Same message", clientMsgId), null);
 
         assertThat(firstId).isEqualTo(secondId);
     }
@@ -194,7 +194,7 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
     @DisplayName("persistInbound w/ null conversationId -> NOOP (legacy compat path)")
     void persistInbound_nullConversationId_skipsSilently() {
         Long messageId = persistence.persistInbound(
-                newTurnRequest("anything", "client-1", null, humanMemberId));
+                newTurnRequest("anything", "client-1", null, humanMemberId), null);
 
         assertThat(messageId).isNull();
     }
@@ -203,8 +203,44 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
     @DisplayName("persistInbound w/ null humanMemberId -> NOOP (defensive)")
     void persistInbound_nullHumanMemberId_skipsSilently() {
         Long messageId = persistence.persistInbound(
-                newTurnRequest("anything", "client-2", conversationId, null));
+                newTurnRequest("anything", "client-2", conversationId, null), null);
 
         assertThat(messageId).isNull();
+    }
+
+    @Test
+    @DisplayName("Phase C.1: persistInbound writes triage_bucket / triage_confidence / triage_reason_codes")
+    void persistInbound_withTriageVerdict_writesTriageColumns() {
+        String clientMsgId = "triage-test-" + System.nanoTime();
+        com.auraboot.framework.agent.triage.TriageVerdict verdict =
+                new com.auraboot.framework.agent.triage.TriageVerdict(
+                        com.auraboot.framework.agent.triage.TriageBucket.LIGHT_CHAT,
+                        0.92,
+                        java.util.List.of("greeting", "no_platform_keyword"),
+                        java.util.Set.of());
+
+        Long messageId = persistence.persistInbound(
+                newTurnRequest("你好", clientMsgId), verdict);
+
+        assertThat(messageId).isNotNull();
+        ImMessage saved = messageMapper.selectById(messageId);
+        assertThat(saved.getTriageBucket()).isEqualTo("light_chat");
+        assertThat(saved.getTriageConfidence()).isEqualByComparingTo(java.math.BigDecimal.valueOf(0.92));
+        assertThat(saved.getTriageReasonCodes()).contains("greeting").contains("no_platform_keyword");
+    }
+
+    @Test
+    @DisplayName("Phase C.1: persistInbound w/ null TriageVerdict leaves triage columns null")
+    void persistInbound_nullVerdict_triageColumnsRemainNull() {
+        String clientMsgId = "no-triage-" + System.nanoTime();
+
+        Long messageId = persistence.persistInbound(
+                newTurnRequest("anything", clientMsgId), null);
+
+        assertThat(messageId).isNotNull();
+        ImMessage saved = messageMapper.selectById(messageId);
+        assertThat(saved.getTriageBucket()).isNull();
+        assertThat(saved.getTriageConfidence()).isNull();
+        assertThat(saved.getTriageReasonCodes()).isNull();
     }
 }
