@@ -1,5 +1,7 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.dto.ResultContract;
+
 import java.util.Map;
 
 /**
@@ -41,6 +43,21 @@ public interface ResponseSink {
 
     /** v4: traceId passed on terminal event. */
     void onDone(String finalResponse, String traceId);
+
+    /**
+     * Phase C.3b: structured tool-result envelope produced by
+     * {@code ResultContractEmitter} after each {@code dsl_query} /
+     * {@code dsl_command} execution. SSE adapter serialises as the
+     * {@code result_contract} event (design v3.3 §3.4); other sinks may
+     * choose to ignore it.
+     *
+     * <p>Default no-op so non-chat sinks (tests, future WS / sync-JSON) need
+     * not implement this — the emitter's existing skip-when-no-context
+     * semantics now manifest as "default no-op on the resolved sink".
+     */
+    default void onResultContract(ResultContract contract) {
+        // default no-op
+    }
 
     /** Adapter-specific liveness check; defaults to true for sinks without disconnect signals. */
     default boolean isClientConnected() {
