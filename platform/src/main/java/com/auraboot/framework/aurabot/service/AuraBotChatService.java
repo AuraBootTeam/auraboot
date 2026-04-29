@@ -418,15 +418,17 @@ public class AuraBotChatService {
         }
         aiTraceService.endSpan(promptSpan, buildPromptSpanOutput(systemPrompt), "success");
 
-        // 5. Route: tool loop (sync) vs text-only streaming
-        if (!tools.isEmpty()) {
-            return doToolLoop(ctx, request.getAgentCode(),
-                    providerCode, config, model, systemPrompt, maxTokens,
-                    request.getHistory(), request.getMessage(), tools,
-                    modelCode, request.getSessionId(), sink, trace);
-        }
-
-        // No tools — use existing streaming path
+        // Phase C.3-cleanup (post-C.3e): the chokepoint routes ACP_RUN +
+        // CONTEXTUAL_ANSWER buckets to the ACP runtime, leaving only
+        // LIGHT_CHAT (and the null-bucket defensive fallback) on this path.
+        // LIGHT_CHAT is "trivial chat" by definition (greeting / thanks /
+        // small talk per design §3.6) and never needs tools — so we always
+        // take the text-only streaming path. The legacy doToolLoop body
+        // and its buildLlmMessages helper have been deleted; tool resolution
+        // above remains because the resolver's metadata feeds the system
+        // prompt's tool hint (buildSystemPrompt(tenantId, request, resolved))
+        // — that hint helps LIGHT_CHAT answer "what can you do?" without
+        // routing through ACP.
         String apiFormat = resolveApiFormat(providerCode);
         try {
             TurnOutcome streamOutcome;
@@ -449,230 +451,6 @@ public class AuraBotChatService {
         }
     }
 
-    // =========================================================================
-    // Tool loop (synchronous LlmProvider.chat)
-    // =========================================================================
-
-    private TurnOutcome doToolLoop(TurnContext ctx, String agentCode,
-                                    String providerCode, ProviderConfig config, String model,
-                                    String systemPrompt, int maxTokens,
-                                    List<ChatMessage> history, String userMessage,
-                                    List<LlmChatRequest.Tool> tools, String modelCode,
-                                    String sessionId, ResponseSink sink, TraceContext trace) {
-        Long tenantId = ctx.tenantId();
-        String tid = trace != null ? trace.getTraceId() : null;
-        LlmProvider provider = llmProviderFactory.getProvider(providerCode);
-        if (provider == null) {
-            aiTraceService.endTraceWithError(trace, "LLM provider not available: " + providerCode);
-            String msg = "LLM provider not available: " + providerCode;
-            sink.onError(msg, tid);
-            return new TurnOutcome.Failed(msg, null);
-        }
-
-        // Persist run record
-        String runPid = null;
-        if (chatRunPersistencePort != null) {
-            runPid = chatRunPersistencePort.createRun(tenantId, sessionId, model, userMessage);
-        }
-        int totalInputTokens = 0, totalOutputTokens = 0;
-
-        // Build conversation messages
-        List<LlmChatRequest.Message> messages = buildLlmMessages(history, userMessage);
-
-        Map<String, Integer> toolCallCounts = new HashMap<>();
-        for (int round = 0; round < maxToolRounds; round++) {
-            LlmChatRequest request = LlmChatRequest.builder()
-                    .model(model)
-                    .systemPrompt(systemPrompt)
-                    .messages(new ArrayList<>(messages))
-                    .tools(tools)
-                    .maxTokens(maxTokens)
-                    .build();
-
-            // --- Trace: LLM call span ---
-            SpanContext llmSpan = aiTraceService.startSpan(
-                    trace, null, "generation", "llm_call_" + round, buildGenerationSpanInput(request));
-
-            LlmChatResponse response;
-            try {
-                response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
-            } catch (Exception e) {
-                aiTraceService.endSpan(llmSpan, Map.of("error", e.getMessage()), "error");
-                aiTraceService.endTraceWithError(trace, e.getMessage());
-                log.error("Tool loop LLM call failed (round {}): {}", round, e.getMessage(), e);
-                if (chatRunPersistencePort != null && runPid != null) {
-                    chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                            0, null, "LLM request failed: " + e.getMessage(), tid);
-                }
-                String msg = "LLM request failed: " + e.getMessage();
-                sink.onError(msg, tid);
-                return new TurnOutcome.Failed(msg, e);
-            }
-
-            // --- Trace: record generation ---
-            aiTraceService.recordGeneration(llmSpan, model,
-                    response.getInputTokens(), response.getOutputTokens(),
-                    null, response.getStopReason(), null, null);
-            aiTraceService.endSpan(llmSpan, buildGenerationSpanOutput(response), "success");
-
-            // Accumulate token counts
-            totalInputTokens += response.getInputTokens();
-            totalOutputTokens += response.getOutputTokens();
-
-            if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
-                aiTraceService.endTraceWithError(trace, "Empty response from LLM");
-                if (chatRunPersistencePort != null && runPid != null) {
-                    chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                            0, null, "Empty response from LLM", tid);
-                }
-                String msg = "Empty response from LLM";
-                sink.onError(msg, tid);
-                return new TurnOutcome.Failed(msg, null);
-            }
-
-            String stopReason = response.getStopReason();
-
-            if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason)) {
-                // Final text response — stream it via SSE
-                String finalText = extractTextFromResponse(response);
-                aiTraceService.endTrace(trace, finalText, "success");
-                if (chatRunPersistencePort != null && runPid != null) {
-                    chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
-                            0, finalText, null, tid);
-                }
-                return streamFinalResponse(response, sink, tid);
-            }
-
-            if ("tool_use".equals(stopReason)) {
-                // Add assistant message with all content blocks (text + tool_use)
-                messages.add(buildAssistantMessage(response.getContent()));
-
-                // Process each tool_use block
-                List<LlmChatRequest.ContentBlock> toolResultBlocks = new ArrayList<>();
-                boolean confirmationRequired = false;
-                String pendingToolId = null;
-
-                for (LlmChatResponse.ContentBlock block : response.getContent()) {
-                    if (!"tool_use".equals(block.getType())) continue;
-
-                    String toolId = block.getId();
-                    String toolName = block.getName();
-                    Map<String, Object> input = block.getInput() != null ? block.getInput() : Map.of();
-
-                    if (!isToolOffered(tools, toolName)) {
-                        log.warn("LLM requested unavailable tool {}; rejecting without execution", toolName);
-                        toolResultBlocks.add(buildToolResultBlock(toolId, unavailableToolResult(toolName)));
-                        continue;
-                    }
-
-                    // Per-tool rate limit: max 5 calls per tool (industry norm for agent loops)
-                    int callCount = toolCallCounts.merge(toolName, 1, Integer::sum);
-                    if (callCount > 5) {
-                        log.warn("Tool {} exceeded call limit ({}), injecting limit message", toolName, callCount);
-                        toolResultBlocks.add(buildToolResultBlock(toolId, Map.of(
-                                "success", false,
-                                "error", "Tool call limit reached. This tool has been called " + callCount
-                                        + " times. Stop calling it and answer with the data you already have.")));
-                        continue;
-                    }
-
-                    if (chatToolResolver.isReadOnly(toolName)) {
-                        // Auto-execute read-only tools
-                        SpanContext toolSpan = aiTraceService.startSpan(trace,
-                                llmSpan != null ? llmSpan.getSpanId() : null, "tool", toolName, input);
-                        sink.onToolStart(toolId, toolName, input);
-
-                        Map<String, Object> result = chatToolExecutor.execute(toolName, input, modelCode);
-                        boolean success = Boolean.TRUE.equals(result.get("success"));
-                        aiTraceService.endSpan(toolSpan, result, success ? "success" : "error");
-                        if (chatRunPersistencePort != null && runPid != null) {
-                            chatRunPersistencePort.recordToolCall(runPid, toolName, input, result, success);
-                        }
-
-                        sink.onToolResult(toolId, result, success);
-
-                        // Add tool_result to conversation
-                        toolResultBlocks.add(buildToolResultBlock(toolId, result));
-                    } else {
-                        // Write tool — requires confirmation
-                        SpanContext toolSpan = aiTraceService.startSpan(trace,
-                                llmSpan != null ? llmSpan.getSpanId() : null, "tool", toolName, input);
-                        aiTraceService.endSpan(toolSpan, null, "pending");
-
-                        String description = buildToolDescription(toolName, input);
-                        // B.6: pendingTurnId is the suspended TurnContext.turnId(); the
-                        // frontend echoes it in /execute so resumeTurn looks up by turnId.
-                        sink.onConfirmRequired(toolId, toolName, description, input, ctx.turnId());
-
-                        // B.6: pending entry now keyed by ctx.turnId() (was sessionId);
-                        // identity tuple is captured so resumeTurn can rebuild TurnContext
-                        // and validate ownership when the user comes back via /execute.
-                        chatSessionStore.storePending(ctx.turnId(), ChatSessionStore.PendingTool.builder()
-                                .turnId(ctx.turnId())
-                                .tenantId(ctx.tenantId())
-                                .userId(ctx.userId())
-                                .humanMemberId(ctx.humanMemberId())
-                                .conversationId(ctx.conversationId())
-                                .agentCode(agentCode)
-                                .sessionId(sessionId)
-                                .toolId(toolId)
-                                .toolName(toolName)
-                                .toolSpanId(toolSpan != null ? toolSpan.getSpanId() : null)
-                                .input(input)
-                                .description(description)
-                                .modelCode(modelCode)
-                                .messages(serializeMessages(messages))
-                                .providerCode(providerCode)
-                                .apiKey(config.getApiKey())
-                                .baseUrl(config.getBaseUrl())
-                                .model(model)
-                                .systemPrompt(systemPrompt)
-                                .maxTokens(maxTokens)
-                                .currentLoop(round)
-                                .build());
-
-                        confirmationRequired = true;
-                        pendingToolId = toolId;
-                        break; // Stop processing further tool calls — wait for confirmation
-                    }
-                }
-
-                if (confirmationRequired) {
-                    // Complete this SSE stream; frontend will call /execute to resume.
-                    // Empty done event is sent to gracefully close SSE — pre-baseline parity.
-                    sink.onDone("", tid);
-                    // B.6: PendingConfirmation.pendingTurnId = ctx.turnId() so
-                    // ConversationTurnServiceImpl can store it consistently with
-                    // ChatSessionStore's turnId-keyed entries.
-                    return new TurnOutcome.PendingConfirmation(ctx.turnId(), "", pendingToolId);
-                }
-
-                // All tool results collected — add user message with tool_results and continue loop
-                messages.add(buildToolResultMessage(toolResultBlocks));
-                continue;
-            }
-
-            // Unknown stop reason — treat as end_turn
-            log.warn("Unknown stop reason from LLM: {}", stopReason);
-            String unknownText = extractTextFromResponse(response);
-            aiTraceService.endTrace(trace, unknownText, "success");
-            if (chatRunPersistencePort != null && runPid != null) {
-                chatRunPersistencePort.completeRun(runPid, true, totalInputTokens, totalOutputTokens,
-                        0, unknownText, null, tid);
-            }
-            return streamFinalResponse(response, sink, tid);
-        }
-
-        // Exceeded max rounds — send what we have
-        aiTraceService.endTraceWithError(trace, "Tool loop exceeded maximum rounds");
-        if (chatRunPersistencePort != null && runPid != null) {
-            chatRunPersistencePort.completeRun(runPid, false, totalInputTokens, totalOutputTokens,
-                    0, null, "Tool loop exceeded maximum rounds", tid);
-        }
-        String exhaustedMsg = "Tool loop exceeded maximum rounds (" + maxToolRounds + ")";
-        sink.onError(exhaustedMsg, tid);
-        return new TurnOutcome.Failed(exhaustedMsg, null);
-    }
 
     // =========================================================================
     // Resume after confirmation
@@ -896,28 +674,6 @@ public class AuraBotChatService {
     // =========================================================================
     // Message building helpers
     // =========================================================================
-
-    /**
-     * Build LLM messages from chat history and current user message.
-     */
-    private List<LlmChatRequest.Message> buildLlmMessages(List<ChatMessage> history, String userMessage) {
-        List<LlmChatRequest.Message> messages = new ArrayList<>();
-        if (history != null) {
-            for (ChatMessage msg : history) {
-                if (!"system".equals(msg.getRole())) {
-                    messages.add(LlmChatRequest.Message.builder()
-                            .role(msg.getRole())
-                            .content(msg.getContent())
-                            .build());
-                }
-            }
-        }
-        messages.add(LlmChatRequest.Message.builder()
-                .role("user")
-                .content(userMessage)
-                .build());
-        return messages;
-    }
 
     /**
      * Build an assistant message from LLM response content blocks.
