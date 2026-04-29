@@ -86,6 +86,7 @@ public class PluginDirectoryLoader {
             if (resourceDirs != null && !resourceDirs.isEmpty()) {
                 loadResourcesFromDirs(pluginDir, manifest, resourceDirs);
             }
+            loadAgentDefinitionsByConvention(pluginDir, manifest, resourceDirs);
 
             log.info("Loaded plugin from directory: {} v{}, resources: {}",
                     manifest.getPluginId(), manifest.getVersion(), manifest.getResourceCounts());
@@ -118,6 +119,7 @@ public class PluginDirectoryLoader {
             if (resourceDirs != null && !resourceDirs.isEmpty()) {
                 loadResourcesFromSource(source, manifest, resourceDirs);
             }
+            loadAgentDefinitionsByConventionFromSource(source, manifest, resourceDirs);
 
             log.info("Loaded plugin from source: {} v{}, resources: {}",
                     manifest.getPluginId(), manifest.getVersion(), manifest.getResourceCounts());
@@ -258,6 +260,15 @@ public class PluginDirectoryLoader {
             }
         }
 
+        // Load agent definitions
+        if (resourceDirs.containsKey("agentDefinitions")) {
+            List<AgentDefinitionDTO> agentDefinitions = loadResourceList(
+                    pluginDir.resolve(resourceDirs.get("agentDefinitions")), AgentDefinitionDTO.class);
+            if (!agentDefinitions.isEmpty()) {
+                manifest.setAgentDefinitions(mergeList(manifest.getAgentDefinitions(), agentDefinitions));
+            }
+        }
+
         // Load saved views
         if (resourceDirs.containsKey("savedViews")) {
             List<SavedViewDefinitionDTO> savedViews = loadResourceList(
@@ -299,6 +310,24 @@ public class PluginDirectoryLoader {
             if (!slaConfigs.isEmpty()) {
                 manifest.setSlaConfigs(mergeList(manifest.getSlaConfigs(), slaConfigs));
             }
+        }
+    }
+
+    private void loadAgentDefinitionsByConvention(Path pluginDir, PluginManifestExtended manifest,
+                                                  Map<String, String> resourceDirs) throws IOException {
+        if (manifest.getAgentDefinitions() != null && !manifest.getAgentDefinitions().isEmpty()) {
+            return;
+        }
+        String path = resourceDirs != null
+                ? resourceDirs.getOrDefault("agentDefinitions", "config/agent-definitions.json")
+                : "config/agent-definitions.json";
+        Path agentDefinitionsPath = pluginDir.resolve(path);
+        if (!Files.exists(agentDefinitionsPath)) {
+            return;
+        }
+        List<AgentDefinitionDTO> agentDefinitions = loadResourceList(agentDefinitionsPath, AgentDefinitionDTO.class);
+        if (!agentDefinitions.isEmpty()) {
+            manifest.setAgentDefinitions(mergeList(manifest.getAgentDefinitions(), agentDefinitions));
         }
     }
 
@@ -496,6 +525,8 @@ public class PluginDirectoryLoader {
                 manifest::getI18nResources, manifest::setI18nResources);
         loadSourceResource(source, resourceDirs, "namedQueries", NamedQueryDefinitionDTO.class,
                 manifest::getNamedQueries, manifest::setNamedQueries);
+        loadSourceResource(source, resourceDirs, "agentDefinitions", AgentDefinitionDTO.class,
+                manifest::getAgentDefinitions, manifest::setAgentDefinitions);
         loadSourceResource(source, resourceDirs, "savedViews", SavedViewDefinitionDTO.class,
                 manifest::getSavedViews, manifest::setSavedViews);
         loadSourceResource(source, resourceDirs, "dashboards", DashboardDefinitionDTO.class,
@@ -516,6 +547,26 @@ public class PluginDirectoryLoader {
         // SLA configs
         loadSourceResource(source, resourceDirs, "sla", SlaConfigDefinitionDTO.class,
                 manifest::getSlaConfigs, manifest::setSlaConfigs);
+    }
+
+    private void loadAgentDefinitionsByConventionFromSource(PluginSource source, PluginManifestExtended manifest,
+                                                            Map<String, String> resourceDirs) throws IOException {
+        if (manifest.getAgentDefinitions() != null && !manifest.getAgentDefinitions().isEmpty()) {
+            return;
+        }
+        String path = resourceDirs != null
+                ? resourceDirs.getOrDefault("agentDefinitions", "config/agent-definitions.json")
+                : "config/agent-definitions.json";
+        if (!source.exists(path)) {
+            return;
+        }
+        String json = source.readString(path);
+        JavaType listType = objectMapper.getTypeFactory()
+                .constructCollectionType(List.class, AgentDefinitionDTO.class);
+        List<AgentDefinitionDTO> agentDefinitions = objectMapper.readValue(json, listType);
+        if (!agentDefinitions.isEmpty()) {
+            manifest.setAgentDefinitions(mergeList(manifest.getAgentDefinitions(), agentDefinitions));
+        }
     }
 
     private void inlineDrlContentFromSource(PluginSource source, BpmRuleDefinitionDTO rule) {
@@ -595,4 +646,3 @@ public class PluginDirectoryLoader {
         return result;
     }
 }
-

@@ -42,6 +42,7 @@ public class TaskService {
     private static final String ACTION_KEY_APPROVE = "approve";
     /** Key for the reject action in designerJson taskActions declarations. */
     private static final String ACTION_KEY_REJECT = "reject";
+    private static final String REJECTION_COMMENT_REQUIRED = "Rejection comment is required";
 
     /**
      * 查询用户待办任务
@@ -252,6 +253,10 @@ public class TaskService {
      * Sets _action=reject and _comment in variables before completing.
      */
     public void rejectTask(String taskId, String comment, Map<String, Object> variables) {
+        if (comment == null || comment.isBlank()) {
+            throw new IllegalArgumentException(REJECTION_COMMENT_REQUIRED);
+        }
+
         String tenantId = MetaContext.getCurrentTenantIdAsString();
         String userId = getCurrentUserId();
 

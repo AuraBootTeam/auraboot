@@ -21,6 +21,7 @@ import com.auraboot.framework.agent.service.SkillAutoGenerator;
 import com.auraboot.framework.agent.service.CapabilityViewService;
 import com.auraboot.framework.agent.service.PluginScaffoldService;
 import com.auraboot.framework.agent.service.ToolDryRunService;
+import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -58,6 +59,7 @@ public class AgentRuntimeController {
     private final AgentSelfImprovementService selfImprovementService;
     private final AgentCostReportService costReportService;
     private final SkillAutoGenerator skillAutoGenerator;
+    private final AgentChatPort agentChatPort;
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
 
@@ -373,7 +375,12 @@ public class AgentRuntimeController {
         if (result == null) {
             return ApiResponse.error("Approval not found or not in PENDING state: " + approvalPid);
         }
-        return ApiResponse.success(result);
+        Map<String, Object> response = new LinkedHashMap<>(result);
+        Map<String, Object> chatToolResult = agentChatPort.executeApprovedPendingTool(tenantId, approvalPid);
+        if (Boolean.TRUE.equals(chatToolResult.get("handled"))) {
+            response.put("toolExecutionResult", chatToolResult);
+        }
+        return ApiResponse.success(response);
     }
 
     /** Reject a pending approval request. Marks the associated agent run as FAILED. */

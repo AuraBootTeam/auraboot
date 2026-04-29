@@ -91,7 +91,7 @@ const ext = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe.serial('Showcase Seed — Extended', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(600_000); // 10 min
 
   test('Phase 8: CRM — C/D tier Accounts (40)', async ({ page }) => {

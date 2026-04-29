@@ -5,6 +5,8 @@ import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.dto.ConfidenceScore;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.trace.AiTraceService;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.NamedQueryService;
@@ -114,7 +116,55 @@ class ToolLoopServiceSafetyTest {
         String result = service.executeToolCall(1L, "run-2", "task-2", "agent",
                 tool.getName(), Map.of("pid", "pc-1"), List.of(tool), null);
 
-        assertThat(result).contains("requires human approval").contains("approval-1");
+        assertThat(result).contains("\"approvalRequired\":true").contains("\"approvalPid\":\"approval-1\"");
         verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
+    @DisplayName("approval-required command does not execute when no policy can create an approval")
+    void approvalRequiredCommandWithoutPolicyDoesNotExecute() {
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("cmd:pe:submit_procurement_comparison")
+                .description("Submit review")
+                .toolType("dsl_command")
+                .sourceCode("pe:submit_procurement_comparison")
+                .riskLevel("L3")
+                .requiresApproval(true)
+                .build();
+        when(approvalGate.checkAndRequestApproval(eq(1L), eq("run-3"), eq("task-3"), eq(tool.getName()),
+                eq(tool.getDescription()), anyMap(), eq(true)))
+                .thenReturn(null);
+
+        String result = service.executeToolCall(1L, "run-3", "task-3", "agent",
+                tool.getName(), Map.of("pid", "pc-1"), List.of(tool), null);
+
+        assertThat(result).contains("approval policy").contains("No data was changed");
+        verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
+    @DisplayName("approved state transition command passes target record id")
+    void approvedStateTransitionCommandPassesTargetRecordId() {
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("cmd_pe_submit_procurement_comparison")
+                .description("Submit review")
+                .toolType("dsl_command")
+                .sourceCode("pe:submit_procurement_comparison")
+                .riskLevel("L3")
+                .requiresApproval(false)
+                .build();
+        when(commandExecutor.execute(eq("pe:submit_procurement_comparison"), any(CommandExecuteRequest.class)))
+                .thenReturn(CommandExecuteResult.builder()
+                        .data(Map.of("pid", "PC-1", "pe_pc_status", "review_required"))
+                        .build());
+
+        String result = service.executeToolCall(1L, "run-4", "task-4", "agent",
+                tool.getName(), Map.of("recordId", "PC-1"), List.of(tool), null);
+
+        org.mockito.ArgumentCaptor<CommandExecuteRequest> requestCaptor =
+                org.mockito.ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(commandExecutor).execute(eq("pe:submit_procurement_comparison"), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getTargetRecordId()).isEqualTo("PC-1");
+        assertThat(result).contains("\"success\":true").contains("review_required");
     }
 }

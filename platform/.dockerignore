@@ -1,6 +1,11 @@
-# Gradle build output
+# Gradle build output. Keep the boot jar visible for Dockerfile.runtime,
+# which packages the host-built jar for GA E2E without running Gradle inside
+# Docker.
 .gradle/
-build/
+build/*
+!build/libs/
+build/libs/*
+!build/libs/*.jar
 !gradle/wrapper/gradle-wrapper.jar
 
 # IDE

@@ -17,6 +17,7 @@ if [ "${1:-}" = "--purge" ]; then
     -f docker-compose.yml \
     -f docker-compose.ga-e2e.override.yml \
     --profile ga-e2e-stack \
+    --profile ga-e2e-runner \
     down -v
 else
   echo "[ga-e2e] tearing down stack (volumes preserved)..."
@@ -24,5 +25,6 @@ else
     -f docker-compose.yml \
     -f docker-compose.ga-e2e.override.yml \
     --profile ga-e2e-stack \
+    --profile ga-e2e-runner \
     down
 fi

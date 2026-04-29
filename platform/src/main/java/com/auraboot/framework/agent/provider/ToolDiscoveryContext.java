@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class ToolDiscoveryContext {
     private Long tenantId;
+    private Long userId;
     private String agentCode;
     private String modelHint;      // model code hint from BIF
     private String intentHint;     // intent hint from BIF

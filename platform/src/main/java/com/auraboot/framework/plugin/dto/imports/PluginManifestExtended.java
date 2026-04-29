@@ -122,6 +122,11 @@ public class PluginManifestExtended extends PluginManifest {
     private List<NamedQueryDefinitionDTO> namedQueries;
 
     /**
+     * Agent definitions to import.
+     */
+    private List<AgentDefinitionDTO> agentDefinitions;
+
+    /**
      * Saved view definitions to import.
      */
     private List<SavedViewDefinitionDTO> savedViews;
@@ -279,6 +284,15 @@ public class PluginManifestExtended extends PluginManifest {
             }
         }
 
+        // Validate agent definitions
+        if (agentDefinitions != null) {
+            for (AgentDefinitionDTO agentDefinition : agentDefinitions) {
+                if (!agentDefinition.isValid()) {
+                    return false;
+                }
+            }
+        }
+
         // Validate pages
         if (pages != null) {
             for (PageSchemaDTO page : pages) {
@@ -429,6 +443,19 @@ public class PluginManifestExtended extends PluginManifest {
             }
         }
 
+        // Validate agent definitions
+        if (agentDefinitions != null) {
+            for (int i = 0; i < agentDefinitions.size(); i++) {
+                AgentDefinitionDTO agentDefinition = agentDefinitions.get(i);
+                if (agentDefinition.getAgentCode() == null || agentDefinition.getAgentCode().isBlank()) {
+                    errors.add("agentDefinitions[" + i + "]: agentCode is required");
+                }
+                if (agentDefinition.getName() == null || agentDefinition.getName().isBlank()) {
+                    errors.add("agentDefinitions[" + i + "]: name is required");
+                }
+            }
+        }
+
         // Validate pages
         if (pages != null) {
             for (int i = 0; i < pages.size(); i++) {
@@ -477,6 +504,8 @@ public class PluginManifestExtended extends PluginManifest {
         collectUnknownFieldWarnings(warnings, "dicts", dicts, DictDefinitionDTO::getUnknownFields, DictDefinitionDTO::getCode);
         collectUnknownFieldWarnings(warnings, "namedQueries", namedQueries,
                 NamedQueryDefinitionDTO::getUnknownFields, NamedQueryDefinitionDTO::getCode);
+        collectUnknownFieldWarnings(warnings, "agentDefinitions", agentDefinitions,
+                AgentDefinitionDTO::getUnknownFields, AgentDefinitionDTO::getAgentCode);
         collectUnknownFieldWarnings(warnings, "savedViews", savedViews,
                 SavedViewDefinitionDTO::getUnknownFields, SavedViewDefinitionDTO::getUniqueKey);
 
@@ -531,6 +560,7 @@ public class PluginManifestExtended extends PluginManifest {
                 || (dicts != null && !dicts.isEmpty())
                 || (i18nResources != null && !i18nResources.isEmpty())
                 || (namedQueries != null && !namedQueries.isEmpty())
+                || (agentDefinitions != null && !agentDefinitions.isEmpty())
                 || (savedViews != null && !savedViews.isEmpty())
                 || (dashboards != null && !dashboards.isEmpty())
                 || (rules != null && !rules.isEmpty())
@@ -556,6 +586,7 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("dicts", dicts != null ? dicts.size() : 0),
                 Map.entry("i18nResources", i18nResources != null ? i18nResources.size() : 0),
                 Map.entry("namedQueries", namedQueries != null ? namedQueries.size() : 0),
+                Map.entry("agentDefinitions", agentDefinitions != null ? agentDefinitions.size() : 0),
                 Map.entry("savedViews", savedViews != null ? savedViews.size() : 0),
                 Map.entry("dashboards", dashboards != null ? dashboards.size() : 0),
                 Map.entry("rules", rules != null ? rules.size() : 0),
@@ -584,6 +615,7 @@ public class PluginManifestExtended extends PluginManifest {
         if (pages != null) pages.removeIf(p -> isCommentObject(p.getPageKey(), p.getUnknownFields()));
         if (dicts != null) dicts.removeIf(d -> isCommentObject(d.getCode(), d.getUnknownFields()));
         if (namedQueries != null) namedQueries.removeIf(n -> isCommentObject(n.getCode(), n.getUnknownFields()));
+        if (agentDefinitions != null) agentDefinitions.removeIf(a -> isCommentObject(a.getAgentCode(), a.getUnknownFields()));
         if (savedViews != null) savedViews.removeIf(s -> isCommentObject(s.getUniqueKey(), s.getUnknownFields()));
         if (dashboards != null) dashboards.removeIf(d -> isCommentObject(d.getCode(), d.getUnknownFields()));
         if (i18nResources != null) i18nResources.removeIf(i -> i.getKey() == null || i.getKey().isBlank());

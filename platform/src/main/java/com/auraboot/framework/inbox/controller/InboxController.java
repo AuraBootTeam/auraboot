@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Unified Inbox API — shared by web and mobile clients.
@@ -28,6 +29,7 @@ import java.util.Map;
 public class InboxController {
 
     private final InboxService inboxService;
+    private static final Set<String> REJECTION_ACTIONS = Set.of("reject", "rejected");
 
     /**
      * List inbox items for the current user.
@@ -164,12 +166,21 @@ public class InboxController {
     @PostMapping("/{id}/approval-action")
     public ApiResponse<Map<String, Object>> submitApprovalAction(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String comment) {
         Long userId = MetaContext.getCurrentUserId();
         Long tenantId = MetaContext.getCurrentTenantId();
-        String action = body.getOrDefault("action", "approved");
-        inboxService.markActed(id, userId, tenantId, action);
-        return ApiResponse.success(Map.of("status", action, "actedAt", Instant.now().toString()));
+        Map<String, String> request = body != null ? body : Map.of();
+        String resolvedAction = normalizeAction(request.getOrDefault("action", action != null ? action : "approved"));
+        String resolvedComment = request.getOrDefault("comment", comment);
+        ApiResponse<Map<String, Object>> rejectionValidation =
+                validateRejectionComment(resolvedAction, resolvedComment);
+        if (rejectionValidation != null) {
+            return rejectionValidation;
+        }
+        inboxService.markActed(id, userId, tenantId, resolvedAction);
+        return ApiResponse.success(Map.of("status", resolvedAction, "actedAt", Instant.now().toString()));
     }
 
     /**
@@ -260,11 +271,19 @@ public class InboxController {
      */
     @PutMapping("/{id}/act")
     public ApiResponse<Void> markActed(@PathVariable Long id,
-                                        @RequestBody Map<String, String> body) {
+                                        @RequestBody(required = false) Map<String, String> body,
+                                        @RequestParam(required = false) String action,
+                                        @RequestParam(required = false) String comment) {
         Long userId = MetaContext.getCurrentUserId();
         Long tenantId = MetaContext.getCurrentTenantId();
-        String action = body.getOrDefault("action", "acted");
-        inboxService.markActed(id, userId, tenantId, action);
+        Map<String, String> request = body != null ? body : Map.of();
+        String resolvedAction = normalizeAction(request.getOrDefault("action", action != null ? action : "acted"));
+        String resolvedComment = request.getOrDefault("comment", comment);
+        ApiResponse<Void> rejectionValidation = validateRejectionComment(resolvedAction, resolvedComment);
+        if (rejectionValidation != null) {
+            return rejectionValidation;
+        }
+        inboxService.markActed(id, userId, tenantId, resolvedAction);
         return ApiResponse.success();
     }
 
@@ -302,15 +321,25 @@ public class InboxController {
      * @param body JSON with "ids" array and "action" string (max 100 items)
      */
     @PutMapping("/batch/act")
-    public ApiResponse<Map<String, Integer>> batchAct(@RequestBody Map<String, Object> body) {
+    public ApiResponse<Map<String, Integer>> batchAct(
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String comment) {
         Long userId = MetaContext.getCurrentUserId();
         Long tenantId = MetaContext.getCurrentTenantId();
+        Map<String, Object> request = body != null ? body : Map.of();
         @SuppressWarnings("unchecked")
-        List<Long> ids = ((List<Number>) body.getOrDefault("ids", List.of()))
+        List<Long> ids = ((List<Number>) request.getOrDefault("ids", List.of()))
                 .stream().map(Number::longValue).toList();
-        String action = body.getOrDefault("action", "acted").toString();
+        String resolvedAction = normalizeAction(request.getOrDefault("action", action != null ? action : "acted").toString());
+        Object resolvedComment = request.getOrDefault("comment", comment);
+        ApiResponse<Map<String, Integer>> rejectionValidation =
+                validateRejectionComment(resolvedAction, resolvedComment);
+        if (rejectionValidation != null) {
+            return rejectionValidation;
+        }
         if (ids.size() > 100) ids = ids.subList(0, 100);
-        int count = inboxService.batchMarkActed(ids, userId, tenantId, action);
+        int count = inboxService.batchMarkActed(ids, userId, tenantId, resolvedAction);
         return ApiResponse.success(Map.of("actedCount", count));
     }
 
@@ -337,11 +366,20 @@ public class InboxController {
      * @param body JSON with "ids" array and optional "comment" string (max 100 items)
      */
     @PostMapping("/batch/reject")
-    public ApiResponse<Map<String, Integer>> batchReject(@RequestBody Map<String, Object> body) {
+    public ApiResponse<Map<String, Integer>> batchReject(
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestParam(required = false) String comment) {
         Long userId = MetaContext.getCurrentUserId();
         Long tenantId = MetaContext.getCurrentTenantId();
+        Map<String, Object> request = body != null ? body : Map.of();
+        Object resolvedComment = request.getOrDefault("comment", comment);
+        ApiResponse<Map<String, Integer>> rejectionValidation =
+                validateRejectionComment("rejected", resolvedComment);
+        if (rejectionValidation != null) {
+            return rejectionValidation;
+        }
         @SuppressWarnings("unchecked")
-        List<Long> ids = ((List<Number>) body.getOrDefault("ids", List.of()))
+        List<Long> ids = ((List<Number>) request.getOrDefault("ids", List.of()))
                 .stream().map(Number::longValue).toList();
         if (ids.size() > 100) ids = ids.subList(0, 100);
         int count = inboxService.batchMarkActed(ids, userId, tenantId, "rejected");
@@ -361,5 +399,22 @@ public class InboxController {
         if (ids.size() > 100) ids = ids.subList(0, 100);
         int count = inboxService.batchDismiss(ids, userId, tenantId);
         return ApiResponse.success(Map.of("dismissedCount", count));
+    }
+
+    private String normalizeAction(String action) {
+        if (action == null || action.isBlank()) {
+            return "acted";
+        }
+        return action.trim().toLowerCase();
+    }
+
+    private <T> ApiResponse<T> validateRejectionComment(String action, Object comment) {
+        if (!REJECTION_ACTIONS.contains(action)) {
+            return null;
+        }
+        if (comment == null || comment.toString().trim().isEmpty()) {
+            return ApiResponse.error("Rejection comment is required");
+        }
+        return null;
     }
 }

@@ -5,6 +5,8 @@ import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
 
+import java.util.Map;
+
 /**
  * Port interface for named-agent (ACP) chat execution.
  *
@@ -77,4 +79,18 @@ public interface AgentChatPort {
      * @return the outcome reflecting how the turn ended
      */
     TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink);
+
+    /**
+     * Execute a high-risk chat tool after its Agent approval request is approved.
+     *
+     * <p>The current turn-service resume path is responsible for pending chat
+     * continuation. Implementations may override this hook when they also store
+     * approval-keyed pending tool payloads.
+     *
+     * @return a map with {@code handled=true} when a chat pending tool was found
+     *         and consumed for the given approval PID.
+     */
+    default Map<String, Object> executeApprovedPendingTool(Long tenantId, String approvalPid) {
+        return Map.of("handled", false);
+    }
 }

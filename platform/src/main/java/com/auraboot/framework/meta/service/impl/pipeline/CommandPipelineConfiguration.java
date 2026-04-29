@@ -17,6 +17,7 @@ public class CommandPipelineConfiguration {
     public CommandPipeline commandPipeline(
             // Pre-guard phases (Order 100-400)
             LoadPhase loadPhase,
+            CommandAuthorizationPhase commandAuthorizationPhase,
             SchemaValidatePhase schemaValidatePhase,
             IdempotencyPhase idempotencyPhase,
             EntitlementPhase entitlementPhase,
@@ -35,6 +36,7 @@ public class CommandPipelineConfiguration {
 
         List<CommandPhase> preGuardPhases = List.of(
                 loadPhase,
+                commandAuthorizationPhase,
                 schemaValidatePhase,
                 idempotencyPhase,
                 entitlementPhase

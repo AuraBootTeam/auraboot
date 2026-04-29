@@ -7,6 +7,7 @@ import com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -27,6 +28,7 @@ public class FieldMapPhase implements CommandPhase {
     private final CommandFieldMapExecutor fieldMapExecutor;
     private final CommandCascadeDeleteExecutor cascadeDeleteExecutor;
     private final RecordSnapshotReader snapshotReader;
+    private final ExtensionRegistry extensionRegistry;
 
     @Override
     public String name() {
@@ -49,7 +51,7 @@ public class FieldMapPhase implements CommandPhase {
 
         // Field map
         Map<String, Object> fieldMapResults;
-        if (ctx.isHasPluginHandler() && !ctx.isPluginRequiresDslPersistence()) {
+        if (isPluginHandledWithoutDslPersistence(ctx)) {
             fieldMapResults = new HashMap<>();
             log.info("Skipping FIELD_MAP for plugin-handled command: {}", ctx.getCommand().getCode());
         } else {
@@ -85,5 +87,34 @@ public class FieldMapPhase implements CommandPhase {
         if (recordId instanceof String recordIdStr && StringUtils.hasText(recordIdStr)) {
             request.setTargetRecordId(recordIdStr);
         }
+    }
+
+    private boolean isPluginHandledWithoutDslPersistence(CommandPipelineContext ctx) {
+        if (ctx.isHasPluginHandler()) {
+            return !ctx.isPluginRequiresDslPersistence();
+        }
+        if (extensionRegistry == null || ctx.getCommand() == null) {
+            return false;
+        }
+        String handlerCode = resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
+        return extensionRegistry.getCommandHandler(handlerCode)
+                .map(handler -> {
+                    boolean requiresPersistence = handler.requiresDslPersistence(
+                            handlerCode, ctx.getExecConfig(), ctx.getRequest());
+                    ctx.setHasPluginHandler(true);
+                    ctx.setPluginRequiresDslPersistence(requiresPersistence);
+                    return !requiresPersistence;
+                })
+                .orElse(false);
+    }
+
+    private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {
+        if (execConfig != null) {
+            Object handler = execConfig.get("handler");
+            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
+                return handlerCode.trim();
+            }
+        }
+        return commandCode;
     }
 }

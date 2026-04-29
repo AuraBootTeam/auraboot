@@ -480,7 +480,10 @@ export const auraBotApi = {
     try {
       const response = await fetch(`${API_BASE_URL}/chat/stream`, {
         method: 'post',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
         body: JSON.stringify(request),
         credentials: 'include',
       });
@@ -520,7 +523,10 @@ export const auraBotApi = {
     try {
       const response = await fetch(`${API_BASE_URL}/execute`, {
         method: 'post',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
         body: JSON.stringify(request),
         credentials: 'include',
       });

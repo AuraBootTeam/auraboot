@@ -15,7 +15,7 @@ export default defineConfig({
   timeout: 600_000, // 10 min per test
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173',
-    storageState: './tests/storage/admin.json',
+    storageState: process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json',
     ...devices['Desktop Chrome'],
   },
 });

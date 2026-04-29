@@ -17,6 +17,10 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,6 +83,130 @@ class InboxControllerTest {
         assertEquals(Map.of("accountName", "Acme Corp", "nextStep", "Call procurement owner"), response.getData().getCardData());
 
         verify(inboxService).getItem(1001L, 101L, 202L);
+    }
+
+    @Test
+    void submitApprovalActionRejectQueryParamWithoutCommentReturnsError() {
+        MetaContext.setCurrentUserId(101L);
+        MetaContext.setCurrentTenantId(202L);
+
+        InboxController controller = new InboxController(inboxService);
+        ApiResponse<Map<String, Object>> response =
+                controller.submitApprovalAction(1001L, null, "reject", null);
+
+        assertFalse(response.isSuccess());
+        assertEquals("Rejection comment is required", response.getMessage());
+        verify(inboxService, never()).markActed(anyLong(), anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void submitApprovalActionRejectBodyWithCommentMarksActed() {
+        MetaContext.setCurrentUserId(101L);
+        MetaContext.setCurrentTenantId(202L);
+
+        InboxController controller = new InboxController(inboxService);
+        ApiResponse<Map<String, Object>> response = controller.submitApprovalAction(
+                1001L,
+                Map.of("action", "rejected", "comment", "Duplicate request"),
+                null,
+                null);
+
+        assertTrue(response.isSuccess());
+        assertNotNull(response.getData());
+        assertEquals("rejected", response.getData().get("status"));
+        verify(inboxService).markActed(1001L, 101L, 202L, "rejected");
+    }
+
+    @Test
+    void markActedRejectQueryParamWithoutCommentReturnsError() {
+        MetaContext.setCurrentUserId(101L);
+        MetaContext.setCurrentTenantId(202L);
+
+        InboxController controller = new InboxController(inboxService);
+        ApiResponse<Void> response = controller.markActed(1001L, null, "rejected", " ");
+
+        assertFalse(response.isSuccess());
+        assertEquals("Rejection comment is required", response.getMessage());
+        verify(inboxService, never()).markActed(anyLong(), anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void markActedRejectBodyWithCommentMarksActed() {
+        MetaContext.setCurrentUserId(101L);
+        MetaContext.setCurrentTenantId(202L);
+
+        InboxController controller = new InboxController(inboxService);
+        ApiResponse<Void> response = controller.markActed(
+                1001L,
+                Map.of("action", "reject", "comment", "Needs corrected data"),
+                null,
+                null);
+
+        assertTrue(response.isSuccess());
+        verify(inboxService).markActed(1001L, 101L, 202L, "reject");
+    }
+
+    @Test
+    void batchRejectWithoutCommentReturnsError() {
+        MetaContext.setCurrentUserId(101L);
+        MetaContext.setCurrentTenantId(202L);
+
+        InboxController controller = new InboxController(inboxService);
+        ApiResponse<Map<String, Integer>> response =
+                controller.batchReject(Map.of("ids", List.of(1001L), "comment", " "), null);
+
+        assertFalse(response.isSuccess());
+        assertEquals("Rejection comment is required", response.getMessage());
+        verify(inboxService, never()).batchMarkActed(anyList(), anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void batchActRejectQueryParamWithoutCommentReturnsError() {
+        MetaContext.setCurrentUserId(101L);
+        MetaContext.setCurrentTenantId(202L);
+
+        InboxController controller = new InboxController(inboxService);
+        ApiResponse<Map<String, Integer>> response =
+                controller.batchAct(Map.of("ids", List.of(1001L)), "rejected", null);
+
+        assertFalse(response.isSuccess());
+        assertEquals("Rejection comment is required", response.getMessage());
+        verify(inboxService, never()).batchMarkActed(anyList(), anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void batchActRejectBodyWithCommentMarksActed() {
+        MetaContext.setCurrentUserId(101L);
+        MetaContext.setCurrentTenantId(202L);
+        when(inboxService.batchMarkActed(List.of(1001L, 1002L), 101L, 202L, "rejected")).thenReturn(2);
+
+        InboxController controller = new InboxController(inboxService);
+        ApiResponse<Map<String, Integer>> response = controller.batchAct(
+                Map.of("ids", List.of(1001L, 1002L), "action", "rejected", "comment", "Reject selected requests"),
+                null,
+                null);
+
+        assertTrue(response.isSuccess());
+        assertNotNull(response.getData());
+        assertEquals(2, response.getData().get("actedCount"));
+        verify(inboxService).batchMarkActed(List.of(1001L, 1002L), 101L, 202L, "rejected");
+    }
+
+    @Test
+    void batchRejectWithCommentMarksActed() {
+        MetaContext.setCurrentUserId(101L);
+        MetaContext.setCurrentTenantId(202L);
+        when(inboxService.batchMarkActed(List.of(1001L, 1002L), 101L, 202L, "rejected")).thenReturn(2);
+
+        InboxController controller = new InboxController(inboxService);
+        ApiResponse<Map<String, Integer>> response = controller.batchReject(
+                Map.of("ids", List.of(1001L, 1002L), "comment", "Reject selected requests"),
+                null);
+
+        assertTrue(response.isSuccess());
+        assertNotNull(response.getData());
+        assertEquals(2, response.getData().get("actedCount"));
+        verify(inboxService).batchMarkActed(List.of(1001L, 1002L), 101L, 202L, "rejected");
     }
 
     private InboxItem buildInboxItem() {

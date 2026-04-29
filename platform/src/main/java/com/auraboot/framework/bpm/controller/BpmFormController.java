@@ -36,6 +36,15 @@ import java.util.Objects;
 @RequirePermission(MetaPermission.BPM_FORM_MANAGE)
 public class BpmFormController {
 
+    private static final Set<String> REJECTION_VALUES = Set.of("reject", "rejected");
+    private static final Set<String> DECISION_VARIABLE_KEYS = Set.of(
+            "decision", "_decision", "action", "_action", "taskResult", "approvalResult"
+    );
+    private static final Set<String> COMMENT_VARIABLE_KEYS = Set.of(
+            "comment", "_comment", "reason", "rejectReason", "rejectionReason"
+    );
+    private static final String REJECTION_COMMENT_REQUIRED = "Rejection comment is required";
+
     private final BpmFormService formService;
     private final TaskService taskService;
     private final SmartEngine smartEngine;
@@ -115,10 +124,18 @@ public class BpmFormController {
             @RequestBody TaskSubmitRequest request) {
         String tenantId = MetaContext.getCurrentTenantIdAsString();
 
+        if (request == null) {
+            return ApiResponse.error("Task submit request is required");
+        }
+
         // 1. Get task context
         TaskInstance task = taskService.getTask(taskId);
         if (task == null) {
             return ApiResponse.error("Task not found: " + taskId);
+        }
+
+        if (isRejectionSubmission(request) && !hasRejectionComment(request)) {
+            return ApiResponse.error(REJECTION_COMMENT_REQUIRED);
         }
 
         String processInstanceId = task.getProcessInstanceId();
@@ -297,5 +314,33 @@ public class BpmFormController {
             }
         }
         return variables;
+    }
+
+    private boolean isRejectionSubmission(TaskSubmitRequest request) {
+        Map<String, Object> variables = request.getVariables();
+        if (variables == null || variables.isEmpty()) {
+            return false;
+        }
+        for (String key : DECISION_VARIABLE_KEYS) {
+            Object value = variables.get(key);
+            if (value != null && REJECTION_VALUES.contains(value.toString().trim().toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasRejectionComment(TaskSubmitRequest request) {
+        Map<String, Object> variables = request.getVariables();
+        if (variables == null || variables.isEmpty()) {
+            return false;
+        }
+        for (String key : COMMENT_VARIABLE_KEYS) {
+            Object value = variables.get(key);
+            if (value != null && !value.toString().trim().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

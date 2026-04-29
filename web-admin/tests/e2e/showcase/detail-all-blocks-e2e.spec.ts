@@ -149,39 +149,71 @@ async function gotoShowcaseListViaMenu(page: Page): Promise<void> {
   await parent.waitFor({ state: 'visible', timeout: 10_000 });
   await parent.evaluate((el: HTMLElement) => el.click());
 
+  const listResp = page
+    .waitForResponse(
+      (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
+      { timeout: 10_000 },
+    )
+    .catch(() => null);
   const leaf = page.locator(`a[href="${LIST_URL}"], a[href*="${LIST_URL}"]`).first();
   await leaf.waitFor({ state: 'attached', timeout: 5_000 });
   await Promise.all([
     page.waitForURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 10_000 }),
     leaf.evaluate((el: HTMLElement) => el.click()),
   ]);
+  await listResp;
 
   await expect(page).toHaveURL(new RegExp(`${LIST_URL}(?:$|\\?)`), { timeout: 5_000 });
-  await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
   await page.evaluate(() => {
     document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
   });
 }
 
-async function openDetailViaListRow(page: Page, recordPid: string): Promise<void> {
-  const rows = page.locator('[data-testid="dynamic-list"] table tbody tr');
+async function focusSeededListRow(page: Page, seed: SeededRecord) {
+  const rows = page.locator('table tbody tr');
   await expect(rows.first()).toBeVisible({ timeout: 10_000 });
 
-  const rowByLink = page.locator(`tr:has(a[href*="/view/${recordPid}"])`);
-  const hasLink = await rowByLink.first().isVisible({ timeout: 3_000 }).catch(() => false);
+  let row = page.locator('table tbody tr', { hasText: seed.sc_name }).first();
+  if (!(await row.isVisible({ timeout: 2_000 }).catch(() => false))) {
+    const search = page
+      .locator(
+        '[data-testid="toolbar-search"] input, input[type="search"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+      )
+      .first();
+    if (await search.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      const listResp = page
+        .waitForResponse(
+          (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
+          { timeout: 10_000 },
+        )
+        .catch(() => null);
+      await search.fill(seed.sc_name);
+      await search.press('Enter').catch(() => null);
+      await listResp;
+    }
+  }
+
+  row = page.locator('table tbody tr', { hasText: seed.sc_name }).first();
+  await expect(row, `seeded row should be visible for ${seed.sc_name}`).toBeVisible({
+    timeout: 10_000,
+  });
+  return row;
+}
+
+async function openDetailViaListRow(page: Page, seed: SeededRecord): Promise<void> {
+  const row = await focusSeededListRow(page, seed);
+  const rowByLink = row.locator(`a[href*="/view/${seed.pid}"], a[href*="/view/"]`).first();
+  const hasLink = await rowByLink.isVisible({ timeout: 3_000 }).catch(() => false);
 
   if (hasLink) {
     await Promise.all([
       page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
-      rowByLink.first().evaluate((tr) => {
-        const a = tr.querySelector('a[href*="/view/"]') as HTMLAnchorElement | null;
-        if (a) a.click();
-      }),
+      rowByLink.click(),
     ]);
   } else {
-    const firstRow = rows.first();
-    await firstRow.hover();
-    const viewBtn = firstRow.locator('[data-testid="row-action-view"]').first();
+    await row.hover();
+    const viewBtn = row.locator('[data-testid="row-action-view"]').first();
     if (await viewBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await Promise.all([
         page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
@@ -190,7 +222,7 @@ async function openDetailViaListRow(page: Page, recordPid: string): Promise<void
     } else {
       await Promise.all([
         page.waitForURL(DETAIL_URL_RE, { timeout: 8_000 }),
-        firstRow.locator('td').nth(1).click({ force: true }),
+        row.locator('td').nth(1).click({ force: true }),
       ]);
     }
   }
@@ -203,9 +235,12 @@ async function openDetailViaListRow(page: Page, recordPid: string): Promise<void
       { timeout: 10_000 },
     )
     .catch(() => null);
-  await page.evaluate(() => {
-    document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-  });
+  await page.waitForLoadState('domcontentloaded', { timeout: 5_000 }).catch(() => null);
+  await page
+    .evaluate(() => {
+      document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
+    })
+    .catch(() => null);
 }
 
 /**
@@ -297,7 +332,7 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
     await replacePageBlocks(request, detailSnapshot, nextBlocks);
 
     await gotoShowcaseListViaMenu(page);
-    await openDetailViaListRow(page, seed.pid);
+    await openDetailViaListRow(page, seed);
 
     // Tabs render — the tab nav button is visible.
     const tabButton = page.locator('button', { hasText: 'D Runtime Tab' }).first();
@@ -360,7 +395,7 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
     await replacePageBlocks(request, detailSnapshot, nextBlocks);
 
     await gotoShowcaseListViaMenu(page);
-    await openDetailViaListRow(page, seed.pid);
+    await openDetailViaListRow(page, seed);
 
     const tabButton = page.locator('button', { hasText: 'D Runtime Tab' }).first();
     await expect(tabButton).toBeVisible({ timeout: 10_000 });
@@ -435,7 +470,7 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
     await replacePageBlocks(request, detailSnapshot, nextBlocks);
 
     await gotoShowcaseListViaMenu(page);
-    await openDetailViaListRow(page, seed.pid);
+    await openDetailViaListRow(page, seed);
 
     const tabButton = page.locator('button', { hasText: 'D Runtime Tab' }).first();
     await expect(tabButton).toBeVisible({ timeout: 10_000 });
@@ -505,7 +540,7 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
     await replacePageBlocks(request, detailSnapshot, nextBlocks);
 
     await gotoShowcaseListViaMenu(page);
-    await openDetailViaListRow(page, seed.pid);
+    await openDetailViaListRow(page, seed);
 
     const tabButton = page.locator('button', { hasText: 'D Runtime Tab' }).first();
     await expect(tabButton).toBeVisible({ timeout: 10_000 });
@@ -558,7 +593,7 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
     await replacePageBlocks(request, detailSnapshot, nextBlocks);
 
     await gotoShowcaseListViaMenu(page);
-    await openDetailViaListRow(page, seed.pid);
+    await openDetailViaListRow(page, seed);
 
     const tabButton = page.locator('button', { hasText: 'D Runtime Tab' }).first();
     await expect(tabButton).toBeVisible({ timeout: 10_000 });
@@ -651,7 +686,7 @@ test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments
     await replacePageBlocks(request, detailSnapshot, nextBlocks);
 
     await gotoShowcaseListViaMenu(page);
-    await openDetailViaListRow(page, seed.pid);
+    await openDetailViaListRow(page, seed);
 
     // Wait for the child-list fetch to land.
     await page

@@ -55,7 +55,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     const configMap = new Map((currentConfig || []).map((c) => [c.code, c]));
 
     // DSL buttons
-    const dslItems: ActionItem[] = buttons.map((btn, _idx) => {
+    const dslItems: ActionItem[] = buttons.map((btn, idx) => {
       const cfg = configMap.get(btn.code);
       const isPrimary = btn.primary || btn.variant === 'primary';
       return {
@@ -184,6 +184,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
   ) => (
     <div
       key={item.code}
+      data-testid={`action-config-row-${item.code}`}
       draggable
       onDragStart={() => handleDragStart(index, section)}
       onDragEnter={() => handleDragEnter(index)}
@@ -212,6 +213,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       {/* Pin/unpin toggle — explicit move between sections */}
       <button
         type="button"
+        data-testid={`action-config-pin-${item.code}`}
         onClick={() => togglePinned(item.code)}
         className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600"
         title={item.pinned ? 'Move to menu' : 'Pin to toolbar'}
@@ -230,6 +232,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       {/* Visibility toggle */}
       <button
         type="button"
+        data-testid={`action-config-visible-${item.code}`}
         onClick={() => toggleVisible(item.code)}
         className={cn(
           'rounded p-1 transition-colors',
@@ -259,13 +262,17 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      data-testid="action-config-panel"
+    >
       <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <h3 className="text-base font-semibold text-gray-900">Configure Buttons</h3>
           <button
             type="button"
+            data-testid="action-config-close"
             onClick={onClose}
             className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           >

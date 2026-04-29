@@ -201,6 +201,7 @@ public class AgentRunService {
             // Build discovery context from BIF
             ToolDiscoveryContext discoveryCtx = ToolDiscoveryContext.builder()
                     .tenantId(tenantId)
+                    .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
                     .agentCode(agentCode)
                     .modelHint(bif != null ? bif.getObject() : null)
                     .intentHint(bif != null ? bif.getIntent() : null)

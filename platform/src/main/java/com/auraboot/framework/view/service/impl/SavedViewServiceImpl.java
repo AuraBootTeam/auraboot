@@ -336,6 +336,7 @@ public class SavedViewServiceImpl implements SavedViewService {
                 if (incoming.getDensity() != null) merged.setDensity(incoming.getDensity());
                 if (incoming.getRowHeight() != null) merged.setRowHeight(incoming.getRowHeight());
                 if (incoming.getConditionalFormats() != null) merged.setConditionalFormats(incoming.getConditionalFormats());
+                if (incoming.getToolbarActions() != null) merged.setToolbarActions(incoming.getToolbarActions());
             }
             existing.setViewConfig(merged);
             existing.setUpdatedAt(Instant.now());

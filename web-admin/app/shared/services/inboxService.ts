@@ -133,8 +133,11 @@ export async function markAllRead(): Promise<void> {
 /**
  * Mark item as acted with an action.
  */
-export async function markActed(id: number, action: string): Promise<void> {
-  await fetchResult(`${BASE}/${id}/act`, { method: 'put', params: { action } });
+export async function markActed(id: number, action: string, comment?: string): Promise<void> {
+  await fetchResult(`${BASE}/${id}/act`, {
+    method: 'put',
+    params: { action, ...(comment != null ? { comment } : {}) },
+  });
 }
 
 /**
@@ -147,10 +150,14 @@ export async function dismissItem(id: number): Promise<void> {
 /**
  * Submit approval action on an inbox item.
  */
-export async function submitApprovalAction(id: number, action: string): Promise<void> {
+export async function submitApprovalAction(
+  id: number,
+  action: string,
+  comment?: string,
+): Promise<void> {
   await fetchResult(`${BASE}/${id}/approval-action`, {
     method: 'post',
-    params: { action },
+    params: { action, ...(comment != null ? { comment } : {}) },
   });
 }
 
@@ -164,8 +171,8 @@ export async function batchApprove(ids: number[]): Promise<void> {
 /**
  * Batch reject items.
  */
-export async function batchReject(ids: number[]): Promise<void> {
-  await fetchResult(`${BASE}/batch/reject`, { method: 'post', params: { ids } });
+export async function batchReject(ids: number[], comment: string): Promise<void> {
+  await fetchResult(`${BASE}/batch/reject`, { method: 'post', params: { ids, comment } });
 }
 
 /**

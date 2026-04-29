@@ -237,6 +237,58 @@ class DslToolProviderTest extends BaseIntegrationTest {
     }
 
     @Test
+    void discover_buildsRecordIdSchemaForStateTransitionCommand() {
+        Long tenantId = getTestTenant().getId();
+        String suffix = "agent_state_" + System.nanoTime();
+        String modelCode = suffix + "_model";
+        String commandCode = suffix + ":submit";
+
+        Map<String, Object> command = new LinkedHashMap<>();
+        command.put("pid", suffix + "_cmd_pid");
+        command.put("tenant_id", tenantId);
+        command.put("code", commandCode);
+        command.put("display_name", "Submit state fixture");
+        command.put("description", "Submit a state fixture record");
+        command.put("model_code", modelCode);
+        command.put("input_schema", "{}");
+        command.put("target_models", "[]");
+        command.put("execution_config", """
+                {"type":"state_transition","stateField":"fixture_status","fromStates":["draft"],"toState":"review_required"}
+                """);
+        command.put("extension", "{}");
+        command.put("cmd_risk_level", "L3");
+        command.put("version", 1);
+        command.put("is_current", true);
+        command.put("status", "published");
+        command.put("deleted_flag", false);
+        dynamicDataMapper.insertWithJsonb("ab_command_definition", command,
+                Set.of("input_schema", "target_models", "execution_config", "extension"));
+
+        var tools = dslToolProvider.discover(ToolDiscoveryContext.builder()
+                .tenantId(tenantId)
+                .modelHint(modelCode)
+                .maxResults(20)
+                .build());
+
+        ToolDefinition commandTool = tools.stream()
+                .filter(tool -> ("cmd:" + commandCode).equals(tool.getToolCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(commandTool.getRiskLevel()).isEqualTo("L3");
+        assertThat(commandTool.isRequiresApproval()).isTrue();
+
+        Map<String, Object> schema = commandTool.getParameterSchema();
+        assertThat(schema).containsEntry("type", "object");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        assertThat(properties).containsKey("recordId");
+        List<String> required = ((List<?>) schema.get("required")).stream()
+                .map(String::valueOf)
+                .toList();
+        assertThat(required).containsExactly("recordId");
+    }
+
+    @Test
     void discover_buildsNamedQueryParameterSchemaFromSqlParams() {
         Long tenantId = getTestTenant().getId();
         String suffix = "agent_nq_" + System.nanoTime();

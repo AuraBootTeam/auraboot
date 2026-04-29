@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.service.AgentSkillService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -58,6 +59,7 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
         // Phase 2: Fallback to ToolProviderRegistry discovery, filtered by intent
         ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
                 .tenantId(tenantId)
+                .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
                 .modelHint(modelHint)
                 .intentHint(intentHint)
                 .maxResults(maxTools * 2) // over-fetch, then filter

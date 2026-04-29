@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,7 @@ public class DslToolProvider implements ToolProvider {
     private final NamedQueryService namedQueryService;
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
+    private final UserPermissionService userPermissionService;
 
     @Override
     public String providerCode() {
@@ -100,6 +102,9 @@ public class DslToolProvider implements ToolProvider {
                         ? (String) row.get("agent_hint")
                         : (String) row.get("description");
                 Map<String, Object> executionConfig = parseExecutionConfig(row.get("execution_config"));
+                if (!hasAnyDeclaredPermission(ctx.getUserId(), executionConfig.get("permissions"))) {
+                    continue;
+                }
                 boolean readQuery = isReadQueryCommand(code, executionConfig, row.get("cmd_risk_level"));
                 String riskLevel = readQuery ? "L0" : normalizeRiskLevel(row.get("cmd_risk_level"), "L1");
                 Map<String, Object> parameterSchema = buildCommandParameterSchema(
@@ -131,7 +136,7 @@ public class DslToolProvider implements ToolProvider {
                     "AND status = 'published' " +
                     "LIMIT #{params.limit}";
             int remaining = maxResults - tools.size();
-            if (remaining > 0) {
+            if (remaining > 0 && canDiscoverNamedQueries(ctx.getUserId())) {
                 List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
                         Map.of("tenantId", ctx.getTenantId(), "codePattern", modelHint + "%", "limit", remaining));
                 for (Map<String, Object> row : rows) {
@@ -159,7 +164,8 @@ public class DslToolProvider implements ToolProvider {
         }
 
         // 3. Always add generic list + get tools for the model
-        if (tools.size() < maxResults) {
+        boolean canReadModel = canReadModel(ctx.getUserId(), modelHint);
+        if (canReadModel && tools.size() < maxResults) {
             tools.add(ToolDefinition.builder()
                     .toolCode(PREFIX_LIST + modelHint)
                     .toolName("List " + modelHint)
@@ -172,7 +178,7 @@ public class DslToolProvider implements ToolProvider {
                     .parameterSchema(listParameterSchema())
                     .build());
         }
-        if (tools.size() < maxResults) {
+        if (canReadModel && tools.size() < maxResults) {
             tools.add(ToolDefinition.builder()
                     .toolCode(PREFIX_GET + modelHint)
                     .toolName("Get " + modelHint)
@@ -301,6 +307,45 @@ public class DslToolProvider implements ToolProvider {
         return "object".equals(schema.get("type"))
                 && properties instanceof Map<?, ?> map
                 && !map.isEmpty();
+    }
+
+    private boolean hasAnyDeclaredPermission(Long userId, Object rawPermissions) {
+        if (userId == null) {
+            return true;
+        }
+        List<String> permissions = extractPermissions(rawPermissions);
+        if (permissions.isEmpty()) {
+            return true;
+        }
+        for (String permission : permissions) {
+            if (userPermissionService.hasPermission(userId, permission)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean canReadModel(Long userId, String modelCode) {
+        return userId == null || userPermissionService.hasPermission(userId, "model." + modelCode + ".read");
+    }
+
+    private boolean canDiscoverNamedQueries(Long userId) {
+        return userId == null
+                || userPermissionService.hasPermission(userId, "system.query.read")
+                || userPermissionService.hasPermission(userId, "system.datasource.read");
+    }
+
+    private List<String> extractPermissions(Object rawPermissions) {
+        if (!(rawPermissions instanceof List<?> values) || values.isEmpty()) {
+            return List.of();
+        }
+        List<String> permissions = new ArrayList<>();
+        for (Object value : values) {
+            if (value != null && !String.valueOf(value).isBlank()) {
+                permissions.add(String.valueOf(value));
+            }
+        }
+        return permissions;
     }
 
     private Map<String, FieldSchemaInfo> loadModelFieldInfo(Long tenantId, String modelCode) {
