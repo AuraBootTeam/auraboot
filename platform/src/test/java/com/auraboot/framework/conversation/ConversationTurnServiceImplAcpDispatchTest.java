@@ -293,4 +293,51 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
             verify(agentRunService, never()).executeTaskSync(anyLong(), anyString(), anyString(), any());
         });
     }
+
+    @Test
+    @DisplayName("C.3e: CONTEXTUAL_ANSWER -> ACP runtime; chatService NOT called")
+    void contextualAnswerBucket_dispatchesToAcp() {
+        // Phase C.3e (Q-C3.5=β step2): explanation-bucket turns reuse the
+        // ACP runtime so D1 grounding + skill routing + read-only tool
+        // discovery + result_contract rendering live in one place. After
+        // C.3e only LIGHT_CHAT (and the null-bucket defensive fallback)
+        // continues to flow through the legacy chat path.
+        withTestIdentity(() -> {
+            Long tenantId = getTestTenant().getId();
+            when(agentRunService.executeTaskSync(eq(tenantId), anyString(), eq("aurabot"), any()))
+                    .thenReturn(new RunOutcome.Success(
+                            "RUN_PID_CTX",
+                            "This page lists customer accounts grouped by region.",
+                            65, 22, 0.0021d));
+
+            TurnOutcome outcome = turnService.runTurn(
+                    buildTurnRequest("what is this page showing", TriageBucket.CONTEXTUAL_ANSWER), sink);
+
+            assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+            assertThat(((TurnOutcome.Success) outcome).finalResponse())
+                    .startsWith("This page lists customer accounts");
+
+            // ACP path engaged
+            verify(agentRunService, times(1)).executeTaskSync(
+                    eq(tenantId), anyString(), eq("aurabot"), any());
+            verify(sink, times(1)).onDone(
+                    eq("This page lists customer accounts grouped by region."), any());
+
+            // Legacy chat path NOT engaged
+            verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
+
+            // ab_agent_task row written (assignee_type='ai', task carries the
+            // contextual question — not action-typed but still task-driven).
+            List<Map<String, Object>> tasks = jdbcTemplate.queryForList(
+                    "SELECT pid, assignee_type, assignee_id, title FROM ab_agent_task " +
+                            "WHERE tenant_id = ? AND deleted_flag = FALSE " +
+                            "ORDER BY created_at DESC LIMIT 1",
+                    tenantId);
+            assertThat(tasks).hasSize(1);
+            Map<String, Object> row = tasks.get(0);
+            assertThat(row.get("assignee_type")).isEqualTo("ai");
+            assertThat(row.get("assignee_id")).isEqualTo("aurabot");
+            assertThat((String) row.get("title")).startsWith("what is this page");
+        });
+    }
 }
