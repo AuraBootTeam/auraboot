@@ -165,7 +165,10 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
                 "missing", ConversationTurnService.ConfirmDecision.APPROVED, sink);
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
-        assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("No pending tool found");
+        // Phase C.3d: error message broadened to cover the dual-path lookup
+        // (chat-store + ab_agent_approval).
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage())
+                .contains("No pending tool or approval found");
         verify(sink, atLeastOnce()).onError(contains("No pending"), any());
         verify(chatService, never()).resumeApprovedTurnFromPending(any(), any(), any());
     }

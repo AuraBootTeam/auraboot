@@ -216,19 +216,49 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ACP_RUN + RunOutcome.PendingApproval -> interim Failed (full wire-up lives in C.3d)")
-    void acpRunPending_mapsToInterimFailed() {
+    @DisplayName("ACP_RUN + RunOutcome.PendingApproval -> TurnOutcome.PendingConfirmation + onConfirmRequired")
+    void acpRunPending_mapsToPendingConfirmation() {
+        // Phase C.3d (Q-C3.3=α): the chokepoint surfaces the approvalPid as
+        // the resumption token on the confirm_required SSE event so the
+        // frontend echoes it back via POST /execute, where resumeTurn picks
+        // it up and drives AgentApprovalGateService.approve / reject.
         withTestIdentity(() -> {
             when(agentRunService.executeTaskSync(anyLong(), anyString(), eq("aurabot"), any()))
-                    .thenReturn(new RunOutcome.PendingApproval("RUN_PID_3", "Step 2 awaits approval"));
+                    .thenReturn(new RunOutcome.PendingApproval(
+                            "RUN_PID_3", "APPROVAL_PID_99", "Step 2 awaits approval"));
+
+            TurnOutcome outcome = turnService.runTurn(
+                    buildTurnRequest("approve the deal", TriageBucket.ACP_RUN), sink);
+
+            assertThat(outcome).isInstanceOf(TurnOutcome.PendingConfirmation.class);
+            TurnOutcome.PendingConfirmation pc = (TurnOutcome.PendingConfirmation) outcome;
+            assertThat(pc.pendingTurnId()).isEqualTo("APPROVAL_PID_99");
+            assertThat(pc.pendingToolId()).isEqualTo("APPROVAL_PID_99");
+            // confirm_required SSE event fires; pendingTurnId field carries the approvalPid
+            verify(sink, times(1)).onConfirmRequired(
+                    eq("APPROVAL_PID_99"),
+                    eq("agent_approval_gate"),
+                    eq("Step 2 awaits approval"),
+                    org.mockito.ArgumentMatchers.<Map<String, Object>>any(),
+                    eq("APPROVAL_PID_99"));
+        });
+    }
+
+    @Test
+    @DisplayName("ACP_RUN + PendingApproval(approvalPid=null) -> Failed (legacy throw site fallback)")
+    void acpRunPendingWithoutApprovalPid_mapsToFailed() {
+        withTestIdentity(() -> {
+            when(agentRunService.executeTaskSync(anyLong(), anyString(), eq("aurabot"), any()))
+                    .thenReturn(new RunOutcome.PendingApproval(
+                            "RUN_PID_4", null, "Approval required but no pid"));
 
             TurnOutcome outcome = turnService.runTurn(
                     buildTurnRequest("approve the deal", TriageBucket.ACP_RUN), sink);
 
             assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
             assertThat(((TurnOutcome.Failed) outcome).errorMessage())
-                    .contains("Approval required").contains("RUN_PID_3").contains("Step 2 awaits approval");
-            verify(sink, atLeastOnce()).onError(startsWith("Approval required"), any());
+                    .contains("no approval pid").contains("RUN_PID_4");
+            verify(sink, atLeastOnce()).onError(contains("no approval pid"), any());
         });
     }
 

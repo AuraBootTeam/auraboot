@@ -48,7 +48,17 @@ public sealed interface RunOutcome
             double totalCost
     ) implements RunOutcome {}
 
-    record PendingApproval(String runPid, String message) implements RunOutcome {}
+    /**
+     * Run paused on an approval gate. Phase C.3d (Q-C3.3=α): {@code approvalPid}
+     * is the {@code ab_agent_approval.pid} that the chokepoint surfaces to the
+     * frontend as the resumption token (sent on the {@code confirm_required}
+     * SSE event's {@code pendingTurnId} field; echoed back via
+     * {@code POST /execute}). Pre-C.3d throw sites that did not yet know the
+     * pid pass {@code null}, in which case the chokepoint falls back to
+     * {@code TurnOutcome.Failed} since there is nothing for the user to
+     * approve.
+     */
+    record PendingApproval(String runPid, String approvalPid, String message) implements RunOutcome {}
 
     record Failed(String runPid, String errorMessage) implements RunOutcome {}
 

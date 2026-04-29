@@ -227,12 +227,16 @@ class AgentRunServiceSyncTest {
     }
 
     @Test
-    @DisplayName("plan loop throws AgentApprovalPendingException -> RunOutcome.PendingApproval")
+    @DisplayName("plan loop throws AgentApprovalPendingException -> RunOutcome.PendingApproval carries approvalPid")
     void planLoopPending_returnsPendingApproval() throws Exception {
         primeHappyPath();
+        // Phase C.3d: StepLoopService throws with approvalPid populated so the
+        // chokepoint can use it as the resumption token on the
+        // confirm_required SSE event.
         when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
                 anyString(), anyString(), any(), any(), any(), any(), any(), anyBoolean()))
-                .thenThrow(new AgentApprovalPendingException("Step 2 awaits approval"));
+                .thenThrow(new AgentApprovalPendingException(
+                        "APPROVAL_PID_42", "Step 2 awaits approval"));
 
         RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
@@ -240,12 +244,29 @@ class AgentRunServiceSyncTest {
         RunOutcome.PendingApproval pending = (RunOutcome.PendingApproval) outcome;
         assertThat(pending.message()).isEqualTo("Step 2 awaits approval");
         assertThat(pending.runPid()).isNotBlank();
+        assertThat(pending.approvalPid()).isEqualTo("APPROVAL_PID_42");
         // Run row flipped to pending status
         verify(dynamicDataMapper, times(1)).update(eq("ab_agent_run"),
                 argThat(updates -> "pending".equals(((Map<?, ?>) updates).get("run_status"))),
                 anyMap());
         // Failed path should NOT have fired
         verify(runLifecycleService, never()).failRun(any(), anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("legacy AgentApprovalPendingException(message) -> PendingApproval with null approvalPid")
+    void planLoopPending_legacyConstructor_nullApprovalPid() throws Exception {
+        primeHappyPath();
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenThrow(new AgentApprovalPendingException("legacy message"));
+
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.PendingApproval.class);
+        RunOutcome.PendingApproval pending = (RunOutcome.PendingApproval) outcome;
+        assertThat(pending.message()).isEqualTo("legacy message");
+        assertThat(pending.approvalPid()).isNull();
     }
 
     @Test

@@ -394,6 +394,26 @@ public class AgentApprovalGateService {
      *         to distinguish double-execution from "not found"
      */
     public Map<String, Object> approve(Long tenantId, String approvalPid, Long approverId) {
+        return approve(tenantId, approvalPid, approverId, true);
+    }
+
+    /**
+     * Phase C.3d (Q-C3.3=α "approval-gate convergence to ACP"): overload that
+     * lets the caller opt out of the async auto-resume. The chokepoint
+     * {@code ConversationTurnService.resumeTurn} passes {@code triggerAutoResume=false}
+     * so it can drive a SYNCHRONOUS resume itself via
+     * {@code AgentRunService.executeTaskSync(..., resumeFromRunPid=runPid)} —
+     * the resulting {@link RunOutcome} is mapped back to a {@code TurnOutcome}
+     * and streamed through the same {@code ResponseSink} that the original
+     * turn used. Pre-C.3d callers (REST controllers, scheduled jobs) keep the
+     * legacy 3-arg overload above which still fires the @Async dispatch.
+     *
+     * <p>All other behaviour (plan_hash check, status guard, event publish,
+     * approval row update) is identical between the two overloads — only the
+     * trailing {@code resumeRunAfterApproval} call is gated.
+     */
+    public Map<String, Object> approve(Long tenantId, String approvalPid, Long approverId,
+                                        boolean triggerAutoResume) {
         // Guard: check for already-processed approval to prevent double-execution
         Map<String, Object> existing = loadApprovalAnyStatus(tenantId, approvalPid);
         if (existing != null) {
@@ -435,7 +455,8 @@ public class AgentApprovalGateService {
         update.put("approved_at", now);
         update.put("updated_at", now);
         dynamicDataMapper.update("ab_agent_approval", update, Map.of("pid", approvalPid));
-        log.info("Approval approved: pid={}, approver={}", approvalPid, approverId);
+        log.info("Approval approved: pid={}, approver={}, triggerAutoResume={}",
+                approvalPid, approverId, triggerAutoResume);
 
         String runPid = (String) approval.get("run_id");
         String agentCode = resolveAgentCode(tenantId, runPid);
@@ -444,11 +465,31 @@ public class AgentApprovalGateService {
         eventBus.publishAfterCommit(new AgentApprovalEvent(
                 tenantId, approvalPid, runPid, agentCode, "approved", approverId));
 
-        // Auto-resume the paused agent run
-        resumeRunAfterApproval(tenantId, runPid);
+        if (triggerAutoResume) {
+            // Auto-resume the paused agent run (legacy async path)
+            resumeRunAfterApproval(tenantId, runPid);
+        }
 
         approval.put("approval_status", "approved");
         return approval;
+    }
+
+    /**
+     * Phase C.3d: read an approval record by pid (any status) for the
+     * chokepoint's {@code resumeTurn} dispatcher. Differs from the package-
+     * private {@code loadApprovalAnyStatus} by returning the full row (not
+     * just pid/status) so the chokepoint can resolve {@code run_id} /
+     * {@code task_id} for the sync-resume path.
+     *
+     * @return the full approval record, or {@code null} when the pid does
+     *         not exist for the given tenant
+     */
+    public Map<String, Object> findApproval(Long tenantId, String approvalPid) {
+        String sql = "SELECT * FROM ab_agent_approval WHERE pid = #{params.pid} " +
+                "AND tenant_id = #{params.tenantId}";
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
+                Map.of("pid", approvalPid, "tenantId", tenantId));
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     /**
