@@ -9,14 +9,19 @@ function uniqueId(prefix = 'crm_agent'): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-async function getToken(): Promise<string> {
+async function getToken(
+  credentials: { email: string; password: string } = TEST_USER,
+): Promise<string> {
   const resp = await fetch(`${BACKEND_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(TEST_USER),
+    body: JSON.stringify(credentials),
   });
   const body = await resp.json();
-  expect(body.code, 'Run auth setup or reset CRM env when login fails').toBe('0');
+  expect(
+    body.code,
+    `Run auth setup or reset CRM env when login fails for ${credentials.email}`,
+  ).toBe('0');
   return body.data.jwt;
 }
 
@@ -33,6 +38,42 @@ async function apiGet(token: string, path: string): Promise<any> {
   const body = await resp.json();
   expect(body.code, `${path} should return ApiResponse code=0`).toBe('0');
   return body.data;
+}
+
+async function readJsonResponse(resp: Response): Promise<any> {
+  const text = await resp.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+}
+
+async function apiGetRaw(token: string, path: string): Promise<{ httpStatus: number; body: any }> {
+  const resp = await fetch(`${BACKEND_URL}${path}`, { headers: authHeaders(token) });
+  return { httpStatus: resp.status, body: await readJsonResponse(resp) };
+}
+
+function apiSucceeded(result: { httpStatus: number; body: any }): boolean {
+  return result.httpStatus >= 200 && result.httpStatus < 300 && result.body?.code === '0';
+}
+
+function apiErrorText(result: { httpStatus: number; body: any }): string {
+  return [
+    result.body?.message,
+    result.body?.error,
+    result.body?.context ? JSON.stringify(result.body.context) : '',
+    JSON.stringify(result.body || {}),
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function parseObjectField(value: unknown): Record<string, any> {
+  if (typeof value === 'string') return JSON.parse(value);
+  if (value && typeof value === 'object') return value as Record<string, any>;
+  return {};
 }
 
 async function executeCommand(
@@ -59,6 +100,23 @@ async function executeCommand(
     recordId: innerData?.recordId || innerData?.pid || body.data?.recordId,
     data: body.data,
   };
+}
+
+async function executeCommandRaw(
+  token: string,
+  commandCode: string,
+  payload: Record<string, unknown>,
+  targetRecordId?: string,
+): Promise<{ httpStatus: number; body: any }> {
+  const requestBody: Record<string, unknown> = { payload };
+  if (targetRecordId) requestBody.targetRecordId = targetRecordId;
+
+  const resp = await fetch(`${BACKEND_URL}/api/meta/commands/execute/${commandCode}`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(requestBody),
+  });
+  return { httpStatus: resp.status, body: await readJsonResponse(resp) };
 }
 
 async function detail(
@@ -161,6 +219,35 @@ async function createAccount(token: string, tag: string): Promise<string> {
   return result.recordId!;
 }
 
+async function provisionRoleUser(
+  adminToken: string,
+  roleCodes: string[],
+  prefix: string,
+): Promise<{ email: string; token: string }> {
+  const password = 'Test2026x';
+  const safePrefix = prefix
+    .replace(/[^a-z0-9]+/gi, '_')
+    .toLowerCase()
+    .slice(0, 24);
+  const email = `${uniqueId(safePrefix)}@agent.test`;
+  const resp = await fetch(`${BACKEND_URL}/api/admin/users`, {
+    method: 'POST',
+    headers: authHeaders(adminToken),
+    body: JSON.stringify({
+      email,
+      displayName: `CRM Agent ${prefix}`,
+      initialPassword: password,
+      roleCodes,
+      sendInviteEmail: false,
+    }),
+  });
+  const body = await readJsonResponse(resp);
+  expect(resp.ok, `provision ${email} should return HTTP 2xx: ${JSON.stringify(body)}`).toBe(true);
+  expect(body?.code, `provision ${email} should return code=0`).toBe('0');
+
+  return { email, token: await getToken({ email, password }) };
+}
+
 test.describe('CRM Agent deterministic validation', () => {
   let token: string;
 
@@ -184,6 +271,20 @@ test.describe('CRM Agent deterministic validation', () => {
       expect(command?.code).toBe(commandCode);
       expect(command?.status).toBe('published');
     }
+
+    const convertCommand = await apiGet(token, '/api/meta/commands/by-code/crm:convert_lead');
+    const convertExecutionConfig = parseObjectField(convertCommand?.executionConfig);
+    const convertActions = (convertExecutionConfig.sideEffects || []).flatMap(
+      (effect: Record<string, any>) => effect.actions || [],
+    );
+    expect(convertActions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'create_record',
+          modelCode: 'crm_opportunity',
+        }),
+      ]),
+    );
 
     for (const queryCode of [
       'crm_lead_pipeline_stats',
@@ -221,6 +322,16 @@ test.describe('CRM Agent deterministic validation', () => {
 
     expect((await executeCommand(token, 'crm:convert_lead', {}, leadPid)).success).toBe(true);
     expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('converted');
+
+    const opportunities = await queryList(token, 'crm_opportunity_list', [
+      { fieldName: 'crm_opp_lead_id', operator: 'EQ', value: leadPid },
+    ]);
+    const convertedOpportunity = opportunities.records.find(
+      (record) => record.crm_opp_lead_id === leadPid,
+    );
+    expect(convertedOpportunity?.crm_opp_name).toBe(created.crm_lead_company);
+    expect(convertedOpportunity?.crm_opp_code).toBe(created.crm_lead_code);
+    expect(convertedOpportunity?.crm_opp_stage).toBe('qualification');
   });
 
   test('AV-02 lead analytics oracle covers status, source, high score, and industry', async () => {
@@ -389,7 +500,7 @@ test.describe('CRM Agent deterministic validation', () => {
     await createLeadActivity(token, freshLeadPid, `${tag}_recent`, recentActivityDate);
 
     const stale = await queryDatasource(token, 'nq:crm_lead_stale_followup', {
-      keyword: tag,
+      leadKeyword: tag,
       staleBefore: isoDaysAgo(7),
       maxItems: '50',
     });
@@ -401,5 +512,69 @@ test.describe('CRM Agent deterministic validation', () => {
     expect(staleRecord?.company).toBe(`Agent Stale Followup ${tag}`);
     expect(staleRecord?.contact_name).toBe(`Stale Contact ${tag}`);
     expect(String(staleRecord?.last_activity_date)).toContain(oldActivityDate.slice(0, 10));
+  });
+
+  test('AV-06 CRM role matrix gates read access, command execution, and command domain permissions', async () => {
+    const tag = uniqueId('role_matrix');
+    await createLead(token, `${tag}_seed`, {
+      crm_lead_company: `Role Matrix Seed ${tag}`,
+    });
+    const accountPid = await createAccount(token, `${tag}_account`);
+
+    const viewer = await provisionRoleUser(token, ['crm_viewer'], `${tag}_viewer`);
+    const sales = await provisionRoleUser(token, ['crm_sales'], `${tag}_sales`);
+    const crmAdmin = await provisionRoleUser(token, ['crm_admin'], `${tag}_admin`);
+
+    const viewerLeadList = await apiGetRaw(
+      viewer.token,
+      '/api/dynamic/crm_lead_list/list?pageNum=1&pageSize=5',
+    );
+    expect(apiSucceeded(viewerLeadList), apiErrorText(viewerLeadList)).toBe(true);
+
+    const viewerCreateLead = await executeCommandRaw(viewer.token, 'crm:create_lead', {
+      crm_lead_company: `Viewer Forbidden ${tag}`,
+      crm_lead_contact_name: 'Viewer',
+      crm_lead_contact_phone: '13800138000',
+      crm_lead_contact_email: `viewer_${tag}@agent.test`,
+      crm_lead_source: 'website',
+      crm_lead_industry: 'technology',
+    });
+    expect(viewerCreateLead.httpStatus, apiErrorText(viewerCreateLead)).toBe(403);
+    expect(apiErrorText(viewerCreateLead)).toContain('system.command.execute');
+
+    const salesLeadList = await apiGetRaw(
+      sales.token,
+      '/api/dynamic/crm_lead_list/list?pageNum=1&pageSize=5',
+    );
+    expect(apiSucceeded(salesLeadList), apiErrorText(salesLeadList)).toBe(true);
+
+    const salesCreateLead = await executeCommandRaw(sales.token, 'crm:create_lead', {
+      crm_lead_company: `Sales Allowed ${tag}`,
+      crm_lead_contact_name: 'Sales',
+      crm_lead_contact_phone: '13800138000',
+      crm_lead_contact_email: `sales_${tag}@agent.test`,
+      crm_lead_source: 'website',
+      crm_lead_industry: 'technology',
+    });
+    expect(apiSucceeded(salesCreateLead), apiErrorText(salesCreateLead)).toBe(true);
+
+    const salesCreateComplaint = await executeCommandRaw(sales.token, 'crm:create_complaint', {
+      crm_cmp_account_id: accountPid,
+      crm_cmp_date: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      crm_cmp_type: 'service',
+      crm_cmp_severity: 'medium',
+      crm_cmp_description: `Sales forbidden complaint ${tag}`,
+    });
+    expect(salesCreateComplaint.body?.code, apiErrorText(salesCreateComplaint)).toBe('403');
+    expect(apiErrorText(salesCreateComplaint)).toContain('crm.complaint.manage');
+
+    const adminCreateComplaint = await executeCommandRaw(crmAdmin.token, 'crm:create_complaint', {
+      crm_cmp_account_id: accountPid,
+      crm_cmp_date: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      crm_cmp_type: 'service',
+      crm_cmp_severity: 'medium',
+      crm_cmp_description: `Admin allowed complaint ${tag}`,
+    });
+    expect(apiSucceeded(adminCreateComplaint), apiErrorText(adminCreateComplaint)).toBe(true);
   });
 });

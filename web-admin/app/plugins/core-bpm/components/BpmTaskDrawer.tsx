@@ -72,6 +72,8 @@ function buildMappedVariables(
   return result;
 }
 
+const REJECT_COMMENT_REQUIRED = 'Rejection comment is required.';
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -180,12 +182,19 @@ export function BpmTaskDrawer({
   }, [hasForm, form, taskId, comment, onComplete, onClose]);
 
   const handleReject = useCallback(async () => {
+    const trimmedComment = comment.trim();
+    if (!trimmedComment) {
+      setDecision('reject');
+      setActionError(REJECT_COMMENT_REQUIRED);
+      return;
+    }
+
     setActionSubmitting(true);
     setActionError(null);
     try {
       await post(`/api/bpm/forms/task/${taskId}/submit`, {
         saveStrategy: 'variable_only',
-        variables: { decision: 'reject', comment },
+        variables: { decision: 'reject', comment: trimmedComment },
       });
       onComplete();
       onClose();

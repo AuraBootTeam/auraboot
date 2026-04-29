@@ -1,4 +1,4 @@
-# GA Follow-up E2E override — fully isolated backend + postgres + frontend.
+# GA Follow-up E2E override - fully isolated backend + postgres + frontend.
 #
 # Goals:
 #   - Run a clean OSS test stack without colliding with developers' local
@@ -41,6 +41,8 @@ services:
     # Compose appends profile lists; this gives backend [full, ga-e2e-stack].
     profiles:
       - ga-e2e-stack
+    build:
+      dockerfile: ${GA_E2E_BACKEND_DOCKERFILE:-Dockerfile}
     ports:
       - "6444:6443"
     volumes:
@@ -48,22 +50,24 @@ services:
       # can resolve absolute paths like /app/plugins/<name>.
       - ./plugins:/app/plugins:ro
     environment:
-      # CORS allow-list covers the in-container vite/BFF ports plus the
+      # CORS allow-list covers the in-container vite/BFF host plus the
       # host-mapped variants (5174/3501) that Playwright targets.
       FRONTEND_BASE_URL: http://localhost:5174
-      CORS_ALLOWED_ORIGINS: "http://localhost:5174,http://127.0.0.1:5174,http://localhost:3501,http://127.0.0.1:3501,http://localhost:5173,http://localhost:3500"
+      CORS_ALLOWED_ORIGINS: "http://ga-e2e-frontend:5173,http://ga-e2e-frontend:3500,http://localhost:5174,http://127.0.0.1:5174,http://localhost:3501,http://127.0.0.1:3501,http://localhost:5173,http://localhost:3500"
 
-  # Vite + BFF dev server in a node:20-alpine container.
+  # Vite + BFF dev server in a browser-capable Node container.
   # We do NOT use web-admin/Dockerfile because it bakes a prod build via
-  # `npm run build` which depends on pnpm (not in alpine). For E2E we want
-  # the same dev-mode flow developers use — bind-mount the source and run
-  # `pnpm dev:full` directly.
+  # `npm run build` while E2E needs the same dev-mode flow developers use:
+  # bind-mount the source and run `pnpm dev:full` directly.
   #
   # Distinct service name (`ga-e2e-frontend`, not `frontend`) so compose
   # does not merge the base file's `frontend.build:` block into us.
   ga-e2e-frontend:
-    image: node:20-alpine
+    # Reuse the Playwright image already needed by the runner. It includes
+    # bash/git/corepack, so startup does not depend on runtime apk/apt calls.
+    image: ${GA_E2E_FRONTEND_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-noble}
     container_name: auraboot-ga-e2e-frontend
+    user: root
     profiles:
       - ga-e2e-stack
     working_dir: /repo/web-admin
@@ -75,6 +79,7 @@ services:
       SPRING_BOOT_URL: http://backend:6443
       BFF_PORT: "3500"
       VITE_PORT: "5173"
+      VITE_ALLOWED_HOSTS: "ga-e2e-frontend,localhost,127.0.0.1"
       # Vite needs to bind 0.0.0.0 inside the container for the host port
       # mapping to work; the dev script honors HOST.
       HOST: "0.0.0.0"
@@ -83,7 +88,7 @@ services:
       NODE_ENV: development
       # SSR-side fetch base URL. Without this, app/shared/services/http-client
       # falls back to "use the incoming request origin", which becomes the
-      # host port (5174) — unreachable from inside the container — so SSR
+      # host port (5174) - unreachable from inside the container - so SSR
       # actions like the /login form submit fail with ECONNREFUSED. Use
       # 127.0.0.1 instead of localhost because Alpine resolves localhost to
       # ::1 first while the dev BFF binds IPv4.
@@ -105,16 +110,20 @@ services:
     command: >-
       sh -c "
       set -e;
-      apk add --no-cache bash git;
-      corepack enable;
-      corepack prepare pnpm@9 --activate;
+      if command -v pnpm >/dev/null 2>&1; then
+        pnpm --version;
+      else
+        corepack enable;
+        corepack prepare pnpm@9 --activate;
+      fi;
       cd /repo;
       pnpm install --no-frozen-lockfile --prefer-offline;
       cd web-admin;
-      pnpm sync-plugins;
+      sh ../scripts/sync-platform-plugins.sh;
+      node ../scripts/generate-plugin-routes.mjs;
       pnpm exec concurrently --names 'web,bff' --prefix-colors 'cyan,green' --restart-tries 5 --restart-after 2000 'pnpm dev:web' 'pnpm dev:bff'
       "
-    # Generous start period — first install can take a few minutes when the
+    # Generous start period - first install can take a few minutes when the
     # node_modules volume is empty.
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5173 >/dev/null 2>&1 && wget -q -O- http://127.0.0.1:3500/health >/dev/null 2>&1 || wget -q -O- http://127.0.0.1:3500 >/dev/null 2>&1"]
@@ -123,6 +132,50 @@ services:
       retries: 30
       start_period: 5m
 
+  # Playwright runner for GA showcase gates.
+  #
+  # Use the official Playwright image instead of the frontend's Alpine node
+  # container. The runner needs browser system dependencies and Linux-gnu node
+  # package binaries, so it gets its own node_modules/pnpm volumes.
+  # The image tag is overridable; the default matches pnpm-lock's Playwright
+  # version and reuses the image's baked /ms-playwright browsers.
+  ga-e2e-runner:
+    image: ${GA_E2E_RUNNER_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-noble}
+    container_name: auraboot-ga-e2e-runner
+    profiles:
+      - ga-e2e-runner
+    working_dir: /repo
+    environment:
+      CI: "true"
+      PLAYWRIGHT_BASE_URL: http://ga-e2e-frontend:5173
+      BASE_URL: http://ga-e2e-frontend:5173
+      BACKEND_URL: http://backend:6443
+      PW_SKIP_WEBSERVER: "1"
+      PW_STORAGE_DIR: tests/storage/ga-docker
+      PW_ADMIN_STORAGE_STATE: tests/storage/ga-docker/admin.json
+      PW_OPERATOR_STORAGE_STATE: tests/storage/ga-docker/operator.json
+      PW_VIEWER_STORAGE_STATE: tests/storage/ga-docker/viewer.json
+      NO_PROXY: "localhost,127.0.0.1,ga-e2e-frontend,backend"
+      no_proxy: "localhost,127.0.0.1,ga-e2e-frontend,backend"
+      PNPM_STORE_DIR: /pnpm-store
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      GA_E2E_SKIP_BROWSER_INSTALL: "1"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+    volumes:
+      - ./:/repo:cached
+      - ga_e2e_runner_node_modules:/repo/node_modules
+      - ga_e2e_runner_web_admin_node_modules:/repo/web-admin/node_modules
+      - ga_e2e_runner_pnpm_store:/pnpm-store
+    depends_on:
+      backend:
+        condition: service_healthy
+      ga-e2e-frontend:
+        condition: service_started
+
 volumes:
   ga_e2e_node_modules:
   ga_e2e_web_admin_node_modules:
+  ga_e2e_runner_node_modules:
+  ga_e2e_runner_web_admin_node_modules:
+  ga_e2e_runner_pnpm_store:

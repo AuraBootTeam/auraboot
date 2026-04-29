@@ -104,7 +104,7 @@ async function cmd(
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe.serial('Showcase Seed Data', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(300_000); // 5 min total
 
   test('Phase 1: Organization — Departments', async ({ page }) => {

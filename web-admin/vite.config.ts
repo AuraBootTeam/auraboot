@@ -7,6 +7,10 @@ import istanbul from 'vite-plugin-istanbul';
 
 const e2eCoverageEnabled = process.env.E2E_COVERAGE === '1';
 const bffProxyTarget = `http://127.0.0.1:${process.env.BFF_PORT || '3500'}`;
+const allowedHosts = process.env.VITE_ALLOWED_HOSTS
+  ?.split(',')
+  .map((host) => host.trim())
+  .filter(Boolean);
 
 // @originjs/vite-plugin-federation 1.4.x does not support SSR — its virtual
 // imports (`__federation_fn_satisfy`, etc.) are emitted unconditionally and
@@ -56,6 +60,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: Number(process.env.VITE_PORT || 5173),
     strictPort: true,
+    allowedHosts,
     // Allow browser devtools/extensions to probe source modules in local dev
     // without tripping CORS errors on HEAD/GET requests.
     cors: true,

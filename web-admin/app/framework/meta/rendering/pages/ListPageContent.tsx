@@ -380,6 +380,7 @@ export function ListPageContent(props: PageContentProps) {
   const [memberImportError, setMemberImportError] = useState<string | null>(null);
   const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(null);
   const { formats: dateTimeFormats } = useTimezone();
+  const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
   const loadDataRef = useRef<
     | ((params?: { page?: number; size?: number; filters?: Record<string, any> }) => Promise<void>)
     | null
@@ -454,6 +455,7 @@ export function ListPageContent(props: PageContentProps) {
       vc.filters.forEach((f) => {
         restoredFilters[f.fieldCode] = f.value;
       });
+      pendingSavedViewFiltersRef.current = restoredFilters;
       setFilters(restoredFilters);
     }
     // Apply saved sorts
@@ -819,6 +821,13 @@ export function ListPageContent(props: PageContentProps) {
   useEffect(() => {
     loadDataRef.current = loadData;
   }, [loadData]);
+
+  useEffect(() => {
+    const restoredFilters = pendingSavedViewFiltersRef.current;
+    if (!restoredFilters) return;
+    pendingSavedViewFiltersRef.current = null;
+    loadData({ page: 0, size: pagination.pageSize, filters: restoredFilters });
+  }, [currentView?.pid, loadData, pagination.pageSize]);
 
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction

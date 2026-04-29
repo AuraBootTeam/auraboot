@@ -17,6 +17,7 @@
  */
 
 import { test as setup, expect } from '@playwright/test';
+import { createCookieSessionStorage } from 'react-router';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,6 +29,28 @@ const STORAGE_DIR = process.env.PW_STORAGE_DIR
   ? path.resolve(process.env.PW_STORAGE_DIR)
   : path.join(__dirname, 'storage');
 const ENABLE_ROLE_AUTH = process.env.PW_ROLE_PROJECTS === '1';
+const NODE_ENV = process.env.NODE_ENV ?? 'development';
+const JWT_TOKEN_KEY = 'jwtToken';
+const authSessionStorage = createCookieSessionStorage({
+  cookie: {
+    name: '__session',
+    httpOnly: true,
+    path: '/',
+    sameSite: 'lax',
+    secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
+    secure: NODE_ENV === 'production',
+  },
+});
+
+async function createSessionCookieValue(jwt: string): Promise<string | null> {
+  const session = await authSessionStorage.getSession();
+  session.set(JWT_TOKEN_KEY, jwt);
+  const setCookie = await authSessionStorage.commitSession(session, {
+    maxAge: 60 * 60 * 24 * 7,
+  });
+  const match = setCookie.match(/__session=([^;]+)/);
+  return match?.[1] ?? null;
+}
 
 /**
  * Patch saved storage state to ensure all cookies have `secure` field.
@@ -122,17 +145,20 @@ async function autoSelectSpace(
     if (!newJwt) return false;
 
     // Set the new JWT (with tenantId) as session cookie
+    const cookieValue = await createSessionCookieValue(newJwt);
+    if (!cookieValue) return false;
+
     const newCookieBase = {
       name: '__session',
-      value: newJwt,
-      path: '/',
+      value: cookieValue,
       httpOnly: true,
       sameSite: 'Lax' as const,
       expires: Math.floor(Date.now() / 1000) + 604800,
     };
     await page.context().addCookies([
-      { ...newCookieBase, domain: 'localhost' },
-      { ...newCookieBase, domain: '127.0.0.1' },
+      { ...newCookieBase, url: baseURL },
+      { ...newCookieBase, domain: 'localhost', path: '/' },
+      { ...newCookieBase, domain: '127.0.0.1', path: '/' },
     ]);
     console.log(`   Auto-selected business space: tenantId=${bizSpace.tenantId}`);
     return true;
@@ -150,17 +176,20 @@ async function loginViaApi(
   const persistSessionCookie = async (jwt: string): Promise<boolean> => {
     if (!jwt) return false;
 
+    const cookieValue = await createSessionCookieValue(jwt);
+    if (!cookieValue) return false;
+
     const cookieBase = {
       name: '__session',
-      value: jwt,
-      path: '/',
+      value: cookieValue,
       httpOnly: true,
       sameSite: 'Lax' as const,
       expires: Math.floor(Date.now() / 1000) + 604800,
     };
     await page.context().addCookies([
-      { ...cookieBase, domain: 'localhost' },
-      { ...cookieBase, domain: '127.0.0.1' },
+      { ...cookieBase, url: baseURL },
+      { ...cookieBase, domain: 'localhost', path: '/' },
+      { ...cookieBase, domain: '127.0.0.1', path: '/' },
     ]);
 
     return true;
@@ -175,6 +204,31 @@ async function loginViaApi(
     const cookies = await page.context().cookies();
     return cookies.find((c) => c.name === '__session')?.value ?? null;
   };
+
+  try {
+    const resp = await page.request.post(`${baseURL}/api/auth/login`, {
+      data: { email: user.email, password: user.password },
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (resp.ok()) {
+      const body = await resp.json();
+      const jwt = body?.data?.jwt;
+      if (typeof jwt === 'string' && (await persistSessionCookie(jwt))) {
+        if (!body?.data?.tenantId) {
+          const resolved = await autoSelectSpace(page, baseURL);
+          if (!resolved) {
+            console.log(
+              `   [${user.email}] Warning: API login returned no tenantId and auto-select failed`,
+            );
+          }
+        }
+        return true;
+      }
+    }
+  } catch {
+    // Fall back to the legacy form action path below.
+  }
 
   // Retry up to 3 times with increasing delays to handle intermittent
   // BFF cold-start issues where it returns 200 instead of 302.

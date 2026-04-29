@@ -107,6 +107,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
     return (
       <th
         className="sticky right-0 z-20 w-px border-l border-gray-200 bg-gray-50 px-2 py-3 text-xs font-medium tracking-wider text-gray-500 uppercase shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]"
+        data-testid={`table-header-${column.field}`}
       >
         {label}
       </th>
@@ -131,6 +132,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
       } ${sortable ? 'select-none' : ''}`}
       style={style}
       onContextMenu={handleContextMenu}
+      data-testid={`table-header-${column.field}`}
     >
       <div className="flex items-center gap-1">
         {/* Drag handle — visible on hover */}
@@ -157,6 +159,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
         <span
           className={`flex flex-1 cursor-pointer items-center gap-1 ${sortable ? 'hover:text-gray-700' : ''}`}
           onClick={handleSortClick}
+          data-testid={`table-header-sort-${column.field}`}
         >
           <span className="truncate">{label}</span>
           {sortable && (

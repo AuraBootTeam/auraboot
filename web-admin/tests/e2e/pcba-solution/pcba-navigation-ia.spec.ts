@@ -24,18 +24,28 @@ type PcbaEntry = {
   route: RegExp;
   modelCode?: string;
   dashboardTitle?: RegExp;
+  inbox?: boolean;
 };
 
 const NAV_TIMEOUT = 15_000;
 const ENTERPRISE_PLUGIN_ROOT = '/Users/ghj/work/auraboot/auraboot-enterprise/plugins';
 
 const REQUIRED_PLUGINS = [
+  'product-catalog',
+  'crm',
+  'sales',
+  'inventory',
+  'procurement',
+  'finance',
+  'quality',
   'pcba-solution',
   'pcba-crm',
   'pcba-procurement',
   'pcba-manufacturing',
   'pcba-compliance',
   'pcba-finance',
+  'pcba-sales',
+  'pcba-warehouse',
 ];
 
 const DASHBOARD_ENTRY: PcbaEntry = {
@@ -44,6 +54,14 @@ const DASHBOARD_ENTRY: PcbaEntry = {
   label: /经营概览|Overview/i,
   route: /\/dashboards\?code=pe_executive_dashboard(?:$|[&#])/,
   dashboardTitle: /经营概览仪表盘|Executive KPI|经营概览/i,
+};
+
+const APPROVAL_CENTER_ENTRY: PcbaEntry = {
+  id: 'approval-center',
+  href: '/inbox?type=approval&status=pending',
+  label: /审批中心|Approval Center/i,
+  route: /\/inbox\?type=approval&status=pending(?:$|[&#])/,
+  inbox: true,
 };
 
 const SALES_AND_PROCUREMENT_ENTRIES: PcbaEntry[] = [
@@ -127,6 +145,84 @@ const GOVERNANCE_AND_FINANCE_ENTRIES: PcbaEntry[] = [
   },
 ];
 
+const SALES_EXTENSION_ENTRIES: PcbaEntry[] = [
+  {
+    id: 'pcba-sales-orders',
+    href: '/p/sl_sales_order',
+    label: /销售订单|Sales Orders/i,
+    parentLabel: /销售到订单|Sales To Order/i,
+    route: /\/p\/sl_sales_order(?:$|[?#])/,
+    modelCode: 'sl_sales_order',
+  },
+  {
+    id: 'pcba-shipments',
+    href: '/p/sl_shipment',
+    label: /发货执行|Shipments/i,
+    parentLabel: /销售到订单|Sales To Order/i,
+    route: /\/p\/sl_shipment(?:$|[?#])/,
+    modelCode: 'sl_shipment',
+  },
+  {
+    id: 'pcba-collections',
+    href: '/p/sl_sales_collection',
+    label: /收款确认|Collections/i,
+    parentLabel: /销售到订单|Sales To Order/i,
+    route: /\/p\/sl_sales_collection(?:$|[?#])/,
+    modelCode: 'sl_sales_collection',
+  },
+  {
+    id: 'pcba-rma',
+    href: '/p/sl_rma',
+    label: /RMA处理|RMA Handling/i,
+    parentLabel: /销售到订单|Sales To Order/i,
+    route: /\/p\/sl_rma(?:$|[?#])/,
+    modelCode: 'sl_rma',
+  },
+];
+
+const WAREHOUSE_EXTENSION_ENTRIES: PcbaEntry[] = [
+  {
+    id: 'pcba-wh-asn',
+    href: '/p/pe_asn',
+    label: /送货通知|Advance Shipment|ASN/i,
+    parentLabel: /仓储执行|Warehouse/i,
+    route: /\/p\/pe_asn(?:$|[?#])/,
+    modelCode: 'pe_asn',
+  },
+  {
+    id: 'pcba-wh-inbound',
+    href: '/p/inv_inbound',
+    label: /入库确认|Inbound Confirmation/i,
+    parentLabel: /仓储执行|Warehouse/i,
+    route: /\/p\/inv_inbound(?:$|[?#])/,
+    modelCode: 'inv_inbound',
+  },
+  {
+    id: 'pcba-wh-outbound',
+    href: '/p/inv_outbound',
+    label: /出库执行|Outbound Execution/i,
+    parentLabel: /仓储执行|Warehouse/i,
+    route: /\/p\/inv_outbound(?:$|[?#])/,
+    modelCode: 'inv_outbound',
+  },
+  {
+    id: 'pcba-wh-pick-orders',
+    href: '/p/inv_pick_order',
+    label: /拣货任务|Pick Orders/i,
+    parentLabel: /仓储执行|Warehouse/i,
+    route: /\/p\/inv_pick_order(?:$|[?#])/,
+    modelCode: 'inv_pick_order',
+  },
+  {
+    id: 'pcba-wh-lots',
+    href: '/p/inv_lot',
+    label: /批次追溯|Lot Traceability/i,
+    parentLabel: /仓储执行|Warehouse/i,
+    route: /\/p\/inv_lot(?:$|[?#])/,
+    modelCode: 'inv_lot',
+  },
+];
+
 function entryLink(nav: Locator, entry: PcbaEntry): Locator {
   const byHref = nav.locator(`a[href="${entry.href}"], a[href$="${entry.href}"]`);
   const byLabel = byHref.filter({ hasText: entry.label });
@@ -181,7 +277,7 @@ async function revealMenuEntry(page: Page, entry: PcbaEntry): Promise<Locator> {
 
 async function openEntryFromSidebar(page: Page, entry: PcbaEntry): Promise<void> {
   const leaf = await revealMenuEntry(page, entry);
-  const listResponsePromise = entry.modelCode
+  const responsePromise = entry.modelCode
     ? page
         .waitForResponse(
           (r) =>
@@ -191,12 +287,22 @@ async function openEntryFromSidebar(page: Page, entry: PcbaEntry): Promise<void>
           { timeout: NAV_TIMEOUT },
         )
         .catch(() => null)
-    : Promise.resolve(null);
+    : entry.inbox
+      ? page
+          .waitForResponse(
+            (r) => {
+              const url = new URL(r.url());
+              return url.pathname === '/api/inbox' && r.status() === 200;
+            },
+            { timeout: NAV_TIMEOUT },
+          )
+          .catch(() => null)
+      : Promise.resolve(null);
 
   await leaf.scrollIntoViewIfNeeded();
   await leaf.evaluate((el: HTMLElement) => el.click());
   await expect(page).toHaveURL(entry.route, { timeout: NAV_TIMEOUT });
-  await listResponsePromise;
+  await responsePromise;
 }
 
 async function expectHealthyPageShell(page: Page): Promise<void> {
@@ -235,6 +341,18 @@ async function expectDashboardReady(page: Page, title: RegExp): Promise<void> {
     .locator('table, [role="table"], canvas, svg, [class*="chart"], [class*="card"]')
     .first();
   await expect(dashboardContent).toBeVisible({ timeout: NAV_TIMEOUT });
+}
+
+async function expectApprovalInboxReady(page: Page): Promise<void> {
+  const inbox = page.getByTestId('unified-inbox-page');
+  await expect(inbox).toBeVisible({ timeout: NAV_TIMEOUT });
+  await expect(page.getByTestId('inbox-tab-approval')).toBeVisible({ timeout: NAV_TIMEOUT });
+  await expect(page.getByTestId('inbox-status-pending')).toBeVisible({ timeout: NAV_TIMEOUT });
+  await expect(inbox.getByText(/Approval queue/i)).toBeVisible({ timeout: NAV_TIMEOUT });
+  await expect(inbox.getByText(/items need attention/i)).toBeVisible({ timeout: NAV_TIMEOUT });
+  await expect(page.getByTestId('inbox-loading-skeleton')).not.toBeVisible({
+    timeout: NAV_TIMEOUT,
+  });
 }
 
 async function importPluginDirectory(request: APIRequestContext, pluginName: string): Promise<void> {
@@ -277,6 +395,12 @@ test.describe('PCBA ERP — Navigation IA Smoke @smoke', () => {
     await expectDashboardReady(page, DASHBOARD_ENTRY.dashboardTitle!);
   });
 
+  test('PCBA-IA-06: approval center opens the unified approval queue', async ({ page }) => {
+    await openEntryFromSidebar(page, APPROVAL_CENTER_ENTRY);
+    await expectHealthyPageShell(page);
+    await expectApprovalInboxReady(page);
+  });
+
   test('PCBA-IA-02: sales-to-order and procurement entries are reachable', async ({ page }) => {
     for (const entry of SALES_AND_PROCUREMENT_ENTRIES) {
       await openEntryFromSidebar(page, entry);
@@ -299,6 +423,16 @@ test.describe('PCBA ERP — Navigation IA Smoke @smoke', () => {
 
   test('PCBA-IA-04: quality and finance entries are reachable', async ({ page }) => {
     for (const entry of GOVERNANCE_AND_FINANCE_ENTRIES) {
+      await openEntryFromSidebar(page, entry);
+      await expectHealthyPageShell(page);
+      await expectDynamicListReady(page);
+    }
+  });
+
+  test('PCBA-IA-05: sales and warehouse workflow extension entries are reachable', async ({
+    page,
+  }) => {
+    for (const entry of [...SALES_EXTENSION_ENTRIES, ...WAREHOUSE_EXTENSION_ENTRIES]) {
       await openEntryFromSidebar(page, entry);
       await expectHealthyPageShell(page);
       await expectDynamicListReady(page);

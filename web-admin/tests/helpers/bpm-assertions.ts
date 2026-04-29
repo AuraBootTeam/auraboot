@@ -453,7 +453,7 @@ export async function startInstanceAndAdvance(
     } else {
       const rejectResp = await api.post(`/api/bpm/tasks/${taskId}/reject`, {
         headers: { ...authHeader(token), 'Content-Type': 'application/json' },
-        data: { comment: '', variables: step.vars ?? {} },
+        data: { comment: `Rejected by step ${stepIndex}`, variables: step.vars ?? {} },
       });
       expect(
         rejectResp.ok(),

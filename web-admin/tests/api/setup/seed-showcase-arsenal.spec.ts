@@ -36,7 +36,7 @@ async function cmd(
 }
 
 test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(300_000);
 
   // ═════════════════════════════════════════════════════════════════════════

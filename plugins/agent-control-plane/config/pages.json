@@ -1632,7 +1632,7 @@
             "label": "approve",
             "confirm": "approve.confirm",
             "action": {
-              "type": "state_transition",
+              "type": "command",
               "command": "acp:approve_request"
             },
             "type": "command"
@@ -1644,7 +1644,7 @@
             "label": "reject",
             "confirm": "reject.confirm",
             "action": {
-              "type": "state_transition",
+              "type": "command",
               "command": "acp:reject_request"
             },
             "type": "command"

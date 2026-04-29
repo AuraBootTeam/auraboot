@@ -66,6 +66,11 @@ public class ViewConfig {
      */
     private List<java.util.Map<String, Object>> conditionalFormats;
 
+    /**
+     * Toolbar action button configurations for TABLE view.
+     */
+    private List<ToolbarActionConfig> toolbarActions;
+
     // ==================== Kanban Fields ====================
 
     /**
@@ -418,6 +423,35 @@ public class ViewConfig {
          * Filter group for complex conditions
          */
         private String group;
+    }
+
+    /**
+     * Toolbar action configuration.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ToolbarActionConfig {
+        /**
+         * Action code from DSL or built-in action code.
+         */
+        private String code;
+
+        /**
+         * Whether the action is visible.
+         */
+        private Boolean visible;
+
+        /**
+         * Whether the action is pinned directly in the toolbar.
+         */
+        private Boolean pinned;
+
+        /**
+         * Display order across pinned and overflow actions.
+         */
+        private Integer order;
     }
 
     /**

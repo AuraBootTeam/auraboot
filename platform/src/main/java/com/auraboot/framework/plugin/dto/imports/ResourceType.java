@@ -18,6 +18,7 @@ public enum ResourceType {
     PAGE("ab_page_schema", "页面", OwnershipType.SHARED),
     DICT("ab_dict", "字典", OwnershipType.SHARED),
     NAMED_QUERY("ab_named_query", "命名查询", OwnershipType.SHARED),
+    AGENT_DEFINITION("ab_agent_definition", "Agent 定义", OwnershipType.SHARED),
     DICT_ITEM("ab_dict_item", "字典项", OwnershipType.USER_CLAIMED),
     SAVED_VIEW("ab_saved_view", "保存视图", OwnershipType.SHARED),
     I18N("ab_i18n_resource", "国际化资源", OwnershipType.SHARED);
@@ -55,6 +56,7 @@ public enum ResourceType {
             case COMMAND -> 70;
             case BINDING_RULE -> 71;
             case NAMED_QUERY -> 75;
+            case AGENT_DEFINITION -> 76;
             case PAGE -> 80;
             case SAVED_VIEW -> 82;
             case PROCESS -> 90;

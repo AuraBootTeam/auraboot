@@ -110,8 +110,17 @@ public class ToolLoopService implements ToolExecutionPort {
             String approvalPid = approvalGate.checkAndRequestApproval(
                     tenantId, runPid, taskPid, toolName, toolDef.getDescription(), input, true);
             if (approvalPid != null) {
-                return "Error: This tool requires human approval. Approval request " + approvalPid + " has been created.";
+                return toJsonResult(Map.of(
+                        "success", false,
+                        "approvalRequired", true,
+                        "approvalPid", approvalPid,
+                        "message", "This tool requires human approval. Approval request " +
+                                approvalPid + " has been created."));
             }
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "approvalRequired", true,
+                    "error", "This tool requires human approval, but no matching approval policy could create a request. No data was changed."));
         }
 
         if (toolDef.isRequiresConfirmation()) {
@@ -150,7 +159,7 @@ public class ToolLoopService implements ToolExecutionPort {
             }
 
             long latencyMs = System.currentTimeMillis() - startMs;
-            boolean success = !result.startsWith("Error");
+            boolean success = isToolResultSuccess(result);
             updateToolStats(tenantId, toolName, success, latencyMs, success ? null : result);
 
             // Emit ResultContract for structured frontend rendering (PR-11). No-op if
@@ -211,6 +220,9 @@ public class ToolLoopService implements ToolExecutionPort {
 
             CommandExecuteRequest request = new CommandExecuteRequest();
             request.setPayload(input);
+            if (recordPid != null) {
+                request.setTargetRecordId(recordPid);
+            }
             cmdResult = commandExecutor.execute(commandCode, request);
 
             String jsonResult = objectMapper.writeValueAsString(Map.of(
@@ -363,6 +375,7 @@ public class ToolLoopService implements ToolExecutionPort {
     private String extractRecordPidFromInput(Map<String, Object> input) {
         if (input == null) return null;
         Object pid = input.get("recordPid");
+        if (pid == null) pid = input.get("recordId");
         if (pid == null) pid = input.get("pid");
         if (pid == null) pid = input.get("id");
         return pid != null ? pid.toString() : null;
@@ -407,6 +420,29 @@ public class ToolLoopService implements ToolExecutionPort {
         } catch (Exception e) {
             log.debug("Failed to update tool stats for {}: {}", toolCode, e.getMessage());
         }
+    }
+
+    private String toJsonResult(Map<String, Object> result) {
+        try {
+            return objectMapper.writeValueAsString(result);
+        } catch (Exception e) {
+            return String.valueOf(result);
+        }
+    }
+
+    private boolean isToolResultSuccess(String result) {
+        if (result == null || result.startsWith("Error")) {
+            return false;
+        }
+        try {
+            Object parsed = objectMapper.readValue(result, Object.class);
+            if (parsed instanceof Map<?, ?> map && map.containsKey("success")) {
+                return Boolean.TRUE.equals(map.get("success"));
+            }
+        } catch (Exception ignored) {
+            // Non-JSON tool output is considered successful unless it starts with Error.
+        }
+        return true;
     }
 
     private void incrementHallucinationCount(String runPid) {

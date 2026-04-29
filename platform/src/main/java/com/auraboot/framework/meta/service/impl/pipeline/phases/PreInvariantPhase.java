@@ -15,6 +15,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.validation.CrossFieldRuleEngine;
 import com.auraboot.framework.meta.validation.RuleEvaluationResult;
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,9 +26,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -68,9 +68,13 @@ public class PreInvariantPhase implements CommandPhase {
         executeCrossFieldRules(ctx.getCommand(), ctx.getPayload(), ctx.getExecConfig());
 
         // Resolve plugin handler flags
-        ctx.setHasPluginHandler(hasPluginHandler(ctx.getCommand().getCode()));
-        ctx.setPluginRequiresDslPersistence(ctx.isHasPluginHandler()
-                && shouldExecuteDslPersistenceWithPlugin(ctx.getExecConfig(), ctx.getRequest()));
+        String pluginHandlerCode = resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
+        Optional<CommandHandlerExtension> pluginHandler = findPluginHandler(pluginHandlerCode);
+        ctx.setHasPluginHandler(pluginHandler.isPresent());
+        ctx.setPluginRequiresDslPersistence(pluginHandler
+                .map(handler -> handler.requiresDslPersistence(
+                        pluginHandlerCode, ctx.getExecConfig(), ctx.getRequest()))
+                .orElse(false));
     }
 
     // ==================== Inlined delegate methods ====================
@@ -121,26 +125,19 @@ public class PreInvariantPhase implements CommandPhase {
         }
     }
 
-    private boolean hasPluginHandler(String commandCode) {
-        return extensionRegistry != null && extensionRegistry.getCommandHandler(commandCode).isPresent();
+    private Optional<CommandHandlerExtension> findPluginHandler(String commandCode) {
+        return extensionRegistry != null
+                ? extensionRegistry.getCommandHandler(commandCode)
+                : Optional.empty();
     }
 
-    private boolean shouldExecuteDslPersistenceWithPlugin(Map<String, Object> execConfig,
-                                                           com.auraboot.framework.meta.dto.CommandExecuteRequest request) {
-        if (execConfig == null || execConfig.isEmpty()) {
-            return false;
-        }
-        String operationType = request != null ? request.getOperationType() : null;
-        if ("delete".equalsIgnoreCase(operationType) || "state_transition".equalsIgnoreCase(operationType)) {
-            return true;
-        }
-        Object type = execConfig.get("type");
-        if (type instanceof String typeValue) {
-            String normalizedType = typeValue.trim().toLowerCase(Locale.ROOT);
-            if (Set.of("create", "update", "delete", "state_transition").contains(normalizedType)) {
-                return true;
+    private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {
+        if (execConfig != null) {
+            Object handler = execConfig.get("handler");
+            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
+                return handlerCode.trim();
             }
         }
-        return execConfig.containsKey("inputFields") || execConfig.containsKey("autoSetFields");
+        return commandCode;
     }
 }

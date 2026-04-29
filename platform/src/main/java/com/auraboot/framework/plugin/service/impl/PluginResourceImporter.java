@@ -20,6 +20,7 @@ public interface PluginResourceImporter {
     boolean checkPageExists(Long tenantId, String pageKey);
     boolean checkDictExists(Long tenantId, String code);
     boolean checkNamedQueryExists(Long tenantId, String code);
+    boolean checkAgentDefinitionExists(Long tenantId, String agentCode);
 
     // ==================== Import Operations ====================
 
@@ -63,6 +64,9 @@ public interface PluginResourceImporter {
 
     PluginResource importNamedQuery(NamedQueryDefinitionDTO dto, String pluginPid, String importId,
                                     Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
+
+    PluginResource importAgentDefinition(AgentDefinitionDTO dto, String pluginPid, String importId,
+                                         Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
 
     /**
      * Import a dashboard definition from {@code config/dashboards/*.json}.

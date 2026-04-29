@@ -37,6 +37,8 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 @Tag(name = "任务管理", description = "任务的查询、处理、委托等操作")
 public class TaskController {
 
+    private static final String REJECTION_COMMENT_REQUIRED = "Rejection comment is required";
+
     private final TaskService taskService;
     private final ProcessEngineService processEngineService;
     private final WithdrawService withdrawService;
@@ -239,6 +241,9 @@ public class TaskController {
             @PathVariable String taskId,
             @RequestBody RejectTaskRequest request) {
         log.info("Rejecting task: {}", taskId);
+        if (request == null || request.comment == null || request.comment.isBlank()) {
+            return ApiResponse.error(REJECTION_COMMENT_REQUIRED);
+        }
         taskService.rejectTask(taskId, request.comment, request.variables);
         return ApiResponse.success();
     }

@@ -372,7 +372,7 @@ test.describe('showcase_all_fields form audit', () => {
 
     const budgetInput = page.locator(`${field('sc_budget')} input`).first();
     await budgetInput.click();
-    await budgetInput.press('Meta+A');
+    await budgetInput.press('ControlOrMeta+A');
     await budgetInput.type(UPDATED_BUDGET);
     await budgetInput.blur();
 

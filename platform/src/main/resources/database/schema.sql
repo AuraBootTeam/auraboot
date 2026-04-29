@@ -2450,7 +2450,7 @@ CREATE TABLE IF NOT EXISTS ab_plugin_resource (
     CONSTRAINT chk_resource_type CHECK (resource_type IN (
         'model', 'field', 'model_field_binding', 'command', 'binding_rule',
         'permission', 'role', 'role_permission', 'menu', 'process', 'page',
-        'dict', 'dict_item', 'named_query', 'i18n'
+        'dict', 'dict_item', 'named_query', 'agent_definition', 'i18n'
     )),
     CONSTRAINT chk_resource_action CHECK (action IN ('create', 'update', 'delete', 'skip'))
 );
@@ -2753,7 +2753,7 @@ BEGIN
         ADD CONSTRAINT chk_resource_type CHECK (resource_type IN (
             'model', 'field', 'model_field_binding', 'command', 'binding_rule',
             'permission', 'role', 'role_permission', 'menu', 'process', 'page',
-            'dict', 'dict_item', 'named_query', 'i18n'
+            'dict', 'dict_item', 'named_query', 'agent_definition', 'i18n'
         ));
 EXCEPTION
     WHEN duplicate_object THEN NULL;
@@ -4897,6 +4897,7 @@ CREATE TABLE IF NOT EXISTS ab_agent_approval (
 );
 -- ACP P0 fix: additive columns for plan integrity freezing.
 -- Idempotent ALTER so both fresh init (after CREATE TABLE above) and upgrade paths apply.
+ALTER TABLE ab_agent_approval ALTER COLUMN approver_id TYPE BIGINT USING approver_id::BIGINT;
 ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS plan_hash VARCHAR(64);
 ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS plan_snapshot TEXT;
 

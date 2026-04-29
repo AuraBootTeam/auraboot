@@ -161,6 +161,27 @@ class PluginValidationPipelineTest {
     }
 
     @Test
+    void commandDefinitionDto_consolidatesTopLevelHandlerAndParams() {
+        CommandDefinitionDTO cmd = new CommandDefinitionDTO();
+        cmd.setCode("pr:submit_purchase_order");
+        cmd.setModelCode("pr_purchase_order");
+        cmd.setType("state_transition");
+        cmd.setHandler("pr:start_approval_flow");
+        cmd.setHandlerParams(Map.of(
+                "processKey", "po_approval",
+                "amountField", "pr_po_total_amount",
+                "statusField", "pr_po_status"));
+
+        Map<String, Object> config = cmd.getConsolidatedExecutionConfig();
+
+        assertNotNull(config);
+        assertEquals("state_transition", config.get("type"));
+        assertEquals("pr:start_approval_flow", config.get("handler"));
+        assertEquals("po_approval", ((Map<?, ?>) config.get("handlerParams")).get("processKey"));
+        assertEquals("pr_po_status", ((Map<?, ?>) config.get("handlerParams")).get("statusField"));
+    }
+
+    @Test
     void executionConfigValidator_invalidType() {
         ExecutionConfigValidator validator = new ExecutionConfigValidator();
 

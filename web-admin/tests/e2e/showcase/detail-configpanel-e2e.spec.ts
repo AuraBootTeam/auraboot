@@ -49,6 +49,24 @@ function uniqueCommandCode(): string {
   return `e2e:detail_action_${ts}_${rnd}`;
 }
 
+async function gotoDomcontentLoadedWithRetry(page: Page, url: string): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 8_000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('ERR_ABORTED')) {
+        throw error;
+      }
+      await page.waitForLoadState('domcontentloaded', { timeout: 5_000 }).catch(() => null);
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Create a detail-kind page_schema directly via the REST API.
  * Setup-only: not counted toward the click/fill > page.request budget per the
@@ -138,9 +156,12 @@ async function navigateToPageSchemaList(page: Page): Promise<void> {
   );
   await leaf.evaluate((el: HTMLElement) => el.click());
   await listResp.catch(() => null);
+  await page
+    .waitForURL(/\/p\/page_schema(?:$|\?)/, { timeout: 5_000 })
+    .catch(() => null);
 
   if (!(await page.getByTestId('toolbar-btn-create').isVisible({ timeout: 5_000 }).catch(() => false))) {
-    await page.goto('/p/page_schema', { waitUntil: 'domcontentloaded' });
+    await gotoDomcontentLoadedWithRetry(page, '/p/page_schema');
   }
   await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 8_000 });
 
