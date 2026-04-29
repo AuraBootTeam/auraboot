@@ -259,7 +259,11 @@ public class StepLoopService {
                 if (approvalPid != null) {
                     step.setStatus(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
                     persistPlan(runPid, plan, i);
-                    throw new AgentApprovalPendingException("Step " + i + " awaiting approval: " + step.getDescription());
+                    // Phase C.3d: pass approvalPid through the exception so the
+                    // chokepoint can surface it as the resumption token on the
+                    // confirm_required SSE event.
+                    throw new AgentApprovalPendingException(approvalPid,
+                            "Step " + i + " awaiting approval: " + step.getDescription());
                 }
             }
 

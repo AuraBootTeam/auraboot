@@ -2,6 +2,7 @@ package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.agent.service.ActiveMemoryService;
+import com.auraboot.framework.agent.service.AgentApprovalGateService;
 import com.auraboot.framework.agent.service.AgentRunService;
 import com.auraboot.framework.agent.service.RunOutcome;
 import com.auraboot.framework.agent.triage.PreGroundingTriage;
@@ -85,6 +86,16 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     @Autowired(required = false)
     private DynamicDataMapper dynamicDataMapper;
 
+    /**
+     * Phase C.3d (Q-C3.3=α): approval-gate convergence. {@link #resumeTurn}
+     * dispatches a resume call to either the legacy {@link ChatSessionStore}
+     * pending-tool path or the ACP {@code ab_agent_approval} path; this bean
+     * services the latter. Optional so OSS deployments without the ACP
+     * runtime keep building.
+     */
+    @Autowired(required = false)
+    private AgentApprovalGateService agentApprovalGateService;
+
     public ConversationTurnServiceImpl(AuraBotChatService chatService,
                                         @Qualifier("turnSideEffects") TurnSideEffects sideEffects,
                                         ChatSessionStore chatSessionStore,
@@ -146,31 +157,53 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             decision = ConfirmDecision.DENIED;
         }
 
-        // 1. Look up the pending state. ChatSessionStore is keyed solely by
-        //    turnId since the chat impl breaks out of the inner tool-loop the
-        //    moment one write tool is queued for confirmation — so at most one
-        //    pending entry exists per turnId at any given time.
+        // Phase C.3d (Q-C3.3=α): the resumption token is opaque to the
+        // frontend — it can be either (a) a ChatSessionStore.PendingTool key
+        // (legacy chat tool-loop suspension, set by AuraBotChatService B.6
+        // path) or (b) an ab_agent_approval.pid (new ACP path written by
+        // dispatchToAcpRun via the C.3d mapRunToTurnOutcome PendingApproval
+        // branch). We try the chat-store first because consumePending atomically
+        // removes the entry; if the token is actually an approval pid the
+        // store returns null and we fall through to the approval lookup.
         ChatSessionStore.PendingTool pending = chatSessionStore.consumePending(pendingTurnId);
-        if (pending == null) {
-            String msg = "No pending tool found for pendingTurnId=" + pendingTurnId
-                    + " (expired or already consumed)";
-            log.warn(msg);
-            sink.onError(msg, null);
-            return new TurnOutcome.Failed(msg, null);
+        if (pending != null) {
+            return resumeChatPendingTool(pending, decision, sink);
         }
 
-        // 2. Identity validation: the caller must own the suspended turn.
+        // Try ACP approval path (only when the gate bean is wired)
+        if (agentApprovalGateService != null) {
+            Long tenantId = MetaContext.getCurrentTenantId();
+            Map<String, Object> approval = tenantId != null
+                    ? agentApprovalGateService.findApproval(tenantId, pendingTurnId)
+                    : null;
+            if (approval != null) {
+                return resumeAcpApproval(approval, decision, sink);
+            }
+        }
+
+        String msg = "No pending tool or approval found for pendingTurnId=" + pendingTurnId
+                + " (expired or already consumed)";
+        log.warn(msg);
+        sink.onError(msg, null);
+        return new TurnOutcome.Failed(msg, null);
+    }
+
+    /** Legacy chat tool-loop suspension resume (Phase B.6 path). Behaviour
+     *  is unchanged from pre-C.3d. */
+    private TurnOutcome resumeChatPendingTool(ChatSessionStore.PendingTool pending,
+                                               ConfirmDecision decision, ResponseSink sink) {
+        // 1. Identity validation: the caller must own the suspended turn.
         TurnOutcome identityFailure = validateIdentity(pending);
         if (identityFailure != null) {
             sink.onError(((TurnOutcome.Failed) identityFailure).errorMessage(), null);
             return identityFailure;
         }
 
-        // 3. Rebuild TurnContext from the saved pending state.
+        // 2. Rebuild TurnContext from the saved pending state.
         TurnContext ctx = rebuildContext(pending);
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
 
-        // 4. Dispatch by decision.
+        // 3. Dispatch by decision.
         TurnOutcome outcome;
         try {
             outcome = switch (decision) {
@@ -196,14 +229,127 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             outcome = new TurnOutcome.Failed(e.getMessage(), e);
         }
 
-        // 5. Finalize — same dispatch as runTurn so persistence/event/audit/metrics
-        //    all fire on the resume path identically.
         try {
             finalizeTurn(ctx, outcome);
         } catch (Exception e) {
             log.warn("resumeTurn finalizeTurn threw, swallowing: {}", e.getMessage(), e);
         }
         return outcome;
+    }
+
+    /**
+     * Phase C.3d (Q-C3.3=α): ACP approval resume. Drives the approve / reject
+     * decision through {@link AgentApprovalGateService} (with the auto-resume
+     * @Async dispatch suppressed) and then synchronously calls
+     * {@link AgentRunService#executeTaskSync} with {@code resumeFromRunPid}
+     * so the resulting {@link RunOutcome} streams back through the SSE sink
+     * the user is still listening on.
+     *
+     * <p>Tenant identity is checked at the {@code findApproval} call site —
+     * the lookup is scoped by tenant — so callers from another tenant get a
+     * "not found" error rather than a successful cross-tenant approve, which
+     * is the same security posture the legacy chat path enforces via
+     * {@link #validateIdentity}.
+     */
+    private TurnOutcome resumeAcpApproval(Map<String, Object> approval, ConfirmDecision decision,
+                                            ResponseSink sink) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long approverId = MetaContext.getCurrentUserId();
+        String approvalPid = (String) approval.get("pid");
+        String runPid = (String) approval.get("run_id");
+        String taskPid = (String) approval.get("task_id");
+        String existingStatus = (String) approval.get("approval_status");
+
+        if (tenantId == null || approverId == null) {
+            String msg = "resumeTurn (ACP path) requires authenticated identity";
+            log.warn(msg);
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
+        }
+        if (!"pending".equals(existingStatus)) {
+            String msg = "Approval " + approvalPid + " is no longer pending (status=" + existingStatus + ")";
+            log.warn(msg);
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
+        }
+
+        // Rebuild a TurnContext that points at this approval's run; the
+        // chokepoint metric / event chain reads turnId etc. from it.
+        TurnContext ctx = new TurnContext(
+                approvalPid,                                  // turnId — reuse approvalPid for trace correlation
+                tenantId,
+                approverId,
+                MetaContext.getCurrentMemberId(),
+                null, null,
+                null,                                         // conversationId — not stored on approval row
+                null,
+                null,                                         // triageBucket — N/A on resume
+                null,
+                java.time.Instant.now());
+        sideEffects.metricsRecorder().recordTurnBegin(ctx);
+
+        TurnOutcome outcome;
+        try {
+            outcome = switch (decision) {
+                case APPROVED -> {
+                    Map<String, Object> approved = agentApprovalGateService.approve(
+                            tenantId, approvalPid, approverId, /*triggerAutoResume=*/ false);
+                    if (approved == null) {
+                        String msg = "Approval " + approvalPid + " could not be approved (terminal state)";
+                        sink.onError(msg, null);
+                        yield new TurnOutcome.Failed(msg, null);
+                    }
+                    yield syncResumeAcpRun(ctx, taskPid, runPid, sink);
+                }
+                case DENIED -> {
+                    agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User denied the operation");
+                    sink.onDone("", null);
+                    yield new TurnOutcome.Interrupted("User denied the operation", "user_denied");
+                }
+                case CANCELLED -> {
+                    agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User cancelled the operation");
+                    sink.onDone("", null);
+                    yield new TurnOutcome.Interrupted("User cancelled the operation", "user_cancelled");
+                }
+            };
+        } catch (Exception e) {
+            log.error("resumeAcpApproval failed: {}", e.getMessage(), e);
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            sink.onError(msg, null);
+            outcome = new TurnOutcome.Failed(msg, e);
+        }
+
+        try {
+            finalizeTurn(ctx, outcome);
+        } catch (Exception e) {
+            log.warn("resumeAcpApproval finalizeTurn threw, swallowing: {}", e.getMessage(), e);
+        }
+        return outcome;
+    }
+
+    /**
+     * Drive a synchronous ACP run resume from an approved approval. Mirrors
+     * {@link #dispatchToAcpRun}'s ResponseSinkContext binding so any
+     * {@code result_contract} events emitted during the resumed step still
+     * stream to the same SSE sink.
+     */
+    private TurnOutcome syncResumeAcpRun(TurnContext ctx, String taskPid, String runPid,
+                                          ResponseSink sink) {
+        if (agentRunService == null || taskPid == null || runPid == null) {
+            String msg = "ACP resume blocked: missing wiring (taskPid=" + taskPid
+                    + ", runPid=" + runPid + ", agentRunService=" + (agentRunService != null) + ")";
+            log.error(msg);
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, null);
+        }
+        ResponseSinkContext.set(sink);
+        try {
+            RunOutcome resumeOutcome = agentRunService.executeTaskSync(
+                    ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, runPid);
+            return mapRunToTurnOutcome(ctx, resumeOutcome, sink);
+        } finally {
+            ResponseSinkContext.clear();
+        }
     }
 
     /**
@@ -431,12 +577,33 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 yield new TurnOutcome.Success(response, meta);
             }
             case RunOutcome.PendingApproval pa -> {
-                // Phase C.3c interim — full approval-gate UI lives in C.3d.
-                String msg = pa.message() != null
-                        ? "Approval required (run " + pa.runPid() + "): " + pa.message()
-                        : "Approval required for run " + pa.runPid();
-                sink.onError(msg, null);
-                yield new TurnOutcome.Failed(msg, null);
+                // Phase C.3d (Q-C3.3=α): convergence to ACP approval gate.
+                // approvalPid identifies the ab_agent_approval row; we surface
+                // it on the confirm_required SSE event as the resumption token
+                // (replacing pendingTurnId for ACP_RUN turns) and return a
+                // PendingConfirmation outcome so finalizeTurn fires the
+                // suspension event chain (TurnSuspendedEvent + ChatSessionStore
+                // savePending stays unwired for ACP path — the approval row IS
+                // the persisted pending state).
+                if (pa.approvalPid() == null) {
+                    // Pre-C.3d throw site: no approvalPid available — fall back
+                    // to Failed so the user is not silently stuck.
+                    String msg = "Approval required but no approval pid available "
+                            + "(run " + pa.runPid() + "): "
+                            + (pa.message() != null ? pa.message() : "<no detail>");
+                    sink.onError(msg, null);
+                    yield new TurnOutcome.Failed(msg, null);
+                }
+                sink.onConfirmRequired(
+                        pa.approvalPid(),                   // toolId — frontend uses for action correlation
+                        "agent_approval_gate",              // toolName — generic ACP gate marker
+                        pa.message() != null ? pa.message() : "Approval required",
+                        Map.of("runPid", pa.runPid()),
+                        pa.approvalPid());                  // pendingTurnId — resumption token
+                yield new TurnOutcome.PendingConfirmation(
+                        pa.approvalPid(),                   // pendingTurnId in TurnOutcome
+                        "",                                 // partialResponse — ACP run does not stream prose
+                        pa.approvalPid());                  // pendingToolId
             }
             case RunOutcome.Failed f -> {
                 String msg = f.errorMessage() != null ? f.errorMessage() : "ACP run failed";
