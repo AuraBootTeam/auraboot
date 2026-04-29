@@ -75,11 +75,20 @@ public class AgentRunService {
     // Thread-local trace context for tool span tracking within a run
     private static final ThreadLocal<TraceContext> currentTraceCtx = new ThreadLocal<>();
 
+    /**
+     * Async fire-and-forget entry point for IM event listeners, the
+     * {@code AgentScheduleService} cron driver, and parent-task dispatch
+     * (see {@link #dispatchChildTasks}). Establishes a system tenant
+     * context (no user) and delegates to {@link #executeTaskSync}; the
+     * sync return value is intentionally discarded — callers that need
+     * the outcome should call {@code executeTaskSync} directly (Q-C3.2=β
+     * "sync core + async at adapter").
+     */
     @Async
     public void executeTask(Long tenantId, String taskPid, String agentCode) {
         MetaContext.setSystemTenantContext(tenantId);
         try {
-            doExecuteTask(tenantId, taskPid, agentCode, null);
+            executeTaskSync(tenantId, taskPid, agentCode, null);
         } finally {
             MetaContext.clear();
         }
@@ -89,16 +98,42 @@ public class AgentRunService {
     public void executeTaskWithResume(Long tenantId, String taskPid, String agentCode, String resumeFromRunPid) {
         MetaContext.setSystemTenantContext(tenantId);
         try {
-            doExecuteTask(tenantId, taskPid, agentCode, resumeFromRunPid);
+            executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid);
         } finally {
             MetaContext.clear();
         }
     }
 
-    private void doExecuteTask(Long tenantId, String taskPid, String agentCode, String resumeFromRunPid) {
+    /**
+     * Synchronous entry point for the ACP run loop. Returns a {@link RunOutcome}
+     * describing the terminal state so a caller in a sync context (e.g.
+     * {@code ConversationTurnService.runTurn} dispatching to ACP under Q-C3.1=A
+     * per-turn task model) can map it to its own outcome type without polling
+     * the database.
+     *
+     * <p>Phase C.3a contract: this method does NOT touch {@link MetaContext} —
+     * the caller is responsible for binding tenant / user context appropriately
+     * (HTTP requests get it from the auth interceptor; the {@code @Async}
+     * wrappers above bind a system context for non-user-driven callers).
+     *
+     * <p>All exceptions are caught and converted into {@link RunOutcome.Failed}
+     * or {@link RunOutcome.PendingApproval}; this method never throws. Side
+     * effects ({@code ab_agent_run} / {@code ab_agent_action} writes,
+     * observation events, trace, memory writeback, child-task dispatch) are
+     * preserved exactly as before — only the return type changes.
+     *
+     * @param tenantId         non-null tenant
+     * @param taskPid          non-null {@code ab_agent_task.pid}
+     * @param agentCode        non-null {@code ab_agent_definition.agent_code}
+     * @param resumeFromRunPid optional previous {@code ab_agent_run.pid} when
+     *                         resuming after an approval gate; {@code null}
+     *                         for a fresh run
+     */
+    public RunOutcome executeTaskSync(Long tenantId, String taskPid, String agentCode,
+                                      String resumeFromRunPid) {
         if (!agentProperties.isEnabled()) {
             log.warn("Agent runtime is disabled, skipping task: {}", taskPid);
-            return;
+            return new RunOutcome.Skipped("Agent runtime disabled");
         }
 
         String runPid = UniqueIdGenerator.generate();
@@ -137,14 +172,14 @@ public class AgentRunService {
                     : RunLifecycleService.DEFAULT_MAX_CONCURRENT_RUNS;
             int activeRuns = runLifecycleService.countActiveRuns(tenantId, agentCode, runPid);
             if (activeRuns >= maxConcurrent) {
+                String concurrencyMsg = "Concurrency limit: " + activeRuns + "/" + maxConcurrent + " runs active";
                 log.info("Agent '{}' concurrency limit reached ({}/{}), queuing run {}",
                         agentCode, activeRuns, maxConcurrent, runPid);
                 dynamicDataMapper.update("ab_agent_run",
-                        Map.of("run_status", "queued", "error_message",
-                                "Concurrency limit: " + activeRuns + "/" + maxConcurrent + " runs active",
+                        Map.of("run_status", "queued", "error_message", concurrencyMsg,
                                 "updated_at", LocalDateTime.now()),
                         Map.of("pid", runPid));
-                return;
+                return new RunOutcome.Failed(runPid, concurrencyMsg);
             }
 
             // Resolve provider with fallback chain
@@ -168,21 +203,23 @@ public class AgentRunService {
             }
 
             if (config == null) {
-                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt,
-                        "No LLM provider configured. Tried: " + providerChain +
-                        ". Add API key via Settings \u2192 Cloud Config \u2192 LLM.");
-                return;
+                String noProviderMsg = "No LLM provider configured. Tried: " + providerChain +
+                        ". Add API key via Settings \u2192 Cloud Config \u2192 LLM.";
+                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, noProviderMsg);
+                return new RunOutcome.Failed(runPid, noProviderMsg);
             }
 
             if (agentDef == null) {
-                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, "Agent not found: " + agentCode);
-                return;
+                String agentMissingMsg = "Agent not found: " + agentCode;
+                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, agentMissingMsg);
+                return new RunOutcome.Failed(runPid, agentMissingMsg);
             }
 
             Map<String, Object> task = loadTask(tenantId, taskPid);
             if (task == null) {
-                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, "Task not found: " + taskPid);
-                return;
+                String taskMissingMsg = "Task not found: " + taskPid;
+                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, taskMissingMsg);
+                return new RunOutcome.Failed(runPid, taskMissingMsg);
             }
 
             String systemPrompt = buildSystemPrompt(agentDef, task, tenantId, agentCode);
@@ -269,12 +306,13 @@ public class AgentRunService {
 
             // Start heartbeat to keep run alive (updated_at refreshed every 30s)
             runLifecycleService.startHeartbeat(runPid);
+            AgentLoopResult result;
             try {
                 // Execute plan steps (replaces executeAgentLoop for multi-step plans)
                 boolean skipApprovalForResumedStep = resumeFromRunPid != null
                         && startStep < plan.size()
                         && plan.get(startStep).getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL;
-                AgentLoopResult result = stepLoopService.executePlanSteps(plan, startStep, tenantId, runPid, taskPid, agentCode,
+                result = stepLoopService.executePlanSteps(plan, startStep, tenantId, runPid, taskPid, agentCode,
                         systemPrompt, userMessage, tools, agentDef, provider, config, traceCtx,
                         skipApprovalForResumedStep);
 
@@ -296,6 +334,18 @@ public class AgentRunService {
                 runLifecycleService.stopHeartbeat(runPid);
             }
 
+            // Map AgentLoopResult to RunOutcome — success carries the LLM final
+            // response + token / cost telemetry so the chokepoint can attach
+            // them to its outbound metric / memory rows; non-success here means
+            // the plan loop reported a soft failure (no exception, but a step
+            // could not complete) which is still a Failed outcome at the
+            // chokepoint level.
+            if (result.success) {
+                return new RunOutcome.Success(runPid, result.lastResponse,
+                        result.totalInputTokens, result.totalOutputTokens, result.totalCost);
+            }
+            return new RunOutcome.Failed(runPid, "Plan execution did not reach success terminal state");
+
         } catch (AgentApprovalPendingException e) {
             log.info("Run {} paused for approval: {}", runPid, e.getMessage());
             Map<String, Object> runUpdate = new HashMap<>();
@@ -307,6 +357,7 @@ public class AgentRunService {
             try { aiTraceService.endTrace(traceCtx, null, "pending"); }
             catch (Exception traceEx) { log.debug("Failed to end trace for run {}: {}", runPid, traceEx.getMessage()); }
             // Task stays IN_PROGRESS — will be resumed after approval
+            return new RunOutcome.PendingApproval(runPid, e.getMessage());
         } catch (Exception e) {
             log.error("Agent execution failed: task={}, agent={}, error={}", taskPid, agentCode, e.getMessage(), e);
             runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, e.getMessage());
@@ -321,6 +372,8 @@ public class AgentRunService {
             // pollute OrphanBacklogGrowing alerts).
             publishSessionEndedIfApplicable(tenantId, runPid, agentCode,
                     SessionEndedEvent.TerminalOutcome.FAILED);
+            return new RunOutcome.Failed(runPid,
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         } finally {
             currentTraceCtx.remove();
         }
