@@ -10,6 +10,7 @@ import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
@@ -19,15 +20,32 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Enterprise-AI implementation of {@link AgentChatPort}.
- * <p>
- * Bridges the AuraBotChatService streaming path to a named ACP agent by:
- * 1. Loading the agent definition (system prompt, provider, model) from ab_agent_definition.
- * 2. Running a synchronous LLM tool loop (up to MAX_TOOL_ROUNDS).
- * 3. Streaming text chunks back via SSE in the same format AuraBotChatService uses.
+ * Default implementation of {@link AgentChatPort}.
+ *
+ * <p>Bridges the chokepoint to a named ACP agent by:
+ * <ol>
+ *   <li>Loading the agent definition (system prompt, provider, model) from
+ *       {@code ab_agent_definition}.</li>
+ *   <li>Running a synchronous LLM tool loop (up to {@link #MAX_TOOL_ROUNDS}).</li>
+ *   <li>Streaming text chunks / tool events back through the {@link ResponseSink}
+ *       transport adapter (parity with the aurabot path).</li>
+ * </ol>
+ *
+ * <p>Phase B.0 follow-up (2026-04-29): the multi-HTTP-turn tool-loop continuation
+ * dropped during the B.0/B.6 → main merge resolution has been re-introduced under
+ * the new {@code runAgentTurn(ctx, request, sink): TurnOutcome} SPI. The
+ * historic message tape is persisted via
+ * {@link ChatSessionStore#storeConversationMessages} keyed by sessionId and
+ * rehydrated on subsequent turns. Confirmation-required tools suspend via
+ * {@link TurnOutcome.PendingConfirmation} and are resumed through the canonical
+ * {@code ConversationTurnService.resumeTurn} path (no port-specific resume hook).
  */
 @Slf4j
 @Service
@@ -42,6 +60,7 @@ public class AgentChatPortImpl implements AgentChatPort {
     private final GroundingService groundingService;
     private final AgentSkillService skillService;
     private final ObjectMapper objectMapper;
+    private final ChatSessionStore chatSessionStore;
 
     // =========================================================================
     // AgentChatPort implementation
@@ -97,28 +116,38 @@ public class AgentChatPortImpl implements AgentChatPort {
         // Build system prompt from agent definition
         String systemPrompt = buildSystemPrompt(agentDef);
 
-        // Discover tools for this agent
-        List<LlmChatRequest.Tool> tools = discoverTools(tenantId, agentCode, request.getMessage());
+        // Discover tools for this agent (with parameterSchema preserved so we can
+        // detect confirmation-required tools when the LLM calls them).
+        List<ToolDefinition> toolDefs = discoverToolDefinitions(tenantId, agentCode, request.getMessage());
+        List<LlmChatRequest.Tool> tools = toLlmTools(toolDefs);
 
-        // Build conversation
-        List<LlmChatRequest.Message> messages = buildMessages(request.getHistory(), request.getMessage());
+        // Build conversation: prefer the persisted multi-turn tape (so any prior
+        // tool_use / tool_result blocks survive the HTTP boundary). When no
+        // server-side tape exists, fall back to the (potentially stale) frontend
+        // history and append the current user message.
+        List<LlmChatRequest.Message> messages = restoreOrBuildMessages(
+                request.getSessionId(), request.getHistory(), request.getMessage());
 
         log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}",
                 agentCode, providerCode, model, tools.size());
 
-        // Run tool loop
-        return doToolLoop(provider, config, model, systemPrompt, maxTokens, messages, tools, sink);
+        // Run the tool loop
+        return doAgentToolLoop(ctx, agentCode, provider, providerCode, config, model,
+                systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink);
     }
 
     // =========================================================================
     // Tool loop
     // =========================================================================
 
-    private TurnOutcome doToolLoop(LlmProvider provider, LlmProviderFactory.ProviderConfig config,
-                                    String model, String systemPrompt, int maxTokens,
-                                    List<LlmChatRequest.Message> messages,
-                                    List<LlmChatRequest.Tool> tools,
-                                    ResponseSink sink) {
+    private TurnOutcome doAgentToolLoop(TurnContext ctx, String agentCode,
+                                        LlmProvider provider, String providerCode,
+                                        LlmProviderFactory.ProviderConfig config, String model,
+                                        String systemPrompt, int maxTokens,
+                                        List<LlmChatRequest.Message> messages,
+                                        List<LlmChatRequest.Tool> tools,
+                                        List<ToolDefinition> toolDefs,
+                                        String sessionId, ResponseSink sink) {
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             LlmChatRequest req = LlmChatRequest.builder()
                     .model(model)
@@ -147,25 +176,95 @@ public class AgentChatPortImpl implements AgentChatPort {
             String stopReason = response.getStopReason();
 
             if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null) {
+                // Persist the final assistant turn so subsequent turns see it as
+                // history without depending on the (potentially stale) frontend tape.
+                messages.add(buildAssistantMessage(response.getContent()));
+                persistMessages(sessionId, messages);
                 return streamFinalResponse(response, sink);
             }
 
             if ("tool_use".equals(stopReason)) {
-                // Add assistant message with all content blocks
+                // Add the assistant message with all content blocks (text + tool_use)
                 messages.add(buildAssistantMessage(response.getContent()));
 
-                // Execute each tool call (read-only for now; no confirmation gate in chat mode)
                 List<LlmChatRequest.ContentBlock> toolResultBlocks = new ArrayList<>();
+                boolean confirmationRequired = false;
+                String pendingToolId = null;
+
                 for (LlmChatResponse.ContentBlock block : response.getContent()) {
                     if (!"tool_use".equals(block.getType())) continue;
-                    Map<String, Object> toolResult = executeToolSafely(block.getName(), block.getInput());
-                    toolResultBlocks.add(buildToolResultBlock(block.getId(), toolResult));
+
+                    String toolId = block.getId();
+                    String toolName = block.getName();
+                    Map<String, Object> input = block.getInput() != null ? block.getInput() : Map.of();
+
+                    ToolDefinition def = findToolDef(toolDefs, toolName);
+                    boolean requiresConfirmation = def != null && def.isRequiresConfirmation();
+
+                    if (requiresConfirmation) {
+                        // Stream confirm_required and suspend the turn. The frontend
+                        // echoes pendingTurnId back through POST /execute; the
+                        // canonical ConversationTurnService.resumeTurn path handles
+                        // resume from the stored PendingTool entry.
+                        String description = buildToolDescription(toolName, input);
+                        sink.onConfirmRequired(toolId, toolName, description, input, ctx.turnId());
+
+                        chatSessionStore.storePending(ctx.turnId(),
+                                ChatSessionStore.PendingTool.builder()
+                                        .turnId(ctx.turnId())
+                                        .tenantId(ctx.tenantId())
+                                        .userId(ctx.userId())
+                                        .humanMemberId(ctx.humanMemberId())
+                                        .conversationId(ctx.conversationId())
+                                        .agentCode(agentCode)
+                                        .sessionId(sessionId)
+                                        .toolId(toolId)
+                                        .toolName(toolName)
+                                        .input(input)
+                                        .description(description)
+                                        .messages(serializeMessages(messages))
+                                        .providerCode(providerCode)
+                                        .apiKey(config.getApiKey())
+                                        .baseUrl(config.getBaseUrl())
+                                        .model(model)
+                                        .systemPrompt(systemPrompt)
+                                        .maxTokens(maxTokens)
+                                        .currentLoop(round)
+                                        .build());
+
+                        // Persist the running tape so a fresh turn can rehydrate
+                        // even if /execute is skipped (e.g. timeout → retry).
+                        persistMessages(sessionId, messages);
+
+                        confirmationRequired = true;
+                        pendingToolId = toolId;
+                        break;
+                    }
+
+                    // Read-only tool: auto-execute and feed result back to the LLM.
+                    sink.onToolStart(toolId, toolName, input);
+                    Map<String, Object> result = executeToolSafely(toolName, input);
+                    boolean success = Boolean.TRUE.equals(result.get("success"));
+                    sink.onToolResult(toolId, result, success);
+                    toolResultBlocks.add(buildToolResultBlock(toolId, result));
                 }
+
+                if (confirmationRequired) {
+                    // Empty done event closes the SSE — frontend will resume via /execute.
+                    sink.onDone("", null);
+                    return new TurnOutcome.PendingConfirmation(ctx.turnId(), "", pendingToolId);
+                }
+
                 messages.add(buildToolResultMessage(toolResultBlocks));
+                // Persist after each tool round so a connection drop does not lose
+                // the structured tool tape — the next turn will see it.
+                persistMessages(sessionId, messages);
                 continue;
             }
 
             // Unknown stop reason — treat as final
+            messages.add(buildAssistantMessage(response.getContent()));
+            persistMessages(sessionId, messages);
             return streamFinalResponse(response, sink);
         }
 
@@ -178,8 +277,7 @@ public class AgentChatPortImpl implements AgentChatPort {
     // Tool discovery
     // =========================================================================
 
-    @SuppressWarnings("unchecked")
-    private List<LlmChatRequest.Tool> discoverTools(Long tenantId, String agentCode, String userMessage) {
+    private List<ToolDefinition> discoverToolDefinitions(Long tenantId, String agentCode, String userMessage) {
         try {
             com.auraboot.framework.agent.dto.BusinessIntentFrame bif = groundingService.ground(
                     tenantId, userMessage,
@@ -194,36 +292,57 @@ public class AgentChatPortImpl implements AgentChatPort {
                     .build();
 
             List<ToolDefinition> defs = toolProviderRegistry.discoverAll(ctx);
-            List<LlmChatRequest.Tool> tools = new ArrayList<>();
-            for (ToolDefinition def : defs) {
-                LlmChatRequest.Tool tool = new LlmChatRequest.Tool();
-                tool.setName(def.getToolCode());
-                tool.setDescription(def.getDescription());
-                // Use the parameterSchema from the tool definition
-                Map<String, Object> schema = def.getParameterSchema();
-                if (schema == null) {
-                    schema = Map.of("type", "object", "properties", Map.of());
-                }
-                tool.setInputSchema(schema);
-                tools.add(tool);
-            }
-            return tools;
+            return defs == null ? Collections.emptyList() : defs;
         } catch (Exception e) {
             log.warn("Tool discovery failed for agent {}: {}", agentCode, e.getMessage());
             return Collections.emptyList();
         }
     }
 
+    private List<LlmChatRequest.Tool> toLlmTools(List<ToolDefinition> defs) {
+        List<LlmChatRequest.Tool> tools = new ArrayList<>();
+        for (ToolDefinition def : defs) {
+            LlmChatRequest.Tool tool = new LlmChatRequest.Tool();
+            tool.setName(def.getToolCode());
+            tool.setDescription(def.getDescription());
+            Map<String, Object> schema = def.getParameterSchema();
+            if (schema == null) {
+                schema = Map.of("type", "object", "properties", Map.of());
+            }
+            tool.setInputSchema(schema);
+            tools.add(tool);
+        }
+        return tools;
+    }
+
+    private ToolDefinition findToolDef(List<ToolDefinition> defs, String toolName) {
+        if (defs == null || toolName == null) return null;
+        for (ToolDefinition def : defs) {
+            if (toolName.equals(def.getToolCode())) {
+                return def;
+            }
+        }
+        return null;
+    }
+
     private Map<String, Object> executeToolSafely(String toolName, Map<String, Object> input) {
         try {
-            // Route to the appropriate tool provider via the registry
-            // For now: pass tool name + input and return a stub result
-            // Full integration with ToolProviderRegistry.execute() can be wired here
+            // Route to the appropriate tool provider via the registry. Real
+            // execution wiring lives behind the read-only tool path; for now we
+            // return a deterministic stub so the loop reaches end_turn.
             log.debug("Agent chat tool call: tool={}, input={}", toolName, input);
             return Map.of("success", true, "message", "Tool executed: " + toolName);
         } catch (Exception e) {
             log.warn("Tool execution failed in agent chat: tool={}, error={}", toolName, e.getMessage());
             return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    private String buildToolDescription(String toolName, Map<String, Object> input) {
+        try {
+            return toolName + " " + objectMapper.writeValueAsString(input);
+        } catch (Exception e) {
+            return toolName;
         }
     }
 
@@ -311,12 +430,25 @@ public class AgentChatPortImpl implements AgentChatPort {
     }
 
     // =========================================================================
-    // Message building helpers
+    // Message building / persistence helpers
     // =========================================================================
 
-    private List<LlmChatRequest.Message> buildMessages(List<ChatMessage> history, String userMessage) {
+    /**
+     * Restore the structured message tape for a session, falling back to the
+     * frontend-supplied history when no server-side tape exists. Always appends
+     * the current user message at the tail.
+     */
+    private List<LlmChatRequest.Message> restoreOrBuildMessages(
+            String sessionId, List<ChatMessage> history, String userMessage) {
+        List<Map<String, Object>> stored = (sessionId == null || sessionId.isBlank())
+                ? Collections.emptyList()
+                : safeLoadStored(sessionId);
         List<LlmChatRequest.Message> messages = new ArrayList<>();
-        if (history != null) {
+        if (!stored.isEmpty()) {
+            // Server-side tape wins — it carries assistant tool_use and user
+            // tool_result blocks that the frontend history cannot represent.
+            messages.addAll(deserializeMessages(stored));
+        } else if (history != null) {
             for (ChatMessage msg : history) {
                 if (!"system".equals(msg.getRole())) {
                     messages.add(LlmChatRequest.Message.builder()
@@ -330,6 +462,48 @@ public class AgentChatPortImpl implements AgentChatPort {
                 .role("user")
                 .content(userMessage)
                 .build());
+        return messages;
+    }
+
+    private List<Map<String, Object>> safeLoadStored(String sessionId) {
+        try {
+            List<Map<String, Object>> loaded = chatSessionStore.loadConversationMessages(sessionId);
+            return loaded == null ? Collections.emptyList() : loaded;
+        } catch (Exception e) {
+            log.debug("Failed to load conversation tape for session {}: {}", sessionId, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private void persistMessages(String sessionId, List<LlmChatRequest.Message> messages) {
+        if (sessionId == null || sessionId.isBlank()) return;
+        try {
+            chatSessionStore.storeConversationMessages(sessionId, serializeMessages(messages));
+        } catch (Exception e) {
+            log.debug("Failed to persist conversation tape for session {}: {}", sessionId, e.getMessage());
+        }
+    }
+
+    private List<Map<String, Object>> serializeMessages(List<LlmChatRequest.Message> messages) {
+        List<Map<String, Object>> serialized = new ArrayList<>();
+        for (LlmChatRequest.Message msg : messages) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("role", msg.getRole());
+            map.put("content", msg.getContent());
+            serialized.add(map);
+        }
+        return serialized;
+    }
+
+    private List<LlmChatRequest.Message> deserializeMessages(List<Map<String, Object>> serialized) {
+        List<LlmChatRequest.Message> messages = new ArrayList<>();
+        if (serialized == null) return messages;
+        for (Map<String, Object> map : serialized) {
+            LlmChatRequest.Message msg = new LlmChatRequest.Message();
+            msg.setRole((String) map.get("role"));
+            msg.setContent(map.get("content"));
+            messages.add(msg);
+        }
         return messages;
     }
 
