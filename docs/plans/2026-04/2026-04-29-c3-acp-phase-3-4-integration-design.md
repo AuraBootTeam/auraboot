@@ -138,18 +138,47 @@ ACP `ResultContractEmitter` 通过 `ChatSseContext` ThreadLocal SSE emitter 推 
 - ACP Phase 5-10 的 cross-channel sync — 与 C.3 正交
 - 移除 `ChatRunPersistencePort`（aurabot 现在写的）— 等 ACP `ab_agent_run` 接管后再清
 
-## 7. owner 决策汇总表
+## 7. owner 决策汇总表（v2 锁定，长期演进视角）
 
-| Q | 内容 | 倾向 | 待 owner 选 |
-|---|------|------|-------------|
-| Q-C3.1 | 任务建模 A/B/C | A 每 turn 一 task | ⏳ |
-| Q-C3.2 | 同步性桥接 α/β/γ | β 提取 executeTaskSync | ⏳ |
-| Q-C3.3 | Approval 语义对齐 α/β/γ | γ 起步 → α 长期 | ⏳ |
-| Q-C3.4 | ResultContractEmitter sink 迁移 α/β | α 改注入 sink | ⏳ |
-| Q-C3.5 | 迁移分阶段策略 α/β/γ | β bucket-driven 渐进 | ⏳ |
+| Q | 内容 | **决策** | 关键判断 |
+|---|------|---------|---------|
+| Q-C3.1 | 任务建模 | **A 每 turn 一 task** | B/C 都让 chokepoint 装饰化 — Phase C 目标是"用 ACP 替换 tool loop"；只接 D1 不接 Tool 等于啥也没干 |
+| Q-C3.2 | 同步性桥接 | **β executeTaskSync 提取** | α DB 轮询是脆弱模式；γ DeferredResult 把 chokepoint 绑死在 Spring MVC；β 与 Q-A.4=A' 「sync core + async at adapter」哲学一致 |
+| Q-C3.3 | Approval 语义对齐 | **α 收敛到 ACP**（**v2 改**：原倾向 γ→α 已删）| **AGENTS.md 长期演进视角红线**：「禁止推迟该做的重构到"以后再说",造成风险倒挂」。γ起步是该红线典型——B.6 才落 PendingTool，C.3 又要在它基础上叠新功能；延后到 D.x 时迁移成本只会更大。前端二次改动是"现在或者永远改不了"问题——dev-stage 允许，就在 C.3 做完 |
+| Q-C3.4 | ResultContractEmitter | **α 改注入 sink** | ChatSseContext ThreadLocal 是 A.3 时代留的兼容 shim，design §3.4 已注释「Phase B+ 退役」。保留 = chokepoint claim 装饰化（声称 sink 是唯一 surface，实际 emitter ThreadLocal 仍在用）|
+| Q-C3.5 | 迁移分阶段策略 | **β bucket-driven 渐进** | α 单 PR ~1500 LOC 不可 review；γ shadow run 加 2× cost 又要拆掉。β 用 C.1 triage bucket 自然分流，每 PR 独立可 review + 独立回滚 |
 
-**待 owner 拍 5 项后才写 C.3 plan v1 + 进 §3 PR 切片。**
+### 6 个月后悔检查
+
+| 决策 | "6 个月后会后悔吗?" | 答 |
+|------|------------------|---|
+| Q-C3.1 = A | "应该早点用 task 建模"? | ✗ 不会后悔 — task-driven 是 ACP / IM / cross-channel 的统一基底 |
+| Q-C3.2 = β | "应该用更轻量的桥接"? | ✗ 不会 — sync core 提取本来就是 ACP runtime 该做的 cleanup |
+| Q-C3.3 = α | "应该再等等再做 approval 迁移"? | ✗ 不会 — 越等 PendingTool 上层依赖越厚，迁移代价只会增 |
+| Q-C3.4 = α | "应该保留 ChatSseContext"? | ✗ 不会 — ThreadLocal 隐式依赖是 future-bug 高发区 |
+| Q-C3.5 = β | "应该一次性切干净"? | △ 中等概率会后悔（如果 β 5 PR 之间出现 main 杂物 commit 拖时间），但 review 成本仍胜过 α 单 PR |
+
+### Steel-man 反方汇总（公平起见）
+
+- **Q-C3.1 反方**：每 chat turn 写 `ab_agent_task` 表膨胀，UI 视图被 ai-assignee 噪声污染。**回应**：UI 加 `assignee_type != 'ai'` 过滤；retention 30d auto-archive；mission_id 关联反而提升 audit 价值。
+- **Q-C3.3 反方**：B.6 刚把前端契约从 sessionId 切到 pendingTurnId，C.3 立刻再切 → ab_agent_approval.pid，前端 UX team 会反弹。**回应**：dev stage 红线说"允许破坏 / 不考虑迁移"。一次性破坏 vs 永远不做的成本不对称。
+- **Q-C3.5 反方**：β 5 个 PR 期间 doToolLoop 与 ACP path 并存，可能有 bug 修在一边漏到另一边。**回应**：每 PR 严格通过 sse-baseline-2026-04-26.sha256 字节验收 + dispatch/finalize 单测；并存窗口控制在 1-2 周（C.3a→C.3e 紧密推进，不拖月）。
+
+## 8. C.3 实施时序（决策已锁，可进 plan v1）
+
+按 §3 PR 切片 + Q-C3.5=β bucket-driven，5 PR 紧密推进：
+
+| PR | 决策来源 | 验收红线 |
+|----|---------|---------|
+| **C.3a** AgentRunService.executeTaskSync 提取 | Q-C3.2=β | 现有 ACP 测试 0 fail；新增 sync 调用单测 |
+| **C.3b** ResultContractEmitter 改注 ResponseSink，ChatSseContext 退役 | Q-C3.4=α | sse-baseline 字节流 4/4 scenario 仍一致；ResultContractEmitter 既有调用方测试 0 fail |
+| **C.3c** runTurn 在 ACP_RUN bucket 时建 task + 调 executeTaskSync + 包装 RunOutcome→TurnOutcome | Q-C3.1=A + Q-C3.5=β step1 | aurabot ACP_RUN 端到端：写 ab_agent_task + ab_agent_run + ab_agent_action 行；chokepoint metrics + memory C.2 仍 fire；前端 SSE byte 仍一致 |
+| **C.3d** Approval 迁 ab_agent_approval（前端契约 turnId → approvalPid 二次切）| Q-C3.3=α | /execute 端到端：approve / reject 走 AgentApprovalGateService；plan_hash 完整性校验生效 |
+| **C.3e** 删 doToolLoop + ChatSessionStore.PendingTool 路径 | Q-C3.5=β step3 | AuraBotChatService LOC 净降 ~600；CONTEXTUAL_ANSWER bucket 也走 ACP；conversation 单测全套 ≥ 当前 55/0 |
+
+每 PR 独立 commit + push + 走 main fast-forward 模式（同 B.x 节奏）。
 
 ## CHANGELOG
 
+- 2026-04-29 v2 owner 长期演进视角决策锁定 5 项；§7 改写决策表 + 6 个月后悔检查 + steel-man；新增 §8 C.3 实施时序
 - 2026-04-29 v1 初始化（C.2 落地后写）
