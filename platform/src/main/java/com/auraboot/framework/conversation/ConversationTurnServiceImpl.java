@@ -1,6 +1,9 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.port.AgentChatPort;
+import com.auraboot.framework.agent.service.ActiveMemoryService;
+import com.auraboot.framework.agent.service.AgentRunService;
+import com.auraboot.framework.agent.service.RunOutcome;
 import com.auraboot.framework.agent.triage.PreGroundingTriage;
 import com.auraboot.framework.agent.triage.TriageBucket;
 import com.auraboot.framework.agent.triage.TriageRequest;
@@ -9,11 +12,19 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.aurabot.service.ChatSessionStore;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Phase A.4 / B.0 implementation of {@link ConversationTurnService}. Synchronous core
@@ -56,6 +67,24 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     @Autowired(required = false)
     private PreGroundingTriage preGroundingTriage;
 
+    /**
+     * Phase C.3c: ACP runtime entry point used when {@link TriageBucket#ACP_RUN}
+     * fires. Optional only because some test contexts may construct the
+     * chokepoint without the full ACP wiring; in production this bean is
+     * always present. When absent, ACP_RUN turns fall back to the legacy
+     * aurabot chat path so users are never broken by partial wiring.
+     */
+    @Autowired(required = false)
+    private AgentRunService agentRunService;
+
+    /**
+     * Phase C.3c: needed to write the {@code ab_agent_task} row that ACP runs
+     * are keyed off (Q-C3.1=A "per-turn task model"). Optional in the same
+     * sense as {@link #agentRunService} — mocking-friendly and OSS-safe.
+     */
+    @Autowired(required = false)
+    private DynamicDataMapper dynamicDataMapper;
+
     public ConversationTurnServiceImpl(AuraBotChatService chatService,
                                         @Qualifier("turnSideEffects") TurnSideEffects sideEffects,
                                         ChatSessionStore chatSessionStore,
@@ -76,7 +105,11 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             ChatRequest legacyRequest = request.legacyRequest();
             String agentCode = request.agentCode();
             if (isAuraBotPath(agentCode)) {
-                outcome = chatService.executeAuraBotTurn(ctx, legacyRequest, sink);
+                if (shouldDispatchToAcpRuntime(ctx)) {
+                    outcome = dispatchToAcpRun(ctx, legacyRequest, sink);
+                } else {
+                    outcome = chatService.executeAuraBotTurn(ctx, legacyRequest, sink);
+                }
             } else {
                 outcome = dispatchToNamedAgent(ctx, legacyRequest, sink, agentCode);
             }
@@ -252,6 +285,172 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         log.info("Chat request delegated to named agent: agentCode={}, tenantId={}, turnId={}",
                 agentCode, ctx.tenantId(), ctx.turnId());
         return agentChatPort.runAgentTurn(ctx, legacyRequest, sink);
+    }
+
+    /**
+     * Phase C.3c (Q-C3.5=β step1): ACP_RUN bucket dispatches to the ACP
+     * runtime for the aurabot main path. The cutover is bucket-driven so
+     * LIGHT_CHAT / CONTEXTUAL_ANSWER turns continue to flow through the
+     * existing chat path — this lets us migrate the action-oriented traffic
+     * (the whole point of "use ACP to replace tool loop") incrementally
+     * without rewriting prose-streaming turns in the same PR.
+     *
+     * <p>Falls back to the legacy chat path when:
+     * <ul>
+     *     <li>{@link #agentRunService} is unbound — partial wiring or test context</li>
+     *     <li>{@link #dynamicDataMapper} is unbound — same</li>
+     * </ul>
+     * Both fall-throughs log at WARN; never silent.
+     */
+    private boolean shouldDispatchToAcpRuntime(TurnContext ctx) {
+        if (ctx.triageBucket() != TriageBucket.ACP_RUN) {
+            return false;
+        }
+        if (agentRunService == null || dynamicDataMapper == null) {
+            log.warn("triageBucket=ACP_RUN but ACP runtime wiring is incomplete "
+                            + "(agentRunService={}, dynamicDataMapper={}); falling back to chat path",
+                    agentRunService != null, dynamicDataMapper != null);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Per Q-C3.1=A, every ACP_RUN turn creates an {@code ab_agent_task} row
+     * with {@code assignee_type='ai'} so the ACP run / step / action /
+     * approval rows downstream all attach to the same task pid. The task
+     * carries the chat turn's identity in {@code input_data} so the run
+     * record can be correlated back to the conversation turn for cross-
+     * feature observability (Q-C3.1 rationale).
+     *
+     * <p>SSE byte note: the chat path emits {@code chunk} text-streaming
+     * events as the LLM types. The ACP path is action-oriented — it emits
+     * {@code result_contract} per tool call (via {@code ResultContractEmitter}
+     * → {@link ResponseSinkContext}) and a single {@code done} event at the
+     * end. Frontend rendering still works because both event types are
+     * supported, but the typing animation is absent for ACP_RUN turns. This
+     * is the intentional UX consequence of routing action verbs through
+     * ACP per design §3.6.
+     *
+     * <p>Approval gate handling: per Q-C3.5=β step1 scope, a
+     * {@link RunOutcome.PendingApproval} surfaces here as a
+     * {@link TurnOutcome.Failed} with a clear "approval pending" message.
+     * The full approve / reject flow over {@code ab_agent_approval} is
+     * Phase C.3d (Q-C3.3=α). Wiring it earlier would force a frontend
+     * contract change in this PR; deferring keeps C.3c reviewable.
+     */
+    private TurnOutcome dispatchToAcpRun(TurnContext ctx, ChatRequest legacyRequest, ResponseSink sink) {
+        // Bind the sink so any ResultContract emitted from inside the ACP
+        // run loop (ToolLoopService -> ResultContractEmitter -> sink) flows
+        // out the same SSE stream the chokepoint already started.
+        ResponseSinkContext.set(sink);
+        try {
+            String taskPid = createAcpTaskRow(ctx, legacyRequest);
+            log.info("ACP_RUN dispatch: tenantId={}, turnId={}, taskPid={}",
+                    ctx.tenantId(), ctx.turnId(), taskPid);
+
+            RunOutcome runOutcome = agentRunService.executeTaskSync(
+                    ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, null);
+
+            return mapRunToTurnOutcome(ctx, runOutcome, sink);
+        } catch (Exception e) {
+            log.error("dispatchToAcpRun failed: {}", e.getMessage(), e);
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, e);
+        } finally {
+            ResponseSinkContext.clear();
+        }
+    }
+
+    /**
+     * Insert an {@code ab_agent_task} row carrying the chat turn's identity
+     * tuple. Returns the task pid so the caller can hand it to
+     * {@code AgentRunService.executeTaskSync}. Never falls back — a DB
+     * failure here surfaces as a runtime exception which the caller maps
+     * into {@link TurnOutcome.Failed}.
+     */
+    private String createAcpTaskRow(TurnContext ctx, ChatRequest legacyRequest) {
+        String taskPid = UniqueIdGenerator.generate();
+        Map<String, Object> task = new HashMap<>();
+        task.put("pid", taskPid);
+        task.put("tenant_id", ctx.tenantId());
+        task.put("title", buildTaskTitle(legacyRequest));
+        task.put("description", legacyRequest != null ? legacyRequest.getMessage() : "");
+        task.put("task_status", "in_progress");
+        task.put("task_priority", "normal");
+        task.put("assignee_type", "ai");
+        task.put("assignee_id", ActiveMemoryService.DEFAULT_AGENT);
+        task.put("created_at", LocalDateTime.now());
+        task.put("updated_at", LocalDateTime.now());
+
+        Map<String, Object> inputData = new LinkedHashMap<>();
+        inputData.put("turnId", ctx.turnId());
+        inputData.put("conversationId", ctx.conversationId());
+        inputData.put("inboundMessageId", ctx.inboundMessageId());
+        inputData.put("triageBucket", ctx.triageBucket() != null ? ctx.triageBucket().name() : null);
+        inputData.put("userMessage", legacyRequest != null ? legacyRequest.getMessage() : null);
+        try {
+            task.put("input_data", objectMapper.writeValueAsString(inputData));
+        } catch (JsonProcessingException ex) {
+            // Don't block the run — fall back to a minimal payload. The user
+            // message in `description` is the same content the LLM sees.
+            task.put("input_data", "{}");
+        }
+
+        dynamicDataMapper.insert("ab_agent_task", task);
+        return taskPid;
+    }
+
+    private static String buildTaskTitle(ChatRequest legacyRequest) {
+        if (legacyRequest == null || legacyRequest.getMessage() == null) {
+            return "Aurabot turn";
+        }
+        String msg = legacyRequest.getMessage().trim();
+        if (msg.length() > 80) {
+            return msg.substring(0, 80) + "...";
+        }
+        return msg.isEmpty() ? "Aurabot turn" : msg;
+    }
+
+    /**
+     * Map ACP {@link RunOutcome} → chokepoint {@link TurnOutcome} and emit
+     * the corresponding terminal SSE event so the frontend's
+     * {@code reader.readChat} loop terminates cleanly.
+     */
+    private TurnOutcome mapRunToTurnOutcome(TurnContext ctx, RunOutcome ro, ResponseSink sink) {
+        return switch (ro) {
+            case RunOutcome.Success s -> {
+                String response = s.finalResponse() != null ? s.finalResponse() : "";
+                sink.onDone(response, null);
+                Map<String, Object> meta = new LinkedHashMap<>();
+                meta.put("runPid", s.runPid());
+                meta.put("inputTokens", s.inputTokens());
+                meta.put("outputTokens", s.outputTokens());
+                meta.put("totalCost", s.totalCost());
+                yield new TurnOutcome.Success(response, meta);
+            }
+            case RunOutcome.PendingApproval pa -> {
+                // Phase C.3c interim — full approval-gate UI lives in C.3d.
+                String msg = pa.message() != null
+                        ? "Approval required (run " + pa.runPid() + "): " + pa.message()
+                        : "Approval required for run " + pa.runPid();
+                sink.onError(msg, null);
+                yield new TurnOutcome.Failed(msg, null);
+            }
+            case RunOutcome.Failed f -> {
+                String msg = f.errorMessage() != null ? f.errorMessage() : "ACP run failed";
+                sink.onError(msg, null);
+                yield new TurnOutcome.Failed(msg, null);
+            }
+            case RunOutcome.Skipped sk -> {
+                // Skipped means a pre-execution gate (agent runtime disabled)
+                // fired. Surface as Failed so the user sees a clear message.
+                String msg = sk.reason() != null ? sk.reason() : "ACP run skipped";
+                sink.onError(msg, null);
+                yield new TurnOutcome.Failed(msg, null);
+            }
+        };
     }
 
     private TurnContext beginTurn(TurnRequest request) {
