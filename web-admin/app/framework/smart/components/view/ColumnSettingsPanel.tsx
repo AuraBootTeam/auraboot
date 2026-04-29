@@ -177,6 +177,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
             const renderColumn = (col: (typeof columns)[0], index: number) => (
               <div
                 key={col.fieldCode}
+                data-testid={`column-settings-row-${col.fieldCode}`}
                 draggable
                 onDragStart={() => handleDragStart(columns.indexOf(col))}
                 onDragEnter={() => handleDragEnter(columns.indexOf(col))}
@@ -200,6 +201,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
                   checked={col.visible}
                   onChange={() => toggleVisibility(col.fieldCode)}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  data-testid={`column-settings-visible-${col.fieldCode}`}
                 />
                 <span
                   className={cn(
@@ -217,6 +219,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
                   className="w-16 rounded border border-gray-200 px-1.5 py-1 text-right text-xs"
                   min={50}
                   max={800}
+                  data-testid={`column-settings-width-${col.fieldCode}`}
                 />
               </div>
             );
@@ -247,6 +250,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
             type="button"
             onClick={onClose}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            data-testid="column-settings-cancel"
           >
             {t('action.cancel') !== 'action.cancel' ? t('action.cancel') : 'Cancel'}
           </button>
@@ -254,6 +258,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
             type="button"
             onClick={handleSave}
             className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+            data-testid="column-settings-save"
           >
             {t('action.save') !== 'action.save' ? t('action.save') : 'Save'}
           </button>

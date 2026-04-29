@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.extension;
 import org.pf4j.ExtensionPoint;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Extension point for custom command handlers.
@@ -95,6 +96,37 @@ public interface CommandHandlerExtension extends ExtensionPoint {
      */
     default boolean supportsDryRun() {
         return false;
+    }
+
+    /**
+     * Whether the generic DSL FIELD_MAP persistence should still run before
+     * this custom handler.
+     *
+     * <p>Most plugin handlers extend normal create/update/delete/state_transition
+     * persistence, so the default preserves the existing behavior. Handlers that
+     * own their full state mutation, such as Agent approval commands, should
+     * return {@code false} to avoid the generic state transition mutating the
+     * row before domain-specific authorization and side effects run.
+     */
+    default boolean requiresDslPersistence(
+            String commandType,
+            Map<String, Object> execConfig,
+            com.auraboot.framework.meta.dto.CommandExecuteRequest request) {
+        if (execConfig == null || execConfig.isEmpty()) {
+            return false;
+        }
+        String operationType = request != null ? request.getOperationType() : null;
+        if ("delete".equalsIgnoreCase(operationType) || "state_transition".equalsIgnoreCase(operationType)) {
+            return true;
+        }
+        Object type = execConfig.get("type");
+        if (type instanceof String typeValue) {
+            String normalizedType = typeValue.trim().toLowerCase(java.util.Locale.ROOT);
+            if (Set.of("create", "update", "delete", "state_transition").contains(normalizedType)) {
+                return true;
+            }
+        }
+        return execConfig.containsKey("inputFields") || execConfig.containsKey("autoSetFields");
     }
 
     /**

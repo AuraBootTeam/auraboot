@@ -1,0 +1,27 @@
+# AuraBoot Backend runtime-only image for GA E2E.
+#
+# The full Dockerfile builds the jar inside Docker. For GA E2E we can build the
+# jar on the host with the already-warmed Gradle cache, then package it here
+# without any network-dependent build step.
+
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser && \
+    mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts && \
+    chown -R appuser:appuser /app
+
+COPY --chown=appuser:appuser build/libs/*.jar app.jar
+
+USER appuser
+
+EXPOSE 6443
+
+ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget -q -O /dev/null http://localhost:6443/actuator/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

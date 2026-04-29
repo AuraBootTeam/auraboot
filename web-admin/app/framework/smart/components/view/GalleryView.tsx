@@ -194,7 +194,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   }
 
   return (
-    <div className={cn('rounded-lg border border-gray-200 bg-white p-4', className)}>
+    <div
+      data-testid="gallery-view"
+      className={cn('rounded-lg border border-gray-200 bg-white p-4', className)}
+    >
       {loading && (
         <div className="mb-2 flex items-center justify-center py-2">
           <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />

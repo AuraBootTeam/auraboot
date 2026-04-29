@@ -14,7 +14,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe.serial('Showcase Seed — Workflow & Automation', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(120_000);
 
   // ═════════════════════════════════════════════════════════════════════════

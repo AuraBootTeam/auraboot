@@ -2,7 +2,7 @@
 # Bring up the GA Follow-up E2E stack on isolated ports.
 #
 # Compose project: auraboot-ga-e2e
-# Profile        : ga-e2e-stack (backend + postgres only; no frontend service)
+# Profile        : ga-e2e-stack (postgres + backend + GA frontend service)
 #
 # After up, wait for backend health before exiting.
 
@@ -57,6 +57,23 @@ if [ ! -f "$WRAPPER_JAR" ]; then
   fi
 fi
 
+GA_E2E_BACKEND_BUILD_MODE="${GA_E2E_BACKEND_BUILD_MODE:-host-jar}"
+case "$GA_E2E_BACKEND_BUILD_MODE" in
+  host-jar)
+    echo "[ga-e2e] building backend jar on host with Gradle cache..."
+    (cd platform && ./gradlew bootJar --no-daemon -x test)
+    export GA_E2E_BACKEND_DOCKERFILE="${GA_E2E_BACKEND_DOCKERFILE:-Dockerfile.runtime}"
+    ;;
+  dockerfile)
+    export GA_E2E_BACKEND_DOCKERFILE="${GA_E2E_BACKEND_DOCKERFILE:-Dockerfile}"
+    ;;
+  *)
+    echo "[ga-e2e] unsupported GA_E2E_BACKEND_BUILD_MODE=$GA_E2E_BACKEND_BUILD_MODE" >&2
+    echo "[ga-e2e] supported values: host-jar, dockerfile" >&2
+    exit 1
+    ;;
+esac
+
 echo "[ga-e2e] starting stack (project=$COMPOSE_PROJECT_NAME)..."
 docker compose \
   -f docker-compose.yml \
@@ -90,7 +107,7 @@ while :; do
   fi
   if [ "$(date +%s)" -ge "$deadline" ]; then
     echo "[ga-e2e] frontend health check timed out" >&2
-    docker compose -p "$COMPOSE_PROJECT_NAME" logs --tail=120 frontend >&2
+    docker compose -p "$COMPOSE_PROJECT_NAME" logs --tail=120 ga-e2e-frontend >&2
     exit 1
   fi
   sleep 5

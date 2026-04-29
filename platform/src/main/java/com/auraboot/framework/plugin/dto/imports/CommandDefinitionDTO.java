@@ -114,6 +114,18 @@ public class CommandDefinitionDTO {
     private String type;
 
     /**
+     * Plugin command handler code.
+     * Allows a business command such as "pr:submit_purchase_order" to invoke
+     * a reusable handler such as "pr:start_approval_flow".
+     */
+    private String handler;
+
+    /**
+     * Parameters passed to the plugin handler through CommandContext.settings().
+     */
+    private Map<String, Object> handlerParams;
+
+    /**
      * Auto-set fields on execution.
      * Map of fieldCode → {strategy: AUTO_GENERATE|CURRENT_USER|CURRENT_DATETIME|FIXED_VALUE, value?: ...}
      */
@@ -236,6 +248,8 @@ public class CommandDefinitionDTO {
 
         // Merge DSL extended fields
         if (type != null) config.put("type", type);
+        if (handler != null) config.put("handler", handler);
+        if (handlerParams != null) config.put("handlerParams", handlerParams);
         if (autoSetFields != null) config.put("autoSetFields", autoSetFields);
         if (sideEffects != null) config.put("sideEffects", sideEffects);
         if (stateTransitionRules != null) config.put("stateTransitionRules", stateTransitionRules);

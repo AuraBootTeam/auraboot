@@ -51,8 +51,8 @@ public class ExtensionRegistry {
 
     @PostConstruct
     public void init() {
-        refreshAllCaches();
-        log.info("ExtensionRegistry initialized");
+        clearAllCaches();
+        log.info("ExtensionRegistry initialized with lazy extension caches");
     }
 
     // ========== Command Handlers ==========
@@ -258,31 +258,22 @@ public class ExtensionRegistry {
      */
     public void refreshAllCaches() {
         log.info("Refreshing all extension caches");
+        clearAllCaches();
+        log.info("Extension caches cleared; extension lists will reload on demand");
+    }
 
-        // Clear all caches
+    private void clearAllCaches() {
         commandHandlers.clear();
         eventListeners.clear();
         dataProviders.clear();
         validators.clear();
         menuProviders.clear();
 
-        // Clear global caches
         allCommandHandlers = null;
         allEventListeners = null;
         allDataProviders = null;
         allValidators = null;
         allMenuProviders = null;
-
-        // Pre-populate caches
-        getAllCommandHandlers();
-        getAllEventListeners();
-        getAllDataProviders();
-        getAllValidators();
-        getAllMenuProviders();
-
-        log.info("Extension caches refreshed: {} command handlers, {} event listeners, {} data providers, {} validators, {} menu providers",
-                allCommandHandlers.size(), allEventListeners.size(), allDataProviders.size(),
-                allValidators.size(), allMenuProviders.size());
     }
 
     /**

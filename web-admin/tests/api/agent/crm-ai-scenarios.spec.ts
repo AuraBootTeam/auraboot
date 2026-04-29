@@ -15,6 +15,8 @@ type ChatResult = {
   toolCalls: ToolCall[];
   confirmations: Confirmation[];
   error?: string;
+  transportAttempts?: number;
+  transientRetryCount?: number;
 };
 type Filter = { fieldName: string; operator: string; value?: unknown; values?: unknown[] };
 type CoverageLevel = 'L1' | 'L2' | 'L3' | 'L4';
@@ -100,11 +102,19 @@ async function writeEvidence(
     coverageLevel,
     error: result.error ?? null,
     confirmations: result.confirmations,
+    transportAttempts: result.transportAttempts ?? 1,
+    transientRetryCount: result.transientRetryCount ?? 0,
     toolCalls: result.toolCalls.map((tool) => ({
       toolName: tool.toolName,
       input: tool.input,
       success: tool.result?.success ?? tool.result?.data?.success ?? null,
       total: tool.result?.data?.total ?? tool.result?.total ?? null,
+      error:
+        tool.result?.errorMessage ??
+        tool.result?.error ??
+        tool.result?.message ??
+        tool.result?.data?.error ??
+        null,
     })),
     contentHash: contentHash(result.content),
     contentPreview: result.content.slice(0, 500),
@@ -193,12 +203,19 @@ async function chatWithAuraBot(
   modelCode?: string,
 ): Promise<ChatResult> {
   let lastResult: ChatResult | undefined;
-  for (let attempt = 0; attempt < LLM_TRANSPORT_ATTEMPTS; attempt += 1) {
+  let retryCount = 0;
+  for (let attempt = 1; attempt <= LLM_TRANSPORT_ATTEMPTS; attempt += 1) {
     lastResult = await chatWithAuraBotOnce(token, message, modelCode);
+    lastResult.transportAttempts = attempt;
+    lastResult.transientRetryCount = retryCount;
     if (!isTransientLlmTransportError(lastResult.error)) {
       return lastResult;
     }
+    if (attempt < LLM_TRANSPORT_ATTEMPTS) {
+      retryCount += 1;
+    }
   }
+  lastResult!.transientRetryCount = retryCount;
   return lastResult!;
 }
 
@@ -292,6 +309,24 @@ async function queryList(
   return { total: body.data?.total || 0, records: body.data?.records || [] };
 }
 
+async function queryDatasource(
+  token: string,
+  datasourceId: string,
+  params: Record<string, string>,
+): Promise<{ total: number; records: Record<string, any>[] }> {
+  const search = new URLSearchParams({ datasourceId, format: 'records', ...params });
+  const resp = await fetch(`${BACKEND_URL}/api/datasource/list?${search}`, {
+    headers: authHeaders(token),
+  });
+  const body = await resp.json();
+  expect(body.code).toBe('0');
+  return { total: body.data?.total || 0, records: body.data?.records || [] };
+}
+
+function isoDaysAgo(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
 async function createLead(
   token: string,
   tag: string,
@@ -311,6 +346,40 @@ async function createLead(
   expect(result.success, result.error).toBe(true);
   expect(result.recordId).toBeTruthy();
   return result.recordId!;
+}
+
+async function createLeadActivity(
+  token: string,
+  leadPid: string,
+  tag: string,
+  activityDate: string,
+): Promise<string> {
+  const activity = await executeCommand(token, 'crm:create_activity', {
+    crm_act_type: 'call',
+    crm_act_subject: `AI activity ${tag}`,
+    crm_act_content: `AI validation activity ${tag}`,
+    crm_act_source: 'manual',
+  });
+  expect(activity.success, activity.error).toBe(true);
+  expect(activity.recordId).toBeTruthy();
+
+  const update = await executeCommand(
+    token,
+    'crm:update_activity',
+    { crm_act_date: activityDate },
+    activity.recordId,
+  );
+  expect(update.success, update.error).toBe(true);
+
+  const relation = await executeCommand(token, 'crm:create_activity_relation', {
+    crm_ar_activity_id: activity.recordId,
+    crm_ar_object_type: 'lead',
+    crm_ar_object_id: leadPid,
+    crm_ar_role: 'primary',
+  });
+  expect(relation.success, relation.error).toBe(true);
+
+  return activity.recordId!;
 }
 
 async function createAccount(token: string, tag: string): Promise<string> {
@@ -372,19 +441,6 @@ async function createComplaint(
   };
 }
 
-function expectL4SoftTelemetry(result: ChatResult, scenarioId: string): void {
-  test.info().annotations.push({
-    type: 'soft-l4',
-    description: `${scenarioId}: real LLM observation only; not counted as hard Agent coverage`,
-  });
-  expect(
-    Boolean(result.error) ||
-      Boolean(result.content) ||
-      result.toolCalls.length > 0 ||
-      result.confirmations.length > 0,
-  ).toBe(true);
-}
-
 test.describe('CRM AI Scenarios', () => {
   let token: string;
   let highScoreLead: { pid: string; company: string; contact: string };
@@ -422,6 +478,18 @@ test.describe('CRM AI Scenarios', () => {
     tag: string;
     contactA: string;
     contactB: string;
+  };
+  let staleFollowupOracle: {
+    tag: string;
+    stalePid: string;
+    freshPid: string;
+    staleCompany: string;
+    staleContact: string;
+    freshCompany: string;
+    freshContact: string;
+    staleBefore: string;
+    oldActivityDate: string;
+    recentActivityDate: string;
   };
 
   test.beforeAll(async () => {
@@ -605,6 +673,50 @@ test.describe('CRM AI Scenarios', () => {
       crm_lead_contact_name: weeklyOracle.contactB,
       crm_lead_score: 54,
     });
+
+    const staleTag = uniqueId('stale_followup');
+    const staleCompany = `AI Stale Followup ${staleTag}`;
+    const staleContact = `Stale Followup Contact ${staleTag}`;
+    const freshCompany = `AI Fresh Followup ${staleTag}`;
+    const freshContact = `Fresh Followup Contact ${staleTag}`;
+    const staleBefore = isoDaysAgo(7);
+    const oldActivityDate = isoDaysAgo(10);
+    const recentActivityDate = isoDaysAgo(1);
+    const stalePid = await createLead(token, `${staleTag}_old`, {
+      crm_lead_company: staleCompany,
+      crm_lead_contact_name: staleContact,
+      crm_lead_status: 'new',
+      crm_lead_score: 57,
+    });
+    const freshPid = await createLead(token, `${staleTag}_fresh`, {
+      crm_lead_company: freshCompany,
+      crm_lead_contact_name: freshContact,
+      crm_lead_status: 'new',
+      crm_lead_score: 58,
+    });
+    await createLeadActivity(token, stalePid, `${staleTag}_old`, oldActivityDate);
+    await createLeadActivity(token, freshPid, `${staleTag}_recent`, recentActivityDate);
+
+    const staleRows = await queryDatasource(token, 'nq:crm_lead_stale_followup', {
+      leadKeyword: staleTag,
+      staleBefore,
+      maxItems: '50',
+    });
+    const stalePids = staleRows.records.map((r) => r.pid);
+    expect(stalePids).toContain(stalePid);
+    expect(stalePids).not.toContain(freshPid);
+    staleFollowupOracle = {
+      tag: staleTag,
+      stalePid,
+      freshPid,
+      staleCompany,
+      staleContact,
+      freshCompany,
+      freshContact,
+      staleBefore,
+      oldActivityDate,
+      recentActivityDate,
+    };
   });
 
   test.setTimeout(LLM_TIMEOUT * 3);
@@ -716,11 +828,22 @@ test.describe('CRM AI Scenarios', () => {
       expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('qualified');
     });
 
-    test('S2-05: Convert lead to customer workflow state', async () => {
+    test('S2-05: Convert lead to opportunity workflow', async () => {
       expect(leadPid).toBeTruthy();
+      const leadBefore = await detail(token, 'crm_lead_list', leadPid);
       const result = await executeCommand(token, 'crm:convert_lead', {}, leadPid);
       expect(result.success, result.error).toBe(true);
       expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('converted');
+
+      const opportunities = await queryList(token, 'crm_opportunity_list', [
+        { fieldName: 'crm_opp_lead_id', operator: 'EQ', value: leadPid },
+      ]);
+      const convertedOpportunity = opportunities.records.find(
+        (record) => record.crm_opp_lead_id === leadPid,
+      );
+      expect(convertedOpportunity?.crm_opp_name).toBe(leadBefore.crm_lead_company);
+      expect(convertedOpportunity?.crm_opp_code).toBe(leadBefore.crm_lead_code);
+      expect(convertedOpportunity?.crm_opp_stage).toBe('qualification');
     });
   });
 
@@ -908,17 +1031,22 @@ test.describe('CRM AI Scenarios', () => {
     test('S5-01: Agent answers a business patrol question', async ({}, testInfo) => {
       const result = await chatWithAuraBot(
         token,
-        '帮我检查一下，有没有超过7天没有更新的 new 状态线索？列出公司名和创建时间',
+        `不要使用 SQL 或 platform_execute_sql。请调用 CRM 长期未跟进线索工具 nq_crm_lead_stale_followup，使用参数 leadKeyword="${staleFollowupOracle.tag}"、staleBefore="${staleFollowupOracle.staleBefore}" 查询 new 状态且超过 7 天没有跟进活动的线索。返回公司名、联系人、最后跟进时间、活动次数；不要返回最近 1 天已跟进的线索。`,
         'crm_lead',
       );
-      await writeEvidence(testInfo, 'S5-01', 'L4', result, {
-        blocker:
-          'Command API cannot safely seed historical updated_at records without direct database writes, so this patrol remains observational.',
-      });
-      expectL4SoftTelemetry(result, 'S5-01');
-      if (!result.error && result.content) {
-        expect(result.toolCalls.length + result.confirmations.length).toBeGreaterThan(0);
-      }
+      await writeEvidence(testInfo, 'S5-01', 'L3', result, staleFollowupOracle);
+
+      expect(result.error).toBeUndefined();
+      expect(result.confirmations).toHaveLength(0);
+      expect(toolNames(result)).toContain('nq_crm_lead_stale_followup');
+      expectNoSqlFallback(result);
+      expectToolInputContains(result, staleFollowupOracle.tag);
+      expectToolInputContains(result, staleFollowupOracle.staleBefore);
+      expect(result.content).toContain(staleFollowupOracle.staleCompany);
+      expect(result.content).toContain(staleFollowupOracle.staleContact);
+      expect(result.content).not.toContain(staleFollowupOracle.freshCompany);
+      expect(result.content).not.toContain(staleFollowupOracle.freshContact);
+      expect(result.content).toMatch(/7|10|超过|未跟进|最后|活动|follow/i);
     });
 
     test('S5-02: Weekly new leads summary', async ({}, testInfo) => {

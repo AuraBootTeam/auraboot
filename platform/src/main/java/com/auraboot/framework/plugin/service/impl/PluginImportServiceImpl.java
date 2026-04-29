@@ -49,6 +49,7 @@ import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -63,6 +64,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -110,8 +112,10 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.template.generator.DocumentCommandGenerator documentCommandGenerator;
     private final com.auraboot.framework.bpm.rule.DroolsRuleService droolsRuleService;
     private final com.auraboot.framework.bpm.service.SlaConfigService slaConfigService;
+    private final JdbcTemplate jdbcTemplate;
 
     private final ObjectMapper objectMapper = createObjectMapper();
+    private final AtomicBoolean pluginResourceTypeConstraintChecked = new AtomicBoolean(false);
 
     // Cache for in-progress imports (importId -> manifest)
     private final Map<String, ImportContext> importContextCache = new ConcurrentHashMap<>();
@@ -320,6 +324,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private void loadResourcesFromZipFiles(PluginManifestExtended manifest, Map<String, byte[]> files) {
         Map<String, String> resourceDirs = manifest.getResourceDirs();
         if (resourceDirs == null || resourceDirs.isEmpty()) {
+            loadAgentDefinitionsFromZipByConvention(manifest, files, resourceDirs);
             return;
         }
 
@@ -407,6 +412,15 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
 
+            // Load agent definitions
+            if (resourceDirs.containsKey("agentDefinitions")) {
+                List<AgentDefinitionDTO> agentDefinitions = loadResourceListFromZip(
+                        files, resourceDirs.get("agentDefinitions"), AgentDefinitionDTO.class);
+                if (!agentDefinitions.isEmpty()) {
+                    manifest.setAgentDefinitions(mergeResourceList(manifest.getAgentDefinitions(), agentDefinitions));
+                }
+            }
+
             // Load saved views
             if (resourceDirs.containsKey("savedViews")) {
                 List<SavedViewDefinitionDTO> savedViews = loadResourceListFromZip(
@@ -434,10 +448,26 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
 
+            loadAgentDefinitionsFromZipByConvention(manifest, files, resourceDirs);
+
             log.info("Loaded resources from ZIP resourceDirs: {}", manifest.getResourceCounts());
 
         } catch (Exception e) {
             log.warn("Failed to load some resources from ZIP: {}", e.getMessage());
+        }
+    }
+
+    private void loadAgentDefinitionsFromZipByConvention(PluginManifestExtended manifest, Map<String, byte[]> files,
+                                                         Map<String, String> resourceDirs) {
+        if (manifest.getAgentDefinitions() != null && !manifest.getAgentDefinitions().isEmpty()) {
+            return;
+        }
+        String path = resourceDirs != null
+                ? resourceDirs.getOrDefault("agentDefinitions", "config/agent-definitions.json")
+                : "config/agent-definitions.json";
+        List<AgentDefinitionDTO> agentDefinitions = loadResourceListFromZip(files, path, AgentDefinitionDTO.class);
+        if (!agentDefinitions.isEmpty()) {
+            manifest.setAgentDefinitions(mergeResourceList(manifest.getAgentDefinitions(), agentDefinitions));
         }
     }
 
@@ -735,6 +765,22 @@ public class PluginImportServiceImpl implements PluginImportService {
                                 .resourceType(ResourceType.NAMED_QUERY)
                                 .resourceCode(namedQuery.getCode())
                                 .resourceName(namedQuery.getEffectiveTitle())
+                                .action(action)
+                                .build()));
+            }
+        }
+
+        // Preview agent definitions
+        if (manifest.getAgentDefinitions() != null) {
+            for (AgentDefinitionDTO agentDefinition : manifest.getAgentDefinitions()) {
+                ResourceAction action = resourceImporter.checkAgentDefinitionExists(tenantId, agentDefinition.getAgentCode())
+                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
+                result.addChange(ResourceType.AGENT_DEFINITION, enrichWithUserModified(
+                        tenantId, ResourceType.AGENT_DEFINITION, agentDefinition.getAgentCode(),
+                        ImportPreviewResult.ResourceChange.builder()
+                                .resourceType(ResourceType.AGENT_DEFINITION)
+                                .resourceCode(agentDefinition.getAgentCode())
+                                .resourceName(agentDefinition.getEffectiveName())
                                 .action(action)
                                 .build()));
             }
@@ -1196,6 +1242,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
                 case BINDING_RULE -> importBindingRules(manifest, request, result, pluginPid, importId, tenantId);
                 case NAMED_QUERY -> importNamedQueries(manifest, request, result, pluginPid, importId, tenantId);
+                case AGENT_DEFINITION -> importAgentDefinitions(manifest, request, result, pluginPid, importId, tenantId);
                 case PAGE -> {
                     importPages(manifest, request, result, pluginPid, importId, tenantId);
                     // Also import first-class dashboards (config/dashboards/*.json, Plan #8).
@@ -1806,6 +1853,29 @@ public class PluginImportServiceImpl implements PluginImportService {
                 result.incrementResourceCount(ResourceType.NAMED_QUERY, resource.getActionEnum());
                 if (resource.getResourcePid() != null) {
                     result.addCreatedResource(ResourceType.NAMED_QUERY, resource.getResourcePid());
+                }
+            }
+        }
+    }
+
+    private void importAgentDefinitions(PluginManifestExtended manifest, ImportRequest request,
+                                        ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
+        if (manifest.getAgentDefinitions() == null) return;
+
+        for (AgentDefinitionDTO agentDefinition : manifest.getAgentDefinitions()) {
+            if (!agentDefinition.isValid()) {
+                log.warn("Skipping invalid agent definition entry (missing agentCode/name): index={}",
+                        manifest.getAgentDefinitions().indexOf(agentDefinition));
+                continue;
+            }
+            PluginResource resource = resourceImporter.importAgentDefinition(
+                    agentDefinition, pluginPid, importId, tenantId, request.getConflictStrategy());
+            if (resource != null) {
+                captureImportSnapshot(resource, agentDefinition);
+                saveOrUpdatePluginResource(resource, tenantId);
+                result.incrementResourceCount(ResourceType.AGENT_DEFINITION, resource.getActionEnum());
+                if (resource.getResourcePid() != null) {
+                    result.addCreatedResource(ResourceType.AGENT_DEFINITION, resource.getResourcePid());
                 }
             }
         }
@@ -2592,6 +2662,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                 PageSchemaDTO::getPageKey, "Page");
         collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.DICT, manifest.getDicts(),
                 DictDefinitionDTO::getCode, "Dictionary");
+        collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.AGENT_DEFINITION,
+                manifest.getAgentDefinitions(), AgentDefinitionDTO::getAgentCode, "AgentDefinition");
         collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.MODEL_FIELD_BINDING,
                 manifest.getModelFieldBindings(), b -> b.getModelCode() + "." + b.getFieldCode(), "ModelFieldBinding");
         collectConflicts(conflicts, importingPluginId, tenantId, ResourceType.I18N, manifest.getI18nResources(),
@@ -2727,6 +2799,10 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Otherwise, insert a new record.
      */
     private void saveOrUpdatePluginResource(PluginResource resource, Long tenantId) {
+        if (ResourceType.AGENT_DEFINITION.code().equals(resource.getResourceType())) {
+            ensureAgentDefinitionResourceTypeAllowed();
+        }
+
         PluginResource existing = pluginResourceMapper.findByTenantPluginAndResource(
                 tenantId, resource.getPluginPid(), resource.getResourceType(), resource.getResourceCode());
 
@@ -2756,6 +2832,34 @@ public class PluginImportServiceImpl implements PluginImportService {
             // Insert new record
             pluginResourceMapper.insert(resource);
         }
+    }
+
+    private void ensureAgentDefinitionResourceTypeAllowed() {
+        if (!pluginResourceTypeConstraintChecked.compareAndSet(false, true)) {
+            return;
+        }
+        jdbcTemplate.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'chk_resource_type'
+                          AND conrelid = 'ab_plugin_resource'::regclass
+                    ) THEN
+                        ALTER TABLE ab_plugin_resource DROP CONSTRAINT chk_resource_type;
+                    END IF;
+
+                    ALTER TABLE ab_plugin_resource
+                        ADD CONSTRAINT chk_resource_type CHECK (resource_type IN (
+                            'model', 'field', 'model_field_binding', 'command', 'binding_rule',
+                            'permission', 'role', 'role_permission', 'menu', 'process', 'page',
+                            'dict', 'dict_item', 'named_query', 'agent_definition', 'i18n'
+                        ));
+                EXCEPTION
+                    WHEN duplicate_object THEN NULL;
+                END $$;
+                """);
     }
 
     /**

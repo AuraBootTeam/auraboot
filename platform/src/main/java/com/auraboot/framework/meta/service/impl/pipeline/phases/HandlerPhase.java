@@ -120,7 +120,8 @@ public class HandlerPhase implements CommandPhase {
         }
 
         // 2. Execute plugin command handlers from ExtensionRegistry
-        executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, request, fieldMapResults, handlerResults);
+        executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, request,
+                fieldMapResults, handlerResults, execConfig);
 
         // 3. Declarative BPM trigger — skipped under dry-run since BPM
         // process state lives outside the command's transaction envelope.
@@ -213,14 +214,16 @@ public class HandlerPhase implements CommandPhase {
                                               Map<String, Object> payload, Long tenantId,
                                               CommandExecuteRequest request,
                                               Map<String, Object> fieldMapResults,
-                                              Map<String, Object> handlerResults) {
+                                              Map<String, Object> handlerResults,
+                                              Map<String, Object> execConfig) {
         if (extensionRegistry == null) {
             return;
         }
 
-        Optional<CommandHandlerExtension> pluginHandler = extensionRegistry.getCommandHandler(commandCode);
+        String handlerCode = resolvePluginHandlerCode(commandCode, execConfig);
+        Optional<CommandHandlerExtension> pluginHandler = extensionRegistry.getCommandHandler(handlerCode);
         if (pluginHandler.isEmpty()) {
-            log.debug("No plugin command handler found for: {}", commandCode);
+            log.debug("No plugin command handler found for: {} (command={})", handlerCode, commandCode);
             return;
         }
 
@@ -231,15 +234,19 @@ public class HandlerPhase implements CommandPhase {
         // because external side effects escape the JDBC rollback envelope.
         if (request.isDryRun() && !handler.supportsDryRun()) {
             log.info("Dry-run: skipping plugin handler {} for command {} (supportsDryRun()=false)",
-                    handler.getClass().getName(), commandCode);
+                    handler.getClass().getName(), handlerCode);
             return;
         }
 
-        log.info("Executing plugin command handler for: {} (handler: {})", commandCode, handler.getClass().getName());
+        log.info("Executing plugin command handler for: {} (command={}, handler={})",
+                handlerCode, commandCode, handler.getClass().getName());
 
         try {
-            String namespace = commandCode.contains(":") ? commandCode.split(":")[0] : null;
+            String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>();
+            pluginSettings.putAll(resolveHandlerParams(execConfig));
+            pluginSettings.put("__commandCode", commandCode);
+            pluginSettings.put("__handlerCode", handlerCode);
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (biTemporalService != null) {
@@ -249,7 +256,7 @@ public class HandlerPhase implements CommandPhase {
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)
                     .namespace(namespace)
-                    .commandType(commandCode)
+                    .commandType(handlerCode)
                     .modelCode(modelCode)
                     .recordId(resolveEffectiveRecordId(request, fieldMapResults))
                     .payload(payload)
@@ -269,9 +276,37 @@ public class HandlerPhase implements CommandPhase {
             }
 
         } catch (Exception e) {
-            log.error("Plugin command handler execution failed for {}: {}", commandCode, e.getMessage(), e);
+            log.error("Plugin command handler execution failed for {} (command={}): {}",
+                    handlerCode, commandCode, e.getMessage(), e);
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         }
+    }
+
+    private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {
+        if (execConfig != null) {
+            Object handler = execConfig.get("handler");
+            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
+                return handlerCode.trim();
+            }
+        }
+        return commandCode;
+    }
+
+    private Map<String, Object> resolveHandlerParams(Map<String, Object> execConfig) {
+        if (execConfig == null) {
+            return Collections.emptyMap();
+        }
+        Object rawParams = execConfig.get("handlerParams");
+        if (!(rawParams instanceof Map<?, ?> rawMap) || rawMap.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> params = new HashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() instanceof String key && StringUtils.hasText(key)) {
+                params.put(key, entry.getValue());
+            }
+        }
+        return params;
     }
 
     @SuppressWarnings("unchecked")

@@ -1,5 +1,8 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.agent.entity.AgentDefinition;
+import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.MenuService;
@@ -43,6 +46,7 @@ import com.auraboot.framework.dashboard.entity.Dashboard;
 import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.AgentDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
@@ -132,6 +136,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final PageSchemaMapper pageSchemaMapper;
     private final DictMapper dictMapper;
     private final NamedQueryMapper namedQueryMapper;
+    private final AgentDefinitionMapper agentDefinitionMapper;
 
     /**
      * Tracks menu code → database ID mappings within a single import session.
@@ -228,6 +233,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    @Override
+    public boolean checkAgentDefinitionExists(Long tenantId, String agentCode) {
+        return findActiveAgentDefinition(tenantId, agentCode) != null;
     }
 
     // ==================== OVERWRITE_SAFE Helper ====================
@@ -1923,6 +1933,142 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         throw new PluginException("Unsupported target named query status: " + target);
     }
 
+    @Override
+    public PluginResource importAgentDefinition(AgentDefinitionDTO dto, String pluginPid, String importId,
+                                                Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
+        AgentDefinition existing = findActiveAgentDefinition(tenantId, dto.getAgentCode());
+        boolean exists = existing != null;
+
+        if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
+            throw new PluginException("Agent definition already exists: " + dto.getAgentCode());
+        }
+
+        if (exists && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
+                    null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
+        }
+
+        if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.AGENT_DEFINITION, dto.getAgentCode())) {
+            log.info("Skipping user-modified resource: {} {}", ResourceType.AGENT_DEFINITION, dto.getAgentCode());
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
+                    null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
+        }
+
+        Map<String, Object> currentState = buildAgentDefinitionState(dto);
+        Instant now = Instant.now();
+
+        if (exists) {
+            applyAgentDefinition(existing, dto);
+            existing.setUpdatedAt(now);
+            existing.setDeletedFlag(false);
+            agentDefinitionMapper.updateById(existing);
+
+            AgentDefinition updated = findActiveAgentDefinition(tenantId, dto.getAgentCode());
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
+                    updated.getPid(), updated.getId(), dto.getAgentCode(), dto.getEffectiveName(),
+                    ResourceAction.UPDATE, null, currentState);
+        }
+
+        AgentDefinition created = new AgentDefinition();
+        created.setPid(UlidGenerator.generate());
+        created.setTenantId(tenantId);
+        applyAgentDefinition(created, dto);
+        created.setCreatedAt(now);
+        created.setUpdatedAt(now);
+        created.setDeletedFlag(false);
+        agentDefinitionMapper.insert(created);
+
+        return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
+                created.getPid(), created.getId(), dto.getAgentCode(), dto.getEffectiveName(),
+                ResourceAction.CREATE, null, currentState);
+    }
+
+    private AgentDefinition findActiveAgentDefinition(Long tenantId, String agentCode) {
+        if (tenantId == null || agentCode == null || agentCode.isBlank()) {
+            return null;
+        }
+        return agentDefinitionMapper.selectOne(new QueryWrapper<AgentDefinition>()
+                .eq("tenant_id", tenantId)
+                .eq("agent_code", agentCode)
+                .apply("(deleted_flag = FALSE OR deleted_flag IS NULL)")
+                .last("LIMIT 1"));
+    }
+
+    private void applyAgentDefinition(AgentDefinition target, AgentDefinitionDTO dto) {
+        target.setAgentCode(dto.getAgentCode());
+        target.setName(dto.getEffectiveName());
+        target.setDescription(dto.getDescription());
+        target.setAvatarUrl(dto.getAvatarUrl());
+        target.setAgentType(defaultString(dto.getAgentType(), "reactive"));
+        target.setModel(defaultString(dto.getModel(), "claude-sonnet-4-6"));
+        target.setSystemPrompt(dto.getSystemPrompt());
+        target.setTools(toJsonText(dto.getTools()));
+        target.setSkills(toJsonText(dto.getSkills()));
+        target.setGuardrails(toJsonText(dto.getGuardrails()));
+        target.setSoulProfile(dto.getSoulProfile());
+        target.setPersonality(dto.getPersonality());
+        target.setExpertise(dto.getExpertise());
+        target.setCommunicationStyle(dto.getCommunicationStyle());
+        target.setBoundaries(dto.getBoundaries());
+        target.setSoulGoals(dto.getSoulGoals());
+        target.setAllowedModels(dto.getAllowedModels());
+        target.setAllowedOperations(dto.getAllowedOperations() != null
+                ? dto.getAllowedOperations()
+                : List.of("query", "create", "update", "delete", "transition"));
+        target.setMaxTools(dto.getMaxTools() != null ? dto.getMaxTools() : 20);
+        target.setMaxConcurrentRuns(dto.getMaxConcurrentRuns() != null ? dto.getMaxConcurrentRuns() : 3);
+        target.setExecutionTimeoutSeconds(dto.getExecutionTimeoutSeconds() != null
+                ? dto.getExecutionTimeoutSeconds()
+                : 300);
+        target.setEventTriggers(dto.getEventTriggers());
+        target.setAutoReplyMode(defaultString(dto.getAutoReplyMode(), "mention"));
+        target.setStatus(defaultString(dto.getStatus(), "active"));
+        target.setStats(dto.getStats());
+        target.setVisibility(defaultString(dto.getVisibility(), "private"));
+    }
+
+    private Map<String, Object> buildAgentDefinitionState(AgentDefinitionDTO dto) {
+        Map<String, Object> state = new HashMap<>();
+        state.put("agentCode", dto.getAgentCode());
+        state.put("name", dto.getEffectiveName());
+        state.put("description", dto.getDescription());
+        state.put("agentType", defaultString(dto.getAgentType(), "reactive"));
+        state.put("model", defaultString(dto.getModel(), "claude-sonnet-4-6"));
+        state.put("systemPrompt", dto.getSystemPrompt());
+        state.put("tools", dto.getTools());
+        state.put("skills", dto.getSkills());
+        state.put("guardrails", dto.getGuardrails());
+        state.put("soulProfile", dto.getSoulProfile());
+        state.put("allowedModels", dto.getAllowedModels());
+        state.put("allowedOperations", dto.getAllowedOperations());
+        state.put("maxTools", dto.getMaxTools());
+        state.put("maxConcurrentRuns", dto.getMaxConcurrentRuns());
+        state.put("executionTimeoutSeconds", dto.getExecutionTimeoutSeconds());
+        state.put("eventTriggers", dto.getEventTriggers());
+        state.put("autoReplyMode", defaultString(dto.getAutoReplyMode(), "mention"));
+        state.put("status", defaultString(dto.getStatus(), "active"));
+        state.put("visibility", defaultString(dto.getVisibility(), "private"));
+        return state;
+    }
+
+    private String toJsonText(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String text) {
+            return text;
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception e) {
+            throw new PluginException("Failed to serialize agent definition field: " + e.getMessage(), e);
+        }
+    }
+
+    private String defaultString(String value, String fallback) {
+        return value != null && !value.isBlank() ? value : fallback;
+    }
+
     // ==================== Rollback Operations ====================
 
     @Override
@@ -2016,6 +2162,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                         log.warn("Failed to delete named query {}: {}", resource.getResourcePid(), e.getMessage());
                         namedQueryMapper.updateStatusByPid(resource.getResourcePid(), "archived");
                     }
+                }
+            }
+            case AGENT_DEFINITION -> {
+                if (resource.getResourcePid() != null) {
+                    jdbcTemplate.update("""
+                            UPDATE ab_agent_definition
+                            SET deleted_flag = TRUE, updated_at = NOW()
+                            WHERE pid = ?
+                            """, resource.getResourcePid());
                 }
             }
             case PROCESS -> processDefinitionMapper.updateStatus(resource.getResourcePid(), "archived");

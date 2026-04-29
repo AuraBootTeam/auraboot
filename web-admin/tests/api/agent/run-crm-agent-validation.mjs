@@ -9,6 +9,11 @@ const commonEnv = {
   PW_WORKERS: process.env.PW_WORKERS || '1',
 };
 
+const reporterArgs =
+  process.env.CRM_AGENT_USE_CONFIG_REPORTER === '1'
+    ? []
+    : ['--reporter', process.env.CRM_AGENT_REPORTER || 'line'];
+
 const stages = [
   {
     name: 'auth',
@@ -18,7 +23,7 @@ const stages = [
       'playwright.noweb.config.ts',
       'tests/auth.setup.ts',
       '--project=auth',
-      '--reporter=line',
+      ...reporterArgs,
     ],
   },
   {
@@ -29,31 +34,51 @@ const stages = [
       'playwright.noweb.config.ts',
       'tests/api/agent/crm-agent-validation.spec.ts',
       '--project=api',
-      '--reporter=line',
+      ...reporterArgs,
+      '--no-deps',
+    ],
+  },
+  {
+    name: 'quality-unit',
+    args: [
+      'test',
+      '-c',
+      'playwright.noweb.config.ts',
+      'tests/api/agent/crm-agent-quality-report.spec.ts',
+      '--project=api',
+      ...reporterArgs,
       '--no-deps',
     ],
   },
   {
     name: 'llm',
+    requiresLlm: true,
     args: [
       'test',
       '-c',
       'playwright.noweb.config.ts',
       'tests/api/agent/crm-ai-scenarios.spec.ts',
       '--project=api',
-      '--reporter=line',
+      ...reporterArgs,
       '--no-deps',
     ],
   },
   {
+    name: 'quality-report',
+    requiresLlm: true,
+    command: 'node',
+    args: ['tests/api/agent/crm-agent-quality-report.mjs'],
+  },
+  {
     name: 'ui',
+    requiresUi: true,
     args: [
       'test',
       '-c',
       'playwright.noweb.config.ts',
       'tests/e2e/crm/crm-agent-ui-smoke.spec.ts',
       '--project=chromium',
-      '--reporter=line',
+      ...reporterArgs,
       '--no-deps',
     ],
   },
@@ -62,7 +87,7 @@ const stages = [
 function runStage(stage) {
   return new Promise((resolve, reject) => {
     console.log(`\n[crm-agent] stage=${stage.name}`);
-    const child = spawn('playwright', stage.args, {
+    const child = spawn(stage.command || 'playwright', stage.args, {
       stdio: 'inherit',
       env: commonEnv,
       shell: false,
@@ -84,6 +109,14 @@ function runStage(stage) {
 }
 
 for (const stage of stages) {
+  if (stage.requiresLlm && process.env.CRM_AGENT_SKIP_LLM === '1') {
+    console.log(`\n[crm-agent] stage=${stage.name} skipped (CRM_AGENT_SKIP_LLM=1)`);
+    continue;
+  }
+  if (stage.requiresUi && process.env.CRM_AGENT_SKIP_UI === '1') {
+    console.log(`\n[crm-agent] stage=${stage.name} skipped (CRM_AGENT_SKIP_UI=1)`);
+    continue;
+  }
   await runStage(stage);
 }
 

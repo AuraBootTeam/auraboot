@@ -121,6 +121,7 @@ test.describe('CRM Agent UI smoke', () => {
       complaintId = complaint.recordId;
       expect(complaintId).toBeTruthy();
 
+      // Setup readback only: the UI list is keyed by the generated complaint code.
       const detailResp = await page.request.get(`/api/dynamic/crm_complaint/${complaintId}`);
       const detailBody = await detailResp.json();
       expect(detailBody.code).toBe('0');
