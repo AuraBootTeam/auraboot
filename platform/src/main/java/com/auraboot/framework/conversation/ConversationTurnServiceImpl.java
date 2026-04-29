@@ -434,12 +434,27 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     }
 
     /**
-     * Phase C.3c (Q-C3.5=β step1): ACP_RUN bucket dispatches to the ACP
-     * runtime for the aurabot main path. The cutover is bucket-driven so
-     * LIGHT_CHAT / CONTEXTUAL_ANSWER turns continue to flow through the
-     * existing chat path — this lets us migrate the action-oriented traffic
-     * (the whole point of "use ACP to replace tool loop") incrementally
-     * without rewriting prose-streaming turns in the same PR.
+     * Phase C.3c (Q-C3.5=β step1) extended by C.3e (step2): ACP_RUN AND
+     * CONTEXTUAL_ANSWER buckets dispatch to the ACP runtime for the aurabot
+     * main path. After C.3e only LIGHT_CHAT (and the {@code null} bucket
+     * defensive fallback when triage SPI is absent) continues to flow
+     * through the legacy chat path — that path serves trivial chat
+     * (greeting / thanks) where ACP's task / run / action machinery would
+     * be pure overhead.
+     *
+     * <p>Per design §3.6 CONTEXTUAL_ANSWER turns benefit from ACP because:
+     * <ul>
+     *     <li>D1 grounding compiles the user's "explain this page" question
+     *         into a {@code BusinessIntentFrame} that {@code GroundingService}
+     *         already produces in the chat path — moving it under ACP keeps
+     *         the BIF + skill-routing + tool-discovery work in one place.</li>
+     *     <li>The read-only tools (e.g. {@code schema.lookup}, {@code record.view})
+     *         the explanation-bucket triage advertises are exactly the read-
+     *         only tools ACP discovers via {@code ToolProviderRegistry}.</li>
+     *     <li>Result rendering: explanation answers are structured (page
+     *         schema, field meanings) — {@code result_contract} renders them
+     *         consistently with the action-bucket flow.</li>
+     * </ul>
      *
      * <p>Falls back to the legacy chat path when:
      * <ul>
@@ -449,13 +464,14 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
      * Both fall-throughs log at WARN; never silent.
      */
     private boolean shouldDispatchToAcpRuntime(TurnContext ctx) {
-        if (ctx.triageBucket() != TriageBucket.ACP_RUN) {
+        TriageBucket bucket = ctx.triageBucket();
+        if (bucket != TriageBucket.ACP_RUN && bucket != TriageBucket.CONTEXTUAL_ANSWER) {
             return false;
         }
         if (agentRunService == null || dynamicDataMapper == null) {
-            log.warn("triageBucket=ACP_RUN but ACP runtime wiring is incomplete "
+            log.warn("triageBucket={} but ACP runtime wiring is incomplete "
                             + "(agentRunService={}, dynamicDataMapper={}); falling back to chat path",
-                    agentRunService != null, dynamicDataMapper != null);
+                    bucket, agentRunService != null, dynamicDataMapper != null);
             return false;
         }
         return true;
