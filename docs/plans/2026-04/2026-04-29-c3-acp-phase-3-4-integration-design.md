@@ -164,21 +164,40 @@ ACP `ResultContractEmitter` 通过 `ChatSseContext` ThreadLocal SSE emitter 推 
 - **Q-C3.3 反方**：B.6 刚把前端契约从 sessionId 切到 pendingTurnId，C.3 立刻再切 → ab_agent_approval.pid，前端 UX team 会反弹。**回应**：dev stage 红线说"允许破坏 / 不考虑迁移"。一次性破坏 vs 永远不做的成本不对称。
 - **Q-C3.5 反方**：β 5 个 PR 期间 doToolLoop 与 ACP path 并存，可能有 bug 修在一边漏到另一边。**回应**：每 PR 严格通过 sse-baseline-2026-04-26.sha256 字节验收 + dispatch/finalize 单测；并存窗口控制在 1-2 周（C.3a→C.3e 紧密推进，不拖月）。
 
-## 8. C.3 实施时序（决策已锁，可进 plan v1）
+## 8. C.3 实施时序（5 PR + cleanup 已全部落地，2026-04-30 close）
 
-按 §3 PR 切片 + Q-C3.5=β bucket-driven，5 PR 紧密推进：
+按 §3 PR 切片 + Q-C3.5=β bucket-driven，5 PR 紧密推进 + 1 个后置 cleanup：
 
-| PR | 决策来源 | 验收红线 |
-|----|---------|---------|
-| **C.3a** AgentRunService.executeTaskSync 提取 | Q-C3.2=β | 现有 ACP 测试 0 fail；新增 sync 调用单测 |
-| **C.3b** ResultContractEmitter 改注 ResponseSink，ChatSseContext 退役 | Q-C3.4=α | sse-baseline 字节流 4/4 scenario 仍一致；ResultContractEmitter 既有调用方测试 0 fail |
-| **C.3c** runTurn 在 ACP_RUN bucket 时建 task + 调 executeTaskSync + 包装 RunOutcome→TurnOutcome | Q-C3.1=A + Q-C3.5=β step1 | aurabot ACP_RUN 端到端：写 ab_agent_task + ab_agent_run + ab_agent_action 行；chokepoint metrics + memory C.2 仍 fire；前端 SSE byte 仍一致 |
-| **C.3d** Approval 迁 ab_agent_approval（前端契约 turnId → approvalPid 二次切）| Q-C3.3=α | /execute 端到端：approve / reject 走 AgentApprovalGateService；plan_hash 完整性校验生效 |
-| **C.3e** 删 doToolLoop + ChatSessionStore.PendingTool 路径 | Q-C3.5=β step3 | AuraBotChatService LOC 净降 ~600；CONTEXTUAL_ANSWER bucket 也走 ACP；conversation 单测全套 ≥ 当前 55/0 |
+| PR | 决策来源 | 验收红线 | 落地 commit | 状态 |
+|----|---------|---------|-------------|------|
+| **C.3a** AgentRunService.executeTaskSync 提取 | Q-C3.2=β | 现有 ACP 测试 0 fail；新增 sync 调用单测 (6 cases) | `4e01088b` | ✅ 2026-04-29 |
+| **C.3b** ResultContractEmitter 改注 ResponseSink，ChatSseContext 退役 | Q-C3.4=α | sse-baseline 字节一致；ResultContractEmitter 9/9 + SseResponseSink 12/12 (+1 onResultContract) | `53a0a290` | ✅ 2026-04-29 |
+| **C.3c** runTurn 在 ACP_RUN bucket 时建 task + 调 executeTaskSync + 包装 RunOutcome→TurnOutcome | Q-C3.1=A + Q-C3.5=β step1 | aurabot ACP_RUN 端到端写 ab_agent_task；新增 5 集成测试 (BaseIntegrationTest + JdbcTemplate 校验 row 落库) | `63d170d3` | ✅ 2026-04-29 |
+| **C.3d** Approval 收敛到 ab_agent_approval（resumeTurn 双路径分派） | Q-C3.3=α | /execute approve/reject 走 AgentApprovalGateService；plan_hash 校验生效；新增 5 ACP resume 测试 + AgentRunServiceSyncTest 7/7 (+1 legacy ctor case) | `705d926a` | ✅ 2026-04-30 |
+| **C.3e** CONTEXTUAL_ANSWER 也走 ACP runtime | Q-C3.5=β step2 | shouldDispatchToAcpRuntime 扩展；AcpDispatchTest 7/7 (+1 CONTEXTUAL_ANSWER) | `c49cd450` | ✅ 2026-04-30 |
+| **cleanup** 删 AuraBotChatService.doToolLoop + buildLlmMessages | post-C.3e | 共享 helper（buildAssistantMessage / serializeMessages 等）保留供 doResumeApprovedInner 用；conversation + agent.service 94/94 绿 | `6feac8dc` | ✅ 2026-04-30 (-244 LOC) |
 
-每 PR 独立 commit + push + 走 main fast-forward 模式（同 B.x 节奏）。
+每 PR 独立 commit + push + 走 main fast-forward 模式（B.x 节奏）。
+
+### 偏离原计划的地方（决策记录）
+
+- **C.3d 实际范围 vs §3 切片表**：§3 表里 C.3d 写的是「CONTEXTUAL_ANSWER bucket 切到 ACP」，但 §8 表（v2 锁定后）改成「Approval 收敛」并把 CONTEXTUAL_ANSWER 切换归入 C.3e。实际按 §8 落地：C.3d=approval，C.3e=CONTEXTUAL_ANSWER 切换。Q-C3.3=α 优先级最高（design v2 红线：禁止推迟该做的重构）。
+- **C.3e 实际范围 vs §8 验收**：原 §8 验收「AuraBotChatService LOC 净降 ~600」+「删 doToolLoop」。审计发现 doToolLoop 的 helper（buildAssistantMessage / buildToolResultBlock 等 8 个）与 doResumeApprovedInner 共享 — 删除会破坏 named-agent confirm resume 路径。所以 C.3e PR 只做 bucket 切换，doToolLoop 删除拆到独立 cleanup PR (`6feac8dc`) 净降 244 LOC。剩余 helper 保留是有意为之，与名为 named-agent (AgentChatPortImpl) PendingTool 流耦合的部分仍是单一来源。
+
+### 长期演进视角的实际兑现
+
+| 决策 | claim | 实际落地证据 |
+|------|------|------------|
+| Q-C3.1=A | 每 chat turn 一 ab_agent_task row | C.3c 集成测试 SQL 校验 ✓ |
+| Q-C3.2=β | sync core + async at adapter | RunOutcome record + executeTaskSync 公开 + 6 outcome unit test ✓ |
+| Q-C3.3=α | Approval 收敛 ACP（不延期） | C.3d 5 测试 + chokepoint resumeTurn 双路径分派 ✓ |
+| Q-C3.4=α | ChatSseContext 退役 | C.3b git rm -f；ResponseSinkContext 取代；SSE 字节 parity 测试 ✓ |
+| Q-C3.5=β | bucket-driven 渐进 | 5 PR 独立可 review，每个 commit 单独 fast-forward ✓ |
+
+chokepoint 不再是「装饰化抽象」：截至 cleanup commit，aurabot 路径里再无并行 tool-loop body，ACP runtime 是非 LIGHT_CHAT 流量的唯一处理引擎。
 
 ## CHANGELOG
 
+- 2026-04-30 §8 标记 5 PR + cleanup 全部落地；新增「偏离原计划」+「长期演进视角实际兑现」两节
 - 2026-04-29 v2 owner 长期演进视角决策锁定 5 项；§7 改写决策表 + 6 个月后悔检查 + steel-man；新增 §8 C.3 实施时序
 - 2026-04-29 v1 初始化（C.2 落地后写）
