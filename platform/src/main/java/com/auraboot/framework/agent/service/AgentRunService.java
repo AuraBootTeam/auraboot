@@ -347,7 +347,8 @@ public class AgentRunService {
             return new RunOutcome.Failed(runPid, "Plan execution did not reach success terminal state");
 
         } catch (AgentApprovalPendingException e) {
-            log.info("Run {} paused for approval: {}", runPid, e.getMessage());
+            log.info("Run {} paused for approval (approvalPid={}): {}",
+                    runPid, e.getApprovalPid(), e.getMessage());
             Map<String, Object> runUpdate = new HashMap<>();
             runUpdate.put("run_status", "pending");
             runUpdate.put("error_message", e.getMessage());
@@ -357,7 +358,7 @@ public class AgentRunService {
             try { aiTraceService.endTrace(traceCtx, null, "pending"); }
             catch (Exception traceEx) { log.debug("Failed to end trace for run {}: {}", runPid, traceEx.getMessage()); }
             // Task stays IN_PROGRESS — will be resumed after approval
-            return new RunOutcome.PendingApproval(runPid, e.getMessage());
+            return new RunOutcome.PendingApproval(runPid, e.getApprovalPid(), e.getMessage());
         } catch (Exception e) {
             log.error("Agent execution failed: task={}, agent={}, error={}", taskPid, agentCode, e.getMessage(), e);
             runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, e.getMessage());
