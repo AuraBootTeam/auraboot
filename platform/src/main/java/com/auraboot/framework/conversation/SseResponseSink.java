@@ -1,5 +1,6 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.dto.ResultContract;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -36,18 +37,6 @@ public class SseResponseSink implements ResponseSink {
     public SseResponseSink(SseEmitter emitter, ObjectMapper objectMapper) {
         this.emitter = emitter;
         this.objectMapper = objectMapper;
-    }
-
-    /**
-     * Internal accessor used by {@code AuraBotChatService.executeAuraBotTurn} to wire the
-     * {@code ChatSseContext} ThreadLocal compat path so {@code ResultContractEmitter} (which
-     * still reads the emitter directly) keeps working through Phase A. Public visibility is
-     * required because {@code AuraBotChatService} lives in a different package; the surface
-     * remains conceptually internal — do not call this from new code, write through the
-     * {@link ResponseSink} interface instead.
-     */
-    public SseEmitter getEmitter() {
-        return emitter;
     }
 
     @Override
@@ -87,6 +76,22 @@ public class SseResponseSink implements ResponseSink {
                 "toolId", toolId,
                 "result", result != null ? result : Map.of(),
                 "success", success));
+    }
+
+    @Override
+    public void onResultContract(ResultContract contract) {
+        // Byte-for-byte parity with the legacy ResultContractEmitter.send():
+        //   emitter.send(SseEmitter.event().name("result_contract")
+        //           .data(objectMapper.writeValueAsString(contract)));
+        // The contract is serialised directly (not wrapped in a Map) so the
+        // sse-baseline-2026-04-26 stream stays identical.
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("result_contract")
+                    .data(objectMapper.writeValueAsString(contract)));
+        } catch (Exception e) {
+            // mirror existing send* helper: swallow disconnects / IO errors
+        }
     }
 
     @Override

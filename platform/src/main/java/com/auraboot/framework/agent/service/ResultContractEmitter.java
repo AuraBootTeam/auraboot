@@ -3,11 +3,12 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.dto.ResultContract;
+import com.auraboot.framework.conversation.ResponseSink;
+import com.auraboot.framework.conversation.ResponseSinkContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -15,21 +16,28 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Builds a ResultContract from a tool-execution result and emits it as a
- * `result_contract` SSE event on the current chat turn's emitter (see
- * ChatSseContext). Called by ToolLoopService after each dsl_query /
- * dsl_command execution.
+ * Builds a {@link ResultContract} from a tool-execution result and pushes it
+ * through the current turn's {@link ResponseSink} (resolved via
+ * {@link ResponseSinkContext}). Called by {@code ToolLoopService} after each
+ * {@code dsl_query} / {@code dsl_command} execution.
  *
- * Hides engine internals behind the contract shape — the frontend renderer
- * at `web-admin/app/plugins/core-aurabot/components-internal/ResultContractView.tsx`
- * dispatches on renderHint.
+ * <p>Phase C.3b migration (2026-04-30, Q-C3.4=α): formerly read the SSE
+ * emitter directly through {@code ChatSseContext.getEmitter()}. The
+ * indirection is now sink-typed — {@code ResponseSinkContext.get()} returns
+ * a transport-agnostic {@link ResponseSink}, and the SSE adapter
+ * ({@code SseResponseSink.onResultContract}) preserves byte-for-byte
+ * equivalence with the prior emitter pipeline. Non-chat callers (tests,
+ * ad-hoc skill invocations) still see no context bound and the emitter
+ * silently no-ops.
+ *
+ * <p>Hides engine internals behind the contract shape — the frontend renderer
+ * at {@code web-admin/app/plugins/core-aurabot/components-internal/ResultContractView.tsx}
+ * dispatches on {@code renderHint}.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ResultContractEmitter {
-
-    private static final String EVENT = "result_contract";
 
     private final ObjectMapper objectMapper;
 
@@ -40,8 +48,8 @@ public class ResultContractEmitter {
      */
     public void emitQueryResult(String toolName, AgentToolDefinition toolDef,
                                 String resultJson, long durationMs, boolean success) {
-        SseEmitter emitter = ChatSseContext.getEmitter();
-        if (emitter == null) return;
+        ResponseSink sink = ResponseSinkContext.get();
+        if (sink == null) return;
 
         ResultContract.ResultContractBuilder b = ResultContract.builder()
                 .skillCode(toolName)
@@ -79,7 +87,7 @@ public class ResultContractEmitter {
             b.renderHint("summary").textSummary(success ? "(unparseable result)" : "Query failed");
         }
 
-        send(emitter, b.build());
+        sink.onResultContract(b.build());
     }
 
     /**
@@ -90,8 +98,8 @@ public class ResultContractEmitter {
     public void emitCommandResult(String toolName, AgentToolDefinition toolDef,
                                    String resultJson, long durationMs, boolean success,
                                    String errorMessage) {
-        SseEmitter emitter = ChatSseContext.getEmitter();
-        if (emitter == null) return;
+        ResponseSink sink = ResponseSinkContext.get();
+        if (sink == null) return;
 
         ResultContract.ResultContractBuilder b = ResultContract.builder()
                 .skillCode(toolName)
@@ -102,7 +110,7 @@ public class ResultContractEmitter {
 
         if (!success) {
             b.renderHint("summary").textSummary(errorMessage != null ? errorMessage : "Command failed");
-            send(emitter, b.build());
+            sink.onResultContract(b.build());
             return;
         }
 
@@ -123,7 +131,7 @@ public class ResultContractEmitter {
             b.renderHint("summary").textSummary("Command succeeded");
         }
 
-        send(emitter, b.build());
+        sink.onResultContract(b.build());
     }
 
     /**
@@ -132,8 +140,8 @@ public class ResultContractEmitter {
      */
     public void emitConfirmationRequired(String toolName, AgentToolDefinition toolDef,
                                          Map<String, Object> input, long durationMs) {
-        SseEmitter emitter = ChatSseContext.getEmitter();
-        if (emitter == null) return;
+        ResponseSink sink = ResponseSinkContext.get();
+        if (sink == null) return;
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("toolCode", toolName);
@@ -160,20 +168,12 @@ public class ResultContractEmitter {
                 .canContinueFrom(true)
                 .build();
 
-        send(emitter, contract);
+        sink.onResultContract(contract);
     }
 
     private String resolveActionability() {
         BusinessIntentFrame bif = BifContext.getCurrentBif();
         if (bif != null && bif.getActionability() != null) return bif.getActionability();
         return "read_only";
-    }
-
-    private void send(SseEmitter emitter, ResultContract contract) {
-        try {
-            emitter.send(SseEmitter.event().name(EVENT).data(objectMapper.writeValueAsString(contract)));
-        } catch (Exception e) {
-            log.debug("Failed to send result_contract SSE event: {}", e.getMessage());
-        }
     }
 }

@@ -1,5 +1,6 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.dto.ResultContract;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
@@ -7,6 +8,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -264,8 +266,51 @@ class SseResponseSinkTest {
         sink.onToolStart("t1", "n", Map.of());
         sink.onToolResult("t1", Map.of(), false);
         sink.onConfirmRequired("t1", "n", "d", Map.of(), "turn-1");
+        sink.onResultContract(ResultContract.builder().skillCode("x").status("success")
+                .renderHint("summary").outputType("text").build());
 
-        // We expect 6 send attempts (one per method) — all swallowed.
-        verify(emitter, times(6)).send(any(SseEmitter.SseEventBuilder.class));
+        // We expect 7 send attempts (one per method) — all swallowed.
+        verify(emitter, times(7)).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    @DisplayName("11) onResultContract -> name=result_contract, JSON-string of the ResultContract object")
+    void onResultContract_jsonStringPayload() throws Exception {
+        // Phase C.3b: byte-for-byte parity with the legacy ResultContractEmitter.send():
+        //   emitter.send(SseEmitter.event().name("result_contract")
+        //           .data(objectMapper.writeValueAsString(contract)));
+        // The contract must be serialised directly (NOT wrapped in a Map) so the
+        // sse-baseline-2026-04-26 stream stays identical when ResultContractEmitter
+        // pushes through the sink rather than the prior ChatSseContext direct path.
+        ResultContract contract = ResultContract.builder()
+                .skillCode("nq_customer_list")
+                .durationMs(142L)
+                .status("success")
+                .actionability("read_only")
+                .outputType("structured_result")
+                .renderHint("table")
+                .table(List.of(Map.of("pid", "01A", "name", "Acme")))
+                .textSummary("1 total, 1 shown")
+                .build();
+
+        sink.onResultContract(contract);
+
+        SseEmitter.SseEventBuilder b = captureBuilder();
+        assertThat(eventName(b)).isEqualTo("result_contract");
+        // Direct ResultContract JSON — not a Map wrapper. Lombok @Data + Jackson
+        // produce the canonical JSON we asserted on under the legacy path.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parsed = objectMapper.readValue((String) firstDataPayload(b), Map.class);
+        assertThat(parsed)
+                .containsEntry("skillCode", "nq_customer_list")
+                .containsEntry("status", "success")
+                .containsEntry("renderHint", "table")
+                .containsEntry("textSummary", "1 total, 1 shown");
+        assertThat(((Number) parsed.get("durationMs")).longValue()).isEqualTo(142L);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> table = (List<Map<String, Object>>) parsed.get("table");
+        assertThat(table).hasSize(1);
+        assertThat(table.get(0)).containsEntry("name", "Acme");
+        verify(emitter, never()).complete();
     }
 }

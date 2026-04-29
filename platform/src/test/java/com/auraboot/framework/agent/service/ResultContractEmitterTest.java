@@ -3,6 +3,8 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.dto.ConfidenceScore;
+import com.auraboot.framework.conversation.ResponseSinkContext;
+import com.auraboot.framework.conversation.SseResponseSink;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,9 +19,13 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Unit test for ResultContractEmitter. Uses a capturing SseEmitter subclass
- * to verify the emitted event name + payload shape for each tool type and
- * edge case (success/failure/empty result/BIF-derived actionability).
+ * Unit test for ResultContractEmitter. Wraps a capturing {@link SseEmitter}
+ * subclass in {@link SseResponseSink} and binds it via
+ * {@link ResponseSinkContext} (Phase C.3b path), then verifies the emitted
+ * event name + payload shape for each tool type and edge case
+ * (success/failure/empty result/BIF-derived actionability) — which means we
+ * still assert byte parity through the full
+ * {@code emitter → sink → SseEmitter} pipeline rather than just sink calls.
  */
 @DisplayName("ResultContractEmitter — SSE event shape")
 class ResultContractEmitterTest {
@@ -32,12 +38,15 @@ class ResultContractEmitterTest {
     void setup() {
         emitter = new ResultContractEmitter(mapper);
         sse = new CapturingEmitter();
-        ChatSseContext.setEmitter(sse);
+        // Phase C.3b: ResultContractEmitter resolves the sink through
+        // ResponseSinkContext (formerly ChatSseContext). The SseResponseSink
+        // adapter preserves byte parity with the legacy direct-emitter path.
+        ResponseSinkContext.set(new SseResponseSink(sse, mapper));
     }
 
     @AfterEach
     void clear() {
-        ChatSseContext.clear();
+        ResponseSinkContext.clear();
         BifContext.clear();
     }
 
@@ -157,9 +166,9 @@ class ResultContractEmitterTest {
     }
 
     @Test
-    @DisplayName("no emitter in context → silent no-op (never throws)")
-    void no_emitter_is_silent() {
-        ChatSseContext.clear();
+    @DisplayName("no sink in context → silent no-op (never throws)")
+    void no_sink_is_silent() {
+        ResponseSinkContext.clear();
         // Should not throw.
         emitter.emitQueryResult("x", queryTool("x"), "{}", 1, true);
         emitter.emitCommandResult("y", commandTool("y"), null, 1, true, null);
