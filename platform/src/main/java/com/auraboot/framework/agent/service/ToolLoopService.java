@@ -163,7 +163,7 @@ public class ToolLoopService implements ToolExecutionPort {
             updateToolStats(tenantId, toolName, success, latencyMs, success ? null : result);
 
             // Emit ResultContract for structured frontend rendering (PR-11). No-op if
-            // ChatSseContext has no emitter (non-chat callers: tests, ad-hoc skill runs).
+            // ResponseSinkContext has no sink bound (non-chat callers: tests, ad-hoc skill runs).
             if ("dsl_query".equals(toolDef.getToolType())) {
                 resultContractEmitter.emitQueryResult(toolName, toolDef, result, latencyMs, success);
             } else if ("dsl_command".equals(toolDef.getToolType())) {

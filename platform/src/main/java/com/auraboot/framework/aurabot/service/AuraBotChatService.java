@@ -13,7 +13,6 @@ import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.conversation.ResponseSink;
-import com.auraboot.framework.conversation.SseResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
@@ -276,17 +275,17 @@ public class AuraBotChatService {
      *
      * <p>What this method DOES manage internally:
      * <ul>
-     *     <li>{@code ChatSseContext.setEmitter} compat for {@link com.auraboot.framework.agent.service.ResultContractEmitter}
-     *         (only when the sink is an {@link SseResponseSink})</li>
-     *     <li>{@code BifContext.clear} + {@code ChatSseContext.clear} in finally</li>
+     *     <li>{@code ResponseSinkContext.set(sink)} so {@link com.auraboot.framework.agent.service.ResultContractEmitter}
+     *         can publish {@code result_contract} events through the same sink (Phase C.3b — formerly
+     *         the SSE-specific {@code ChatSseContext}; now transport-agnostic so WS / sync-JSON adapters
+     *         work without an SSE-instanceof branch)</li>
+     *     <li>{@code BifContext.clear} + {@code ResponseSinkContext.clear} in finally</li>
      *     <li>Top-level exception barrier — translates uncaught throws to {@link TurnOutcome.Failed}
      *         and surfaces them on the sink</li>
      * </ul>
      */
     public TurnOutcome executeAuraBotTurn(TurnContext ctx, ChatRequest request, ResponseSink sink) {
-        if (sink instanceof SseResponseSink ssr) {
-            com.auraboot.framework.agent.service.ChatSseContext.setEmitter(ssr.getEmitter());
-        }
+        com.auraboot.framework.conversation.ResponseSinkContext.set(sink);
         try {
             return doStreamChatInnerSinkAware(ctx, request, sink);
         } catch (Exception e) {
@@ -295,7 +294,7 @@ public class AuraBotChatService {
             return new TurnOutcome.Failed(e.getMessage(), e);
         } finally {
             com.auraboot.framework.agent.service.BifContext.clear();
-            com.auraboot.framework.agent.service.ChatSseContext.clear();
+            com.auraboot.framework.conversation.ResponseSinkContext.clear();
         }
     }
 
@@ -690,9 +689,7 @@ public class AuraBotChatService {
     public TurnOutcome resumeApprovedTurnFromPending(TurnContext ctx,
                                                       ChatSessionStore.PendingTool pending,
                                                       ResponseSink sink) {
-        if (sink instanceof SseResponseSink ssr) {
-            com.auraboot.framework.agent.service.ChatSseContext.setEmitter(ssr.getEmitter());
-        }
+        com.auraboot.framework.conversation.ResponseSinkContext.set(sink);
         try {
             return doResumeApprovedInner(ctx, pending, sink);
         } catch (Exception e) {
@@ -701,7 +698,7 @@ public class AuraBotChatService {
             return new TurnOutcome.Failed(e.getMessage(), e);
         } finally {
             com.auraboot.framework.agent.service.BifContext.clear();
-            com.auraboot.framework.agent.service.ChatSseContext.clear();
+            com.auraboot.framework.conversation.ResponseSinkContext.clear();
         }
     }
 
