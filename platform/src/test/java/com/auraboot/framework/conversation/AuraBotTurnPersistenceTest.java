@@ -121,6 +121,7 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
                 null, null,
                 InboundMode.NEW_FROM_REQUEST,
                 null,
+                null,                                 // inboundMessageId — D.1
                 legacy);
     }
 
@@ -242,5 +243,94 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
         assertThat(saved.getTriageBucket()).isNull();
         assertThat(saved.getTriageConfidence()).isNull();
         assertThat(saved.getTriageReasonCodes()).isNull();
+    }
+
+    // =========================================================================
+    // Phase D.1 — InboundMode.EXISTING_MESSAGE_ID branch tests
+    // =========================================================================
+
+    /**
+     * Build a TurnRequest with {@code inboundMode=EXISTING_MESSAGE_ID} and a
+     * pre-existing messageId. The IM-event path's contract: the user message
+     * row is already in {@code ab_im_message}; the chokepoint only stamps
+     * triage decision onto it.
+     */
+    private TurnRequest newImEventTurnRequest(String message, Long inboundMessageId) {
+        com.auraboot.framework.aurabot.dto.ChatRequest legacy =
+                new com.auraboot.framework.aurabot.dto.ChatRequest();
+        legacy.setMessage(message);
+        legacy.setSessionId("d1-im-event-test");
+        legacy.setAgentCode("aurabot");
+        legacy.setConversationId(conversationId);
+        return new TurnRequest(
+                tenantId,
+                getTestUser().getId(),
+                humanMemberId,
+                "im_panel",                           // Phase D.1: IM-event channel
+                "aurabot",
+                conversationId,
+                null,                                 // clientMsgId — IM already wrote w/ its own
+                message,
+                null, null,
+                InboundMode.EXISTING_MESSAGE_ID,      // ← Phase D.1
+                null,
+                inboundMessageId,                     // ← D.1: existing row id
+                legacy);
+    }
+
+    @Test
+    @DisplayName("Phase D.1: EXISTING_MESSAGE_ID + verdict -> UPDATE existing row's triage cols; no new row")
+    void persistInbound_existingMessageId_updatesTriageOnExistingRow() {
+        // Arrange: write a normal inbound row first (simulating the IM event
+        // handler's prior call to ImMessageService.sendMessage).
+        String clientMsgId = "d1-existing-" + System.nanoTime();
+        Long existingId = persistence.persistInbound(newTurnRequest("Hi", clientMsgId), null);
+        assertThat(existingId).isNotNull();
+        ImMessage before = messageMapper.selectById(existingId);
+        assertThat(before.getTriageBucket()).isNull();
+
+        // Act: simulate the chokepoint receiving an IM-event TurnRequest that
+        // points back at this row.
+        com.auraboot.framework.agent.triage.TriageVerdict verdict =
+                new com.auraboot.framework.agent.triage.TriageVerdict(
+                        com.auraboot.framework.agent.triage.TriageBucket.ACP_RUN,
+                        0.88,
+                        java.util.List.of("crud_verb", "im_event"),
+                        java.util.Set.of());
+        Long returned = persistence.persistInbound(newImEventTurnRequest("Hi", existingId), verdict);
+
+        // Assert:
+        // 1. Returned id is the SAME row (no new INSERT).
+        assertThat(returned).isEqualTo(existingId);
+        // 2. Existing row now carries triage metadata.
+        ImMessage after = messageMapper.selectById(existingId);
+        assertThat(after.getTriageBucket()).isEqualTo("acp_run");
+        assertThat(after.getTriageConfidence()).isEqualByComparingTo(java.math.BigDecimal.valueOf(0.88));
+        assertThat(after.getTriageReasonCodes()).contains("crud_verb").contains("im_event");
+        // 3. Content unchanged — UPDATE only touched triage cols.
+        assertThat(after.getContent()).isEqualTo(before.getContent());
+        assertThat(after.getSenderType()).isEqualTo(before.getSenderType());
+    }
+
+    @Test
+    @DisplayName("Phase D.1: EXISTING_MESSAGE_ID + null verdict -> returns id, no UPDATE fired")
+    void persistInbound_existingMessageId_nullVerdict_returnsIdSilently() {
+        String clientMsgId = "d1-no-verdict-" + System.nanoTime();
+        Long existingId = persistence.persistInbound(newTurnRequest("Hi", clientMsgId), null);
+        assertThat(existingId).isNotNull();
+
+        Long returned = persistence.persistInbound(newImEventTurnRequest("Hi", existingId), null);
+
+        assertThat(returned).isEqualTo(existingId);
+        // Triage cols still null
+        ImMessage after = messageMapper.selectById(existingId);
+        assertThat(after.getTriageBucket()).isNull();
+    }
+
+    @Test
+    @DisplayName("Phase D.1: EXISTING_MESSAGE_ID + null inboundMessageId -> NOOP (returns null)")
+    void persistInbound_existingMessageId_nullId_returnsNull() {
+        Long returned = persistence.persistInbound(newImEventTurnRequest("Hi", null), null);
+        assertThat(returned).isNull();
     }
 }

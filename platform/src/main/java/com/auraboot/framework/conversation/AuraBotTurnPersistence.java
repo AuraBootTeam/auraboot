@@ -2,6 +2,7 @@ package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.identity.AuraBotAgentResolver;
 import com.auraboot.framework.im.dto.SendMessageRequest;
+import com.auraboot.framework.im.mapper.ImMessageMapper;
 import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.service.ImMessageService;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,7 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
 
     private final ImMessageService imMessageService;
     private final AuraBotAgentResolver agentResolver;
+    private final ImMessageMapper imMessageMapper;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Override
@@ -70,6 +72,12 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
             log.debug("persistInbound: missing conversationId on TurnRequest, skipping "
                     + "(legacy frontend path that has not migrated to Phase B.1 contract yet)");
             return null;
+        }
+        // Phase D.1: dispatch by InboundMode. EXISTING_MESSAGE_ID means the IM
+        // event handler already persisted the user message before firing — we
+        // only need to backfill the triage decision onto the existing row.
+        if (request.inboundMode() == InboundMode.EXISTING_MESSAGE_ID) {
+            return updateTriageOnExistingRow(request, triageVerdict);
         }
         if (request.humanMemberId() == null) {
             log.warn("persistInbound: humanMemberId is null for tenantId={} conversationId={}; "
@@ -169,5 +177,76 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
     /** Outbound rows are deduped per turn — turnId is the natural per-turn key. */
     private static String outboundClientMsgId(TurnContext ctx) {
         return ctx.turnId() != null ? "out-" + ctx.turnId() : null;
+    }
+
+    /**
+     * Phase D.1 ({@link InboundMode#EXISTING_MESSAGE_ID} branch): the IM /
+     * group-chat event handler already wrote the user message via
+     * {@code ImMessageService.sendMessage} before firing the Spring event
+     * that drives {@code runTurn}. We only need to backfill the triage
+     * verdict columns on that pre-existing row, then return its id so
+     * {@link TurnContext#inboundMessageId()} carries it through the rest
+     * of the lifecycle.
+     *
+     * <p>Validation:
+     * <ul>
+     *     <li>{@code inboundMessageId} must be present — without it we cannot
+     *         locate the existing row, which is a contract bug at the call
+     *         site (the IM event handler has the {@code ImMessage.id}).</li>
+     *     <li>The UPDATE is tenant-scoped (mapper's WHERE clause includes
+     *         {@code tenant_id}), so a misbehaving caller cannot stamp
+     *         triage values cross-tenant.</li>
+     *     <li>A null triage verdict means the SPI was absent — we still
+     *         return the id (so {@code TurnContext.inboundMessageId} is
+     *         populated) but skip the UPDATE; this matches how
+     *         {@code Persistence.persistInbound} treats null triage on the
+     *         {@code NEW_FROM_REQUEST} branch (no triage column write).</li>
+     * </ul>
+     */
+    private Long updateTriageOnExistingRow(TurnRequest request,
+                                            com.auraboot.framework.agent.triage.TriageVerdict triageVerdict) {
+        Long inboundMessageId = request.inboundMessageId();
+        if (inboundMessageId == null) {
+            log.warn("persistInbound (EXISTING_MESSAGE_ID): inboundMessageId is null for "
+                            + "tenantId={} conversationId={}; cannot backfill triage on phantom row",
+                    request.tenantId(), request.conversationId());
+            return null;
+        }
+        if (triageVerdict == null || triageVerdict.bucket() == null) {
+            // Triage SPI absent — preserve TurnContext.inboundMessageId without
+            // touching the row.
+            log.debug("persistInbound (EXISTING_MESSAGE_ID): no triage verdict for "
+                            + "messageId={}; returning id without UPDATE",
+                    inboundMessageId);
+            return inboundMessageId;
+        }
+        try {
+            String reasonCodesJson = null;
+            if (triageVerdict.reasonCodes() != null && !triageVerdict.reasonCodes().isEmpty()) {
+                try {
+                    reasonCodesJson = objectMapper.writeValueAsString(triageVerdict.reasonCodes());
+                } catch (Exception jsonEx) {
+                    log.warn("persistInbound (EXISTING_MESSAGE_ID): reasonCodes serialization failed: {}",
+                            jsonEx.getMessage());
+                }
+            }
+            int updated = imMessageMapper.updateTriageMetadata(
+                    inboundMessageId,
+                    request.tenantId(),
+                    triageVerdict.bucket().name().toLowerCase(),
+                    java.math.BigDecimal.valueOf(triageVerdict.confidence()),
+                    reasonCodesJson);
+            if (updated == 0) {
+                log.warn("persistInbound (EXISTING_MESSAGE_ID): UPDATE matched 0 rows "
+                                + "(tenantId={} messageId={}); cross-tenant write attempt or row deleted",
+                        request.tenantId(), inboundMessageId);
+            }
+            return inboundMessageId;
+        } catch (Exception e) {
+            // Per design §3.4: persistInbound failure = whole runTurn fails fast.
+            log.error("persistInbound (EXISTING_MESSAGE_ID) failed for tenantId={} messageId={}: {}",
+                    request.tenantId(), inboundMessageId, e.getMessage());
+            throw e;
+        }
     }
 }
