@@ -1,10 +1,13 @@
 package com.auraboot.framework.agent.port;
 
+import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -78,7 +81,37 @@ public interface AgentChatPort {
      * @param sink    transport-agnostic response sink (typically {@code SseResponseSink})
      * @return the outcome reflecting how the turn ended
      */
-    TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink);
+    default TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink) {
+        return runAgentTurn(ctx, request, sink, Collections.emptyList());
+    }
+
+    /**
+     * Phase D.3-chokepoint DC.1 (Q-DC.1=β) extension. Same as
+     * {@link #runAgentTurn(TurnContext, ChatRequest, ResponseSink)} but accepts
+     * an additional list of caller-supplied {@link ToolDefinition} entries that
+     * the implementation MUST merge into the registry-discovered tool list
+     * before running the LLM tool loop.
+     *
+     * <p>Use case: group-chat handoff. {@code AgentReplyTask} calls this with
+     * {@code extraTools = [HandoffToolProvider.getToolDefinition(otherAgents)]}
+     * so the LLM can emit {@code transfer_to_agent} as a regular tool call.
+     * The conversation-scope nature of the handoff tool (its valid
+     * {@code targetAgentCode} enum is the OTHER members of THIS conversation)
+     * makes it inappropriate for the tenant-scoped {@code ToolProviderRegistry};
+     * passing it through this side-channel keeps the registry clean while
+     * still routing the LLM call through the chokepoint.
+     *
+     * <p>Merge semantics: if {@code extraTools} contains a tool with the same
+     * {@code toolCode} as a registry-discovered tool, the {@code extraTools}
+     * entry wins (with a {@code log.warn} so collisions are visible). Empty or
+     * null {@code extraTools} means "behave exactly as the no-arg overload"
+     * — the aurabot main path uses this default.
+     *
+     * @param extraTools optional caller-supplied tool definitions (e.g. handoff);
+     *                   {@code null} or empty list both mean "no extras"
+     */
+    TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink,
+                              List<ToolDefinition> extraTools);
 
     /**
      * Execute a high-risk chat tool after its Agent approval request is approved.

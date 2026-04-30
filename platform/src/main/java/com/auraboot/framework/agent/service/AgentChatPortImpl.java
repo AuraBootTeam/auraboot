@@ -80,7 +80,8 @@ public class AgentChatPortImpl implements AgentChatPort {
     }
 
     @Override
-    public TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink) {
+    public TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink,
+                                     List<ToolDefinition> extraTools) {
         Long tenantId = ctx.tenantId();
         String agentCode = request.getAgentCode();
 
@@ -119,6 +120,10 @@ public class AgentChatPortImpl implements AgentChatPort {
         // Discover tools for this agent (with parameterSchema preserved so we can
         // detect confirmation-required tools when the LLM calls them).
         List<ToolDefinition> toolDefs = discoverToolDefinitions(tenantId, agentCode, request.getMessage());
+        // DC.1 (Q-DC.1=β): merge caller-supplied extraTools (e.g. group-chat
+        // handoff tool) on top of registry-discovered tools. Name collisions
+        // resolve to extraTools (caller knows the conversation-scope semantics).
+        toolDefs = mergeExtraTools(toolDefs, extraTools);
         List<LlmChatRequest.Tool> tools = toLlmTools(toolDefs);
 
         // Build conversation: prefer the persisted multi-turn tape (so any prior
@@ -297,6 +302,52 @@ public class AgentChatPortImpl implements AgentChatPort {
             log.warn("Tool discovery failed for agent {}: {}", agentCode, e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * DC.1 (Q-DC.1=β): merge caller-supplied {@code extraTools} into the
+     * registry-discovered list. The caller (e.g. {@code AgentReplyTask} for
+     * group-chat handoff) owns the conversation-scope semantics of the extra
+     * tools — for example, {@code transfer_to_agent}'s valid
+     * {@code targetAgentCode} enum is the OTHER members of THIS conversation,
+     * which can't be expressed in the tenant-scoped
+     * {@link com.auraboot.framework.agent.provider.ToolProviderRegistry}.
+     *
+     * <p>Name-collision rule: if {@code extraTools} contains a tool whose
+     * {@code toolCode} matches a registry tool, the {@code extraTools} entry
+     * wins. We log at WARN so collisions are visible in ops dashboards. The
+     * registry tool is dropped, not merged — overlapping behaviors would
+     * confuse the LLM and produce unpredictable tool calls.
+     */
+    private List<ToolDefinition> mergeExtraTools(List<ToolDefinition> registryTools,
+                                                  List<ToolDefinition> extraTools) {
+        if (extraTools == null || extraTools.isEmpty()) {
+            return registryTools;
+        }
+        java.util.Set<String> extraNames = new java.util.HashSet<>();
+        for (ToolDefinition extra : extraTools) {
+            if (extra != null && extra.getToolCode() != null) {
+                extraNames.add(extra.getToolCode());
+            }
+        }
+        List<ToolDefinition> merged = new ArrayList<>();
+        if (registryTools != null) {
+            for (ToolDefinition reg : registryTools) {
+                if (reg == null || reg.getToolCode() == null) continue;
+                if (extraNames.contains(reg.getToolCode())) {
+                    log.warn("Tool name collision: registry tool '{}' shadowed by caller extraTools entry "
+                            + "(extraTools wins per DC.1 contract)", reg.getToolCode());
+                    continue;
+                }
+                merged.add(reg);
+            }
+        }
+        for (ToolDefinition extra : extraTools) {
+            if (extra != null && extra.getToolCode() != null) {
+                merged.add(extra);
+            }
+        }
+        return merged;
     }
 
     private List<LlmChatRequest.Tool> toLlmTools(List<ToolDefinition> defs) {
