@@ -39,6 +39,7 @@ class SchemaPublishedEventIntegrationTest extends BaseIntegrationTest {
         pageSchemaMapper.insertForPluginImport(
                 pid,
                 getTestTenant().getId(),
+                null,  // envId (env-layering #16)
                 "draft",
                 pageKey,
                 "event_model_" + suffix,

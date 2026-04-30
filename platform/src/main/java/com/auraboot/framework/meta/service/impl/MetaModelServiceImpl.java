@@ -82,6 +82,12 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Lazy
     private com.auraboot.framework.meta.mapper.PageSchemaMapper pageSchemaMapper;
 
+    // env-layering PoC #16: native @Insert SQL bypasses MetaObjectHandler, so callers must
+    // resolve env_id explicitly before insertForPluginImport.
+    @Autowired
+    @Lazy
+    private com.auraboot.framework.environment.service.EnvironmentService environmentService;
+
     @Override
     @Cacheable(value = "modelDefinitions", key = "#modelCode + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()", unless = "#result == null")
     public Optional<ModelDefinition> getModelDefinition(String modelCode) {
@@ -2056,9 +2062,16 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             String titleLabel = modelCode + " " + spec.kind();
             String titleJson = "{\"en\":\"" + titleLabel + "\",\"zh-CN\":\"" + titleLabel + "\"}";
 
+            // Resolve env_id from MetaContext or fall back to tenant default
+            Long envId = com.auraboot.framework.application.tenant.MetaContext.getCurrentEnvironmentId();
+            if (envId == null) {
+                envId = environmentService.findOrCreateDefaultId(tenantId);
+            }
+
             int inserted = pageSchemaMapper.insertForPluginImport(
                 UniqueIdGenerator.generate(),   // pid
                 tenantId,                        // tenantId
+                envId,                           // envId (env-layering #16)
                 "published",                     // status
                 spec.pageKey(),                  // pageKey
                 modelCode,                       // modelCode
