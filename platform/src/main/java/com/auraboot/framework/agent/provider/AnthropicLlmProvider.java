@@ -5,23 +5,61 @@ import com.auraboot.framework.agent.dto.AnthropicResponse;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Anthropic Claude Messages API provider.
  * Translates unified LlmChatRequest into Anthropic's /v1/messages format.
+ *
+ * <p>Prompt caching: every request enables ephemeral cache on (a) the system
+ * prompt segment and (b) the last tool in the tools array. Anthropic caches
+ * the prefix up to the last {@code cache_control} marker, so identical
+ * system+tools across turns will hit the cache and be billed at 0.1x the
+ * normal input rate. The first request that establishes the cache pays
+ * 1.25x for the cached tokens.
  */
 @Slf4j
 @Component
 public class AnthropicLlmProvider implements LlmProvider {
+
+    private static final Map<String, Object> EPHEMERAL_CACHE_CONTROL =
+            Map.of("type", "ephemeral");
+
+    /** Anthropic bills tokens written to the ephemeral cache at 1.25x base input. */
+    private static final double CACHE_WRITE_MULTIPLIER = 1.25;
+
+    /** Anthropic bills tokens served from the ephemeral cache at 0.10x base input. */
+    private static final double CACHE_READ_MULTIPLIER = 0.10;
+
+    /** Pricing tables are quoted per million tokens. */
+    private static final double TOKENS_PER_MILLION = 1_000_000.0;
+
+    /** USD per 1M tokens for a given model family. */
+    private record AnthropicPricing(double inputPer1M, double outputPer1M) {}
+
+    /**
+     * Lookup table keyed by model-family substring. {@link #estimateCost}
+     * matches via {@code model.contains(key)} so concrete model codes such as
+     * {@code claude-sonnet-4-6} or {@code claude-opus-4-7} resolve to the
+     * right family. Sonnet is the default when no key matches.
+     */
+    private static final Map<String, AnthropicPricing> PRICING_TABLE = Map.of(
+            "opus", new AnthropicPricing(15.0, 75.0),
+            "sonnet", new AnthropicPricing(3.0, 15.0),
+            "haiku", new AnthropicPricing(0.25, 1.25)
+    );
+
+    /** Default family when no key matches — keep in sync with {@link #getDefaultModel()}. */
+    private static final AnthropicPricing DEFAULT_PRICING = PRICING_TABLE.get("sonnet");
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
@@ -58,11 +96,12 @@ public class AnthropicLlmProvider implements LlmProvider {
 
     @Override
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception {
-        // Build Anthropic-specific request
+        // Build Anthropic-specific request — system + last tool both carry
+        // cache_control: ephemeral so the prefix is cached across turns.
         AnthropicRequest anthropicReq = AnthropicRequest.builder()
                 .model(request.getModel())
                 .max_tokens(request.getMaxTokens())
-                .system(request.getSystemPrompt())
+                .system(convertSystem(request.getSystemPrompt()))
                 .messages(convertMessages(request.getMessages()))
                 .tools(convertTools(request.getTools()))
                 .build();
@@ -83,17 +122,47 @@ public class AnthropicLlmProvider implements LlmProvider {
 
     @Override
     public double estimateCost(String model, int inputTokens, int outputTokens) {
-        double inputRate;
-        double outputRate;
-        if (model != null && model.contains("opus")) {
-            inputRate = 15.0; outputRate = 75.0;
-        } else if (model != null && model.contains("haiku")) {
-            inputRate = 0.25; outputRate = 1.25;
-        } else {
-            // sonnet default
-            inputRate = 3.0; outputRate = 15.0;
+        // Backward-compatible path: no cache write/read accounting.
+        return estimateCost(model, inputTokens, outputTokens, 0, 0);
+    }
+
+    /**
+     * Cache-aware cost estimate. Anthropic bills cache writes at 1.25x and
+     * cache reads at 0.1x the base input rate; output rate is unchanged.
+     *
+     * @param model               model code (sonnet/opus/haiku)
+     * @param inputTokens         non-cached input tokens (billed at 1.0x)
+     * @param outputTokens        output tokens
+     * @param cacheCreationTokens tokens written to the ephemeral cache (1.25x)
+     * @param cacheReadTokens     tokens served from the ephemeral cache (0.1x)
+     */
+    @Override
+    public double estimateCost(String model, int inputTokens, int outputTokens,
+                               int cacheCreationTokens, int cacheReadTokens) {
+        AnthropicPricing pricing = resolvePricing(model);
+        double total = inputTokens * pricing.inputPer1M()
+                + cacheCreationTokens * pricing.inputPer1M() * CACHE_WRITE_MULTIPLIER
+                + cacheReadTokens * pricing.inputPer1M() * CACHE_READ_MULTIPLIER
+                + outputTokens * pricing.outputPer1M();
+        return total / TOKENS_PER_MILLION;
+    }
+
+    /**
+     * Resolve the pricing tier for a concrete model code by matching the
+     * first family keyword found in {@link #PRICING_TABLE}. Falls back to
+     * {@link #DEFAULT_PRICING} (sonnet) when no key matches or the model is
+     * null — this keeps cost estimation safe for unknown / future models
+     * rather than throwing.
+     */
+    private AnthropicPricing resolvePricing(String model) {
+        if (model != null) {
+            for (Map.Entry<String, AnthropicPricing> entry : PRICING_TABLE.entrySet()) {
+                if (model.contains(entry.getKey())) {
+                    return entry.getValue();
+                }
+            }
         }
-        return (inputTokens * inputRate + outputTokens * outputRate) / 1_000_000.0;
+        return DEFAULT_PRICING;
     }
 
     // =========================================================================
@@ -112,13 +181,43 @@ public class AnthropicLlmProvider implements LlmProvider {
 
     private List<AnthropicRequest.Tool> convertTools(List<LlmChatRequest.Tool> tools) {
         if (tools == null || tools.isEmpty()) return null;
-        return tools.stream()
-                .map(t -> AnthropicRequest.Tool.builder()
-                        .name(t.getName())
-                        .description(t.getDescription())
-                        .input_schema(t.getInputSchema())
-                        .build())
-                .toList();
+        List<AnthropicRequest.Tool> converted = new ArrayList<>(tools.size());
+        for (LlmChatRequest.Tool t : tools) {
+            converted.add(AnthropicRequest.Tool.builder()
+                    .name(t.getName())
+                    .description(t.getDescription())
+                    .input_schema(t.getInputSchema())
+                    .build());
+        }
+        // Anthropic caches the prefix up to (and including) the last
+        // cache_control marker, so we mark only the LAST tool. This caches the
+        // entire tools array as a single unit.
+        AnthropicRequest.Tool last = converted.get(converted.size() - 1);
+        last.setCache_control(new HashMap<>(EPHEMERAL_CACHE_CONTROL));
+        if (log.isDebugEnabled()) {
+            log.debug("Anthropic prompt cache: tools.size={}, lastTool={}",
+                    converted.size(), last.getName());
+        }
+        return converted;
+    }
+
+    /**
+     * Convert the unified system prompt string into Anthropic's
+     * list-of-content-blocks form, with an ephemeral cache_control marker
+     * attached so the system segment is cached across turns.
+     *
+     * @return null when prompt is blank, otherwise a single-element list of
+     *         content blocks ready to be serialized as the {@code system} field.
+     */
+    private Object convertSystem(String systemPrompt) {
+        if (systemPrompt == null || systemPrompt.isBlank()) {
+            return null;
+        }
+        Map<String, Object> block = new LinkedHashMap<>();
+        block.put("type", "text");
+        block.put("text", systemPrompt);
+        block.put("cache_control", new HashMap<>(EPHEMERAL_CACHE_CONTROL));
+        return List.of(block);
     }
 
     private LlmChatResponse convertResponse(AnthropicResponse resp) {
@@ -134,11 +233,14 @@ public class AnthropicLlmProvider implements LlmProvider {
                         .build());
             }
         }
+        AnthropicResponse.Usage usage = resp.getUsage();
         return LlmChatResponse.builder()
                 .stopReason(resp.getStop_reason())
                 .content(blocks)
-                .inputTokens(resp.getUsage() != null ? resp.getUsage().getInput_tokens() : 0)
-                .outputTokens(resp.getUsage() != null ? resp.getUsage().getOutput_tokens() : 0)
+                .inputTokens(usage != null ? usage.getInput_tokens() : 0)
+                .outputTokens(usage != null ? usage.getOutput_tokens() : 0)
+                .cacheCreationInputTokens(usage != null ? usage.getCache_creation_input_tokens() : 0)
+                .cacheReadInputTokens(usage != null ? usage.getCache_read_input_tokens() : 0)
                 .build();
     }
 }
