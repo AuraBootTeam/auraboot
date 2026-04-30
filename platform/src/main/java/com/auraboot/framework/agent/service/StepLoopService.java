@@ -84,6 +84,11 @@ public class StepLoopService {
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
+        // Anthropic prompt-cache accounting: cache writes (1.25x base) and
+        // cache reads (0.10x base) feed the cache-aware estimateCost overload
+        // so the cost guard reflects real billing on cache-capable providers.
+        int totalCacheCreationTokens = 0;
+        int totalCacheReadTokens = 0;
         double totalCost = 0;
         String lastTextResponse = "";
         List<Map<String, Object>> toolCallLog = new ArrayList<>();
@@ -126,7 +131,10 @@ public class StepLoopService {
 
             totalInputTokens += response.getInputTokens();
             totalOutputTokens += response.getOutputTokens();
-            totalCost = provider.estimateCost(model, totalInputTokens, totalOutputTokens);
+            totalCacheCreationTokens += response.getCacheCreationInputTokens();
+            totalCacheReadTokens += response.getCacheReadInputTokens();
+            totalCost = provider.estimateCost(model, totalInputTokens, totalOutputTokens,
+                    totalCacheCreationTokens, totalCacheReadTokens);
 
             if (totalCost > costLimit) {
                 log.warn("Cost limit exceeded: run={}, cost={}, limit={}", runPid, totalCost, costLimit);
@@ -223,6 +231,8 @@ public class StepLoopService {
 
         double totalCost = 0;
         int totalInputTokens = 0, totalOutputTokens = 0;
+        // Cache-aware token tallies for cost estimation (see executeAgentLoop).
+        int totalCacheCreationTokens = 0, totalCacheReadTokens = 0;
         String lastTextResponse = "";
         List<Map<String, Object>> toolCallLog = new ArrayList<>();
 
@@ -309,7 +319,10 @@ public class StepLoopService {
                     LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
                     totalInputTokens += response.getInputTokens();
                     totalOutputTokens += response.getOutputTokens();
-                    totalCost = provider.estimateCost(model, totalInputTokens, totalOutputTokens);
+                    totalCacheCreationTokens += response.getCacheCreationInputTokens();
+                    totalCacheReadTokens += response.getCacheReadInputTokens();
+                    totalCost = provider.estimateCost(model, totalInputTokens, totalOutputTokens,
+                            totalCacheCreationTokens, totalCacheReadTokens);
 
                     if ("tool_use".equals(response.getStopReason())) {
                         List<Object> assistantContent = new ArrayList<>();
