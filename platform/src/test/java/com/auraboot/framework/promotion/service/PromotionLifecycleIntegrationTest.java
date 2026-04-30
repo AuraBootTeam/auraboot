@@ -154,6 +154,15 @@ class PromotionLifecycleIntegrationTest extends BaseIntegrationTest {
         assertThat(conflict.getResourcePid()).isEqualTo(sourcePage.getPid());
         assertThat(conflict.getReason()).contains(pageKey);
 
+        // Field-level diff is populated and points at the actual change
+        assertThat(conflict.getDiff()).isNotEmpty();
+        com.auraboot.framework.promotion.diff.SemanticDiffEntry firstChange = conflict.getDiff().get(0);
+        assertThat(firstChange.getPath()).isEqualTo("blocks[0].a");
+        assertThat(firstChange.getOp())
+                .isEqualTo(com.auraboot.framework.promotion.diff.SemanticDiffEntry.Op.MODIFY);
+        assertThat(firstChange.getOldValue().toString()).isEqualTo("1");
+        assertThat(firstChange.getNewValue().toString()).isEqualTo("2");
+
         PromotionResponse reload = promotionService.getByPid(draft.getPid(), testTenant.getId());
         // Conflicts → status stays at (or rolls back to) DRAFT — apply must not be permitted yet
         assertThat(reload.getStatus()).isEqualTo("DRAFT");
