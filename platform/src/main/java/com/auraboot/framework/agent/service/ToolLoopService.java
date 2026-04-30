@@ -19,6 +19,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -55,7 +57,21 @@ public class ToolLoopService implements ToolExecutionPort {
     /**
      * Execute a tool call within an agent run.
      * This is the main entry point — dispatches to the appropriate executor based on tool type.
+     *
+     * <p>ACP P0-5: marked {@code REQUIRES_NEW} for parallel-tool failure isolation.
+     * When the StepLoop fans out N tool calls onto async workers, each tool must
+     * commit / roll back independently — one tool's RuntimeException must not
+     * mark a sibling's transaction rollback-only. This is NOT being used to
+     * bypass an outer rollback-only state (which the project's red lines forbid);
+     * the parent agent loop has no enclosing @Transactional. Tool stats / Action
+     * audit writes are independently committed so partial-success batches still
+     * leave a complete audit trail.
+     *
+     * <p>Stateless contract: callable from concurrent threads. Verified by
+     * code inspection — no static mutable state, no instance-level mutation;
+     * all per-call state lives on the stack or in tenant-scoped DB rows.
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 60)
     public String executeToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
                                    String toolName, Map<String, Object> input,
                                    List<AgentToolDefinition> tools, TraceContext traceCtx) {

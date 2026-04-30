@@ -69,6 +69,16 @@ public class ActionRecorder {
             if (stepIndex != null) {
                 row.put("step_index", stepIndex);
             }
+            // ACP P0-5: stamp parallel-batch coordinates so audits can group
+            // Actions emitted from the same LLM parallel tool_use block.
+            String parallelGroupId = StepContext.getParallelGroupId();
+            Integer parallelIndex = StepContext.getParallelIndex();
+            if (parallelGroupId != null) {
+                row.put("parallel_group_id", parallelGroupId);
+            }
+            if (parallelIndex != null) {
+                row.put("parallel_index", parallelIndex);
+            }
             row.put("action_code", meta.modelCode + "." + meta.executionType);
             row.put("action_type", actionType);
             row.put("transaction_scope", transactionScope);
@@ -156,6 +166,14 @@ public class ActionRecorder {
             Integer stepIndex = StepContext.getStepIndex();
             if (stepIndex != null) {
                 row.put("step_index", stepIndex);
+            }
+            String parallelGroupId = StepContext.getParallelGroupId();
+            Integer parallelIndex = StepContext.getParallelIndex();
+            if (parallelGroupId != null) {
+                row.put("parallel_group_id", parallelGroupId);
+            }
+            if (parallelIndex != null) {
+                row.put("parallel_index", parallelIndex);
             }
             row.put("action_code", modelCode + ".query");
             row.put("action_type", "read");

@@ -195,7 +195,11 @@ spring:
     username: ${DATABASE_USERNAME:auraboot}
     password: ${DATABASE_PASSWORD:}
     hikari:
-      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:20}
+      # ACP P0-5 Parallel Tool Calls: bumped from 20 → 30 to leave 50% headroom.
+      # Worst-case math: maxFanout=5 parallel tools × @Transactional(REQUIRES_NEW)
+      # each borrows a fresh DB connection, multiplied by concurrent chat users
+      # and a per-tool timeout of 60s — a 20-pool is exhausted under modest load.
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:30}
       minimum-idle: ${HIKARI_MIN_IDLE:5}
       connection-timeout: 30000
       idle-timeout: 600000
