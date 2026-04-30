@@ -742,7 +742,7 @@ CREATE TABLE ab_page_schema (
     pid VARCHAR(32) NOT NULL,
     tenant_id BIGINT NOT NULL,
     namespace VARCHAR(100) NOT NULL DEFAULT 'default',
-    env VARCHAR(20) NOT NULL DEFAULT 'prod',
+    env_id BIGINT,  -- env-layering PoC: nullable in batch 1 (auto-fill via MetaObjectHandler in batch 2 → SET NOT NULL)
 
     is_current BOOLEAN NOT NULL DEFAULT TRUE,
     status TEXT NOT NULL DEFAULT 'draft',
@@ -2213,6 +2213,7 @@ COMMENT ON TABLE ab_api_connector_endpoint IS 'API connector endpoint definition
       id BIGSERIAL PRIMARY KEY,
       tenant_id BIGINT NOT NULL,
       pid VARCHAR(32) NOT NULL,
+      env_id BIGINT,  -- env-layering PoC: history rows belong to the env where the snapshot was taken
       snapshot JSONB,
       op VARCHAR(20) NOT NULL,
       op_by VARCHAR(32),
@@ -2225,6 +2226,7 @@ COMMENT ON TABLE ab_api_connector_endpoint IS 'API connector endpoint definition
   CREATE INDEX IF NOT EXISTS idx_page_schema_history_pid ON ab_page_schema_history(pid);
   CREATE INDEX IF NOT EXISTS idx_page_schema_history_op ON ab_page_schema_history(op);
   CREATE INDEX IF NOT EXISTS idx_page_schema_history_op_at ON ab_page_schema_history(op_at);
+  CREATE INDEX IF NOT EXISTS idx_page_schema_history_env_id ON ab_page_schema_history(env_id) WHERE env_id IS NOT NULL;
 
   -- 复合索引：按页面和时间查询历史
   CREATE INDEX IF NOT EXISTS idx_page_schema_history_page_time ON ab_page_schema_history(pid, op_at DESC);
@@ -2233,6 +2235,7 @@ COMMENT ON TABLE ab_api_connector_endpoint IS 'API connector endpoint definition
   COMMENT ON COLUMN ab_page_schema_history.id IS '主键ID';
   COMMENT ON COLUMN ab_page_schema_history.tenant_id IS '租户ID';
   COMMENT ON COLUMN ab_page_schema_history.pid IS '关联的页面Schema PID';
+  COMMENT ON COLUMN ab_page_schema_history.env_id IS 'env-layering: environment id this history snapshot belongs to (FK ab_environment.id)';
   COMMENT ON COLUMN ab_page_schema_history.snapshot IS '页面Schema全量快照(JSONB)';
   COMMENT ON COLUMN ab_page_schema_history.op IS '操作类型: CREATE/UPDATE/PUBLISH/ARCHIVE/DELETE/RESTORE';
   COMMENT ON COLUMN ab_page_schema_history.op_by IS '操作人PID';
@@ -6010,13 +6013,21 @@ CREATE TABLE IF NOT EXISTS ab_environment (
 
     created_by BIGINT,
     updated_by BIGINT,
-    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- env-layering extension (PoC): promotion chain + lock audit
+    parent_pid VARCHAR(26),
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+    locked_by BIGINT,
+    locked_at TIMESTAMP WITH TIME ZONE,
+    locked_reason TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_environment_pid ON ab_environment(pid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_environment_tenant_code ON ab_environment(tenant_id, code) WHERE deleted_flag = FALSE;
 CREATE INDEX IF NOT EXISTS idx_ab_environment_tenant_id ON ab_environment(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_ab_environment_status ON ab_environment(status);
+CREATE INDEX IF NOT EXISTS idx_ab_environment_parent_pid ON ab_environment(parent_pid) WHERE parent_pid IS NOT NULL;
 
 COMMENT ON TABLE ab_environment IS 'Environment configuration table for multi-environment management';
 COMMENT ON COLUMN ab_environment.pid IS 'Business ID (ULID)';
@@ -6027,6 +6038,11 @@ COMMENT ON COLUMN ab_environment.db_connection_info IS 'Database connection conf
 COMMENT ON COLUMN ab_environment.status IS 'active or inactive';
 COMMENT ON COLUMN ab_environment.is_default IS 'Whether this is the default environment';
 COMMENT ON COLUMN ab_environment.sort_order IS 'Display order';
+COMMENT ON COLUMN ab_environment.parent_pid IS 'Parent environment pid for promotion chain (NULL for root)';
+COMMENT ON COLUMN ab_environment.is_locked IS 'Lock flag preventing direct edits; locked envs require unlock or four-eyes promotion';
+COMMENT ON COLUMN ab_environment.locked_by IS 'User id who locked the environment';
+COMMENT ON COLUMN ab_environment.locked_at IS 'Timestamp when the environment was locked';
+COMMENT ON COLUMN ab_environment.locked_reason IS 'Free-form reason captured at lock time for audit';
 
 
 -- ============================================================

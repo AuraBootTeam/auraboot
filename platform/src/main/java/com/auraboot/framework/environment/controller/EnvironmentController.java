@@ -110,4 +110,30 @@ public class EnvironmentController {
         EnvironmentDiffResponse result = environmentService.diff(source, target, tenantId);
         return ApiResponse.success(result);
     }
+
+    /**
+     * Lock an environment. Reason is required and recorded for audit.
+     */
+    @PostMapping("/{pid}/lock")
+    public ApiResponse<EnvironmentResponse> lock(
+            @PathVariable String pid,
+            @Valid @RequestBody EnvironmentLockRequest request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        EnvironmentResponse result = environmentService.lock(pid, tenantId, userId, request.getReason());
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * Unlock a locked environment. Reason is required and recorded for audit.
+     */
+    @PostMapping("/{pid}/unlock")
+    public ApiResponse<EnvironmentResponse> unlock(
+            @PathVariable String pid,
+            @Valid @RequestBody EnvironmentLockRequest request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        EnvironmentResponse result = environmentService.unlock(pid, tenantId, userId, request.getReason());
+        return ApiResponse.success(result);
+    }
 }

@@ -248,7 +248,69 @@ public class EnvironmentServiceImpl implements EnvironmentService {
         resp.setSortOrder(env.getSortOrder());
         resp.setCreatedAt(env.getCreatedAt());
         resp.setUpdatedAt(env.getUpdatedAt());
+        resp.setParentPid(env.getParentPid());
+        resp.setIsLocked(env.getIsLocked() != null && env.getIsLocked());
+        resp.setLockedBy(env.getLockedBy());
+        resp.setLockedAt(env.getLockedAt());
+        resp.setLockedReason(env.getLockedReason());
         return resp;
+    }
+
+    @Override
+    @Transactional
+    public EnvironmentResponse lock(String pid, Long tenantId, Long userId, String reason) {
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new IllegalArgumentException("Lock reason must not be blank");
+        }
+        Environment env = findByPidOrThrow(pid, tenantId);
+        if (Boolean.TRUE.equals(env.getIsLocked())) {
+            throw new IllegalStateException("Environment is already locked: " + pid);
+        }
+
+        env.setIsLocked(true);
+        env.setLockedBy(userId);
+        env.setLockedAt(new Date());
+        env.setLockedReason(reason);
+        env.setUpdatedAt(new Date());
+        env.setUpdatedBy(userId);
+        environmentMapper.updateById(env);
+        log.info("Locked environment: pid={}, code={}, reason={}", pid, env.getCode(), reason);
+
+        return toResponse(env);
+    }
+
+    @Override
+    @Transactional
+    public EnvironmentResponse unlock(String pid, Long tenantId, Long userId, String reason) {
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new IllegalArgumentException("Unlock reason must not be blank");
+        }
+        Environment env = findByPidOrThrow(pid, tenantId);
+        if (!Boolean.TRUE.equals(env.getIsLocked())) {
+            throw new IllegalStateException("Environment is not locked: " + pid);
+        }
+
+        // MyBatis-Plus default updateById skips null fields; use UpdateWrapper to explicitly clear lock columns.
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Environment> uw =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<>();
+        uw.eq("id", env.getId())
+                .set("is_locked", false)
+                .set("locked_by", null)
+                .set("locked_at", null)
+                .set("locked_reason", null)
+                .set("updated_at", new Date())
+                .set("updated_by", userId);
+        environmentMapper.update(null, uw);
+
+        env.setIsLocked(false);
+        env.setLockedBy(null);
+        env.setLockedAt(null);
+        env.setLockedReason(null);
+        env.setUpdatedAt(new Date());
+        env.setUpdatedBy(userId);
+        log.info("Unlocked environment: pid={}, code={}, reason={}", pid, env.getCode(), reason);
+
+        return toResponse(env);
     }
 
     private void addDiffIfChanged(List<EnvironmentDiffResponse.DiffEntry> diffs, String key, Object srcVal, Object tgtVal) {
