@@ -133,10 +133,15 @@ public class AiScoringService {
             }
         }
 
+        // Use the cache-aware overload so Anthropic prompt-cache hits show
+        // up as the 0.1x billing they actually are. Non-cache providers fall
+        // through to the 3-arg default (cache tokens are 0 anyway).
         double cost = provider.estimateCost(config.getDefaultModel(),
-                response.getInputTokens(), response.getOutputTokens());
-        log.info("LLM scoring call: input={}, output={}, cost=${}",
-                response.getInputTokens(), response.getOutputTokens(), cost);
+                response.getInputTokens(), response.getOutputTokens(),
+                response.getCacheCreationInputTokens(), response.getCacheReadInputTokens());
+        log.info("LLM scoring call: input={}, output={}, cacheCreate={}, cacheRead={}, cost=${}",
+                response.getInputTokens(), response.getOutputTokens(),
+                response.getCacheCreationInputTokens(), response.getCacheReadInputTokens(), cost);
 
         // Extract JSON array from response (may be wrapped in markdown code block)
         String jsonStr = extractJsonArray(responseText);

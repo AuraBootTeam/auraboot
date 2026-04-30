@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,21 +13,32 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class AnthropicRequest {
 
     private String model;
     private int max_tokens;
-    private String system;
+
+    /**
+     * Anthropic accepts {@code system} as either a plain {@link String} or a list of
+     * content blocks. We use {@link Object} here so the provider can pass either form,
+     * and so we can attach {@code cache_control} markers to enable ephemeral
+     * prompt caching on the system prompt segment.
+     */
+    private Object system;
+
     private List<Message> messages;
     private List<Tool> tools;
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Message {
         private String role;
         private Object content;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ContentBlock {
         private String type;
         private String text;
@@ -38,9 +50,18 @@ public class AnthropicRequest {
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Tool {
         private String name;
         private String description;
         private Map<String, Object> input_schema;
+
+        /**
+         * Optional ephemeral cache marker. When set to
+         * {@code {"type": "ephemeral"}} on the LAST tool of a request, Anthropic
+         * caches everything up to and including the tools array, so subsequent
+         * requests with identical system+tools pay 0.1x for the cached prefix.
+         */
+        private Map<String, Object> cache_control;
     }
 }
