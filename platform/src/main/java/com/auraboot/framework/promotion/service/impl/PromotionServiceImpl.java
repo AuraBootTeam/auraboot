@@ -8,6 +8,8 @@ import com.auraboot.framework.promotion.dao.entity.Promotion;
 import com.auraboot.framework.promotion.dao.entity.PromotionUnit;
 import com.auraboot.framework.promotion.dao.mapper.PromotionMapper;
 import com.auraboot.framework.promotion.dao.mapper.PromotionUnitMapper;
+import com.auraboot.framework.promotion.diff.PageSchemaDiffService;
+import com.auraboot.framework.promotion.diff.SemanticDiffEntry;
 import com.auraboot.framework.promotion.domain.PromotionStateMachine;
 import com.auraboot.framework.promotion.domain.PromotionStatus;
 import com.auraboot.framework.promotion.dto.DryRunResult;
@@ -39,6 +41,7 @@ public class PromotionServiceImpl implements PromotionService {
     private final PromotionMapper promotionMapper;
     private final PromotionUnitMapper promotionUnitMapper;
     private final PageSchemaMapper pageSchemaMapper;
+    private final PageSchemaDiffService pageSchemaDiffService;
 
     @Override
     @Transactional
@@ -135,12 +138,15 @@ public class PromotionServiceImpl implements PromotionService {
             PageSchema target = withEnvId(p.getTargetEnvId(),
                     () -> findByPageKey(source.getPageKey(), tenantId));
             if (target != null && contentDiffers(source, target)) {
+                List<SemanticDiffEntry> diff = pageSchemaDiffService.diff(source, target);
                 DryRunResult.Conflict c = new DryRunResult.Conflict();
                 c.setResourceType("PAGE_SCHEMA");
                 c.setResourcePid(unit.getResourcePid());
                 c.setSourceVersion(source.getVersion());
                 c.setTargetVersion(target.getVersion());
-                c.setReason("target env already has a different version of " + source.getPageKey());
+                c.setReason("target env already has a different version of " + source.getPageKey()
+                        + " (" + diff.size() + " field-level changes)");
+                c.setDiff(diff);
                 result.getConflicts().add(c);
             }
         }

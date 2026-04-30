@@ -1,5 +1,6 @@
 package com.auraboot.framework.promotion.dto;
 
+import com.auraboot.framework.promotion.diff.SemanticDiffEntry;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -36,6 +37,8 @@ public class DryRunResult {
         private Integer targetVersion;
         /** Short human-readable summary, e.g. "blocks differ" or "title changed". */
         private String reason;
+        /** Field-level diff entries; powers the Diff Viewer side-by-side highlight. */
+        private List<SemanticDiffEntry> diff = new ArrayList<>();
     }
 
     @Data
