@@ -177,6 +177,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             com.auraboot.framework.meta.dto.CommandDefinitionDTO cmd = commandService.findByCode(code);
             return cmd != null;
         } catch (Exception e) {
+            // findByCode lacks a NotFoundException type today; any failure is treated as
+            // "does not exist" so a re-import can proceed with create. Logged at debug
+            // so a real DB/connectivity failure is still observable when troubleshooting.
+            log.debug("checkCommandExists treating exception as 'not exists' for code={}: {}", code, e.toString());
             return false;
         }
     }
@@ -187,6 +191,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             PermissionDTO perm = permissionService.findByCode(code);
             return perm != null;
         } catch (Exception e) {
+            log.debug("checkPermissionExists treating exception as 'not exists' for code={}: {}", code, e.toString());
             return false;
         }
     }
@@ -231,6 +236,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             NamedQueryDTO query = namedQueryService.findByCode(code);
             return query != null;
         } catch (Exception e) {
+            log.debug("checkNamedQueryExists treating exception as 'not exists' for code={}: {}", code, e.toString());
             return false;
         }
     }
@@ -407,7 +413,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     metaFieldService.publishVersion(field.getPid());
                     log.info("Auto-published field after import: {}", dto.getCode());
                 } catch (Exception e) {
-                    log.warn("Failed to auto-publish field {}: {}", dto.getCode(), e.getMessage());
+                    // Auto-publish is best-effort: import succeeded, the field exists in
+                    // draft state, an admin can publish manually later. Don't fail the
+                    // whole import for a publish hiccup.
+                    log.warn("Failed to auto-publish field {}: {}", dto.getCode(), e.getMessage(), e);
                 }
             }
         }
@@ -856,7 +865,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         try {
             command = commandService.findByCode(dto.getCommandCode());
         } catch (Exception e) {
-            throw new PluginException("Command not found: " + dto.getCommandCode());
+            throw new PluginException("Command not found: " + dto.getCommandCode(), e);
         }
 
         String ruleCode = dto.getCommandCode() + ":" + dto.getRuleType();
@@ -1081,7 +1090,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     permissionService.bindToRole(roleId, perm.getId());
                 }
             } catch (Exception e) {
-                log.warn("Failed to bind permission {} to role: {}", permCode, e.getMessage());
+                // Bind loop is per-permission best-effort: a single failed binding
+                // (missing perm, race with another import) must not block the rest
+                // of the role's permission set. Failure surfaced via warn log only.
+                log.warn("Failed to bind permission {} to role: {}", permCode, e.getMessage(), e);
             }
         }
     }
@@ -2071,6 +2083,20 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     // ==================== Rollback Operations ====================
 
+    /**
+     * Rollback handlers below run during plugin un-install or import-failure compensation.
+     *
+     * The {@code catch (Exception)} branches here are intentional:
+     *   1. They are best-effort cleanups; a single failed delete must not block
+     *      subsequent rollback steps for other resource types.
+     *   2. They fall back to a direct mapper/jdbc archive call when the service
+     *      method fails — the resource still ends up in a tombstoned state.
+     *   3. {@code log.warn} carries the message + cause via SLF4J's {@code {}}
+     *      placeholder, so trace context is preserved for incident analysis.
+     *
+     * Per docs/agent-rules/review-baseline.md §1, this is the "non-transactional
+     * cleanup" exception to the no-catch-Exception rule.
+     */
     @Override
     public void rollbackResource(PluginResource resource) {
         ResourceType type = resource.getResourceTypeEnum();
@@ -2233,7 +2259,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         try {
             return objectMapper.writeValueAsString(obj);
         } catch (Exception e) {
-            throw new PluginException("Failed to serialize to JSON: " + e.getMessage());
+            throw new PluginException("Failed to serialize to JSON: " + e.getMessage(), e);
         }
     }
 
