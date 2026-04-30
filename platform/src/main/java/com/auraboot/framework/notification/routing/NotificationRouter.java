@@ -13,6 +13,7 @@ import com.auraboot.module.meta.event.CommandCompletedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
@@ -68,11 +69,15 @@ public class NotificationRouter {
         this.digestService = digestService;
     }
 
+    // ASYNC: avoid blocking BPM command chain (BE-5 P0 fix 2026-04-30)
+    @Async("eventTaskExecutor")
     @EventListener
     public void onCommandCompleted(CommandCompletedEvent event) {
         route(event, event.getCommandCode());
     }
 
+    // ASYNC: avoid blocking BPM command chain (BE-5 P0 fix 2026-04-30)
+    @Async("eventTaskExecutor")
     @EventListener
     public void onBpmEvent(BpmEvent event) {
         route(event, event.getEventType());
