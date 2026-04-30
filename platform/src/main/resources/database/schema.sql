@@ -8138,3 +8138,33 @@ ALTER TABLE ab_im_message
 CREATE INDEX IF NOT EXISTS idx_im_msg_triage_bucket
   ON ab_im_message(triage_bucket)
   WHERE triage_bucket IS NOT NULL;
+
+-- =====================================================================
+-- ab_agent_batch_job — Anthropic Messages Batch API job tracking (P0-4).
+-- Half-price async batch jobs with a 24h SLA. Each row is one submitted
+-- batch; per-request results are streamed from the upstream API and not
+-- persisted here (we only track aggregate counts).
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS ab_agent_batch_job (
+  pid             VARCHAR(26) PRIMARY KEY,
+  tenant_id       BIGINT NOT NULL,
+  batch_id        VARCHAR(64) NOT NULL,
+  purpose         VARCHAR(40) NOT NULL,                  -- memory_promotion_scoring | kb_chunk_summary | classification | ...
+  request_count   INTEGER NOT NULL,
+  status          VARCHAR(20) NOT NULL DEFAULT 'submitted', -- submitted | in_progress | succeeded | failed | partial
+  succeeded_count INTEGER DEFAULT 0,
+  errored_count   INTEGER DEFAULT 0,
+  results_uri     VARCHAR(500),
+  metadata        JSONB DEFAULT '{}',
+  submitted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at    TIMESTAMPTZ,
+  created_by      BIGINT,
+  deleted_flag    BOOLEAN DEFAULT FALSE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_batch_job_batch_id
+  ON ab_agent_batch_job(tenant_id, batch_id) WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_batch_job_status
+  ON ab_agent_batch_job(tenant_id, status)
+  WHERE status IN ('submitted','in_progress');
+COMMENT ON TABLE ab_agent_batch_job IS
+  'Anthropic Messages Batch API job tracking — half-price async batch jobs (24h SLA)';

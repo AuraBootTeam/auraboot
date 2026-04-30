@@ -1,10 +1,14 @@
 package com.auraboot.framework.agent.memory;
 
+import com.auraboot.framework.agent.dto.AnthropicRequest;
+import com.auraboot.framework.agent.dto.BatchRequest;
 import com.auraboot.framework.agent.metrics.MemoryL1L2PromotionMetrics;
+import com.auraboot.framework.agent.provider.AnthropicBatchService;
 import com.auraboot.framework.agent.service.MemoryEmbeddingService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,6 +20,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,6 +88,28 @@ public class MemoryL1L2Promoter {
 
     @Value("${acp.memory.l1l2.semantic-dedup-threshold:0.92}")
     private double semanticDedupThreshold = DEFAULT_SEMANTIC_DEDUP_THRESHOLD;
+
+    /**
+     * P0-4 — when {@code true}, large promotion candidate sets get a parallel
+     * second-pass evaluation via the Anthropic Batch API (half-price, 24h SLA).
+     * The synchronous promotion still runs; the batch result is recorded for
+     * later auditing / re-scoring and does not block the write path. Default
+     * {@code false} so existing behaviour is unchanged.
+     */
+    @Value("${aura.memory.promotion.use-batch:false}")
+    private boolean useBatch = false;
+
+    /** Minimum candidate count before batch second-pass scoring is worth submitting. */
+    @Value("${aura.memory.promotion.batch-min-candidates:50}")
+    private int batchMinCandidates = 50;
+
+    /**
+     * Optional batch service — autowired so unit tests / older Spring
+     * contexts that do not include the bean still construct cleanly. The
+     * synchronous promotion path never depends on this.
+     */
+    @Autowired(required = false)
+    private AnthropicBatchService batchService;
 
     public MemoryL1L2Promoter(JdbcTemplate jdbc,
                               MemoryTierEvaluator evaluator,
@@ -174,8 +201,60 @@ public class MemoryL1L2Promoter {
                         + "dedup={} dedupSemantic={} lowScore={}",
                 tenantId, runId, candidates.size(), promoted, skippedDup,
                 skippedDupSemantic, skippedLowScore);
+
+        // P0-4 hook: kick off a half-price batch second-pass if the feature
+        // flag is on AND we have enough candidates to amortise the request.
+        // Synchronous results above are unaffected; batch is purely additive
+        // (audit + future re-scoring). Failure to submit must NOT roll back
+        // the synchronous transaction — wrap in a try/catch.
+        if (useBatch && batchService != null && candidates.size() >= batchMinCandidates) {
+            try {
+                submitMemoryPromotionBatch(tenantId, runId, candidates);
+            } catch (RuntimeException e) {
+                log.warn("L1->L2 promotion batch submit failed for tenant={} run={}: {}",
+                        tenantId, runId, e.getMessage());
+            }
+        }
+
         return new PromotionSummary(candidates.size(), promoted, skippedDup,
                 skippedDupSemantic, skippedLowScore);
+    }
+
+    /**
+     * Build one Anthropic batch request per candidate and submit. The prompt
+     * asks the model to score the memory's promotion-worthiness on the same
+     * factors {@link MemoryTierEvaluator} uses, but at LLM quality. Result
+     * consumption happens later in {@code BatchJobPoller}; this method only
+     * fires the submission and stores the {@code batch_id} in
+     * {@code ab_agent_batch_job} (handled by {@link AnthropicBatchService}).
+     */
+    private void submitMemoryPromotionBatch(Long tenantId, String runId,
+                                            List<Map<String, Object>> candidates) {
+        List<BatchRequest> requests = new ArrayList<>(candidates.size());
+        for (Map<String, Object> row : candidates) {
+            String pid = (String) row.get("pid");
+            String content = (String) row.get("memory_content");
+            if (pid == null || content == null) continue;
+
+            AnthropicRequest req = AnthropicRequest.builder()
+                    .model("claude-haiku-4")  // cheapest tier — batch already halves the price
+                    .max_tokens(256)
+                    .system("You are a memory-promotion scorer. Reply with a single JSON "
+                            + "object: {\"score\": 0.0-1.0, \"reason\": \"...\"}.")
+                    .messages(List.of(AnthropicRequest.Message.builder()
+                            .role("user")
+                            .content("Score this memory for L2 promotion:\n\n" + content)
+                            .build()))
+                    .build();
+            requests.add(BatchRequest.builder()
+                    .customId(pid)
+                    .params(req)
+                    .build());
+        }
+        if (requests.isEmpty()) return;
+        String batchId = batchService.submitBatch(requests, "memory_promotion_scoring");
+        log.info("L1->L2 batch second-pass submitted: tenant={} run={} batch_id={} candidates={}",
+                tenantId, runId, batchId, requests.size());
     }
 
     /**
