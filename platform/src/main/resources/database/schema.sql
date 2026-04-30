@@ -4677,6 +4677,8 @@ CREATE TABLE IF NOT EXISTS ab_agent_definition (
   max_concurrent_runs INTEGER NOT NULL DEFAULT 3,    -- Max simultaneous runs for this agent
   execution_timeout_seconds INTEGER DEFAULT 300,     -- Per-run timeout (default 5 min)
   event_triggers JSONB,                             -- Event-driven dispatch config: {"triggers":[{eventType,modelCode,condition}]}
+  -- Execution-time knobs (read by StepLoopService.resolveThinkingConfig and friends)
+  execution_config JSONB DEFAULT '{}',              -- {thinking_enabled, thinking_budget_tokens, ...} per-agent runtime config
   -- AI Employee fields
   employee_id        BIGINT,                                  -- FK to mt_org_employee (type=ai); non-null = agent is a digital employee
   auto_reply_mode    VARCHAR(20) DEFAULT 'mention',           -- mention | always | off
@@ -4694,6 +4696,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_def_tenant ON ab_agent_definition (tenant_i
 CREATE INDEX IF NOT EXISTS idx_agent_def_event_triggers ON ab_agent_definition (tenant_id) WHERE event_triggers IS NOT NULL AND status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL);
 COMMENT ON TABLE ab_agent_definition IS 'AI Agent definitions with model, tools, skills, guardrails, and soul profile';
 COMMENT ON COLUMN ab_agent_definition.visibility IS 'Who can see this agent: private (creator only), team (same dept), tenant (all users)';
+COMMENT ON COLUMN ab_agent_definition.execution_config IS 'JSONB execution-time config (thinking_enabled, thinking_budget_tokens, ...). Read by StepLoopService.resolveThinkingConfig.';
 
 -- Mission (north star goal to prevent agent goal drift)
 CREATE TABLE IF NOT EXISTS ab_mission (

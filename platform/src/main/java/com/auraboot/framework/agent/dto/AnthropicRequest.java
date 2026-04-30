@@ -30,6 +30,15 @@ public class AnthropicRequest {
     private List<Message> messages;
     private List<Tool> tools;
 
+    /**
+     * Anthropic Extended Thinking config. Serialized as
+     * {@code {"thinking":{"type":"enabled","budget_tokens":N}}}. Omitted via
+     * {@code @JsonInclude(NON_NULL)} when not set. Only valid for Claude
+     * Sonnet 4.6+/Opus 4.x/Haiku 4.x — capability gating happens in the
+     * provider before this field is populated.
+     */
+    private Thinking thinking;
+
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Message {
@@ -63,5 +72,13 @@ public class AnthropicRequest {
          * requests with identical system+tools pay 0.1x for the cached prefix.
          */
         private Map<String, Object> cache_control;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class Thinking {
+        /** Always {@code "enabled"} when present. Omit the whole field to disable. */
+        private String type;
+        private int budget_tokens;
     }
 }

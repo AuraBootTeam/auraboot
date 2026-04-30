@@ -39,7 +39,13 @@ interface SimpleMessage {
     | 'result_contract'
     | 'confirm_card'
     | 'tool_executed'
-    | 'tool_cancelled';
+    | 'tool_cancelled'
+    /**
+     * Anthropic Extended Thinking trace (P0-2). Carries the chain-of-thought
+     * prose returned alongside the assistant turn. Rendered collapsed by
+     * default — see {@code ThinkingBlock}.
+     */
+    | 'thinking';
   sender: 'user' | 'bot' | 'system';
   timestamp: number;
   content: string;
@@ -55,6 +61,15 @@ interface SimpleMessage {
    * payload and stores it on the corresponding tool message.
    */
   pendingTurnId?: string;
+  /**
+   * Anthropic thinking-block fields. Populated only when {@code type === 'thinking'}.
+   * {@code thinkingTokens} is the precise count from the SSE event; falls back to a
+   * word-count estimate inside the ThinkingBlock component when absent.
+   * {@code thinkingSignature} is the opaque resume token Anthropic returns; we
+   * persist it for forward compatibility but do not yet round-trip it.
+   */
+  thinkingTokens?: number;
+  thinkingSignature?: string;
 }
 
 interface KnowledgeBaseInfo {
@@ -730,6 +745,25 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   timestamp: Date.now(),
                   content: contract.textSummary ?? '',
                   resultContract: contract,
+                },
+              });
+            },
+            onThinking: (content: string, tokens: number, signature?: string) => {
+              // P0-2: Anthropic Extended Thinking. Each thinking content block
+              // becomes its own collapsible card in the chat surface (rendered
+              // by ThinkingBlock). The bot text bubble that follows still
+              // receives the streamed text via onChunk, so the user sees
+              // "[reasoning toggle] [final answer]" as separate UI entries.
+              dispatch({
+                type: 'add_message',
+                payload: {
+                  id: `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  type: 'thinking',
+                  sender: 'bot',
+                  timestamp: Date.now(),
+                  content,
+                  thinkingTokens: tokens,
+                  thinkingSignature: signature,
                 },
               });
             },
