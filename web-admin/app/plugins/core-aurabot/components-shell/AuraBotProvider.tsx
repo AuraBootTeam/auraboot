@@ -341,13 +341,28 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
 
 export type FormFillHandler = (fields: Record<string, any>) => void;
 
+/**
+ * P1: image attachment carried alongside a user message. Each entry is the
+ * raw base64-encoded bytes (no data: URI prefix) plus the original mediaType
+ * — the backend rebuilds the Anthropic Messages API content blocks from these
+ * fields. {@code name} is purely cosmetic for the bubble preview.
+ */
+export interface ChatImageAttachment {
+  /** MIME type — image/jpeg, image/png, image/gif, image/webp. */
+  mediaType: string;
+  /** Raw base64 string, no {@code data:image/...;base64,} prefix. */
+  data: string;
+  /** Original file name for the chip preview (optional). */
+  name?: string;
+}
+
 interface AuraBotContextValue {
   state: AuraBotState;
   sessions: AuraBotSessionSummary[];
   openPanel: () => void;
   closePanel: () => void;
   togglePanel: () => void;
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, attachments?: ChatImageAttachment[]) => void;
   confirmTool: (toolId: string) => void;
   cancelTool: (toolId: string) => void;
   clearMessages: () => void;
@@ -636,8 +651,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
   // Send message — wired to SSE streaming
   const sendMessage = useCallback(
-    async (content: string) => {
-      if (!content.trim() || state.isLoading) return;
+    async (content: string, attachments?: ChatImageAttachment[]) => {
+      const hasAttachments = !!attachments && attachments.length > 0;
+      // Allow empty text when image attachments are present — the model can
+      // still answer the implicit "what is this?". Without attachments, we
+      // keep the original gating so blank Enter presses are no-ops.
+      if (!hasAttachments && !content.trim()) return;
+      if (state.isLoading) return;
 
       const { conversationId } = await ensureConversation();
 
@@ -679,6 +699,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                 role: m.sender === 'user' ? 'user' : 'assistant',
                 content: m.content,
               })),
+            // P1 — Vision: image attachments from the AuraBotChat paperclip.
+            // Forwarded as-is; the backend translates these into Anthropic
+            // Messages API image content blocks. Omitted when empty so the
+            // wire shape stays byte-identical with the pre-P1 baseline.
+            attachments: hasAttachments ? attachments : undefined,
           },
           {
             onChunk: (chunk: string) => {

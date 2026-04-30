@@ -473,6 +473,11 @@ export const auraBotApi = {
   /**
    * Send a chat message and receive SSE streaming response (simple callbacks).
    * Used by AuraBotProvider.sendMessage for the copilot panel.
+   *
+   * <p>P1 — Vision: when {@code attachments} is supplied, the backend rebuilds
+   * Anthropic Messages API image content blocks from {@code mediaType + data}
+   * and prepends them to the user message body. Omitted (undefined) on
+   * text-only turns so the wire shape stays unchanged for the legacy path.
    */
   async chatStream(
     request: {
@@ -482,6 +487,9 @@ export const auraBotApi = {
       pageContext?: any;
       knowledgeBaseIds?: string[];
       history?: Array<{ role: string; content: string }>;
+      conversationId?: number;
+      clientMsgId?: string;
+      attachments?: Array<{ mediaType: string; data: string; name?: string }>;
     },
     callbacks: ChatStreamOptions,
   ): Promise<void> {
