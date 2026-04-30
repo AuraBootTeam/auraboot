@@ -54,6 +54,22 @@ public class AgentChatPortImpl implements AgentChatPort {
 
     private static final int MAX_TOOL_ROUNDS = 5;
 
+    /**
+     * DC.2 (Q-DC.2=α): the caller-injected tool name that signals "hand off
+     * this conversation to another agent". When the LLM emits a tool_use
+     * block with this name, AgentChatPortImpl does NOT execute the tool —
+     * it surfaces the request via {@link TurnOutcome.Success#meta} and lets
+     * the caller (e.g. {@code AgentReplyTask} in DC.3) drive the handoff
+     * recursion. Constant matches {@code HandoffToolProvider}'s tool name.
+     */
+    static final String HANDOFF_TOOL_NAME = "transfer_to_agent";
+
+    /** {@link TurnOutcome.Success#meta} key carrying the target agent code on a handoff. */
+    static final String META_HANDOFF_TO = "_handoff_to";
+
+    /** {@link TurnOutcome.Success#meta} key carrying the handoff context string. */
+    static final String META_HANDOFF_CONTEXT = "_handoff_context";
+
     private final DynamicDataMapper dynamicDataMapper;
     private final LlmProviderFactory providerFactory;
     private final ToolProviderRegistry toolProviderRegistry;
@@ -202,6 +218,18 @@ public class AgentChatPortImpl implements AgentChatPort {
                     String toolId = block.getId();
                     String toolName = block.getName();
                     Map<String, Object> input = block.getInput() != null ? block.getInput() : Map.of();
+
+                    // DC.2 (Q-DC.2=α): handoff signal. transfer_to_agent is a
+                    // caller-injected tool (via extraTools per DC.1) whose
+                    // execution semantics live in the caller — AgentChatPortImpl
+                    // does NOT execute it. Persist the running tape (so the
+                    // outgoing assistant tool_use block survives the boundary),
+                    // surface the handoff request via Success.meta, and let the
+                    // caller (AgentReplyTask in DC.3) drive the recursion.
+                    if (HANDOFF_TOOL_NAME.equals(toolName)) {
+                        persistMessages(sessionId, messages);
+                        return buildHandoffOutcome(response, sink, input);
+                    }
 
                     ToolDefinition def = findToolDef(toolDefs, toolName);
                     boolean requiresConfirmation = def != null && def.isRequiresConfirmation();
@@ -610,5 +638,52 @@ public class AgentChatPortImpl implements AgentChatPort {
         }
         sink.onDone(text, null);
         return new TurnOutcome.Success(text, java.util.Map.of());
+    }
+
+    /**
+     * DC.2 (Q-DC.2=α): build a handoff-bearing {@link TurnOutcome.Success}
+     * for the caller (e.g. {@code AgentReplyTask}) to detect via meta.
+     *
+     * <p>Behaviour:
+     * <ul>
+     *   <li>Stream any text content the LLM emitted alongside the
+     *       transfer_to_agent tool call (the "handing off…" message). Empty
+     *       text is fine; we still call onDone so the SSE / WS stream
+     *       terminates cleanly.</li>
+     *   <li>Carry {@code targetAgentCode} (and optional {@code context})
+     *       from the tool input on {@link TurnOutcome.Success#meta} under the
+     *       {@code _handoff_to} / {@code _handoff_context} keys. The caller
+     *       uses these to drive recursion + child-task creation.</li>
+     *   <li>Do NOT execute the tool — handoff coordination is a caller
+     *       concern; AgentChatPortImpl's only job is signal-passing.</li>
+     * </ul>
+     */
+    private TurnOutcome buildHandoffOutcome(LlmChatResponse response, ResponseSink sink,
+                                              Map<String, Object> input) {
+        StringBuilder sb = new StringBuilder();
+        for (LlmChatResponse.ContentBlock block : response.getContent()) {
+            if ("text".equals(block.getType()) && block.getText() != null) {
+                sb.append(block.getText());
+            }
+        }
+        String text = sb.toString();
+        if (!text.isEmpty()) {
+            sink.onTextChunk(text);
+        }
+        sink.onDone(text, null);
+
+        java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
+        Object targetAgentCode = input != null ? input.get("targetAgentCode") : null;
+        if (targetAgentCode != null) {
+            meta.put(META_HANDOFF_TO, String.valueOf(targetAgentCode));
+        }
+        Object context = input != null ? input.get("context") : null;
+        if (context != null) {
+            meta.put(META_HANDOFF_CONTEXT, String.valueOf(context));
+        }
+        log.info("Handoff signal detected: target={}, context={}",
+                meta.get(META_HANDOFF_TO),
+                meta.containsKey(META_HANDOFF_CONTEXT) ? "present" : "absent");
+        return new TurnOutcome.Success(text, meta);
     }
 }
