@@ -59,6 +59,29 @@ public interface ImMessageMapper extends BaseMapper<ImMessage> {
                       @Param("tenantId") Long tenantId,
                       @Param("senderId") Long senderId);
 
+    /**
+     * Phase D.1: backfill triage metadata onto an existing inbound row when
+     * the conversation enters {@code runTurn} via the IM-event path
+     * ({@code InboundMode.EXISTING_MESSAGE_ID}). The user message itself was
+     * already persisted by {@code ImMessageService.sendMessage} during the
+     * upstream IM dispatch — this UPDATE only stamps the triage decision.
+     *
+     * <p>Tenant scope is enforced explicitly so a misbehaving caller cannot
+     * write triage rows across tenants.
+     */
+    @Update("""
+        UPDATE ab_im_message SET
+            triage_bucket = #{triageBucket},
+            triage_confidence = #{triageConfidence},
+            triage_reason_codes = #{triageReasonCodes}::jsonb
+        WHERE id = #{messageId} AND tenant_id = #{tenantId}
+        """)
+    int updateTriageMetadata(@Param("messageId") Long messageId,
+                             @Param("tenantId") Long tenantId,
+                             @Param("triageBucket") String triageBucket,
+                             @Param("triageConfidence") java.math.BigDecimal triageConfidence,
+                             @Param("triageReasonCodes") String triageReasonCodesJson);
+
     @Select("""
         <script>
         SELECT m.id AS messageId, m.conversation_id AS conversationId,

@@ -21,6 +21,14 @@ import java.util.Map;
  * Phase A chat impl can read fields ({@code sessionId / history / pageContext /
  * knowledgeBaseIds}) that are not yet hoisted into the record. Phase B will
  * absorb these fields into native record fields and drop legacyRequest.
+ *
+ * <p>Phase D.1 (2026-04-30): {@code inboundMessageId} carries the existing
+ * {@code ab_im_message.id} when {@link InboundMode#EXISTING_MESSAGE_ID} is in
+ * effect — group-chat / IM-event paths persist the user message via
+ * {@code ImMessageService} BEFORE firing the Spring event that ultimately
+ * calls {@code runTurn}. The chokepoint must NOT write a duplicate row; it
+ * only updates the triage metadata columns on the existing one. Always
+ * {@code null} for {@link InboundMode#NEW_FROM_REQUEST} (web SSE path).
  */
 public record TurnRequest(
         long tenantId,
@@ -35,5 +43,6 @@ public record TurnRequest(
         Map<String, Object> options,
         InboundMode inboundMode,
         TriageBucket precomputedBucket,
+        Long inboundMessageId,                    // D.1: existing ab_im_message.id when inboundMode=EXISTING_MESSAGE_ID
         ChatRequest legacyRequest                 // v4: original ChatRequest preserved for Phase A
 ) {}

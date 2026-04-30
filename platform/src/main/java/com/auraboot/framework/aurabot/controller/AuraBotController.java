@@ -88,6 +88,7 @@ public class AuraBotController {
                         null,                                 // options — carried in legacyRequest
                         InboundMode.NEW_FROM_REQUEST,
                         null,                                 // precomputedBucket — Phase B+
+                        null,                                 // inboundMessageId — D.1: only set when EXISTING_MESSAGE_ID
                         request);                             // legacyRequest (Q-A.6)
 
                 turnService.runTurn(turnReq, sink);
