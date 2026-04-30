@@ -7713,6 +7713,12 @@ CREATE TABLE IF NOT EXISTS ab_im_message (
     conversation_id BIGINT          NOT NULL,
     tenant_id       BIGINT          NOT NULL,
     sender_id       BIGINT          NOT NULL,
+    -- sender_type history (v3.3 Q8 / Phase D Q-D.3=α):
+    --   pre-Phase B.1 / D.2: AI responses written as 'system' + sender_id=0
+    --   from Phase B.1 (AuraBotTurnPersistence) + Phase D.2 (ImAiService refactor):
+    --   AI responses written as 'agent' + sender_id=<aurabot agent_definition.id>.
+    --   Production envs that started before Phase B.1 should run
+    --   migrations/2026-04-30-d5-sender-type-backfill.sql to converge legacy rows.
     sender_type     VARCHAR(20)     NOT NULL DEFAULT 'human',   -- human | agent
     seq             BIGINT          NOT NULL,                    -- per-conversation incrementing sequence
     message_type    VARCHAR(32)     NOT NULL DEFAULT 'text',     -- TEXT | IMAGE | FILE | CARD | SYSTEM | AI_RESPONSE
