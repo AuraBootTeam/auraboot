@@ -11,6 +11,8 @@ public class MetaContext {
 
     private static final ThreadLocal<MetaContext> HOLDER = new ThreadLocal<>();
     private static final ThreadLocal<Long> MEMBER_ID = new ThreadLocal<>();
+    private static final ThreadLocal<Long> ENV_ID = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
 
     @Getter
     private final Long tenantId;
@@ -58,6 +60,57 @@ public class MetaContext {
     public static void clear() {
         HOLDER.remove();
         MEMBER_ID.remove();
+        ENV_ID.remove();
+        ENV_FILTER_BYPASSED.remove();
+    }
+
+    // ---- env-layering extension (PoC) ----
+
+    /**
+     * Get the current environment id. May be null if the request did not specify one and the
+     * tenant has no default env yet.
+     */
+    public static Long getCurrentEnvironmentId() {
+        return ENV_ID.get();
+    }
+
+    /**
+     * Set the current environment id. Typically called by EnvironmentResolverFilter from
+     * {@code ?env=} or {@code X-Environment} header, or by services starting background work.
+     */
+    public static void setEnvironmentId(Long envId) {
+        ENV_ID.set(envId);
+    }
+
+    /**
+     * @return true if env filter is currently bypassed (cross-env queries such as promotion).
+     */
+    public static boolean isEnvFilterBypassed() {
+        return Boolean.TRUE.equals(ENV_FILTER_BYPASSED.get());
+    }
+
+    /**
+     * Run a block with env filtering disabled. Use sparingly — only for legitimate cross-env
+     * reads/writes (promotion source→target). State is restored even on exception.
+     */
+    public static <T> T runWithoutEnvFilter(java.util.function.Supplier<T> action) {
+        Boolean prior = ENV_FILTER_BYPASSED.get();
+        ENV_FILTER_BYPASSED.set(true);
+        try {
+            return action.get();
+        } finally {
+            ENV_FILTER_BYPASSED.set(prior);
+        }
+    }
+
+    /**
+     * Run a block with env filtering disabled (no return value).
+     */
+    public static void runWithoutEnvFilter(Runnable action) {
+        runWithoutEnvFilter(() -> {
+            action.run();
+            return null;
+        });
     }
 
     public static Long getCurrentMemberId() {

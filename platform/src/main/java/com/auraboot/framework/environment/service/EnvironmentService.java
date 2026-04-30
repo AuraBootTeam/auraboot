@@ -49,4 +49,22 @@ public interface EnvironmentService {
      * Compute the diff between two environments' configurations.
      */
     EnvironmentDiffResponse diff(String sourceCode, String targetCode, Long tenantId);
+
+    /**
+     * Lock an environment to prevent direct edits. Subsequent edits / promotions need explicit unlock.
+     * Reason must be non-blank for audit. Re-locking an already-locked env is rejected.
+     *
+     * @throws IllegalArgumentException env not found, or reason blank
+     * @throws IllegalStateException    env already locked
+     */
+    EnvironmentResponse lock(String pid, Long tenantId, Long userId, String reason);
+
+    /**
+     * Unlock a locked environment. Reason must be non-blank for audit. Unlocking an already-unlocked
+     * env is rejected.
+     *
+     * @throws IllegalArgumentException env not found, or reason blank
+     * @throws IllegalStateException    env not currently locked
+     */
+    EnvironmentResponse unlock(String pid, Long tenantId, Long userId, String reason);
 }
