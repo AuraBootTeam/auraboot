@@ -798,13 +798,14 @@ CREATE TABLE ab_page_schema (
 );
 
 -- Partial unique index (logical delete friendly)
--- env-layering PoC: include env_id so same page_key can coexist in dev/staging/prod.
+-- env-layering PoC: include env_id so same page_key can coexist in dev/staging/prod;
+-- include is_current so version-bump promotion (#9 apply) can keep old not-current
+-- versions for history without clashing with the new is_current row.
 -- NULLS NOT DISTINCT (PG 15+) treats two NULL env_ids as the same key, preserving
--- "one row per page_key" guarantee for legacy / batch-1 rows that haven't been
--- env-stamped yet. Tighten to NOT NULL together with column constraint.
+-- "one row per page_key" guarantee for legacy / batch-1 rows.
 CREATE UNIQUE INDEX uk_page_schema_page_key
 ON ab_page_schema (tenant_id, namespace, page_key, env_id) NULLS NOT DISTINCT
-WHERE deleted_flag = FALSE;
+WHERE deleted_flag = FALSE AND is_current = TRUE;
 
 -- Indexes
 CREATE INDEX idx_page_schema_tenant
