@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.config.AgentProperties;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.metrics.ParallelToolMetrics;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.TraceContext;
@@ -10,6 +11,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.event.config.TenantAwareTaskDecorator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,6 +54,8 @@ class StepLoopParallelToolTest {
     private StepLoopService stepLoopService;
     private AgentProperties agentProperties;
     private ThreadPoolTaskExecutor executor;
+    private SimpleMeterRegistry meterRegistry;
+    private ParallelToolMetrics parallelToolMetrics;
 
     @BeforeEach
     void setup() {
@@ -65,6 +69,8 @@ class StepLoopParallelToolTest {
         executor.setThreadNamePrefix("test-async-");
         executor.setTaskDecorator(new TenantAwareTaskDecorator());
         executor.initialize();
+        meterRegistry = new SimpleMeterRegistry();
+        parallelToolMetrics = new ParallelToolMetrics(meterRegistry);
         stepLoopService = new StepLoopService(
                 toolLoopService,
                 dynamicDataMapper,
@@ -73,7 +79,8 @@ class StepLoopParallelToolTest {
                 aiTraceService,
                 approvalGate,
                 agentProperties,
-                executor);
+                executor,
+                parallelToolMetrics);
     }
 
     @AfterEach
@@ -267,6 +274,89 @@ class StepLoopParallelToolTest {
         assertThat(toolLoopService.parallelGroupIds).allMatch(g -> g == null);
         // All ran on the same calling thread (serial path)
         assertThat(toolLoopService.threadsUsed).hasSize(1);
+    }
+
+    // -------------------------------------------------------------------
+    // 7) metrics: fanout + max-latency emitted on parallel happy path
+    // -------------------------------------------------------------------
+    @Test
+    @DisplayName("parallelToolCalls_emitsFanoutAndLatencyMetrics")
+    void parallelToolCalls_emitsFanoutAndLatencyMetrics() {
+        MetaContext.setContext(101L, 9L, "u", "t");
+        toolLoopService.sleepMs = 50; // each tool ~50ms
+
+        List<AgentToolDefinition> tools = Arrays.asList(
+                readTool("nq:a"), readTool("nq:b"), readTool("nq:c"));
+        List<LlmChatResponse.ContentBlock> blocks = Arrays.asList(
+                toolBlock("c1", "nq:a"),
+                toolBlock("c2", "nq:b"),
+                toolBlock("c3", "nq:c"));
+
+        stepLoopService.processToolUseBlocksParallel(
+                blocks, tools, 101L, "run_metrics", null, "agent_a",
+                TraceContext.builder().traceId("t").tenantId(101L).build());
+
+        // Fanout DistributionSummary recorded once with value=3
+        var fanoutSummary = meterRegistry.find(ParallelToolMetrics.FANOUT_NAME)
+                .tag("tenant", "101")
+                .summary();
+        assertThat(fanoutSummary).as("fanout summary should be registered").isNotNull();
+        assertThat(fanoutSummary.count()).isEqualTo(1L);
+        assertThat(fanoutSummary.totalAmount()).isEqualTo(3.0);
+
+        // Max-latency DistributionSummary recorded once with value > 0
+        var latencySummary = meterRegistry.find(ParallelToolMetrics.MAX_LATENCY_NAME)
+                .tag("tenant", "101")
+                .summary();
+        assertThat(latencySummary).as("max-latency summary should be registered").isNotNull();
+        assertThat(latencySummary.count()).isEqualTo(1L);
+        assertThat(latencySummary.totalAmount())
+                .as("max latency should reflect ~50ms per-tool sleep")
+                .isGreaterThan(0.0);
+
+        // Rejected and timeout counters MUST NOT have fired on the happy path
+        assertThat(meterRegistry.find(ParallelToolMetrics.REJECTED_NAME).counter()).isNull();
+        assertThat(meterRegistry.find(ParallelToolMetrics.TIMEOUT_NAME).counter()).isNull();
+    }
+
+    // -------------------------------------------------------------------
+    // 8) metrics: rejected counter increments when fanout > maxFanout
+    // -------------------------------------------------------------------
+    @Test
+    @DisplayName("parallelToolCalls_fanoutExceedsLimit_emitsRejectedMetric")
+    void parallelToolCalls_fanoutExceedsLimit_emitsRejectedMetric() {
+        MetaContext.setContext(101L, 9L, "u", "t");
+        agentProperties.getParallel().setMaxFanout(3);
+
+        List<AgentToolDefinition> tools = new ArrayList<>();
+        List<LlmChatResponse.ContentBlock> blocks = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            tools.add(readTool("nq:tool_" + i));
+            blocks.add(toolBlock("c" + i, "nq:tool_" + i));
+        }
+
+        stepLoopService.processToolUseBlocksParallel(
+                blocks, tools, 101L, "run_reject_metric", null, "agent_a",
+                TraceContext.builder().traceId("t").tenantId(101L).build());
+
+        // Fanout still recorded (raw shape captured pre-rejection)
+        var fanoutSummary = meterRegistry.find(ParallelToolMetrics.FANOUT_NAME)
+                .tag("tenant", "101")
+                .summary();
+        assertThat(fanoutSummary).isNotNull();
+        assertThat(fanoutSummary.count()).isEqualTo(1L);
+        assertThat(fanoutSummary.totalAmount()).isEqualTo(5.0);
+
+        // Rejected counter == 1 (per batch, not per tool)
+        var rejectedCounter = meterRegistry.find(ParallelToolMetrics.REJECTED_NAME)
+                .tag("tenant", "101")
+                .counter();
+        assertThat(rejectedCounter).as("rejected counter should be registered").isNotNull();
+        assertThat(rejectedCounter.count()).isEqualTo(1.0);
+
+        // Max-latency NOT recorded (no parallel batch ran)
+        assertThat(meterRegistry.find(ParallelToolMetrics.MAX_LATENCY_NAME).summary()).isNull();
+        assertThat(meterRegistry.find(ParallelToolMetrics.TIMEOUT_NAME).counter()).isNull();
     }
 
     // -------------------------------------------------------------------

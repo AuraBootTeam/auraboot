@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.AgentPlanStep;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.metrics.ParallelToolMetrics;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.trace.AiTraceService;
@@ -43,6 +44,7 @@ public class StepLoopService {
     private final AgentApprovalGateService approvalGate;
     private final AgentProperties agentProperties;
     private final Executor asyncTaskExecutor;
+    private final ParallelToolMetrics parallelToolMetrics;
 
     static final int MAX_TOOL_LOOPS = 20;
 
@@ -53,7 +55,8 @@ public class StepLoopService {
                            AiTraceService aiTraceService,
                            AgentApprovalGateService approvalGate,
                            AgentProperties agentProperties,
-                           @Qualifier("asyncTaskExecutor") Executor asyncTaskExecutor) {
+                           @Qualifier("asyncTaskExecutor") Executor asyncTaskExecutor,
+                           ParallelToolMetrics parallelToolMetrics) {
         this.toolLoopService = toolLoopService;
         this.dynamicDataMapper = dynamicDataMapper;
         this.objectMapper = objectMapper;
@@ -62,6 +65,7 @@ public class StepLoopService {
         this.approvalGate = approvalGate;
         this.agentProperties = agentProperties;
         this.asyncTaskExecutor = asyncTaskExecutor;
+        this.parallelToolMetrics = parallelToolMetrics;
     }
 
     // =========================================================================
@@ -734,6 +738,13 @@ public class StepLoopService {
             return List.of();
         }
 
+        // P0-5 metric: record the LLM's raw tool-emission shape. Recorded once
+        // per dispatched batch BEFORE any fanout/serial branching so the
+        // histogram captures rejected and serial batches too — operators tuning
+        // max-fanout need to see the full distribution, not just the parallel
+        // subset that survived the cap.
+        parallelToolMetrics.recordFanout(tenantId, toolBlocks.size());
+
         // AgentProperties.parallel is eagerly initialised in the @Data POJO
         // (see AgentProperties.java field initializer = new Parallel()) so the
         // reference is never null in production. No defensive null guard.
@@ -750,6 +761,8 @@ public class StepLoopService {
         // the LLM (and any frontend rendering tool errors) can recognise this
         // as a single batch-level rejection rather than N independent failures.
         if (toolBlocks.size() > maxFanout) {
+            // P0-5 metric: one increment per rejected batch (not per tool).
+            parallelToolMetrics.recordRejected(tenantId);
             String errJson = buildFanoutExceededJson(toolBlocks.size(), maxFanout);
             log.warn("Parallel fanout rejected: run={}, fanout={}, max={}", runPid, toolBlocks.size(), maxFanout);
             for (int i = 0; i < toolBlocks.size(); i++) {
@@ -807,6 +820,13 @@ public class StepLoopService {
             String groupId = UniqueIdGenerator.generate();
             log.debug("Parallel tool batch: run={}, group={}, fanout={}", runPid, groupId, parallelIdx.size());
 
+            // P0-5 metric: per-tool wall-clock duration captured inside each
+            // worker lambda so the post-batch max-latency observation reflects
+            // the actual slowest tool, not the join overhead. Indexed by
+            // parallel-position (pos) — distinct from result-slot which uses
+            // original block index.
+            long[] durations = new long[parallelIdx.size()];
+
             List<CompletableFuture<Void>> futures = new ArrayList<>(parallelIdx.size());
             for (int pos = 0; pos < parallelIdx.size(); pos++) {
                 final int slot = parallelIdx.get(pos);
@@ -817,6 +837,7 @@ public class StepLoopService {
                     // TenantAwareTaskDecorator (it is single-purpose).
                     // Set parallel coords here so ActionRecorder stamps them.
                     StepContext.setParallel(groupId, parallelIndex);
+                    long t0 = System.currentTimeMillis();
                     try {
                         String r = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
                                 b.getName(), b.getInput(), tools, traceCtx);
@@ -829,6 +850,7 @@ public class StepLoopService {
                         results[slot] = new ToolResult(b.getId(), b.getName(),
                                 "Error: " + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()));
                     } finally {
+                        durations[parallelIndex] = System.currentTimeMillis() - t0;
                         StepContext.clearParallel();
                     }
                 }, asyncTaskExecutor);
@@ -838,7 +860,18 @@ public class StepLoopService {
             try {
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                         .get(totalTimeoutMs, TimeUnit.MILLISECONDS);
+                // P0-5 metric: emit max per-tool latency on the happy path. We
+                // report max(duration) rather than sum because the user-perceived
+                // wall clock of a parallel batch is the slowest tool, not the
+                // total CPU work.
+                long maxMs = 0;
+                for (long d : durations) {
+                    if (d > maxMs) maxMs = d;
+                }
+                parallelToolMetrics.recordMaxLatency(tenantId, maxMs);
             } catch (TimeoutException te) {
+                // P0-5 metric: one increment per batch that hit totalTimeoutMs.
+                parallelToolMetrics.recordTimeout(tenantId);
                 log.warn("Parallel tool batch timed out after {}ms: run={}, group={}", totalTimeoutMs, runPid, groupId);
                 // M5 fix: cancel still-running futures so worker threads do not
                 // continue chewing connections / per-tool 60s timeouts after we
