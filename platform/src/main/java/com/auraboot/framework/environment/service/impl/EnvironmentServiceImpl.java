@@ -258,6 +258,33 @@ public class EnvironmentServiceImpl implements EnvironmentService {
 
     @Override
     @Transactional
+    public Long findOrCreateDefaultId(Long tenantId) {
+        if (tenantId == null) {
+            throw new IllegalArgumentException("tenantId must not be null");
+        }
+        Environment existing = environmentMapper.findByTenantAndCode(tenantId, "default");
+        if (existing != null) {
+            return existing.getId();
+        }
+        Environment env = new Environment();
+        env.setPid(UniqueIdGenerator.generate());
+        env.setTenantId(tenantId);
+        env.setCode("default");
+        env.setName("Default");
+        env.setStatus(StatusConstants.ACTIVE);
+        env.setIsDefault(true);
+        env.setSortOrder(0);
+        env.setIsLocked(false);
+        env.setDeletedFlag(false);
+        env.setCreatedAt(new Date());
+        env.setUpdatedAt(new Date());
+        environmentMapper.insert(env);
+        log.info("Created default environment for tenant {}: id={}", tenantId, env.getId());
+        return env.getId();
+    }
+
+    @Override
+    @Transactional
     public EnvironmentResponse lock(String pid, Long tenantId, Long userId, String reason) {
         if (reason == null || reason.trim().isEmpty()) {
             throw new IllegalArgumentException("Lock reason must not be blank");
