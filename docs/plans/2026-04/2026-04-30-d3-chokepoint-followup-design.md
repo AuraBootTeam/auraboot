@@ -1,6 +1,6 @@
 # D.3-chokepoint Follow-up — HandoffToolProvider × AgentChatPort SPI Integration
 
-> **Status**: v2 (2026-04-30) — owner locked 5 decisions; Q-DC.4 corrected from α (dual-publish) to β (one-shot migration) after a discussion that surfaced the Phase D.4 over-cautious framing. §8 implementation sequence locked at 4 PRs.
+> **Status**: v3 (2026-04-30) — DC.1 + DC.2 landed; DC.3 + DC.4 deferred pending sub-design after implementation-time discovery that group-chat prompt/history/tool semantics need substantial AgentReplyContext absorption work not anticipated in v2 §3. See §9 "DC.3 实施期发现" for details.
 > **Predecessor**: [`2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md`](./2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md) v3 §8 row D.3 deferral note.
 
 ## 0. 摘要
@@ -253,7 +253,53 @@ D.3 现状 AgentReplyTask 用 `SseEmitterManager.sendToUsers(SseEventType.STREAM
 
 ---
 
+## 9. DC.3 实施期发现 — AgentReplyContext absorption is a sub-design
+
+DC.3 (route `AgentReplyTask` through `turnService.runTurn`) revealed a coupling that v2 §3 LOC estimate didn't account for. **DC.1 + DC.2 are landed (`131f8890` + `d7f9175b`); DC.3 is deferred pending the sub-design work below.**
+
+### 9.1 The coupling
+
+| 维度 | `AgentReplyTask` 现状 | `AgentChatPortImpl.runAgentTurn` |
+|---|---|---|
+| 系统提示词 | `AgentReplyContext.buildSystemPrompt(agentDto, conversationId, tenantId)` — 群聊语境（soul profile + 多 agent 描述 + 群聊角色定位） | `buildSystemPrompt(agentDef)` — 1:1 chat 模型 |
+| 历史消息 | `replyContext.buildHistory(conversationId, tenantId, contextWindow)` — 从 `ab_im_message` 拉群聊全员 history（含其他 agent 回复） | 来自 `ChatRequest.history`（前端传的 1:1 history） |
+| 工具列表 | `agent.getTools()` 直挂的工具 | `ToolProviderRegistry.discoverAll(ctx)` — tenant-scoped 发现 |
+
+直接把 AgentReplyTask 切到 `agentChatPort.runAgentTurn(ctx, ChatRequest, sink, extraTools)` 会丢失群聊语境（agent 不知道自己在群聊里，失去多 agent 协作能力）。
+
+### 9.2 Sub-design 方向选项
+
+- **选项 A**: `AgentChatPort` SPI 加 optional 字段（`customSystemPrompt` / `historyOverride` / `pinnedToolDefs`）让调用方注入预构建上下文；AgentChatPortImpl 看到非空就用调用方版本，否则走默认。
+  - Pro: SPI 演进自然；调用方知道群聊语境
+  - Con: SPI surface 持续膨胀
+
+- **选项 B**: 把 `AgentReplyContext` 的群聊语境组装搬进 `AgentChatPortImpl` —— `AgentChatPortImpl` 检测 `ChatRequest.channel == "im_group"` 时切换到群聊提示词 / 群聊 history 来源 / agent.getTools() 工具表
+  - Pro: chokepoint 真正成为单一入口
+  - Con: AgentChatPortImpl 复杂度上升；channel-driven 分支多
+
+- **选项 C**: 引入 `GroupChatAgentChatPort` 扩展 SPI（`AgentChatPort` 子接口）专门处理群聊；普通 `AgentChatPort` 不变
+  - Pro: 关注点分离
+  - Con: SPI 分裂；ConversationTurnService dispatch 需识别用哪个 port
+
+### 9.3 已落地的 DC.1 + DC.2 价值
+
+即便 DC.3 暂缓，DC.1 + DC.2 不是空跑：
+
+- **DC.1 extraTools** SPI 让任何 named-agent 调用方可以注入会话 scope 工具（不仅仅是 handoff —— 未来其他场景同样可用）
+- **DC.2 transfer_to_agent → Success.meta** 让 handoff 信号成为 chokepoint 标准协议；任何走 `AgentChatPort.runAgentTurn` 的调用方都能识别 handoff 而不是黑盒到工具执行
+
+DC.3-sub-design 启动前，AgentReplyTask 仍是直接调 `provider.chat`（D.3 task chain 已落，handoff via 自定义 tool execute 路径仍工作）。
+
+### 9.4 DC.4 状态
+
+DC.4（删 OSS SseEmitterManager + 迁 enterprise imSseClient.ts）依赖 DC.3 完成（AgentReplyTask 不再发 STREAM_CHUNK / STREAM_END SSE 事件）。所以 DC.4 也随 DC.3 deferred。
+
+D.4 文档化的 dual-transport 决策（commit `06b77d87`）仍然 valid 作为现状记录。一次性到位的 cross-repo 迁移待 DC.3-sub-design 完成后才能跟随。
+
+---
+
 ## CHANGELOG
 
+- 2026-04-30 v3 DC.1 + DC.2 landed (`131f8890` + `d7f9175b`); DC.3 + DC.4 deferred pending §9 sub-design — AgentReplyContext 群聊语境 absorption (3 选项) 需要单独设计 lock
 - 2026-04-30 v2 owner 决策锁定 5 项；§7.1 新增"前因后果"节解释 Q-DC.4 从 α (dual-publish) 修正到 β (one-shot)；§8 锁定 4 PR 实施时序（v1 是 3 PR，DC.4 跨仓 transport 删除新加为独立 step）
 - 2026-04-30 v1 初稿；5 个决策点 surfacing；候选 PR 切片 DC.1-DC.3
