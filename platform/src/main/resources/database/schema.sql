@@ -6686,6 +6686,19 @@ CREATE INDEX IF NOT EXISTS idx_action_fidelity ON ab_agent_action(fidelity) WHER
 CREATE INDEX IF NOT EXISTS idx_action_skill_code ON ab_agent_action(skill_code) WHERE skill_code IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_action_command_signature ON ab_agent_action(tenant_id, command_signature) WHERE command_signature IS NOT NULL;
 
+-- ACP P0-5 Parallel Tool Calls — group same-turn parallel actions for audit
+-- parallel_group_id: ULID/UUID shared by all Actions belonging to the same
+--                    LLM-emitted parallel tool_use block group. NULL when the
+--                    Action ran serial (approval-required path or fanout=1).
+-- parallel_index:    0-based position within the parallel group, preserving
+--                    the original LLM block order so message reconstruction
+--                    is deterministic even when CompletableFuture finishes
+--                    out-of-order.
+ALTER TABLE ab_agent_action
+    ADD COLUMN IF NOT EXISTS parallel_group_id VARCHAR(26),
+    ADD COLUMN IF NOT EXISTS parallel_index    INTEGER;
+CREATE INDEX IF NOT EXISTS idx_action_parallel_group ON ab_agent_action(parallel_group_id) WHERE parallel_group_id IS NOT NULL;
+
 -- ============================================================================
 -- ACP Capability Layer (Spec 00 §5.6)
 -- Routes BIF(intent + object) → Capability → Skill

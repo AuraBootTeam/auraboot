@@ -9,15 +9,20 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.TraceContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -28,7 +33,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class StepLoopService {
 
     private final ToolLoopService toolLoopService;
@@ -38,8 +42,27 @@ public class StepLoopService {
     private final AiTraceService aiTraceService;
     private final AgentApprovalGateService approvalGate;
     private final AgentProperties agentProperties;
+    private final Executor asyncTaskExecutor;
 
     static final int MAX_TOOL_LOOPS = 20;
+
+    public StepLoopService(ToolLoopService toolLoopService,
+                           DynamicDataMapper dynamicDataMapper,
+                           ObjectMapper objectMapper,
+                           LlmProviderFactory providerFactory,
+                           AiTraceService aiTraceService,
+                           AgentApprovalGateService approvalGate,
+                           AgentProperties agentProperties,
+                           @Qualifier("asyncTaskExecutor") Executor asyncTaskExecutor) {
+        this.toolLoopService = toolLoopService;
+        this.dynamicDataMapper = dynamicDataMapper;
+        this.objectMapper = objectMapper;
+        this.providerFactory = providerFactory;
+        this.aiTraceService = aiTraceService;
+        this.approvalGate = approvalGate;
+        this.agentProperties = agentProperties;
+        this.asyncTaskExecutor = asyncTaskExecutor;
+    }
 
     // =========================================================================
     // LLM Chat Loop
@@ -154,31 +177,23 @@ public class StepLoopService {
                 List<Object> assistantContent = new ArrayList<>();
                 List<Object> toolResults = new ArrayList<>();
 
-                for (LlmChatResponse.ContentBlock block : response.getContent()) {
-                    if ("text".equals(block.getType())) {
-                        assistantContent.add(Map.of("type", "text", "text", block.getText()));
-                        lastTextResponse = block.getText();
-                    } else if ("tool_use".equals(block.getType())) {
-                        assistantContent.add(Map.of(
-                                "type", "tool_use",
-                                "id", block.getId(),
-                                "name", block.getName(),
-                                "input", block.getInput()));
+                ToolBlockBatch batch = collectToolBlocks(response, assistantContent);
+                lastTextResponse = batch.lastText != null ? batch.lastText : lastTextResponse;
 
-                        String toolResult = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
-                                block.getName(), block.getInput(), tools, traceCtx);
+                List<ToolResult> results = processToolUseBlocksParallel(
+                        batch.toolBlocks, tools, tenantId, runPid, taskPid, agentCode, traceCtx);
 
-                        toolResults.add(Map.of(
-                                "type", "tool_result",
-                                "tool_use_id", block.getId(),
-                                "content", toolResult));
-
-                        toolCallLog.add(Map.of(
-                                "tool", block.getName(),
-                                "input", block.getInput(),
-                                "output", toolResult,
-                                "loop", loop));
-                    }
+                for (int i = 0; i < results.size(); i++) {
+                    ToolResult tr = results.get(i);
+                    toolResults.add(Map.of(
+                            "type", "tool_result",
+                            "tool_use_id", tr.toolUseId(),
+                            "content", tr.result()));
+                    toolCallLog.add(Map.of(
+                            "tool", tr.name(),
+                            "input", batch.toolBlocks.get(i).getInput(),
+                            "output", tr.result(),
+                            "loop", loop));
                 }
 
                 messages.add(LlmChatRequest.Message.builder().role("assistant").content(assistantContent).build());
@@ -328,20 +343,19 @@ public class StepLoopService {
                         List<Object> assistantContent = new ArrayList<>();
                         List<Object> toolResults = new ArrayList<>();
 
-                        for (LlmChatResponse.ContentBlock block : response.getContent()) {
-                            if ("text".equals(block.getType())) {
-                                assistantContent.add(Map.of("type", "text", "text", block.getText()));
-                                lastTextResponse = block.getText();
-                            } else if ("tool_use".equals(block.getType())) {
-                                assistantContent.add(Map.of(
-                                        "type", "tool_use", "id", block.getId(),
-                                        "name", block.getName(), "input", block.getInput()));
-                                String toolResult = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
-                                        block.getName(), block.getInput(), tools, traceCtx);
-                                toolResults.add(Map.of("type", "tool_result", "tool_use_id", block.getId(), "content", toolResult));
-                                toolCallLog.add(Map.of("tool", block.getName(), "input", block.getInput(),
-                                        "output", toolResult, "step", i));
-                            }
+                        ToolBlockBatch batch = collectToolBlocks(response, assistantContent);
+                        lastTextResponse = batch.lastText != null ? batch.lastText : lastTextResponse;
+
+                        List<ToolResult> results = processToolUseBlocksParallel(
+                                batch.toolBlocks, tools, tenantId, runPid, taskPid, agentCode, traceCtx);
+
+                        for (int k = 0; k < results.size(); k++) {
+                            ToolResult tr = results.get(k);
+                            toolResults.add(Map.of("type", "tool_result", "tool_use_id", tr.toolUseId(), "content", tr.result()));
+                            toolCallLog.add(Map.of("tool", tr.name(),
+                                    "input", batch.toolBlocks.get(k).getInput(),
+                                    "output", tr.result(),
+                                    "step", i));
                         }
                         messages.add(LlmChatRequest.Message.builder().role("assistant").content(assistantContent).build());
                         messages.add(LlmChatRequest.Message.builder().role("user").content(toolResults).build());
@@ -562,5 +576,242 @@ public class StepLoopService {
         } catch (Exception e) {
             log.error("Failed to update tool_calls: {}", e.getMessage());
         }
+    }
+
+    // =========================================================================
+    // ACP P0-5 Parallel Tool Calls
+    // =========================================================================
+
+    /** Result of one tool execution, in original LLM block order. */
+    record ToolResult(String toolUseId, String name, String result) {}
+
+    /** Tool-use blocks extracted from a single LLM response, plus assistant text echo. */
+    static final class ToolBlockBatch {
+        final List<LlmChatResponse.ContentBlock> toolBlocks = new ArrayList<>();
+        String lastText;
+    }
+
+    /**
+     * Walk the LLM response once: collect tool_use blocks for execution and
+     * mirror the entire assistant turn (text + tool_use) into {@code assistantContent}
+     * so the conversation history stays exact.
+     */
+    ToolBlockBatch collectToolBlocks(LlmChatResponse response, List<Object> assistantContent) {
+        ToolBlockBatch batch = new ToolBlockBatch();
+        for (LlmChatResponse.ContentBlock block : response.getContent()) {
+            if ("text".equals(block.getType())) {
+                assistantContent.add(Map.of("type", "text", "text", block.getText()));
+                batch.lastText = block.getText();
+            } else if ("tool_use".equals(block.getType())) {
+                assistantContent.add(Map.of(
+                        "type", "tool_use",
+                        "id", block.getId(),
+                        "name", block.getName(),
+                        "input", block.getInput()));
+                batch.toolBlocks.add(block);
+            }
+        }
+        return batch;
+    }
+
+    /**
+     * Execute a batch of tool_use blocks, parallel where safe.
+     *
+     * <p>Policy:
+     * <ul>
+     *   <li>If parallel disabled or batch ≤ 1 → fully serial path (legacy semantics).</li>
+     *   <li>If batch size > {@code parallel.maxFanout} → reject the whole batch
+     *       and surface an error message back to the LLM for every block. This
+     *       feeds back into the next loop iteration so the LLM can retry with
+     *       fewer concurrent tool calls. Refusing to silently degrade keeps
+     *       executor / DB pool from being overwhelmed by runaway agents.</li>
+     *   <li>Otherwise: split into approval-required vs parallel-eligible. Approval
+     *       blocks run serially first (an approval pending throws and short-circuits
+     *       the run; we cannot let other tools run while a human is being asked
+     *       to consent to a different one). Remaining blocks dispatch to
+     *       {@code asyncTaskExecutor} and join via {@link CompletableFuture#allOf}.</li>
+     * </ul>
+     *
+     * <p>Results are returned in the SAME order as {@code toolBlocks} — LLM
+     * message ordering is contract-sensitive (Anthropic / OpenAI both expect
+     * tool_result blocks to align with tool_use ids). CompletableFuture finish
+     * order is irrelevant; we collect by index.
+     *
+     * <p>{@code MetaContext} (tenant/user) is auto-propagated by
+     * {@link com.auraboot.framework.event.config.TenantAwareTaskDecorator}. The
+     * StepContext parallel coordinates are set inside each lambda explicitly.
+     */
+    List<ToolResult> processToolUseBlocksParallel(List<LlmChatResponse.ContentBlock> toolBlocks,
+                                                   List<AgentToolDefinition> tools,
+                                                   Long tenantId, String runPid, String taskPid, String agentCode,
+                                                   TraceContext traceCtx) {
+        ToolResult[] results = new ToolResult[toolBlocks.size()];
+
+        if (toolBlocks.isEmpty()) {
+            return List.of();
+        }
+
+        // AgentProperties.parallel is eagerly initialised in the @Data POJO
+        // (see AgentProperties.java field initializer = new Parallel()) so the
+        // reference is never null in production. No defensive null guard.
+        AgentProperties.Parallel cfg = agentProperties.getParallel();
+        boolean parallelEnabled = cfg.isEnabled();
+        int maxFanout = cfg.getMaxFanout();
+        long totalTimeoutMs = cfg.getTotalTimeoutMs();
+
+        // Fanout guard: reject and report back to LLM. The LLM should reduce
+        // the batch on retry. We deliberately do NOT degrade to serial because
+        // a runaway 50-tool batch served serially is a worse failure mode.
+        //
+        // M3 fix: emit a structured JSON ToolResult for every tool_use_id so
+        // the LLM (and any frontend rendering tool errors) can recognise this
+        // as a single batch-level rejection rather than N independent failures.
+        if (toolBlocks.size() > maxFanout) {
+            String errJson = buildFanoutExceededJson(toolBlocks.size(), maxFanout);
+            log.warn("Parallel fanout rejected: run={}, fanout={}, max={}", runPid, toolBlocks.size(), maxFanout);
+            for (int i = 0; i < toolBlocks.size(); i++) {
+                LlmChatResponse.ContentBlock b = toolBlocks.get(i);
+                results[i] = new ToolResult(b.getId(), b.getName(), errJson);
+            }
+            return Arrays.asList(results);
+        }
+
+        // Single block, or parallel disabled → straight serial path. No group id.
+        if (!parallelEnabled || toolBlocks.size() == 1) {
+            for (int i = 0; i < toolBlocks.size(); i++) {
+                LlmChatResponse.ContentBlock b = toolBlocks.get(i);
+                String r = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
+                        b.getName(), b.getInput(), tools, traceCtx);
+                results[i] = new ToolResult(b.getId(), b.getName(), r);
+            }
+            return Arrays.asList(results);
+        }
+
+        // Split: approval-required (serial-first) vs eligible-for-parallel.
+        // We preserve original index so result placement stays deterministic.
+        List<Integer> approvalIdx = new ArrayList<>();
+        List<Integer> parallelIdx = new ArrayList<>();
+        for (int i = 0; i < toolBlocks.size(); i++) {
+            LlmChatResponse.ContentBlock b = toolBlocks.get(i);
+            AgentToolDefinition def = findToolDef(tools, b.getName());
+            if (def != null && def.isRequiresApproval()) {
+                approvalIdx.add(i);
+            } else {
+                parallelIdx.add(i);
+            }
+        }
+
+        // 1) Run approval-required tools serially FIRST. If any throws an
+        //    AgentApprovalPendingException the run halts here — we must not
+        //    let other tools fire while the human is still deciding.
+        for (int i : approvalIdx) {
+            LlmChatResponse.ContentBlock b = toolBlocks.get(i);
+            String r = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
+                    b.getName(), b.getInput(), tools, traceCtx);
+            results[i] = new ToolResult(b.getId(), b.getName(), r);
+        }
+
+        // 2) Dispatch the rest concurrently. ULID groupId stamps every Action
+        //    so audits can reconstruct "these N tool calls came from the same
+        //    LLM batch".
+        if (parallelIdx.size() == 1) {
+            int i = parallelIdx.get(0);
+            LlmChatResponse.ContentBlock b = toolBlocks.get(i);
+            String r = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
+                    b.getName(), b.getInput(), tools, traceCtx);
+            results[i] = new ToolResult(b.getId(), b.getName(), r);
+        } else if (!parallelIdx.isEmpty()) {
+            String groupId = UniqueIdGenerator.generate();
+            log.debug("Parallel tool batch: run={}, group={}, fanout={}", runPid, groupId, parallelIdx.size());
+
+            List<CompletableFuture<Void>> futures = new ArrayList<>(parallelIdx.size());
+            for (int pos = 0; pos < parallelIdx.size(); pos++) {
+                final int slot = parallelIdx.get(pos);
+                final int parallelIndex = pos;
+                LlmChatResponse.ContentBlock b = toolBlocks.get(slot);
+                CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
+                    // StepContext is intentionally NOT auto-propagated by
+                    // TenantAwareTaskDecorator (it is single-purpose).
+                    // Set parallel coords here so ActionRecorder stamps them.
+                    StepContext.setParallel(groupId, parallelIndex);
+                    try {
+                        String r = toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
+                                b.getName(), b.getInput(), tools, traceCtx);
+                        results[slot] = new ToolResult(b.getId(), b.getName(), r);
+                    } catch (Throwable t) {
+                        // ToolLoopService.executeToolCall is supposed to swallow
+                        // and return a String "Error: ..." but we defend in depth
+                        // so one tool's blowup never breaks the batch.
+                        log.warn("Parallel tool {} failed: {}", b.getName(), t.getMessage());
+                        results[slot] = new ToolResult(b.getId(), b.getName(),
+                                "Error: " + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()));
+                    } finally {
+                        StepContext.clearParallel();
+                    }
+                }, asyncTaskExecutor);
+                futures.add(f);
+            }
+
+            try {
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                        .get(totalTimeoutMs, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException te) {
+                log.warn("Parallel tool batch timed out after {}ms: run={}, group={}", totalTimeoutMs, runPid, groupId);
+                // M5 fix: cancel still-running futures so worker threads do not
+                // continue chewing connections / per-tool 60s timeouts after we
+                // have already given up on the batch. cancel(true) interrupts
+                // the worker; ToolLoopService boundary returns "Error: ..." on
+                // catch, so we still leave the audit trail consistent.
+                for (CompletableFuture<Void> f : futures) {
+                    if (!f.isDone()) {
+                        f.cancel(true);
+                    }
+                }
+                for (int i : parallelIdx) {
+                    if (results[i] == null) {
+                        LlmChatResponse.ContentBlock b = toolBlocks.get(i);
+                        results[i] = new ToolResult(b.getId(), b.getName(),
+                                "Error: tool batch timed out after " + totalTimeoutMs + "ms");
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Parallel tool batch failed: run={}, group={}, err={}", runPid, groupId, e.getMessage());
+                for (int i : parallelIdx) {
+                    if (results[i] == null) {
+                        LlmChatResponse.ContentBlock b = toolBlocks.get(i);
+                        results[i] = new ToolResult(b.getId(), b.getName(),
+                                "Error: parallel batch failure — " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        return Arrays.asList(results);
+    }
+
+    private AgentToolDefinition findToolDef(List<AgentToolDefinition> tools, String name) {
+        if (tools == null) return null;
+        for (AgentToolDefinition t : tools) {
+            if (t.getName() != null && t.getName().equals(name)) return t;
+        }
+        return null;
+    }
+
+    /**
+     * Build the structured JSON payload returned to the LLM for every tool_use_id
+     * when the batch is rejected for exceeding {@code parallel.maxFanout}. Single
+     * batch-level error code so the LLM (and frontend renderers) can recognise
+     * this as a coordinated rejection rather than N independent tool failures.
+     *
+     * <p>Hand-rolled JSON keeps this method allocation-cheap and never throws
+     * (ObjectMapper would require a try/catch we'd then have to swallow).
+     */
+    private String buildFanoutExceededJson(int fanout, int max) {
+        return "{\"error\":\"batch_fanout_exceeded\","
+                + "\"fanout\":" + fanout + ","
+                + "\"max\":" + max + ","
+                + "\"action\":\"retry_with_fewer_tools\","
+                + "\"message\":\"Requested " + fanout + " tools in single turn, max is " + max
+                + ". Reduce parallel tool count and retry.\"}";
     }
 }
