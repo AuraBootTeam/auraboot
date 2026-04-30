@@ -443,14 +443,14 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      */
     @Insert("""
         INSERT INTO ab_page_schema (
-            pid, tenant_id, namespace, env, is_current, status,
+            pid, tenant_id, namespace, is_current, status,
             extension, page_key, model_code,
             name, title, description, kind, profile,
             layout, blocks, schema_version,
             is_template, template_category, published_at,
             version, sort_weight, plugin_pid, created_at, updated_at
         ) VALUES (
-            #{pid}, #{tenantId}, 'default', 'prod', true, #{status},
+            #{pid}, #{tenantId}, 'default', true, #{status},
             #{extension}::jsonb, #{pageKey}, #{modelCode},
             #{name}, #{title}::jsonb, #{description}, #{kind}, #{profile},
             #{layout}::jsonb, #{blocks}::jsonb, #{schemaVersion},
@@ -458,6 +458,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
             '1', #{sortWeight}, #{pluginPid}, NOW(), NOW()
         )
         """)
+    // env-layering PoC: 'env' VARCHAR removed; env_id auto-filled by MetaObjectHandler (batch 2).
     int insertForPluginImport(@Param("pid") String pid,
                               @Param("tenantId") Long tenantId,
                               @Param("status") String status,

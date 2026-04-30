@@ -22,4 +22,11 @@ public class EnvironmentResponse {
     private Integer sortOrder;
     private Date createdAt;
     private Date updatedAt;
+
+    // env-layering extension (PoC)
+    private String parentPid;
+    private Boolean isLocked;
+    private Long lockedBy;
+    private Date lockedAt;
+    private String lockedReason;
 }
