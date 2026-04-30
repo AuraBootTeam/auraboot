@@ -111,6 +111,7 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
                 null, null,
                 InboundMode.NEW_FROM_REQUEST,
                 null,
+                null,                                 // inboundMessageId — D.1
                 legacy);
     }
 

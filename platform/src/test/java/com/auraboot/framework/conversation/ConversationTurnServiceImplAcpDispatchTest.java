@@ -135,6 +135,7 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
                 null,
                 InboundMode.NEW_FROM_REQUEST,
                 bucket,
+                null,                                 // inboundMessageId — D.1
                 legacy);
     }
 
