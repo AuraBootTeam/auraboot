@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -80,5 +81,43 @@ public class AnthropicRequest {
         /** Always {@code "enabled"} when present. Omit the whole field to disable. */
         private String type;
         private int budget_tokens;
+    }
+
+    /**
+     * Wire-format multimodal content block (P1 — Vision input).
+     * Anthropic Messages API accepts a list of these as {@code Message.content}
+     * with {@code type=image|text}. The image source is either inline base64
+     * ({@code type=base64, media_type, data}) or a URL ({@code type=url, url}).
+     *
+     * <p>This sits next to {@link ContentBlock} (which carries tool_use /
+     * tool_result for assistant turns) — image input only flows on user turns.
+     */
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ImageContentBlock {
+        /** "image" or "text" — same wire shape, different fields. */
+        private String type;
+        /** Populated when type=text. */
+        private String text;
+        /** Populated when type=image. */
+        private ImageSource source;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ImageSource {
+        /** "base64" or "url". */
+        private String type;
+        /**
+         * MIME type of the image when {@code type=base64}. Anthropic accepts
+         * image/jpeg, image/png, image/gif, image/webp. Serialized as
+         * {@code media_type} per the API contract.
+         */
+        @JsonProperty("media_type")
+        private String mediaType;
+        /** Raw base64-encoded bytes when {@code type=base64} (no {@code data:} prefix). */
+        private String data;
+        /** Remote URL when {@code type=url}. */
+        private String url;
     }
 }

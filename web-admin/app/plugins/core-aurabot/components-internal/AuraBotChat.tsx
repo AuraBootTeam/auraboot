@@ -11,6 +11,7 @@ import React, { useState, useCallback, useRef, useEffect, type KeyboardEvent } f
 import {
   useAuraBot,
   type SimpleMessage,
+  type ChatImageAttachment,
 } from '../components-shell/AuraBotProvider';
 import { useI18n } from '~/contexts/I18nContext';
 import { ToolResultCard } from './ToolResultCard';
@@ -35,6 +36,20 @@ function SendIcon({ className }: { className?: string }) {
     >
       <line x1="22" y1="2" x2="11" y2="13" />
       <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  );
+}
+
+function PaperclipIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
     </svg>
   );
 }
@@ -497,11 +512,53 @@ function SelectedKbChips() {
 // Main Component
 // ============================================================================
 
+// ============================================================================
+// Image Attachment helpers (P1 — Vision)
+// ============================================================================
+
+/**
+ * MIME types accepted by the AuraBotChat paperclip — Anthropic supports
+ * these four formats on Messages API image blocks.
+ */
+const ACCEPTED_IMAGE_MIME_TYPES = 'image/jpeg,image/png,image/gif,image/webp';
+
+/** Hard cap (bytes) on a single image attachment. Anthropic rejects > 5MB
+ *  per image; we apply a slightly tighter limit so base64-bloated payloads
+ *  still fit within the request body cap. */
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4 MiB
+
+/**
+ * Strip the {@code data:image/png;base64,} prefix that {@link FileReader}
+ * adds, leaving raw base64 bytes ready to ship to Anthropic.
+ */
+function stripDataUriPrefix(dataUri: string): string {
+  const idx = dataUri.indexOf(',');
+  return idx >= 0 ? dataUri.slice(idx + 1) : dataUri;
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      resolve(stripDataUriPrefix(result));
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function AuraBotChat() {
   const { state, sendMessage, setInputValue, confirmTool, cancelTool } = useAuraBot();
   const { t } = useI18n();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // P1 — vision: pending image attachments staged for the next send. Cleared
+  // on send (success path) or via the per-chip remove button.
+  const [attachments, setAttachments] = useState<ChatImageAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const { messages, inputValue, isLoading } = state;
 
@@ -523,6 +580,63 @@ export function AuraBotChat() {
     [setInputValue],
   );
 
+  // P1 — vision: pop the OS file picker and stage selected images locally.
+  const handleAttachClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFilesSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? []);
+      // Reset the input so picking the same file twice in a row still fires.
+      if (e.target) e.target.value = '';
+      if (files.length === 0) return;
+
+      setAttachmentError(null);
+      const next: ChatImageAttachment[] = [];
+      for (const f of files) {
+        if (f.size > MAX_IMAGE_BYTES) {
+          setAttachmentError(`图片 ${f.name} 超过 4MB 限制`);
+          continue;
+        }
+        if (!ACCEPTED_IMAGE_MIME_TYPES.split(',').includes(f.type)) {
+          setAttachmentError(`图片 ${f.name} 格式不支持，仅支持 JPEG/PNG/GIF/WEBP`);
+          continue;
+        }
+        try {
+          const data = await readFileAsBase64(f);
+          next.push({ mediaType: f.type, data, name: f.name });
+        } catch (err) {
+          setAttachmentError(`读取图片 ${f.name} 失败`);
+        }
+      }
+      if (next.length > 0) {
+        setAttachments((prev) => [...prev, ...next]);
+      }
+    },
+    [],
+  );
+
+  const handleRemoveAttachment = useCallback((idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  /**
+   * Dispatch the message + (optional) attachments. Centralises the send
+   * codepath so Cmd+Enter / Enter / send-button all clear the staged image
+   * preview after a successful send.
+   */
+  const dispatchSend = useCallback(
+    (text: string) => {
+      const hasAttachments = attachments.length > 0;
+      if (!hasAttachments && !text.trim()) return;
+      sendMessage(text, hasAttachments ? attachments : undefined);
+      // Clear staged attachments — successful send takes ownership.
+      if (hasAttachments) setAttachments([]);
+    },
+    [sendMessage, attachments],
+  );
+
   // Handle key press
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -534,22 +648,22 @@ export function AuraBotChat() {
       // Cmd/Ctrl + Enter to send
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        sendMessage(e.currentTarget.value);
+        dispatchSend(e.currentTarget.value);
       }
 
-      // Enter without shift to send (if not empty)
-      if (e.key === 'Enter' && !e.shiftKey && e.currentTarget.value.trim()) {
+      // Enter without shift to send (if not empty OR attachments staged)
+      if (e.key === 'Enter' && !e.shiftKey && (e.currentTarget.value.trim() || attachments.length > 0)) {
         e.preventDefault();
-        sendMessage(e.currentTarget.value);
+        dispatchSend(e.currentTarget.value);
       }
     },
-    [sendMessage],
+    [dispatchSend, attachments.length],
   );
 
   // Handle send button click
   const handleSend = useCallback(() => {
-    sendMessage(inputValue);
-  }, [sendMessage, inputValue]);
+    dispatchSend(inputValue);
+  }, [dispatchSend, inputValue]);
 
   const hasMessages = messages.length > 0;
 
@@ -590,10 +704,75 @@ export function AuraBotChat() {
         {/* Selected KB chips */}
         <SelectedKbChips />
 
+        {/* P1: staged image attachments preview */}
+        {attachments.length > 0 && (
+          <div
+            className="flex flex-wrap gap-2 px-4 pt-2 pb-1"
+            data-testid="aurabot-attachments-preview"
+          >
+            {attachments.map((att, idx) => (
+              <div
+                key={idx}
+                className="group relative inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+                data-testid={`aurabot-attachment-${idx}`}
+              >
+                <img
+                  src={`data:${att.mediaType};base64,${att.data}`}
+                  alt={att.name || `attachment-${idx}`}
+                  className="h-8 w-8 rounded object-cover"
+                />
+                <span className="max-w-[120px] truncate">{att.name || `image-${idx + 1}`}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveAttachment(idx)}
+                  className="ml-1 rounded-full p-0.5 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800"
+                  title="Remove"
+                  data-testid={`aurabot-attachment-remove-${idx}`}
+                >
+                  <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Attachment validation error */}
+        {attachmentError && (
+          <div
+            className="px-4 pt-1 text-[11px] text-red-600 dark:text-red-400"
+            data-testid="aurabot-attachment-error"
+          >
+            {attachmentError}
+          </div>
+        )}
+
         <div className="px-4 py-3">
           <div className="flex items-end gap-2">
             {/* KB selector */}
             <KnowledgeBaseSelector />
+
+            {/* P1: image attachment trigger */}
+            <button
+              type="button"
+              onClick={handleAttachClick}
+              disabled={isLoading}
+              className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-gray-700"
+              title="Attach image"
+              data-testid="aurabot-attach-image"
+            >
+              <PaperclipIcon className="h-4.5 w-4.5" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_IMAGE_MIME_TYPES}
+              multiple
+              onChange={handleFilesSelected}
+              className="hidden"
+              data-testid="aurabot-file-input"
+            />
 
             {/* Input */}
             <div className="relative flex-1">
@@ -613,13 +792,13 @@ export function AuraBotChat() {
               />
             </div>
 
-            {/* Send button */}
+            {/* Send button — enabled when text OR attachments are present */}
             <button
               onClick={handleSend}
               data-testid="aurabot-send"
-              disabled={!inputValue.trim() || isLoading}
+              disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
               className={`flex-shrink-0 rounded-xl p-2.5 transition-colors ${
-                inputValue.trim() && !isLoading
+                (inputValue.trim() || attachments.length > 0) && !isLoading
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'cursor-not-allowed bg-gray-200 text-gray-400'
               } `}
