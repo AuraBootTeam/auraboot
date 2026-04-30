@@ -1,6 +1,6 @@
 # D.3-chokepoint Follow-up — HandoffToolProvider × AgentChatPort SPI Integration
 
-> **Status**: v4 (2026-04-30) — DC.1 + DC.2 landed; v3 §9 surfaced the AgentReplyContext absorption sub-design problem; v4 §10 expands each option with full code-shape comparison + 6-month-regret check + steel-man + recommendation. **Pending owner review.**
+> **Status**: v5 (2026-04-30) — owner reviewed v4 §10 from long-term-evolution lens; locked **A'**: caller-owned context via **server-only `AgentTurnOverrides`**, NOT public `ChatRequest` fields. v5 §10.7 captures the 5 must-fix issues that v4 missed (security boundary on ChatRequest, named-agent outbound identity drift, task lifecycle protocol, handoff schema field-name bug, DC.4 underestimation). v5 §10.8 refines the PR sequence accordingly.
 > **Predecessor**: [`2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md`](./2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md) v3 §8 row D.3 deferral note.
 
 ## 0. 摘要
@@ -577,8 +577,149 @@ if (request.getCustomSystemPrompt() != null) {
 
 ---
 
+## 10.7 v5 — A' 锁定（owner review of v4）+ 5 项 must-fix
+
+owner 接受 v4 长期方向（A vs B vs C 反模式判断），但拒绝 v4 落地形状（"ChatRequest 加 optional 字段"）。锁定为 **A'**：caller-owned context 但通过 **server-only 内部对象** 传入，不暴露给客户端。
+
+### A vs A' 关键区别
+
+| | v4 选项 A | v5 选项 A' |
+|---|---|---|
+| context 注入面 | `ChatRequest` 加 `customSystemPrompt` / `historyOverride` / `pinnedToolDefs` 字段 | 新增 server-only `AgentTurnOverrides` 对象，仅 server 内部 caller 构造 |
+| 接受路径 | `/chat/stream` 的 `@RequestBody ChatRequest` 反序列化 | 不反序列化；HTTP 控制器永远传 `null` overrides |
+| 客户端能否注入 | **能**（即便不文档化，攻击者发现字段就能注入 system prompt / 工具定义） | **不能**（DTO 边界外） |
+| AgentChatPort SPI 扩展 | `runAgentTurn(ctx, request, sink, extraTools)` 留 4 个参数 | `runAgentTurn(ctx, request, sink, extraTools, overrides)` 加第 5 个参数（或 builder/options 包对象） |
+
+A' 在长期演进上与 A 完全等价（chokepoint claim 真实 / SRP / 跨模块依赖方向不变 / metric 自我监督），但**安全边界对**。v4 的 §10.5 倾向 A 的论证全部对 A' 同样成立。
+
+### 5 项 must-fix（v4 漏掉的）
+
+#### Fix 1 — `ChatRequest` 是公开 DTO，安全边界禁止扩展
+
+**问题**：[ChatRequest.java:14](../../platform/src/main/java/com/auraboot/framework/aurabot/dto/ChatRequest.java) 直接被 `/api/ai/aurabot/chat/stream` 用 `@RequestBody` 接收。v4 提议加 `customSystemPrompt` / `pinnedToolDefs` → 客户端可注入系统提示词 + 工具定义 → prompt injection / tool定义伪造 / 越权访问数据。这不是字段膨胀问题，是**安全边界**问题。
+
+**v5 修正**：
+- 不动 `ChatRequest`
+- 新增 server-only 对象（候选名 `AgentTurnOverrides` 或 `PreparedAgentTurnContext`）：
+  ```java
+  public final class AgentTurnOverrides {
+      private final String systemPromptOverride;
+      private final List<LlmChatRequest.Message> messagesOverride;
+      private final List<ToolDefinition> toolDefsOverride;
+      private final List<ToolDefinition> extraTools;          // 替代 DC.1 的额外参数（一并合入此处）
+      private final Boolean persistSessionTape;               // 可选：群聊不需要持久 tape，aurabot 需要
+      // builder + 不可变 + 包内/明确 visibility
+  }
+  ```
+- `AgentChatPort.runAgentTurn` 签名（最终版）：
+  ```java
+  TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink,
+                           AgentTurnOverrides overrides);  // overrides=null 时全走默认路径
+  ```
+  （DC.1 的 `extraTools` 参数被 overrides 吸收，统一一处）
+- HTTP 控制器路径：`AuraBotController` 调 `agentChatPort.runAgentTurn(ctx, req, sink, null)` —— overrides 永远 null。**关键测试**：写一个 controller 集成测试，让客户端在 ChatRequest 里塞 systemPrompt 字段（如果 attacker 知道有这个 server-only 字段名），验证 server 不识别、不路由进 overrides。
+
+#### Fix 2 — `persistOutbound` 写 outbound 行时硬编码 aurabot agent
+
+**问题**：[AuraBotTurnPersistence.java:153](../../platform/src/main/java/com/auraboot/framework/conversation/AuraBotTurnPersistence.java) 用 `agentResolver.resolve(tenantId, AuraBotAgentResolver.DEFAULT_AGENT_CODE)` 解析 agentId。群聊 named-agent (Alpha/Beta) 切进 `runTurn` 后，所有 outbound `ab_im_message` row 会落成 `sender_id=aurabot_agent_id`，而不是 Alpha/Beta 的 id。Phase D Q-D.3=α 历史行 backfill 用 `'system'+0 → aurabot_agent_id` 假设 aurabot 是唯一 agent —— 群聊路径切入后这个假设破裂。
+
+**v5 修正**：
+- `TurnContext` 加 `agentCode` 字段（`String`，非 `Long agentId` 因为 AuraBotAgentResolver 已经做 lazy-seed by code）
+- `ConversationTurnServiceImpl.beginTurn` 把 `request.agentCode()` 落到 `TurnContext.agentCode`（aurabot 路径填 `"aurabot"`，named-agent 路径填具体 code）
+- `AuraBotTurnPersistence.writeAgentRow` 改为：
+  ```java
+  String resolveAgentCode = ctx.agentCode() != null ? ctx.agentCode() : AuraBotAgentResolver.DEFAULT_AGENT_CODE;
+  long agentId = agentResolver.resolve(ctx.tenantId(), resolveAgentCode);
+  ```
+- 5 个 `new TurnContext(...)` 构造点全部加新字段（与 D.1 加 `inboundMessageId` 同模式）
+- 集成测试：群聊场景跑通 → 验证 `ab_im_message.sender_id == agent_alpha.id`
+
+**为什么是 ctx.agentCode 不是 overrides.agentCode**：agentCode 是 turn lifecycle 全程必备身份字段（persistInbound / persistOutbound / metrics / event 都可能要看），属于 TurnContext。overrides 是"可选的 context 替换"语义。
+
+#### Fix 3 — `ab_agent_task` 单 task 模型缺协议闭环
+
+**问题**：[ConversationTurnServiceImpl.java:417 dispatchToNamedAgent](../../platform/src/main/java/com/auraboot/framework/conversation/ConversationTurnServiceImpl.java) 当前路径 **不创建 task**；[ConversationTurnServiceImpl.java:504 dispatchToAcpRun](../../platform/src/main/java/com/auraboot/framework/conversation/ConversationTurnServiceImpl.java) 才创建。Phase D 设计写"chokepoint 单 task 模型 + parentTaskPid 传参"，但 named-agent 路径根本没建过 task，所以"AgentReplyTask 不再开 task，让 chokepoint 接管"会**丢 task 链**。
+
+**v5 必须明确的协议**：
+
+| 谁创建 task | 谁关闭 task | handoff 时 child 的 parentTaskPid 来源 |
+|---|---|---|
+| `ConversationTurnServiceImpl.dispatchToNamedAgent` 入口（在调 AgentChatPort 前） | `finalizeTurn` 在 outcome 终态时按 outcome 类型关闭 | runTurn 通过 `TurnOutcome.Success.meta.taskPid` 暴露给 caller，caller (AgentReplyTask) handoff 时把它作为下一次 runTurn 的 `parentTaskPid` 传 |
+
+具体落地：
+- `TurnRequest` 加 `parentTaskPid` (caller→runTurn 输入)
+- `TurnContext` 加 `taskPid` (runTurn 内部产出，传给 AgentChatPort)
+- `dispatchToNamedAgent`：
+  ```java
+  String taskPid = (request.parentTaskPid() != null)
+          ? createChildTaskRow(ctx, request, request.parentTaskPid())
+          : createRootTaskRow(ctx, request);
+  TurnContext ctxWithTask = ctx.withTaskPid(taskPid);
+  TurnOutcome outcome = agentChatPort.runAgentTurn(ctxWithTask, ...);
+  ```
+- `finalizeTurn`：根据 outcome 类型关闭 task
+  - Success / Interrupted → status='completed'
+  - Failed → status='failed' + error_message
+  - PendingConfirmation → status='in_progress' (留给 resume 后续关)
+  - Success with `_handoff_to` → status='completed' + reason='handoff_to:targetCode'
+- `runTurn` 在 outcome.meta 里加 `_taskPid`：caller 调 runTurn 后从 outcome 拿到自己 turn 的 taskPid 做 handoff
+- AgentReplyTask 不再开/关 task —— D.3 commit 在 AgentReplyTask 内的 task 写入路径全部删
+
+**Phase D D.3 task 写入要 revert**：D.3 (`afbc283e`) 让 AgentReplyTask 写 task，DC.3 改成 chokepoint 写。AgentReplyTask 的 D.3 task 写代码在 DC.3c 删。
+
+#### Fix 4 — handoff schema 字段名不一致（DC.2 实际有 bug）
+
+**问题**：[HandoffToolProvider.java:57](../../platform/src/main/java/com/auraboot/framework/agentchat/handoff/HandoffToolProvider.java) tool input schema 用 `agent_code`；[AgentChatPortImpl.java:676 (DC.2)](../../platform/src/main/java/com/auraboot/framework/agent/service/AgentChatPortImpl.java) 读 `input.get("targetAgentCode")`。**真实 handoff tool 命中时 `_handoff_to` 始终为空** —— DC.2 的测试用 `targetAgentCode` 自欺欺人。
+
+**v5 修正**（在 DC.3d 一并修）：
+- `AgentChatPortImpl.buildHandoffOutcome` 改为优先读 `agent_code`，向后兼容读 `targetAgentCode`：
+  ```java
+  Object target = input.get("agent_code");
+  if (target == null) target = input.get("targetAgentCode");  // 兼容老测试 / 未来其他 handoff tool 实现
+  ```
+- DC.2 已有的 4 测试中 3 个改成断言真实 schema (`agent_code`)；保留 1 个用 `targetAgentCode` 验证向后兼容
+- 新增"用真实 `HandoffToolProvider.getToolDefinition` 产出的 schema 喂给 AgentChatPortImpl"端到端测试，避免再次出现 DC.2 类型的 schema 漂移
+
+#### Fix 5 — DC.4 enterprise 前端工作量被严重低估
+
+**问题**：原 v2/v3 设想 enterprise 前端"复用现有 ImWebSocket 连接订阅 TYPING_INDICATOR / MESSAGE 帧"。实际 [imSseClient.ts:17](../../../auraboot-enterprise/web-admin-ext/plugins/ent-im-chat/overlay/app/chat/services/imSseClient.ts) 只有 SSE client，**没有现成 IM WebSocket client** 可订阅。并且 [GroupChatPage.tsx:197](../../../auraboot-enterprise/web-admin-ext/plugins/ent-im-chat/overlay/app/chat/components/group/GroupChatPage.tsx) consumer 期望 SSE event 形如 `data.message`，而 OSS 的 WS frame payload 是直接 row data —— payload 形状不同。
+
+**v5 修正**（DC.4 范围扩大）：
+- 新增 enterprise `imWsClient.ts`（参考 OSS 的 `web-admin/app/.../imWebSocketClient.ts` 实现路径）
+- 新增 payload adapter：把 WS frame 的 `MESSAGE / TYPING_INDICATOR` 帧适配成 ent-im-chat 现有 consumer 期望的 `data.message` 等字段格式（或者直接改 consumer，二选一在 DC.4 时决定）
+- WS frame type 规范化（OSS WsFrame.type 当前用大小写不一的字符串）作为 DC.4 必修项
+- DC.4 的工作量从 ~80 LOC enterprise 改写 上调到 ~200-300 LOC（新 client + adapter + consumer 适配）
+- DC.4 同 session 浏览器验证 enterprise ent-im-chat 群聊页面群聊 → AI agent 回复 → typing 动画 → 消息渲染完整链路
+
+### v5 锁定的 PR 切片（5 PRs，按 owner 调整）
+
+| PR | 内容 | 依赖 |
+|----|------|------|
+| **DC.3a** 新增 server-only `AgentTurnOverrides` + AgentChatPort SPI 改用此参数（吸收原 DC.1 的 extraTools 参数）；AgentChatPortImpl 内部 step 1-5 检测并使用 overrides；REST controller 路径恒传 null overrides；写"REST 不能注入 overrides"的安全测试 | DC.1 + DC.2 |
+| **DC.3b** 抽 `GroupChatTurnContextAssembler`（公共工具类）封装 `AgentReplyContext` 的 buildSystemPrompt + buildHistory；目标多群聊 caller 共享；不引入新依赖方向 | — |
+| **DC.3c** named-agent 路径补全：`TurnContext` 加 `agentCode` + `taskPid`；`AuraBotTurnPersistence` 用 ctx.agentCode 解析 agentId；`ConversationTurnServiceImpl.dispatchToNamedAgent` 创建/关闭 task（含 parentTaskPid 链）；AgentReplyTask 重写为 dispatch 调 runTurn；revert D.3 在 AgentReplyTask 内的 task 写入 | DC.3a + DC.3b |
+| **DC.3d** 修 handoff schema 字段名（DC.2 bug fix）+ 真实 HandoffToolProvider 产出的 schema 端到端测试 + metric `agentchatport.caller_overrides_used{field=...}` + sunset 标准文档化 | DC.3a |
+| **DC.4** 跨仓 transport 删除（unchanged scope）+ enterprise 新 `imWsClient.ts` + payload adapter + frame type 规范化 + ent-im-chat consumer 适配 | DC.3c |
+
+预估总时长：DC.3a (1天) + DC.3b (0.5天) + DC.3c (2天 — task 协议 + identity drift 双修) + DC.3d (0.5天) + DC.4 (2天 — enterprise WS client) ≈ **6 天**。比 v4 估的 4.5 天上调 1.5 天，主要是 DC.3c 的 task lifecycle 协议 + DC.4 enterprise WS 工作。
+
+### v5 与 v4 的关键差异速览
+
+| 维度 | v4 | v5 |
+|---|---|---|
+| context 注入面 | 公开 `ChatRequest` 字段 | server-only `AgentTurnOverrides` |
+| 安全模型 | 漏 — REST 客户端可注入 system prompt | 修 — DTO 边界严格 |
+| named-agent outbound identity | 未涉及 | DC.3c Fix 2 |
+| task lifecycle 协议 | "加 parentTaskPid" 含糊 | DC.3c 明确 谁创建/谁关闭/handoff parent_id 来源 |
+| DC.2 handoff schema bug | 未发现 | DC.3d 修 |
+| DC.4 enterprise 工作量 | ~80 LOC | ~200-300 LOC + WS client + payload adapter |
+| PR 数 | 4 (DC.3a/b/c + DC.4) | 5 (DC.3a/b/c/d + DC.4) |
+
+---
+
 ## CHANGELOG
 
+- 2026-04-30 v5 owner reviewed v4 长期方向接受；落地形状 lock 为 **A'**（server-only `AgentTurnOverrides` 替代公开 ChatRequest 字段，安全边界修正）；§10.7 列 5 项 must-fix（含 DC.2 真实 bug：handoff schema 字段名 agent_code vs targetAgentCode）；§10.8 PR 切片调整为 DC.3a-d + DC.4 共 5 PR。
 - 2026-04-30 v4 §10 三个 sub-design 选项详细对比 + 6/12 个月演进预测 + steel-man + v4 倾向 (选项 A) + DC.3a-d 落地切片. **Pending owner review.**
 - 2026-04-30 v3 DC.1 + DC.2 landed (`131f8890` + `d7f9175b`); DC.3 + DC.4 deferred pending §9 sub-design — AgentReplyContext 群聊语境 absorption (3 选项) 需要单独设计 lock
 - 2026-04-30 v2 owner 决策锁定 5 项；§7.1 新增"前因后果"节解释 Q-DC.4 从 α (dual-publish) 修正到 β (one-shot)；§8 锁定 4 PR 实施时序（v1 是 3 PR，DC.4 跨仓 transport 删除新加为独立 step）
