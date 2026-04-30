@@ -13,6 +13,8 @@ import net.sf.jsqlparser.expression.LongValue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Set;
+
 @Configuration
 public class MybatisPlusConfig {
 
@@ -122,6 +124,40 @@ public class MybatisPlusConfig {
 
         interceptor.addInnerInterceptor(tenantInterceptor);
 
+        // env-layering PoC: second tenant-line interceptor reused with column=env_id, applied
+        // ONLY to whitelisted @EnvScoped tables (whitelist via blacklist inversion). The
+        // TenantLineHandler abstraction has no native whitelist — we invert ignoreTable.
+        TenantLineInnerInterceptor envInterceptor = new TenantLineInnerInterceptor();
+        envInterceptor.setTenantLineHandler(new TenantLineHandler() {
+            @Override
+            public Expression getTenantId() {
+                Long envId = MetaContext.getCurrentEnvironmentId();
+                // ignoreTable below short-circuits when envId == null, so this is only reached
+                // with a real env id.
+                return new LongValue(envId);
+            }
+
+            @Override
+            public String getTenantIdColumn() {
+                return "env_id";
+            }
+
+            @Override
+            public boolean ignoreTable(String tableName) {
+                if (MetaContext.isEnvFilterBypassed()) {
+                    return true;  // promotion cross-env reads bypass intentionally
+                }
+                if (MetaContext.getCurrentEnvironmentId() == null) {
+                    return true;  // no env context → don't filter (background tasks, legacy tests)
+                }
+                if (!ENV_SCOPED_TABLES.contains(tableName)) {
+                    return true;  // not a DSL resource → don't apply env filter
+                }
+                return false;
+            }
+        });
+        interceptor.addInnerInterceptor(envInterceptor);
+
         // Configure pagination with the correct database type
         DbType dbType = databaseDialect.getType() == DatabaseType.MYSQL
                 ? DbType.MYSQL
@@ -130,4 +166,18 @@ public class MybatisPlusConfig {
 
         return interceptor;
     }
+
+    /**
+     * Whitelist of tables backing {@code @EnvScoped} entities. Only these tables get the
+     * {@code WHERE env_id = ?} predicate auto-injected. Identity / business data / platform
+     * tables intentionally stay off this list.
+     *
+     * <p>PoC scope: only ab_page_schema and its history. Adding a DSL resource means:
+     * adding the entity table here AND adding @EnvScoped to its entity class AND adding
+     * env_id BIGINT column with index.
+     */
+    private static final Set<String> ENV_SCOPED_TABLES = Set.of(
+            "ab_page_schema",
+            "ab_page_schema_history"
+    );
 }

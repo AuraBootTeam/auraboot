@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.entity;
 import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.auraboot.framework.meta.entity.common.AbstractMultiVersionEntity;
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -83,9 +84,9 @@ public class PageSchema extends AbstractMultiVersionEntity {
 
     /**
      * env-layering PoC: foreign key to ab_environment(id). Auto-filled on insert by
-     * {@code EnvIdMetaObjectHandler} (batch 2) from {@link com.auraboot.framework.application.tenant.MetaContext}.
-     * Nullable in batch 1; tightened to NOT NULL after auto-fill is wired.
+     * {@code EnvIdMetaObjectHandler} from {@link com.auraboot.framework.application.tenant.MetaContext},
+     * with fallback to the tenant's default environment.
      */
-    @TableField("env_id")
+    @TableField(value = "env_id", fill = FieldFill.INSERT)
     private Long envId;
 }
