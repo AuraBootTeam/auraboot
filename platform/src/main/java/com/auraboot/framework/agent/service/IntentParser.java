@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.intent.service.LlmClient;
+import com.auraboot.framework.intent.service.LlmClient.ChatOptions;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,24 @@ public class IntentParser {
             "create", "update", "delete", "transition", "assign",
             "export", "report", "notify", "recommend", "automate"
     );
+
+    /**
+     * P0-2 Extended Thinking gate: queries longer than this many characters
+     * are routed through the LLM with {@code thinking.enabled=true}. Short
+     * queries take the cheap pattern/keyword path or the no-thinking LLM
+     * fallback. The threshold is intentionally a single signal — message
+     * length — to keep the gate predictable; richer "complexity" hints
+     * belong in a higher layer that owns the call site.
+     */
+    private static final int THINKING_QUERY_LENGTH_THRESHOLD = 200;
+
+    /**
+     * Token budget for the Anthropic thinking block on intent classification.
+     * Intent parsing is short-form (one category word out), so the budget is
+     * deliberately small relative to chat-style use; the provider auto-extends
+     * {@code max_tokens} to {@code budget + 4096} when needed.
+     */
+    private static final int THINKING_BUDGET_TOKENS_FOR_INTENT = 8000;
 
     // ========== Phase 1: Sentence patterns (zh + en + ja) ==========
     // ORDER MATTERS: more specific intents before broader ones
@@ -204,7 +223,13 @@ public class IntentParser {
                 // single string today; once it gains a system+user split, swap to that.
                 String safeUserMessage = userMessage.replace("</user_message>", "<\\/user_message>");
                 String prompt = String.format(LLM_INTENT_PROMPT, safeUserMessage);
-                String llmResponse = llmClient.chat(prompt).strip().toLowerCase();
+                // P0-2 follow-up: enable Anthropic Extended Thinking only on
+                // long / complex queries. Short queries get the cheap path so
+                // we don't pay thinking-budget tokens for "show me orders".
+                ChatOptions options = userMessage.length() > THINKING_QUERY_LENGTH_THRESHOLD
+                        ? ChatOptions.thinkingEnabled(THINKING_BUDGET_TOKENS_FOR_INTENT)
+                        : ChatOptions.defaults();
+                String llmResponse = llmClient.chat(prompt, options).strip().toLowerCase();
                 long llmLatencyMs = System.currentTimeMillis() - llmStartMs;
 
                 String extractedIntent = extractIntentFromResponse(llmResponse);
