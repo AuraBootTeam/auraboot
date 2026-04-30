@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Anthropic Claude Messages API provider.
@@ -61,6 +62,37 @@ public class AnthropicLlmProvider implements LlmProvider {
     /** Default family when no key matches — keep in sync with {@link #getDefaultModel()}. */
     private static final AnthropicPricing DEFAULT_PRICING = PRICING_TABLE.get("sonnet");
 
+    // =========================================================================
+    // Extended Thinking (P0-2) capability gate.
+    //
+    // Anthropic only accepts the {@code thinking} request field on Sonnet 4.6+,
+    // Opus 4.x, and Haiku 4.x. Older models (claude-3-*) reject the request
+    // with HTTP 400 if it carries the field, so we filter on a model-substring
+    // allow-list. The check is intentionally conservative: anything not
+    // recognised is treated as "no thinking" (silent drop, not error) so that
+    // future model codes can be added by editing the allow-list without
+    // breaking existing requests.
+    // =========================================================================
+    private static final Set<String> THINKING_CAPABLE_PATTERNS = Set.of(
+            "sonnet-4-6", "sonnet-4-7",
+            "opus-4",
+            "haiku-4");
+
+    /**
+     * Headroom Anthropic requires above {@code thinking.budget_tokens}. The API
+     * rejects requests where {@code max_tokens <= budget_tokens}; we want a
+     * comfortable margin for the model's actual reply on top of the thinking
+     * trace.
+     */
+    private static final int THINKING_HEADROOM_TOKENS = 1024;
+
+    /**
+     * Fallback max_tokens to use when the caller's max_tokens is too small
+     * given the requested budget. Generous enough that a model can produce a
+     * full reply on top of the thinking trace.
+     */
+    private static final int THINKING_FALLBACK_MAX_TOKENS = 4096;
+
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
@@ -98,13 +130,12 @@ public class AnthropicLlmProvider implements LlmProvider {
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception {
         // Build Anthropic-specific request — system + last tool both carry
         // cache_control: ephemeral so the prefix is cached across turns.
-        AnthropicRequest anthropicReq = AnthropicRequest.builder()
-                .model(request.getModel())
-                .max_tokens(request.getMaxTokens())
-                .system(convertSystem(request.getSystemPrompt()))
-                .messages(convertMessages(request.getMessages()))
-                .tools(convertTools(request.getTools()))
-                .build();
+        // P0-2 M9: collect any provider-side warnings (e.g. max_tokens
+        // auto-extension when the Extended Thinking budget exceeds the
+        // caller's value) so we can surface them on the response instead of
+        // dropping them in a log.warn.
+        java.util.List<String> warnings = new java.util.ArrayList<>();
+        AnthropicRequest anthropicReq = buildAnthropicRequest(request, warnings);
 
         String responseBody = webClient.post()
                 .uri(baseUrl + "/v1/messages")
@@ -117,7 +148,11 @@ public class AnthropicLlmProvider implements LlmProvider {
                 .block();
 
         AnthropicResponse anthropicResp = objectMapper.readValue(responseBody, AnthropicResponse.class);
-        return convertResponse(anthropicResp);
+        LlmChatResponse out = convertResponse(anthropicResp);
+        if (!warnings.isEmpty()) {
+            out.setWarnings(warnings);
+        }
+        return out;
     }
 
     @Override
@@ -168,6 +203,88 @@ public class AnthropicLlmProvider implements LlmProvider {
     // =========================================================================
     // Format conversion: Unified ↔ Anthropic
     // =========================================================================
+
+    /**
+     * Translate the unified {@link LlmChatRequest} into the wire-format
+     * {@link AnthropicRequest}. Extracted from {@link #chat} so unit tests can
+     * verify thinking-block plumbing without spinning up a WebClient.
+     *
+     * <p>Extended Thinking gating: the {@code thinking} field is added only when
+     * (a) the unified request supplies a non-null {@link LlmChatRequest.ThinkingConfig}
+     * with {@code enabled=true}, and (b) the model code matches the
+     * {@link #THINKING_CAPABLE_PATTERNS} allow-list. Old models silently drop
+     * the field — we never error here because callers may have the same agent
+     * config target multiple model versions.
+     *
+     * <p>When thinking is enabled and the caller's {@code maxTokens} is too
+     * small for Anthropic's {@code max_tokens > budget_tokens} requirement, we
+     * auto-extend to {@code budget + THINKING_FALLBACK_MAX_TOKENS} and emit a
+     * warning log. The alternative (HTTP 400) would silently break callers
+     * that did not anticipate the headroom rule.
+     */
+    AnthropicRequest buildAnthropicRequest(LlmChatRequest request) {
+        // Backward-compatible overload — discards any warnings. Used by tests
+        // that only need the wire shape; the production path through
+        // {@link #chat} uses the warnings-collecting overload below so the
+        // surface response can carry the auto-extension message back to the
+        // caller (P0-2 M9).
+        return buildAnthropicRequest(request, null);
+    }
+
+    AnthropicRequest buildAnthropicRequest(LlmChatRequest request, java.util.List<String> warningsOut) {
+        int maxTokens = request.getMaxTokens();
+        AnthropicRequest.Thinking thinkingBlock = null;
+
+        LlmChatRequest.ThinkingConfig requested = request.getThinking();
+        if (requested != null && requested.isEnabled() && supportsThinking(request.getModel())) {
+            int budget = requested.getBudgetTokens();
+            if (budget <= 0) {
+                budget = 10_000; // mirror LlmChatRequest.ThinkingConfig default
+            }
+            if (maxTokens < budget + THINKING_HEADROOM_TOKENS) {
+                int adjusted = budget + THINKING_FALLBACK_MAX_TOKENS;
+                String msg = String.format(
+                        "Extended Thinking budget (%d) requires max_tokens >= budget + %d; "
+                                + "caller passed max_tokens=%d for model=%s, auto-extended to %d. "
+                                + "Pass max_tokens >= %d explicitly to silence this warning.",
+                        budget, THINKING_HEADROOM_TOKENS, request.getMaxTokens(), request.getModel(),
+                        adjusted, budget + THINKING_HEADROOM_TOKENS);
+                log.warn(msg);
+                if (warningsOut != null) {
+                    warningsOut.add(msg);
+                }
+                maxTokens = adjusted;
+            }
+            thinkingBlock = AnthropicRequest.Thinking.builder()
+                    .type("enabled")
+                    .budget_tokens(budget)
+                    .build();
+        }
+
+        return AnthropicRequest.builder()
+                .model(request.getModel())
+                .max_tokens(maxTokens)
+                .system(convertSystem(request.getSystemPrompt()))
+                .messages(convertMessages(request.getMessages()))
+                .tools(convertTools(request.getTools()))
+                .thinking(thinkingBlock)
+                .build();
+    }
+
+    /**
+     * Capability gate for Anthropic Extended Thinking. Returns {@code true}
+     * iff the model code carries one of the {@link #THINKING_CAPABLE_PATTERNS}
+     * substrings — i.e. Sonnet 4.6+, Opus 4.x, or Haiku 4.x. Returns
+     * {@code false} for null/empty/legacy/non-Anthropic identifiers, so an
+     * accidental call from another provider is a silent no-op.
+     */
+    boolean supportsThinking(String model) {
+        if (model == null || model.isBlank()) return false;
+        for (String pattern : THINKING_CAPABLE_PATTERNS) {
+            if (model.contains(pattern)) return true;
+        }
+        return false;
+    }
 
     private List<AnthropicRequest.Message> convertMessages(List<LlmChatRequest.Message> messages) {
         if (messages == null) return List.of();
@@ -230,6 +347,11 @@ public class AnthropicLlmProvider implements LlmProvider {
                         .id(b.getId())
                         .name(b.getName())
                         .input(b.getInput())
+                        // Anthropic Extended Thinking: type="thinking" carries
+                        // the prose chain-of-thought + an opaque signature.
+                        // Both fields are null for non-thinking blocks.
+                        .thinking(b.getThinking())
+                        .signature(b.getSignature())
                         .build());
             }
         }

@@ -1065,7 +1065,19 @@ public class AuraBotChatService {
             return new TurnOutcome.Failed(msg, null);
         }
 
+        // P0-2 Extended Thinking streaming protocol:
+        // Anthropic emits {type:"thinking"} content blocks BEFORE the first text
+        // block. Each thinking block opens with content_block_start
+        // (content_block.type=="thinking"), accumulates via content_block_delta
+        // (delta.type=="thinking_delta", delta.thinking="...prose..."), gains a
+        // signature via delta.type=="signature_delta", and closes on
+        // content_block_stop. We accumulate per-block on the {@code thinkingBuf}
+        // keyed by block index, and emit a single ResponseSink.onThinking on
+        // block close so the frontend renders one collapsible card per
+        // thinking block (not one per delta — that would be ~hundreds of
+        // events for a long trace).
         StringBuilder accumulated = new StringBuilder();
+        Map<Integer, ThinkingBlockBuffer> thinkingBuf = new HashMap<>();
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
             String line;
@@ -1078,19 +1090,65 @@ public class AuraBotChatService {
                     if (dataLine == null || !dataLine.startsWith("data: ")) continue;
                     String data = dataLine.substring(6);
 
-                    if ("content_block_delta".equals(eventType)) {
+                    if ("content_block_start".equals(eventType)) {
                         try {
                             Map<String, Object> parsed = objectMapper.readValue(data, Map.class);
+                            Integer index = parsed.get("index") instanceof Number n ? n.intValue() : null;
+                            Map<String, Object> contentBlock = (Map<String, Object>) parsed.get("content_block");
+                            if (index != null && contentBlock != null
+                                    && "thinking".equals(contentBlock.get("type"))) {
+                                thinkingBuf.put(index, new ThinkingBlockBuffer());
+                            }
+                        } catch (Exception e) {
+                            log.debug("Failed to parse Anthropic content_block_start: {}", data);
+                        }
+                    } else if ("content_block_delta".equals(eventType)) {
+                        try {
+                            Map<String, Object> parsed = objectMapper.readValue(data, Map.class);
+                            Integer index = parsed.get("index") instanceof Number n ? n.intValue() : null;
                             Map<String, Object> delta = (Map<String, Object>) parsed.get("delta");
                             if (delta != null) {
+                                String deltaType = (String) delta.get("type");
+                                // Plain text delta — append to accumulator and stream to client
                                 String text = (String) delta.get("text");
                                 if (text != null) {
                                     accumulated.append(text);
                                     sink.onTextChunk(text);
                                 }
+                                // Extended Thinking deltas — buffer per-block
+                                if ("thinking_delta".equals(deltaType) && index != null) {
+                                    String thinkingDelta = (String) delta.get("thinking");
+                                    if (thinkingDelta != null) {
+                                        thinkingBuf.computeIfAbsent(index, k -> new ThinkingBlockBuffer())
+                                                .content.append(thinkingDelta);
+                                    }
+                                } else if ("signature_delta".equals(deltaType) && index != null) {
+                                    String sig = (String) delta.get("signature");
+                                    if (sig != null) {
+                                        ThinkingBlockBuffer buf = thinkingBuf.computeIfAbsent(index,
+                                                k -> new ThinkingBlockBuffer());
+                                        buf.signature = (buf.signature == null ? sig : buf.signature + sig);
+                                    }
+                                }
                             }
                         } catch (Exception e) {
                             log.debug("Failed to parse Anthropic delta: {}", data);
+                        }
+                    } else if ("content_block_stop".equals(eventType)) {
+                        try {
+                            Map<String, Object> parsed = objectMapper.readValue(data, Map.class);
+                            Integer index = parsed.get("index") instanceof Number n ? n.intValue() : null;
+                            ThinkingBlockBuffer buf = index != null ? thinkingBuf.remove(index) : null;
+                            if (buf != null && buf.content.length() > 0) {
+                                String content = buf.content.toString();
+                                // Token count is best-effort; the streaming protocol
+                                // does not give a per-block usage figure, so we leave
+                                // it at -1 and let the frontend ThinkingBlock fall
+                                // back to a word-count estimate.
+                                sink.onThinking(content, -1, buf.signature);
+                            }
+                        } catch (Exception e) {
+                            log.debug("Failed to parse Anthropic content_block_stop: {}", data);
                         }
                     } else if ("message_stop".equals(eventType)) {
                         String full = accumulated.toString();
@@ -1325,6 +1383,18 @@ public class AuraBotChatService {
     private String buildQualityIssueHint(String issue) {
         return "\n- quality_gate: " + issue +
                 " — grounding is uncertain; if the user's request is ambiguous, ask a clarifying question before using any write tool.\n";
+    }
+
+    /**
+     * P0-2: per-block accumulator for the Anthropic Extended Thinking
+     * streaming protocol. {@code content} grows across {@code thinking_delta}
+     * events; {@code signature} is appended across {@code signature_delta}
+     * events (Anthropic concatenates the opaque blob in chunks). Closed out
+     * on {@code content_block_stop} and emitted via {@link ResponseSink#onThinking}.
+     */
+    private static final class ThinkingBlockBuffer {
+        final StringBuilder content = new StringBuilder();
+        String signature;
     }
 
     /**

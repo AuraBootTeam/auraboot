@@ -104,6 +104,11 @@ public class StepLoopService {
 
         String model = resolveModel(agentDef, config.getProviderCode());
         int maxTokens = config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
+        // P0-2: agent-level Extended Thinking knob. Anthropic capability gating
+        // and max_tokens auto-extension live inside AnthropicLlmProvider; here
+        // we only translate the JSONB execution_config into a typed
+        // ThinkingConfig and let the provider decide whether to honour it.
+        LlmChatRequest.ThinkingConfig thinkingConfig = resolveThinkingConfig(agentDef);
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
@@ -148,6 +153,7 @@ public class StepLoopService {
                     .systemPrompt(systemPrompt)
                     .messages(messages)
                     .tools(llmTools.isEmpty() ? null : llmTools)
+                    .thinking(thinkingConfig)
                     .build();
 
             LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
@@ -229,6 +235,8 @@ public class StepLoopService {
                                                       boolean skipApprovalForResumedStep) throws Exception {
         String model = resolveModel(agentDef, config.getProviderCode());
         int maxTokens = config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
+        // P0-2: same agent-level thinking knob as executeAgentLoop.
+        LlmChatRequest.ThinkingConfig thinkingConfig = resolveThinkingConfig(agentDef);
 
         double costLimit = agentProperties.getDefaultCostLimit();
         String guardrailsJson = (String) agentDef.get("guardrails");
@@ -329,6 +337,7 @@ public class StepLoopService {
                             .systemPrompt(systemPrompt)
                             .messages(messages)
                             .tools(llmTools.isEmpty() ? null : llmTools)
+                            .thinking(thinkingConfig)
                             .build();
 
                     LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
@@ -398,7 +407,7 @@ public class StepLoopService {
                 step.setOutput(failSummary);
 
                 // Attempt adaptive re-planning
-                boolean replanned = attemptReplan(plan, i, e.getMessage(), provider, config, model, systemPrompt, tools, messages);
+                boolean replanned = attemptReplan(plan, i, e.getMessage(), provider, config, model, systemPrompt, tools, messages, thinkingConfig);
                 if (!replanned) {
                     persistPlan(runPid, plan, i);
                     throw e;
@@ -427,7 +436,8 @@ public class StepLoopService {
     boolean attemptReplan(List<AgentPlanStep> plan, int failedStepIndex, String errorMessage,
                            LlmProvider provider, LlmProviderFactory.ProviderConfig config,
                            String model, String systemPrompt, List<AgentToolDefinition> tools,
-                           List<LlmChatRequest.Message> messages) {
+                           List<LlmChatRequest.Message> messages,
+                           LlmChatRequest.ThinkingConfig thinkingConfig) {
         String remaining = plan.subList(failedStepIndex + 1, plan.size()).stream()
                 .map(AgentPlanStep::getDescription).collect(Collectors.joining("\n- ", "- ", ""));
         String replanPrompt = "## Re-Planning Required\nStep " + failedStepIndex + " failed: " + errorMessage
@@ -438,7 +448,11 @@ public class StepLoopService {
             LlmChatRequest req = LlmChatRequest.builder()
                     .model(model).systemPrompt(systemPrompt)
                     .messages(List.of(LlmChatRequest.Message.builder().role("user").content(replanPrompt).build()))
-                    .maxTokens(2000).build();
+                    .maxTokens(2000)
+                    // Replanning is exactly the kind of multi-hop reasoning that
+                    // benefits most from Extended Thinking — let the same agent
+                    // knob flow through.
+                    .thinking(thinkingConfig).build();
 
             LlmChatResponse resp = provider.chat(req, config.getApiKey(), config.getBaseUrl());
             String content = resp.getContent().stream()
@@ -514,6 +528,75 @@ public class StepLoopService {
     // =========================================================================
     // Private helpers (duplicated from AgentRunService to keep extraction clean)
     // =========================================================================
+
+    /**
+     * Pull the agent-level Extended Thinking knob out of {@code agentDef.execution_config}
+     * (a JSONB-as-string column on {@code ab_agent_definition}). Returns
+     * {@code null} when the agent does not opt in — matching the
+     * {@link com.auraboot.framework.agent.dto.LlmChatRequest} contract that
+     * absent thinking equals "do not transmit a thinking field".
+     *
+     * <p>Recognised keys (mirrors the AgentTemplateSeeder convention from plan §2.4):
+     * <ul>
+     *   <li>{@code thinking_enabled}: boolean, defaults to false</li>
+     *   <li>{@code thinking_budget_tokens}: int, defaults to 10_000 when enabled</li>
+     * </ul>
+     */
+    @SuppressWarnings("unchecked")
+    LlmChatRequest.ThinkingConfig resolveThinkingConfig(Map<String, Object> agentDef) {
+        if (agentDef == null) return null;
+        Object raw = agentDef.get("execution_config");
+        if (raw == null) return null;
+
+        // JDBC drivers vary in how they expose JSONB:
+        //   - PostgreSQL JDBC returns org.postgresql.util.PGobject (toString
+        //     yields the JSON text).
+        //   - Some MyBatis typehandlers pre-parse it to a Map.
+        //   - Plain VARCHAR columns surface as String.
+        // We accept all three so the same agentDef payload works whether it
+        // came from DynamicDataMapper, JdbcTemplate, or a hand-built Map in a
+        // unit test.
+        Map<String, Object> config;
+        if (raw instanceof Map) {
+            config = (Map<String, Object>) raw;
+        } else {
+            String json;
+            if (raw instanceof String s) {
+                json = s;
+            } else if ("org.postgresql.util.PGobject".equals(raw.getClass().getName())) {
+                // Use reflection to avoid hard-coupling this module to the
+                // PostgreSQL driver — JDBC contracts only guarantee toString().
+                json = raw.toString();
+            } else {
+                json = raw.toString();
+            }
+            if (json == null || json.isBlank() || "null".equals(json.trim())) {
+                return null;
+            }
+            try {
+                config = objectMapper.readValue(json, Map.class);
+            } catch (Exception e) {
+                log.debug("Ignoring malformed agent execution_config JSON: {}", e.getMessage());
+                return null;
+            }
+        }
+
+        Object enabled = config.get("thinking_enabled");
+        if (!(enabled instanceof Boolean) || !(Boolean) enabled) {
+            return null;
+        }
+
+        int budget = 10_000;
+        Object budgetObj = config.get("thinking_budget_tokens");
+        if (budgetObj instanceof Number n) {
+            int parsed = n.intValue();
+            if (parsed > 0) budget = parsed;
+        }
+        return LlmChatRequest.ThinkingConfig.builder()
+                .enabled(true)
+                .budgetTokens(budget)
+                .build();
+    }
 
     private String resolveModel(Map<String, Object> agentDef, String providerCode) {
         if (agentDef != null) {

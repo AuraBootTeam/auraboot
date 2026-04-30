@@ -18,6 +18,7 @@ import { ChatBiResultCard } from './ChatBiResultCard';
 import { ConfirmCard } from './ConfirmCard';
 import { ModelSuggestionCard } from './ModelSuggestionCard';
 import { ResultContractView } from './ResultContractView';
+import { ThinkingBlock } from './ThinkingBlock';
 
 // ============================================================================
 // Icons
@@ -122,6 +123,11 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
         </div>
       </div>
     );
+  }
+
+  // Anthropic Extended Thinking trace — collapsed by default. P0-2.
+  if (message.type === 'thinking') {
+    return <ThinkingBlock content={message.content} tokens={message.thinkingTokens} />;
   }
 
   // Tool loading — spinner + text

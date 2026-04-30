@@ -24,6 +24,22 @@ public class AnthropicResponse {
         private String id;
         private String name;
         private Map<String, Object> input;
+
+        /**
+         * Anthropic Extended Thinking returns {@code {type:"thinking",
+         * thinking:"...prose...", signature:"..."}}. Both fields are present
+         * only on blocks where {@code type=="thinking"}; otherwise they remain
+         * {@code null}.
+         */
+        private String thinking;
+
+        /**
+         * Opaque signature accompanying a thinking block. Anthropic returns it
+         * so callers can pass it back on subsequent requests to resume from a
+         * cached thinking trace; we currently store it for forward
+         * compatibility but do not yet round-trip it.
+         */
+        private String signature;
     }
 
     @Data

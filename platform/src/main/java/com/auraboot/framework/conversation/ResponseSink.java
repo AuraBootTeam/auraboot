@@ -45,6 +45,27 @@ public interface ResponseSink {
     void onDone(String finalResponse, String traceId);
 
     /**
+     * P0-2 (Anthropic Extended Thinking): chain-of-thought trace produced by
+     * the assistant alongside its final answer. The SSE adapter serialises this
+     * as the {@code thinking} event (see frontend ThinkingBlock); other sinks
+     * may choose to ignore it.
+     *
+     * <p>{@code content} is the full thinking prose for the block (we emit on
+     * block boundaries, not per delta, so the frontend renders a single
+     * collapsible card per turn). {@code tokens} is the precise output token
+     * count when known (best-effort; -1 when the upstream stream did not
+     * surface a per-block usage figure). {@code signature} is Anthropic's
+     * opaque resume token — non-null only on the Anthropic streaming path.
+     *
+     * <p>Default no-op so non-chat sinks (tests, future WS / sync-JSON) need
+     * not implement it. Anthropic-only — OpenAI-compatible providers never
+     * call it because their reasoning lives in a different stream shape.
+     */
+    default void onThinking(String content, int tokens, String signature) {
+        // default no-op
+    }
+
+    /**
      * Phase C.3b: structured tool-result envelope produced by
      * {@code ResultContractEmitter} after each {@code dsl_query} /
      * {@code dsl_command} execution. SSE adapter serialises as the

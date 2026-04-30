@@ -39,12 +39,38 @@ public class LlmChatResponse {
      */
     private int cacheReadInputTokens;
 
+    /**
+     * Provider-side warnings produced while building / executing this request
+     * (e.g. Extended Thinking budget required auto-extension of {@code max_tokens}
+     * because the caller's value would have triggered a 400). Empty / null when
+     * the call was clean. Surfaced explicitly instead of silent log-only
+     * behaviour so downstream callers can route the message to the user (P0-2
+     * M9 — replaces the prior "log.warn + auto-extend" silent fallback that
+     * violated the no-fallback red line).
+     *
+     * <p>Null when no warnings were emitted (most calls); never an empty list,
+     * to keep the JSON wire form compact via {@code @JsonInclude(NON_NULL)}
+     * where applicable.
+     */
+    private List<String> warnings;
+
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class ContentBlock {
-        private String type;        // "text" or "tool_use"
+        /** "text", "tool_use", or "thinking" (Anthropic Extended Thinking only). */
+        private String type;
         private String text;
         private String id;          // tool call id
         private String name;        // tool name
         private Map<String, Object> input;  // tool input args
+
+        /**
+         * Anthropic Extended Thinking — populated when {@code type == "thinking"}.
+         * The raw chain-of-thought prose the model produced. Other providers
+         * never set this.
+         */
+        private String thinking;
+
+        /** Opaque signature carried alongside a thinking block (Anthropic only). */
+        private String signature;
     }
 }
