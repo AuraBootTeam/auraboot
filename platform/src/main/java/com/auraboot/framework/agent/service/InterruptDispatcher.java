@@ -24,9 +24,16 @@ import java.util.Map;
  *                      pending queue (gateway/session state responsibility);
  *                      the active run's Stage 7 loop will pick it up at
  *                      the next LLM checkpoint.
- *   insert_subtask   → log + mark "subtask_enqueued". Actual subagent
- *                      spawn is §6.10 delegate_task — not wired here;
- *                      this is the authorisation primitive.
+ *   insert_subtask   → log + spawn child run via {@link SubAgentRunner}
+ *                      (P0-6 — ACP §6.10 multi-agent spawn). The new run
+ *                      carries {@code parent_run_id = activeRunId} and
+ *                      {@code subtask_origin='interrupt_subtask'} so the
+ *                      gateway can render the parent ↔ child tree, and
+ *                      downstream §6.10 {@code delegate_task} reuses the
+ *                      same primitive. The child run executes async; the
+ *                      parent does NOT block on it (synchronous join is P1).
+ *                      When no active run is provided, the dispatcher logs
+ *                      noop and skips spawn — there is nothing to attach to.
  *
  * Always writes to {@code ab_agent_interrupt_log} regardless of policy.
  */
@@ -35,9 +42,27 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class InterruptDispatcher {
 
+    /** Audit label written to ab_agent_run.subtask_origin for INSERT_SUBTASK. */
+    public static final String SUBTASK_ORIGIN_INTERRUPT = "interrupt_subtask";
+    /**
+     * Legacy alias for {@link #SUBTASK_ORIGIN_INTERRUPT} kept so external
+     * callers compiled against the older name still link. New code must use
+     * the *_INTERRUPT-suffixed constant.
+     */
+    public static final String SUBTASK_ORIGIN = SUBTASK_ORIGIN_INTERRUPT;
+    /** Value written to ab_agent_interrupt_log.action_taken for INSERT_SUBTASK. */
+    public static final String SUBTASK_ENQUEUED_ACTION = "subtask_enqueued";
+    /** Value written to ab_agent_interrupt_log.action_taken for REPLACE_INTENT (run cancelled). */
+    public static final String CANCELLED_RUN_ACTION = "cancelled_run";
+    /** Value written to ab_agent_interrupt_log.action_taken for APPEND_CONTEXT. */
+    public static final String CONTEXT_INJECTED_ACTION = "context_injected";
+    /** Value written to ab_agent_interrupt_log.action_taken when no policy applies. */
+    public static final String NOOP_ACTION = "noop";
+
     private final JdbcTemplate jdbcTemplate;
     private final ApplicationEventPublisher eventPublisher;
     private final RunLifecycleService runLifecycleService;
+    private final SubAgentRunner subAgentRunner;
 
     @Data
     @Builder
@@ -46,6 +71,12 @@ public class InterruptDispatcher {
         private String subPolicy;
         private String actionTaken;     // cancelled_run | context_injected | subtask_enqueued | noop
         private String activeRunId;     // when replace_intent cancelled a run
+        /**
+         * Pid of the child {@code ab_agent_run} spawned for an INSERT_SUBTASK
+         * interrupt. Null for every other policy and for INSERT_SUBTASK
+         * dispatches that ran without an {@code activeRunId} (noop).
+         */
+        private String subtaskRunId;
     }
 
     /**
@@ -59,44 +90,61 @@ public class InterruptDispatcher {
                                     InterruptClassifier.Classification classification) {
         String logPid = UniqueIdGenerator.generate();
         String action;
+        String subtaskRunId = null;
 
         switch (classification.getSubPolicy()) {
             case InterruptClassifier.REPLACE_INTENT -> {
                 if (activeRunId != null) {
                     cancelRun(activeRunId);
-                    action = "cancelled_run";
+                    action = CANCELLED_RUN_ACTION;
                 } else {
-                    action = "noop";
+                    action = NOOP_ACTION;
                 }
             }
-            case InterruptClassifier.INSERT_SUBTASK ->
-                    action = "subtask_enqueued";
+            case InterruptClassifier.INSERT_SUBTASK -> {
+                if (activeRunId != null) {
+                    SubAgentRunner.SpawnResult sr = subAgentRunner.spawn(
+                            tenantId, activeRunId, sessionId, newMessage, SUBTASK_ORIGIN_INTERRUPT);
+                    subtaskRunId = sr.getChildRunPid();
+                    action = SUBTASK_ENQUEUED_ACTION;
+                } else {
+                    // No parent to attach to — log the intent but skip spawn.
+                    // Sub-agents always derive lineage from a live parent;
+                    // refusing to invent a parentless root keeps the audit
+                    // tree well-formed.
+                    log.info("insert_subtask without active_run_id; logging noop (session={})", sessionId);
+                    action = NOOP_ACTION;
+                }
+            }
             case InterruptClassifier.APPEND_CONTEXT ->
-                    action = "context_injected";
-            default -> action = "noop";
+                    action = CONTEXT_INJECTED_ACTION;
+            default -> action = NOOP_ACTION;
         }
 
         jdbcTemplate.update(
                 "INSERT INTO ab_agent_interrupt_log " +
                         "(pid, tenant_id, session_id, active_run_id, new_message_excerpt, " +
-                        " sub_policy, classifier_tier, confidence, reason, action_taken) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        " sub_policy, classifier_tier, confidence, reason, action_taken, " +
+                        " subtask_run_id) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 logPid, tenantId, sessionId, activeRunId,
                 truncate(newMessage, 500),
                 classification.getSubPolicy(),
                 classification.getTier(),
                 classification.getConfidence(),
                 truncate(classification.getReason(), 500),
-                action);
+                action,
+                subtaskRunId);
 
-        log.info("Interrupt: session={} policy={} action={} run={}",
-                sessionId, classification.getSubPolicy(), action, activeRunId);
+        log.info("Interrupt: session={} policy={} action={} run={} subtaskRun={}",
+                sessionId, classification.getSubPolicy(), action, activeRunId, subtaskRunId);
 
         return DispatchResult.builder()
                 .interruptLogPid(logPid)
                 .subPolicy(classification.getSubPolicy())
                 .actionTaken(action)
                 .activeRunId(activeRunId)
+                .subtaskRunId(subtaskRunId)
                 .build();
     }
 
