@@ -87,46 +87,43 @@ class BroadcastResponseSinkTest {
     }
 
     @Test
-    @DisplayName("2) onDone emits MESSAGE frame with full text + TYPING_INDICATOR(state=stopped); explicit fullContent wins")
-    void onDone_emitsMessageAndStopsTyping() {
+    @DisplayName("2) onDone emits ONLY TYPING_INDICATOR(state=stopped); MESSAGE frame deferred to caller post-persist")
+    void onDone_emitsOnlyStopTyping() {
+        // Phase D.2 contract refinement: BroadcastResponseSink does NOT emit a
+        // MESSAGE frame on onDone — that responsibility moved to the IM-event
+        // caller (e.g. ImAiService) which broadcasts AFTER persistOutbound has
+        // written the row, so the WS frame can carry {messageId, seq, ...}.
         sink.onDone("The full answer.", "trace-abc");
 
-        List<WsFrame> frames = captureAllFrames();
-        assertThat(frames).hasSize(2);
-        WsFrame msg = frames.get(0);
-        assertThat(msg.getType()).isEqualTo("MESSAGE");
+        WsFrame f = captureSingleFrame();
+        assertThat(f.getType()).isEqualTo("TYPING_INDICATOR");
         @SuppressWarnings("unchecked")
-        Map<String, Object> msgData = (Map<String, Object>) msg.getData();
-        assertThat(msgData)
+        Map<String, Object> data = (Map<String, Object>) f.getData();
+        assertThat(data)
                 .containsEntry("conversationId", CONV_ID)
-                .containsEntry("messageType", "text")
-                .containsEntry("content", "The full answer.")
-                .containsEntry("traceId", "trace-abc");
-
-        WsFrame stop = frames.get(1);
-        assertThat(stop.getType()).isEqualTo("TYPING_INDICATOR");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> stopData = (Map<String, Object>) stop.getData();
-        assertThat(stopData).containsEntry("state", "stopped");
+                .containsEntry("state", "stopped");
     }
 
     @Test
-    @DisplayName("2b) onDone with null fullContent falls back to buffered chunks")
-    void onDone_nullFullContent_fallsBackToBuffer() {
+    @DisplayName("2b) onDone preserves bufferedText for diagnostics; only stop-typing emitted")
+    void onDone_preservesBufferForDiagnostics() {
         sink.onTextChunk("buffered ");
         sink.onTextChunk("answer");
-        // 2 frames so far (per chunk); now flush:
+        assertThat(sink.bufferedText()).isEqualTo("buffered answer");
+
         sink.onDone(null, null);
 
+        // 2 chunk-typing frames + 1 stop-typing frame = 3 total.
         List<WsFrame> frames = captureAllFrames();
-        // 2 typing frames + MESSAGE + stopped = 4 total
-        assertThat(frames).hasSize(4);
-        WsFrame msg = frames.get(2);
-        assertThat(msg.getType()).isEqualTo("MESSAGE");
+        assertThat(frames).hasSize(3);
+        assertThat(frames.get(2).getType()).isEqualTo("TYPING_INDICATOR");
         @SuppressWarnings("unchecked")
-        Map<String, Object> msgData = (Map<String, Object>) msg.getData();
-        assertThat(msgData).containsEntry("content", "buffered answer");
-        assertThat(msgData).doesNotContainKey("traceId");
+        Map<String, Object> data = (Map<String, Object>) frames.get(2).getData();
+        assertThat(data).containsEntry("state", "stopped");
+        // The buffered text is still accessible for callers that need it as
+        // a fallback (e.g. persistOutbound returned null and we want to log
+        // what the LLM actually produced).
+        assertThat(sink.bufferedText()).isEqualTo("buffered answer");
     }
 
     @Test

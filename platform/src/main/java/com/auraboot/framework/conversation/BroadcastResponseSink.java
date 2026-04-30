@@ -92,21 +92,20 @@ public class BroadcastResponseSink implements ResponseSink {
 
     @Override
     public void onDone(String fullContent, String traceId) {
-        // Prefer the explicit fullContent passed by the chat impl; fall back
-        // to the buffered chunks if the impl declined to repeat itself.
-        String text = (fullContent != null && !fullContent.isEmpty())
-                ? fullContent : textBuffer.toString();
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("conversationId", conversationId);
-        data.put("messageType", "text");
-        data.put("content", text);
-        if (traceId != null) data.put("traceId", traceId);
-        broadcaster.publish(targetUserIds, WsFrame.builder()
-                .type("MESSAGE")
-                .data(data)
-                .build());
-        // Stop the typing indicator explicitly — some IM clients hold it
-        // until they see this frame.
+        // Phase D.2 contract refinement: the sink does NOT emit a MESSAGE frame
+        // on onDone. The persisted ab_im_message row is written later by
+        // {@code Persistence.persistOutbound} in the chokepoint's finalizeTurn,
+        // and only THEN does the caller broadcast a MESSAGE frame carrying the
+        // proper {messageId, seq, senderId, ...} metadata (see
+        // {@code ImAiService.generateResponse}). Emitting a content-only
+        // MESSAGE frame here without {messageId, seq} would force IM clients to
+        // either render duplicate rows or invent fallback ids — both worse than
+        // a brief "AI thinking…" → "AI typed:" transition.
+        //
+        // We DO publish a TYPING_INDICATOR(state=stopped) so the typing dots
+        // disappear promptly even before persistOutbound fires, and we keep
+        // the buffered text reachable via {@link #bufferedText} for tests /
+        // diagnostics that want to assert what the LLM produced.
         broadcaster.publish(targetUserIds, WsFrame.builder()
                 .type("TYPING_INDICATOR")
                 .data(Map.of(
