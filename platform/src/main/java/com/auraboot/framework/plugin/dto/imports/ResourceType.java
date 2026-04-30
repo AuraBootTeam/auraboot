@@ -71,4 +71,23 @@ public enum ResourceType {
         }
         return valueOf(code.toUpperCase());
     }
+
+    /**
+     * Whitelist of all table names declared by this enum, computed once at class load.
+     * Used by callers that build dynamic SQL with {@code String.format("... %s ...", tableName)}
+     * to assert the table is enum-sourced before execution. Defence-in-depth against future
+     * mis-configuration where a non-enum string ends up in a SQL template.
+     * (BE-4 P2 fix 2026-04-30)
+     */
+    private static final java.util.Set<String> KNOWN_TABLES;
+    static {
+        java.util.Set<String> set = new java.util.HashSet<>();
+        for (ResourceType t : values()) set.add(t.tableName);
+        KNOWN_TABLES = java.util.Collections.unmodifiableSet(set);
+    }
+
+    /** True iff {@code tableName} is one of the table names declared by this enum. */
+    public static boolean isKnownTable(String tableName) {
+        return tableName != null && KNOWN_TABLES.contains(tableName);
+    }
 }

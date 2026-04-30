@@ -139,6 +139,10 @@ public class PluginResourceServiceImpl implements PluginResourceService {
         // NOTE: JdbcTemplate is used here because this method queries arbitrary tables
         // with dynamic table/column names. This cannot be expressed as a single Mapper method.
         String tableName = type.getTableName();
+        // SECURITY_BOUNDARY: dynamic SQL — tableName must pass ResourceType whitelist. (BE-4 P2 fix 2026-04-30)
+        if (!ResourceType.isKnownTable(tableName)) {
+            throw new IllegalStateException("SECURITY: Disallowed resource table: " + tableName);
+        }
         String codeColumn = getCodeColumn(type);
         String activeCondition = getActiveCondition(type);
 
@@ -368,6 +372,11 @@ public class PluginResourceServiceImpl implements PluginResourceService {
         } else {
             // All other resource tables support pid-based soft-delete
             String tableName = type.getTableName();
+            // SECURITY_BOUNDARY: dynamic SQL — tableName must come from ResourceType enum AND
+            // pass enum's whitelist. Defence-in-depth against future mis-config. (BE-4 P2 fix 2026-04-30)
+            if (!ResourceType.isKnownTable(tableName)) {
+                throw new IllegalStateException("SECURITY: Disallowed resource table: " + tableName);
+            }
             // NOTE: JdbcTemplate used here for dynamic table name in soft-delete.
             // Each resource type maps to a different table, so a single Mapper method cannot cover all.
             jdbcTemplate.update(
@@ -390,6 +399,10 @@ public class PluginResourceServiceImpl implements PluginResourceService {
         ResourceType type = resource.getResourceTypeEnum();
         if (type != ResourceType.MODEL_FIELD_BINDING) {
             String tableName = type.getTableName();
+            // SECURITY_BOUNDARY: same as deleteResource above. (BE-4 P2 fix 2026-04-30)
+            if (!ResourceType.isKnownTable(tableName)) {
+                throw new IllegalStateException("SECURITY: Disallowed resource table: " + tableName);
+            }
             // NOTE: JdbcTemplate used here for dynamic table name (same reason as deleteResource)
             jdbcTemplate.update(
                     String.format("UPDATE %s SET plugin_pid = NULL, updated_at = NOW() WHERE pid = ?", tableName),
