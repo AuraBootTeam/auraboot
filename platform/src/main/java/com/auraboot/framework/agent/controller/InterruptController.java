@@ -56,6 +56,10 @@ public class InterruptController {
         out.put("action_taken", r.getActionTaken());
         out.put("interrupt_log_pid", r.getInterruptLogPid());
         out.put("active_run_id", r.getActiveRunId());
+        // P0-6: surface spawned child run id when INSERT_SUBTASK forked one.
+        // Always present in the response shape (null for non-spawn paths) so
+        // gateway clients can rely on the key without optional checks.
+        out.put("subtask_run_id", r.getSubtaskRunId());
         return ApiResponse.ok(out);
     }
 
@@ -72,7 +76,7 @@ public class InterruptController {
 
         StringBuilder sql = new StringBuilder(
                 "SELECT pid, session_id, active_run_id, new_message_excerpt, sub_policy, " +
-                        "       classifier_tier, confidence, reason, action_taken, created_at " +
+                        "       classifier_tier, confidence, reason, action_taken, subtask_run_id, created_at " +
                         "FROM ab_agent_interrupt_log WHERE tenant_id = ? ");
         List<Object> params = new java.util.ArrayList<>();
         params.add(tenantId);
@@ -93,7 +97,7 @@ public class InterruptController {
         int capped = Math.min(Math.max(1, limit), 200);
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT pid, active_run_id, new_message_excerpt, sub_policy, " +
-                        "       classifier_tier, confidence, reason, action_taken, created_at " +
+                        "       classifier_tier, confidence, reason, action_taken, subtask_run_id, created_at " +
                         "FROM ab_agent_interrupt_log " +
                         "WHERE tenant_id = ? AND session_id = ? " +
                         "ORDER BY created_at DESC LIMIT ?",

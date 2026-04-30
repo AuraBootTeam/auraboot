@@ -4779,6 +4779,8 @@ CREATE TABLE IF NOT EXISTS ab_agent_run (
   timeout_at      TIMESTAMPTZ,                       -- When this run should be force-terminated
   hallucination_count INTEGER DEFAULT 0,           -- Consecutive non-existent tool calls
   session_ended_published_at TIMESTAMPTZ,          -- Idempotency guard for SessionEndedEvent (memory L1->L2 promoter). Atomic flip from NULL -> NOW() on first terminal-state publish; second publish sees non-null and skips.
+  parent_run_id   VARCHAR(26),                      -- ACP §6.10 multi-agent spawn: pid of parent run when this run was forked from an interrupt-driven subtask. NULL for root user-initiated runs.
+  subtask_origin  VARCHAR(32),                      -- Audit label for parent_run_id: 'interrupt_subtask' (InterruptDispatcher INSERT_SUBTASK), 'delegate_task' (§6.10 tool), 'scheduled_split' (scheduler). NULL when parent_run_id IS NULL. CHECK constraint added below.
   created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   created_by     BIGINT,
@@ -4788,7 +4790,19 @@ CREATE INDEX IF NOT EXISTS idx_agent_run_tenant ON ab_agent_run (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_agent_run_task ON ab_agent_run (task_id);
 CREATE INDEX IF NOT EXISTS idx_agent_run_agent ON ab_agent_run (agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_run_status ON ab_agent_run (tenant_id, run_status);
+CREATE INDEX IF NOT EXISTS idx_agent_run_parent ON ab_agent_run (parent_run_id) WHERE parent_run_id IS NOT NULL;
 COMMENT ON TABLE ab_agent_run IS 'Agent execution session records (audit log, never deleted)';
+
+-- ACP §6.10: subtask_origin audit-label whitelist. Keeps free-text drift out
+-- of the column so dashboards / SQL reports can rely on the enum.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_agent_run_subtask_origin') THEN
+        ALTER TABLE ab_agent_run ADD CONSTRAINT chk_agent_run_subtask_origin
+            CHECK (subtask_origin IS NULL OR subtask_origin IN
+                   ('interrupt_subtask', 'delegate_task', 'scheduled_split'));
+    END IF;
+END $$;
 
 -- Agent artifact (execution output — documents, code, reports)
 CREATE TABLE IF NOT EXISTS ab_agent_artifact (
@@ -7046,10 +7060,12 @@ CREATE TABLE IF NOT EXISTS ab_agent_interrupt_log (
     confidence        DECIMAL(3,2),
     reason            VARCHAR(500),
     action_taken      VARCHAR(32),                     -- cancelled_run | context_injected | subtask_enqueued | noop
+    subtask_run_id    VARCHAR(26),                     -- ACP §6.10: pid of the child run spawned by InterruptDispatcher.dispatch when sub_policy='insert_subtask'. NULL for non-spawn actions.
     created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_interrupt_log_session ON ab_agent_interrupt_log (session_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_interrupt_log_run ON ab_agent_interrupt_log (active_run_id);
+CREATE INDEX IF NOT EXISTS idx_interrupt_log_subtask ON ab_agent_interrupt_log (subtask_run_id) WHERE subtask_run_id IS NOT NULL;
 COMMENT ON TABLE ab_agent_interrupt_log IS 'Interrupt Protocol audit log — one row per user-interrupt classification decision';
 
 -- ============================================================================
