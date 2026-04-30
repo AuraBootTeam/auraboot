@@ -12,8 +12,55 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
- * Manages per-user SSE connections for real-time IM push.
- * Supports multiple tabs/sessions per user.
+ * Manages per-user SSE connections for real-time IM push. Supports multiple
+ * tabs / sessions per user.
+ *
+ * <h2>Phase D.4 transport architecture (2026-04-30)</h2>
+ *
+ * <p>This is one of TWO independent push transports the IM stack uses; they
+ * coexist deliberately and are NOT redundant:
+ *
+ * <table>
+ *   <caption>Two push channels</caption>
+ *   <tr><th>Channel</th><th>Endpoint</th><th>Used by</th><th>Frame</th></tr>
+ *   <tr>
+ *     <td>{@code SseEmitterManager} (this class)</td>
+ *     <td>{@code GET /api/im/stream} (HTTP SSE)</td>
+ *     <td>Enterprise {@code ent-im-chat} plugin (live consumer at
+ *         {@code auraboot-enterprise/web-admin-ext/plugins/ent-im-chat/overlay/app/chat/services/imSseClient.ts}).
+ *         {@code AgentReplyTask} streams {@code TYPING / STREAM_CHUNK / STREAM_END}
+ *         events through here.</td>
+ *     <td>{@link SseEventType} text events serialized as JSON-string {@code data}.</td>
+ *   </tr>
+ *   <tr>
+ *     <td>{@code ImMessageBroadcaster} + {@code ImWebSocketHandler}</td>
+ *     <td>{@code WS /api/im/ws}</td>
+ *     <td>OSS web-admin IM panel + chokepoint sink path. {@code ImAiService}
+ *         (Phase D.2) pushes through {@code BroadcastResponseSink} which wraps
+ *         this transport.</td>
+ *     <td>{@link com.auraboot.framework.im.dto.WsFrame} typed enum
+ *         ({@code TYPING_INDICATOR / MESSAGE / ERROR / SYNC_RESULT / ...}).</td>
+ *   </tr>
+ * </table>
+ *
+ * <p><b>Why both:</b> the original Phase D.4 design (2026-04-30 v2) proposed
+ * extracting a {@code WsResponseSink} and migrating {@code AgentReplyTask}'s
+ * SSE-based TYPING / STREAM_CHUNK / STREAM_END to WebSocket frames so that
+ * one transport could serve every push need. Implementation discovery:
+ * {@code ent-im-chat}'s active SSE subscription (fixed connection URL
+ * {@code /api/im/stream}) makes a unilateral OSS-side migration a breaking
+ * change to enterprise. The decision recorded here: <b>SSE remains the
+ * canonical transport for {@code AgentReplyTask}-style streaming until
+ * enterprise frontend is migrated</b>; the chokepoint flow ({@code ImAiService}
+ * etc.) uses {@code BroadcastResponseSink} → WS for consistency with the
+ * other chokepoint adapters but the two channels coexist.
+ *
+ * <p>Do not delete this class without a coordinated frontend migration.
+ *
+ * @see com.auraboot.framework.conversation.BroadcastResponseSink
+ *      The chokepoint sink that wraps {@code ImMessageBroadcaster} (the
+ *      sister WS transport). Both SHOULD eventually consolidate; D.4 chose
+ *      to defer rather than break enterprise.
  */
 @Slf4j
 @Component
