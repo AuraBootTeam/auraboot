@@ -1,10 +1,12 @@
 package com.auraboot.framework.im.service;
 
-import com.auraboot.framework.agent.dto.LlmChatRequest;
-import com.auraboot.framework.agent.dto.LlmChatResponse;
-import com.auraboot.framework.agent.provider.LlmProvider;
-import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.conversation.BroadcastResponseSink;
+import com.auraboot.framework.conversation.ConversationTurnService;
+import com.auraboot.framework.conversation.InboundMode;
+import com.auraboot.framework.conversation.TurnOutcome;
+import com.auraboot.framework.conversation.TurnRequest;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;
 import com.auraboot.framework.im.model.ImMessage;
@@ -14,15 +16,39 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
- * Handles @AI mentions in IM conversations.
- * When a user mentions "ai" in a message, this service calls the configured
- * LLM provider and posts the AI response back to the same conversation.
+ * Handles {@code @AI} mentions in IM conversations.
+ *
+ * <p>When a user mentions {@code "ai"} in a message, the IM WebSocket
+ * handler asynchronously calls {@link #generateResponse}. This service
+ * routes the work through {@link ConversationTurnService#runTurn} (the
+ * conversation chokepoint), so the IM-event path inherits every chokepoint
+ * concern that the web SSE path already gets:
+ *
+ * <ul>
+ *   <li>Pre-Grounding Triage (light_chat / contextual_answer / acp_run buckets)</li>
+ *   <li>ACP runtime dispatch when triage routes to acp_run / contextual_answer</li>
+ *   <li>{@code ab_agent_task} / {@code ab_agent_run} writes for cross-channel observability</li>
+ *   <li>Memory L1 writeback (Phase C.2 listener)</li>
+ *   <li>Approval gate convergence (Phase C.3d)</li>
+ *   <li>{@code sender_type='agent'} + {@code sender_id=agentId} (Q-D.3=α; resolved by
+ *       {@code AuraBotTurnPersistence.persistOutbound} via {@code AuraBotAgentResolver})</li>
+ * </ul>
+ *
+ * <p>Phase D.2 (2026-04-30, Q-D.1=α + Q-D.3=α): the LLM call + message build +
+ * direct persistence that lived inline here is gone. Streaming feedback flows
+ * through {@link BroadcastResponseSink} (TYPING_INDICATOR + cards/errors).
+ * After {@code runTurn} returns, this service looks up the persisted agent
+ * row and broadcasts a single MESSAGE frame carrying full row metadata so
+ * connected IM clients update their conversation view.
+ *
+ * <p>The {@code @Async("eventTaskExecutor")} wrapper preserves fire-and-forget
+ * semantics for {@code ImWebSocketHandler}; the chokepoint executes synchronously
+ * inside the worker thread (Q-A.4=A' / Q-C3.2=β / Q-D.1=α — sync core, async at
+ * adapter boundary).
  *
  * @since 6.2.0
  */
@@ -31,17 +57,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ImAiService {
 
-    private final LlmProviderFactory llmProviderFactory;
     private final ImMessageService messageService;
     private final ImMessageBroadcaster broadcaster;
     private final ImConversationMemberMapper memberMapper;
-
-    private static final String AI_SYSTEM_PROMPT = """
-            You are AuraBot, an AI assistant embedded in AuraBoot's IM system.
-            You help users with business questions, data analysis, and general inquiries.
-            Keep responses concise and helpful. Use markdown formatting when appropriate.
-            Respond in the same language as the user's message.
-            """;
+    private final ConversationTurnService turnService;
 
     /**
      * Check if a message mentions AI.
@@ -56,114 +75,92 @@ public class ImAiService {
      */
     @Async("eventTaskExecutor")
     public void generateResponse(ImMessage userMessage, Long tenantId) {
-        MetaContext.setContext(tenantId, 0L, null, null);
+        Long userId = userMessage.getSenderId();   // sender_type='human' → senderId is user id
+        MetaContext.setContext(tenantId, userId, null, null);
         try {
-            // Resolve LLM provider
-            LlmProviderFactory.ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, null);
-            LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+            Long conversationId = userMessage.getConversationId();
+            List<Long> memberUserIds = memberMapper.findHumanMemberIds(conversationId, tenantId);
 
-            // Build conversation context from recent messages
-            List<LlmChatRequest.Message> messages = buildConversationContext(userMessage, tenantId);
+            BroadcastResponseSink sink = new BroadcastResponseSink(
+                    broadcaster, memberUserIds, conversationId);
 
-            // Build request
-            LlmChatRequest request = LlmChatRequest.builder()
-                    .model(config.getDefaultModel())
-                    .systemPrompt(AI_SYSTEM_PROMPT)
-                    .maxTokens(1024)
-                    .messages(messages)
-                    .build();
+            ChatRequest legacy = new ChatRequest();
+            legacy.setMessage(userMessage.getContent());
+            legacy.setSessionId("im-conv-" + conversationId);
+            legacy.setAgentCode("aurabot");
+            legacy.setConversationId(conversationId);
+            legacy.setClientMsgId(userMessage.getClientMsgId());
 
-            // Call LLM
-            LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
+            TurnRequest req = new TurnRequest(
+                    tenantId,
+                    userId,
+                    userId,                            // humanMemberId == userId for IM 'human' members
+                    "im_panel",                        // channel
+                    "aurabot",
+                    conversationId,
+                    userMessage.getClientMsgId(),
+                    userMessage.getContent(),
+                    null,                              // pageContext — IM has no page context
+                    null,                              // options
+                    InboundMode.EXISTING_MESSAGE_ID,   // user msg already persisted by IM dispatch
+                    null,                              // precomputedBucket — let triage SPI decide
+                    userMessage.getId(),               // inboundMessageId — D.1 EXISTING_MESSAGE_ID payload
+                    legacy);
 
-            // Extract text response
-            String aiText = response.getContent().stream()
-                    .filter(b -> "text".equals(b.getType()))
-                    .map(LlmChatResponse.ContentBlock::getText)
-                    .findFirst()
-                    .orElse("Sorry, I could not generate a response.");
-
-            // Post AI response as system message in the same conversation
-            String clientMsgId = "ai_reply_" + userMessage.getId() + "_" + UUID.randomUUID().toString().substring(0, 8);
-            ImMessage aiMessage = messageService.sendSystemMessage(
-                    userMessage.getConversationId(), tenantId,
-                    "ai_response", aiText, null, clientMsgId);
-
-            // Push to all conversation members via WebSocket
-            pushToConversationMembers(userMessage.getConversationId(), aiMessage, tenantId);
-
-            log.debug("AI response delivered: conversationId={}, seq={}, tokens={}/{}",
-                    userMessage.getConversationId(), aiMessage.getSeq(),
-                    response.getInputTokens(), response.getOutputTokens());
-
+            TurnOutcome outcome = turnService.runTurn(req, sink);
+            broadcastPersistedAgentResponse(conversationId, tenantId, memberUserIds, outcome, userMessage);
         } catch (Exception e) {
-            log.error("Failed to generate AI response for message={}: {}",
+            log.error("ImAiService chokepoint dispatch failed for messageId={}: {}",
                     userMessage.getId(), e.getMessage(), e);
-
-            // Post error message so user knows something went wrong
-            try {
-                String errorMsg = "Sorry, I encountered an error processing your request. Please try again later.";
-                String clientMsgId = "ai_err_" + userMessage.getId();
-                ImMessage errorMessage = messageService.sendSystemMessage(
-                        userMessage.getConversationId(), tenantId,
-                        "ai_response", errorMsg, null, clientMsgId);
-                pushToConversationMembers(userMessage.getConversationId(), errorMessage, tenantId);
-            } catch (Exception ex) {
-                log.error("Failed to send AI error message", ex);
-            }
+            // The chokepoint already surfaced the error via sink.onError; nothing to do.
         } finally {
             MetaContext.clear();
         }
     }
 
     /**
-     * Build conversation context from recent messages (up to 10) before the current message.
-     * Maps user messages to "user" role and AI_RESPONSE messages to "assistant" role.
+     * After {@code runTurn} returns, look up the persisted agent row that
+     * {@code Persistence.persistOutbound} wrote and broadcast a MESSAGE frame
+     * so connected IM clients render the answer with full row metadata
+     * ({@code messageId / seq / senderId / createdAt}). For the
+     * {@link TurnOutcome.Failed} branch the outbound row is a system-typed
+     * error message — we still broadcast it so the user sees the failure,
+     * mirroring the legacy ImAiService behaviour.
+     *
+     * <p>Race-safe: {@code @Async("eventTaskExecutor")} serializes per IM
+     * event so concurrent agent responses for the same conversation cannot
+     * interleave the look-up. We scan rows with {@code seq > triggeringSeq}
+     * and take the last agent/system row.
      */
-    private List<LlmChatRequest.Message> buildConversationContext(ImMessage currentMessage, Long tenantId) {
-        List<LlmChatRequest.Message> messages = new ArrayList<>();
-
-        // Fetch recent messages before the current one (for context)
-        List<ImMessage> recentMessages = messageService.getMessagesBeforeSeq(
-                currentMessage.getConversationId(), currentMessage.getSeq(), 10, tenantId);
-
-        // recentMessages is ordered by seq DESC, reverse for chronological order
-        for (int i = recentMessages.size() - 1; i >= 0; i--) {
-            ImMessage msg = recentMessages.get(i);
-            if (msg.getRecalled() != null && msg.getRecalled()) continue;
-            if (msg.getContent() == null || msg.getContent().isBlank()) continue;
-
-            String role = "ai_response".equals(msg.getMessageType()) ? "assistant" : "user";
-            messages.add(LlmChatRequest.Message.builder()
-                    .role(role)
-                    .content(msg.getContent())
-                    .build());
+    private void broadcastPersistedAgentResponse(Long conversationId, Long tenantId,
+                                                  List<Long> memberUserIds,
+                                                  TurnOutcome outcome,
+                                                  ImMessage triggeringMessage) {
+        List<ImMessage> recent = messageService.getMessagesAfterSeq(
+                conversationId, triggeringMessage.getSeq(), 50, tenantId);
+        ImMessage persisted = recent.stream()
+                .filter(m -> "agent".equals(m.getSenderType()) || "system".equals(m.getSenderType()))
+                .reduce((first, second) -> second) // last one in seq order
+                .orElse(null);
+        if (persisted == null) {
+            log.debug("ImAiService: no persisted agent/system row found post-turn for "
+                            + "conversationId={} (triggeringSeq={}); skipping broadcast — outcome={}",
+                    conversationId, triggeringMessage.getSeq(),
+                    outcome != null ? outcome.getClass().getSimpleName() : "null");
+            return;
         }
-
-        // Add the current message
-        messages.add(LlmChatRequest.Message.builder()
-                .role("user")
-                .content(currentMessage.getContent())
-                .build());
-
-        return messages;
-    }
-
-    private void pushToConversationMembers(Long conversationId, ImMessage message, Long tenantId) {
         WsFrame frame = WsFrame.builder()
-                .type("message")
+                .type("MESSAGE")
                 .data(Map.of(
-                        "messageId", message.getId(),
+                        "messageId", persisted.getId(),
                         "conversationId", conversationId,
-                        "senderId", message.getSenderId(),
-                        "seq", message.getSeq(),
-                        "messageType", message.getMessageType(),
-                        "content", message.getContent() != null ? message.getContent() : "",
-                        "createdAt", message.getCreatedAt().toString()
-                ))
+                        "senderId", persisted.getSenderId(),
+                        "senderType", persisted.getSenderType() != null ? persisted.getSenderType() : "",
+                        "seq", persisted.getSeq(),
+                        "messageType", persisted.getMessageType() != null ? persisted.getMessageType() : "ai_response",
+                        "content", persisted.getContent() != null ? persisted.getContent() : "",
+                        "createdAt", persisted.getCreatedAt() != null ? persisted.getCreatedAt().toString() : ""))
                 .build();
-
-        List<Long> memberIds = memberMapper.findHumanMemberIds(conversationId, tenantId);
-        broadcaster.publish(memberIds, frame);
+        broadcaster.publish(memberUserIds, frame);
     }
 }
