@@ -1,6 +1,6 @@
 # D.3-chokepoint Follow-up — HandoffToolProvider × AgentChatPort SPI Integration
 
-> **Status**: v3 (2026-04-30) — DC.1 + DC.2 landed; DC.3 + DC.4 deferred pending sub-design after implementation-time discovery that group-chat prompt/history/tool semantics need substantial AgentReplyContext absorption work not anticipated in v2 §3. See §9 "DC.3 实施期发现" for details.
+> **Status**: v4 (2026-04-30) — DC.1 + DC.2 landed; v3 §9 surfaced the AgentReplyContext absorption sub-design problem; v4 §10 expands each option with full code-shape comparison + 6-month-regret check + steel-man + recommendation. **Pending owner review.**
 > **Predecessor**: [`2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md`](./2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md) v3 §8 row D.3 deferral note.
 
 ## 0. 摘要
@@ -298,8 +298,288 @@ D.4 文档化的 dual-transport 决策（commit `06b77d87`）仍然 valid 作为
 
 ---
 
+## 10. DC.3-redesign — 三个 sub-design 选项详细对比（2026-04-30 v4）
+
+> 此节给 owner review 用。每个选项给出：(a) 代码形状预览 (b) 长期演进 6/12 个月预测 (c) reverse 反方 steel-man (d) 6 个月后悔检查。最后给出 v4 倾向 + 反方理由。
+
+### 10.1 起点：当前两条路径对应的代码层次
+
+```
+AgentReplyTask (~327 LOC) — 群聊路径
+  ├─ Step 1-2: 加载 AgentDefinition + TYPING SSE
+  ├─ Step 3:   buildHistory(conv, tenant, ctxWin)        ← 群聊 ab_im_message 跨 agent tape
+  ├─ Step 4:   buildSystemPrompt(agentDto, conv, tenant) ← 多 agent 群聊语境
+  ├─ Step 5:   buildTools(conv, tenant, currentAgentId)  ← agent.getTools() + handoff tool
+  ├─ Step 6:   resolveProvider + buildLlmChatRequest
+  ├─ Step 7:   provider.chat(...) ← 直调 LLM
+  ├─ Step 8:   handle response (end_turn / tool_use / handoff recursion)
+  └─ Step 9:   STREAM_CHUNK / STREAM_END SSE + saveAgentMessage
+
+AgentChatPortImpl.runAgentTurn (~600 LOC) — 1:1 chat 路径
+  ├─ Step 1:   加载 AgentDefinition (by agentCode)
+  ├─ Step 2:   resolveProvider + config
+  ├─ Step 3:   buildSystemPrompt(agentDef)               ← 1:1 chat 模型
+  ├─ Step 4:   discoverToolDefinitions (ToolProviderRegistry) ← tenant scope
+  │           + DC.1 mergeExtraTools(extraTools)
+  ├─ Step 5:   restoreOrBuildMessages (ChatRequest.history + 持久 tape)
+  ├─ Step 6:   多轮 LLM tool loop:
+  │            - provider.chat
+  │            - end_turn → streamFinalResponse → Success
+  │            - tool_use:
+  │              - DC.2 transfer_to_agent → buildHandoffOutcome → Success.meta._handoff_to
+  │              - requiresConfirmation → sink.onConfirmRequired, PendingTool 存
+  │              - read-only → 执行 + tool_result 喂回循环
+  ├─ Step 7:   max rounds / LLM 异常 → Failed
+  └─ Step 8:   传入的 sink 接收 onTextChunk / onDone / onError / onToolResult / ...
+```
+
+**核心观察**：步骤 6（LLM tool loop）80%+ 是相同的；差异集中在步骤 1-5（**context 准备**）。
+
+### 10.2 选项 A — `ChatRequest` 加 optional 字段（caller 预构建 context）
+
+#### 代码形状
+
+```java
+// ChatRequest 加 3 个 optional 字段
+public class ChatRequest {
+    // existing: agentCode, message, history, sessionId, pageContext, options, ...
+    + private String customSystemPrompt;       // 非 null 时 AgentChatPortImpl 用此
+    + private List<LlmChatRequest.Message> historyOverride;  // 非 null 时用此
+    + private List<ToolDefinition> pinnedToolDefs;  // 非 null 时用此（替代 ToolProviderRegistry 发现）
+}
+
+// AgentReplyTask 重写
+ChatRequest req = new ChatRequest();
+req.setAgentCode(agent.getAgentCode());
+req.setMessage(triggerContent);
+req.setSessionId("im-conv-" + conversationId);
+req.setCustomSystemPrompt(replyContext.buildSystemPrompt(agentDto, conversationId, tenantId));
+req.setHistoryOverride(replyContext.buildHistory(conversationId, tenantId, contextWindow));
+req.setPinnedToolDefs(buildAgentAttachedToolDefs(agent));
+
+ResponseSink sink = new GroupChatSseBridgingSink(sseEmitterManager, humanMemberIds, ...);
+List<ToolDefinition> extraTools = List.of(handoffToolDef);
+TurnOutcome outcome = agentChatPort.runAgentTurn(ctx, req, sink, extraTools);
+
+// Handle outcome.meta._handoff_to → 关 task / 开 child / recurse
+```
+
+`AgentChatPortImpl.runAgentTurn` 内部三个分支：
+```java
+String systemPrompt = request.getCustomSystemPrompt() != null
+        ? request.getCustomSystemPrompt()
+        : buildSystemPrompt(agentDef);  // existing default
+List<LlmChatRequest.Message> messages = request.getHistoryOverride() != null
+        ? request.getHistoryOverride()
+        : restoreOrBuildMessages(...);  // existing default
+List<ToolDefinition> toolDefs = request.getPinnedToolDefs() != null
+        ? request.getPinnedToolDefs()
+        : discoverToolDefinitions(...);  // existing default
+toolDefs = mergeExtraTools(toolDefs, extraTools);  // DC.1 unchanged
+```
+
+#### Pros / Cons
+
+**Pros**:
+- AgentChatPortImpl 单 SPI 单 entry，Channel 知识在 AgentReplyTask 一处
+- 现有 1:1 chat / aurabot 主路径**零行为变化**（不传 optional 字段就走默认）
+- 步骤 6（LLM tool loop）100% 单实现共享 —— bug 修一处，所有 channel 受益
+- 未来新 channel（webhook / BPM / 调度）模式相同：caller 预构建 context，feed through optional fields
+- ChatRequest 字段增长可观察：metric `agentchatport_caller_prebuild_count{field=...}` 高 → 该字段是真实需求；低 → 该字段死掉，可删
+
+**Cons**:
+- ChatRequest 字段数量 8 → 11，长期可能继续涨
+- "if non-null, use this; else build default" 分支逻辑在 AgentChatPortImpl 内
+- "chokepoint claim" 严格说不是"all context built here"而是"all LLM calls go through here"，前者更弱
+
+#### 6/12 个月演进预测
+- 6 个月：除 AgentReplyTask 外，可能 1-2 个新 caller 用 optional 字段（webhook trigger / scheduled agent）；ChatRequest 字段增长缓慢
+- 12 个月：optional 字段稳定在 3-5 个；metric 数据告诉 owner 哪些字段真用、哪些死掉
+- **6 个月后悔检查**："早知道当时该选 B 把 group-chat 吸进 AgentChatPortImpl"？— 不会后悔；distributed context-build 是 SRP 自然结果，每个 channel 拥有自己的 context source
+
+#### Steel-man 反方
+> "Optional 字段创造模糊 API contract — 调用方不知道哪些字段组合产生正确行为。Chokepoint claim 弱化。"
+
+回应：optional + "if present takes precedence" 是 Java 生态成熟模式（Spring 大量使用）。chokepoint claim 的核心是"all LLM calls use the same loop and side effects"，A 满足。
+
+---
+
+### 10.3 选项 B — `AgentChatPortImpl` 吸收 `AgentReplyContext`（channel-driven 内部分支）
+
+#### 代码形状
+
+```java
+// TurnContext 加 channel 字段
+public record TurnContext(..., String channel, ...);  // "im_group" / "aurabot" / "webhook" / ...
+
+// AgentChatPortImpl 内部 channel 分支
+public TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink,
+                                  List<ToolDefinition> extraTools) {
+    // ... 加载 agentDef / 解析 provider 不变 ...
+
+    boolean isGroupChat = "im_group".equals(ctx.channel());
+
+    String systemPrompt = isGroupChat
+            ? buildGroupChatSystemPrompt(agentDef, ctx.conversationId(), ctx.tenantId())
+            : buildSystemPrompt(agentDef);
+
+    List<LlmChatRequest.Message> messages = isGroupChat
+            ? loadGroupChatHistory(ctx.conversationId(), ctx.tenantId(), DEFAULT_CONTEXT_WINDOW)
+            : restoreOrBuildMessages(request.getSessionId(), request.getHistory(), request.getMessage());
+
+    List<ToolDefinition> toolDefs = isGroupChat
+            ? buildAgentAttachedToolDefs(agentDef)
+            : discoverToolDefinitions(...);
+    toolDefs = mergeExtraTools(toolDefs, extraTools);
+
+    // ... step 6 LLM tool loop 不变 ...
+}
+```
+
+需要：
+- `TurnContext.channel` 新字段（5 个 TurnContext 构造点全部加）
+- `AgentChatPortImpl` 注入 `AgentReplyContext` + `GroupChatMessagePort`（来自 `agentchat` 包）
+- AgentReplyTask 缩成 ~50 LOC：dispatch + handoff 递归
+
+#### Pros / Cons
+
+**Pros**:
+- AgentChatPortImpl 是真正的 single LLM entry — chokepoint claim 最强
+- AgentReplyTask 缩成薄 dispatcher，大量代码消灭
+- ChatRequest 字段不变
+
+**Cons**:
+- **跨包反向依赖**：`agent.service.AgentChatPortImpl`（核心 agent 模块）需要依赖 `agentchat.spi.GroupChatMessagePort` + `agentchat.reply.AgentReplyContext`（应用层模块）。当前依赖方向 `agentchat → agent`，反过来意味着核心模块 import 应用模块 → 模块边界破坏
+- AgentChatPortImpl 复杂度上升 ~+200 LOC；每新增 channel 加一个分支
+- "isGroupChat" 字符串比较散落在多处；switch case 多 channel 时需 strategy 模式重构 → 又走向 A
+- TurnContext.channel 字段全链路传递（5+ 构造点 + Persistence + EventEmitter 路径都要意识到 channel 语义）
+
+#### 6/12 个月演进预测
+- 6 个月：`im_group` 分支落地；新加 `webhook` / `bpm` channel 又加分支
+- 12 个月：AgentChatPortImpl 内部 5+ channel 分支；isXxx 比较或 strategy map 散落多处
+- **6 个月后悔检查**："早知道该用 A 把 channel 知识留在 caller"？— 后悔可能性高。Channel-driven god class 是已知反模式（OOP 历史教训：每加一个分支就考虑是不是该多态了）
+
+#### Steel-man 反方
+> "True chokepoint 必须 single canonical impl。Channel-driven 分支 IS 正确做法 —— 与 C.3c 的 bucket-driven 分派同源。"
+
+回应：bucket dispatch 在边界上（chokepoint → ACP runtime vs chokepoint → chat impl），那两条路径**根本不同**（一条 task-based plan 循环，一条 LLM tool loop）。在 AgentChatPortImpl 内部 step 6 的 LLM tool loop 99% 相同，只有 step 1-5 context 不同 —— 这是 SRP 应该拆开的地方而不是统一的地方。
+
+---
+
+### 10.4 选项 C — `GroupChatAgentChatPort` 子接口（两个并行 impl）
+
+#### 代码形状
+
+```java
+interface AgentChatPort {  // 基础（1:1 chat）
+    TurnOutcome runAgentTurn(...);
+}
+
+interface GroupChatAgentChatPort extends AgentChatPort {
+    // 群聊专用 hook（如果需要）
+    TurnOutcome runAgentTurnWithGroupContext(...);
+}
+
+class AgentChatPortImpl implements AgentChatPort { ... }       // 1:1 chat (~600 LOC)
+class GroupChatAgentChatPortImpl implements GroupChatAgentChatPort {
+    ...                                                         // 群聊 (~400 LOC, 大量复制 1:1 的 LLM tool loop)
+}
+
+// ConversationTurnService 按 channel 分派
+if ("im_group".equals(channel)) {
+    groupChatPort.runAgentTurnWithGroupContext(...);
+} else {
+    agentChatPort.runAgentTurn(...);
+}
+```
+
+#### Pros / Cons
+
+**Pros**:
+- 关注点清晰分离：1:1 chat 一个 impl，群聊一个 impl
+- 各自可独立演进，不互相干扰
+
+**Cons**:
+- **代码重复**：步骤 6（LLM tool loop）80%+ 重复一遍。tool execution / confirmation / handoff signal / message persistence 全部各做一份
+- DC.1 + DC.2 在两个 impl 各实现一次 → 漂移风险（已经有先例：D.4 SseEmitterManager 与 ImMessageBroadcaster 平行 transport，最终是技术债）
+- ConversationTurnService dispatch 多一个 channel 分支（基本就是 B 选项的同样问题往外移了一层）
+- "chokepoint" 概念分裂 —— 哪个才是 named-agent 的 canonical 入口？
+
+#### 6/12 个月演进预测
+- 6 个月：两个 impl 同步；新 bug 修在哪个看作者哪个 PR
+- 12 个月：两个 impl 漂移；1:1 修了 retry 逻辑，群聊没修 → 群聊 retry 行为悄悄不一致；用户报 bug 时定位困难
+- **6 个月后悔检查**："早知道该用 A 让两条路径共享 LLM tool loop"？— 后悔可能性最高。两个并行 impl 漂移是经典反模式
+
+#### Steel-man 反方
+> "两个 impl 共享基类是标准 Java 实践。"
+
+回应：当 80%+ 代码共享时，基类成为事实上的 god class（回到 B 选项的问题）。真正分离需要 <50% 共享，这里不适用。
+
+---
+
+### 10.5 v4 倾向 + 反方理由
+
+| | 选项 A | 选项 B | 选项 C |
+|---|---|---|---|
+| chokepoint claim | "all LLM calls 走同一 loop"（语义稍弱但够用） | "all named-agent context 在一处构建"（语义最强） | "named-agent 有 2 个 impl，按 channel 选"（claim 削弱） |
+| LLM tool loop 共享 | ✓ 100% | ✓ 100% | ✗ 复制 80% |
+| Channel 知识位置 | caller 拥有（自然） | AgentChatPortImpl（god class 风险） | 各 impl 各自含 |
+| 跨模块依赖方向 | 不变（agent ← agentchat 单向） | **反向**（agent → agentchat） | 不变 |
+| 新增 channel 成本 | 写一个 caller，注入 optional fields | 加分支或 strategy entry | 写一个新 impl + 更新 dispatcher |
+| 6 个月后悔风险 | 低 | 中（god class） | 高（双 impl 漂移） |
+| 反模式倾向 | 接近"distributed factory"（已知模式） | 接近"channel god class"（已知反模式） | 接近"parallel implementations"（最强反模式） |
+
+**v4 倾向**：**选项 A**（带 metric 监督）。
+
+理由：
+1. AGENTS.md "长期演进视角" 红线："禁止推荐让接口契约 / chokepoint / 抽象 claim **装饰化**"。A 让 chokepoint claim 真实 — `runAgentTurn` 是 100% LLM-loop 唯一入口；只是 context 准备权交给 caller。这是 SRP 的自然结果。
+2. B 的 god class 模式 + 跨模块反向依赖在 6-12 个月后是已知反模式（chokepoint refactor 自己就在修类似的反模式 —— 谁会想再加一个）。
+3. C 是最强反模式（双 impl 漂移）。
+4. A 字段增长用 metric 自我监督：optional 字段使用率低 → 删；高 → 是真实模式。对应 AGENTS.md 的"sunset metric / observability discipline"。
+
+**A 增强建议**：
+
+```java
+// AgentChatPortImpl 加 metric 桩
+if (request.getCustomSystemPrompt() != null) {
+    Metrics.increment("agentchatport.caller_prebuild", "field", "systemPrompt", "channel", ctx.channel());
+}
+// 同样为 historyOverride / pinnedToolDefs
+
+// 6 个月后审查 metric。某字段所有 channel 都使用 → 升级为非 optional；某字段只有 1 channel 使用 → 设计决策记录"该字段是 channel-specific extension"
+```
+
+**反方 steel-man**（公平起见）：
+
+> "选项 A 把 group-chat 知识放 AgentReplyTask，6 个月后 GroupChatAgentRouter / 邮件回复 agent / 群聊任意场景都各自构建 group-chat-specific context — 等于代码复制只是分散到多个 caller。"
+
+回应：这是真问题。缓解：把 `AgentReplyContext.buildSystemPrompt + buildHistory` 升级为公开的群聊语境构建器（可注入到任何 caller），名字可改为 `GroupChatTurnContextAssembler`。它是个工具类，不是 SPI；所有群聊 caller 共用。这把 A 的"context 由 caller 构建"细化成"context 由 caller 调用共享 assembler 构建"，不再是 caller 各自重复。
+
+> "选项 B 真的会变 god class 吗？也许只有 group-chat 一个分支永远存在。"
+
+回应：可能。但关键是 SPI 决策不应押注"未来不会有新 channel"。A 对未来 channel 是开放的（加 optional 字段或不加都可），B 对未来 channel 是封闭的（必须改 AgentChatPortImpl）。
+
+---
+
+### 10.6 落地 PR 切片（owner 锁 A 后）
+
+| PR | 内容 | 估 LOC | 依赖 |
+|----|------|------|------|
+| **DC.3a** `ChatRequest` 加 3 optional 字段（customSystemPrompt / historyOverride / pinnedToolDefs）+ AgentChatPortImpl 在 step 1-5 检测并使用 | ~120 + 3 单测 | DC.1 + DC.2 |
+| **DC.3b** 抽 `GroupChatTurnContextAssembler`（公开工具类）封装现有 `AgentReplyContext.buildSystemPrompt + buildHistory`；目标多 caller 共享 | ~80 (-50)，纯重组 | — |
+| **DC.3c** AgentReplyTask 重写：注入 AgentChatPort + GroupChatTurnContextAssembler；构建预制 ChatRequest 调 runAgentTurn；handoff 通过 outcome.meta._handoff_to | ~250 (-200) | DC.3a + DC.3b |
+| **DC.3d** Metric 桩 (`agentchatport.caller_prebuild`) + 文档化 sunset 标准（"6 个月后所有 channel 都不使用某字段 → 删") | ~30 | DC.3a |
+| **DC.4** （unchanged from v2）跨仓 OSS 删 SseEmitterManager + enterprise imSseClient.ts → WS | ~150 (-150) + ~80 enterprise | DC.3c |
+
+合计：~630 LOC 新（含 metric） / -400 LOC 删除（净 +230）。每 PR 独立可 review。
+
+预估时长：DC.3a (1天) + DC.3b (0.5天) + DC.3c (1.5天) + DC.3d (0.5天) + DC.4 (1天) ≈ 4.5 天。
+
+---
+
 ## CHANGELOG
 
+- 2026-04-30 v4 §10 三个 sub-design 选项详细对比 + 6/12 个月演进预测 + steel-man + v4 倾向 (选项 A) + DC.3a-d 落地切片. **Pending owner review.**
 - 2026-04-30 v3 DC.1 + DC.2 landed (`131f8890` + `d7f9175b`); DC.3 + DC.4 deferred pending §9 sub-design — AgentReplyContext 群聊语境 absorption (3 选项) 需要单独设计 lock
 - 2026-04-30 v2 owner 决策锁定 5 项；§7.1 新增"前因后果"节解释 Q-DC.4 从 α (dual-publish) 修正到 β (one-shot)；§8 锁定 4 PR 实施时序（v1 是 3 PR，DC.4 跨仓 transport 删除新加为独立 step）
 - 2026-04-30 v1 初稿；5 个决策点 surfacing；候选 PR 切片 DC.1-DC.3
