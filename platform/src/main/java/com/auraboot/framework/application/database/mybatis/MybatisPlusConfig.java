@@ -178,6 +178,7 @@ public class MybatisPlusConfig {
      */
     private static final Set<String> ENV_SCOPED_TABLES = Set.of(
             "ab_page_schema",
-            "ab_page_schema_history"
+            "ab_page_schema_history",
+            "ab_resource_reference"  // task #8: reverse-reference index follows the page it indexes
     );
 }
