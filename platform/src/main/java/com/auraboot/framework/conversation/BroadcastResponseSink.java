@@ -52,6 +52,15 @@ import java.util.Map;
  * delivery is fire-and-forget; partially-disconnected clients are handled
  * by {@link ImMessageBroadcaster} (LocalBroadcaster drops, RedisBroadcaster
  * Pub/Sub) without surfacing back to this sink.
+ *
+ * <p><b>Phase D.4 transport architecture (2026-04-30):</b> this sink is the
+ * chokepoint-flow side of two coexisting push transports. The other side is
+ * {@code com.auraboot.framework.agentchat.sse.SseEmitterManager} (HTTP SSE
+ * at {@code GET /api/im/stream}) which the enterprise {@code ent-im-chat}
+ * plugin actively subscribes to via {@code imSseClient.ts}. Both channels
+ * are kept until a coordinated frontend migration consolidates them. See
+ * {@code SseEmitterManager}'s class javadoc for the full transport decision
+ * matrix; D.4 commit message records the no-op-on-this-side rationale.
  */
 public class BroadcastResponseSink implements ResponseSink {
 
