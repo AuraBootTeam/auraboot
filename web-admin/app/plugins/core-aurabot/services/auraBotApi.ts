@@ -104,6 +104,14 @@ export interface ChatStreamOptions {
     input: Record<string, any>,
     pendingTurnId: string,
   ) => void;
+  /**
+   * P0-2: Anthropic Extended Thinking — chain-of-thought trace emitted before
+   * the assistant's final answer. {@code tokens} may be -1 when the upstream
+   * stream did not surface a per-block usage figure (the renderer estimates
+   * from word count in that case). {@code signature} is opaque resume metadata
+   * carried through for forward compatibility (Phase P1).
+   */
+  onThinking?: (content: string, tokens: number, signature?: string) => void;
 }
 
 export interface AuraBotConversationItem {
@@ -606,6 +614,16 @@ async function processSSEStream(
               case 'result_contract':
                 callbacks.onResultContract?.(
                   (typeof data === 'string' ? JSON.parse(data) : data) as ResultContract,
+                );
+                break;
+              case 'thinking':
+                // P0-2: Anthropic Extended Thinking. Backend emits one event
+                // per thinking content block (not per delta), so the panel
+                // gets a single structured payload to render via ThinkingBlock.
+                callbacks.onThinking?.(
+                  typeof data.content === 'string' ? data.content : '',
+                  typeof data.tokens === 'number' ? data.tokens : -1,
+                  typeof data.signature === 'string' ? data.signature : undefined,
                 );
                 break;
               case 'confirm_required':

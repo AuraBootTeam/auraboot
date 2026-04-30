@@ -741,6 +741,16 @@
     "en-US": "AI Modeling Wizard"
   },
   {
+    "key": "aurabot.thinking.label",
+    "zh-CN": "推理过程",
+    "en-US": "Reasoning"
+  },
+  {
+    "key": "aurabot.thinking.tokens",
+    "zh-CN": "{count} tokens",
+    "en-US": "{count} tokens"
+  },
+  {
     "key": "auth.channel.emailCode",
     "zh-CN": "邮箱验证码",
     "en-US": "Email Code"

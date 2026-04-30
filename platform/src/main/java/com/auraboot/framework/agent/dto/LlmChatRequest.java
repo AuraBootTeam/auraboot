@@ -25,6 +25,17 @@ public class LlmChatRequest {
     private List<Tool> tools;
     private int maxTokens;
 
+    /**
+     * Optional Anthropic Extended Thinking configuration. When {@code null} the
+     * provider must NOT add a {@code thinking} field to the wire request — this
+     * keeps existing chat callers byte-identical with the pre-P0-2 behaviour.
+     *
+     * <p>Capability gating happens in the provider: even when this is set with
+     * {@code enabled=true}, providers that cannot handle thinking (legacy
+     * Claude 3, OpenAI/DeepSeek/Qwen, etc.) silently drop it.
+     */
+    private ThinkingConfig thinking;
+
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class Message {
         private String role;        // "user", "assistant"
@@ -48,5 +59,21 @@ public class LlmChatRequest {
         private String description;
         private Map<String, Object> inputSchema;
         private Map<String, Object> nativeToolConfig; // For LLM_NATIVE tools — passed directly to provider
+    }
+
+    /**
+     * Anthropic Extended Thinking knob. Only honoured by Claude Sonnet 4.6+,
+     * Opus 4.x, and Haiku 4.x — see {@code AnthropicLlmProvider#supportsThinking}.
+     *
+     * <p>{@code budgetTokens} is the maximum tokens the model may spend in its
+     * private thinking block. Anthropic requires
+     * {@code request.max_tokens > thinking.budget_tokens}; if not, the provider
+     * auto-extends max_tokens to {@code budget + 4096} to avoid HTTP 400.
+     */
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class ThinkingConfig {
+        private boolean enabled;
+        @Builder.Default
+        private int budgetTokens = 10_000;
     }
 }

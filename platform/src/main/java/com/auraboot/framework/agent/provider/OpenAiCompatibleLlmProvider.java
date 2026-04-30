@@ -58,6 +58,15 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
     @Override
     @SuppressWarnings("unchecked")
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception {
+        // Anthropic Extended Thinking is intentionally NOT mapped here.
+        // OpenAI o1/o3 reasoning_effort lives in a different request shape and
+        // is out of scope for P0-2 — see plan §5. Drop the field with a debug
+        // log so noisy callers can observe the skip without polluting INFO.
+        if (request.getThinking() != null && request.getThinking().isEnabled() && log.isDebugEnabled()) {
+            log.debug("OpenAI-compatible provider does not honour LlmChatRequest.thinking; "
+                    + "dropping for model={}", request.getModel());
+        }
+
         // Build OpenAI Chat Completions request
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", request.getModel());

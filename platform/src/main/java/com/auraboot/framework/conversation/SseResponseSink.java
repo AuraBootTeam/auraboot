@@ -79,6 +79,21 @@ public class SseResponseSink implements ResponseSink {
     }
 
     @Override
+    public void onThinking(String content, int tokens, String signature) {
+        // P0-2: Anthropic Extended Thinking — frontend ThinkingBlock listens
+        // for the {@code thinking} SSE event with payload
+        // {@code {content, tokens, signature?}}. Wrapped in JSON-string like
+        // tool_start / tool_result so the SSEEvent shape stays uniform.
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("content", content != null ? content : "");
+        payload.put("tokens", tokens);
+        if (signature != null) {
+            payload.put("signature", signature);
+        }
+        sendJsonString("thinking", payload);
+    }
+
+    @Override
     public void onResultContract(ResultContract contract) {
         // Byte-for-byte parity with the legacy ResultContractEmitter.send():
         //   emitter.send(SseEmitter.event().name("result_contract")
