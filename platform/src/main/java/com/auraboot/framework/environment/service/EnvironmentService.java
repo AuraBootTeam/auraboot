@@ -67,4 +67,18 @@ public interface EnvironmentService {
      * @throws IllegalStateException    env not currently locked
      */
     EnvironmentResponse unlock(String pid, Long tenantId, Long userId, String reason);
+
+    /**
+     * Find the tenant's default environment. If none exists, create one with code='default',
+     * name='Default', is_default=true. Idempotent: concurrent calls are serialized by the unique
+     * (tenant_id, code) index.
+     *
+     * <p>Used by:
+     * <ul>
+     *   <li>{@code EnvIdMetaObjectHandler} fallback when MetaContext has no env id</li>
+     *   <li>{@code EnvironmentResolverFilter} default branch when request has no env hint</li>
+     *   <li>Test fixtures (BaseIntegrationTest) to seed a default env per test tenant</li>
+     * </ul>
+     */
+    Long findOrCreateDefaultId(Long tenantId);
 }
