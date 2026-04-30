@@ -260,4 +260,87 @@ export const actionNodes: FlowNodeDefinition[] = [
       actionType: 'start_process',
     },
   },
+  {
+    // P1 — Workflow LLM action node. Lets users embed an LLM inference step
+    // (summarise / classify / extract / decide) inside an automation flow.
+    // Resolves variables in the prompt template against the current execution
+    // context, calls the configured LLM provider, and stores the response text
+    // under context.<outputVariableName> so downstream nodes can consume it
+    // (e.g. ${llmOutput} in a subsequent send-notification step).
+    type: 'action-llm-call',
+    label: '$i18n:automation.action.llmCall',
+    icon: 'Sparkles',
+    category: 'action',
+    description: '$i18n:automation.action.llmCall.desc',
+    configSchema: [
+      {
+        key: 'model',
+        label: '$i18n:automation.field.llmModel',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Claude Sonnet 4.6', value: 'claude-sonnet-4-6' },
+          { label: 'Claude Opus 4', value: 'claude-opus-4' },
+          { label: 'Claude Haiku 4', value: 'claude-haiku-4' },
+        ],
+        description: '$i18n:automation.field.llmModel.desc',
+        group: 'model',
+      },
+      {
+        key: 'systemPrompt',
+        label: '$i18n:automation.field.llmSystemPrompt',
+        type: 'textarea',
+        placeholder: 'You are a helpful assistant.',
+        description: '$i18n:automation.field.llmSystemPrompt.desc',
+        group: 'prompt',
+      },
+      {
+        key: 'userPromptTemplate',
+        label: '$i18n:automation.field.llmUserPrompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Summarise the following: ${trigger.text}',
+        description: '$i18n:automation.field.llmUserPrompt.desc',
+        group: 'prompt',
+      },
+      {
+        key: 'maxTokens',
+        label: '$i18n:automation.field.llmMaxTokens',
+        type: 'number',
+        description: '$i18n:automation.field.llmMaxTokens.desc',
+        group: 'model',
+      },
+      {
+        key: 'thinkingEnabled',
+        label: '$i18n:automation.field.llmThinkingEnabled',
+        type: 'boolean',
+        description: '$i18n:automation.field.llmThinkingEnabled.desc',
+        group: 'advanced',
+      },
+      {
+        key: 'thinkingBudgetTokens',
+        label: '$i18n:automation.field.llmThinkingBudget',
+        type: 'number',
+        description: '$i18n:automation.field.llmThinkingBudget.desc',
+        dependsOn: { field: 'thinkingEnabled', value: true },
+        group: 'advanced',
+      },
+      {
+        key: 'outputVariableName',
+        label: '$i18n:automation.field.llmOutputVariable',
+        type: 'text',
+        description: '$i18n:automation.field.llmOutputVariable.desc',
+        placeholder: 'llmOutput',
+        group: 'output',
+      },
+    ],
+    defaultConfig: {
+      actionType: 'llm_call',
+      model: 'claude-sonnet-4-6',
+      maxTokens: 1024,
+      thinkingEnabled: false,
+      thinkingBudgetTokens: 8000,
+      outputVariableName: 'llmOutput',
+    },
+  },
 ];
