@@ -78,6 +78,35 @@ public class AnthropicLlmProvider implements LlmProvider {
             "opus-4",
             "haiku-4");
 
+    // =========================================================================
+    // P1 — Vision (image input) capability gate.
+    //
+    // Anthropic accepts image content blocks on Claude 3.5+, Claude 4.x, and
+    // future Claude 5.x models. Old Claude 2 / Claude Instant variants reject
+    // the request. Unlike Extended Thinking, vision is a request-level
+    // capability — sending an image to a non-vision model returns HTTP 400.
+    // We surface this as an {@link IllegalArgumentException} on the chat()
+    // entry-point so the caller learns immediately rather than getting a
+    // confusing wire-level error from Anthropic.
+    //
+    // Anthropic model codes use two distinct version-placement conventions:
+    //   - claude-{family}-{major}-{minor}     (e.g. claude-sonnet-4-6) — newer
+    //   - claude-{major}-{minor}-{family}-... (e.g. claude-3-5-sonnet-20241022) — older
+    // We match BOTH placements explicitly so the gate works across all
+    // Anthropic naming variants seen in the wild.
+    // =========================================================================
+    private static final Set<String> VISION_CAPABLE_PATTERNS = Set.of(
+            // Modern naming: family first
+            "sonnet-4-6", "sonnet-4-7",
+            "opus-4",
+            "haiku-4",
+            // Legacy naming: version first (Claude 3.x family — all support vision)
+            "3-5-sonnet",
+            "3-5-haiku",
+            "3-opus",
+            "3-sonnet",
+            "3-haiku");
+
     /**
      * Headroom Anthropic requires above {@code thinking.budget_tokens}. The API
      * rejects requests where {@code max_tokens <= budget_tokens}; we want a
@@ -128,6 +157,19 @@ public class AnthropicLlmProvider implements LlmProvider {
 
     @Override
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception {
+        // P1 vision capability gate — fail fast before we hit the wire so the
+        // caller gets a deterministic error string with the offending model name
+        // instead of an opaque HTTP 400 from Anthropic. Silent drop is NOT an
+        // option here: image attachment is an explicit user gesture (paperclip
+        // upload), and dropping it would erase the user's intent without any
+        // visible feedback.
+        if (containsImageContent(request.getMessages()) && !supportsVision(request.getModel())) {
+            throw new IllegalArgumentException(
+                    "model " + request.getModel() + " does not support vision input; "
+                            + "use a Claude 3.5+ / 4.x / 5.x model (e.g. claude-sonnet-4-6) "
+                            + "or remove the image attachment.");
+        }
+
         // Build Anthropic-specific request — system + last tool both carry
         // cache_control: ephemeral so the prefix is cached across turns.
         // P0-2 M9: collect any provider-side warnings (e.g. max_tokens
@@ -291,9 +333,96 @@ public class AnthropicLlmProvider implements LlmProvider {
         return messages.stream()
                 .map(m -> AnthropicRequest.Message.builder()
                         .role(m.getRole())
-                        .content(m.getContent())
+                        .content(convertMessageContent(m.getContent()))
                         .build())
                 .toList();
+    }
+
+    /**
+     * Translate the unified {@code Message.content} into the wire-format value
+     * Anthropic expects:
+     * <ul>
+     *   <li>String → passes through unchanged (text-only messages).</li>
+     *   <li>{@code List<MessageContentBlock>} → each block is mapped to
+     *       {@link AnthropicRequest.ImageContentBlock} so the
+     *       {@code source.media_type} field serialises with snake_case as
+     *       required by the API.</li>
+     *   <li>Any other List (e.g. tool_use / tool_result blocks emitted by the
+     *       agent loop) → passes through unchanged so existing assistant turn
+     *       handling stays byte-identical.</li>
+     * </ul>
+     *
+     * <p>Mapping is intentionally one-way and explicit — we do NOT silently
+     * coerce shape mismatches because vision input is a load-bearing user
+     * gesture and a quiet "(image stripped)" fallback would hide bugs.
+     */
+    private Object convertMessageContent(Object content) {
+        if (!(content instanceof List<?> list) || list.isEmpty()) {
+            return content;
+        }
+        // Detect MessageContentBlock at the head — if present, ALL blocks are
+        // expected to be MessageContentBlock (the helpers in Message build
+        // homogeneous lists). Mixed legacy-vs-vision blocks are not supported
+        // because tool_use blocks never appear on the same turn as image input.
+        Object first = list.get(0);
+        if (!(first instanceof LlmChatRequest.MessageContentBlock)) {
+            return content;
+        }
+        List<AnthropicRequest.ImageContentBlock> converted = new ArrayList<>(list.size());
+        for (Object raw : list) {
+            if (!(raw instanceof LlmChatRequest.MessageContentBlock block)) continue;
+            AnthropicRequest.ImageContentBlock.ImageContentBlockBuilder b =
+                    AnthropicRequest.ImageContentBlock.builder().type(block.getType());
+            if ("image".equals(block.getType()) && block.getSource() != null) {
+                LlmChatRequest.ImageSource src = block.getSource();
+                b.source(AnthropicRequest.ImageSource.builder()
+                        .type(src.getType())
+                        .mediaType(src.getMediaType())
+                        .data(src.getData())
+                        .url(src.getUrl())
+                        .build());
+            } else if ("text".equals(block.getType())) {
+                b.text(block.getText());
+            }
+            converted.add(b.build());
+        }
+        return converted;
+    }
+
+    /**
+     * P1 capability gate for Anthropic vision (image content blocks). Returns
+     * {@code true} iff the model code carries one of the
+     * {@link #VISION_CAPABLE_PATTERNS} substrings — every Claude 3.5+, 4.x,
+     * and 5.x family member. Returns {@code false} for null/empty/legacy
+     * (claude-2, claude-instant) identifiers.
+     *
+     * <p>Visible to tests via package-private accessor.
+     */
+    boolean supportsVision(String model) {
+        if (model == null || model.isBlank()) return false;
+        for (String pattern : VISION_CAPABLE_PATTERNS) {
+            if (model.contains(pattern)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns true iff any message in the request carries at least one
+     * image content block. Used by {@link #chat} as the trigger for the
+     * {@link #supportsVision} capability gate.
+     */
+    private boolean containsImageContent(List<LlmChatRequest.Message> messages) {
+        if (messages == null) return false;
+        for (LlmChatRequest.Message m : messages) {
+            if (!(m.getContent() instanceof List<?> blocks)) continue;
+            for (Object block : blocks) {
+                if (block instanceof LlmChatRequest.MessageContentBlock mcb
+                        && "image".equals(mcb.getType())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private List<AnthropicRequest.Tool> convertTools(List<LlmChatRequest.Tool> tools) {

@@ -67,6 +67,19 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                     + "dropping for model={}", request.getModel());
         }
 
+        // P1 vision: this provider is the OpenAI-compat fall-through used by
+        // DeepSeek / Qwen / Zhipu / MiniMax / etc. Most of them don't accept
+        // OpenAI's image_url content blocks yet, and the few that do have
+        // diverging schemas (qwen-vl uses a different field shape). Until P1.5
+        // adds a per-provider vision matrix, we refuse image input outright
+        // rather than silently dropping it or fabricating "[image]" text —
+        // either alternative would erase the user's intent.
+        if (containsImageContent(request.getMessages())) {
+            throw new IllegalArgumentException(
+                    "openai-compatible provider does not support vision in this build; "
+                            + "use Anthropic (Claude 3.5+) for image input.");
+        }
+
         // Build OpenAI Chat Completions request
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", request.getModel());
@@ -168,6 +181,26 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
     private boolean isToolUnsupportedProvider(String model) {
         // MiniMax-M2.5+ supports OpenAI-compatible function calling.
         // Only disable for truly unsupported providers if discovered later.
+        return false;
+    }
+
+    /**
+     * P1 vision pre-check. Returns true iff any user message carries a
+     * {@code MessageContentBlock} with {@code type=image}. This provider
+     * rejects such requests outright rather than dropping the image silently —
+     * see the {@link #chat} guard for rationale.
+     */
+    private boolean containsImageContent(List<LlmChatRequest.Message> messages) {
+        if (messages == null) return false;
+        for (LlmChatRequest.Message m : messages) {
+            if (!(m.getContent() instanceof List<?> blocks)) continue;
+            for (Object block : blocks) {
+                if (block instanceof LlmChatRequest.MessageContentBlock mcb
+                        && "image".equals(mcb.getType())) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
