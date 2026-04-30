@@ -1,6 +1,6 @@
 # D.3-chokepoint Follow-up — HandoffToolProvider × AgentChatPort SPI Integration
 
-> **Status**: v1 draft (2026-04-30) — decisions surfaced, not yet owner-locked.
+> **Status**: v2 (2026-04-30) — owner locked 5 decisions; Q-DC.4 corrected from α (dual-publish) to β (one-shot migration) after a discussion that surfaced the Phase D.4 over-cautious framing. §8 implementation sequence locked at 4 PRs.
 > **Predecessor**: [`2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md`](./2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md) v3 §8 row D.3 deferral note.
 
 ## 0. 摘要
@@ -181,15 +181,51 @@ D.3 现状 AgentReplyTask 用 `SseEmitterManager.sendToUsers(SseEventType.STREAM
 
 ---
 
-## 7. owner 决策汇总（v1 待 lock）
+## 7. owner 决策汇总（v2 已 lock 2026-04-30）
 
-| Q | 内容 | v1 倾向 | 决策（owner 填）|
+| Q | 内容 | **决策** | 关键判断 |
 |---|------|---------|---|
-| Q-DC.1 | HandoffToolProvider × Registry 关系 | β SPI 加 extraTools | TBD |
-| Q-DC.2 | transfer_to_agent 信号传递 | α Success.meta | TBD |
-| Q-DC.3 | task 链与 chokepoint task 整合 | α chokepoint 单 task 模型 | TBD |
-| Q-DC.4 | 群聊 transport | α 双推（继承 D.4 决策）| TBD |
-| Q-DC.5 | 实施分阶段 | β 三 PR | TBD |
+| Q-DC.1 | HandoffToolProvider × Registry 关系 | **β** SPI 加 extraTools | 会话 scope 工具不应污染 tenant-scoped registry；optional 参数最小 blast radius |
+| Q-DC.2 | transfer_to_agent 信号传递 | **α** Success.meta(_handoff_to/_handoff_context) | 新加 outcome 变体污染 4 个 caller；γ 让 SPI impl 承担业务流程协调；α 改动最小 |
+| Q-DC.3 | task 链与 chokepoint task 整合 | **α** chokepoint 单 task 模型 + parentTaskPid 传参 | β 嵌套 task 让 mission view 复杂；γ 让 chokepoint 装饰化（task 路径分叉） |
+| Q-DC.4 | 群聊 transport | **β** 一次性删 SSE + enterprise 前端迁 WS（**v1 → v2 决策修正，前因后果见 §7.1**） | 我们 OSS + enterprise 同 owner / 同 workspace / 同 dev-stage — 不符合 dual-publish 的"控制不了消费者发版"前置条件；强行 dual-publish 引入伪复杂度 + sunset 维护负担 |
+| Q-DC.5 | 实施分阶段 | **β** 4 PR（DC.1 SPI / DC.2 handoff / DC.3 routing / DC.4 跨仓 transport 删除）| 单 PR ~600 LOC 不可 review；feature flag 在 dev-stage 红线下不必要 |
+
+### 7.1 前因后果 — 为什么 Q-DC.4 从 α 改到 β
+
+**v1 决策（错的）**：α 双推 — 继承 D.4 dual-transport 决策。理由：enterprise `ent-im-chat` 主动订阅 `/api/im/stream`，单方面 OSS 侧迁移会破坏 enterprise；保持双推等 enterprise 前端独立迁移完后再 cleanup。
+
+**v1 的判断盲点**：把 enterprise 当成"独立第三方消费者"对待。这个框架来自业界 dual-publish 的标准前置条件：
+
+> Dual-publish 模式之所以是 transitional 标准做法，是因为它解决一个特定问题：**后端不能同步推动消费者客户端发版**（典型场景：Stripe / Slack 第三方 API 用户 / 移动 App 6 个月发版周期 / 浏览器扩展用户安装周期）。
+
+**实际情况打破了这个前提**：
+
+| 维度 | dual-publish 前提 | 我们的实际情况 |
+|---|---|---|
+| 消费者主体 | 外部 / 多组织 | 同一个 owner / 同一个工作目录 |
+| 代码物理位置 | 跨网络 / 跨公司 | `/Users/ghj/work/auraboot/auraboot-enterprise/` ← 就在隔壁 |
+| 发版协调 | 不可控 | 一次 session 可以同时改 |
+| 稳定性约束 | prod 用户在线 | dev-stage（AGENTS.md 红线允许 breaking changes） |
+| Rollback | 客户端旧版本无法立即修 | git revert 一次搞定两仓 |
+
+**修正后的决策（β）**：跨仓 one-shot migration —— DC.4 在同一个 PR sequence 里同时改 OSS 后端（删 SseEmitterManager）+ enterprise 前端（imSseClient.ts → WS 订阅）。同 session 完成 + 启动验证。
+
+**长期净比较**：
+
+| | α dual-publish + sunset | β 一次性到位 |
+|---|---|---|
+| OSS 改动量 | 保留 SseEmitterManager + 双推显式调用 | 删 ~150 LOC SseEmitterManager 路径 |
+| 企业改动量 | 不改 | imSseClient.ts → WS（~80 LOC 改写）|
+| 长期债务 | sunset metric / dashboard / 跟踪删除 PR | 0 |
+| 6 个月后 | 看运气：metric 跌零顺利下线 OR 永久双轨 | 干净的单 transport |
+| 反模式风险 | 高（dual-publish 没人记得 sunset → 永久双轨）| 0 |
+
+**判断信号**（AGENTS.md "长期演进视角"红线）：α 的核心理由是"避免单方面迁移破坏 enterprise"——但 enterprise 不是单方面，是同 team 同 session 可同步改。这种"避免 X 风险"作为唯一推理由的方案通常方向反了。
+
+**D.4 commit message 关于 dual-transport 的决策（`06b77d87`）**仍然 valid 作为"双 transport 当时的状态记录"，但下一步行动应是迁移到单 transport，不是把 dual-transport 永久化。DC.4 PR 同时把 D.4 javadoc 中"do not delete without coordinated frontend migration"的"warning"翻成"resolved by DC.4 in this PR sequence"。
+
+**长期演进视角检查**：
 
 **长期演进视角检查**：
 - 6 个月后回头看，β 选项把 SPI 加参数：会后悔吗？— 不会，optional 参数是低成本扩展；γ "channel-driven AgentChatPortImpl 内部识别"反而把跨模块依赖反向，长期维护成本更高
@@ -202,14 +238,22 @@ D.3 现状 AgentReplyTask 用 `SseEmitterManager.sendToUsers(SseEventType.STREAM
 
 ---
 
-## 8. 实施时序（决策 lock 后填）
+## 8. 实施时序（owner 决策已锁，4 PR 紧密推进）
 
-待 v2 (owner-decision-locked 版) 撰写。每 PR 模式照 Phase D 节奏：独立 commit + push + main fast-forward。
+| PR | 决策来源 | 验收红线 |
+|----|---------|---------|
+| **DC.1** `AgentChatPort.runAgentTurn(ctx, request, sink, extraTools)` 签名扩展 + AgentChatPortImpl 把 extraTools 与 ToolProviderRegistry 发现的列表合并 | Q-DC.1=β | 单测：extraTools null/empty 行为与既有完全一致；extraTools 与 registry 工具名重名时 extraTools 优先（带 warn 日志）；既有 AgentChatPortImpl 6/6 测试不破 |
+| **DC.2** AgentChatPortImpl 识别 transfer_to_agent 工具命中 → `TurnOutcome.Success(meta._handoff_to, _handoff_context)`；不执行该工具 | Q-DC.2=α | 单测：handoff 命中 → Success.meta 含 _handoff_to/_handoff_context；非 handoff 工具走原路径不破；aurabot main path（无 handoff tool）行为不变 |
+| **DC.3** `TurnRequest.parentTaskPid` 字段；ConversationTurnServiceImpl 在 parentTaskPid 非空时不重复建 task；AgentReplyTask 改写：每跳调 `turnService.runTurn(req with parentTaskPid, sink, extraTools=[handoffTool])`；看 outcome.meta._handoff_to 触发 handoff 递归 | Q-DC.3=α + Q-DC.5=β step3 | 集成测试：群聊 @mention → runTurn 被调；handoff 链每跳建 ab_agent_task 父子；MAX_HANDOFF_DEPTH=5 仍生效；C.2 memory L1 writeback fire；旧 LLM 直调路径删除 -200 LOC。**保留** SseEmitterManager.sendToUsers 调用直至 DC.4 |
+| **DC.4** 跨仓 one-shot transport 删除：OSS 删 SseEmitterManager + ImSseController + SseEventType + agentchat.sse 整个 package + AgentReplyTask 内残留 SSE 调用；enterprise `imSseClient.ts` → 改用现有 ImWebSocket 连接订阅 TYPING_INDICATOR / MESSAGE 帧 | Q-DC.4=β + Q-DC.5=β step4 | 同 session 验证：reset-and-init.sh + 浏览器跑通群聊 @mention 流式输出（含 typing dots → message render）+ enterprise ent-im-chat 插件页面验证；OSS 后端 -150 LOC，enterprise 前端 ~80 LOC 改写 |
 
-预估总时长：DC.1 (0.5天) + DC.2 (1天) + DC.3 (1.5天) ≈ 3 天工作量。
+每 PR 独立 commit + push + main fast-forward 模式。DC.4 涉及 enterprise 仓 commit，会分别 push 两仓。
+
+预估总时长：DC.1 (0.5天) + DC.2 (1天) + DC.3 (1.5天) + DC.4 (1天，含 enterprise 前端 + 同 session 验证) ≈ 4 天工作量。
 
 ---
 
 ## CHANGELOG
 
+- 2026-04-30 v2 owner 决策锁定 5 项；§7.1 新增"前因后果"节解释 Q-DC.4 从 α (dual-publish) 修正到 β (one-shot)；§8 锁定 4 PR 实施时序（v1 是 3 PR，DC.4 跨仓 transport 删除新加为独立 step）
 - 2026-04-30 v1 初稿；5 个决策点 surfacing；候选 PR 切片 DC.1-DC.3
