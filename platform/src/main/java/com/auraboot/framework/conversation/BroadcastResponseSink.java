@@ -53,14 +53,13 @@ import java.util.Map;
  * by {@link ImMessageBroadcaster} (LocalBroadcaster drops, RedisBroadcaster
  * Pub/Sub) without surfacing back to this sink.
  *
- * <p><b>Phase D.4 transport architecture (2026-04-30):</b> this sink is the
- * chokepoint-flow side of two coexisting push transports. The other side is
- * {@code com.auraboot.framework.agentchat.sse.SseEmitterManager} (HTTP SSE
- * at {@code GET /api/im/stream}) which the enterprise {@code ent-im-chat}
- * plugin actively subscribes to via {@code imSseClient.ts}. Both channels
- * are kept until a coordinated frontend migration consolidates them. See
- * {@code SseEmitterManager}'s class javadoc for the full transport decision
- * matrix; D.4 commit message records the no-op-on-this-side rationale.
+ * <p><b>DC.4 (2026-05-03) transport unification:</b> the parallel HTTP-SSE
+ * transport ({@code SseEmitterManager} + {@code ImSseController} +
+ * {@code GroupChatSseBridgingSink}) was deleted; this sink is now the sole
+ * push surface for chokepoint output. Enterprise {@code ent-im-chat}
+ * consumes the same {@code WS /api/im/ws} frames as the OSS web-admin IM
+ * panel — see the matching DC.4 frontend commit replacing
+ * {@code imSseClient.ts} with {@code imWsClient.ts}.
  */
 public class BroadcastResponseSink implements ResponseSink {
 

@@ -9,22 +9,23 @@ import com.auraboot.framework.agentchat.handoff.HandoffToolProvider;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
 import com.auraboot.framework.agentchat.spi.NoOpGroupChatMessagePort;
-import com.auraboot.framework.agentchat.sse.SseEmitterManager;
-import com.auraboot.framework.agentchat.sse.SseEventType;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.conversation.BroadcastResponseSink;
 import com.auraboot.framework.conversation.ConversationTurnService;
 import com.auraboot.framework.conversation.InboundMode;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.conversation.TurnRequest;
+import com.auraboot.framework.im.dto.WsFrame;
+import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Drives group-chat agent replies. After DC.3c (Q-DC.1=A' / design v5 §10.7
@@ -47,9 +48,12 @@ import java.util.Set;
  *   <li>System prompt + history + handoff tool list — composed via the
  *       {@link AgentTurnOverrides} side channel (server-only) so they stay out
  *       of the public {@code ChatRequest} DTO surface (design v5 §10.7 Fix 1).</li>
- *   <li>SSE streaming via {@code SseEmitterManager} — kept as-is for
- *       enterprise {@code ent-im-chat} compatibility (per Phase D.4 dual-
- *       transport decision; DC.4 will retire it via cross-repo migration).</li>
+ *   <li>Streaming + typing indicator via {@link BroadcastResponseSink} →
+ *       {@link ImMessageBroadcaster} (WebSocket frames at
+ *       {@code /api/im/ws}). DC.4 (2026-05-03) retired the parallel
+ *       {@code SseEmitterManager} HTTP-SSE transport in favour of a single
+ *       WebSocket channel; enterprise {@code ent-im-chat} consumes the
+ *       same WS frames as the OSS web-admin IM panel.</li>
  * </ul>
  *
  * <h2>Handoff recursion</h2>
@@ -73,20 +77,20 @@ public class AgentReplyTask {
     private final AgentDefinitionMapper agentDefinitionMapper;
     private final GroupChatMessagePort messagePort;
     private final GroupChatTurnContextAssembler contextAssembler;
-    private final SseEmitterManager sseEmitterManager;
+    private final ImMessageBroadcaster broadcaster;
     private final HandoffToolProvider handoffToolProvider;
     private final ConversationTurnService turnService;
 
     public AgentReplyTask(AgentDefinitionMapper agentDefinitionMapper,
                           ObjectProvider<GroupChatMessagePort> messagePortProvider,
                           GroupChatTurnContextAssembler contextAssembler,
-                          SseEmitterManager sseEmitterManager,
+                          ImMessageBroadcaster broadcaster,
                           HandoffToolProvider handoffToolProvider,
                           ConversationTurnService turnService) {
         this.agentDefinitionMapper = agentDefinitionMapper;
         this.messagePort = messagePortProvider.getIfAvailable(NoOpGroupChatMessagePort::new);
         this.contextAssembler = contextAssembler;
-        this.sseEmitterManager = sseEmitterManager;
+        this.broadcaster = broadcaster;
         this.handoffToolProvider = handoffToolProvider;
         this.turnService = turnService;
     }
@@ -120,16 +124,21 @@ public class AgentReplyTask {
             return;
         }
 
-        Set<Long> humanMemberIds = messagePort.getHumanMemberIds(conversationId, tenantId);
+        List<Long> humanMemberIds = new ArrayList<>(messagePort.getHumanMemberIds(conversationId, tenantId));
 
-        // Typing indicator — kept on the legacy SseEmitterManager transport for
-        // enterprise ent-im-chat compatibility (Phase D.4 dual-transport
-        // decision). DC.4 will retire SseEmitterManager via cross-repo migration.
-        sseEmitterManager.sendToUsers(humanMemberIds, SseEventType.TYPING, Map.of(
-                "conversationId", conversationId,
-                "agentId", agentId,
-                "agentName", agent.getName() != null ? agent.getName() : "AI"
-        ));
+        // DC.4: emit an explicit TYPING_INDICATOR(state=typing) before runTurn
+        // so members see "AI is thinking…" even before the LLM emits its first
+        // token. BroadcastResponseSink will keep firing TYPING_INDICATOR on
+        // every onTextChunk and a final TYPING_INDICATOR(state=stopped) on
+        // onDone — this preamble just makes the start-of-turn signal immediate.
+        broadcaster.publish(humanMemberIds, WsFrame.builder()
+                .type("TYPING_INDICATOR")
+                .data(Map.of(
+                        "conversationId", conversationId,
+                        "state", "typing",
+                        "agentId", agentId,
+                        "agentName", agent.getName() != null ? agent.getName() : "AI"))
+                .build());
 
         // Compose group-chat context via the public assembler.
         int contextWindow = messagePort.getAiContextWindow(conversationId, tenantId);
@@ -182,8 +191,7 @@ public class AgentReplyTask {
                 overrides,                            // server-only context bag (DC.3a)
                 /*legacyRequest=*/ buildLegacyChatRequest(agent.getAgentCode(), triggerContent, conversationId));
 
-        ResponseSink sink = new GroupChatSseBridgingSink(sseEmitterManager, humanMemberIds,
-                conversationId, agentId, agent.getName());
+        ResponseSink sink = new BroadcastResponseSink(broadcaster, humanMemberIds, conversationId);
         TurnOutcome outcome = turnService.runTurn(req, sink);
 
         handleOutcome(outcome, conversationId, tenantId, agent, humanMemberIds, depth);
@@ -237,7 +245,7 @@ public class AgentReplyTask {
      * </ul>
      */
     private void handleOutcome(TurnOutcome outcome, Long conversationId, Long tenantId,
-                                AgentDefinition agent, Set<Long> humanMemberIds, int depth) {
+                                AgentDefinition agent, List<Long> humanMemberIds, int depth) {
         if (outcome instanceof TurnOutcome.Success success && success.meta() != null) {
             Object handoffTo = success.meta().get("_handoff_to");
             if (handoffTo != null) {
