@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.port.AgentTurnOverrides;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
@@ -160,7 +161,7 @@ class AgentChatPortImplHandoffSignalTest {
         when(provider.chat(any(), anyString(), anyString()))
                 .thenReturn(handoffToolUseResponse("agent_beta", "user wants beta", "Handing off to Beta..."));
 
-        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, List.of(handoffToolDef()));
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, AgentTurnOverrides.builder().extraTools(List.of(handoffToolDef())).build());
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
         TurnOutcome.Success success = (TurnOutcome.Success) outcome;
@@ -184,7 +185,7 @@ class AgentChatPortImplHandoffSignalTest {
         when(provider.chat(any(), anyString(), anyString()))
                 .thenReturn(handoffToolUseResponse("agent_beta", null, ""));
 
-        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, List.of(handoffToolDef()));
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, AgentTurnOverrides.builder().extraTools(List.of(handoffToolDef())).build());
 
         TurnOutcome.Success success = (TurnOutcome.Success) outcome;
         assertThat(success.finalResponse()).isEmpty();
@@ -203,7 +204,7 @@ class AgentChatPortImplHandoffSignalTest {
         when(provider.chat(any(), anyString(), anyString()))
                 .thenReturn(handoffToolUseResponse(null, null, "passing through"));
 
-        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, List.of(handoffToolDef()));
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, AgentTurnOverrides.builder().extraTools(List.of(handoffToolDef())).build());
 
         TurnOutcome.Success success = (TurnOutcome.Success) outcome;
         assertThat(success.meta()).isEmpty();
@@ -241,7 +242,7 @@ class AgentChatPortImplHandoffSignalTest {
 
         when(provider.chat(any(), anyString(), anyString())).thenReturn(round1).thenReturn(round2);
 
-        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, List.of(handoffToolDef()));
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, AgentTurnOverrides.builder().extraTools(List.of(handoffToolDef())).build());
 
         // Final outcome is Success (from end_turn round 2), NOT handoff
         assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
