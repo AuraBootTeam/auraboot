@@ -1,0 +1,9 @@
+{
+  "_comment": "Place at ~/.claude/mcp_servers.json (Claude Code) or use 'claude mcp add auraboot --command aura --args \"mcp serve\"'. The server inherits AURA_API_URL and AURA_TOKEN from the parent shell environment.",
+  "mcpServers": {
+    "auraboot": {
+      "command": "aura",
+      "args": ["mcp", "serve"]
+    }
+  }
+}

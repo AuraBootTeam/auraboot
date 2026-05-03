@@ -86,6 +86,22 @@ export class ApiClient {
   }
 
   /**
+   * Make an authenticated PUT request.
+   */
+  async put<T = any>(path: string, body?: any): Promise<ApiResponse<T>> {
+    const url = new URL(path, this.baseUrl);
+    return this.request<T>('put', url.toString(), body);
+  }
+
+  /**
+   * Make an authenticated DELETE request.
+   */
+  async delete<T = any>(path: string): Promise<ApiResponse<T>> {
+    const url = new URL(path, this.baseUrl);
+    return this.request<T>('delete', url.toString());
+  }
+
+  /**
    * Get the base URL (for SSE connections).
    */
   getBaseUrl(): string {

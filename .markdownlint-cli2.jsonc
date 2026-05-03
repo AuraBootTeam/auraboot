@@ -1,0 +1,70 @@
+// Markdownlint config for AuraBoot OSS docs.
+//
+// Philosophy: catch real bugs (dead links, malformed structure), not bikeshed
+// formatting. Many OSS docs are dev notes / handovers / use-case writeups
+// authored quickly — fail-fast on stylistic noise creates a culture of
+// disabling lint rather than fixing real problems.
+//
+// Rules we DO enforce:
+//   MD001 heading levels increment monotonically
+//   MD003 heading style consistent
+//   MD004 unordered list style consistent
+//   MD007 list indentation
+//   MD009 trailing spaces
+//   MD011 reversed link syntax
+//   MD018 no missing space after hash on heading
+//   MD019 no multiple spaces after hash on heading
+//   MD020 no missing space inside hashes on closed atx
+//   MD022 headings surrounded by blank lines
+//   MD023 headings start at line beginning
+//   MD025 single h1 in doc
+//   MD027 no multiple spaces after blockquote
+//   MD028 blank line in blockquote
+//   MD029 ordered list item prefix
+//   MD030 spaces after list markers
+//   MD037 no spaces inside emphasis markers
+//   MD038 no spaces inside code-span
+//   MD039 no spaces inside link text
+//   MD042 no empty links
+//   MD046 code block style (fenced)
+//   MD050 strong style consistent
+//   MD051 link fragments valid (catches anchor typos)
+
+{
+  "config": {
+    // Disabled — noise rules that don't reflect AuraBoot doc culture
+    "MD012": false,  // multiple blank lines
+    "MD013": false,  // line length
+    "MD024": false,  // duplicate headings (allowed in handover/changelog)
+    "MD026": false,  // trailing punctuation in heading
+    "MD031": false,  // blanks around fences
+    "MD032": false,  // blanks around lists
+    "MD033": false,  // inline HTML (we use it for badges/emoji)
+    "MD034": false,  // bare URL
+    "MD036": false,  // emphasis as heading
+    "MD040": false,  // fenced code language (often unspecified for diffs/output)
+    "MD041": false,  // first line h1
+    "MD045": false,  // no alt text (auto-generated images often lack)
+    "MD047": false,  // single trailing newline
+    "MD048": false,  // code fence style
+    "MD049": false,  // emphasis style
+    "MD053": false,  // link reference definitions used
+    "MD055": false,  // table pipe style (varies by author)
+    "MD056": false,  // table column count
+    "MD058": false,  // tables surrounded by blank lines
+    "MD060": false,  // table column style (whitespace inside cells)
+    // The following are real rules but disabling for now — too many existing
+    // docs would need touching. Re-enable in a future cleanup phase:
+    "MD022": false,  // blanks around headings
+    "MD029": false,  // ordered list prefix (some docs use "1." for all)
+    "MD030": false   // spaces after list marker
+  },
+  "ignores": [
+    "node_modules/**",
+    ".github/**",
+    "**/node_modules/**",
+    "build/**",
+    "dist/**",
+    "**/CHANGELOG.md"
+  ]
+}
