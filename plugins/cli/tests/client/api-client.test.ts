@@ -70,4 +70,63 @@ describe('ApiClient', () => {
       expect(header).toBe('Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.test');
     });
   });
+
+  describe('put / delete (write verbs)', () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      // Default response matches the AuraBoot envelope so parseResponse succeeds.
+      fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ code: 200, data: { id: 1 }, message: 'ok' }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('put<T> uses HTTP PUT and sends JSON body', async () => {
+      const { ApiClient } = await import('../../src/client/api-client.js');
+      const client = new ApiClient({ token: 't1', env: 'local' });
+      const resp = await client.put('/api/meta/models/abc', { code: 'crm_lead' });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(typeof url).toBe('string');
+      expect(url).toMatch(/\/api\/meta\/models\/abc$/);
+      expect(init.method).toBe('put');
+      expect(JSON.parse(init.body)).toEqual({ code: 'crm_lead' });
+      expect(init.headers.Authorization).toBe('Bearer t1');
+      expect(resp.ok).toBe(true);
+    });
+
+    it('delete<T> uses HTTP DELETE and sends no body', async () => {
+      const { ApiClient } = await import('../../src/client/api-client.js');
+      const client = new ApiClient({ token: 't1', env: 'local' });
+      await client.delete('/api/meta/models/abc');
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toMatch(/\/api\/meta\/models\/abc$/);
+      expect(init.method).toBe('delete');
+      expect(init.body).toBeUndefined();
+      expect(init.headers.Authorization).toBe('Bearer t1');
+    });
+
+    it('put propagates non-ok status via ApiResponse.ok=false', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        text: async () => 'validation failed',
+      });
+      const { ApiClient } = await import('../../src/client/api-client.js');
+      const client = new ApiClient({ token: 't1', env: 'local' });
+      const resp = await client.put('/api/meta/models/abc', {});
+      expect(resp.ok).toBe(false);
+      expect(resp.status).toBe(422);
+      expect(resp.message).toMatch(/validation failed/);
+    });
+  });
 });

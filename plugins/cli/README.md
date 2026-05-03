@@ -84,6 +84,66 @@ Options:
 - `-u, --user <email>` — Login email
 - `-p, --password <password>` — Login password
 
+### `aura mcp serve`
+
+Start the AuraBoot MCP stdio server so Cursor / Claude Code / Codex can use AuraBoot tools directly from the IDE.
+
+The server refuses to start unless the current session has a tenant pinned (see `aura login`). Every tool invocation is logged to `~/.aura/mcp-audit.log`.
+
+**Cursor** — `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global):
+
+```jsonc
+{
+  "mcpServers": {
+    "auraboot": {
+      "command": "aura",
+      "args": ["mcp", "serve"],
+      "env": {
+        "AURA_API_URL": "http://localhost:6443",
+        "AURA_TOKEN": "${env:AURA_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+**Claude Code** — `claude mcp add auraboot --command aura --args "mcp serve"` or `~/.claude/mcp_servers.json`:
+
+```jsonc
+{ "auraboot": { "command": "aura", "args": ["mcp", "serve"] } }
+```
+
+After editing the config, fully quit and relaunch Cursor / Claude Code — the MCP server list is read once at process start.
+
+Ready-made copies live in [`examples/cursor.mcp.json.example`](./examples/cursor.mcp.json.example) and [`examples/claude-code.mcp_servers.json.example`](./examples/claude-code.mcp_servers.json.example).
+
+The server REFUSES to start if the JWT carries no `tenantId` claim. Run `aura login --tenant <name>` first so writes always land on the intended tenant. Every tool invocation is journaled to `~/.aura/mcp-audit.log` so you can review what an AI session actually did.
+
+**Tools currently exposed** (10 total, expanding to 12 in W2):
+
+| Tool | Purpose |
+|---|---|
+| `query_entity` | Fetch records from any entity model with filters / sort. |
+| `run_named_query` | Run a NamedQuery for aggregations / dashboards. |
+| `list_agents` / `list_tools` | Inspect the ACP agent registry. |
+| `dispatch_agent` | Hand a task off to an agent (Professional license). |
+| `ask_aurabot` | Forward a natural-language question to AuraBot. |
+| `query_dsl_capabilities` | Canonical map of supported kinds / blocks / data types — call before generating any schema. |
+| `query_existing_models` | List models in tenant; call before `create_model` to avoid collisions. |
+| `query_page_schemas` | List V2 page schemas; call before `create_page_schema`. |
+| `describe_command_pipeline` | The 20+4-stage pipeline reference (no HTTP, pure docs). |
+
+### `aura mcp list / add / remove / test / tools`
+
+Manage *external* MCP server connections (the CLI as a client of other servers — distinct from `aura mcp serve` which makes AuraBoot itself a server).
+
+```bash
+aura mcp list
+aura mcp add slack --transport sse --url http://localhost:3001
+aura mcp test slack
+aura mcp tools slack
+```
+
 ## Plugin Directory Structure
 
 ```
