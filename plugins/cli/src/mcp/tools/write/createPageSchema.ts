@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ApiClient } from '../../../client/api-client.js';
+import { toolErrorFromBackend } from '../../errors.js';
 import type { Tool } from '../../registry.js';
 
 /**
@@ -147,33 +148,7 @@ export function createPageSchemaTool(client: ApiClient): Tool<Params> {
       try {
         const resp = await client.post('/api/pages', body);
         if (!resp.ok) {
-          const message = resp.message ?? `Status ${resp.status}`;
-          // Backend uses ApiResponse.error with messages including "已存在" /
-          // "exists" for the duplicate-pageKey case. Surface as MCP isError.
-          const isConflict =
-            message.includes('已存在') ||
-            /\balready exists\b/i.test(message) ||
-            resp.status === 409;
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(
-                  {
-                    error: message,
-                    kind: isConflict ? 'conflict' : 'backend_error',
-                    status: resp.status,
-                    suggestion: isConflict
-                      ? 'Pick a different pageKey (often suffix _v2 or version) and retry.'
-                      : undefined,
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-            isError: true,
-          };
+          return toolErrorFromBackend(resp);
         }
 
         return {

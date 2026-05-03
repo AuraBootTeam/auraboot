@@ -16,7 +16,10 @@ import { queryExistingModelsTool } from './tools/read/queryExistingModels.js';
 import { queryPageSchemasTool } from './tools/read/queryPageSchemas.js';
 import { runNamedQueryTool } from './tools/read/runNamedQuery.js';
 import { createModelTool } from './tools/write/createModel.js';
+import { createCommandTool } from './tools/write/createCommand.js';
 import { createPageSchemaTool } from './tools/write/createPageSchema.js';
+import { importPluginTool } from './tools/write/importPlugin.js';
+import { rollbackImportTool } from './tools/write/rollbackImport.js';
 
 /**
  * Aura MCP Server — exposes AuraBoot data and (in later increments)
@@ -64,12 +67,17 @@ export function buildToolRegistry(client: ApiClient): ToolRegistry {
   // Write tools (W2) — destructive, dryRun=true keeps LLM iteration safe.
   registry.register(createModelTool(client));
   registry.register(createPageSchemaTool(client));
+  registry.register(createCommandTool(client));
+  registry.register(importPluginTool(client));
+  registry.register(rollbackImportTool(client));
 
   return registry;
 }
 
 export async function startMcpServer(options: { token?: string; env?: string }): Promise<void> {
-  const client = new ApiClient(options);
+  // `interactive: false` so that 403 / 404 from a single tool call returns
+  // an ApiResponse instead of killing the long-lived MCP server process.
+  const client = new ApiClient({ ...options, interactive: false });
   const ctx = pinTenant(client.getToken());
   const audit = makeAuditWrapper(ctx, { remoteClient: client });
 

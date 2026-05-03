@@ -17,8 +17,27 @@ const SHOWCASE_LIST_URL = '/p/showcase_all_fields';
 /** Navigate to showcase list and wait for table to render with data. */
 async function gotoShowcaseList(page: import('@playwright/test').Page) {
   await page.goto(SHOWCASE_LIST_URL, { waitUntil: 'domcontentloaded' });
-  await page.locator('[data-testid="dynamic-list"] table tbody tr').first()
+  await page
+    .locator('[data-testid="dynamic-list"] table tbody tr')
+    .first()
     .waitFor({ state: 'visible', timeout: 20_000 });
+}
+
+async function clearActiveSorts(page: import('@playwright/test').Page) {
+  const sortBtn = page.locator('[data-testid="sort-popover-trigger"]');
+  await expect(sortBtn).toBeVisible({ timeout: 10_000 });
+  await sortBtn.click();
+
+  const clearAll = page.getByRole('button', { name: /clear all/i });
+  if (await clearAll.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await clearAll.click();
+    await expect(sortBtn.locator('span').filter({ hasText: /^\d+$/ })).toHaveCount(0, {
+      timeout: 5_000,
+    });
+  }
+
+  await page.keyboard.press('Escape');
+  await expect.poll(() => page.url(), { timeout: 5_000 }).not.toContain('sort=');
 }
 
 test.describe('List Page UX Features', () => {
@@ -27,6 +46,7 @@ test.describe('List Page UX Features', () => {
   test('Sort Popover opens, adds a rule, and shows badge count', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoShowcaseList(page);
+    await clearActiveSorts(page);
 
     const sortBtn = page.locator('[data-testid="sort-popover-trigger"]');
     await expect(sortBtn).toBeVisible({ timeout: 15_000 });
@@ -52,27 +72,29 @@ test.describe('List Page UX Features', () => {
   test('Column header click cycles through asc, desc, and clear sort', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoShowcaseList(page);
+    await clearActiveSorts(page);
     await expect(page.locator('thead')).toBeVisible({ timeout: 10_000 });
 
-    // Click second th (first is checkbox)
-    const targetHeader = page.locator('thead th').nth(1);
+    const targetHeader = page.getByTestId('table-header-sc_code');
+    const sortTarget = page.getByTestId('table-header-sort-sc_code');
     await expect(targetHeader).toBeVisible();
 
     // First click — ascending. The blue SVG indicator becoming visible is the
     // ground truth that the sort was applied; toBeVisible auto-polls.
-    await targetHeader.locator('div').first().click();
+    await sortTarget.click();
 
     // SVG sort indicator has blue fill
     const bluePath = targetHeader.locator('svg path[fill="#2563eb"]');
     await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
 
     // Second click — descending. The blue indicator stays visible (now desc).
-    await targetHeader.locator('div').first().click();
+    await sortTarget.click();
     await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
 
     // Third click — clear sort. The same locator should become invisible
     // (auto-polling) once the sort indicator is removed from the DOM.
-    await targetHeader.locator('div').first().click();
+    await sortTarget.click();
+    await expect(bluePath.first()).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('More menu opens with expected items and closes on outside click', async ({ page }) => {
@@ -89,7 +111,9 @@ test.describe('List Page UX Features', () => {
 
     // Close by clicking outside
     await page.mouse.click(10, 10);
-    await expect(page.locator('[data-testid="more-menu-import"]')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-testid="more-menu-import"]')).not.toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test('Configure Buttons panel opens and auto-saves on change', async ({ page }) => {
@@ -107,7 +131,9 @@ test.describe('List Page UX Features', () => {
     await expect(heading).toBeVisible({ timeout: 5_000 });
 
     // Panel should NOT have Cancel/Save footer buttons (auto-save mode)
-    await expect(page.locator('[data-testid="action-config-save"]')).not.toBeVisible({ timeout: 2_000 });
+    await expect(page.locator('[data-testid="action-config-save"]')).not.toBeVisible({
+      timeout: 2_000,
+    });
 
     // Close via X button
     const closeBtn = heading.locator('..').locator('button').first();
@@ -129,7 +155,9 @@ test.describe('List Page UX Features', () => {
     test.setTimeout(60_000);
     await gotoShowcaseList(page);
 
-    await expect(page.locator('[data-testid="sort-popover-trigger"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="sort-popover-trigger"]')).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.locator('[data-testid="column-settings-btn"]')).toBeVisible();
     await expect(page.locator('[data-testid="quick-filters"]')).toBeVisible();
     await expect(page.locator('[data-testid="toolbar-more-menu"]')).toBeVisible();
@@ -160,11 +188,12 @@ test.describe('List Page UX Features', () => {
 
     // Apply a sort to create unsaved changes — the blue SVG indicator is the
     // ground-truth signal that the sort was applied; toBeVisible auto-polls.
-    const targetHeader = page.locator('thead th').nth(1);
-    await targetHeader.locator('div').first().click();
-    await expect(
-      targetHeader.locator('svg path[fill="#2563eb"]').first(),
-    ).toBeVisible({ timeout: 5_000 });
+    await clearActiveSorts(page);
+    const targetHeader = page.getByTestId('table-header-sc_code');
+    await page.getByTestId('table-header-sort-sc_code').click();
+    await expect(targetHeader.locator('svg path[fill="#2563eb"]').first()).toBeVisible({
+      timeout: 5_000,
+    });
 
     // Now a save-related button should appear (Save view or Save as...)
     // Check for any button containing "save" text in the header area
@@ -235,7 +264,10 @@ test.describe('List Page UX Features', () => {
     await expect(header).toBeVisible({ timeout: 10_000 });
 
     // ViewSelector renders view type buttons or dropdown — check for any
-    const viewSelector = header.locator('button').filter({ hasText: /Table|Kanban|Calendar|view/i }).first();
+    const viewSelector = header
+      .locator('button')
+      .filter({ hasText: /Table|Kanban|Calendar|view/i })
+      .first();
     if (await viewSelector.isVisible({ timeout: 3_000 }).catch(() => false)) {
       // ViewSelector is rendered
       expect(true).toBe(true);
@@ -248,8 +280,8 @@ test.describe('List Page UX Features', () => {
     await gotoShowcaseList(page);
 
     // Apply sort — poll until the URL reflects the sort param.
-    const th = page.locator('thead th').nth(1);
-    await th.locator('div').first().click();
+    await clearActiveSorts(page);
+    await page.getByTestId('table-header-sort-sc_code').click();
     await expect.poll(() => page.url(), { timeout: 5_000 }).toMatch(/sort=/);
 
     // Verify URL has sort param
@@ -258,14 +290,16 @@ test.describe('List Page UX Features', () => {
 
     // Reload
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.locator('[data-testid="dynamic-list"] table tbody tr').first()
+    await page
+      .locator('[data-testid="dynamic-list"] table tbody tr')
+      .first()
       .waitFor({ state: 'visible', timeout: 20_000 });
 
     // Sort param still in URL
     expect(page.url()).toContain('sort=');
 
     // Sort indicator still visible
-    const bluePath = page.locator('thead th').nth(1).locator('svg path[fill="#2563eb"]');
+    const bluePath = page.getByTestId('table-header-sc_code').locator('svg path[fill="#2563eb"]');
     await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
   });
 
@@ -304,7 +338,9 @@ test.describe('List Page UX Features', () => {
 
     // Reload and verify panel still has the configuration
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.locator('[data-testid="dynamic-list"] table tbody tr').first()
+    await page
+      .locator('[data-testid="dynamic-list"] table tbody tr')
+      .first()
       .waitFor({ state: 'visible', timeout: 20_000 });
 
     // Re-open configure panel

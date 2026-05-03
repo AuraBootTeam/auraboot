@@ -151,7 +151,8 @@ describe('createPageSchemaTool', () => {
       expect(result.isError).toBe(true);
       const body = JSON.parse(result.content[0].text);
       expect(body.kind).toBe('conflict');
-      expect(body.suggestion).toMatch(/pageKey/i);
+      // Standardized via src/mcp/errors.ts — generic rename hint, not pageKey-specific.
+      expect(body.suggestion).toMatch(/Rename/i);
     });
 
     it('classifies "already exists" English message as conflict', async () => {
@@ -195,8 +196,9 @@ describe('createPageSchemaTool', () => {
 
       expect(result.isError).toBe(true);
       const body = JSON.parse(result.content[0].text);
-      expect(body.kind).toBe('backend_error');
-      expect(body.suggestion).toBeUndefined();
+      // After D10 the classifier separates 422 from generic 4xx.
+      expect(body.kind).toBe('validation');
+      expect(body.suggestion).toMatch(/violated field/i);
     });
   });
 });
