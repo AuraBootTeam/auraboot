@@ -60,7 +60,7 @@ class AgentReplyTaskTaskChainTest {
 
     @Mock private AgentDefinitionMapper agentDefinitionMapper;
     @Mock private GroupChatMessagePort messagePort;
-    @Mock private AgentReplyContext replyContext;
+    @Mock private GroupChatTurnContextAssembler replyContext;
     @Mock private SseEmitterManager sseEmitterManager;
     @Mock private HandoffToolProvider handoffToolProvider;
     @Mock private LlmProviderFactory llmProviderFactory;

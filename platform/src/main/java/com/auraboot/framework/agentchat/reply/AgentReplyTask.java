@@ -42,7 +42,7 @@ public class AgentReplyTask {
 
     private final AgentDefinitionMapper agentDefinitionMapper;
     private final GroupChatMessagePort messagePort;
-    private final AgentReplyContext replyContext;
+    private final GroupChatTurnContextAssembler replyContext;
     private final SseEmitterManager sseEmitterManager;
     private final HandoffToolProvider handoffToolProvider;
     private final LlmProviderFactory llmProviderFactory;
@@ -59,7 +59,7 @@ public class AgentReplyTask {
 
     public AgentReplyTask(AgentDefinitionMapper agentDefinitionMapper,
                           ObjectProvider<GroupChatMessagePort> messagePortProvider,
-                          AgentReplyContext replyContext,
+                          GroupChatTurnContextAssembler replyContext,
                           SseEmitterManager sseEmitterManager,
                           HandoffToolProvider handoffToolProvider,
                           LlmProviderFactory llmProviderFactory) {
