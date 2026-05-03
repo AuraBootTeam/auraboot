@@ -4,12 +4,15 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.Builder;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -49,16 +52,26 @@ import java.util.Map;
  *       observation publisher) can cross-link.</li>
  * </ul>
  *
- * <p>What this does NOT do (left for P1 per task brief):
+ * <p>What this DOES (P1 — multi-agent execute wiring):
  * <ul>
- *   <li>Block the parent on child completion (no synchronous join).</li>
+ *   <li>After the spawn transaction commits, register a
+ *       {@link TransactionSynchronization#afterCommit()} hook that submits
+ *       a fire-and-forget call to
+ *       {@link AgentRunService#executeTaskForExistingRun} so the child
+ *       row's LLM loop actually starts executing. The dispatch is async
+ *       (executeTaskForExistingRun is {@code @Async}); the parent does NOT
+ *       block — completion is observed via {@link SessionEndedEvent} which
+ *       {@link ParentJoinService} bridges into {@code ChildRunCompletedEvent}.</li>
+ *   <li>If no transaction is active (caller is mid-rollback or in a unit
+ *       test bypassing TX), fall back to a direct dispatch — the @Async
+ *       executor still runs the LLM loop on a worker thread.</li>
+ * </ul>
+ *
+ * <p>What this does NOT do (deferred):
+ * <ul>
+ *   <li>Block the parent on child completion (no synchronous join — P2).</li>
  *   <li>Cross-tenant or cross-user spawn — {@code tenantId} arg is the
  *       caller-supplied scope; SubAgentRunner refuses {@code null}.</li>
- *   <li>Trigger the actual LLM execution loop. The child run row sits in
- *       {@code run_status='running'} and is the responsibility of the
- *       async dispatcher (today: {@link AgentRunService#executeTask}).
- *       Tests pin this by inserting the row + flipping it manually so
- *       the unit-of-work is "row exists with correct parent linkage".</li>
  *   <li>Publish completion events — that already happens inside
  *       {@code AgentRunService} for any run that reaches terminal state,
  *       and the child row carries the same publisher contract as a
@@ -75,10 +88,23 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SubAgentRunner {
 
     private final JdbcTemplate jdbcTemplate;
+    /**
+     * Lazy provider for {@link AgentRunService} to avoid a hard circular
+     * dependency: AgentRunService → (eventually, via dispatchChildTasks
+     * or similar) → SubAgentRunner. Resolved on first use after Spring
+     * has finished wiring all beans.
+     */
+    private final ObjectProvider<AgentRunService> agentRunServiceProvider;
+
+    @Autowired
+    public SubAgentRunner(JdbcTemplate jdbcTemplate,
+                          ObjectProvider<AgentRunService> agentRunServiceProvider) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.agentRunServiceProvider = agentRunServiceProvider;
+    }
 
     @Data
     @Builder
@@ -223,6 +249,53 @@ public class SubAgentRunner {
 
         log.info("SubAgentRunner.spawn: parent={} → child={} (task={}, agent={}, origin={})",
                 parentRunPid, childRunPid, childTaskPid, agentCode, origin);
+
+        // P1: After the spawn transaction commits, fire-and-forget the LLM
+        // execution loop on the freshly-seeded child run. We register a
+        // TransactionSynchronization so the @Async dispatch happens AFTER the
+        // INSERTs are visible to other DB sessions (otherwise the executor
+        // thread could read its own row before commit lands).
+        //
+        // If we are not running inside a managed transaction (synchronization
+        // not active), fall back to a direct dispatch — this is the unit-test
+        // path where REQUIRED transactions exist but the test framework still
+        // lets us see writes via REPEATABLE_READ. The executor itself is
+        // marked @Async so it runs on a worker thread either way.
+        final Long capturedTenant = tenantId;
+        final String capturedTaskPid = childTaskPid;
+        final String capturedAgent = agentCode;
+        final String capturedRunPid = childRunPid;
+        Runnable dispatch = () -> {
+            try {
+                AgentRunService runService = agentRunServiceProvider.getIfAvailable();
+                if (runService == null) {
+                    log.warn("SubAgentRunner.spawn: AgentRunService bean unavailable; "
+                            + "child run {} will not execute (parent={})", capturedRunPid, parentRunPid);
+                    return;
+                }
+                runService.executeTaskForExistingRun(
+                        capturedTenant, capturedTaskPid, capturedAgent, capturedRunPid);
+            } catch (Exception ex) {
+                // Don't propagate — the spawn transaction has already committed.
+                // Failure to dispatch is logged so operators can investigate;
+                // the child row stays in 'running' until the heartbeat / orphan
+                // cron sweeps it.
+                log.error("SubAgentRunner.spawn: async dispatch failed for child run {} (parent={}): {}",
+                        capturedRunPid, parentRunPid, ex.getMessage(), ex);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatch.run();
+                }
+            });
+        } else {
+            // No active TX — call directly. @Async on executeTaskForExistingRun
+            // ensures the LLM loop still runs on a worker thread.
+            dispatch.run();
+        }
 
         return SpawnResult.builder()
                 .childRunPid(childRunPid)

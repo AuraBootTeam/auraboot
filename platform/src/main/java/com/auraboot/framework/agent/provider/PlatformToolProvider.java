@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.nlmodeling.NlModelingService;
 import com.auraboot.framework.agent.nlmodeling.dto.NlApplyRequest;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingRequest;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingResponse;
+import com.auraboot.framework.agent.service.SubAgentRunner;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.ai.AiModelSuggestionService;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
@@ -13,6 +14,7 @@ import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.MetaModelService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -44,6 +46,8 @@ public class PlatformToolProvider implements ToolProvider {
     private final MetaModelService metaModelService;
     private final AiModelSuggestionService aiModelSuggestionService;
     private final NlModelingService nlModelingService;
+    private final SubAgentRunner subAgentRunner;
+    private final JdbcTemplate jdbcTemplate;
 
     private static final List<ToolDefinition> PLATFORM_TOOLS = List.of(
         ToolDefinition.builder()
@@ -95,6 +99,32 @@ public class PlatformToolProvider implements ToolProvider {
                             "description", Map.of("type", "string",
                                     "description", "Natural language description of the data model to create")),
                     "required", List.of("description")))
+            .build(),
+        ToolDefinition.builder()
+            .toolCode("platform.delegate_task")
+            .toolName("Delegate Subtask to Sub-Agent")
+            .description("Spawn a child agent run under the current run to handle a side-task in parallel. "
+                    + "The child run inherits the parent's agent (or use agentCode to override) and tenant; "
+                    + "the parent does NOT block on the child — completion is observed via "
+                    + "ChildRunCompletedEvent. This is a WRITE operation that creates a new ab_agent_run "
+                    + "row. Use only when the user's request contains a clearly separable side-task that "
+                    + "should run independently of the current intent.")
+            .providerCode("platform")
+            .toolType("platform")
+            .sourceCode("platform.delegate_task")
+            .riskLevel("L2")
+            .confirmationPolicy("approval_required")
+            .requiresApproval(true)
+            .parameterSchema(Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                            "subtaskMessage", Map.of("type", "string",
+                                    "description", "The user-facing description of the subtask the "
+                                            + "child agent should perform"),
+                            "agentCode", Map.of("type", "string",
+                                    "description", "Optional agent_code for the child run. "
+                                            + "Defaults to inheriting the parent run's agent.")),
+                    "required", List.of("subtaskMessage")))
             .build()
     );
 
@@ -123,6 +153,7 @@ public class PlatformToolProvider implements ToolProvider {
                 case "platform.model_suggest"  -> modelSuggest(params);
                 case "platform.create_model"   -> createModel(params);
                 case "platform.fill_form"     -> fillForm(params);
+                case "platform.delegate_task" -> delegateTask(params, tenantId);
                 default -> Map.of("error", "Unknown platform tool: " + toolCode);
             };
             boolean success = !result.containsKey("error") || Boolean.TRUE.equals(result.get("success"));
@@ -410,6 +441,57 @@ public class PlatformToolProvider implements ToolProvider {
         output.put("instruction", "Form fill data ready. The frontend will populate the form. "
                 + "Tell the user which fields were extracted and ask them to review before submitting.");
         return output;
+    }
+
+    // ==================== platform.delegate_task ====================
+
+    /**
+     * Spawn a child run under the current run via {@link SubAgentRunner}. The
+     * parent run id is read from {@link StepContext#getRunPid()} (set by
+     * {@code ToolLoopService.executeToolCall}); throws clear error if absent
+     * (delegate_task can only be called from inside a tool loop, never from
+     * an ad-hoc invocation). Origin is fixed to {@code "delegate_task"}, which
+     * matches the {@code ab_agent_run.subtask_origin} CHECK constraint added
+     * by P0-6.
+     */
+    private Map<String, Object> delegateTask(Map<String, Object> params, Long tenantId) {
+        String subtaskMessage = getStringParam(params, "subtaskMessage");
+        if (subtaskMessage == null || subtaskMessage.isBlank()) {
+            return errorResult("subtaskMessage is required for platform.delegate_task");
+        }
+        String parentRunPid = com.auraboot.framework.agent.service.StepContext.getRunPid();
+        if (parentRunPid == null || parentRunPid.isBlank()) {
+            return errorResult("platform.delegate_task can only be invoked from inside an active run "
+                    + "(ToolLoopService binds the run pid before each tool call). No parent run on the "
+                    + "current thread.");
+        }
+        Long effectiveTenantId = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
+        if (effectiveTenantId == null) {
+            return errorResult("Tenant context is required for platform.delegate_task");
+        }
+
+        try {
+            SubAgentRunner.SpawnResult spawn = subAgentRunner.spawn(
+                    effectiveTenantId,
+                    parentRunPid,
+                    /* sessionId */ null,
+                    subtaskMessage,
+                    /* origin */ "delegate_task");
+            Map<String, Object> output = new LinkedHashMap<>();
+            output.put("success", true);
+            output.put("childRunPid", spawn.getChildRunPid());
+            output.put("childTaskPid", spawn.getChildTaskPid());
+            output.put("origin", spawn.getOrigin());
+            output.put("message", "Subtask delegated. The child agent run will execute asynchronously; "
+                    + "completion is observed via ChildRunCompletedEvent. The parent run does NOT block.");
+            return output;
+        } catch (IllegalStateException e) {
+            // SubAgentRunner refuses cross-tenant / parent-not-running etc.
+            return errorResult("delegate_task refused: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("platform.delegate_task failed: {}", e.getMessage(), e);
+            return errorResult("delegate_task execution failed: " + e.getMessage());
+        }
     }
 
     // ==================== Helpers ====================

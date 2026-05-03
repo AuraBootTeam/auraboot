@@ -75,6 +75,17 @@ public class ToolLoopService implements ToolExecutionPort {
     public String executeToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
                                    String toolName, Map<String, Object> input,
                                    List<AgentToolDefinition> tools, TraceContext traceCtx) {
+        StepContext.setRunPid(runPid);
+        try {
+            return executeToolCallInternal(tenantId, runPid, taskPid, agentCode, toolName, input, tools, traceCtx);
+        } finally {
+            StepContext.clearRunPid();
+        }
+    }
+
+    private String executeToolCallInternal(Long tenantId, String runPid, String taskPid, String agentCode,
+                                            String toolName, Map<String, Object> input,
+                                            List<AgentToolDefinition> tools, TraceContext traceCtx) {
         AgentToolDefinition toolDef = tools.stream()
                 .filter(t -> t.getName().equals(toolName))
                 .findFirst().orElse(null);

@@ -105,6 +105,33 @@ public class AgentRunService {
     }
 
     /**
+     * Async fire-and-forget entry for callers that have already pre-seeded the
+     * {@code ab_agent_run} row (e.g. {@link SubAgentRunner#spawn} which inserts
+     * the row in-band so the parent ↔ child link is observable before the LLM
+     * loop starts). Mirrors {@link #executeTask} but skips the
+     * {@code createRunRecord} step inside {@link #executeTaskSync} — the
+     * existing row identified by {@code existingRunPid} is mutated in place
+     * (status/cost/timing updates).
+     *
+     * <p>Used by {@link SubAgentRunner} to wire P0-6 spawn → real LLM execution
+     * without creating two run rows for the same logical execution.
+     *
+     * @param existingRunPid non-null pid of the {@code ab_agent_run} row that
+     *                       was pre-seeded by the caller; must already exist
+     *                       in {@code run_status='running'} state.
+     */
+    @Async
+    public void executeTaskForExistingRun(Long tenantId, String taskPid, String agentCode,
+                                          String existingRunPid) {
+        MetaContext.setSystemTenantContext(tenantId);
+        try {
+            executeTaskSync(tenantId, taskPid, agentCode, null, existingRunPid);
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    /**
      * Synchronous entry point for the ACP run loop. Returns a {@link RunOutcome}
      * describing the terminal state so a caller in a sync context (e.g.
      * {@code ConversationTurnService.runTurn} dispatching to ACP under Q-C3.1=A
@@ -131,12 +158,24 @@ public class AgentRunService {
      */
     public RunOutcome executeTaskSync(Long tenantId, String taskPid, String agentCode,
                                       String resumeFromRunPid) {
+        return executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid, null);
+    }
+
+    /**
+     * Internal overload supporting an {@code existingRunPid} provided by a
+     * caller that has already inserted the {@code ab_agent_run} row (e.g.
+     * {@link SubAgentRunner}). When non-null, the run record creation step
+     * is skipped and the existing row is mutated in place. All other behavior
+     * is identical to the public 4-arg overload.
+     */
+    public RunOutcome executeTaskSync(Long tenantId, String taskPid, String agentCode,
+                                      String resumeFromRunPid, String existingRunPid) {
         if (!agentProperties.isEnabled()) {
             log.warn("Agent runtime is disabled, skipping task: {}", taskPid);
             return new RunOutcome.Skipped("Agent runtime disabled");
         }
 
-        String runPid = UniqueIdGenerator.generate();
+        String runPid = existingRunPid != null ? existingRunPid : UniqueIdGenerator.generate();
         LocalDateTime startedAt = LocalDateTime.now();
 
         // Create trace for observability (non-blocking — failures logged and ignored)
@@ -156,8 +195,20 @@ public class AgentRunService {
             String providerCode = resolveProviderCode(agentDef);
             String model = resolveModel(agentDef, providerCode);
 
-            // Create run record first (even if API key missing, we want the record)
-            runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt);
+            // Create run record first (even if API key missing, we want the record).
+            // When the caller pre-seeded the row (existingRunPid != null, e.g.
+            // SubAgentRunner.spawn), skip the INSERT and mutate the existing row
+            // so we don't double-write a parallel un-linked run record for the
+            // same logical execution.
+            if (existingRunPid == null) {
+                runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, model, startedAt);
+            } else {
+                // Refresh model + updated_at so the pre-seeded row reflects the
+                // executor's resolved configuration. run_status stays 'running'.
+                dynamicDataMapper.update("ab_agent_run",
+                        Map.of("run_model", model, "updated_at", LocalDateTime.now()),
+                        Map.of("pid", runPid));
+            }
 
             // If resuming, link to original run
             if (resumeFromRunPid != null) {
