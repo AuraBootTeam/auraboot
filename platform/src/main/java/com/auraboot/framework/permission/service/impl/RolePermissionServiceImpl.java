@@ -20,8 +20,33 @@ import java.util.stream.Collectors;
 import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
- * Role-Permission Service Implementation
- * 
+ * Role-Permission Service Implementation.
+ *
+ * <h3>Exception strategy: write-throws / read-fails-closed</h3>
+ *
+ * Two complementary catch(Exception) patterns appear here:
+ *
+ * <ul>
+ *   <li><b>§P4 wrap-and-rethrow</b> on mutation methods (assignPermission,
+ *       removePermission, removeAll, syncPermissions, copyPermissions): any
+ *       failure is logged with the cause and re-thrown as
+ *       {@link BusinessException} so the surrounding {@code @Transactional}
+ *       rolls back and {@code GlobalExceptionHandler} surfaces a clean
+ *       error response to the client.</li>
+ *
+ *   <li><b>§P4 fail-closed</b> on read queries (getPermissionIds,
+ *       getPermissionPids, getRolePermissionStats): a DB or mapper failure
+ *       is logged with the cause and an EMPTY collection is returned. The
+ *       calling permission check then sees "no permissions" and DENIES
+ *       access, which is the correct security default — better to deny a
+ *       legitimate user than grant an attacker. Throwing here would crash
+ *       the request handler instead.</li>
+ * </ul>
+ *
+ * All catches log via {@code log.error(msg, args..., e)} and either throw
+ * with cause or return a safe empty value. See
+ * {@code docs/standards/core/catch-exception-pattern.md}.
+ *
  * @author AuraBoot Platform
  * @since V4
  */
@@ -146,6 +171,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
                 .collect(Collectors.toSet());
                 
         } catch (Exception e) {
+            // §P4 fail-closed: empty set causes the permission check to deny
+            // — safer than throwing, which would 500 the request.
             log.error("获取角色的Permission IDs失败: roleId={}", roleId, e);
             return Collections.emptySet();
         }
@@ -174,6 +201,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
                 .collect(Collectors.toList());
                 
         } catch (Exception e) {
+            // §P4 fail-closed: see getPermissionIds above.
             log.error("获取角色的Permission PIDs失败: roleId={}", roleId, e);
             return Collections.emptyList();
         }
@@ -288,6 +316,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             return statistics;
             
         } catch (Exception e) {
+            // §P4 fail-closed: stats are read-only diagnostics; empty map is
+            // safer than throwing into a UI that may render the response.
             log.error("获取角色Permission统计失败: roleId={}", roleId, e);
             return Collections.emptyMap();
         }
