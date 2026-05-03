@@ -88,11 +88,14 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
                 tenantId,
                 getTestUser().getId(),
                 humanMemberId,
-                null, null,
+                null,                                // agentId
+                null,                                // agentCode (DC.3c)
+                null,                                // channelSessionId
                 conversationId,
                 null,
                 null,
                 null,
+                null,                                // taskPid (DC.3c)
                 Instant.now());
     }
 
@@ -122,6 +125,8 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
                 InboundMode.NEW_FROM_REQUEST,
                 null,
                 null,                                 // inboundMessageId — D.1
+                null,                                 // parentTaskPid (DC.3c)
+                null,                                 // overrides (DC.3c)
                 legacy);
     }
 
@@ -275,6 +280,8 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
                 InboundMode.EXISTING_MESSAGE_ID,      // ← Phase D.1
                 null,
                 inboundMessageId,                     // ← D.1: existing row id
+                null,                                 // parentTaskPid (DC.3c)
+                null,                                 // overrides (DC.3c)
                 legacy);
     }
 

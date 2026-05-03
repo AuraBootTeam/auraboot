@@ -105,6 +105,8 @@ public class ImAiService {
                     InboundMode.EXISTING_MESSAGE_ID,   // user msg already persisted by IM dispatch
                     null,                              // precomputedBucket — let triage SPI decide
                     userMessage.getId(),               // inboundMessageId — D.1 EXISTING_MESSAGE_ID payload
+                    null,                                 // parentTaskPid (DC.3c)
+                    null,                                 // overrides (DC.3c)
                     legacy);
 
             TurnOutcome outcome = turnService.runTurn(req, sink);
