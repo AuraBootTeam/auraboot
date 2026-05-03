@@ -65,6 +65,31 @@ import java.util.List;
  * {@code extraTools} parameter is now {@link #extraTools()} on this object.
  * Existing test suites that supplied {@code List<ToolDefinition>} get
  * mechanically rewritten to {@code AgentTurnOverrides.builder().extraTools(...).build()}.
+ *
+ * <h2>Sunset criteria (DC.3d)</h2>
+ *
+ * <p>{@code AgentChatPortImpl} emits the
+ * {@code agentchatport.caller_overrides_used{field=...}} counter every
+ * time a non-null override field is consumed. The SPI {@code overrides}
+ * parameter exists to support callers (notably group-chat
+ * {@code AgentReplyTask}) that the tenant-scoped registry cannot serve;
+ * once those call paths migrate to either:
+ * <ul>
+ *   <li>conversation-scoped tool registration in {@code ToolProviderRegistry}
+ *       (so the registry path can express dynamic transfer_to_agent input
+ *       schemas without caller injection), and</li>
+ *   <li>history-source unification (so AgentChatPortImpl can rehydrate
+ *       group-chat history from {@code ab_im_message} the same way it
+ *       rehydrates aurabot tape from {@code ChatSessionStore}),</li>
+ * </ul>
+ * the counter trends to zero across all five {@code field} tag values.
+ *
+ * <p>When the counter reads zero across an entire release window for all
+ * five fields, the {@code overrides} parameter on
+ * {@link AgentChatPort#runAgentTurn} can be deprecated, the 3-arg variant
+ * can become the only public surface, and this class can be removed. Until
+ * then, {@code overrides=null} from REST callers is the fast path; the
+ * security boundary in §10.7 Fix 1 / §3 of design v5 stays intact.
  */
 public final class AgentTurnOverrides {
 

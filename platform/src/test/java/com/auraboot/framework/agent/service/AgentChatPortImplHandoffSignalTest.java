@@ -45,11 +45,11 @@ import static org.mockito.Mockito.when;
  * <ol>
  *   <li>LLM emits {@code transfer_to_agent} tool_use → AgentChatPortImpl
  *       does NOT execute the tool, returns {@link TurnOutcome.Success}
- *       with {@code meta._handoff_to=targetAgentCode} and (when present)
+ *       with {@code meta._handoff_to=<agent_code>} and (when present)
  *       {@code meta._handoff_context}.</li>
  *   <li>Other tool calls (read-only / confirmation-required) behave
  *       exactly as before — DC.2 is additive.</li>
- *   <li>{@code transfer_to_agent} without {@code targetAgentCode} input
+ *   <li>{@code transfer_to_agent} without {@code agent_code} input
  *       still surfaces a Success outcome but {@code meta} is empty (caller
  *       handles missing target as a no-op).</li>
  *   <li>Streaming continues: any text the LLM emitted alongside the
@@ -143,7 +143,7 @@ class AgentChatPortImplHandoffSignalTest {
         toolBlock.setName("transfer_to_agent");
         toolBlock.setId("tool_call_handoff_1");
         java.util.Map<String, Object> input = new java.util.LinkedHashMap<>();
-        if (targetAgentCode != null) input.put("targetAgentCode", targetAgentCode);
+        if (targetAgentCode != null) input.put("agent_code", targetAgentCode);
         if (context != null) input.put("context", context);
         toolBlock.setInput(input);
         blocks.add(toolBlock);
@@ -199,7 +199,7 @@ class AgentChatPortImplHandoffSignalTest {
     }
 
     @Test
-    @DisplayName("transfer_to_agent missing targetAgentCode input -> Success with empty meta (caller handles)")
+    @DisplayName("transfer_to_agent missing agent_code input -> Success with empty meta (caller handles)")
     void handoffToolUse_missingTarget_emptyMeta() throws Exception {
         when(provider.chat(any(), anyString(), anyString()))
                 .thenReturn(handoffToolUseResponse(null, null, "passing through"));
