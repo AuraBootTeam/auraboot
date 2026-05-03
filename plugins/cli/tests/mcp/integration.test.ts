@@ -52,7 +52,7 @@ describe('MCP server integration (in-memory transport)', () => {
     await server.close();
   });
 
-  it('lists all 12 registered tools over MCP', async () => {
+  it('lists all 15 registered tools over MCP', async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
 
@@ -74,6 +74,9 @@ describe('MCP server integration (in-memory transport)', () => {
         // Write tools (W2)
         'create_model',
         'create_page_schema',
+        'create_command',
+        'import_plugin',
+        'rollback_import',
       ].sort(),
     );
   });
@@ -109,6 +112,71 @@ describe('MCP server integration (in-memory transport)', () => {
     expect(path).toBe('/api/meta/models');
     expect(body).not.toHaveProperty('dryRun');
     expect(body).toMatchObject({ code: 'crm_lead', displayName: 'Lead' });
+  });
+
+  it('import_plugin defaults dryRun=true on the wire when caller omits it', async () => {
+    apiPost.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      data: { dryRun: true, valid: true, errors: [], conflicts: [] },
+    });
+
+    await client.callTool({
+      name: 'import_plugin',
+      arguments: {
+        manifest: { pluginId: 'demo', namespace: 'demo', version: '1.0.0' },
+      },
+    });
+
+    const [path, body, query] = apiPost.mock.calls[0];
+    expect(path).toBe('/api/plugins/import/execute-direct');
+    expect(body).toMatchObject({ pluginId: 'demo' });
+    expect(query.dryRun).toBe('true');
+  });
+
+  it('rollback_import POSTs to /import/{id}/rollback', async () => {
+    apiPost.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      data: { importId: 'imp-1', success: true },
+    });
+
+    const result = await client.callTool({
+      name: 'rollback_import',
+      arguments: { importId: 'imp-1' },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const [path] = apiPost.mock.calls[0];
+    expect(path).toBe('/api/plugins/import/imp-1/rollback');
+  });
+
+  it('orchestrates create_command + 2 binding-rules over MCP without rollback', async () => {
+    apiPost.mockImplementation(async (path: string) => {
+      if (path === '/api/meta/commands') {
+        return { ok: true, status: 200, data: { pid: 'cmd-x', code: 'crm_lead.assign' } };
+      }
+      return { ok: true, status: 200, data: { pid: 'br-' + Date.now() } };
+    });
+
+    const result = await client.callTool({
+      name: 'create_command',
+      arguments: {
+        code: 'crm_lead.assign',
+        modelCode: 'crm_lead',
+        bindingRules: [
+          { ruleType: 'EXPRESSION', expression: 'amount > 0' },
+          { ruleType: 'EVENT', eventType: 'lead.assigned' },
+        ],
+        dryRun: false,
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(apiPost).toHaveBeenCalledTimes(3);
+    expect(apiPost.mock.calls[0][0]).toBe('/api/meta/commands');
+    expect(apiPost.mock.calls[1][0]).toBe('/api/meta/commands/cmd-x/binding-rules');
+    expect(apiPost.mock.calls[2][0]).toBe('/api/meta/commands/cmd-x/binding-rules');
   });
 
   it('forwards create_page_schema to POST /api/pages with V2 flat body', async () => {

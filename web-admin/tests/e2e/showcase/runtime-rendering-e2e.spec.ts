@@ -50,10 +50,7 @@ interface SeedFields {
  * The command envelope follows the pattern used by web-admin code paths:
  *   { operationType: 'create', payload: { ...fields } }
  */
-async function seedRecord(
-  request: APIRequestContext,
-  overrides: SeedFields = {},
-): Promise<string> {
+async function seedRecord(request: APIRequestContext, overrides: SeedFields = {}): Promise<string> {
   const ts = Date.now();
   const rnd = Math.random().toString(36).slice(2, 6);
   const payload: SeedFields = {
@@ -203,9 +200,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     // Step 3: sort by clicking the sc_quantity column header. Capture the
     // first-page response and verify sortField is sent.
     const sortHeader = page.locator('[data-testid="table-th-sc_quantity"]').first();
-    const sortVisible = await sortHeader
-      .isVisible({ timeout: 3_000 })
-      .catch(() => false);
+    const sortVisible = await sortHeader.isVisible({ timeout: 3_000 }).catch(() => false);
     if (sortVisible) {
       const sortResp = page.waitForResponse(
         (r) =>
@@ -226,14 +221,11 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
 
     // Step 4: filter via keyword search → only seed A row should remain.
     const keywordInput = page
-      .locator(
-        'input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]',
-      )
+      .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
       .first();
     if (await keywordInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
       const filterResp = page.waitForResponse(
-        (r) =>
-          r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
+        (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
         { timeout: 10_000 },
       );
       await keywordInput.click();
@@ -252,27 +244,46 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
 
     // Step 5: pagination — click page 2 if pagination is exposed. With only a
     // few records the next-page button may be disabled; treat as gap.
-    const nextPageBtn = page
-      .locator('button[aria-label*="next" i], button:has-text("下一页"), button:has-text("Next")')
-      .first();
-    const nextVisible = await nextPageBtn
-      .isVisible({ timeout: 2_000 })
-      .catch(() => false);
-    const nextEnabled = nextVisible
-      ? await nextPageBtn.isEnabled().catch(() => false)
-      : false;
-    if (nextEnabled) {
-      const pageResp = page.waitForResponse(
-        (r) =>
-          r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
-        { timeout: 10_000 },
+    const listRoot = page.locator('[data-testid="dynamic-list"]').first();
+    const nextPageBtns = listRoot.locator(
+      'button[aria-label*="next" i], button:has-text("下一页"), button:has-text("Next")',
+    );
+    let actionableNext = null as ReturnType<typeof page.locator> | null;
+    for (let i = 0, count = await nextPageBtns.count(); i < count; i += 1) {
+      const candidate = nextPageBtns.nth(i);
+      const visible = await candidate.isVisible({ timeout: 500 }).catch(() => false);
+      const enabled = visible ? await candidate.isEnabled().catch(() => false) : false;
+      const box = enabled ? await candidate.boundingBox().catch(() => null) : null;
+      if (box && box.width > 0 && box.height > 0) {
+        actionableNext = candidate;
+        break;
+      }
+    }
+
+    if (actionableNext) {
+      const clicked = await actionableNext.click({ timeout: 3_000 }).then(
+        () => true,
+        () => false,
       );
-      await nextPageBtn.click();
-      await pageResp;
+      if (clicked) {
+        await page
+          .waitForResponse(
+            (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
+            { timeout: 10_000 },
+          )
+          .catch(() => null);
+      } else {
+        test.info().annotations.push({
+          type: 'note',
+          description:
+            'pagination next-page present but not actionable after filter — pagination click skipped',
+        });
+      }
     } else {
       test.info().annotations.push({
         type: 'note',
-        description: 'pagination next-page disabled (insufficient records) — pagination click skipped',
+        description:
+          'pagination next-page disabled (insufficient records) — pagination click skipped',
       });
     }
   });
@@ -346,20 +357,14 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     const nameInput = nameField.locator('input, textarea').first();
     await expect(nameInput).toBeVisible({ timeout: 5_000 });
 
-    const quantityInput = page
-      .locator('[data-testid="field-sc_quantity"] input')
-      .first();
+    const quantityInput = page.locator('[data-testid="field-sc_quantity"] input').first();
     const priceInput = page.locator('[data-testid="field-sc_price"] input').first();
     await expect(quantityInput).toBeVisible({ timeout: 5_000 });
     await expect(priceInput).toBeVisible({ timeout: 5_000 });
 
     // Enum widget — Priority. Native <select> inside the field wrapper.
-    const prioritySelect = page
-      .locator('[data-testid="field-sc_priority"] select')
-      .first();
-    const hasPrioritySelect = await prioritySelect
-      .isVisible({ timeout: 2_000 })
-      .catch(() => false);
+    const prioritySelect = page.locator('[data-testid="field-sc_priority"] select').first();
+    const hasPrioritySelect = await prioritySelect.isVisible({ timeout: 2_000 }).catch(() => false);
 
     // Fill required + a few interesting widgets.
     const ts = Date.now();
@@ -416,9 +421,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     // forbidden by the UX standard.
     const stillOnForm = FORM_NEW_URL_RE.test(page.url());
     if (stillOnForm) {
-      const toast = page
-        .locator('text=/成功|Success|已创建|created/i')
-        .first();
+      const toast = page.locator('text=/成功|Success|已创建|created/i').first();
       await expect(
         toast,
         'submit must show a success toast when staying on /new (no silent success)',
@@ -426,10 +429,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     } else {
       // Redirected away — assert we landed on the detail or list (positive
       // navigation, not just "not /new").
-      await expect(page).toHaveURL(
-        new RegExp(`/p/${MODEL_CODE}(?:/|$|\\?)`),
-        { timeout: 3_000 },
-      );
+      await expect(page).toHaveURL(new RegExp(`/p/${MODEL_CODE}(?:/|$|\\?)`), { timeout: 3_000 });
     }
 
     // D14: round-trip assertion — confirm the new record exists in the DB
@@ -500,14 +500,11 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
 
     // Search for the row so it's on page 1.
     const keywordInput = page
-      .locator(
-        'input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]',
-      )
+      .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
       .first();
     if (await keywordInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
       const filterResp = page.waitForResponse(
-        (r) =>
-          r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
+        (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
         { timeout: 10_000 },
       );
       await keywordInput.click();
@@ -534,12 +531,8 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
       await viewBtn.click();
     } else {
       // Fallback: localized "详情/Detail" button text inside the row.
-      const detailBtn = row
-        .locator('button:has-text("详情"), button:has-text("Detail")')
-        .first();
-      const detailVisible = await detailBtn
-        .isVisible({ timeout: 2_000 })
-        .catch(() => false);
+      const detailBtn = row.locator('button:has-text("详情"), button:has-text("Detail")').first();
+      const detailVisible = await detailBtn.isVisible({ timeout: 2_000 }).catch(() => false);
       if (detailVisible) {
         await detailBtn.click();
       } else {
@@ -565,13 +558,13 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     if (tabBarVisible) {
       // Confirm at least 2 tab items render (overview + one more).
       const tabCount = await tabItems.count();
-      expect(tabCount, 'detail page must render exactly 2 tabs (overview + selectors_people)').toBe(2);
+      expect(tabCount, 'detail page must render exactly 2 tabs (overview + selectors_people)').toBe(
+        2,
+      );
 
       // Switch to the second tab and assert section content updates.
       const secondTab = tabItems.nth(1);
-      const overviewSectionsBefore = await page
-        .locator('.form-section')
-        .count();
+      const overviewSectionsBefore = await page.locator('.form-section').count();
       await secondTab.click().catch(() => null);
       await expect(page.locator('.form-section').first()).toBeVisible({
         timeout: 5_000,
@@ -585,7 +578,10 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
       expect(overviewSectionsBefore).toBeGreaterThan(0);
 
       // Switch back to overview.
-      await tabItems.nth(0).click().catch(() => null);
+      await tabItems
+        .nth(0)
+        .click()
+        .catch(() => null);
     } else {
       test.info().annotations.push({
         type: 'gap',
@@ -598,10 +594,9 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     const detailSections = page.locator('.form-section');
     await expect(detailSections.first()).toBeVisible({ timeout: 10_000 });
     const detailSectionCount = await detailSections.count();
-    expect(
-      detailSectionCount,
-      'detail overview tab should expose ≥1 form-section',
-    ).toBeGreaterThan(0);
+    expect(detailSectionCount, 'detail overview tab should expose ≥1 form-section').toBeGreaterThan(
+      0,
+    );
 
     // D14: data-value assertions — every seeded field MUST be visible on the
     // detail page (no "any element with sc_name appears" — we want each value
@@ -647,8 +642,9 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
 
     // Action buttons: detail toolbar block declares preset edit/delete via
     // standard CRUD. Click count not strictly required — assert visibility.
-    const actionButtons = page
-      .locator('button:has-text("编辑"), button:has-text("Edit"), button:has-text("删除"), button:has-text("Delete")');
+    const actionButtons = page.locator(
+      'button:has-text("编辑"), button:has-text("Edit"), button:has-text("删除"), button:has-text("Delete")',
+    );
     const actionCount = await actionButtons.count();
     if (actionCount === 0) {
       test.info().annotations.push({

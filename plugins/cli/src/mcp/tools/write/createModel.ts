@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ApiClient } from '../../../client/api-client.js';
+import { toolErrorFromBackend } from '../../errors.js';
 import type { Tool } from '../../registry.js';
 
 /**
@@ -143,31 +144,7 @@ export function createModelTool(client: ApiClient): Tool<Params> {
       try {
         const resp = await client.post('/api/meta/models', body);
         if (!resp.ok) {
-          // The backend uses ApiResponse.error("模型编码已存在: ...") for the
-          // duplicate-code case (HTTP 200 + envelope.code != 0). Surface it
-          // as MCP isError so the LLM can rename and retry.
-          const message = resp.message ?? `Status ${resp.status}`;
-          const isConflict = message.includes('已存在') || resp.status === 409;
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(
-                  {
-                    error: message,
-                    kind: isConflict ? 'conflict' : 'backend_error',
-                    status: resp.status,
-                    suggestion: isConflict
-                      ? 'Pick a different code (e.g. add a numeric suffix) and retry.'
-                      : undefined,
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-            isError: true,
-          };
+          return toolErrorFromBackend(resp);
         }
 
         return {

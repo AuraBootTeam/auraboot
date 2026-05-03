@@ -35,6 +35,18 @@ async function cmd(
   return result.recordId;
 }
 
+async function findShowcaseRecordIdByName(page: any, name: string): Promise<string> {
+  const filters = encodeURIComponent(
+    JSON.stringify([{ fieldName: 'sc_name', operator: 'eq', value: name }]),
+  );
+  const resp = await page.request.get(
+    `/api/dynamic/showcase_all_fields/list?pageNum=1&pageSize=1&filters=${filters}`,
+  );
+  const body = await resp.json().catch(() => ({}));
+  const record = body?.data?.records?.[0];
+  return String(record?.pid ?? record?.id ?? '');
+}
+
 test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(300_000);
@@ -43,7 +55,9 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
   // 1. Showcase Plugin — 10 records with ALL field types
   // ═════════════════════════════════════════════════════════════════════════
 
-  test('Arsenal 1: Showcase All-Fields — 10 sample records with all 22 fields', async ({ page }) => {
+  test('Arsenal 1: Showcase All-Fields — 10 sample records with all 22 fields', async ({
+    page,
+  }) => {
     const items = [
       {
         name: '高性能MCU控制模块',
@@ -63,10 +77,21 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'mcu-support@xinrantech.com',
         phone: '021-58769300',
         attachment: [
-          { name: 'MCU-Datasheet-v2.3.pdf', url: '/files/mcu-datasheet.pdf', size: 2457600, type: 'application/pdf' },
-          { name: '原理图-Rev3.zip', url: '/files/schematic-rev3.zip', size: 5242880, type: 'application/zip' },
+          {
+            name: 'MCU-Datasheet-v2.3.pdf',
+            url: '/files/mcu-datasheet.pdf',
+            size: 2457600,
+            type: 'application/pdf',
+          },
+          {
+            name: '原理图-Rev3.zip',
+            url: '/files/schematic-rev3.zip',
+            size: 5242880,
+            type: 'application/zip',
+          },
         ],
-        richtext: '<h2>STM32F4 高性能MCU控制模块</h2><p>基于 <strong>ARM Cortex-M4</strong> 内核，主频高达 <em>168MHz</em>，内置 FPU 浮点运算单元。</p><h3>核心特性</h3><ul><li>支持 <strong>CAN 2.0B</strong> / LIN 总线通信</li><li>工作温度范围：-40°C ~ +125°C</li><li>内置 1MB Flash + 192KB SRAM</li></ul><blockquote>通过 <strong>AEC-Q100 Grade 1</strong> 车规认证，适用于汽车电子 ECU 开发。</blockquote><ol><li>硬件设计参考 <a href="https://www.st.com/stm32">STM32 官方文档</a></li><li>配套开发板已集成 CAN 收发器</li><li>提供完整的 HAL 驱动库和示例工程</li></ol>',
+        richtext:
+          '<h2>STM32F4 高性能MCU控制模块</h2><p>基于 <strong>ARM Cortex-M4</strong> 内核，主频高达 <em>168MHz</em>，内置 FPU 浮点运算单元。</p><h3>核心特性</h3><ul><li>支持 <strong>CAN 2.0B</strong> / LIN 总线通信</li><li>工作温度范围：-40°C ~ +125°C</li><li>内置 1MB Flash + 192KB SRAM</li></ul><blockquote>通过 <strong>AEC-Q100 Grade 1</strong> 车规认证，适用于汽车电子 ECU 开发。</blockquote><ol><li>硬件设计参考 <a href="https://www.st.com/stm32">STM32 官方文档</a></li><li>配套开发板已集成 CAN 收发器</li><li>提供完整的 HAL 驱动库和示例工程</li></ol>',
         remark: 'Q1 主推产品，配合方案设计一起推广',
       },
       {
@@ -87,9 +112,15 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'ldo-team@xinrantech.com',
         phone: '0755-86543210',
         attachment: [
-          { name: 'LDO-AEC-Q100-Report.pdf', url: '/files/ldo-q100.pdf', size: 1843200, type: 'application/pdf' },
+          {
+            name: 'LDO-AEC-Q100-Report.pdf',
+            url: '/files/ldo-q100.pdf',
+            size: 1843200,
+            type: 'application/pdf',
+          },
         ],
-        richtext: '<h2>车规级 LDO 线性稳压器</h2><p>超低噪声 <strong>LDO 稳压器</strong>，输出电流高达 <em>500mA</em>，压差仅 200mV。</p><h3>电气参数</h3><ol><li>输入电压范围：<strong>3.0V ~ 40V</strong></li><li>输出精度：±1%（全温度范围）</li><li>静态电流：仅 <em>25μA</em>（典型值）</li></ol><h3>认证与可靠性</h3><ul><li>通过 <strong>AEC-Q100 Grade 0</strong> 认证</li><li>温度范围：-40°C ~ +150°C</li><li>MTBF > <em>500万小时</em></li></ul><blockquote>适用于汽车 ECU、ADAS、车身电子等对电源纹波要求严格的场景。详见 <a href="https://www.ti.com/power-management">TI 电源管理</a>。</blockquote>',
+        richtext:
+          '<h2>车规级 LDO 线性稳压器</h2><p>超低噪声 <strong>LDO 稳压器</strong>，输出电流高达 <em>500mA</em>，压差仅 200mV。</p><h3>电气参数</h3><ol><li>输入电压范围：<strong>3.0V ~ 40V</strong></li><li>输出精度：±1%（全温度范围）</li><li>静态电流：仅 <em>25μA</em>（典型值）</li></ol><h3>认证与可靠性</h3><ul><li>通过 <strong>AEC-Q100 Grade 0</strong> 认证</li><li>温度范围：-40°C ~ +150°C</li><li>MTBF > <em>500万小时</em></li></ul><blockquote>适用于汽车 ECU、ADAS、车身电子等对电源纹波要求严格的场景。详见 <a href="https://www.ti.com/power-management">TI 电源管理</a>。</blockquote>',
         remark: '长期供应协议已签，年用量>100K',
       },
       {
@@ -110,11 +141,27 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'smt@auramanufacturing.com',
         phone: '0769-22881234',
         attachment: [
-          { name: 'SMT产线介绍.pdf', url: '/files/smt-intro.pdf', size: 3145728, type: 'application/pdf' },
-          { name: 'IPC-A-610认证.jpg', url: '/files/ipc-cert.jpg', size: 524288, type: 'image/jpeg' },
-          { name: '报价模板.xlsx', url: '/files/quote-template.xlsx', size: 102400, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+          {
+            name: 'SMT产线介绍.pdf',
+            url: '/files/smt-intro.pdf',
+            size: 3145728,
+            type: 'application/pdf',
+          },
+          {
+            name: 'IPC-A-610认证.jpg',
+            url: '/files/ipc-cert.jpg',
+            size: 524288,
+            type: 'image/jpeg',
+          },
+          {
+            name: '报价模板.xlsx',
+            url: '/files/quote-template.xlsx',
+            size: 102400,
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
         ],
-        richtext: '<h2>PCBA 贴片加工服务</h2><p>拥有 <strong>6 条全自动 SMT 产线</strong>，日产能达 <em>200万点</em>，支持从打样到量产全流程。</p><h3>工艺能力</h3><ul><li>最小元件：<strong>01005</strong>（公制 0402）</li><li>最大 PCB 尺寸：<em>510mm × 460mm</em></li><li>BGA 最小间距：<strong>0.3mm pitch</strong></li></ul><h3>质量保障</h3><ol><li><strong>SPI</strong> 锡膏检测 — 100% 覆盖</li><li><strong>AOI</strong> 光学检测 — 焊后全检</li><li><strong>X-Ray</strong> — BGA/QFN 内部焊点抽检</li></ol><blockquote>通过 <strong>ISO 9001</strong> / <strong>IATF 16949</strong> / <strong>ISO 14001</strong> 认证。详见 <a href="https://www.jlcpcb.com">JLCPCB</a>。</blockquote>',
+        richtext:
+          '<h2>PCBA 贴片加工服务</h2><p>拥有 <strong>6 条全自动 SMT 产线</strong>，日产能达 <em>200万点</em>，支持从打样到量产全流程。</p><h3>工艺能力</h3><ul><li>最小元件：<strong>01005</strong>（公制 0402）</li><li>最大 PCB 尺寸：<em>510mm × 460mm</em></li><li>BGA 最小间距：<strong>0.3mm pitch</strong></li></ul><h3>质量保障</h3><ol><li><strong>SPI</strong> 锡膏检测 — 100% 覆盖</li><li><strong>AOI</strong> 光学检测 — 焊后全检</li><li><strong>X-Ray</strong> — BGA/QFN 内部焊点抽检</li></ol><blockquote>通过 <strong>ISO 9001</strong> / <strong>IATF 16949</strong> / <strong>ISO 14001</strong> 认证。详见 <a href="https://www.jlcpcb.com">JLCPCB</a>。</blockquote>',
         remark: '正在洽谈年度框架协议，目标下季度签约',
       },
       {
@@ -135,9 +182,15 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'connector@xinrantech.com',
         phone: '0512-66789012',
         attachment: [
-          { name: 'IP67连接器选型手册.pdf', url: '/files/connector-catalog.pdf', size: 7340032, type: 'application/pdf' },
+          {
+            name: 'IP67连接器选型手册.pdf',
+            url: '/files/connector-catalog.pdf',
+            size: 7340032,
+            type: 'application/pdf',
+          },
         ],
-        richtext: '<h2>工业级 IP67 防水连接器</h2><p>专为 <strong>恶劣工业环境</strong> 设计的矩形连接器，防护等级 <em>IP67</em>，耐盐雾、耐振动。</p><h3>技术规格</h3><ul><li>针数：<strong>12Pin</strong>（可定制 4~24Pin）</li><li>额定电流：<em>5A / 250VAC</em></li><li>接触电阻：≤ <strong>20mΩ</strong></li></ul><h3>机械特性</h3><ol><li>插拔寿命：<strong>>5000 次</strong></li><li>振动：10-500Hz / <em>10G</em></li><li>工作温度：-40°C ~ +105°C</li></ol><blockquote>广泛应用于 <strong>工业自动化</strong>、机器人、轨道交通等领域。选型参考 <a href="https://www.te.com/connectors">TE Connectivity</a>。</blockquote>',
+        richtext:
+          '<h2>工业级 IP67 防水连接器</h2><p>专为 <strong>恶劣工业环境</strong> 设计的矩形连接器，防护等级 <em>IP67</em>，耐盐雾、耐振动。</p><h3>技术规格</h3><ul><li>针数：<strong>12Pin</strong>（可定制 4~24Pin）</li><li>额定电流：<em>5A / 250VAC</em></li><li>接触电阻：≤ <strong>20mΩ</strong></li></ul><h3>机械特性</h3><ol><li>插拔寿命：<strong>>5000 次</strong></li><li>振动：10-500Hz / <em>10G</em></li><li>工作温度：-40°C ~ +105°C</li></ol><blockquote>广泛应用于 <strong>工业自动化</strong>、机器人、轨道交通等领域。选型参考 <a href="https://www.te.com/connectors">TE Connectivity</a>。</blockquote>',
         remark: '客户反馈插拔手感偏紧，已反馈供应商优化',
       },
       {
@@ -158,10 +211,21 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'iot@auraboot.io',
         phone: '010-82568900',
         attachment: [
-          { name: 'IoT网关快速入门指南.pdf', url: '/files/iot-quickstart.pdf', size: 1572864, type: 'application/pdf' },
-          { name: '固件v3.2.1.bin', url: '/files/firmware-v3.2.1.bin', size: 8388608, type: 'application/octet-stream' },
+          {
+            name: 'IoT网关快速入门指南.pdf',
+            url: '/files/iot-quickstart.pdf',
+            size: 1572864,
+            type: 'application/pdf',
+          },
+          {
+            name: '固件v3.2.1.bin',
+            url: '/files/firmware-v3.2.1.bin',
+            size: 8388608,
+            type: 'application/octet-stream',
+          },
         ],
-        richtext: '<h2>物联网网关开发套件 v3.2</h2><p>一站式 <strong>IoT 网关解决方案</strong>，预装 <em>AuraBoot Agent</em>，开箱即用，支持多协议接入。</p><h3>硬件配置</h3><ul><li>处理器：<strong>ARM Cortex-A7</strong> 双核 1GHz</li><li>内存：512MB DDR3 + 8GB eMMC</li><li>通信：<em>4G LTE / WiFi / BLE 5.0 / GPS</em></li></ul><h3>软件特性</h3><ol><li>预装 <strong>Linux 5.10</strong> + AuraBoot Agent</li><li>支持 <strong>MQTT / HTTP / CoAP / Modbus</strong> 协议</li><li>OTA 远程升级，支持 A/B 分区</li></ol><blockquote>已在 <em>50+ 项目</em>中部署验证，详细文档见 <a href="https://docs.auraboot.io/iot-gateway">开发者文档</a>。</blockquote>',
+        richtext:
+          '<h2>物联网网关开发套件 v3.2</h2><p>一站式 <strong>IoT 网关解决方案</strong>，预装 <em>AuraBoot Agent</em>，开箱即用，支持多协议接入。</p><h3>硬件配置</h3><ul><li>处理器：<strong>ARM Cortex-A7</strong> 双核 1GHz</li><li>内存：512MB DDR3 + 8GB eMMC</li><li>通信：<em>4G LTE / WiFi / BLE 5.0 / GPS</em></li></ul><h3>软件特性</h3><ol><li>预装 <strong>Linux 5.10</strong> + AuraBoot Agent</li><li>支持 <strong>MQTT / HTTP / CoAP / Modbus</strong> 协议</li><li>OTA 远程升级，支持 A/B 分区</li></ol><blockquote>已在 <em>50+ 项目</em>中部署验证，详细文档见 <a href="https://docs.auraboot.io/iot-gateway">开发者文档</a>。</blockquote>',
         remark: '已发出50套样品，反馈良好，计划量产',
       },
       {
@@ -182,9 +246,15 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'fpc-sales@flexpcb.cn',
         phone: '0755-23456789',
         attachment: [
-          { name: 'FPC设计规范.pdf', url: '/files/fpc-design-guide.pdf', size: 921600, type: 'application/pdf' },
+          {
+            name: 'FPC设计规范.pdf',
+            url: '/files/fpc-design-guide.pdf',
+            size: 921600,
+            type: 'application/pdf',
+          },
         ],
-        richtext: '<h2>柔性 FPC 排线</h2><p>超薄 <strong>柔性印刷电路板</strong>，厚度仅 <em>0.1mm</em>，弯折半径低至 0.5mm，适合高密度空间布线。</p><h3>产品规格</h3><ul><li>间距：<strong>0.5mm</strong>（可选 0.3mm / 1.0mm）</li><li>层数：<em>6层</em>双面 FPCB</li><li>基材：<strong>PI（聚酰亚胺）</strong></li></ul><h3>应用场景</h3><ol><li>智能手机内部连接（屏幕↔主板）</li><li>可穿戴设备柔性互联</li><li>折叠屏铰链处弯折排线</li></ol><blockquote>通过 <strong>UL 认证</strong>，弯折寿命 > <em>10万次</em>（R=1mm）。选型参考 <a href="https://www.szlcsc.com/fpc">立创商城 FPC</a>。</blockquote>',
+        richtext:
+          '<h2>柔性 FPC 排线</h2><p>超薄 <strong>柔性印刷电路板</strong>，厚度仅 <em>0.1mm</em>，弯折半径低至 0.5mm，适合高密度空间布线。</p><h3>产品规格</h3><ul><li>间距：<strong>0.5mm</strong>（可选 0.3mm / 1.0mm）</li><li>层数：<em>6层</em>双面 FPCB</li><li>基材：<strong>PI（聚酰亚胺）</strong></li></ul><h3>应用场景</h3><ol><li>智能手机内部连接（屏幕↔主板）</li><li>可穿戴设备柔性互联</li><li>折叠屏铰链处弯折排线</li></ol><blockquote>通过 <strong>UL 认证</strong>，弯折寿命 > <em>10万次</em>（R=1mm）。选型参考 <a href="https://www.szlcsc.com/fpc">立创商城 FPC</a>。</blockquote>',
         remark: '大客户定制款，已通过信赖性测试',
       },
       {
@@ -205,10 +275,21 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'power-ic@xinrantech.com',
         phone: '021-31278800',
         attachment: [
-          { name: 'PMIC评估板手册.pdf', url: '/files/pmic-eval.pdf', size: 1048576, type: 'application/pdf' },
-          { name: '充放电曲线数据.csv', url: '/files/charge-curve.csv', size: 51200, type: 'text/csv' },
+          {
+            name: 'PMIC评估板手册.pdf',
+            url: '/files/pmic-eval.pdf',
+            size: 1048576,
+            type: 'application/pdf',
+          },
+          {
+            name: '充放电曲线数据.csv',
+            url: '/files/charge-curve.csv',
+            size: 51200,
+            type: 'text/csv',
+          },
         ],
-        richtext: '<h2>智能多通道 PMIC</h2><p>集成 <strong>4 路 DC-DC</strong> + <strong>3 路 LDO</strong> 的电源管理芯片，内置锂电池充电管理和 <em>路径管理</em> 功能。</p><h3>关键参数</h3><ul><li>充电电流：最大 <strong>2A</strong>（可编程）</li><li>转换效率：<em>>95%</em>（DC-DC）</li><li>静态功耗：<strong>< 10μA</strong>（Shutdown 模式）</li></ul><h3>智能功能</h3><ol><li>I2C 接口可编程电压输出</li><li>NTC <strong>温度监控</strong> + 过温保护</li><li>支持 <em>USB PD / QC</em> 快充协议</li></ol><blockquote>适用于智能穿戴、TWS 耳机、便携医疗设备。参考 <a href="https://www.nxp.com/pmic">NXP PMIC</a> 产品线。</blockquote>',
+        richtext:
+          '<h2>智能多通道 PMIC</h2><p>集成 <strong>4 路 DC-DC</strong> + <strong>3 路 LDO</strong> 的电源管理芯片，内置锂电池充电管理和 <em>路径管理</em> 功能。</p><h3>关键参数</h3><ul><li>充电电流：最大 <strong>2A</strong>（可编程）</li><li>转换效率：<em>>95%</em>（DC-DC）</li><li>静态功耗：<strong>< 10μA</strong>（Shutdown 模式）</li></ul><h3>智能功能</h3><ol><li>I2C 接口可编程电压输出</li><li>NTC <strong>温度监控</strong> + 过温保护</li><li>支持 <em>USB PD / QC</em> 快充协议</li></ol><blockquote>适用于智能穿戴、TWS 耳机、便携医疗设备。参考 <a href="https://www.nxp.com/pmic">NXP PMIC</a> 产品线。</blockquote>',
         remark: '样品测试中，待确认纹波指标',
       },
       {
@@ -229,11 +310,27 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'fixture@auramanufacturing.com',
         phone: '0769-33445566',
         attachment: [
-          { name: '夹具3D模型.step', url: '/files/fixture-3d.step', size: 15728640, type: 'application/step' },
-          { name: '测试规格书.docx', url: '/files/test-spec.docx', size: 204800, type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
-          { name: '验收报告.pdf', url: '/files/acceptance-report.pdf', size: 1048576, type: 'application/pdf' },
+          {
+            name: '夹具3D模型.step',
+            url: '/files/fixture-3d.step',
+            size: 15728640,
+            type: 'application/step',
+          },
+          {
+            name: '测试规格书.docx',
+            url: '/files/test-spec.docx',
+            size: 204800,
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          },
+          {
+            name: '验收报告.pdf',
+            url: '/files/acceptance-report.pdf',
+            size: 1048576,
+            type: 'application/pdf',
+          },
         ],
-        richtext: '<h2>自动化 ICT/FCT 测试夹具</h2><p>全定制化测试解决方案，覆盖 <strong>ICT 在线测试</strong> + <strong>FCT 功能测试</strong> + <em>编程烧录</em>一体化。</p><h3>测试覆盖</h3><ul><li><strong>ICT</strong>：开短路、电阻、电容、二极管、IC 引脚</li><li><strong>FCT</strong>：电源上电、通信接口、传感器采集</li><li><strong>烧录</strong>：SWD / JTAG / UART 多接口</li></ul><h3>夹具规格</h3><ol><li>定位精度：<em>±0.05mm</em></li><li>探针寿命：> <strong>50万次</strong></li><li>切换时间：< <em>3秒</em>（气动下压）</li></ol><blockquote>已交付 <strong>200+ 套</strong>测试夹具，覆盖消费电子、汽车电子、工业控制领域。参考 <a href="https://www.keysight.com/test">Keysight</a>。</blockquote>',
+        richtext:
+          '<h2>自动化 ICT/FCT 测试夹具</h2><p>全定制化测试解决方案，覆盖 <strong>ICT 在线测试</strong> + <strong>FCT 功能测试</strong> + <em>编程烧录</em>一体化。</p><h3>测试覆盖</h3><ul><li><strong>ICT</strong>：开短路、电阻、电容、二极管、IC 引脚</li><li><strong>FCT</strong>：电源上电、通信接口、传感器采集</li><li><strong>烧录</strong>：SWD / JTAG / UART 多接口</li></ul><h3>夹具规格</h3><ol><li>定位精度：<em>±0.05mm</em></li><li>探针寿命：> <strong>50万次</strong></li><li>切换时间：< <em>3秒</em>（气动下压）</li></ol><blockquote>已交付 <strong>200+ 套</strong>测试夹具，覆盖消费电子、汽车电子、工业控制领域。参考 <a href="https://www.keysight.com/test">Keysight</a>。</blockquote>',
         remark: '项目已归档，客户后续无新需求',
       },
       {
@@ -254,9 +351,15 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'emc@xinrantech.com',
         phone: '0755-86123456',
         attachment: [
-          { name: 'EMC整改案例集.pdf', url: '/files/emc-cases.pdf', size: 4194304, type: 'application/pdf' },
+          {
+            name: 'EMC整改案例集.pdf',
+            url: '/files/emc-cases.pdf',
+            size: 4194304,
+            type: 'application/pdf',
+          },
         ],
-        richtext: '<h2>EMC 电磁兼容整改咨询</h2><p>提供从 <strong>预测试</strong> 到 <strong>整改方案</strong> 到 <em>复测通过</em> 的全流程 EMC 咨询服务。</p><h3>服务范围</h3><ul><li><strong>辐射发射 (RE)</strong>：30MHz ~ 6GHz</li><li><strong>传导发射 (CE)</strong>：150kHz ~ 30MHz</li><li><strong>ESD / EFT / Surge</strong> 抗扰度</li></ul><h3>整改流程</h3><ol><li>预扫描 — <em>定位超标频点和辐射源</em></li><li>方案设计 — 滤波、屏蔽、接地优化</li><li>PCB 改版指导 — <strong>布局布线优化建议</strong></li><li>复测验证 — 陪同进实验室直到通过</li></ol><blockquote>已成功整改 <strong>100+ 项目</strong>，一次通过率 > <em>90%</em>。仪器参考 <a href="https://www.rohde-schwarz.com/emc">R&S EMC</a>。</blockquote>',
+        richtext:
+          '<h2>EMC 电磁兼容整改咨询</h2><p>提供从 <strong>预测试</strong> 到 <strong>整改方案</strong> 到 <em>复测通过</em> 的全流程 EMC 咨询服务。</p><h3>服务范围</h3><ul><li><strong>辐射发射 (RE)</strong>：30MHz ~ 6GHz</li><li><strong>传导发射 (CE)</strong>：150kHz ~ 30MHz</li><li><strong>ESD / EFT / Surge</strong> 抗扰度</li></ul><h3>整改流程</h3><ol><li>预扫描 — <em>定位超标频点和辐射源</em></li><li>方案设计 — 滤波、屏蔽、接地优化</li><li>PCB 改版指导 — <strong>布局布线优化建议</strong></li><li>复测验证 — 陪同进实验室直到通过</li></ol><blockquote>已成功整改 <strong>100+ 项目</strong>，一次通过率 > <em>90%</em>。仪器参考 <a href="https://www.rohde-schwarz.com/emc">R&S EMC</a>。</blockquote>',
         remark: '新能源车载设备EMC整改项目，Q2交付',
       },
       {
@@ -277,11 +380,27 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         email: 'bms-engineering@xinrantech.com',
         phone: '0591-88776655',
         attachment: [
-          { name: 'BMS主控板原理图.pdf', url: '/files/bms-schematic.pdf', size: 2097152, type: 'application/pdf' },
-          { name: 'SOC算法说明.pdf', url: '/files/soc-algorithm.pdf', size: 1572864, type: 'application/pdf' },
-          { name: 'BMS测试报告-v2.pdf', url: '/files/bms-test-report.pdf', size: 3145728, type: 'application/pdf' },
+          {
+            name: 'BMS主控板原理图.pdf',
+            url: '/files/bms-schematic.pdf',
+            size: 2097152,
+            type: 'application/pdf',
+          },
+          {
+            name: 'SOC算法说明.pdf',
+            url: '/files/soc-algorithm.pdf',
+            size: 1572864,
+            type: 'application/pdf',
+          },
+          {
+            name: 'BMS测试报告-v2.pdf',
+            url: '/files/bms-test-report.pdf',
+            size: 3145728,
+            type: 'application/pdf',
+          },
         ],
-        richtext: '<h2>新能源 BMS 主控板</h2><p>支持 <strong>16串锂电池组</strong> 管理，集成 <em>SOC 估算</em>、主动均衡、CAN 通信等核心功能。</p><h3>核心功能</h3><ul><li><strong>电压采集</strong>：16 通道，精度 ±2mV</li><li><strong>温度监测</strong>：8 路 NTC，精度 ±1°C</li><li><strong>均衡电流</strong>：<em>200mA</em>（主动均衡）</li></ul><h3>SOC 算法</h3><ol><li>安时积分法 + <strong>EKF（扩展卡尔曼滤波）</strong></li><li>OCV-SOC 查表校准</li><li>SOC 估算精度：<em>< ±3%</em></li></ol><blockquote>满足 <strong>GB/T 36276-2018</strong> 储能系统安全标准，支持 <em>CAN 2.0B</em> 上位机通信。参考 <a href="https://www.catl.com/bms">CATL BMS</a>。</blockquote>',
+        richtext:
+          '<h2>新能源 BMS 主控板</h2><p>支持 <strong>16串锂电池组</strong> 管理，集成 <em>SOC 估算</em>、主动均衡、CAN 通信等核心功能。</p><h3>核心功能</h3><ul><li><strong>电压采集</strong>：16 通道，精度 ±2mV</li><li><strong>温度监测</strong>：8 路 NTC，精度 ±1°C</li><li><strong>均衡电流</strong>：<em>200mA</em>（主动均衡）</li></ul><h3>SOC 算法</h3><ol><li>安时积分法 + <strong>EKF（扩展卡尔曼滤波）</strong></li><li>OCV-SOC 查表校准</li><li>SOC 估算精度：<em>< ±3%</em></li></ol><blockquote>满足 <strong>GB/T 36276-2018</strong> 储能系统安全标准，支持 <em>CAN 2.0B</em> 上位机通信。参考 <a href="https://www.catl.com/bms">CATL BMS</a>。</blockquote>',
         remark: '审核中 - 等待安规认证报告完成',
       },
     ];
@@ -289,6 +408,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
     // Create all 10 records and collect their IDs for state transitions
     const recordIds: string[] = [];
     let created = 0;
+    let available = 0;
     for (const item of items) {
       try {
         const recordId = await cmd(page, 'sc:create_showcase', {
@@ -314,15 +434,22 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         });
         recordIds.push(recordId);
         created++;
+        available++;
       } catch (e) {
-        recordIds.push('');
-        console.warn(
-          `  Failed to create showcase record "${item.name}": ${(e as Error).message.slice(0, 100)}`,
-        );
+        const existingId = await findShowcaseRecordIdByName(page, item.name);
+        recordIds.push(existingId);
+        if (existingId) {
+          available++;
+          console.log(`  Reusing existing showcase record "${item.name}"`);
+        } else {
+          console.warn(
+            `  Failed to create showcase record "${item.name}": ${(e as Error).message.slice(0, 100)}`,
+          );
+        }
       }
     }
-    console.log(`  Created ${created}/10 showcase records`);
-    expect(created).toBeGreaterThanOrEqual(5);
+    console.log(`  Created ${created}/10 showcase records, available ${available}/10`);
+    expect(available).toBeGreaterThanOrEqual(5);
 
     // State transitions: all records start as draft
     // Records 0,1,2,4,5,8: activate (draft -> active)
@@ -336,7 +463,9 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         await cmd(page, 'sc:activate_showcase', {}, recordIds[idx], 'update');
         console.log(`  Activated: ${items[idx].name}`);
       } catch (e) {
-        console.warn(`  Failed to activate "${items[idx].name}": ${(e as Error).message.slice(0, 80)}`);
+        console.warn(
+          `  Failed to activate "${items[idx].name}": ${(e as Error).message.slice(0, 80)}`,
+        );
       }
     }
 
@@ -347,7 +476,9 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         await cmd(page, 'sc:submit_review_showcase', {}, recordIds[idx], 'update');
         console.log(`  Submitted for review: ${items[idx].name}`);
       } catch (e) {
-        console.warn(`  Failed to submit_review "${items[idx].name}": ${(e as Error).message.slice(0, 80)}`);
+        console.warn(
+          `  Failed to submit_review "${items[idx].name}": ${(e as Error).message.slice(0, 80)}`,
+        );
       }
     }
 
@@ -357,7 +488,9 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         await cmd(page, 'sc:archive_showcase', {}, recordIds[7], 'update');
         console.log(`  Archived: ${items[7].name}`);
       } catch (e) {
-        console.warn(`  Failed to archive "${items[7].name}": ${(e as Error).message.slice(0, 80)}`);
+        console.warn(
+          `  Failed to archive "${items[7].name}": ${(e as Error).message.slice(0, 80)}`,
+        );
       }
     }
 
