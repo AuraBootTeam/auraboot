@@ -13,6 +13,7 @@ public class MetaContext {
     private static final ThreadLocal<Long> MEMBER_ID = new ThreadLocal<>();
     private static final ThreadLocal<Long> ENV_ID = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
 
     @Getter
     private final Long tenantId;
@@ -62,6 +63,7 @@ public class MetaContext {
         MEMBER_ID.remove();
         ENV_ID.remove();
         ENV_FILTER_BYPASSED.remove();
+        LOCK_GUARD_BYPASSED.remove();
     }
 
     // ---- env-layering extension (PoC) ----
@@ -108,6 +110,38 @@ public class MetaContext {
      */
     public static void runWithoutEnvFilter(Runnable action) {
         runWithoutEnvFilter(() -> {
+            action.run();
+            return null;
+        });
+    }
+
+    // ---- env lock guard (env-layering #17) ----
+
+    /**
+     * @return true if the lock guard is currently bypassed (legitimate writes such as
+     *         {@code promotion.apply} that target a locked env via four-eyes flow).
+     */
+    public static boolean isLockGuardBypassed() {
+        return Boolean.TRUE.equals(LOCK_GUARD_BYPASSED.get());
+    }
+
+    /**
+     * Run a block with the lock guard disabled. Use sparingly — only for the legitimate
+     * writes-to-locked-env path: promotion apply, plugin import bootstrap, system migrations.
+     * State is restored even on exception.
+     */
+    public static <T> T runWithoutLockGuard(java.util.function.Supplier<T> action) {
+        Boolean prior = LOCK_GUARD_BYPASSED.get();
+        LOCK_GUARD_BYPASSED.set(true);
+        try {
+            return action.get();
+        } finally {
+            LOCK_GUARD_BYPASSED.set(prior);
+        }
+    }
+
+    public static void runWithoutLockGuard(Runnable action) {
+        runWithoutLockGuard(() -> {
             action.run();
             return null;
         });

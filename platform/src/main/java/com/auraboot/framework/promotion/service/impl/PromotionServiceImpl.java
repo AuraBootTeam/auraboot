@@ -325,12 +325,15 @@ public class PromotionServiceImpl implements PromotionService {
         clone.setRowVersion(1);
         clone.setDeletedFlag(false);
 
-        withEnvId(p.getTargetEnvId(), () -> {
-            pageSchemaMapper.insert(clone);
-            // Refresh reverse references for the freshly written page (env-scoped)
-            resourceReferenceService.refresh(clone);
-            return null;
-        });
+        // env-layering #17: promotion to a locked target env bypasses the lock guard —
+        // four-eyes already enforced in the outer apply() pre-check.
+        withEnvId(p.getTargetEnvId(), () ->
+                MetaContext.runWithoutLockGuard(() -> {
+                    pageSchemaMapper.insert(clone);
+                    // Refresh reverse references for the freshly written page (env-scoped)
+                    resourceReferenceService.refresh(clone);
+                    return null;
+                }));
 
         // Stamp target_version on the unit
         unit.setTargetVersion(targetVersion);
