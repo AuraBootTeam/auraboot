@@ -54,11 +54,12 @@ class SpringEventEmitterTest {
         return new TurnContext(
                 "test-turn-" + System.nanoTime(),
                 1L, 2L, 3L,
-                null, null,
-                10L,
-                null,
-                null,
-                null,
+                null,                                // agentId
+                null,                                // agentCode (DC.3c)
+                null,                                // channelSessionId
+                10L,                                 // conversationId
+                null, null, null,
+                null,                                // taskPid (DC.3c)
                 Instant.now());
     }
 

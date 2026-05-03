@@ -44,5 +44,7 @@ public record TurnRequest(
         InboundMode inboundMode,
         TriageBucket precomputedBucket,
         Long inboundMessageId,                    // D.1: existing ab_im_message.id when inboundMode=EXISTING_MESSAGE_ID
+        String parentTaskPid,                     // DC.3c Fix 3: ab_agent_task.pid of upstream hop (null = root turn)
+        com.auraboot.framework.agent.port.AgentTurnOverrides overrides,  // DC.3c: server-only context overrides; null = defaults
         ChatRequest legacyRequest                 // v4: original ChatRequest preserved for Phase A
 ) {}

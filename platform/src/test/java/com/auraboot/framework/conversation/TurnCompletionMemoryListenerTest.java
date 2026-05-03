@@ -35,11 +35,14 @@ class TurnCompletionMemoryListenerTest {
                 tenantId == null ? 0L : tenantId,
                 userId == null ? 0L : userId,
                 200L,
-                null, null,
-                999L,
+                null,                                // agentId
+                null,                                // agentCode (DC.3c)
+                null,                                // channelSessionId
+                999L,                                // conversationId
                 null,
                 bucket,
                 null,
+                null,                                // taskPid (DC.3c)
                 Instant.now());
     }
 
