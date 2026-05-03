@@ -29,8 +29,29 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 模式管理服务实现
- * 
+ * 模式管理服务实现.
+ *
+ * <h3>Exception strategy: wrap-as-result (catch-pattern §P4 variant)</h3>
+ *
+ * Most public DDL operations here ({@code createTableForModel}, {@code addField},
+ * {@code dropField}, {@code updateField}, etc.) catch {@code Exception} at the
+ * method top level and return a {@code SchemaOperationResult.success=false}
+ * carrying the failure message instead of throwing. This is intentional:
+ * <ul>
+ *   <li>Callers (PluginResourceImporter, Page Designer, DDL preview UI) need
+ *       per-operation outcomes — a thrown exception would collapse a batch.</li>
+ *   <li>Each top-level catch logs the cause via {@code log.error(msg, args..., e)}
+ *       so full stack traces still reach the log pipeline.</li>
+ *   <li>The returned result includes a human-readable {@code message} so
+ *       callers can surface it in their aggregated outcome.</li>
+ * </ul>
+ *
+ * Inner per-item catches at {@code createIndex} loop, {@code alterTable} loop,
+ * and {@code dropIndex} loop follow §P1 (per-item tolerance). The post-DDL
+ * {@code clearPreparedPlans} catch follows §P2 (best-effort cleanup outside
+ * the DDL transaction). See {@code docs/standards/core/catch-exception-pattern.md}
+ * for the full taxonomy.
+ *
  * @author AuraBoot Team
  * @since 2.0.0
  */
@@ -92,7 +113,9 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                         executedDDL.add(indexDDL);
                         log.debug("Created index: {}", indexDDL);
                     } catch (Exception e) {
-                        log.warn("Failed to create index: {}, error: {}", indexDDL, e.getMessage());
+                        // §P1 per-index tolerance: a single bad index DDL must not abort
+                        // the whole table-create flow; the table itself is already created.
+                        log.warn("Failed to create index: {}, error: {}", indexDDL, e.getMessage(), e);
                     }
                 }
                 
@@ -606,7 +629,12 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     try {
                         dynamicDataMapper.alterTable(singleDdl);
                     } catch (Exception e) {
-                        log.warn("Failed to execute DDL: {}, error: {}", singleDdl, e.getMessage());
+                        // §P1 per-DDL tolerance: alter-column produces multiple ddls
+                        // (TYPE / NOT NULL / DEFAULT) that should be applied
+                        // independently — one rejected by Postgres should not stop
+                        // the others. The outer wrap-as-result still reports overall
+                        // success or partial failure to the caller.
+                        log.warn("Failed to execute DDL: {}, error: {}", singleDdl, e.getMessage(), e);
                     }
                 }
                 
@@ -827,7 +855,9 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     executedDDLs.add(ddl);
                     log.debug("Dropped index: {}", indexName);
                 } catch (Exception e) {
-                    log.warn("Failed to drop index {}: {}", indexName, e.getMessage());
+                    // §P1 per-index tolerance: a single index that no longer exists
+                    // (manual drop, restored backup) should not stop dropping others.
+                    log.warn("Failed to drop index {}: {}", indexName, e.getMessage(), e);
                 }
             }
             
@@ -1163,7 +1193,11 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 statement.execute("DEALLOCATE ALL");
             }
         } catch (Exception e) {
-            log.warn("Failed to clear PostgreSQL prepared plans after DDL: {}", e.getMessage());
+            // §P2 best-effort cleanup: DEALLOCATE failure (connection lost, broken
+            // pool member) does not invalidate the DDL just executed; stale plans
+            // would self-evict on next prepare. Logged at warn so a recurring
+            // failure can be picked up by ops.
+            log.warn("Failed to clear PostgreSQL prepared plans after DDL: {}", e.getMessage(), e);
         }
     }
 
