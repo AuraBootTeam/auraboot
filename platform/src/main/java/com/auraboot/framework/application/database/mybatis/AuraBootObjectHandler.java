@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.database.mybatis;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.environment.service.EnvLockGuard;
 import com.auraboot.framework.environment.service.EnvironmentService;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import lombok.extern.slf4j.Slf4j;
@@ -29,10 +30,13 @@ import java.time.Instant;
 public class AuraBootObjectHandler implements MetaObjectHandler {
 
     private final EnvironmentService environmentService;
+    private final EnvLockGuard envLockGuard;
 
     @Autowired
-    public AuraBootObjectHandler(@Lazy EnvironmentService environmentService) {
+    public AuraBootObjectHandler(@Lazy EnvironmentService environmentService,
+                                 @Lazy EnvLockGuard envLockGuard) {
         this.environmentService = environmentService;
+        this.envLockGuard = envLockGuard;
     }
 
     @Override
@@ -53,19 +57,23 @@ public class AuraBootObjectHandler implements MetaObjectHandler {
         if (!metaObject.hasGetter("envId")) {
             return;
         }
-        Object existing = metaObject.getValue("envId");
-        if (existing != null) {
-            return;  // explicit set wins (e.g. promotion cross-env writes)
-        }
-        Long envId = MetaContext.getCurrentEnvironmentId();
+        Long envId = (Long) metaObject.getValue("envId");
         if (envId == null) {
-            Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
-            if (tenantId == null) {
-                log.debug("envId fill skipped: no MetaContext / no tenantId");
-                return;
+            Long ctxEnvId = MetaContext.getCurrentEnvironmentId();
+            if (ctxEnvId != null) {
+                envId = ctxEnvId;
+            } else {
+                Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+                if (tenantId == null) {
+                    log.debug("envId fill skipped: no MetaContext / no tenantId");
+                    return;
+                }
+                envId = environmentService.findOrCreateDefaultId(tenantId);
             }
-            envId = environmentService.findOrCreateDefaultId(tenantId);
+            metaObject.setValue("envId", envId);
         }
-        metaObject.setValue("envId", envId);
+        // env-layering #17: lock guard fires after envId is resolved, before the SQL runs.
+        // Bypass paths (promotion.apply, plugin-import bootstrap) wrap with runWithoutLockGuard.
+        envLockGuard.assertWritable(envId);
     }
 }
