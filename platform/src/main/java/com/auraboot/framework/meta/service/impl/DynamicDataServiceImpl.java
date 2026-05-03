@@ -37,8 +37,39 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 动态数据服务实现
- * 
+ * 动态数据服务实现.
+ *
+ * <h3>Exception strategy: security-strict, enrichment-tolerant</h3>
+ *
+ * Two distinct catch(Exception) patterns appear throughout this class. They
+ * are intentional and complementary:
+ *
+ * <ul>
+ *   <li><b>§P4 wrap-and-rethrow</b> (security paths): Any failure in
+ *       row-level data permission, data domain filter, or field masking
+ *       is caught, logged with stack trace, and re-thrown as
+ *       {@link MetaServiceException}. <i>The system fails closed</i> —
+ *       a permission engine error must never silently degrade access.
+ *       Same applies to wrap-as-result for export / import / custom
+ *       action which return {@code success=false} carrying the message.</li>
+ *
+ *   <li><b>§P2 best-effort enrichment</b> (display paths): Avatar URL
+ *       resolution, REFERENCE display enrichment, change-log recording,
+ *       automation triggers, and field-permission filtering catch + log
+ *       but do not throw. The underlying CRUD operation succeeded; the
+ *       enrichment is decoration that must never block a write.</li>
+ *
+ *   <li><b>§P1 per-row tolerance</b> (batch paths): Batch create/update,
+ *       sub-table joint save, and relation create/remove iterate N items
+ *       and aggregate per-item errors into a result; one bad row must
+ *       not abort the rest.</li>
+ * </ul>
+ *
+ * Per {@code docs/standards/core/catch-exception-pattern.md}, all
+ * {@code log.warn/error} calls must trail the exception as the final
+ * argument so SLF4J emits the stack trace; all {@code throw new
+ * MetaServiceException(msg)} must include {@code e} as cause.
+ *
  * @author AuraBoot Team
  * @since 2.0.0
  */
@@ -141,7 +172,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         } catch (Exception e) {
             log.error("Failed to apply row-level data permission for model {} — returning empty result for security", modelCode, e);
-            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode);
+            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
         }
 
         // Apply data domain isolation filter (D5) — fail-secure
@@ -153,7 +184,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         } catch (Exception e) {
             log.error("Failed to apply domain filter for model {} — returning empty result for security", modelCode, e);
-            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode);
+            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
         }
 
         // Add keyword search across searchable fields
@@ -205,7 +236,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         } catch (Exception e) {
             log.error("Failed to apply row-level data permission to count query for model {} — denying access", modelCode, e);
-            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode);
+            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
         }
 
         // Apply the same domain filter to count query for consistency (D5) — fail-secure
@@ -217,7 +248,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         } catch (Exception e) {
             log.error("Failed to apply domain filter to count query for model {} — denying access", modelCode, e);
-            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode);
+            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
         }
 
         // Apply the same keyword search to count query for consistency
@@ -240,7 +271,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         } catch (Exception e) {
             log.error("Failed to apply field masking for model {} — returning empty result for security", modelCode, e);
-            throw new MetaServiceException("Field masking evaluation failed for model: " + modelCode);
+            throw new MetaServiceException("Field masking evaluation failed for model: " + modelCode, e);
         }
 
         // Apply configurable field masking (A9) — fail-secure
@@ -249,7 +280,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             records = fieldMaskService.applyMaskingForList(modelCode, records, userId);
         } catch (Exception e) {
             log.error("Failed to apply configurable field masking for model {} — returning empty result for security", modelCode, e);
-            throw new MetaServiceException("Configurable field masking failed for model: " + modelCode);
+            throw new MetaServiceException("Configurable field masking failed for model: " + modelCode, e);
         }
 
         // Apply field-level permission filtering — remove hidden fields from results
@@ -301,7 +332,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 hidden.forEach(record::remove);
             }
         } catch (Exception e) {
-            log.warn("Failed to apply field permission filter for model {}: {}", modelCode, e.getMessage());
+            log.warn("Failed to apply field permission filter for model {}: {}", modelCode, e.getMessage(), e);
         }
         return records;
     }
@@ -321,7 +352,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
             fieldPerms.hiddenFields().forEach(record::remove);
         } catch (Exception e) {
-            log.warn("Failed to apply field permission filter for model {}: {}", modelCode, e.getMessage());
+            log.warn("Failed to apply field permission filter for model {}: {}", modelCode, e.getMessage(), e);
         }
         return record;
     }
@@ -374,7 +405,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 try {
                     record.put("user_avatar_url", fileService.getFileDownloadUrl(user.getImgId()));
                 } catch (Exception e) {
-                    log.warn("Failed to resolve avatar URL for userId={}: {}", userId, e.getMessage());
+                    log.warn("Failed to resolve avatar URL for userId={}: {}", userId, e.getMessage(), e);
                 }
             }
         }
@@ -503,7 +534,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.warn("Failed to enrich REFERENCE display for field {} in model {}: {}",
-                        fieldCode, modelCode, e.getMessage());
+                        fieldCode, modelCode, e.getMessage(), e);
             }
         }
     }
@@ -696,7 +727,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         } catch (MetaServiceException e) {
             throw e;
         } catch (Exception e) {
-            log.warn("Failed to check row-level access for model {} record {}: {}", modelCode, recordId, e.getMessage());
+            log.warn("Failed to check row-level access for model {} record {}: {}", modelCode, recordId, e.getMessage(), e);
         }
 
         // Apply column-level field masking (policy-based)
@@ -710,7 +741,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to apply field masking for model {} record {}: {}", modelCode, recordId, e.getMessage());
+            log.warn("Failed to apply field masking for model {} record {}: {}", modelCode, recordId, e.getMessage(), e);
         }
 
         // Apply configurable field masking for detail view (A9)
@@ -718,7 +749,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Long userId = getCurrentUserId();
             record = fieldMaskService.applyMaskingForDetail(modelCode, record, userId);
         } catch (Exception e) {
-            log.warn("Failed to apply configurable field masking for model {} record {}: {}", modelCode, recordId, e.getMessage());
+            log.warn("Failed to apply configurable field masking for model {} record {}: {}", modelCode, recordId, e.getMessage(), e);
         }
 
         // Apply field-level permission filtering — remove hidden fields
@@ -805,7 +836,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     .build());
         } catch (Exception e) {
             log.error("Failed to record change log for create: model={}, id={}: {}",
-                    modelCode, recordIdValue, e.getMessage());
+                    modelCode, recordIdValue, e.getMessage(), e);
         }
 
         // Trigger automations for record creation
@@ -813,7 +844,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             getAutomationTriggerService().onRecordCreate(modelCode, recordIdValue, createdRecord);
         } catch (Exception e) {
             log.error("Failed to trigger automations for create: model={}, id={}: {}",
-                    modelCode, recordIdValue, e.getMessage());
+                    modelCode, recordIdValue, e.getMessage(), e);
         }
 
         return createdRecord;
@@ -840,7 +871,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 Object convertedValue = convertFieldValue(field, value);
                 convertedData.put(fieldCode, convertedValue);
             } catch (Exception e) {
-                log.warn("Failed to convert field {} value {}: {}", fieldCode, value, e.getMessage());
+                log.warn("Failed to convert field {} value {}: {}", fieldCode, value, e.getMessage(), e);
                 // 保持原值，让数据库处理类型转换
             }
         }
@@ -883,7 +914,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         return java.sql.Date.valueOf((String) value);
                     } catch (Exception e) {
                         throw new MetaServiceException(
-                            "Invalid date value for field '" + field.getCode() + "': " + value);
+                            "Invalid date value for field '" + field.getCode() + "': " + value, e);
                     }
                 }
                 return value;
@@ -895,7 +926,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         return java.sql.Timestamp.valueOf((String) value);
                     } catch (Exception e) {
                         throw new MetaServiceException(
-                            "Invalid datetime value for field '" + field.getCode() + "': " + value);
+                            "Invalid datetime value for field '" + field.getCode() + "': " + value, e);
                     }
                 }
                 return value;
@@ -1011,7 +1042,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     enrichedData.remove(primaryKey.getCode());
                 }
             } catch (Exception e) {
-                log.warn("Could not get primary key field for model {}: {}", modelCode, e.getMessage());
+                log.warn("Could not get primary key field for model {}: {}", modelCode, e.getMessage(), e);
                 // Try common primary key field names
                 enrichedData.remove("id");
                 enrichedData.remove(modelCode + "_id");
@@ -1074,7 +1105,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.error("Failed to record change log for update: model={}, id={}: {}",
-                        modelCode, recordId, e.getMessage());
+                        modelCode, recordId, e.getMessage(), e);
             }
 
             // Trigger automations for record update
@@ -1082,14 +1113,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 getAutomationTriggerService().onRecordUpdate(modelCode, recordId, existingRecord, updatedRecord);
             } catch (Exception e) {
                 log.error("Failed to trigger automations for update: model={}, id={}: {}",
-                        modelCode, recordId, e.getMessage());
+                        modelCode, recordId, e.getMessage(), e);
             }
 
             return updatedRecord;
             
         } catch (Exception e) {
             log.error("Update operation failed for model {} with ID {}: {}", modelCode, recordId, e.getMessage(), e);
-            throw new MetaServiceException("Update failed: " + e.getMessage());
+            throw new MetaServiceException("Update failed: " + e.getMessage(), e);
         }
     }
 
@@ -1144,7 +1175,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     .build());
         } catch (Exception e) {
             log.error("Failed to record change log for delete: model={}, id={}: {}",
-                    modelCode, recordId, e.getMessage());
+                    modelCode, recordId, e.getMessage(), e);
         }
     }
 
@@ -1197,7 +1228,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             } catch (Exception e) {
                 failedCount++;
                 errors.add("Row " + (i + 1) + ": " + e.getMessage());
-                log.warn("Batch create failed for row {}: {}", i + 1, e.getMessage());
+                log.warn("Batch create failed for row {}: {}", i + 1, e.getMessage(), e);
             }
         }
 
@@ -1242,7 +1273,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             } catch (Exception e) {
                 failedCount++;
                 errors.add("Row " + (i + 1) + ": " + e.getMessage());
-                log.warn("Batch update failed for row {}: {}", i + 1, e.getMessage());
+                log.warn("Batch update failed for row {}: {}", i + 1, e.getMessage(), e);
             }
         }
         
@@ -1338,7 +1369,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         } catch (Exception e) {
             log.error("Failed to apply row-level data permission in aggregate for model {} — denying access", modelCode, e);
-            throw new MetaServiceException("Data permission evaluation failed for aggregate: " + modelCode);
+            throw new MetaServiceException("Data permission evaluation failed for aggregate: " + modelCode, e);
         }
 
         // Domain isolation filter (fail-secure)
@@ -1349,7 +1380,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         } catch (Exception e) {
             log.error("Failed to apply domain filter in aggregate for model {} — denying access", modelCode, e);
-            throw new MetaServiceException("Data domain filter evaluation failed for aggregate: " + modelCode);
+            throw new MetaServiceException("Data domain filter evaluation failed for aggregate: " + modelCode, e);
         }
 
         // Add GROUP BY if present
@@ -1515,7 +1546,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.error("Failed to apply row-level permission in getRelationData for target: {} — denying access", targetModelCode, e);
-                throw new MetaServiceException("Data permission evaluation failed for relation query");
+                throw new MetaServiceException("Data permission evaluation failed for relation query", e);
             }
 
             // Domain isolation filter on target model (fail-secure)
@@ -1526,7 +1557,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.error("Failed to apply domain filter in getRelationData for target: {} — denying access", targetModelCode, e);
-                throw new MetaServiceException("Data domain filter failed for relation query");
+                throw new MetaServiceException("Data domain filter failed for relation query", e);
             }
 
             List<Map<String, Object>> targetResults = dynamicDataMapper.selectByQuery(targetSqlBuilder.toString(), targetParams);
@@ -1539,7 +1570,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.error("Failed to apply field masking in getRelationData for target: {} — denying access", targetModelCode, e);
-                throw new MetaServiceException("Field masking failed for relation query");
+                throw new MetaServiceException("Field masking failed for relation query", e);
             }
 
             return targetResults;
@@ -1563,7 +1594,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.error("Failed to apply row-level permission in getRelationData for target: {} — denying access", targetModelCode, e);
-                throw new MetaServiceException("Data permission evaluation failed for relation query");
+                throw new MetaServiceException("Data permission evaluation failed for relation query", e);
             }
 
             // Domain isolation filter on target model (fail-secure)
@@ -1574,7 +1605,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.error("Failed to apply domain filter in getRelationData for target: {} — denying access", targetModelCode, e);
-                throw new MetaServiceException("Data domain filter failed for relation query");
+                throw new MetaServiceException("Data domain filter failed for relation query", e);
             }
 
             // Apply limit from queryParams
@@ -1592,7 +1623,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.error("Failed to apply field masking in getRelationData for target: {} — denying access", targetModelCode, e);
-                throw new MetaServiceException("Field masking failed for relation query");
+                throw new MetaServiceException("Field masking failed for relation query", e);
             }
 
             return relationResults;
@@ -1633,7 +1664,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 log.debug("Relation already exists for target {}, treating as success", targetId);
                 successIds.add(targetId);
             } catch (Exception e) {
-                log.warn("Failed to create relation for target {}: {}", targetId, e.getMessage());
+                log.warn("Failed to create relation for target {}: {}", targetId, e.getMessage(), e);
                 failedIds.add(targetId);
             }
         }
@@ -1681,7 +1712,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     failedIds.add(targetId);
                 }
             } catch (Exception e) {
-                log.warn("Failed to remove relation for target {}: {}", targetId, e.getMessage());
+                log.warn("Failed to remove relation for target {}: {}", targetId, e.getMessage(), e);
                 failedIds.add(targetId);
             }
         }
@@ -1769,7 +1800,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         } catch (Exception e) {
             log.error("Failed to apply row-level permission in getFieldOptions — denying access", e);
-            throw new MetaServiceException("Data permission evaluation failed for field options");
+            throw new MetaServiceException("Data permission evaluation failed for field options", e);
         }
 
         // Add keyword filter
@@ -1829,7 +1860,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
         } catch (Exception e) {
             log.error("Failed to apply row-level data permission in export for model {} — denying access", modelCode, e);
-            throw new MetaServiceException("Data permission evaluation failed for export: " + modelCode);
+            throw new MetaServiceException("Data permission evaluation failed for export: " + modelCode, e);
         }
 
         String domainFilter;
@@ -1837,7 +1868,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
         } catch (Exception e) {
             log.error("Failed to apply domain filter in export for model {} — denying access", modelCode, e);
-            throw new MetaServiceException("Data domain filter failed for export: " + modelCode);
+            throw new MetaServiceException("Data domain filter failed for export: " + modelCode, e);
         }
 
         try {
@@ -1880,14 +1911,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             } catch (Exception e) {
                 log.error("Failed to apply policy-based masking in export for model {} — denying access", modelCode, e);
-                throw new MetaServiceException("Policy-based masking failed for export: " + modelCode);
+                throw new MetaServiceException("Policy-based masking failed for export: " + modelCode, e);
             }
 
             // Apply configurable field masking for export (A9)
             try {
                 data = fieldMaskService.applyMaskingForExport(modelCode, data, userId);
             } catch (Exception e) {
-                log.warn("Failed to apply export masking for model {}: {}", modelCode, e.getMessage());
+                log.warn("Failed to apply export masking for model {}: {}", modelCode, e.getMessage(), e);
             }
 
             // Determine export fields
@@ -2593,7 +2624,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                                 successCount++;
                             } catch (Exception e) {
                                 log.warn("Failed to save child record at index {} for relation {}: {}",
-                                        i, relationName, e.getMessage());
+                                        i, relationName, e.getMessage(), e);
                                 rowErrors.add(JointSubTableSaveResponse.SubTableError.builder()
                                         .rowIndex(i)
                                         .message(e.getMessage())
