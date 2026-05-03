@@ -327,7 +327,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             try {
                 getModelDefinition(modelCode);
             } catch (Exception e) {
-                log.warn("Failed to preload model: {}, error: {}", modelCode, e.getMessage());
+                // §P1 per-model tolerance: preload is best-effort warm-up; one
+                // missing or malformed model must not abort warming the others.
+                log.warn("Failed to preload model: {}, error: {}", modelCode, e.getMessage(), e);
             }
         }
     }
@@ -377,6 +379,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                     .build();
                     
         } catch (Exception e) {
+            // §P4 wrap-as-result variant: validateModel is invoked from import flows
+            // and DDL preview where a thrown exception would collapse a batch. Surface
+            // the failure in the result; log with stack trace so root cause is visible
+            // in observability.
+            log.error("Model validation failed with exception for {}: {}", modelCode, e.getMessage(), e);
             return MetadataValidationResult.builder()
                     .valid(false)
                     .modelCode(modelCode)
@@ -391,7 +398,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         try {
             return getModelDefinition(modelCode).isPresent();
         } catch (Exception e) {
-            log.warn("Error checking model existence: {}, error: {}", modelCode, e.getMessage());
+            // exists-check semantics: any failure is treated as "not exists" so callers
+            // (importer / re-import) can proceed to create. Real DB failures still
+            // surface via the warn log + stack trace for ops triage.
+            log.warn("Error checking model existence: {}, error: {}", modelCode, e.getMessage(), e);
             return false;
         }
     }
@@ -402,6 +412,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             getFieldDefinition(modelCode, fieldCode);
             return true;
         } catch (Exception e) {
+            // exists-check semantics: any failure is treated as "not exists"; logged
+            // at debug so a real DB/connectivity failure remains observable when
+            // troubleshooting unexpected re-creates during import.
+            log.debug("Error checking field existence: model={}, field={}, error={}",
+                    modelCode, fieldCode, e.toString());
             return false;
         }
     }
@@ -946,7 +961,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 return objectMapper.convertValue(rawList,
                     objectMapper.getTypeFactory().constructCollectionType(List.class, CrossFieldRule.class));
             } catch (Exception e) {
-                log.warn("Failed to parse cross-field rules for model {}: {}", model.getCode(), e.getMessage());
+                // §P2 best-effort: malformed cross-field-rule JSON should not block
+                // model load. Caller treats null as "no rules"; warn log surfaces
+                // the bad config for the model owner to fix.
+                log.warn("Failed to parse cross-field rules for model {}: {}", model.getCode(), e.getMessage(), e);
                 return null;
             }
         }
@@ -1455,7 +1473,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         try {
             return metaModelMapper.selectById(modelId) != null;
         } catch (Exception e) {
-            log.error("检查模型存在性失败: modelId={}, error={}", modelId, e.getMessage());
+            // exists-check semantics (§P4 wrap-as-bool): caller treats false as
+            // "not exists"; raised exception (DB down, schema mismatch) is surfaced
+            // via error log + stack trace rather than thrown, since binding flows
+            // batch-iterate over many ids and one DB hiccup must not abort the loop.
+            log.error("检查模型存在性失败: modelId={}, error={}", modelId, e.getMessage(), e);
             return false;
         }
     }
@@ -1465,7 +1487,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         try {
             return metaFieldMapper.selectById(fieldId) != null;
         } catch (Exception e) {
-            log.error("检查字段存在性失败: fieldId={}, error={}", fieldId, e.getMessage());
+            // exists-check semantics: see existsModelById above for full pattern note.
+            log.error("检查字段存在性失败: fieldId={}, error={}", fieldId, e.getMessage(), e);
             return false;
         }
     }
@@ -1475,7 +1498,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         try {
             return fieldBindingMapper.countByModelAndField(modelId, fieldId) > 0;
         } catch (Exception e) {
-            log.error("检查字段绑定关系失败: modelId={}, fieldId={}, error={}", modelId, fieldId, e.getMessage());
+            // exists-check semantics: see existsModelById above for full pattern note.
+            log.error("检查字段绑定关系失败: modelId={}, fieldId={}, error={}", modelId, fieldId, e.getMessage(), e);
             return false;
         }
     }
@@ -1969,8 +1993,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                                 expandedFields.size(), model.getCode(), String.join(", ", expandedFields));
                     }
                 } catch (Exception e) {
+                    // §P2 best-effort: MONEY/i18n field expansion is a derived view;
+                    // a parse failure should not prevent the underlying model from
+                    // loading. Caller falls back to the un-expanded field set.
                     log.warn("MONEY field expansion failed for model {} (non-blocking): {}",
-                            model.getCode(), e.getMessage());
+                            model.getCode(), e.getMessage(), e);
                 }
             }
 
@@ -1982,8 +2009,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                             i18nFields.size(), model.getCode(), String.join(", ", i18nFields));
                 }
             } catch (Exception e) {
+                // §P2 best-effort: see MONEY expansion above.
                 log.warn("i18n field expansion failed for model {} (non-blocking): {}",
-                        model.getCode(), e.getMessage());
+                        model.getCode(), e.getMessage(), e);
             }
 
             // Create table via SchemaManagementService
