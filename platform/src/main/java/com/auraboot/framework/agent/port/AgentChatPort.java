@@ -1,13 +1,10 @@
 package com.auraboot.framework.agent.port;
 
-import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -82,36 +79,34 @@ public interface AgentChatPort {
      * @return the outcome reflecting how the turn ended
      */
     default TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink) {
-        return runAgentTurn(ctx, request, sink, Collections.emptyList());
+        return runAgentTurn(ctx, request, sink, null);
     }
 
     /**
-     * Phase D.3-chokepoint DC.1 (Q-DC.1=β) extension. Same as
-     * {@link #runAgentTurn(TurnContext, ChatRequest, ResponseSink)} but accepts
-     * an additional list of caller-supplied {@link ToolDefinition} entries that
-     * the implementation MUST merge into the registry-discovered tool list
-     * before running the LLM tool loop.
+     * Phase D.3-chokepoint DC.3a (Q-DC.1=A' lock) — server-only overrides
+     * variant. Trusted internal callers (e.g. {@code AgentReplyTask} for
+     * group-chat) build a context bag and pass it to override
+     * {@code AgentChatPortImpl}'s default per-step build path.
      *
-     * <p>Use case: group-chat handoff. {@code AgentReplyTask} calls this with
-     * {@code extraTools = [HandoffToolProvider.getToolDefinition(otherAgents)]}
-     * so the LLM can emit {@code transfer_to_agent} as a regular tool call.
-     * The conversation-scope nature of the handoff tool (its valid
-     * {@code targetAgentCode} enum is the OTHER members of THIS conversation)
-     * makes it inappropriate for the tenant-scoped {@code ToolProviderRegistry};
-     * passing it through this side-channel keeps the registry clean while
-     * still routing the LLM call through the chokepoint.
+     * <p>{@code overrides=null} means "behave exactly as the 3-arg overload"
+     * — the aurabot main path uses this default. When non-null, the implementation
+     * MUST honour each non-null field on {@link AgentTurnOverrides} (system
+     * prompt, messages, tool definitions, extra tools, persistence flag).
      *
-     * <p>Merge semantics: if {@code extraTools} contains a tool with the same
-     * {@code toolCode} as a registry-discovered tool, the {@code extraTools}
-     * entry wins (with a {@code log.warn} so collisions are visible). Empty or
-     * null {@code extraTools} means "behave exactly as the no-arg overload"
-     * — the aurabot main path uses this default.
+     * <p><b>Security boundary</b>: {@link AgentTurnOverrides} is a server-only
+     * object, NEVER deserialised from a client request. The
+     * {@code @RequestBody} controllers ({@code AuraBotController}) always pass
+     * {@code null} here. See design v5 §10.7 Fix 1 for the prompt-injection /
+     * tool-forgery threat model that motivated splitting overrides off the
+     * public {@code ChatRequest} DTO.
      *
-     * @param extraTools optional caller-supplied tool definitions (e.g. handoff);
-     *                   {@code null} or empty list both mean "no extras"
+     * <p><b>Replaces DC.1 4-arg signature</b>: the previous
+     * {@code runAgentTurn(ctx, request, sink, List<ToolDefinition> extraTools)}
+     * overload (DC.1) is removed; its single {@code extraTools} parameter
+     * is now {@link AgentTurnOverrides#extraTools()}.
      */
     TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink,
-                              List<ToolDefinition> extraTools);
+                              AgentTurnOverrides overrides);
 
     /**
      * Execute a high-risk chat tool after its Agent approval request is approved.

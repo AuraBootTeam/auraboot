@@ -97,7 +97,7 @@ public class AgentChatPortImpl implements AgentChatPort {
 
     @Override
     public TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink,
-                                     List<ToolDefinition> extraTools) {
+                                     com.auraboot.framework.agent.port.AgentTurnOverrides overrides) {
         Long tenantId = ctx.tenantId();
         String agentCode = request.getAgentCode();
 
@@ -130,31 +130,53 @@ public class AgentChatPortImpl implements AgentChatPort {
             maxTokens = request.getOptions().getMaxTokens();
         }
 
-        // Build system prompt from agent definition
-        String systemPrompt = buildSystemPrompt(agentDef);
+        // DC.3a (Q-DC.1=A'): each step honours the corresponding override on
+        // AgentTurnOverrides when caller supplied one. Server-only callers
+        // (e.g. AgentReplyTask for group-chat) use overrides to inject pre-
+        // built context that the tenant-scoped registry / 1:1 chat defaults
+        // can't express. REST callers always pass overrides=null.
+        String systemPrompt = (overrides != null && overrides.systemPromptOverride() != null)
+                ? overrides.systemPromptOverride()
+                : buildSystemPrompt(agentDef);
 
-        // Discover tools for this agent (with parameterSchema preserved so we can
-        // detect confirmation-required tools when the LLM calls them).
-        List<ToolDefinition> toolDefs = discoverToolDefinitions(tenantId, agentCode, request.getMessage());
-        // DC.1 (Q-DC.1=β): merge caller-supplied extraTools (e.g. group-chat
-        // handoff tool) on top of registry-discovered tools. Name collisions
-        // resolve to extraTools (caller knows the conversation-scope semantics).
-        toolDefs = mergeExtraTools(toolDefs, extraTools);
+        // Tool list: caller may REPLACE the registry-discovered list entirely
+        // (toolDefsOverride non-null), then we still merge extraTools on top
+        // so handoff-style additive injection composes with replacement.
+        List<ToolDefinition> toolDefs = (overrides != null && overrides.toolDefsOverride() != null)
+                ? overrides.toolDefsOverride()
+                : discoverToolDefinitions(tenantId, agentCode, request.getMessage());
+        List<ToolDefinition> extraToolsForMerge = overrides != null ? overrides.extraTools() : null;
+        // DC.1 (Q-DC.1=β) merge contract preserved: name collisions resolve
+        // to extraTools (caller knows conversation-scope semantics).
+        toolDefs = mergeExtraTools(toolDefs, extraToolsForMerge);
         List<LlmChatRequest.Tool> tools = toLlmTools(toolDefs);
 
         // Build conversation: prefer the persisted multi-turn tape (so any prior
         // tool_use / tool_result blocks survive the HTTP boundary). When no
         // server-side tape exists, fall back to the (potentially stale) frontend
-        // history and append the current user message.
-        List<LlmChatRequest.Message> messages = restoreOrBuildMessages(
-                request.getSessionId(), request.getHistory(), request.getMessage());
+        // history and append the current user message. DC.3a: caller may
+        // REPLACE this entirely (e.g. group-chat history loaded from
+        // ab_im_message via GroupChatTurnContextAssembler).
+        // Defensive copy so the loop's messages.add(...) mutations don't blow
+        // up when caller passes an immutable List (e.g. List.of(...)).
+        List<LlmChatRequest.Message> messages = (overrides != null && overrides.messagesOverride() != null)
+                ? new ArrayList<>(overrides.messagesOverride())
+                : restoreOrBuildMessages(request.getSessionId(), request.getHistory(), request.getMessage());
 
-        log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}",
-                agentCode, providerCode, model, tools.size());
+        // DC.3a: caller controls whether the post-turn tape gets persisted to
+        // ChatSessionStore. Group-chat callers typically opt out (history
+        // already lives in ab_im_message); aurabot main path opts in (default).
+        boolean persistTape = overrides == null || overrides.persistSessionTape() == null
+                ? true
+                : overrides.persistSessionTape();
+
+        log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
+                agentCode, providerCode, model, tools.size(), overrides != null);
 
         // Run the tool loop
         return doAgentToolLoop(ctx, agentCode, provider, providerCode, config, model,
-                systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink);
+                systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink,
+                persistTape);
     }
 
     // =========================================================================
@@ -168,7 +190,8 @@ public class AgentChatPortImpl implements AgentChatPort {
                                         List<LlmChatRequest.Message> messages,
                                         List<LlmChatRequest.Tool> tools,
                                         List<ToolDefinition> toolDefs,
-                                        String sessionId, ResponseSink sink) {
+                                        String sessionId, ResponseSink sink,
+                                        boolean persistTape) {
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             LlmChatRequest req = LlmChatRequest.builder()
                     .model(model)
@@ -200,7 +223,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                 // Persist the final assistant turn so subsequent turns see it as
                 // history without depending on the (potentially stale) frontend tape.
                 messages.add(buildAssistantMessage(response.getContent()));
-                persistMessages(sessionId, messages);
+                if (persistTape) persistMessages(sessionId, messages);
                 return streamFinalResponse(response, sink);
             }
 
@@ -227,7 +250,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                     // surface the handoff request via Success.meta, and let the
                     // caller (AgentReplyTask in DC.3) drive the recursion.
                     if (HANDOFF_TOOL_NAME.equals(toolName)) {
-                        persistMessages(sessionId, messages);
+                        if (persistTape) persistMessages(sessionId, messages);
                         return buildHandoffOutcome(response, sink, input);
                     }
 
@@ -267,7 +290,7 @@ public class AgentChatPortImpl implements AgentChatPort {
 
                         // Persist the running tape so a fresh turn can rehydrate
                         // even if /execute is skipped (e.g. timeout → retry).
-                        persistMessages(sessionId, messages);
+                        if (persistTape) persistMessages(sessionId, messages);
 
                         confirmationRequired = true;
                         pendingToolId = toolId;
@@ -291,13 +314,13 @@ public class AgentChatPortImpl implements AgentChatPort {
                 messages.add(buildToolResultMessage(toolResultBlocks));
                 // Persist after each tool round so a connection drop does not lose
                 // the structured tool tape — the next turn will see it.
-                persistMessages(sessionId, messages);
+                if (persistTape) persistMessages(sessionId, messages);
                 continue;
             }
 
             // Unknown stop reason — treat as final
             messages.add(buildAssistantMessage(response.getContent()));
-            persistMessages(sessionId, messages);
+            if (persistTape) persistMessages(sessionId, messages);
             return streamFinalResponse(response, sink);
         }
 
