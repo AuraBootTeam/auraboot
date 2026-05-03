@@ -24,4 +24,20 @@ public class BusinessException extends RootUnCheckedException {
     public BusinessException(String message, Throwable cause) {
         super(ResponseCode.BUSINESS_ERROR, cause);
     }
+
+    /**
+     * Construct with explicit ResponseCode, human-readable message, and root cause.
+     * Use this when wrapping a low-level exception (DB, IO, parse, etc.) into a
+     * BusinessException so the cause chain remains intact for
+     * {@code GlobalExceptionHandler} and observability.
+     *
+     * <p>The other constructors either drop the message (the {@code (String,
+     * Throwable)} ctor) or drop the cause (the {@code (ResponseCode, Object)}
+     * ctor when context is a String). Prefer this one for §P4 wrap-and-rethrow
+     * — see {@code docs/standards/core/catch-exception-pattern.md}.
+     */
+    public BusinessException(ResponseCode responseCode, String message, Throwable cause) {
+        super(responseCode, message);
+        initCause(cause);
+    }
 }
