@@ -118,10 +118,11 @@ describe('createModelTool', () => {
       expect(result.isError).toBe(true);
       const body = JSON.parse(result.content[0].text);
       expect(body.kind).toBe('conflict');
-      expect(body.suggestion).toMatch(/different code/i);
+      // Standardized via src/mcp/errors.ts — generic rename hint, no longer tool-specific text.
+      expect(body.suggestion).toMatch(/Rename/i);
     });
 
-    it('classifies non-conflict failure as backend_error without suggestion', async () => {
+    it('classifies 422 failure as validation (not generic backend_error)', async () => {
       const tool = createModelTool(
         fakeClient(async () => ({
           ok: false,
@@ -141,8 +142,9 @@ describe('createModelTool', () => {
 
       expect(result.isError).toBe(true);
       const body = JSON.parse(result.content[0].text);
-      expect(body.kind).toBe('backend_error');
-      expect(body.suggestion).toBeUndefined();
+      // After D10 the classifier separates 422 from generic 4xx.
+      expect(body.kind).toBe('validation');
+      expect(body.suggestion).toMatch(/violated field/i);
     });
 
     it('captures thrown errors into isError result', async () => {

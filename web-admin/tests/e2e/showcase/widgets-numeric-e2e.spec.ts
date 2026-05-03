@@ -87,11 +87,7 @@ async function apiCreateFormPage(page: Page, pageKey: string): Promise<string> {
   return pid!;
 }
 
-async function navigateToDesignerViaMenu(
-  page: Page,
-  pid: string,
-  pageKey: string,
-): Promise<void> {
+async function navigateToDesignerViaMenu(page: Page, pid: string, pageKey: string): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
 
   const parent = page
@@ -109,7 +105,12 @@ async function navigateToDesignerViaMenu(
   await leaf.evaluate((el: HTMLElement) => el.click());
   await listResp.catch(() => null);
 
-  if (!(await page.getByTestId('toolbar-btn-create').isVisible({ timeout: 5_000 }).catch(() => false))) {
+  if (
+    !(await page
+      .getByTestId('toolbar-btn-create')
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false))
+  ) {
     await page.goto('/p/page_schema', { waitUntil: 'domcontentloaded' });
   }
   await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 10_000 });
@@ -126,10 +127,9 @@ async function navigateToDesignerViaMenu(
     await search.fill(pageKey);
     await search.press('Enter').catch(() => null);
     await page
-      .waitForResponse(
-        (r) => r.url().includes('/dynamic/page_schema_list') && r.status() === 200,
-        { timeout: 5_000 },
-      )
+      .waitForResponse((r) => r.url().includes('/dynamic/page_schema_list') && r.status() === 200, {
+        timeout: 5_000,
+      })
       .catch(() => null);
   }
 
@@ -169,13 +169,31 @@ async function addBlockViaPalette(page: Page, blockType: string): Promise<void> 
 async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promise<void> {
   const panel = page.getByTestId('designer-properties-panel');
   const codeInput = panel.locator('input[placeholder="输入字段代码"]').first();
-  const addBtn = panel.locator('button:has-text("添加")').first();
   await expect(codeInput).toBeVisible({ timeout: 5_000 });
 
   for (const code of fieldCodes) {
-    await codeInput.click();
-    await codeInput.fill(code);
-    await addBtn.click();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await codeInput.click();
+      await codeInput.fill(code);
+      const clicked = await panel
+        .locator('button:has-text("添加")')
+        .first()
+        .click({ timeout: 5_000 })
+        .then(
+          () => true,
+          () => false,
+        );
+      const added = clicked
+        ? await panel
+            .locator(`text="${code}"`)
+            .first()
+            .isVisible({ timeout: 3_000 })
+            .catch(() => false)
+        : false;
+      if (added) {
+        break;
+      }
+    }
     await expect(panel.locator(`text="${code}"`).first()).toBeVisible({ timeout: 3_000 });
   }
 }
@@ -185,20 +203,14 @@ async function selectFieldInBlock(
   blockTitle: string,
   fieldCode: string,
 ): Promise<void> {
-  const block = page
-    .getByTestId('sortable-block')
-    .filter({ hasText: blockTitle })
-    .first();
+  const block = page.getByTestId('sortable-block').filter({ hasText: blockTitle }).first();
   await expect(block).toBeVisible({ timeout: 5_000 });
   const fieldLabel = block.locator(`label:has-text("${fieldCode}")`).first();
   await expect(fieldLabel).toBeVisible({ timeout: 5_000 });
-  await fieldLabel
-    .locator('xpath=ancestor::div[contains(@class,"group/field")]')
-    .first()
-    .click();
-  await expect(
-    page.getByTestId('designer-properties-panel').locator('text=字段属性'),
-  ).toBeVisible({ timeout: 5_000 });
+  await fieldLabel.locator('xpath=ancestor::div[contains(@class,"group/field")]').first().click();
+  await expect(page.getByTestId('designer-properties-panel').locator('text=字段属性')).toBeVisible({
+    timeout: 5_000,
+  });
 }
 
 function widgetSelect(page: Page) {
@@ -315,9 +327,7 @@ async function clickSaveAndWait(page: Page, pid: string): Promise<void> {
   const putResp = page
     .waitForResponse(
       (r) =>
-        r.url().includes(`/api/pages/${pid}`) &&
-        r.request().method() === 'PUT' &&
-        r.status() < 400,
+        r.url().includes(`/api/pages/${pid}`) && r.request().method() === 'PUT' && r.status() < 400,
       { timeout: 5_000 },
     )
     .catch(() => null);
@@ -363,10 +373,9 @@ async function configureWidgetProps(
   widgetProps: Record<string, unknown>,
 ): Promise<{ applied: Record<string, unknown>; gaps: string[] }> {
   const panel = page.locator('[data-testid="widget-specific-panel"]').first();
-  await expect(
-    panel,
-    `WidgetSpecificPanel should mount for component=${component}`,
-  ).toBeVisible({ timeout: 5_000 });
+  await expect(panel, `WidgetSpecificPanel should mount for component=${component}`).toBeVisible({
+    timeout: 5_000,
+  });
   // Sanity: panel reports the component we just chose.
   await expect(panel).toHaveAttribute('data-component', component, { timeout: 3_000 });
 
@@ -379,9 +388,7 @@ async function configureWidgetProps(
     // Without this, sequential fills on the same render see stale `props`
     // and the spread `{...props, key: value}` overwrites earlier writes
     // (observed: maxRating:5 + size:24 → final state {size:24}).
-    await page.evaluate(
-      () => new Promise<void>((r) => requestAnimationFrame(() => r())),
-    );
+    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
     const wrapper = panel.locator(`[data-testid="widget-prop-${key}"]`).first();
     const present = await wrapper.isVisible({ timeout: 2_000 }).catch(() => false);
     if (!present) {
@@ -429,9 +436,7 @@ async function configureWidgetProps(
     // the React input value tracker).
     await input.click();
     await input.fill('');
-    await page.evaluate(
-      () => new Promise<void>((r) => requestAnimationFrame(() => r())),
-    );
+    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
     await input.fill(String(value));
     await input.evaluate((el) => (el as HTMLElement).blur());
     applied[key] = value;
@@ -440,11 +445,7 @@ async function configureWidgetProps(
   return { applied, gaps };
 }
 
-async function assertRuntimeRenders(
-  page: Page,
-  pageKey: string,
-  fieldCode: string,
-): Promise<void> {
+async function assertRuntimeRenders(page: Page, pageKey: string, fieldCode: string): Promise<void> {
   // Custom-pageKey runtime route. The form may hide our field at first paint
   // because the visibleWhen expression we configured depends on
   // `form.sc_status` (undefined → falsy on a blank record), so we don't
@@ -458,9 +459,7 @@ async function assertRuntimeRenders(
   // the renderer didn't blow up. Field-label visibility is gated on the
   // configured visibleWhen, so we don't assert on `fieldCode` directly.
   const formScaffold = page
-    .locator(
-      'form, [role="form"], [data-testid*="form"], [data-page-kind="form"], main',
-    )
+    .locator('form, [role="form"], [data-testid*="form"], [data-page-kind="form"], main')
     .first();
   await expect(formScaffold).toBeVisible({ timeout: 5_000 });
   // Sanity: the page is the one we created — the title (page name) should
@@ -614,9 +613,7 @@ test.describe('GA B2 — numeric widget configuration chain', () => {
           async () =>
             await sel
               .locator('option')
-              .evaluateAll(
-                (opts) => (opts as HTMLOptionElement[]).filter((o) => o.value).length,
-              ),
+              .evaluateAll((opts) => (opts as HTMLOptionElement[]).filter((o) => o.value).length),
           { timeout: 5_000 },
         )
         .toBeGreaterThan(0);
@@ -668,9 +665,7 @@ test.describe('GA B2 — numeric widget configuration chain', () => {
       const sections = (saved.blocks || []).filter(
         (b: any) => b.blockType === 'form-section' && b.title !== 'Placeholder',
       );
-      expect(sections.length, 'non-placeholder form-section must exist').toBeGreaterThanOrEqual(
-        1,
-      );
+      expect(sections.length, 'non-placeholder form-section must exist').toBeGreaterThanOrEqual(1);
       // Find the section containing our field.
       const section = sections.find((s: any) =>
         (s.fields || []).some((fr: any) => {
@@ -697,20 +692,14 @@ test.describe('GA B2 — numeric widget configuration chain', () => {
       expect(Boolean(override.required), `${c.field}.required`).toBe(c.commonProps.required);
       expect(Boolean(override.readonly), `${c.field}.readonly`).toBe(c.commonProps.readOnly);
       expect(Number(override.span), `${c.field}.span (colSpan)`).toBe(c.commonProps.colSpan);
-      expect(override.visible, `${c.field}.visible (visibleWhen)`).toBe(
-        c.commonProps.visibleWhen,
-      );
+      expect(override.visible, `${c.field}.visible (visibleWhen)`).toBe(c.commonProps.visibleWhen);
 
       // 3. validation min/max
       if (c.validation?.minValue !== undefined) {
-        expect(Number(override.minValue), `${c.field}.minValue`).toBe(
-          c.validation.minValue,
-        );
+        expect(Number(override.minValue), `${c.field}.minValue`).toBe(c.validation.minValue);
       }
       if (c.validation?.maxValue !== undefined) {
-        expect(Number(override.maxValue), `${c.field}.maxValue`).toBe(
-          c.validation.maxValue,
-        );
+        expect(Number(override.maxValue), `${c.field}.maxValue`).toBe(c.validation.maxValue);
       }
 
       // 4. widget-specific PropertySchema props land under props.*

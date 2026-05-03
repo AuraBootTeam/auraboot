@@ -115,6 +115,34 @@ describe('ApiClient', () => {
       expect(init.headers.Authorization).toBe('Bearer t1');
     });
 
+    it('interactive=false: 403 returns ApiResponse instead of process.exit (MCP server safety)', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ message: 'no role' }),
+      });
+      const { ApiClient } = await import('../../src/client/api-client.js');
+      const client = new ApiClient({ token: 't1', env: 'local', interactive: false });
+      const resp = await client.get('/api/foo');
+      expect(resp.ok).toBe(false);
+      expect(resp.status).toBe(403);
+      expect(resp.message).toBe('no role');
+    });
+
+    it('interactive=false: 404 returns ApiResponse instead of process.exit', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ message: 'gone' }),
+      });
+      const { ApiClient } = await import('../../src/client/api-client.js');
+      const client = new ApiClient({ token: 't1', env: 'local', interactive: false });
+      const resp = await client.get('/api/foo');
+      expect(resp.ok).toBe(false);
+      expect(resp.status).toBe(404);
+      expect(resp.message).toBe('gone');
+    });
+
     it('put propagates non-ok status via ApiResponse.ok=false', async () => {
       fetchMock.mockResolvedValueOnce({
         ok: false,

@@ -4,6 +4,18 @@ import { resolveToken, resolveBaseUrl, autoLogin, isTokenExpired, loadCredential
 export interface ApiClientOptions {
   token?: string;
   env?: string;
+  /**
+   * When true (default), the client behaves like an interactive CLI:
+   * 403 / 404 responses print a helpful message and call `process.exit()`
+   * with the matching EXIT code. This is the right behavior for one-shot
+   * `aura plugin publish` style commands.
+   *
+   * Set to `false` for long-lived hosts (e.g. `aura mcp serve`) so a single
+   * tool call returning 403/404 does NOT kill the entire process. The error
+   * is surfaced as `ApiResponse{ ok: false, status, message }` instead, and
+   * the caller (the MCP tool handler + audit wrapper) decides what to do.
+   */
+  interactive?: boolean;
 }
 
 export interface ApiResponse<T = any> {
@@ -31,11 +43,13 @@ export class ApiClient {
   private baseUrl: string;
   private token: string | null;
   private env?: string;
+  private interactive: boolean;
 
   constructor(options: ApiClientOptions = {}) {
     this.env = options.env;
     this.baseUrl = resolveBaseUrl(options.env);
     this.token = resolveToken(options);
+    this.interactive = options.interactive ?? true;
   }
 
   /**
@@ -78,10 +92,20 @@ export class ApiClient {
   }
 
   /**
-   * Make an authenticated POST request.
+   * Make an authenticated POST request. Optional query params are appended
+   * to the URL (mirrors `get`) so callers don't have to hand-encode strings.
    */
-  async post<T = any>(path: string, body?: any): Promise<ApiResponse<T>> {
+  async post<T = any>(
+    path: string,
+    body?: any,
+    params?: Record<string, string>,
+  ): Promise<ApiResponse<T>> {
     const url = new URL(path, this.baseUrl);
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        url.searchParams.set(k, v);
+      }
+    }
     return this.request<T>('post', url.toString(), body);
   }
 
@@ -161,20 +185,28 @@ export class ApiClient {
     if (resp.status === 403) {
       const data = await resp.json().catch(() => ({})) as any;
       const msg = data.message || data.error || 'Access denied';
-      // Check if this is an enterprise feature restriction
-      if (msg.includes('Professional') || msg.includes('license') || msg.includes('Enterprise')) {
-        console.error(chalk.yellow(`\n  This feature requires a Professional license.`));
-        console.error(chalk.dim(`  Learn more: https://auraboot.com/pricing\n`));
-      } else {
-        console.error(chalk.red(`Permission denied: ${msg}`));
+      if (this.interactive) {
+        // Check if this is an enterprise feature restriction
+        if (msg.includes('Professional') || msg.includes('license') || msg.includes('Enterprise')) {
+          console.error(chalk.yellow(`\n  This feature requires a Professional license.`));
+          console.error(chalk.dim(`  Learn more: https://auraboot.com/pricing\n`));
+        } else {
+          console.error(chalk.red(`Permission denied: ${msg}`));
+        }
+        process.exit(EXIT.FORBIDDEN);
       }
-      process.exit(EXIT.FORBIDDEN);
+      // Long-lived host (e.g. MCP server): hand the error to the caller.
+      return { ok: false, status: 403, data: null as any, message: msg };
     }
 
     if (resp.status === 404) {
       const data = await resp.json().catch(() => ({})) as any;
-      console.error(chalk.red(`Not found: ${data.message || resp.url}`));
-      process.exit(EXIT.NOT_FOUND);
+      const msg = data.message || `Not found: ${resp.url}`;
+      if (this.interactive) {
+        console.error(chalk.red(`Not found: ${data.message || resp.url}`));
+        process.exit(EXIT.NOT_FOUND);
+      }
+      return { ok: false, status: 404, data: null as any, message: msg };
     }
 
     if (!resp.ok) {
