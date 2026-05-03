@@ -182,7 +182,7 @@ B.3 /execute pendingTurnId 端到端契约（design §3.10）
 | `36715e55` | A.1 SPI + DTOs（ConversationTurnService 接口 + TurnContext / TurnRequest / TurnOutcome / ResponseSink / InboundMode / TurnSideEffects） | feat branch |
 | `7234fce2` | A.2 SseResponseSink + ResponseSink SPI v4 update + TurnRequest.legacyRequest | feat branch |
 | `d0766d79` | A.2b SSE pre-refactor baseline sha256 lock | OSS main |
-| **`9cf276e4`** | **A.3 chatService split — sync core executeAuraBotTurn**（38 个 send* call site → sink.on* + 9 helpers 删除 + streamTextContent dead code 清理） | feat branch |
+| **`9cf276e4`** | **A.3 chatService split — sync core executeAuraBotTurn**(38 个 send\* call site → sink.on\* + 9 helpers 删除 + streamTextContent dead code 清理)| feat branch |
 | **`383cd23b`** | **A.4 + A.5 + A.6 — runTurn impl + controller cutover + Spring config**（ConversationTurnServiceImpl + ConversationTurnConfig + Micrometer counters + AuraBotController 单一异步入口） | feat branch |
 
 剩余：A.7 完整验收（plan §10）—— 4 scenario SSE diff（已部分跑过 pass）+ sender_type 分布 + worktree 前端 E2E + 后端集成测试。

@@ -1,226 +1,94 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
+import chalk from 'chalk';
 import { ApiClient } from '../client/api-client.js';
-import { queryDynamicList, queryNamedQuery, type FilterItem } from '../client/dynamic-query.js';
+import { makeAuditWrapper } from './audit.js';
+import { ToolRegistry } from './registry.js';
+import { pinTenant } from './tenant-pin.js';
+import { askAuraBotTool } from './tools/read/askAuraBot.js';
+import { describeCommandPipelineTool } from './tools/read/describeCommandPipeline.js';
+import { dispatchAgentTool } from './tools/read/dispatchAgent.js';
+import { listAgentsTool } from './tools/read/listAgents.js';
+import { listToolsTool } from './tools/read/listTools.js';
+import { queryDslCapabilitiesTool } from './tools/read/queryDslCapabilities.js';
+import { queryEntityTool } from './tools/read/queryEntity.js';
+import { queryExistingModelsTool } from './tools/read/queryExistingModels.js';
+import { queryPageSchemasTool } from './tools/read/queryPageSchemas.js';
+import { runNamedQueryTool } from './tools/read/runNamedQuery.js';
+import { createModelTool } from './tools/write/createModel.js';
+import { createPageSchemaTool } from './tools/write/createPageSchema.js';
 
 /**
- * Aura MCP Server — exposes AuraBoot data as tools for AI agents.
+ * Aura MCP Server — exposes AuraBoot data and (in later increments)
+ * write operations as tools for AI agents running inside Cursor /
+ * Claude Code / any MCP-aware client.
  *
  * Usage:
- *   aura mcp-server              # start stdio server
+ *   aura mcp serve            # the only entry point
  *
- * Claude Code config (~/.claude/mcp_servers.json):
- *   { "aura": { "command": "aura", "args": ["mcp-server"] } }
+ * Cursor `.cursor/mcp.json`:
+ *   { "mcpServers": { "auraboot": { "command": "aura", "args": ["mcp", "serve"] } } }
+ *
+ * Claude Code `~/.claude/mcp_servers.json`:
+ *   { "aura": { "command": "aura", "args": ["mcp", "serve"] } }
+ *
+ * The server REFUSES to start if the current session has no tenant
+ * pinned. This is the multi-tenant safety boundary — without a pinned
+ * tenant we cannot decide which AuraBoot instance the AI is writing to.
  */
+/**
+ * Build the canonical AuraBoot ToolRegistry, populated with every tool
+ * that should be visible over MCP. Exported so tests (and any future
+ * non-stdio entry point — Streamable HTTP, in-process embedding) can
+ * exercise the same wiring as the production stdio server.
+ */
+export function buildToolRegistry(client: ApiClient): ToolRegistry {
+  const registry = new ToolRegistry();
+
+  // Read tools (preserved from v1.x — behavior must remain identical).
+  registry.register(queryEntityTool(client));
+  registry.register(runNamedQueryTool(client));
+  registry.register(listAgentsTool(client));
+  registry.register(listToolsTool(client));
+  registry.register(dispatchAgentTool(client));
+  registry.register(askAuraBotTool(client));
+
+  // Discovery tools — pre-create context for write tools coming in W2.
+  registry.register(queryDslCapabilitiesTool(client));
+  registry.register(queryExistingModelsTool(client));
+  registry.register(queryPageSchemasTool(client));
+
+  // Static doc tool — pipeline phase reference for LLM context (D3).
+  registry.register(describeCommandPipelineTool());
+
+  // Write tools (W2) — destructive, dryRun=true keeps LLM iteration safe.
+  registry.register(createModelTool(client));
+  registry.register(createPageSchemaTool(client));
+
+  return registry;
+}
+
 export async function startMcpServer(options: { token?: string; env?: string }): Promise<void> {
   const client = new ApiClient(options);
+  const ctx = pinTenant(client.getToken());
+  const audit = makeAuditWrapper(ctx, { remoteClient: client });
 
   const server = new McpServer({
     name: 'aura',
     version: '2.0.0',
   });
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Tool: query_entity — Generic Dynamic CRUD query
-  // ──────────────────────────────────────────────────────────────────────
-  server.registerTool(
-    'query_entity',
-    {
-      title: 'Query Entity Data',
-      description: 'Query any AuraBoot entity (model) with filters. Use model code as entityCode (e.g. crm_lead, pm_project, crm_account).',
-      inputSchema: z.object({
-        entityCode: z.string().describe('Model code, e.g. crm_lead, pm_project, crm_account'),
-        keyword: z.string().optional().describe('Search keyword'),
-        filters: z.array(z.object({
-          fieldName: z.string(),
-          operator: z.enum(['EQ', 'neq', 'like', 'GT', 'gte', 'LT', 'lte', 'IN']),
-          value: z.string(),
-        })).optional().describe('Filter conditions'),
-        limit: z.number().optional().default(20).describe('Max results (default 20)'),
-        sortField: z.string().optional().describe('Sort by field'),
-        sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
-      }),
-    },
-    async (params) => {
-      try {
-        const filters: FilterItem[] = params.filters?.map(f => ({
-          fieldName: f.fieldName,
-          operator: f.operator as FilterItem['operator'],
-          value: f.value,
-        })) || [];
+  const registry = buildToolRegistry(client);
+  registry.attachTo(server, audit);
 
-        const records = await queryDynamicList(client, params.entityCode, {
-          pageSize: params.limit,
-          keyword: params.keyword,
-          filters,
-          sortField: params.sortField,
-          sortOrder: params.sortOrder,
-        });
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(records, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [{ type: 'text' as const, text: `Error: ${(e as Error).message}` }],
-          isError: true,
-        };
-      }
-    },
-  );
-
-  // ──────────────────────────────────────────────────────────────────────
-  // Tool: run_named_query — Execute a NamedQuery
-  // ──────────────────────────────────────────────────────────────────────
-  server.registerTool(
-    'run_named_query',
-    {
-      title: 'Run Named Query',
-      description: 'Execute a NamedQuery for aggregations, dashboards, and analytics. Common NQs: crm_dashboard_kpi, crm_opportunity_pipeline_stats, pm_dashboard_kpi, acp_agent_stats.',
-      inputSchema: z.object({
-        queryCode: z.string().describe('Named query code, e.g. crm_dashboard_kpi'),
-        params: z.record(z.string(), z.string()).optional().describe('Additional query parameters'),
-        limit: z.number().optional().default(200).describe('Max results'),
-      }),
-    },
-    async (params) => {
-      try {
-        const records = await queryNamedQuery(client, params.queryCode, {
-          maxItems: String(params.limit),
-          ...params.params,
-        });
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(records, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [{ type: 'text' as const, text: `Error: ${(e as Error).message}` }],
-          isError: true,
-        };
-      }
-    },
-  );
-
-  // ──────────────────────────────────────────────────────────────────────
-  // Tool: list_agents — List AI agents
-  // ──────────────────────────────────────────────────────────────────────
-  server.registerTool(
-    'list_agents',
-    {
-      title: 'List AI Agents',
-      description: 'List all configured AI agents with their status, model, and run statistics.',
-      inputSchema: z.object({}),
-    },
-    async () => {
-      try {
-        const records = await queryNamedQuery(client, 'acp_agent_stats');
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(records, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [{ type: 'text' as const, text: `Error: ${(e as Error).message}` }],
-          isError: true,
-        };
-      }
-    },
-  );
-
-  // ──────────────────────────────────────────────────────────────────────
-  // Tool: list_tools — List agent tools
-  // ──────────────────────────────────────────────────────────────────────
-  server.registerTool(
-    'list_tools',
-    {
-      title: 'List Agent Tools',
-      description: 'List all active agent tools with their type and source.',
-      inputSchema: z.object({}),
-    },
-    async () => {
-      try {
-        const records = await queryNamedQuery(client, 'acp_agent_tools_active');
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(records, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [{ type: 'text' as const, text: `Error: ${(e as Error).message}` }],
-          isError: true,
-        };
-      }
-    },
-  );
-
-  // ──────────────────────────────────────────────────────────────────────
-  // Tool: dispatch_agent — Dispatch a task to an agent
-  // ──────────────────────────────────────────────────────────────────────
-  server.registerTool(
-    'dispatch_agent',
-    {
-      title: 'Dispatch Agent Task',
-      description: 'Dispatch a task to an AI agent for execution. Requires Professional license.',
-      inputSchema: z.object({
-        taskPid: z.string().describe('Task PID to dispatch'),
-      }),
-    },
-    async (params) => {
-      try {
-        const resp = await client.post('/api/agent/dispatch', { taskPid: params.taskPid });
-        if (!resp.ok) {
-          return {
-            content: [{ type: 'text' as const, text: `Dispatch failed: ${resp.message}` }],
-            isError: true,
-          };
-        }
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(resp.data, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [{ type: 'text' as const, text: `Error: ${(e as Error).message}` }],
-          isError: true,
-        };
-      }
-    },
-  );
-
-  // ──────────────────────────────────────────────────────────────────────
-  // Tool: ask_aurabot — Ask AuraBot a question
-  // ──────────────────────────────────────────────────────────────────────
-  server.registerTool(
-    'ask_aurabot',
-    {
-      title: 'Ask AuraBot',
-      description: 'Ask the AuraBot AI assistant a question about company data. Returns AI-generated response.',
-      inputSchema: z.object({
-        question: z.string().describe('Natural language question'),
-      }),
-    },
-    async (params) => {
-      try {
-        const resp = await client.post('/api/ai/aurabot/chat/stream', {
-          messages: [{ role: 'user', content: params.question }],
-        });
-        // For MCP we don't stream — just return whatever we get
-        return {
-          content: [{ type: 'text' as const, text: resp.ok ? JSON.stringify(resp.data) : `Error: ${resp.message}` }],
-          isError: !resp.ok,
-        };
-      } catch (e) {
-        return {
-          content: [{ type: 'text' as const, text: `Error: ${(e as Error).message}` }],
-          isError: true,
-        };
-      }
-    },
-  );
-
-  // ──────────────────────────────────────────────────────────────────────
-  // Connect via stdio transport
-  // ──────────────────────────────────────────────────────────────────────
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[aura-mcp] Server ready — 6 tools available');
+
+  // Banner goes to stderr — stdout is reserved for JSON-RPC frames.
+  console.error(
+    chalk.dim(
+      `[aura-mcp] Connected as ${ctx.email ?? '<unknown>'} @ tenant=${ctx.tenantName ?? ctx.tenantId}`,
+    ),
+  );
+  console.error(chalk.dim(`[aura-mcp] Server ready — ${registry.size()} tools available`));
 }

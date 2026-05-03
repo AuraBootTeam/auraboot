@@ -1,0 +1,13 @@
+{
+  "_comment": "Drop this at .cursor/mcp.json (per-project) or ~/.cursor/mcp.json (global) and FULLY restart Cursor — MCP servers are loaded once at startup, not on reload.",
+  "mcpServers": {
+    "auraboot": {
+      "command": "aura",
+      "args": ["mcp", "serve"],
+      "env": {
+        "AURA_API_URL": "http://localhost:6443",
+        "AURA_TOKEN": "${env:AURA_TOKEN}"
+      }
+    }
+  }
+}

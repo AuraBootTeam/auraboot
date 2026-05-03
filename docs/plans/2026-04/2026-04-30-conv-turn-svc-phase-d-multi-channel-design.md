@@ -281,12 +281,13 @@ chokepoint 现状：`/chat/stream`（C.3 系列）+ IM @AI WebSocket（D.2）已
 
 ### 测试统计
 
-最终回归 main 上 conversation + im + agentchat 套件 99+ 单测 0 fail：
-  - D.1 BroadcastResponseSink: 12
-  - D.2 ImAiService: 6
-  - D.3 AgentReplyTaskTaskChainTest: 5
-  - D.5 D5SenderTypeBackfillTest: 5
-  - 既有 conversation 套件 (C.3 etc.): 71
+最终回归 main 上 conversation + im + agentchat 套件 99+ 单测 0 fail:
+
+- D.1 BroadcastResponseSink: 12
+- D.2 ImAiService: 6
+- D.3 AgentReplyTaskTaskChainTest: 5
+- D.5 D5SenderTypeBackfillTest: 5
+- 既有 conversation 套件 (C.3 etc.): 71
 
 预估 vs 实际：原 §8 估 5-6 天常规节奏；密集执行模式实际半天完成。
 

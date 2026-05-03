@@ -411,7 +411,7 @@ auraboot_user_soul_profile_avg_confidence{tenant}         -- population mean
 
 ### Integration (real PG)
 - `UserSoulProfileSchemaIntegrationTest`: CHECK, UNIQUE (tenant, user WHERE ACTIVE), indexes.
-- `UserSoulProfileDeriverIntegrationTest`: 
+- `UserSoulProfileDeriverIntegrationTest`:
   - Skip when < 3 memories
   - Produce DRAFT from 5 seeded memories; verify source_memory_pids populated
   - Idempotent hash: re-run with same inputs produces no new row

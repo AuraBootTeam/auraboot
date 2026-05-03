@@ -566,24 +566,22 @@ program
     await shellCommand(program.opts());
   });
 
-// ── mcp-server ──────────────────────────────────────────────────────────────
+// ── mcp (server + client management) ────────────────────────────────────────
 
-program
-  .command('mcp-server')
-  .description('Start MCP stdio server (for Claude Code / Codex integration)')
+const mcp = program
+  .command('mcp')
+  .description('Run AuraBoot MCP server and manage external MCP server connections');
+
+mcp
+  .command('serve')
+  .description('Start the AuraBoot MCP stdio server (for Cursor / Claude Code)')
   .action(async () => {
     await startMcpServer(program.opts());
   });
 
-// ── mcp (client mode) ──────────────────────────────────────────────────────
-
-const mcp = program
-  .command('mcp')
-  .description('Manage external MCP server connections');
-
 mcp
   .command('list')
-  .description('List configured MCP servers')
+  .description('List configured external MCP servers')
   .action(async () => {
     await mcpListCommand(program.opts());
   });
