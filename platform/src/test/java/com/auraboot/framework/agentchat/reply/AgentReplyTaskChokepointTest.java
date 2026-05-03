@@ -8,8 +8,8 @@ import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agentchat.handoff.HandoffToolProvider;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
-import com.auraboot.framework.agentchat.sse.SseEmitterManager;
 import com.auraboot.framework.conversation.ConversationTurnService;
+import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 import com.auraboot.framework.conversation.InboundMode;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnOutcome;
@@ -71,7 +71,7 @@ class AgentReplyTaskChokepointTest {
     @Mock private GroupChatMessagePort messagePort;
     @Mock @SuppressWarnings("rawtypes") private ObjectProvider messagePortProvider;
     @Mock private GroupChatTurnContextAssembler contextAssembler;
-    @Mock private SseEmitterManager sseEmitterManager;
+    @Mock private ImMessageBroadcaster broadcaster;
     @Mock private HandoffToolProvider handoffToolProvider;
     @Mock private ConversationTurnService turnService;
 
@@ -87,7 +87,7 @@ class AgentReplyTaskChokepointTest {
     void setUp() {
         when(messagePortProvider.getIfAvailable(any())).thenReturn(messagePort);
         service = new AgentReplyTask(agentDefinitionMapper, messagePortProvider,
-                contextAssembler, sseEmitterManager, handoffToolProvider, turnService);
+                contextAssembler, broadcaster, handoffToolProvider, turnService);
 
         AgentDefinition alpha = new AgentDefinition();
         alpha.setId(ALPHA_ID);
