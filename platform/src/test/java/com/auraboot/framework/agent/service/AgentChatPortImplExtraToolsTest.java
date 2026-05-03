@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.port.AgentTurnOverrides;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
@@ -175,7 +176,7 @@ class AgentChatPortImplExtraToolsTest {
                 .thenReturn(List.of(tool("nq_demo_query", "registry tool")));
         ToolDefinition handoff = tool("transfer_to_agent", "handoff");
 
-        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, List.of(handoff));
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, AgentTurnOverrides.builder().extraTools(List.of(handoff)).build());
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
         List<LlmChatRequest.Tool> tools = capturedToolsFromProviderCall();
@@ -201,7 +202,7 @@ class AgentChatPortImplExtraToolsTest {
                 .sourceCode("agentchat_handoff")
                 .build();
 
-        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, List.of(callerHandoff));
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink, AgentTurnOverrides.builder().extraTools(List.of(callerHandoff)).build());
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
         List<LlmChatRequest.Tool> tools = capturedToolsFromProviderCall();
@@ -228,7 +229,7 @@ class AgentChatPortImplExtraToolsTest {
 
         // reset for second invocation: provider.chat will be called twice total.
         // Re-verify via getAllValues.
-        TurnOutcome outcomeEmpty = service.runAgentTurn(newCtx(), newRequest(), sink, Collections.emptyList());
+        TurnOutcome outcomeEmpty = service.runAgentTurn(newCtx(), newRequest(), sink, AgentTurnOverrides.builder().extraTools(Collections.emptyList()).build());
         assertThat(outcomeEmpty).isInstanceOf(TurnOutcome.Success.class);
 
         ArgumentCaptor<LlmChatRequest> captor = ArgumentCaptor.forClass(LlmChatRequest.class);
