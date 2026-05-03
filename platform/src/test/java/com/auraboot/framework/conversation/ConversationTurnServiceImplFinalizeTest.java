@@ -112,6 +112,8 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
                 InboundMode.NEW_FROM_REQUEST,
                 null,
                 null,                                 // inboundMessageId — D.1
+                null,                                 // parentTaskPid (DC.3c)
+                null,                                 // overrides (DC.3c)
                 legacy);
     }
 

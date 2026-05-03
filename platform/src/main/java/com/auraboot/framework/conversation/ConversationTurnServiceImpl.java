@@ -122,7 +122,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                     outcome = chatService.executeAuraBotTurn(ctx, legacyRequest, sink);
                 }
             } else {
-                outcome = dispatchToNamedAgent(ctx, legacyRequest, sink, agentCode);
+                outcome = dispatchToNamedAgent(ctx, request, legacyRequest, sink, agentCode);
             }
             if (outcome == null) {
                 // Defensive: chat impls always return non-null, but if a future
@@ -280,11 +280,14 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 tenantId,
                 approverId,
                 MetaContext.getCurrentMemberId(),
-                null, null,
+                null,                                         // agentId
+                null,                                         // agentCode (DC.3c)
+                null,                                         // channelSessionId
                 null,                                         // conversationId — not stored on approval row
-                null,
+                null,                                         // inboundMessageId
                 null,                                         // triageBucket — N/A on resume
-                null,
+                null,                                         // traceId
+                null,                                         // taskPid (DC.3c)
                 java.time.Instant.now());
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
 
@@ -391,11 +394,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 pending.getUserId(),
                 pending.getHumanMemberId(),
                 null,                                  // agentId — Phase B/B+ AuraBotAgentResolver
+                pending.getAgentCode(),                // DC.3c Fix 2: preserve named-agent identity across resume
                 null,                                  // channelSessionId — Phase B+ ChannelSessionResolver
                 pending.getConversationId(),
                 null,                                  // inboundMessageId — already persisted at suspend time
                 null,                                  // triageBucket
                 null,                                  // traceId — chat impl re-attaches via aiTraceService.findActiveTrace
+                null,                                  // taskPid — resume reuses original task on chokepoint side; DC.3c+ closure protocol
                 java.time.Instant.now());
     }
 
@@ -413,9 +418,26 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
      * (the OSS distribution may not include the ACP runtime), so handle absence
      * + agent-not-found symmetrically through the sink + Failed outcome rather
      * than throwing or silently falling through to aurabot.
+     *
+     * <p>DC.3c (design v5 §10.7 Fix 3): the chokepoint owns the
+     * {@code ab_agent_task} row lifecycle for named-agent dispatch:
+     * <ul>
+     *   <li>{@link #createNamedAgentTask} writes a row at entry, with
+     *       {@code parent_id = request.parentTaskPid()} (null for root, set
+     *       for handoff hops).</li>
+     *   <li>{@code TurnContext.withTaskPid} threads the new pid into the
+     *       ctx that {@link AgentChatPort#runAgentTurn} sees.</li>
+     *   <li>{@link #attachTaskPidToOutcome} ensures the returned
+     *       {@code TurnOutcome.Success} carries {@code meta._taskPid} so the
+     *       caller can use it as the next hop's parentTaskPid.</li>
+     *   <li>{@link #finalizeTurn} closes the task by outcome type.</li>
+     * </ul>
+     * AgentReplyTask used to write task rows itself in D.3 — that path is
+     * removed here in favour of single chokepoint ownership.
      */
-    private TurnOutcome dispatchToNamedAgent(TurnContext ctx, ChatRequest legacyRequest,
-                                              ResponseSink sink, String agentCode) {
+    private TurnOutcome dispatchToNamedAgent(TurnContext ctx, TurnRequest request,
+                                              ChatRequest legacyRequest, ResponseSink sink,
+                                              String agentCode) {
         if (agentChatPort == null) {
             String msg = "Named agent requested (agentCode=" + agentCode + ") but AgentChatPort " +
                     "is not available in the current runtime.";
@@ -428,9 +450,93 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             sink.onError(msg, null);
             return new TurnOutcome.Failed(msg, null);
         }
-        log.info("Chat request delegated to named agent: agentCode={}, tenantId={}, turnId={}",
-                agentCode, ctx.tenantId(), ctx.turnId());
-        return agentChatPort.runAgentTurn(ctx, legacyRequest, sink);
+
+        // DC.3c Fix 3: create ab_agent_task row before invoking AgentChatPort,
+        // with parent_id linking to the upstream hop on a handoff chain.
+        String taskPid = createNamedAgentTask(ctx, request, agentCode);
+        TurnContext ctxWithTask = (taskPid != null) ? ctx.withTaskPid(taskPid) : ctx;
+
+        log.info("Chat request delegated to named agent: agentCode={}, tenantId={}, turnId={}, taskPid={}, parentTaskPid={}, overrides={}",
+                agentCode, ctx.tenantId(), ctx.turnId(), taskPid, request.parentTaskPid(),
+                request.overrides() != null);
+        // DC.3a: pass server-only overrides through to the AgentChatPort SPI
+        // (4-arg variant). Aurabot REST callers always pass null; group-chat
+        // AgentReplyTask passes a populated AgentTurnOverrides.
+        TurnOutcome outcome = agentChatPort.runAgentTurn(ctxWithTask, legacyRequest, sink, request.overrides());
+        // Surface taskPid on Success.meta so AgentReplyTask (handoff caller) can
+        // use it as parentTaskPid for the next hop.
+        return attachTaskPidToOutcome(outcome, taskPid);
+    }
+
+    /**
+     * DC.3c Fix 3: create an {@code ab_agent_task} row for a named-agent turn
+     * dispatched through the chokepoint. Returns the pid; null when
+     * {@code dynamicDataMapper} is unbound (test contexts) so the rest of the
+     * dispatch still works without observability rows.
+     */
+    private String createNamedAgentTask(TurnContext ctx, TurnRequest request, String agentCode) {
+        if (dynamicDataMapper == null) {
+            return null;
+        }
+        try {
+            String taskPid = com.auraboot.framework.common.util.UniqueIdGenerator.generate();
+            java.util.Map<String, Object> row = new java.util.HashMap<>();
+            row.put("pid", taskPid);
+            row.put("tenant_id", ctx.tenantId());
+            row.put("title", buildNamedAgentTaskTitle(request));
+            row.put("description", request.userMessage() != null ? request.userMessage() : "");
+            row.put("task_status", "in_progress");
+            row.put("task_priority", "normal");
+            row.put("assignee_type", "ai");
+            row.put("assignee_id", agentCode);
+            if (request.parentTaskPid() != null) {
+                row.put("parent_id", request.parentTaskPid());
+            }
+            row.put("created_at", java.time.LocalDateTime.now());
+            row.put("updated_at", java.time.LocalDateTime.now());
+            // Carry turn identity so cross-channel mission view can correlate.
+            java.util.Map<String, Object> inputData = new java.util.LinkedHashMap<>();
+            inputData.put("turnId", ctx.turnId());
+            inputData.put("conversationId", ctx.conversationId());
+            inputData.put("inboundMessageId", ctx.inboundMessageId());
+            inputData.put("agentCode", agentCode);
+            inputData.put("channel", request.channel());
+            try {
+                row.put("input_data", objectMapper.writeValueAsString(inputData));
+            } catch (Exception jsonEx) {
+                row.put("input_data", "{}");
+            }
+            dynamicDataMapper.insert("ab_agent_task", row);
+            return taskPid;
+        } catch (Exception e) {
+            // Observability row write failure must not break the user-visible turn.
+            log.warn("createNamedAgentTask failed for agentCode={}: {}", agentCode, e.getMessage());
+            return null;
+        }
+    }
+
+    private static String buildNamedAgentTaskTitle(TurnRequest request) {
+        String msg = request.userMessage();
+        if (msg == null || msg.isBlank()) return "Named-agent turn";
+        String trimmed = msg.trim();
+        return trimmed.length() > 80 ? trimmed.substring(0, 80) + "..." : trimmed;
+    }
+
+    /**
+     * DC.3c Fix 3: surface {@code taskPid} on {@code TurnOutcome.Success.meta}
+     * so the caller (AgentReplyTask handoff loop) can read it for the next
+     * hop's {@code parentTaskPid}. Failed / Interrupted / PendingConfirmation
+     * outcomes pass through unchanged — taskPid only needed for handoff
+     * recursion which only fires on Success with meta._handoff_to.
+     */
+    private TurnOutcome attachTaskPidToOutcome(TurnOutcome outcome, String taskPid) {
+        if (taskPid == null || !(outcome instanceof TurnOutcome.Success success)) {
+            return outcome;
+        }
+        java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
+        if (success.meta() != null) meta.putAll(success.meta());
+        meta.putIfAbsent("_taskPid", taskPid);
+        return new TurnOutcome.Success(success.finalResponse(), meta);
     }
 
     /**
@@ -657,11 +763,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 request.userId(),
                 request.humanMemberId(),
                 null,                                // agentId — Phase B's AuraBotAgentResolver
+                request.agentCode(),                 // DC.3c Fix 2: drives outbound sender_id resolution
                 null,                                // channelSessionId — Phase B's ChannelSessionResolver
                 request.conversationId(),
                 inboundMessageId,
                 effectiveBucket,
                 null,                                // traceId — set inside chat impl (kept null on TurnContext for Phase A)
+                null,                                // taskPid — chokepoint dispatch later fills via withTaskPid (DC.3c)
                 java.time.Instant.now());
     }
 
@@ -737,6 +845,61 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 sideEffects.eventEmitter().emit(new TurnSuspendedEvent(ctx, pc));
             }
         }
+        // DC.3c Fix 3: close ab_agent_task by outcome type when this turn
+        // owns one (named-agent dispatch path created it; aurabot main path
+        // does not — ctx.taskPid() stays null there).
+        closeNamedAgentTask(ctx, outcome);
         sideEffects.metricsRecorder().recordTurnEnd(ctx, outcome);
+    }
+
+    /**
+     * DC.3c Fix 3: close the {@code ab_agent_task} row that {@link #createNamedAgentTask}
+     * opened, with status driven by outcome type:
+     * <ul>
+     *   <li>{@link TurnOutcome.Success} with {@code meta._handoff_to} → completed
+     *       (reason: {@code handoff_to:<targetCode>}) — the upstream hop finishes
+     *       by delegating; child task is the next hop's responsibility.</li>
+     *   <li>{@link TurnOutcome.Success} otherwise → completed.</li>
+     *   <li>{@link TurnOutcome.Interrupted} → completed (terminal but not a failure).</li>
+     *   <li>{@link TurnOutcome.Failed} → failed with errorMessage.</li>
+     *   <li>{@link TurnOutcome.PendingConfirmation} → status remains {@code in_progress};
+     *       resume path will close it.</li>
+     * </ul>
+     */
+    private void closeNamedAgentTask(TurnContext ctx, TurnOutcome outcome) {
+        if (dynamicDataMapper == null || ctx.taskPid() == null) {
+            return;
+        }
+        try {
+            java.util.Map<String, Object> updates = new java.util.HashMap<>();
+            updates.put("updated_at", java.time.LocalDateTime.now());
+            switch (outcome) {
+                case TurnOutcome.Success s -> {
+                    updates.put("task_status", "completed");
+                    if (s.meta() != null && s.meta().get("_handoff_to") != null) {
+                        updates.put("error_message", "handoff_to:" + s.meta().get("_handoff_to"));
+                    }
+                }
+                case TurnOutcome.Interrupted i -> {
+                    updates.put("task_status", "completed");
+                    if (i.reason() != null) {
+                        updates.put("error_message", "interrupted:" + i.reason());
+                    }
+                }
+                case TurnOutcome.Failed f -> {
+                    updates.put("task_status", "failed");
+                    updates.put("error_message",
+                            f.errorMessage() != null ? f.errorMessage() : "unknown_error");
+                }
+                case TurnOutcome.PendingConfirmation pc -> {
+                    // Leave in_progress; resume path closes it.
+                    return;
+                }
+            }
+            dynamicDataMapper.update("ab_agent_task", updates,
+                    java.util.Map.of("pid", ctx.taskPid()));
+        } catch (Exception e) {
+            log.warn("closeNamedAgentTask failed for taskPid={}: {}", ctx.taskPid(), e.getMessage());
+        }
     }
 }

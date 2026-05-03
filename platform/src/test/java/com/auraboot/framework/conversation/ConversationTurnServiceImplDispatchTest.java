@@ -94,6 +94,8 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
                 InboundMode.NEW_FROM_REQUEST,
                 null,
                 null,                                 // inboundMessageId — D.1
+                null,                                 // parentTaskPid (DC.3c)
+                null,                                 // overrides (DC.3c)
                 legacy);
     }
 
@@ -194,7 +196,9 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
             Long tenantId = getTestTenant().getId();
             String agentCode = "test_agent";
             when(agentChatPort.agentExists(eq(tenantId), eq(agentCode))).thenReturn(true);
-            when(agentChatPort.runAgentTurn(any(), any(), any()))
+            // DC.3a: chokepoint now invokes the 4-arg overload (overrides arg).
+            when(agentChatPort.runAgentTurn(any(), any(), any(),
+                    org.mockito.ArgumentMatchers.<com.auraboot.framework.agent.port.AgentTurnOverrides>any()))
                     .thenReturn(new TurnOutcome.Success("delegated-ok", java.util.Map.of()));
 
             TurnOutcome outcome = turnService.runTurn(buildTurnRequest(agentCode, "hi agent"), sink);
@@ -207,7 +211,8 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
                     argThat(ctx -> ctx.tenantId() == tenantId),
                     argThat(req -> agentCode.equals(req.getAgentCode())
                             && "hi agent".equals(req.getMessage())),
-                    same(sink));
+                    same(sink),
+                    org.mockito.ArgumentMatchers.<com.auraboot.framework.agent.port.AgentTurnOverrides>any());
             verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
         });
     }

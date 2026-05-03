@@ -136,6 +136,8 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
                 InboundMode.NEW_FROM_REQUEST,
                 bucket,
                 null,                                 // inboundMessageId — D.1
+                null,                                 // parentTaskPid (DC.3c)
+                null,                                 // overrides (DC.3c)
                 legacy);
     }
 

@@ -151,7 +151,15 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
     }
 
     private Long writeAgentRow(TurnContext ctx, String messageType, String content, String cardPayload) {
-        long agentId = agentResolver.resolve(ctx.tenantId(), AuraBotAgentResolver.DEFAULT_AGENT_CODE);
+        // DC.3c Fix 2: resolve agent identity from ctx.agentCode (chokepoint
+        // beginTurn fills it from request.agentCode). Falls back to
+        // DEFAULT_AGENT_CODE when null for legacy code paths. Without this
+        // fix, named-agent group-chat (Alpha/Beta/...) outbound rows would
+        // incorrectly land with sender_id=aurabot_agent_id.
+        String resolveCode = (ctx.agentCode() != null && !ctx.agentCode().isBlank())
+                ? ctx.agentCode()
+                : AuraBotAgentResolver.DEFAULT_AGENT_CODE;
+        long agentId = agentResolver.resolve(ctx.tenantId(), resolveCode);
         ImMessage saved = imMessageService.sendAgentMessage(
                 ctx.conversationId(),
                 ctx.tenantId(),
