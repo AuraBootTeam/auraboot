@@ -16,8 +16,11 @@ import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -78,6 +81,22 @@ public class AgentChatPortImpl implements AgentChatPort {
     private final ObjectMapper objectMapper;
     private final ChatSessionStore chatSessionStore;
 
+    /**
+     * DC.3d: optional counter for {@code agentchatport.caller_overrides_used}
+     * tagged by {@code field=systemPromptOverride|messagesOverride|toolDefsOverride|extraTools|persistSessionTape}.
+     *
+     * <p>Wired {@code @Autowired(required = false)} so unit tests that
+     * construct {@link AgentChatPortImpl} via the {@code @RequiredArgsConstructor}
+     * do not have to provide a {@link MeterRegistry}. Production paths get
+     * a real registry from Spring Boot's actuator auto-configuration.
+     *
+     * <p>See {@link com.auraboot.framework.agent.port.AgentTurnOverrides}
+     * sunset criteria — when this counter reads zero across all fields for a
+     * full release window, the SPI override param can be deprecated.
+     */
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
+
     // =========================================================================
     // AgentChatPort implementation
     // =========================================================================
@@ -135,17 +154,28 @@ public class AgentChatPortImpl implements AgentChatPort {
         // (e.g. AgentReplyTask for group-chat) use overrides to inject pre-
         // built context that the tenant-scoped registry / 1:1 chat defaults
         // can't express. REST callers always pass overrides=null.
-        String systemPrompt = (overrides != null && overrides.systemPromptOverride() != null)
-                ? overrides.systemPromptOverride()
-                : buildSystemPrompt(agentDef);
+        String systemPrompt;
+        if (overrides != null && overrides.systemPromptOverride() != null) {
+            systemPrompt = overrides.systemPromptOverride();
+            recordOverrideUsage("systemPromptOverride");
+        } else {
+            systemPrompt = buildSystemPrompt(agentDef);
+        }
 
         // Tool list: caller may REPLACE the registry-discovered list entirely
         // (toolDefsOverride non-null), then we still merge extraTools on top
         // so handoff-style additive injection composes with replacement.
-        List<ToolDefinition> toolDefs = (overrides != null && overrides.toolDefsOverride() != null)
-                ? overrides.toolDefsOverride()
-                : discoverToolDefinitions(tenantId, agentCode, request.getMessage());
+        List<ToolDefinition> toolDefs;
+        if (overrides != null && overrides.toolDefsOverride() != null) {
+            toolDefs = overrides.toolDefsOverride();
+            recordOverrideUsage("toolDefsOverride");
+        } else {
+            toolDefs = discoverToolDefinitions(tenantId, agentCode, request.getMessage());
+        }
         List<ToolDefinition> extraToolsForMerge = overrides != null ? overrides.extraTools() : null;
+        if (extraToolsForMerge != null && !extraToolsForMerge.isEmpty()) {
+            recordOverrideUsage("extraTools");
+        }
         // DC.1 (Q-DC.1=β) merge contract preserved: name collisions resolve
         // to extraTools (caller knows conversation-scope semantics).
         toolDefs = mergeExtraTools(toolDefs, extraToolsForMerge);
@@ -159,16 +189,24 @@ public class AgentChatPortImpl implements AgentChatPort {
         // ab_im_message via GroupChatTurnContextAssembler).
         // Defensive copy so the loop's messages.add(...) mutations don't blow
         // up when caller passes an immutable List (e.g. List.of(...)).
-        List<LlmChatRequest.Message> messages = (overrides != null && overrides.messagesOverride() != null)
-                ? new ArrayList<>(overrides.messagesOverride())
-                : restoreOrBuildMessages(request.getSessionId(), request.getHistory(), request.getMessage());
+        List<LlmChatRequest.Message> messages;
+        if (overrides != null && overrides.messagesOverride() != null) {
+            messages = new ArrayList<>(overrides.messagesOverride());
+            recordOverrideUsage("messagesOverride");
+        } else {
+            messages = restoreOrBuildMessages(request.getSessionId(), request.getHistory(), request.getMessage());
+        }
 
         // DC.3a: caller controls whether the post-turn tape gets persisted to
         // ChatSessionStore. Group-chat callers typically opt out (history
         // already lives in ab_im_message); aurabot main path opts in (default).
-        boolean persistTape = overrides == null || overrides.persistSessionTape() == null
-                ? true
-                : overrides.persistSessionTape();
+        boolean persistTape;
+        if (overrides != null && overrides.persistSessionTape() != null) {
+            persistTape = overrides.persistSessionTape();
+            recordOverrideUsage("persistSessionTape");
+        } else {
+            persistTape = true;
+        }
 
         log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
                 agentCode, providerCode, model, tools.size(), overrides != null);
@@ -673,10 +711,15 @@ public class AgentChatPortImpl implements AgentChatPort {
      *       transfer_to_agent tool call (the "handing off…" message). Empty
      *       text is fine; we still call onDone so the SSE / WS stream
      *       terminates cleanly.</li>
-     *   <li>Carry {@code targetAgentCode} (and optional {@code context})
-     *       from the tool input on {@link TurnOutcome.Success#meta} under the
-     *       {@code _handoff_to} / {@code _handoff_context} keys. The caller
-     *       uses these to drive recursion + child-task creation.</li>
+     *   <li>Carry {@code agent_code} (and optional {@code context}) from the
+     *       tool input on {@link TurnOutcome.Success#meta} under the
+     *       {@code _handoff_to} / {@code _handoff_context} keys. Field name
+     *       {@code agent_code} matches {@link com.auraboot.framework.agentchat.handoff.HandoffToolProvider}'s
+     *       declared input schema (DC.3d Fix 4 — earlier code read
+     *       {@code targetAgentCode} which never appeared in the real schema,
+     *       so the meta was always empty and DC.2 unit tests self-deceptively
+     *       passed against a synthetic schema). The caller uses these meta
+     *       keys to drive recursion + child-task creation.</li>
      *   <li>Do NOT execute the tool — handoff coordination is a caller
      *       concern; AgentChatPortImpl's only job is signal-passing.</li>
      * </ul>
@@ -696,7 +739,8 @@ public class AgentChatPortImpl implements AgentChatPort {
         sink.onDone(text, null);
 
         java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
-        Object targetAgentCode = input != null ? input.get("targetAgentCode") : null;
+        // DC.3d Fix 4: read agent_code (matches HandoffToolProvider schema).
+        Object targetAgentCode = input != null ? input.get("agent_code") : null;
         if (targetAgentCode != null) {
             meta.put(META_HANDOFF_TO, String.valueOf(targetAgentCode));
         }
@@ -708,5 +752,20 @@ public class AgentChatPortImpl implements AgentChatPort {
                 meta.get(META_HANDOFF_TO),
                 meta.containsKey(META_HANDOFF_CONTEXT) ? "present" : "absent");
         return new TurnOutcome.Success(text, meta);
+    }
+
+    /**
+     * DC.3d: increment {@code agentchatport.caller_overrides_used} tagged
+     * by override field. No-op when {@link #meterRegistry} is unbound (unit
+     * tests). See {@link com.auraboot.framework.agent.port.AgentTurnOverrides}
+     * sunset criteria.
+     */
+    private void recordOverrideUsage(String field) {
+        if (meterRegistry == null) return;
+        Counter.builder("agentchatport.caller_overrides_used")
+                .tag("field", field)
+                .description("Count of AgentTurnOverrides field usages — drives sunset decision for the SPI overrides param")
+                .register(meterRegistry)
+                .increment();
     }
 }
