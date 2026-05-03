@@ -117,7 +117,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             throw e;
         } catch (Exception e) {
             log.error("搜索成员失败", e);
-            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "搜索成员失败: " + e.getMessage());
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "搜索成员失败: " + e.getMessage(), e);
         }
     }
     
@@ -145,7 +145,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             throw e;
         } catch (Exception e) {
             log.error("获取成员信息失败，memberPid: {}", memberPid, e);
-            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "获取成员信息失败: " + e.getMessage());
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "获取成员信息失败: " + e.getMessage(), e);
         }
     }
     
@@ -194,8 +194,10 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                         
                         member.setExtensions(objectMapper.writeValueAsString(extensionsNode));
                     } catch (Exception e) {
-                        log.warn("存储拒绝原因到extensions字段失败: {}", e.getMessage());
-                        // 即使JSON处理失败，也不影响主要的拒绝流程
+                        // §P2 best-effort: failure to persist the rejection reason
+                        // into the extensions JSON must not block the primary
+                        // rejection workflow — the member is still rejected.
+                        log.warn("存储拒绝原因到extensions字段失败: {}", e.getMessage(), e);
                     }
                 }
                 
@@ -214,7 +216,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             throw e;
         } catch (Exception e) {
             log.error("审批成员失败，memberPid: {}, action: {}", memberPid, action, e);
-            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "审批成员失败: " + e.getMessage());
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "审批成员失败: " + e.getMessage(), e);
         }
     }
     
@@ -259,7 +261,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             throw e;
         } catch (Exception e) {
             log.error("更新成员状态失败，memberPid: {}, status: {}", memberPid, status, e);
-            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "更新成员状态失败: " + e.getMessage());
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "更新成员状态失败: " + e.getMessage(), e);
         }
     }
     
@@ -294,7 +296,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             throw e;
         } catch (Exception e) {
             log.error("移除成员失败，memberPid: {}", memberPid, e);
-            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "移除成员失败: " + e.getMessage());
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "移除成员失败: " + e.getMessage(), e);
         }
     }
 
@@ -330,7 +332,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             throw e;
         } catch (Exception e) {
             log.error("发送成员重置密码邮件失败，memberPid: {}", memberPid, e);
-            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "发送重置密码邮件失败: " + e.getMessage());
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "发送重置密码邮件失败: " + e.getMessage(), e);
         }
     }
     
@@ -375,7 +377,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             throw e;
         } catch (Exception e) {
             log.error("批量移除成员失败", e);
-            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "批量移除成员失败: " + e.getMessage());
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "批量移除成员失败: " + e.getMessage(), e);
         }
     }
     
@@ -417,7 +419,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             workbook.write(output);
             return new ByteArrayResource(output.toByteArray());
         } catch (IOException e) {
-            throw new BusinessException(ResponseCode.SystemError, "生成导入模板失败: " + e.getMessage());
+            throw new BusinessException(ResponseCode.SystemError, "生成导入模板失败: " + e.getMessage(), e);
         }
     }
 
