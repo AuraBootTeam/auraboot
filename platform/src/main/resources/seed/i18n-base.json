@@ -751,6 +751,61 @@
     "en-US": "{count} tokens"
   },
   {
+    "key": "aurabot.admin.runs.menu",
+    "zh-CN": "Agent 运行记录",
+    "en-US": "Agent Runs"
+  },
+  {
+    "key": "aurabot.admin.runs.title",
+    "zh-CN": "Agent 运行记录",
+    "en-US": "Agent Runs"
+  },
+  {
+    "key": "aurabot.admin.runs.filter.status",
+    "zh-CN": "状态",
+    "en-US": "Status"
+  },
+  {
+    "key": "aurabot.admin.runs.filter.agentCode",
+    "zh-CN": "Agent 编码",
+    "en-US": "Agent Code"
+  },
+  {
+    "key": "aurabot.admin.runs.filter.parentRunId",
+    "zh-CN": "父运行 ID",
+    "en-US": "Parent Run ID"
+  },
+  {
+    "key": "aurabot.admin.runs.filter.keyword",
+    "zh-CN": "关键词",
+    "en-US": "Keyword"
+  },
+  {
+    "key": "aurabot.admin.runs.column.runId",
+    "zh-CN": "运行 ID",
+    "en-US": "Run ID"
+  },
+  {
+    "key": "aurabot.admin.runs.column.agentCode",
+    "zh-CN": "Agent",
+    "en-US": "Agent"
+  },
+  {
+    "key": "aurabot.admin.runs.column.status",
+    "zh-CN": "状态",
+    "en-US": "Status"
+  },
+  {
+    "key": "aurabot.admin.runs.column.cost",
+    "zh-CN": "成本",
+    "en-US": "Cost"
+  },
+  {
+    "key": "aurabot.admin.runs.column.duration",
+    "zh-CN": "耗时",
+    "en-US": "Duration"
+  },
+  {
     "key": "auth.channel.emailCode",
     "zh-CN": "邮箱验证码",
     "en-US": "Email Code"

@@ -79,4 +79,10 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 39, group: 'aurabot' }, permission: 'aurabot.dashboard.read',
     file: './plugins/core-aurabot/pages/mission-control/soul-profiles-admin.tsx',
   },
+  {
+    key: 'aurabot.admin.runs', path: '/admin/agent-runs',
+    title: { en: 'Agent Runs', zh: 'Agent 运行记录' }, icon: 'list',
+    menu: { order: 100, group: 'aurabot' }, permission: 'aurabot.run.read',
+    file: './plugins/core-aurabot/pages/admin/agent-runs.tsx',
+  },
 ]
