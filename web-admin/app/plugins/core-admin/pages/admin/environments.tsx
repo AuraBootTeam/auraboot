@@ -9,7 +9,11 @@ import {
   ArrowUpTrayIcon,
   CheckCircleIcon,
   XCircleIcon,
+  LockClosedIcon,
+  LockOpenIcon,
+  RocketLaunchIcon,
 } from '@heroicons/react/24/outline';
+import { Link } from 'react-router';
 import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { useToken as useAuthToken } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -28,6 +32,12 @@ interface EnvironmentData {
   sortOrder?: number;
   createdAt?: string;
   updatedAt?: string;
+  // env-layering #4 + #5: lock / promotion-chain audit
+  parentPid?: string | null;
+  isLocked?: boolean;
+  lockedBy?: number | null;
+  lockedAt?: string | null;
+  lockedReason?: string | null;
 }
 
 interface DiffEntry {
@@ -58,6 +68,12 @@ export default function EnvironmentManagement() {
   const [diffSource, setDiffSource] = useState('');
   const [diffTarget, setDiffTarget] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Lock dialog state (env-layering #5 / #15)
+  const [lockingEnv, setLockingEnv] = useState<EnvironmentData | null>(null);
+  const [lockMode, setLockMode] = useState<'lock' | 'unlock'>('lock');
+  const [lockReason, setLockReason] = useState('');
+  const [lockSubmitting, setLockSubmitting] = useState(false);
 
   // Form state
   const [formCode, setFormCode] = useState('');
@@ -286,6 +302,49 @@ export default function EnvironmentManagement() {
     }
   };
 
+  // Open lock/unlock dialog (env-layering #15)
+  const openLockDialog = (env: EnvironmentData, mode: 'lock' | 'unlock') => {
+    setLockingEnv(env);
+    setLockMode(mode);
+    setLockReason('');
+  };
+
+  const closeLockDialog = () => {
+    setLockingEnv(null);
+    setLockReason('');
+  };
+
+  const handleLockSubmit = async () => {
+    if (!lockingEnv) return;
+    if (!lockReason.trim()) {
+      setError(`${lockMode === 'lock' ? 'Lock' : 'Unlock'} reason is required`);
+      return;
+    }
+
+    setLockSubmitting(true);
+    setError(null);
+    try {
+      const result = await fetchResult<EnvironmentData>(
+        `/api/admin/environments/${lockingEnv.pid}/${lockMode}`,
+        {
+          method: 'post',
+          params: { reason: lockReason.trim() },
+          token: token ?? undefined,
+        },
+      );
+      if (result.success) {
+        closeLockDialog();
+        fetchEnvironments();
+      } else {
+        setError(`${lockMode === 'lock' ? 'Lock' : 'Unlock'} failed`);
+      }
+    } catch (err) {
+      setError(`${lockMode === 'lock' ? 'Lock' : 'Unlock'} failed`);
+    } finally {
+      setLockSubmitting(false);
+    }
+  };
+
   // ---------- Render ----------
 
   const statusBadge = (status: string) => {
@@ -503,6 +562,15 @@ export default function EnvironmentManagement() {
                         Default
                       </span>
                     )}
+                    {env.isLocked && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                        title={env.lockedReason || 'Locked'}
+                      >
+                        <LockClosedIcon className="h-3 w-3" />
+                        Locked
+                      </span>
+                    )}
                   </div>
                   <p className="font-mono text-sm text-gray-500 dark:text-gray-400">{env.code}</p>
                 </div>
@@ -555,6 +623,32 @@ export default function EnvironmentManagement() {
                 >
                   <ArrowUpTrayIcon className="h-4 w-4" />
                 </button>
+                {/* env-layering #5 / #15: lock toggle */}
+                {env.isLocked ? (
+                  <button
+                    onClick={() => openLockDialog(env, 'unlock')}
+                    className="rounded p-1.5 text-amber-500 hover:text-amber-700 dark:hover:text-amber-400"
+                    title={`Unlock — locked by user ${env.lockedBy ?? '?'}: ${env.lockedReason ?? ''}`}
+                  >
+                    <LockOpenIcon className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => openLockDialog(env, 'lock')}
+                    className="rounded p-1.5 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400"
+                    title="Lock environment (require four-eyes promotion to write)"
+                  >
+                    <LockClosedIcon className="h-4 w-4" />
+                  </button>
+                )}
+                {/* env-layering #15: nav into the promotion UI scoped to this env */}
+                <Link
+                  to={`/admin/promotions?env=${encodeURIComponent(env.code)}`}
+                  className="rounded p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  title="Promotions for this environment"
+                >
+                  <RocketLaunchIcon className="h-4 w-4" />
+                </Link>
                 <div className="flex-1" />
                 <button
                   onClick={() => handleDelete(env)}
@@ -566,6 +660,63 @@ export default function EnvironmentManagement() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Lock / Unlock reason modal (env-layering #15) */}
+      {lockingEnv && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-800">
+            <div className="p-6">
+              <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+                {lockMode === 'lock' ? (
+                  <LockClosedIcon className="h-5 w-5 text-amber-600" />
+                ) : (
+                  <LockOpenIcon className="h-5 w-5 text-amber-600" />
+                )}
+                {lockMode === 'lock' ? 'Lock Environment' : 'Unlock Environment'}
+              </h2>
+              <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                {lockMode === 'lock'
+                  ? `Lock "${lockingEnv.name}" (${lockingEnv.code}). Direct writes will be rejected; only promotions can write to it.`
+                  : `Unlock "${lockingEnv.name}" (${lockingEnv.code}). Direct writes will be allowed again.`}
+              </p>
+              {lockMode === 'unlock' && lockingEnv.lockedReason && (
+                <div className="mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                  <span className="font-medium">Currently locked:</span> {lockingEnv.lockedReason}
+                </div>
+              )}
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Reason (required)
+              </label>
+              <textarea
+                value={lockReason}
+                onChange={(e) => setLockReason(e.target.value)}
+                rows={3}
+                placeholder={lockMode === 'lock' ? 'e.g. cutover freeze for release 1.2' : 'e.g. release shipped, resuming dev'}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={closeLockDialog}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLockSubmit}
+                  disabled={lockSubmitting || !lockReason.trim()}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                    lockMode === 'lock'
+                      ? 'bg-amber-600 hover:bg-amber-700'
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
+                >
+                  {lockSubmitting ? 'Saving...' : lockMode === 'lock' ? 'Lock' : 'Unlock'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
