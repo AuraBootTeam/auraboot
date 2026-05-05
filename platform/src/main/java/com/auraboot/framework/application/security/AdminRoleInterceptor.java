@@ -24,21 +24,23 @@ import java.nio.charset.StandardCharsets;
  * default-deny choke point. See design doc
  * {@code docs/plans/2026-04/2026-04-19-platform-admin-guard-design.md} — Plan C.
  *
- * <p><b>Audit:</b> as of 2026-04-19 the platform ships exactly <b>9</b> admin
- * controllers (8 framework + 1 USP):
+ * <p><b>Audit:</b> as of 2026-04-29 the platform ships exactly <b>11</b> admin
+ * controllers (8 framework + USP + Memory tier + Agent run replay):
  * <pre>
+ * /api/admin/agent-runs            AgentRunController
  * /api/admin/cloud-config          CloudConfigController
  * /api/admin/environments          EnvironmentController
  * /api/admin/exchange-rates        ExchangeRateController
  * /api/admin/i18n                  I18nAdminController
  * /api/admin/infrastructure        InfrastructureController
  * /api/admin/login-channels        LoginChannelManageController
+ * /api/admin/memory                MemoryTierAdminController
  * /api/admin/timezone              TimezoneMigrationController
  * /api/admin/user-soul-profiles    UserSoulProfileAdminController
  * /api/admin/users                 AdminUserController
  * </pre>
  * Grep <code>@RequestMapping(&quot;/api/admin</code> under
- * {@code platform/src/main/java} should return exactly 9 matches; CI / reviewers
+ * {@code platform/src/main/java} should return exactly 11 matches; CI / reviewers
  * must update this JavaDoc count whenever a new admin controller is added.
  *
  * <p><b>Error contract:</b> returns HTTP 200 body with
