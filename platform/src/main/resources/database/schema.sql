@@ -8168,3 +8168,36 @@ CREATE INDEX IF NOT EXISTS idx_batch_job_status
   WHERE status IN ('submitted','in_progress');
 COMMENT ON TABLE ab_agent_batch_job IS
   'Anthropic Messages Batch API job tracking — half-price async batch jobs (24h SLA)';
+
+
+-- ==========================================================================
+-- Bi-temporal record store (module/bitemporal)
+-- ==========================================================================
+-- Single shared table for the generic bi-temporal service used by any module
+-- that needs (validTime × txTime) versioned records keyed by (entityType, entityId).
+-- Module-specific bi-temporal tables (per-entity DDL) are managed separately
+-- via BitemporalDdlHelper.
+CREATE TABLE IF NOT EXISTS ab_bitemporal_record (
+  id            BIGSERIAL PRIMARY KEY,
+  tenant_id     BIGINT NOT NULL,
+  entity_type   VARCHAR(80) NOT NULL,
+  entity_id     VARCHAR(80) NOT NULL,
+  valid_from    TIMESTAMP NOT NULL,
+  valid_to      TIMESTAMP NOT NULL,
+  tx_from       TIMESTAMP NOT NULL,
+  tx_to         TIMESTAMP NOT NULL,
+  payload       JSONB,
+  version_no    INTEGER NOT NULL DEFAULT 1,
+  created_by    BIGINT,
+  created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+  deleted_flag  BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_bitemporal_current
+  ON ab_bitemporal_record(tenant_id, entity_type, entity_id, tx_to)
+  WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_bitemporal_history
+  ON ab_bitemporal_record(tenant_id, entity_type, entity_id, valid_from, tx_from)
+  WHERE deleted_flag = FALSE;
+COMMENT ON TABLE ab_bitemporal_record IS
+  'Generic bi-temporal record store — (validTime × txTime) versioning keyed by (entityType, entityId).';
