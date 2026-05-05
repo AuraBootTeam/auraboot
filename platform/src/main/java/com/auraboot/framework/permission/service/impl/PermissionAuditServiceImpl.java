@@ -66,9 +66,12 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
             entry.setCreatedAt(Instant.now());
             auditLogMapper.insertAuditLog(entry);
         } catch (Exception e) {
-            // CATCH: non-transactional async write — safe to swallow; must not affect caller
+            // §P2 best-effort: audit write runs @Async on a separate transaction
+            // and must never propagate failure to the permission-check hot path.
+            // A persisted audit row is nice-to-have for forensics; a missed one
+            // is logged here for ops to triage.
             log.warn("Failed to persist permission audit log: memberId={}, resource={}, action={}: {}",
-                    explanation.memberId(), explanation.resource(), explanation.action(), e.getMessage());
+                    explanation.memberId(), explanation.resource(), explanation.action(), e.getMessage(), e);
         }
     }
 
@@ -77,7 +80,10 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
         try {
             return auditLogMapper.findRecent(tenantId, limit);
         } catch (Exception e) {
-            log.warn("Failed to query recent audit logs for tenant={}: {}", tenantId, e.getMessage());
+            // §P4 fail-closed for read query: empty list keeps the audit UI
+            // safe and observable even when the audit table is unavailable
+            // — operators see "no recent activity" rather than a 500.
+            log.warn("Failed to query recent audit logs for tenant={}: {}", tenantId, e.getMessage(), e);
             return Collections.emptyList();
         }
     }
@@ -87,8 +93,9 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
         try {
             return auditLogMapper.findByMember(tenantId, memberId, limit);
         } catch (Exception e) {
+            // §P4 fail-closed: see getRecentLogs above.
             log.warn("Failed to query audit logs for tenant={}, memberId={}: {}",
-                    tenantId, memberId, e.getMessage());
+                    tenantId, memberId, e.getMessage(), e);
             return Collections.emptyList();
         }
     }
@@ -98,8 +105,9 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
         try {
             return auditLogMapper.findByResource(tenantId, resourceCode, limit);
         } catch (Exception e) {
+            // §P4 fail-closed: see getRecentLogs above.
             log.warn("Failed to query audit logs for tenant={}, resource={}: {}",
-                    tenantId, resourceCode, e.getMessage());
+                    tenantId, resourceCode, e.getMessage(), e);
             return Collections.emptyList();
         }
     }
