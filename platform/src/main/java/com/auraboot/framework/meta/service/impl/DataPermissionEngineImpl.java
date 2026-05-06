@@ -39,6 +39,37 @@ import java.util.stream.Collectors;
  * <p>When multiple ROW policies apply to the same user/model, they are
  * combined with OR logic (union of accessible data).
  *
+ * <h2>SQL building safety</h2>
+ *
+ * The row-filter builders below assemble SQL fragments via plain Java
+ * string concatenation rather than {@code PreparedStatement} parameters.
+ * This is intentional and safe for the current call sites:
+ *
+ * <ul>
+ *   <li><b>Numeric values</b> ({@code tenantId}, {@code userId}) are
+ *       declared {@code Long} — Java's auto-boxing converts them to plain
+ *       digit-only strings via {@code Long.toString()}. There is no path
+ *       for non-numeric content to reach these positions.</li>
+ *   <li><b>Identifiers</b> ({@code targetField}, {@code deptModelCode},
+ *       {@code deptParentField}, {@code projectField}) flow through
+ *       {@link SqlSafetyUtils#isValidIdentifier(String)} guards before
+ *       interpolation; failures fall through to {@code 1=0}.</li>
+ *   <li><b>Inputs</b> originate from {@link MetaContext} (JWT-derived
+ *       userId) and {@code DataPermissionPolicy} table rows — never from
+ *       request payloads.</li>
+ * </ul>
+ *
+ * <p>The builders previously used {@code String.format("...%d...", longVal)}.
+ * That was equally safe (Java's {@code %d} only formats {@link Number}
+ * subtypes and throws on anything else) but error-prone in 9-positional
+ * format strings with three references to the same variable. The current
+ * concat form is mechanically identical at runtime, just easier to audit.
+ *
+ * <p>If a future change introduces user-controlled string positions here,
+ * convert that specific call site to a {@link java.sql.PreparedStatement}
+ * or MyBatis {@code #{}} parameter binding — do <em>not</em> rely on
+ * {@code SqlSafetyUtils} for free-form value escaping.
+ *
  * @since 5.1.0
  */
 @Slf4j
@@ -380,21 +411,19 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             // Note: the dynamic table name is "mt_{modelCode}" with hyphens replaced
             String deptTable = SystemFieldConstants.DYNAMIC_TABLE_PREFIX + deptModelCode.replace("-", "_");
 
-            return String.format(
-                    "%s IN (" +
-                    "WITH RECURSIVE dept_tree(id, lvl) AS (" +
-                    "  SELECT id, 1 FROM %s WHERE tenant_id = %d AND id IN (" +
-                    "    SELECT %s FROM %s WHERE tenant_id = %d AND created_by = %d" +
-                    "  )" +
-                    "  UNION ALL" +
-                    "  SELECT d.id, dt.lvl + 1 FROM %s d INNER JOIN dept_tree dt ON d.%s = dt.id" +
-                    "    WHERE d.tenant_id = %d AND dt.lvl < 10" +
-                    ") SELECT id FROM dept_tree" +
-                    ")",
-                    targetField,
-                    deptTable, tenantId, targetField, deptTable, tenantId, userId,
-                    deptTable, deptParentField, tenantId
-            );
+            // Concat form (was String.format with 9 positional %s/%d args, error-prone with 3 references to tenantId).
+            // tenantId / userId are Long → Long.toString() via auto-boxing → digit-only string.
+            // targetField / deptTable / deptParentField are SqlSafetyUtils-validated above.
+            return targetField + " IN ("
+                    + "WITH RECURSIVE dept_tree(id, lvl) AS ("
+                    + "  SELECT id, 1 FROM " + deptTable + " WHERE tenant_id = " + tenantId + " AND id IN ("
+                    + "    SELECT " + targetField + " FROM " + deptTable + " WHERE tenant_id = " + tenantId + " AND created_by = " + userId
+                    + "  )"
+                    + "  UNION ALL"
+                    + "  SELECT d.id, dt.lvl + 1 FROM " + deptTable + " d INNER JOIN dept_tree dt ON d." + deptParentField + " = dt.id"
+                    + "    WHERE d.tenant_id = " + tenantId + " AND dt.lvl < 10"
+                    + ") SELECT id FROM dept_tree"
+                    + ")";
         } else {
             // Simple DEPARTMENT: match records where targetField equals user's department
             // Find user's department by looking at records created by this user
@@ -405,10 +434,10 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                 return "1=0";
             }
 
-            return String.format(
-                    "%s IN (SELECT %s FROM %s WHERE tenant_id = %d AND created_by = %d AND %s IS NOT NULL)",
-                    targetField, targetField, deptTable, tenantId, userId, targetField
-            );
+            // tenantId / userId are Long; targetField / deptTable validated above.
+            return targetField + " IN (SELECT " + targetField + " FROM " + deptTable
+                    + " WHERE tenant_id = " + tenantId + " AND created_by = " + userId
+                    + " AND " + targetField + " IS NOT NULL)";
         }
     }
 
@@ -427,9 +456,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         }
 
         Long tenantId = policy.getTenantId();
-        return String.format(
-                "%s IN (SELECT project_pid FROM ab_user_project_binding WHERE tenant_id = %d AND user_id = %d)",
-                projectField, tenantId, userId);
+        // projectField validated above; tenantId / userId are Long.
+        return projectField + " IN (SELECT project_pid FROM ab_user_project_binding"
+                + " WHERE tenant_id = " + tenantId + " AND user_id = " + userId + ")";
     }
 
     /**
