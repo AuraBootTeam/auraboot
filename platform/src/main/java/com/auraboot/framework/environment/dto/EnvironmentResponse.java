@@ -11,6 +11,8 @@ import java.util.Map;
 @Data
 public class EnvironmentResponse {
 
+    /** Internal numeric id; surfaced for promotion create form (sourceEnvId / targetEnvId). */
+    private Long id;
     private String pid;
     private String code;
     private String name;
