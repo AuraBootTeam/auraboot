@@ -197,4 +197,150 @@ class StepLoopServiceThinkingIntegrationTest extends BaseIntegrationTest {
                 .as("thinking_enabled=false must NOT add a thinking field")
                 .isNull();
     }
+
+    // =========================================================================
+    // F.2 wiring: per-skill execution_config merge over per-agent
+    // (skill keys win, null skill = back-compat agent-only behavior).
+    // These tests exercise resolveThinkingConfig(agentDef, skillDef) directly
+    // because LlmProvider invocation is already covered above; the merge
+    // logic itself is the unit of behaviour we need to lock in.
+    // =========================================================================
+
+    /**
+     * F.2 case 1: skill carries thinking_enabled=true while the agent has no
+     * opt-in. The merged config must enable thinking — this is the primary
+     * production path for the seeded {@code report_analysis} skill.
+     */
+    @Test
+    @DisplayName("merge_skillEnablesThinking_agentEmpty_thinkingEnabled")
+    void merge_skillEnablesThinking_agentEmpty_thinkingEnabled() {
+        Map<String, Object> agentDef = new HashMap<>();
+        agentDef.put("execution_config", "{}");
+        Map<String, Object> skillDef = new HashMap<>();
+        skillDef.put("execution_config",
+                "{\"thinking_enabled\":true,\"thinking_budget_tokens\":8000}");
+
+        LlmChatRequest.ThinkingConfig resolved =
+                stepLoopService.resolveThinkingConfig(agentDef, skillDef);
+
+        assertThat(resolved)
+                .as("skill-level thinking_enabled must surface even when agent execution_config is empty")
+                .isNotNull();
+        assertThat(resolved.isEnabled()).isTrue();
+        assertThat(resolved.getBudgetTokens()).isEqualTo(8000);
+    }
+
+    /**
+     * F.2 case 2: agent carries the legacy thinking_enabled while skill is
+     * empty. Behavior must match today's agent-only path so existing P0-2
+     * deployments do not regress.
+     */
+    @Test
+    @DisplayName("merge_agentEnablesThinking_skillEmpty_thinkingEnabled")
+    void merge_agentEnablesThinking_skillEmpty_thinkingEnabled() {
+        Map<String, Object> agentDef = new HashMap<>();
+        agentDef.put("execution_config",
+                "{\"thinking_enabled\":true,\"thinking_budget_tokens\":12000}");
+        Map<String, Object> skillDef = new HashMap<>();
+        skillDef.put("execution_config", "{}");
+
+        LlmChatRequest.ThinkingConfig resolved =
+                stepLoopService.resolveThinkingConfig(agentDef, skillDef);
+
+        assertThat(resolved)
+                .as("agent-level thinking_enabled must propagate when skill carries no opt-in (back-compat)")
+                .isNotNull();
+        assertThat(resolved.isEnabled()).isTrue();
+        assertThat(resolved.getBudgetTokens()).isEqualTo(12000);
+    }
+
+    /**
+     * F.2 case 3: both sides carry thinking_budget_tokens — skill must win.
+     * Asserts the documented merge precedence (skill overlays agent).
+     */
+    @Test
+    @DisplayName("merge_skillBudgetOverridesAgentBudget_skillWins")
+    void merge_skillBudgetOverridesAgentBudget_skillWins() {
+        Map<String, Object> agentDef = new HashMap<>();
+        agentDef.put("execution_config",
+                "{\"thinking_enabled\":true,\"thinking_budget_tokens\":4000}");
+        Map<String, Object> skillDef = new HashMap<>();
+        skillDef.put("execution_config",
+                "{\"thinking_enabled\":true,\"thinking_budget_tokens\":8000}");
+
+        LlmChatRequest.ThinkingConfig resolved =
+                stepLoopService.resolveThinkingConfig(agentDef, skillDef);
+
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.isEnabled()).isTrue();
+        assertThat(resolved.getBudgetTokens())
+                .as("skill-level thinking_budget_tokens must override agent-level value")
+                .isEqualTo(8000);
+    }
+
+    /**
+     * F.2 case 4: skill missing entirely (null) must fall through to
+     * agent-only behavior — the AgentRunService non-skill path keeps
+     * working untouched.
+     */
+    @Test
+    @DisplayName("merge_skillNull_fallsThroughToAgent")
+    void merge_skillNull_fallsThroughToAgent() {
+        Map<String, Object> agentDef = new HashMap<>();
+        agentDef.put("execution_config",
+                "{\"thinking_enabled\":true,\"thinking_budget_tokens\":6000}");
+
+        LlmChatRequest.ThinkingConfig resolved =
+                stepLoopService.resolveThinkingConfig(agentDef, null);
+
+        assertThat(resolved)
+                .as("null skillDef must preserve agent-only resolution (back-compat)")
+                .isNotNull();
+        assertThat(resolved.isEnabled()).isTrue();
+        assertThat(resolved.getBudgetTokens()).isEqualTo(6000);
+    }
+
+    /**
+     * F.2 case 5 — full LLM-request integration: insert a real
+     * ab_agent_definition row with empty execution_config plus a hand-built
+     * skill row map carrying thinking_enabled=true. Drive the full
+     * executeAgentLoop entry point that SkillEngine.executeOrchestration
+     * uses, then inspect the captured LlmChatRequest. This is the test
+     * that proves the end-to-end wiring (not just unit merge) actually
+     * surfaces ThinkingConfig.enabled=true at the LLM provider boundary.
+     */
+    @Test
+    @DisplayName("executeAgentLoop_skillEnablesThinking_propagatesToProvider")
+    void executeAgentLoop_skillEnablesThinking_propagatesToProvider() throws Exception {
+        // Agent has no thinking opt-in
+        Map<String, Object> agentDef = insertAgentDef("merge", "{}");
+
+        // Skill row mimics the seeded report_analysis shape (string JSON in
+        // execution_config, like JdbcTemplate-loaded JSONB)
+        Map<String, Object> skillDef = new HashMap<>();
+        skillDef.put("skill_code", "report_analysis_test_" + System.nanoTime());
+        skillDef.put("execution_config",
+                "{\"thinking_enabled\":true,\"thinking_budget_tokens\":8000}");
+
+        LlmProvider provider = mockProviderReturningEndTurn();
+
+        stepLoopService.executeAgentLoop(
+                getTestTenant().getId(), "run-pid-" + System.nanoTime(),
+                "task-pid-" + System.nanoTime(), (String) agentDef.get("agent_code"),
+                "system", "msg", List.of(), agentDef, skillDef,
+                provider, anthropicConfig(),
+                TraceContext.builder().traceId("trace-test-merge").build(),
+                StepLoopService.MAX_TOOL_LOOPS);
+
+        ArgumentCaptor<LlmChatRequest> reqCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(1)).chat(reqCaptor.capture(), anyString(), anyString());
+
+        LlmChatRequest captured = reqCaptor.getValue();
+        assertThat(captured.getThinking())
+                .as("F.2: ab_agent_skill.execution_config.thinking_enabled must surface in LlmChatRequest "
+                        + "even when ab_agent_definition.execution_config is empty")
+                .isNotNull();
+        assertThat(captured.getThinking().isEnabled()).isTrue();
+        assertThat(captured.getThinking().getBudgetTokens()).isEqualTo(8_000);
+    }
 }

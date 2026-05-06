@@ -79,17 +79,40 @@ public class StepLoopService {
                                                       LlmProvider provider, LlmProviderFactory.ProviderConfig config,
                                                       TraceContext traceCtx) throws Exception {
         return executeAgentLoop(tenantId, runPid, taskPid, agentCode, systemPrompt, userMessage,
-                tools, agentDef, provider, config, traceCtx, MAX_TOOL_LOOPS);
+                tools, agentDef, null, provider, config, traceCtx, MAX_TOOL_LOOPS);
     }
 
     /**
      * Overload with configurable maxLoops — used by SkillEngine orchestration mode
      * to respect the skill's max_steps instead of the global MAX_TOOL_LOOPS.
+     * Delegates to the (agentDef, skillDef) overload with {@code skillDef = null}
+     * so the AgentRunService path keeps today's agent-only behavior.
      */
     @SuppressWarnings("unchecked")
     AgentRunService.AgentLoopResult executeAgentLoop(Long tenantId, String runPid, String taskPid,
                                                       String agentCode, String systemPrompt, String userMessage,
                                                       List<AgentToolDefinition> tools, Map<String, Object> agentDef,
+                                                      LlmProvider provider, LlmProviderFactory.ProviderConfig config,
+                                                      TraceContext traceCtx, int maxLoops) throws Exception {
+        return executeAgentLoop(tenantId, runPid, taskPid, agentCode, systemPrompt, userMessage,
+                tools, agentDef, null, provider, config, traceCtx, maxLoops);
+    }
+
+    /**
+     * F.2 wiring: execute the agent loop with explicit skill context so the
+     * per-skill {@code ab_agent_skill.execution_config} JSONB merges over the
+     * per-agent {@code ab_agent_definition.execution_config} (skill wins).
+     *
+     * <p>Used by {@link SkillEngine#executeOrchestration} where the skill row
+     * is the canonical source of {@code thinking_enabled} (e.g. seeded
+     * {@code report_analysis} ships with a 8000-token thinking budget). Pass
+     * {@code skillDef = null} to keep today's agent-only behavior.
+     */
+    @SuppressWarnings("unchecked")
+    AgentRunService.AgentLoopResult executeAgentLoop(Long tenantId, String runPid, String taskPid,
+                                                      String agentCode, String systemPrompt, String userMessage,
+                                                      List<AgentToolDefinition> tools, Map<String, Object> agentDef,
+                                                      Map<String, Object> skillDef,
                                                       LlmProvider provider, LlmProviderFactory.ProviderConfig config,
                                                       TraceContext traceCtx, int maxLoops) throws Exception {
         List<LlmChatRequest.Message> messages = new ArrayList<>();
@@ -108,11 +131,13 @@ public class StepLoopService {
 
         String model = resolveModel(agentDef, config.getProviderCode());
         int maxTokens = config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
-        // P0-2: agent-level Extended Thinking knob. Anthropic capability gating
+        // P0-2 / F.2: per-skill execution_config overlays the per-agent one
+        // (skill wins). When {@code skillDef} is null we degrade to agent-only,
+        // preserving the original P0-2 behavior. Anthropic capability gating
         // and max_tokens auto-extension live inside AnthropicLlmProvider; here
-        // we only translate the JSONB execution_config into a typed
+        // we only translate the merged JSONB execution_config into a typed
         // ThinkingConfig and let the provider decide whether to honour it.
-        LlmChatRequest.ThinkingConfig thinkingConfig = resolveThinkingConfig(agentDef);
+        LlmChatRequest.ThinkingConfig thinkingConfig = resolveThinkingConfig(agentDef, skillDef);
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
@@ -545,53 +570,47 @@ public class StepLoopService {
      *   <li>{@code thinking_enabled}: boolean, defaults to false</li>
      *   <li>{@code thinking_budget_tokens}: int, defaults to 10_000 when enabled</li>
      * </ul>
+     *
+     * <p>This single-arg overload is preserved for back-compat — F.2 wiring
+     * uses {@link #resolveThinkingConfig(Map, Map)} which adds skill-level
+     * merge.
+     */
+    LlmChatRequest.ThinkingConfig resolveThinkingConfig(Map<String, Object> agentDef) {
+        return resolveThinkingConfig(agentDef, null);
+    }
+
+    /**
+     * F.2 wiring: resolve Extended Thinking config by merging
+     * {@code skillDef.execution_config} on top of {@code agentDef.execution_config}
+     * (skill keys override agent keys when both present). When
+     * {@code skillDef} is {@code null} or carries no {@code execution_config},
+     * behavior is identical to the single-arg overload (back-compat).
+     *
+     * <p>Both inputs are JSONB-as-string in production (loaded via
+     * {@code DynamicDataMapper} from {@code ab_agent_definition} /
+     * {@code ab_agent_skill}) but unit tests may pass pre-parsed {@code Map}
+     * — both shapes are accepted.
      */
     @SuppressWarnings("unchecked")
-    LlmChatRequest.ThinkingConfig resolveThinkingConfig(Map<String, Object> agentDef) {
-        if (agentDef == null) return null;
-        Object raw = agentDef.get("execution_config");
-        if (raw == null) return null;
+    LlmChatRequest.ThinkingConfig resolveThinkingConfig(Map<String, Object> agentDef,
+                                                         Map<String, Object> skillDef) {
+        Map<String, Object> agentCfg = parseExecutionConfig(agentDef);
+        Map<String, Object> skillCfg = parseExecutionConfig(skillDef);
 
-        // JDBC drivers vary in how they expose JSONB:
-        //   - PostgreSQL JDBC returns org.postgresql.util.PGobject (toString
-        //     yields the JSON text).
-        //   - Some MyBatis typehandlers pre-parse it to a Map.
-        //   - Plain VARCHAR columns surface as String.
-        // We accept all three so the same agentDef payload works whether it
-        // came from DynamicDataMapper, JdbcTemplate, or a hand-built Map in a
-        // unit test.
-        Map<String, Object> config;
-        if (raw instanceof Map) {
-            config = (Map<String, Object>) raw;
-        } else {
-            String json;
-            if (raw instanceof String s) {
-                json = s;
-            } else if ("org.postgresql.util.PGobject".equals(raw.getClass().getName())) {
-                // Use reflection to avoid hard-coupling this module to the
-                // PostgreSQL driver — JDBC contracts only guarantee toString().
-                json = raw.toString();
-            } else {
-                json = raw.toString();
-            }
-            if (json == null || json.isBlank() || "null".equals(json.trim())) {
-                return null;
-            }
-            try {
-                config = objectMapper.readValue(json, Map.class);
-            } catch (Exception e) {
-                log.debug("Ignoring malformed agent execution_config JSON: {}", e.getMessage());
-                return null;
-            }
-        }
+        // Merge: agent keys form the base, skill keys overlay. Both maps may
+        // be null/empty — we only allocate when at least one carried data.
+        if (agentCfg == null && skillCfg == null) return null;
+        Map<String, Object> merged = new HashMap<>();
+        if (agentCfg != null) merged.putAll(agentCfg);
+        if (skillCfg != null) merged.putAll(skillCfg);
 
-        Object enabled = config.get("thinking_enabled");
+        Object enabled = merged.get("thinking_enabled");
         if (!(enabled instanceof Boolean) || !(Boolean) enabled) {
             return null;
         }
 
         int budget = 10_000;
-        Object budgetObj = config.get("thinking_budget_tokens");
+        Object budgetObj = merged.get("thinking_budget_tokens");
         if (budgetObj instanceof Number n) {
             int parsed = n.intValue();
             if (parsed > 0) budget = parsed;
@@ -600,6 +619,51 @@ public class StepLoopService {
                 .enabled(true)
                 .budgetTokens(budget)
                 .build();
+    }
+
+    /**
+     * Parse the {@code execution_config} JSONB column off an agent-def or
+     * skill-def row Map. Returns {@code null} when the row is missing,
+     * lacks the column, or carries unparseable JSON.
+     *
+     * <p>JDBC drivers vary in how they expose JSONB:
+     *   <ul>
+     *     <li>PostgreSQL JDBC returns {@code org.postgresql.util.PGobject}
+     *         (toString yields the JSON text).</li>
+     *     <li>Some MyBatis typehandlers pre-parse it to a Map.</li>
+     *     <li>Plain VARCHAR columns surface as String.</li>
+     *   </ul>
+     * We accept all three so the same row payload works whether it came
+     * from {@code DynamicDataMapper}, {@code JdbcTemplate}, or a hand-built
+     * Map in a unit test.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseExecutionConfig(Map<String, Object> row) {
+        if (row == null) return null;
+        Object raw = row.get("execution_config");
+        if (raw == null) return null;
+        if (raw instanceof Map) {
+            return (Map<String, Object>) raw;
+        }
+        String json;
+        if (raw instanceof String s) {
+            json = s;
+        } else if ("org.postgresql.util.PGobject".equals(raw.getClass().getName())) {
+            // Use reflection-free toString() to avoid hard-coupling this
+            // module to the PostgreSQL driver — JDBC only guarantees toString().
+            json = raw.toString();
+        } else {
+            json = raw.toString();
+        }
+        if (json == null || json.isBlank() || "null".equals(json.trim())) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, Map.class);
+        } catch (Exception e) {
+            log.debug("Ignoring malformed execution_config JSON: {}", e.getMessage());
+            return null;
+        }
     }
 
     private String resolveModel(Map<String, Object> agentDef, String providerCode) {
