@@ -204,7 +204,10 @@ describe('MCP Client — Config Management', () => {
       const eqIdx = pair.indexOf('=');
       const key = pair.substring(0, eqIdx);
       const value = pair.substring(eqIdx + 1);
-      expect(key).toBe('api_key');
+      // Env var keys preserve case as written by the user — UPPER_SNAKE_CASE
+      // is conventional but the parser does NOT lowercase. Splitting on the
+      // FIRST '=' must keep `=def=ghi` in the value untouched.
+      expect(key).toBe('API_KEY');
       expect(value).toBe('abc=def=ghi');
     });
   });
