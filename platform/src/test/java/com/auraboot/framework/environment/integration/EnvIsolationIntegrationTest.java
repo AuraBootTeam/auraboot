@@ -119,6 +119,41 @@ class EnvIsolationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void runWithoutEnvFilter_nestedClosure_outerStateRestoredAfterInnerExits() {
+        Long devEnvId = createEnv("dev_n_" + shortId());
+        Long stagingEnvId = createEnv("staging_n_" + shortId());
+
+        MetaContext.setEnvironmentId(devEnvId);
+        PageSchema devPage = newBarePage("p_n_" + shortId());
+        pageSchemaMapper.insert(devPage);
+
+        // Switch to staging — dev page invisible by default
+        MetaContext.setEnvironmentId(stagingEnvId);
+        assertThat(pageSchemaMapper.selectByPid(devPage.getPid())).isNull();
+
+        Boolean[] innerCheck = { null };
+        Integer outerCount = MetaContext.runWithoutEnvFilter(() -> {
+            // Outer bypass active — should see all envs
+            assertThat(pageSchemaMapper.selectByPid(devPage.getPid())).isNotNull();
+
+            // Nested bypass — still sees all
+            MetaContext.runWithoutEnvFilter(() -> {
+                innerCheck[0] = pageSchemaMapper.selectByPid(devPage.getPid()) != null;
+            });
+
+            // After inner closure exits, outer must STILL be in bypass mode (state restored
+            // to prior=true, not naively to false). Pinned by reviewer #18.
+            return pageSchemaMapper.selectByPid(devPage.getPid()) != null ? 1 : 0;
+        });
+
+        assertThat(innerCheck[0]).isTrue();
+        assertThat(outerCount).isEqualTo(1);
+
+        // After outer closure exits, bypass is fully off — page invisible again
+        assertThat(pageSchemaMapper.selectByPid(devPage.getPid())).isNull();
+    }
+
+    @Test
     void explicitEnvIdOnEntity_isHonored() {
         Long devEnvId = createEnv("dev4_" + shortId());
         Long otherEnvId = createEnv("other_" + shortId());
