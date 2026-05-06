@@ -3,20 +3,63 @@ package com.auraboot.framework.application.database.mybatis;
 import com.auraboot.framework.application.database.dialect.DatabaseDialect;
 import com.auraboot.framework.application.database.dialect.DatabaseType;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
+import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 
+import java.util.HashSet;
 import java.util.Set;
 
+@Slf4j
 @Configuration
 public class MybatisPlusConfig {
+
+    /** Static cache populated on first access. Drop-in replacement for the prior hardcoded Set. */
+    private static volatile Set<String> envScopedTables;
+
+    /**
+     * Whitelist of tables backing {@code @EnvScoped} entities, discovered via classpath scan
+     * (env-layering #18). Adding a new env-scoped resource is now one-step: annotate the
+     * entity. The MyBatis-Plus interceptor reads this set on every query.
+     */
+    private static Set<String> envScopedTables() {
+        Set<String> cached = envScopedTables;
+        if (cached != null) return cached;
+        synchronized (MybatisPlusConfig.class) {
+            if (envScopedTables != null) return envScopedTables;
+            Set<String> tables = new HashSet<>();
+            ClassPathScanningCandidateComponentProvider scanner =
+                    new ClassPathScanningCandidateComponentProvider(false);
+            scanner.addIncludeFilter(new AnnotationTypeFilter(EnvScoped.class));
+            for (var bd : scanner.findCandidateComponents("com.auraboot")) {
+                String className = bd.getBeanClassName();
+                if (className == null) continue;
+                try {
+                    Class<?> clazz = Class.forName(className);
+                    TableName tn = clazz.getAnnotation(TableName.class);
+                    if (tn != null && !tn.value().isBlank()) {
+                        tables.add(tn.value());
+                    }
+                } catch (ClassNotFoundException e) {
+                    log.warn("Failed to load @EnvScoped candidate {}: {}", className, e.getMessage());
+                }
+            }
+            log.info("Resolved env-scoped tables via classpath scan: {}", tables);
+            envScopedTables = Set.copyOf(tables);
+            return envScopedTables;
+        }
+    }
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor(DatabaseDialect databaseDialect) {
@@ -150,7 +193,7 @@ public class MybatisPlusConfig {
                 if (MetaContext.getCurrentEnvironmentId() == null) {
                     return true;  // no env context → don't filter (background tasks, legacy tests)
                 }
-                if (!ENV_SCOPED_TABLES.contains(tableName)) {
+                if (!envScopedTables().contains(tableName)) {
                     return true;  // not a DSL resource → don't apply env filter
                 }
                 return false;
@@ -167,18 +210,4 @@ public class MybatisPlusConfig {
         return interceptor;
     }
 
-    /**
-     * Whitelist of tables backing {@code @EnvScoped} entities. Only these tables get the
-     * {@code WHERE env_id = ?} predicate auto-injected. Identity / business data / platform
-     * tables intentionally stay off this list.
-     *
-     * <p>PoC scope: only ab_page_schema and its history. Adding a DSL resource means:
-     * adding the entity table here AND adding @EnvScoped to its entity class AND adding
-     * env_id BIGINT column with index.
-     */
-    private static final Set<String> ENV_SCOPED_TABLES = Set.of(
-            "ab_page_schema",
-            "ab_page_schema_history",
-            "ab_resource_reference"  // task #8: reverse-reference index follows the page it indexes
-    );
 }

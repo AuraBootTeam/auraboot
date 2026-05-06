@@ -1,9 +1,12 @@
 package com.auraboot.framework.environment.web;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.environment.dao.entity.Environment;
 import com.auraboot.framework.environment.dao.mapper.EnvironmentMapper;
 import com.auraboot.framework.environment.service.EnvironmentService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +42,7 @@ public class EnvironmentResolverInterceptor implements HandlerInterceptor {
 
     private final EnvironmentMapper environmentMapper;
     private final EnvironmentService environmentService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -59,9 +63,9 @@ public class EnvironmentResolverInterceptor implements HandlerInterceptor {
             Environment env = environmentMapper.findByTenantAndCode(tenantId, code);
             if (env == null) {
                 // Explicit env code that doesn't exist for this tenant — fail fast rather than
-                // silently fall back, which would mask configuration mistakes.
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                log.warn("Environment '{}' not found for tenant {}", code, tenantId);
+                // silently fall back, which would mask configuration mistakes. Returns 404 with
+                // canonical ApiResponse envelope (env-layering #18 reviewer fix).
+                writeNotFoundResponse(response, code, tenantId);
                 return false;
             }
             resolvedEnvId = env.getId();
@@ -73,5 +77,21 @@ public class EnvironmentResolverInterceptor implements HandlerInterceptor {
         MetaContext.setEnvironmentId(resolvedEnvId);
         log.debug("Resolved environment {} for tenant {}", resolvedEnvId, tenantId);
         return true;
+    }
+
+    private void writeNotFoundResponse(HttpServletResponse response, String code, Long tenantId) {
+        log.warn("Environment '{}' not found for tenant {}", code, tenantId);
+        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+        response.setContentType("application/json;charset=UTF-8");
+        ApiResponse<Void> body = ApiResponse.error(
+                ResponseCode.PluginNotFound,  // closest existing not-found code
+                java.util.Map.of("envCode", code, "tenantId", tenantId));
+        try {
+            response.getOutputStream().write(
+                    objectMapper.writeValueAsBytes(body));
+            response.getOutputStream().flush();
+        } catch (Exception writeFail) {
+            log.warn("Failed to write 404 envelope for env '{}': {}", code, writeFail.getMessage());
+        }
     }
 }

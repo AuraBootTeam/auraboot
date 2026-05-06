@@ -1,5 +1,6 @@
 package com.auraboot.framework.promotion.reference.dao.entity;
 
+import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -16,6 +17,7 @@ import java.util.Objects;
  */
 @Data
 @TableName(value = "ab_resource_reference", autoResultMap = true)
+@EnvScoped
 public class ResourceReference {
 
     @TableId(type = IdType.ASSIGN_ID)
