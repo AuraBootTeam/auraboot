@@ -237,6 +237,7 @@ public class EnvironmentServiceImpl implements EnvironmentService {
 
     private EnvironmentResponse toResponse(Environment env) {
         EnvironmentResponse resp = new EnvironmentResponse();
+        resp.setId(env.getId());
         resp.setPid(env.getPid());
         resp.setCode(env.getCode());
         resp.setName(env.getName());
