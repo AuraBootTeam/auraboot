@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.entity;
 
 import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
+import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -21,6 +22,7 @@ import java.util.Map;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @TableName("ab_page_schema_history")
+@EnvScoped
 public class PageSchemaHistory {
 
     @TableId(value = "id", type = IdType.AUTO)

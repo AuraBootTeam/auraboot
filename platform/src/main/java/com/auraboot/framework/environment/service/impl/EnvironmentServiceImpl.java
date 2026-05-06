@@ -279,7 +279,18 @@ public class EnvironmentServiceImpl implements EnvironmentService {
         env.setDeletedFlag(false);
         env.setCreatedAt(new Date());
         env.setUpdatedAt(new Date());
-        environmentMapper.insert(env);
+        try {
+            environmentMapper.insert(env);
+        } catch (org.springframework.dao.DuplicateKeyException raceLost) {
+            // Race lost — another thread created the default first. Re-find returns its row,
+            // which is what the caller wants (idempotent semantics). Pinned by issue #18.
+            Environment winner = environmentMapper.findByTenantAndCode(tenantId, "default");
+            if (winner != null) {
+                log.debug("findOrCreateDefaultId race resolved by re-fetch for tenant {}", tenantId);
+                return winner.getId();
+            }
+            throw raceLost;
+        }
         log.info("Created default environment for tenant {}: id={}", tenantId, env.getId());
         return env.getId();
     }
