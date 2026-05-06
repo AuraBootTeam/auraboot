@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.AnthropicResponse;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -23,7 +24,7 @@ class AnthropicLlmProviderTest {
 
     private AnthropicLlmProvider createProvider() {
         // WebClient is not exercised by the methods under test; pass null.
-        return new AnthropicLlmProvider(null, new ObjectMapper());
+        return new AnthropicLlmProvider(null, new ObjectMapper(), new SimpleMeterRegistry());
     }
 
     @SuppressWarnings("unchecked")
