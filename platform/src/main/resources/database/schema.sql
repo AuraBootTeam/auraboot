@@ -6648,7 +6648,11 @@ ALTER TABLE ab_agent_skill
     ADD COLUMN IF NOT EXISTS actionability         VARCHAR(20) DEFAULT 'read_only',
     ADD COLUMN IF NOT EXISTS produced_action_types JSONB,
     ADD COLUMN IF NOT EXISTS idempotency_mode      VARCHAR(20) DEFAULT 'not_idempotent',
-    ADD COLUMN IF NOT EXISTS step_input_mappings   JSONB;
+    ADD COLUMN IF NOT EXISTS step_input_mappings   JSONB,
+    -- Per-skill execution-time knobs (parallels ab_agent_definition.execution_config).
+    -- Read by StepLoopService when executing a skill so multi-hop reasoning skills
+    -- (e.g. report_analysis) can opt into Extended Thinking by default.
+    ADD COLUMN IF NOT EXISTS execution_config      JSONB DEFAULT '{}'::jsonb;
 
 -- ACP Approval Protocol enhancement (Spec 00 §5.5)
 ALTER TABLE ab_agent_approval
