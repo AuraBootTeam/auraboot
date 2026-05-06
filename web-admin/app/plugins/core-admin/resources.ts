@@ -9,5 +9,6 @@ export const RESOURCES: PluginResource[] = [
   { key: 'admin.templates', path: '/admin/templates', title: { en: 'Templates', zh: '模板' }, icon: 'file-template', menu: { order: 60, group: 'admin' }, permission: 'admin.read', file: './plugins/core-admin/pages/admin/templates.tsx' },
   { key: 'admin.template-preview', path: '/admin/templates/:templateId/preview', title: { en: 'Template Preview', zh: '模板预览' }, menu: false, parentKey: 'admin.templates', permission: 'admin.read', file: './plugins/core-admin/pages/admin/templates.$templateId.preview.tsx' },
   { key: 'admin.environments', path: '/admin/environments', title: { en: 'Environments', zh: '环境' }, icon: 'layers', menu: { order: 70, group: 'admin' }, permission: 'admin.manage', file: './plugins/core-admin/pages/admin/environments.tsx' },
+  { key: 'admin.diff', path: '/admin/diff', title: { en: 'Diff Viewer', zh: '差异对比' }, menu: false, parentKey: 'admin.environments', permission: 'admin.manage', file: './plugins/core-admin/pages/admin/diff.tsx' },
   { key: 'admin.permissions', path: '/enterprise/permissions', title: { en: 'Permissions', zh: '权限管理' }, icon: 'shield-check', menu: { order: 80, group: 'admin' }, permission: 'admin.manage', file: './routes/enterprise/PermissionManagement.tsx' },
 ]
