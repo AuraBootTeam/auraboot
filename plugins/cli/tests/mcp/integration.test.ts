@@ -351,6 +351,89 @@ describe('MCP server integration (in-memory transport)', () => {
     await newServer.close();
   });
 
+  describe('error model end-to-end (D10 classifier reaches the wire)', () => {
+    it('401 response from a write tool surfaces as isError + kind:session_expired', async () => {
+      apiPost.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        data: null,
+        message: 'token expired',
+      });
+
+      const result = await client.callTool({
+        name: 'create_model',
+        arguments: { code: 'foo', displayName: 'Foo', dryRun: false },
+      });
+
+      expect(result.isError).toBe(true);
+      const body = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+      expect(body.kind).toBe('session_expired');
+      expect(body.suggestion).toMatch(/aura login/i);
+    });
+
+    it('403 response surfaces as isError + kind:permission_denied (NOT process.exit)', async () => {
+      apiPost.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        data: null,
+        message: 'role missing',
+      });
+
+      const result = await client.callTool({
+        name: 'create_page_schema',
+        arguments: {
+          pageKey: 'foo_list',
+          name: 'foo_list',
+          title: 'Foo',
+          kind: 'list',
+          blocks: [{ blockType: 'table' }],
+          dryRun: false,
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      const body = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+      expect(body.kind).toBe('permission_denied');
+    });
+
+    it('409 surfaces as isError + kind:conflict regardless of message', async () => {
+      apiPost.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        data: null,
+        message: 'whatever',
+      });
+
+      const result = await client.callTool({
+        name: 'create_model',
+        arguments: { code: 'foo', displayName: 'Foo', dryRun: false },
+      });
+
+      expect(result.isError).toBe(true);
+      const body = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+      expect(body.kind).toBe('conflict');
+    });
+
+    it('422 surfaces as isError + kind:validation', async () => {
+      apiPost.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        data: null,
+        message: 'displayName length exceeds limit',
+      });
+
+      const result = await client.callTool({
+        name: 'create_model',
+        arguments: { code: 'foo', displayName: 'Foo', dryRun: false },
+      });
+
+      expect(result.isError).toBe(true);
+      const body = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+      expect(body.kind).toBe('validation');
+      expect(body.suggestion).toMatch(/violated field/i);
+    });
+  });
+
   it('rejects kind=dashboard at the schema layer for query_page_schemas', async () => {
     // zod rejection happens during the MCP protocol's own arg validation.
     // Either the SDK throws or returns isError; both are acceptable as long
