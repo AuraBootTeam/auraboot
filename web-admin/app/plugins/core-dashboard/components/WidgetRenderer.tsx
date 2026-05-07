@@ -39,7 +39,7 @@ export function renderWidget({
 
   if (!Component) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-400">
+      <div data-widget-id={widget.id} className="h-full flex items-center justify-center text-sm text-gray-400">
         Unknown widget: {widget.type}
       </div>
     );
@@ -60,15 +60,17 @@ export function renderWidget({
   };
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-full items-center justify-center text-sm text-gray-400">
-          Loading...
-        </div>
-      }
-    >
-      <Component {...props} />
-    </Suspense>
+    <div data-widget-id={widget.id} className="h-full">
+      <Suspense
+        fallback={
+          <div className="flex h-full items-center justify-center text-sm text-gray-400">
+            Loading...
+          </div>
+        }
+      >
+        <Component {...props} />
+      </Suspense>
+    </div>
   );
 }
 

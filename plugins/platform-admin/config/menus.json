@@ -132,24 +132,6 @@
     "pageKey": "scheduled_task_list"
   },
   {
-    "code": "template_gallery",
-    "parentCode": "system_management",
-    "name:zh-CN": "模板中心",
-    "name:en": "Template Center",
-    "path": "/admin/templates",
-    "component": null,
-    "icon": "IconRocket",
-    "type": 1,
-    "permissionCode": "system_management",
-    "orderNo": 45,
-    "visible": true,
-    "extension": {
-      "platforms": [
-        "web"
-      ]
-    }
-  },
-  {
     "code": "system_management",
     "parentCode": null,
     "name": "系统管理",
