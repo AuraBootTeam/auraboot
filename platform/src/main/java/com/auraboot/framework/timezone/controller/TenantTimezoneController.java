@@ -13,15 +13,15 @@ import java.time.DateTimeException;
 import java.util.Map;
 
 /**
- * REST controller for timezone migration guidance.
+ * REST controller for tenant timezone configuration.
  *
  * <p>Endpoints help tenant administrators understand the impact of changing their
  * display timezone and safely apply the new setting.</p>
  */
 @RestController
-@RequestMapping("/api/admin/timezone")
+@RequestMapping("/api/admin/tenants/timezone")
 @RequiredArgsConstructor
-public class TimezoneMigrationController {
+public class TenantTimezoneController {
 
     private static final String TIMEZONE_PREF_KEY = "ui.timezone";
     private static final String DEFAULT_TIMEZONE = "Asia/Shanghai";
@@ -32,7 +32,7 @@ public class TimezoneMigrationController {
     /**
      * Assess the impact of a hypothetical timezone change without applying it.
      *
-     * <p>GET /api/admin/timezone/migration-check?fromTimezone=Asia/Shanghai&amp;toTimezone=Asia/Tokyo</p>
+     * <p>GET /api/admin/tenants/timezone/migration-check?fromTimezone=Asia/Shanghai&amp;toTimezone=Asia/Tokyo</p>
      */
     @GetMapping("/migration-check")
     public ApiResponse<?> migrationCheck(
@@ -49,7 +49,7 @@ public class TimezoneMigrationController {
     /**
      * Update the current tenant's timezone after generating an impact assessment.
      *
-     * <p>PUT /api/admin/timezone/tenant-timezone</p>
+     * <p>PUT /api/admin/tenants/timezone/tenant-timezone</p>
      * <p>Body: {@code { "timezone": "Asia/Tokyo" }}</p>
      *
      * <p>The endpoint:</p>

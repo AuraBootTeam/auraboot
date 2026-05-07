@@ -35,7 +35,7 @@ import java.nio.charset.StandardCharsets;
  * /api/admin/infrastructure        InfrastructureController
  * /api/admin/login-channels        LoginChannelManageController
  * /api/admin/memory                MemoryTierAdminController
- * /api/admin/timezone              TimezoneMigrationController
+ * /api/admin/tenants/timezone      TenantTimezoneController
  * /api/admin/user-soul-profiles    UserSoulProfileAdminController
  * /api/admin/users                 AdminUserController
  * </pre>
