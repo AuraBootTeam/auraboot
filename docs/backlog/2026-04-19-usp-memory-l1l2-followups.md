@@ -37,13 +37,9 @@ NO_PROXY=localhost npx playwright test tests/e2e/user-soul-profile/real-parallel
 
 ---
 
-## 3. `TimezoneMigrationController` 生命周期
+## 3. ~~`TimezoneMigrationController` 生命周期~~ (DONE — renamed to `TenantTimezoneController`)
 
-**What**：现有 ops 一次性工具，随 Plan C 拦截器落地后它被 `tenant_admin` 粗粒度覆盖；语义上是"平台 ops 一次性迁移"，应迁到 `/api/admin/ops/**` + `platform_admin` gate，或者直接下线。
-
-**Why**：长期留在 `/api/admin/timezone-migration/**` 会给未来添一块"这是租户管理员做的事吗？"的混淆点。
-
-**建议触发**：`PLATFORM_ADMIN` 落地后顺手处理。
+**Resolution (PR-B)**：实际调查显示该 controller 操作的是 `TenantPreference`（单租户配置），并非"平台 ops 一次性迁移"工具。已重命名为 `TenantTimezoneController`，路径从 `/api/admin/timezone` 改为 `/api/admin/tenants/timezone`，保留 `tenant_admin` gate。
 
 ---
 
