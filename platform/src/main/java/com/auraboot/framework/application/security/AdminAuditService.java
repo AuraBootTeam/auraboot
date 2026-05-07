@@ -1,5 +1,6 @@
 package com.auraboot.framework.application.security;
 
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,7 +30,7 @@ public class AdminAuditService {
      * Asynchronously inserts one audit row.
      *
      * @param tenantId            tenant context of the request
-     * @param actorUserId         authenticated user (nullable if MetaContext was incomplete)
+     * @param actorUserId         authenticated user (non-null; caller must validate before invoking)
      * @param actorRole           resolved role that was checked ({@code tenant_admin} or
      *                            {@code platform_admin})
      * @param path                request URI
@@ -48,6 +49,7 @@ public class AdminAuditService {
                                int status,
                                String requestBodySummary,
                                Integer latencyMs) {
+        Objects.requireNonNull(actorUserId, "actorUserId required for admin audit");
         try {
             jdbcTemplate.update(
                     "INSERT INTO ab_admin_action_log " +
@@ -55,7 +57,7 @@ public class AdminAuditService {
                             " status, request_body_summary, latency_ms, created_at) " +
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())",
                     tenantId,
-                    actorUserId != null ? actorUserId.toString() : null,
+                    actorUserId.toString(),
                     actorRole,
                     path,
                     method,
