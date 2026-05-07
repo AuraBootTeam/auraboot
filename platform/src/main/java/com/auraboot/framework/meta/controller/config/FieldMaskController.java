@@ -23,7 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/field-mask/config")
 @RequiredArgsConstructor
-@RequirePermission(MetaPermission.META_PERMISSION_MANAGE)
+@RequirePermission(MetaPermission.PERMISSION_MANAGE)
 public class FieldMaskController {
 
     private final FieldMaskService fieldMaskService;
