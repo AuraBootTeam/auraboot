@@ -119,10 +119,22 @@ test('VAL-001 — Create form: submit with empty required field is blocked', asy
 
   // DO NOT fill sc_name (required field) — leave it empty
   // Click submit
+  // Scope the listener to the showcase create command path. Unrelated
+  // /commands/execute/ traffic — model/schema resolution, sibling page
+  // polling under full-suite load — must not flip this flag. Use exact
+  // command-code suffix match.
   let commandExecuted = false;
+  let executedUrl = '';
   page.on('request', (req) => {
-    if (req.url().includes('/api/meta/commands/execute/') && req.method() === 'POST') {
+    const url = req.url();
+    if (
+      req.method() === 'POST' &&
+      /\/api\/meta\/commands\/execute\/(?:sc[:_])?create_showcase(?:_all_fields)?(?:[/?]|$)/i.test(
+        url,
+      )
+    ) {
       commandExecuted = true;
+      executedUrl = url;
     }
   });
   const submitBtn = page.locator('[data-testid="form-btn-submit"]');
@@ -170,7 +182,10 @@ test('VAL-001 — Create form: submit with empty required field is blocked', asy
 
   // Should NOT navigate away — still on the form page
   await page.waitForTimeout(1_000);
-  expect(commandExecuted, 'Invalid empty form should not execute backend command').toBe(false);
+  expect(
+    commandExecuted,
+    `Invalid empty form should not execute backend command (matched: ${executedUrl})`,
+  ).toBe(false);
   expect(hasErrors, 'Submitting empty form should show validation feedback').toBeTruthy();
   expect(page.url()).not.toContain('/p/showcase_all_fields?');
   expect(page.url()).not.toMatch(/\/dynamic\/showcase[-_]all[-_]fields$/);

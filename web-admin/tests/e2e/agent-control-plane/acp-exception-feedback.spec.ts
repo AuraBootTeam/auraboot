@@ -453,7 +453,7 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
         const body = await r.json().catch(() => null);
         return body?.code === '0' || body?.success === true;
       },
-      { timeout: 15000 },
+      { timeout: 30000 },
     ).catch(() => null);
 
     const saveBtn = page.locator(

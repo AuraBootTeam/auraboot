@@ -109,7 +109,10 @@ async function clickRowActionBtn(page: Page, row: Locator, btnCode: string): Pro
  */
 async function assertBtnVisible(row: Locator, btnCode: string): Promise<void> {
   const btn = row.locator(`[data-testid="row-action-${btnCode}"]`);
-  await expect(btn).toBeVisible({ timeout: 8_000 });
+  // Mid-suite the row's action column may render after a list refetch lands;
+  // 8s is too tight under chromium-deep contention. Bump to 20s to match the
+  // observed wall-clock on a hot BFF.
+  await expect(btn).toBeVisible({ timeout: 20_000 });
 }
 
 /**
