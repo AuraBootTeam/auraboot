@@ -7,6 +7,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Check, X } from 'lucide-react';
 import { cn } from '~/utils/cn';
 import type { KanbanCard, KanbanCardField } from '~/framework/smart/types/kanban';
 import {
@@ -30,6 +31,8 @@ export interface KanbanCardItemProps {
   cardFields?: KanbanCardField[];
   /** Whether the card can be dragged, defaults to true */
   draggable?: boolean;
+  /** Terminal state of the column this card belongs to (drives visual treatment) */
+  terminal?: 'won' | 'lost';
   /** Callback when card is clicked */
   onClick?: (card: KanbanCard) => void;
 }
@@ -94,6 +97,7 @@ export function KanbanCardItem({
   descriptionField,
   cardFields,
   draggable = true,
+  terminal,
   onClick,
 }: KanbanCardItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -122,11 +126,16 @@ export function KanbanCardItem({
       {...attributes}
       {...listeners}
       className={cn(
-        'cursor-grab rounded-lg border bg-white p-3 shadow-sm',
+        'relative cursor-grab rounded-lg border border-l-4 bg-white p-3 shadow-sm',
         'transition-shadow hover:shadow-md',
+        terminal === 'won' && 'border-l-green-500',
+        terminal === 'lost' && 'border-l-gray-400',
+        !terminal && 'border-l-blue-300',
         isDragging && 'opacity-50',
         !draggable && 'cursor-default',
       )}
+      data-card-id={card.id}
+      data-card-terminal={terminal ?? ''}
       onClick={handleClick}
       role="button"
       tabIndex={0}
@@ -136,6 +145,20 @@ export function KanbanCardItem({
         }
       }}
     >
+      {/* Terminal corner badge */}
+      {terminal === 'won' && (
+        <Check
+          className="absolute right-1 top-1 h-3 w-3 text-green-500"
+          data-testid="card-terminal-icon-won"
+        />
+      )}
+      {terminal === 'lost' && (
+        <X
+          className="absolute right-1 top-1 h-3 w-3 text-gray-400"
+          data-testid="card-terminal-icon-lost"
+        />
+      )}
+
       {/* Title */}
       <div className="truncate text-sm font-medium" title={String(title ?? '')}>
         {String(title ?? '')}

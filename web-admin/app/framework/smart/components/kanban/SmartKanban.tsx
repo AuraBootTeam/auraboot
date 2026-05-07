@@ -285,6 +285,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
                   descriptionField={dataSource.descriptionField}
                   cardFields={dataSource.cardFields}
                   draggable={draggable}
+                  terminal={column.terminal}
                   onClick={onCardClick}
                 />
               ))}
@@ -375,6 +376,11 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
                   descriptionField={dataSource.descriptionField}
                   cardFields={dataSource.cardFields}
                   draggable={false}
+                  terminal={
+                    enrichedColumns.find((col) =>
+                      col.cards.some((c) => c.id === activeCard.id),
+                    )?.terminal
+                  }
                 />
               </div>
             )}
