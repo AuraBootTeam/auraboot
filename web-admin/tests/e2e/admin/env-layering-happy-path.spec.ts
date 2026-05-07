@@ -93,10 +93,11 @@ test.describe('Env-layering happy path', () => {
   });
 
   test('EL-002 create dev + staging envs (D4 + D6)', async ({ page }) => {
-    // Create dev
+    // Create dev — modal "Create" button is exact-text "Create" (the empty-state
+    // CTA is "Create your first environment" so we must use exact match).
     await page.locator('button', { hasText: 'New Environment' }).click();
     await fillCreateForm(page, DEV_CODE, DEV_NAME);
-    await page.locator('button', { hasText: 'Create' }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
     // Modal closes, card appears with our code
     await expect(envCard(page, DEV_CODE)).toBeVisible();
     await expect(envCard(page, DEV_CODE).locator('h3')).toHaveText(DEV_NAME);
@@ -104,7 +105,7 @@ test.describe('Env-layering happy path', () => {
     // Create staging
     await page.locator('button', { hasText: 'New Environment' }).click();
     await fillCreateForm(page, STAGING_CODE, STAGING_NAME);
-    await page.locator('button', { hasText: 'Create' }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(envCard(page, STAGING_CODE)).toBeVisible();
     await expect(envCard(page, STAGING_CODE).locator('h3')).toHaveText(STAGING_NAME);
   });

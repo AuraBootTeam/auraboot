@@ -124,6 +124,11 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
   // ---- Tab switching between Permissions and Members ----
   test('switch between Permissions and Members tabs', async ({ page }) => {
+    // navigateToPermissions alone may consume ~15s waiting for permission-page
+    // testid + role-item render under load; the default 15s test timeout
+    // leaves no room for the actual tab-switch assertions. Match sibling D1+D2
+    // which uses 30s.
+    test.setTimeout(30_000);
     await navigateToPermissions(page);
 
     // Click first role
