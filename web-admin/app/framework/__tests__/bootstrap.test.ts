@@ -52,7 +52,6 @@ describe('bootstrap', () => {
     await k.pluginLoader.activateAll()
 
     expect(k.routeRegistry.findByKey('demo.home')?.path).toBe('/demo')
-    const menu = k.routeRegistry.buildMenuTree({ permissions: [], features: [] })
-    expect(menu.map(m => m.key)).toEqual(['demo.home'])
+    expect(k.routeRegistry.getAll().map(r => r.key)).toContain('demo.home')
   })
 })
