@@ -125,7 +125,13 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
     );
   }
 
-  const flowData = automation?.flowConfig ?? synthesizeFlowData(automation);
+  // Backend returns `flowConfig: {}` for legacy automations created via flat
+  // {triggerType, actions} payloads. Treat an empty/nodes-less object the same
+  // as null and synthesize a layout from triggerType + actions, otherwise the
+  // canvas mounts with zero nodes (`{} ?? synthesize` returns `{}`).
+  const rawFlow = automation?.flowConfig;
+  const hasFlowNodes = Array.isArray(rawFlow?.nodes) && rawFlow!.nodes.length > 0;
+  const flowData = hasFlowNodes ? rawFlow : synthesizeFlowData(automation);
 
   return (
     <AutomationEditor

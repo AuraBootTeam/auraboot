@@ -1485,8 +1485,9 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await clickEditOnRow(page, policyName);
     await waitForFormReady(page);
 
-    // Change timeout_hours from 24 to 48
-    await fillFormField(page, 'timeout_hours', '48').catch(() => null);
+    // Change timeout_hours from 24 to 48 — assertion below depends on this,
+    // so we must NOT swallow the fill error.
+    await fillFormField(page, 'timeout_hours', '48');
     await fillFormField(page, 'description', updatedDescription);
 
     const cmdPromise = page.waitForResponse(

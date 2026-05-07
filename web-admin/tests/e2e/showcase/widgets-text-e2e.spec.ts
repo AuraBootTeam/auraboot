@@ -514,12 +514,20 @@ async function navigateToShowcaseRuntimeForm(page: Page): Promise<void> {
   await listResp;
 
   // Click the list's "新建" / Create button to enter the form.
+  // The list page can re-render once after the initial fetch resolves, which
+  // detaches the toolbar nodes; re-resolve the button after a load-state pause
+  // so we click on a stable handle.
+  await page.waitForLoadState('networkidle').catch(() => null);
   const createBtn = page
     .locator(
       '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
     )
     .first();
   await expect(createBtn).toBeVisible({ timeout: 8_000 });
+  await createBtn.scrollIntoViewIfNeeded().catch(() => null);
+  await createBtn
+    .click({ trial: true })
+    .catch(() => null);
   await createBtn.click();
   await expect(page).toHaveURL(SHOWCASE_FORM_NEW_URL_RE, { timeout: 10_000 });
 

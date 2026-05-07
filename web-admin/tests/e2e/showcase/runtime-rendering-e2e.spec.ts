@@ -628,10 +628,20 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     ).toBeVisible({ timeout: 5_000 });
 
     // sc_quantity / sc_price may be formatted (toLocaleString → "555.55" or
-    // "555,555" etc). Check for a substring tolerant of locale formatting.
-    const quantityRegex = new RegExp(`\\b${seedQuantity}\\b`);
+    // "555,555" etc). The ${seedQuantity} value `7` collides with the
+    // locale-rendered "5月7日" inside the print-meta block (display:none on
+    // screen). Use `:visible` engine to exclude hidden elements, and require
+    // the matched node to be a leaf (small text container) so we don't pick up
+    // the body element which contains the print-meta date as a descendant.
+    // Field values render in plain leaf divs/spans; pick the smallest visible
+    // node whose text equals exactly the seeded quantity (avoiding the
+    // `5月7日` print-meta date which contains "7").
     await expect(
-      detailBody.locator(`text=${quantityRegex}`).first(),
+      detailBody
+        .getByText(String(seedQuantity), { exact: true })
+        .locator(':visible')
+        .first()
+        .or(detailBody.getByText(String(seedQuantity), { exact: true }).first()),
       `seeded sc_quantity ${seedQuantity} should be visible on detail page`,
     ).toBeVisible({ timeout: 5_000 });
 

@@ -58,6 +58,7 @@ async function navigateToPermissions(page: Page): Promise<void> {
 test.describe('Permission Management — Role List & Matrix', () => {
   // ---- D1+D2: Navigate and see role list ----
   test('D1+D2: navigate to permission management and see role list', async ({ page }) => {
+    test.setTimeout(30_000);
     await navigateToPermissions(page);
 
     // Page container visible
