@@ -146,7 +146,6 @@ export function TaskTable({
               </th>
             )}
             <th className="px-4 py-3">任务名称</th>
-            <th className="px-4 py-3">流程</th>
             <th className="px-4 py-3">业务单号</th>
             <th className="w-16 px-4 py-3">优先级</th>
             <th className="px-4 py-3">创建时间</th>
@@ -253,9 +252,6 @@ function TaskRow({
             )}
           </div>
         </div>
-      </td>
-      <td className="px-4 py-3 text-xs text-gray-600" data-testid="task-process-key-cell">
-        {task.processDefinitionKey || <span className="text-gray-400">-</span>}
       </td>
       <td className="px-4 py-3 font-mono text-xs text-gray-700" data-testid="task-business-key">
         {task.businessKey || <span className="text-gray-400">-</span>}
