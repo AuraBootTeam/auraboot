@@ -8396,6 +8396,7 @@ CREATE INDEX IF NOT EXISTS idx_bitemporal_history
 COMMENT ON TABLE ab_bitemporal_record IS
   'Generic bi-temporal record store — (validTime × txTime) versioning keyed by (entityType, entityId).';
 
+<<<<<<< HEAD
 
 -- =====================================================================
 -- env-layering #4 — env_id backfill + SET NOT NULL
@@ -8453,3 +8454,27 @@ BEGIN
             FOREIGN KEY (env_id) REFERENCES ab_environment(id);
     END IF;
 END$$;
+=======
+-- ==========================================================================
+-- Admin Guard v2 — generic admin action audit log (2026-05-07)
+-- ==========================================================================
+-- Generic audit trail for every /api/admin/** request processed by
+-- AdminRoleInterceptor. USP retains its own per-business-object table; both
+-- coexist. See migration: database/migrations/2026-05-07_admin_guard_v2.sql
+CREATE TABLE IF NOT EXISTS ab_admin_action_log (
+    id                    BIGSERIAL PRIMARY KEY,
+    tenant_id             BIGINT        NOT NULL,
+    actor_user_id         VARCHAR(64)   NOT NULL,
+    actor_role            VARCHAR(32)   NOT NULL,
+    path                  VARCHAR(512)  NOT NULL,
+    method                VARCHAR(8)    NOT NULL,
+    status                INTEGER       NOT NULL,
+    request_body_summary  VARCHAR(2048),
+    latency_ms            INTEGER,
+    created_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_admin_action_log_tenant_time
+    ON ab_admin_action_log (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_action_log_actor_time
+    ON ab_admin_action_log (actor_user_id, created_at DESC);
+>>>>>>> 2fa85b87 (feat(admin-guard): add AdminAuditService with async write to ab_admin_action_log)

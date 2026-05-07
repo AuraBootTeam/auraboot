@@ -342,6 +342,9 @@ dependencies {
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.8'
 
+    // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
+    testImplementation 'org.awaitility:awaitility:4.2.0'
+
     // JUnit 5 Platform
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine'
