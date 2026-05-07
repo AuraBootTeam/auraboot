@@ -254,7 +254,6 @@ public class StepLoopService {
     // Plan Step Execution
     // =========================================================================
 
-    @SuppressWarnings("unchecked")
     AgentRunService.AgentLoopResult executePlanSteps(List<AgentPlanStep> plan, int startStep,
                                                       Long tenantId, String runPid, String taskPid, String agentCode,
                                                       String systemPrompt, String userMessage,
@@ -262,10 +261,41 @@ public class StepLoopService {
                                                       LlmProvider provider, LlmProviderFactory.ProviderConfig config,
                                                       TraceContext traceCtx,
                                                       boolean skipApprovalForResumedStep) throws Exception {
+        // Back-compat overload: callers that have not yet built a skill map
+        // (or run plans without skill-tagged steps) get today's agent-only
+        // thinking-config behavior — equivalent to passing an empty map.
+        return executePlanSteps(plan, startStep, tenantId, runPid, taskPid, agentCode,
+                systemPrompt, userMessage, tools, agentDef, null,
+                provider, config, traceCtx, skipApprovalForResumedStep);
+    }
+
+    /**
+     * H.3 wiring: execute plan steps with explicit per-skill thinking
+     * resolution. The {@code skillByCode} map is keyed by
+     * {@link AgentPlanStep#getSkillCode()} (or {@code toolCode} when skill is
+     * unset — the same fallback {@code executePlanSteps} already does for
+     * step.input). For each step we re-resolve {@link LlmChatRequest.ThinkingConfig}
+     * by merging {@code ab_agent_skill.execution_config} on top of the
+     * agent-level config (skill keys win). Replan also re-resolves so the
+     * adaptive-replan LLM call inherits the skill knob of the failed step.
+     *
+     * <p>Pass {@code skillByCode = null} (or empty map) to preserve the
+     * pre-H.3 agent-only behavior.
+     */
+    @SuppressWarnings("unchecked")
+    public AgentRunService.AgentLoopResult executePlanSteps(List<AgentPlanStep> plan, int startStep,
+                                                      Long tenantId, String runPid, String taskPid, String agentCode,
+                                                      String systemPrompt, String userMessage,
+                                                      List<AgentToolDefinition> tools, Map<String, Object> agentDef,
+                                                      Map<String, Map<String, Object>> skillByCode,
+                                                      LlmProvider provider, LlmProviderFactory.ProviderConfig config,
+                                                      TraceContext traceCtx,
+                                                      boolean skipApprovalForResumedStep) throws Exception {
         String model = resolveModel(agentDef, config.getProviderCode());
         int maxTokens = config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
-        // P0-2: same agent-level thinking knob as executeAgentLoop.
-        LlmChatRequest.ThinkingConfig thinkingConfig = resolveThinkingConfig(agentDef);
+        // P0-2 baseline = agent-only thinking config. Per-step we may
+        // overlay the matching ab_agent_skill.execution_config (H.3 wiring).
+        LlmChatRequest.ThinkingConfig agentOnlyThinking = resolveThinkingConfig(agentDef, null);
 
         double costLimit = agentProperties.getDefaultCostLimit();
         String guardrailsJson = (String) agentDef.get("guardrails");
@@ -288,11 +318,16 @@ public class StepLoopService {
         String lastTextResponse = "";
         List<Map<String, Object>> toolCallLog = new ArrayList<>();
 
-        // If plan is a single "Execute directly" step, use the classic agent loop
+        // If plan is a single "Execute directly" step, use the classic agent
+        // loop. Forward the matching skill row when available so the H.3 wiring
+        // also covers single-step plans (e.g. report_analysis when the planner
+        // collapses to one direct-execution step).
         if (plan.size() == 1 && "Execute task directly".equals(plan.get(0).getDescription())) {
             plan.get(0).setStatus(AgentPlanStep.StepStatus.RUNNING);
+            Map<String, Object> singleStepSkill = lookupSkillForStep(plan.get(0), skillByCode);
             AgentRunService.AgentLoopResult result = executeAgentLoop(tenantId, runPid, taskPid, agentCode,
-                    systemPrompt, userMessage, tools, agentDef, provider, config, traceCtx);
+                    systemPrompt, userMessage, tools, agentDef, singleStepSkill,
+                    provider, config, traceCtx, MAX_TOOL_LOOPS);
             plan.get(0).setStatus(result.success ? AgentPlanStep.StepStatus.COMPLETED : AgentPlanStep.StepStatus.FAILED);
             plan.get(0).setResult(result.lastResponse != null ? truncate(result.lastResponse, 200) : null);
             return result;
@@ -312,6 +347,15 @@ public class StepLoopService {
                 step.setInput(step.getToolInput());
             }
             long stepStart = System.currentTimeMillis();
+
+            // H.3 wiring: per-step thinking config — overlay this step's
+            // skill execution_config on top of the agent baseline. Falls
+            // back to the agent-only config when no skill is associated or
+            // the lookup map is empty (back-compat).
+            Map<String, Object> stepSkill = lookupSkillForStep(step, skillByCode);
+            LlmChatRequest.ThinkingConfig thinkingConfig = stepSkill != null
+                    ? resolveThinkingConfig(agentDef, stepSkill)
+                    : agentOnlyThinking;
 
             // Check approval gate for this step
             if (step.isRequiresApproval() && !(skipApprovalForResumedStep && i == startStep)) {
@@ -435,7 +479,10 @@ public class StepLoopService {
                 failSummary.put("error", truncate(e.getMessage(), 200));
                 step.setOutput(failSummary);
 
-                // Attempt adaptive re-planning
+                // Attempt adaptive re-planning. H.3: thinkingConfig is now
+                // resolved per-step (skill overlay applied above), so the
+                // replan LLM call inherits the failed step's skill-level
+                // thinking budget — not a hoisted agent-only value.
                 boolean replanned = attemptReplan(plan, i, e.getMessage(), provider, config, model, systemPrompt, tools, messages, thinkingConfig);
                 if (!replanned) {
                     persistPlan(runPid, plan, i);
@@ -619,6 +666,28 @@ public class StepLoopService {
                 .enabled(true)
                 .budgetTokens(budget)
                 .build();
+    }
+
+    /**
+     * Look up the skill row Map for a given plan step. Resolution order:
+     * <ol>
+     *   <li>{@code step.skillCode}</li>
+     *   <li>{@code step.toolCode} (treated as skill alias — same fallback
+     *       executePlanSteps uses for {@code skillCode}/{@code input})</li>
+     * </ol>
+     * Returns {@code null} when the map is null/empty, the step carries
+     * neither code, or the code is not present in the map. Callers must
+     * handle {@code null} as "no skill overlay" (agent-only resolution).
+     */
+    private Map<String, Object> lookupSkillForStep(AgentPlanStep step,
+                                                    Map<String, Map<String, Object>> skillByCode) {
+        if (skillByCode == null || skillByCode.isEmpty() || step == null) return null;
+        String code = step.getSkillCode();
+        if (code == null || code.isBlank()) {
+            code = step.getToolCode();
+        }
+        if (code == null || code.isBlank()) return null;
+        return skillByCode.get(code);
     }
 
     /**
