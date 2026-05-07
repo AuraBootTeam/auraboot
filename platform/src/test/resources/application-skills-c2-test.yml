@@ -1,0 +1,35 @@
+# C-2 Skills SPI integration-test profile.
+#
+# Pairs with the docker stack defined in
+# `auraboot/docker-compose.skills-c2.override.yml`:
+#   - PostgreSQL on host port 25442 (auraboot/auraboot_dev/aura_boot)
+#   - Redis      on host port 26389
+#
+# A subclass that wants the skill SPI's isolated infra simply adds
+# `@ActiveProfiles({"integration-test", "skills-c2-test"})` — Spring's
+# last-profile-wins ordering ensures these datasource / redis settings
+# replace the integration-test defaults that point at the host's port 5432.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:25442/aura_boot?charSet=UTF8
+    username: auraboot
+    password: auraboot_dev
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 1
+      connection-timeout: 10000
+
+  redis:
+    host: localhost
+    port: 26389
+    timeout: 2000ms
+  data:
+    redis:
+      host: localhost
+      port: 26389
+      timeout: 2000ms
+
+# Repository-only ITs don't need scheduler / git plumbing; keep the
+# integration-test base config for those.
