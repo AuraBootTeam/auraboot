@@ -67,7 +67,8 @@ public class GroupChatAgentRouter {
         }
 
         for (Long agentId : targetAgentIds) {
-            agentReplyTask.executeReply(conversationId, tenantId, agentId, event.getContent());
+            agentReplyTask.executeReply(conversationId, tenantId, agentId,
+                    event.getContent(), event.getSeq());
         }
     }
 

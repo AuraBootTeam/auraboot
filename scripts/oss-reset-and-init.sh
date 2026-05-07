@@ -540,6 +540,13 @@ SELECT
     psql -h localhost -U ghj -d aura_boot -f "$SCRIPT_DIR/seed-cs-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
     echo -e "${GREEN}   CS Agent seed complete${NC}"
 
+    # Step 7.9: Seed AuraBot agent definition (GAP-296)
+    # Per-tenant aurabot agent_definition row so AuraBotAgentResolver hot-paths
+    # never fall back to the inline LAZY_SEED_AURABOT branch.
+    echo -e "${YELLOW}Step 7.9: Seeding AuraBot agent definition...${NC}"
+    psql -h localhost -U ghj -d aura_boot -f "$SCRIPT_DIR/seed-aurabot-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
+    echo -e "${GREEN}   AuraBot agent seed complete${NC}"
+
     # Step 8: Seed showcase demo data (optional — skip with SKIP_SEED=1)
     if [ "${SKIP_SEED:-0}" != "1" ]; then
         echo -e "${YELLOW}Step 8: Seeding showcase demo data...${NC}"

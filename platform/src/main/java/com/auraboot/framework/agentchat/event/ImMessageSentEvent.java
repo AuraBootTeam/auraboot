@@ -14,11 +14,12 @@ public class ImMessageSentEvent extends ApplicationEvent {
     private final List<String> mentions;
     private final Long messageId;
     private final String conversationType;
+    private final Long seq;
 
     public ImMessageSentEvent(Object source, Long conversationId, Long tenantId,
                                Long senderId, String senderType, String content,
                                List<String> mentions, Long messageId,
-                               String conversationType) {
+                               String conversationType, Long seq) {
         super(source);
         this.conversationId = conversationId;
         this.tenantId = tenantId;
@@ -28,5 +29,6 @@ public class ImMessageSentEvent extends ApplicationEvent {
         this.mentions = mentions;
         this.messageId = messageId;
         this.conversationType = conversationType;
+        this.seq = seq;
     }
 }
