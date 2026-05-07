@@ -5,6 +5,8 @@ import com.auraboot.framework.aurabot.skill.AuraBotSkill;
 import com.auraboot.framework.aurabot.skill.RiskLevel;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.SkillRunRepository;
+import com.auraboot.framework.aurabot.skill.entity.SkillRun;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.exception.ValidationException;
@@ -16,7 +18,6 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
-import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -66,25 +67,25 @@ public class ModelCreateSkill implements AuraBotSkill {
 
     private final MetaModelService metaModelService;
     private final MetaFieldService metaFieldService;
-    private final SchemaManagementService schemaManagementService;
     private final MetaModelFieldBindingMapper bindingMapper;
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
+    private final SkillRunRepository skillRunRepository;
 
     private JsonNode schema;
 
     public ModelCreateSkill(MetaModelService metaModelService,
                             MetaFieldService metaFieldService,
-                            SchemaManagementService schemaManagementService,
                             MetaModelFieldBindingMapper bindingMapper,
                             DynamicDataMapper dynamicDataMapper,
-                            ObjectMapper objectMapper) {
+                            ObjectMapper objectMapper,
+                            SkillRunRepository skillRunRepository) {
         this.metaModelService = metaModelService;
         this.metaFieldService = metaFieldService;
-        this.schemaManagementService = schemaManagementService;
         this.bindingMapper = bindingMapper;
         this.dynamicDataMapper = dynamicDataMapper;
         this.objectMapper = objectMapper;
+        this.skillRunRepository = skillRunRepository;
     }
 
     @PostConstruct
@@ -291,7 +292,9 @@ public class ModelCreateSkill implements AuraBotSkill {
         r.setSourceType("physical");
         r.setPrimaryKey("pid");
         r.setFields(buildDefaultFields());
-        r.setAutoPublish(true);
+        // autoPublish field removed from MetaModelCreateRequest in main per
+        // C-3 finding F-1 (dead flag — createDirectly never honored it).
+        // Skill orchestrates publish manually via ensureNameFieldBound after create.
         return r;
     }
 
@@ -341,11 +344,22 @@ public class ModelCreateSkill implements AuraBotSkill {
 
     @Override
     public SkillResult undo(String undoToken) {
-        // Token-based entry is wired in T6 (Controller hand-off): the controller
-        // resolves SkillRunRepository → modelPid/modelCode, then dispatches to
-        // {@link #undoByModel(String, String)}. Direct invocation is not supported.
-        throw new UnsupportedOperationException(
-                "undo(undoToken) routed to undoByModel via Controller hand-off — see T6");
+        // Resolve the SkillRun row via undoToken, then dispatch to the
+        // internal (modelPid, modelCode) entry. The Controller hand-off path
+        // (T6, Plan §C-3 §5) — no SPI surface change.
+        SkillRun row = skillRunRepository.findByUndoToken(undoToken)
+                .orElseThrow(() -> new SkillSpiException(
+                        SkillErrorCode.UNDO_EXPIRED,
+                        "no SkillRun for undoToken " + undoToken,
+                        null));
+        JsonNode after = row.getAfterSnapshot();
+        if (after == null || !after.has("modelPid") || !after.has("modelCode")) {
+            throw new SkillSpiException(
+                    SkillErrorCode.SKILL_INTERNAL_ERROR,
+                    "afterSnapshot missing modelPid or modelCode",
+                    null);
+        }
+        return undoByModel(after.get("modelPid").asText(), after.get("modelCode").asText());
     }
 
     /**
@@ -360,7 +374,7 @@ public class ModelCreateSkill implements AuraBotSkill {
      *     <li>Hard-delete the model's field bindings so {@code MetaModelService.delete}'s
      *         {@code validateCanDelete} guard passes (the {@code name_<suffix>} field
      *         created by {@link #ensureNameFieldBound} would otherwise block deletion).</li>
-     *     <li>Drop the {@code mt_<code>} table via {@link SchemaManagementService#dropTableByModel}.</li>
+     *     <li>Drop the {@code mt_<code>} table via raw {@code DROP TABLE IF EXISTS}.</li>
      *     <li>Soft-delete the {@code ab_meta_model} row via {@link MetaModelService#delete}.</li>
      * </ol>
      *

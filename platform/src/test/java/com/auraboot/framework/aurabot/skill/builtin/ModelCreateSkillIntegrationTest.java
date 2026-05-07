@@ -1,6 +1,8 @@
 package com.auraboot.framework.aurabot.skill.builtin;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.aurabot.skill.AuraBotSkillRegistry;
+import com.auraboot.framework.aurabot.skill.SkillMeta;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillResult;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
@@ -23,6 +25,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +46,7 @@ class ModelCreateSkillIntegrationTest extends BaseIntegrationTest {
     @Autowired MetaModelService metaModelService;
     @Autowired DynamicDataMapper dynamicDataMapper;
     @Autowired ObjectMapper objectMapper;
+    @Autowired AuraBotSkillRegistry registry;
 
     private String testCode;
 
@@ -218,6 +222,18 @@ class ModelCreateSkillIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(() -> skill.undoByModel(modelPid, testCode))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("模型不存在");
+    }
+
+    @Test
+    @DisplayName("Registry.list excludes model:create for caller without MODEL.CREATE")
+    void permission_missing_excludesFromDiscovery() {
+        Set<String> noModelCreate = Set.of("MODEL.READ");
+        List<SkillMeta> metas = registry.list(noModelCreate);
+        assertThat(metas).extracting("name").doesNotContain("model:create");
+
+        Set<String> withCreate = Set.of("MODEL.CREATE");
+        List<SkillMeta> metas2 = registry.list(withCreate);
+        assertThat(metas2).extracting("name").contains("model:create");
     }
 
     private SkillRequest req(String code) {
