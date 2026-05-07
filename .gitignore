@@ -58,6 +58,7 @@ uploads/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 !**/gradle/wrapper/gradle-wrapper.jar
+!platform/gradle/wrapper/gradle-wrapper.jar
 *.class
 org/
 
