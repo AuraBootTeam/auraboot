@@ -312,6 +312,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                                         .conversationId(ctx.conversationId())
                                         .agentCode(agentCode)
                                         .sessionId(sessionId)
+                                        .channelSessionPid(ctx.channelSessionId())
                                         .toolId(toolId)
                                         .toolName(toolName)
                                         .input(input)

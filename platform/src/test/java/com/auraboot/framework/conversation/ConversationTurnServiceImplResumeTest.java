@@ -1,5 +1,6 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.identity.ChannelSessionResolver;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
@@ -59,6 +60,9 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
 
     @MockitoBean
     private ChatSessionStore chatSessionStore;
+
+    @Autowired
+    private ChannelSessionResolver channelSessionResolver;
 
     private ResponseSink sink;
 
@@ -199,5 +203,85 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
         assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
         assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("pendingTurnId");
         verify(chatSessionStore, never()).consumePending(any());
+    }
+
+    // =========================================================================
+    // GAP-295 resume path — channelSessionId re-attach
+    // =========================================================================
+
+    @Test
+    @DisplayName("GAP-295: pending.channelSessionPid → ctx.channelSessionId on resume APPROVED")
+    void resume_reAttachesChannelSessionFromPendingPid() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+
+        // 1. Seed a real ab_agent_channel_session_state row via the resolver
+        ChannelSessionResolver.ChannelSession seeded = channelSessionResolver.resolve(
+                new ChannelSessionResolver.ResolveRequest(
+                        tenantId,
+                        "web",
+                        String.valueOf(userId),
+                        /*profileId=*/ null,
+                        userId,
+                        /*createIfAbsent=*/ true));
+        assertThat(seeded).isNotNull();
+        assertThat(seeded.pid()).isNotNull();
+
+        // 2. Build a PendingTool carrying that pid
+        String pendingTurnId = "01HW3KGAP295";
+        ChatSessionStore.PendingTool pending = ChatSessionStore.PendingTool.builder()
+                .turnId(pendingTurnId)
+                .tenantId(tenantId)
+                .userId(userId)
+                .humanMemberId(getTestTenantMember().getId())
+                .conversationId(1L)
+                .agentCode("aurabot")
+                .channelSessionPid(seeded.pid())
+                .toolId("tool-gap295")
+                .toolName("cmd_test")
+                .input(Map.of())
+                .description("gap295")
+                .build();
+        when(chatSessionStore.consumePending(eq(pendingTurnId))).thenReturn(pending);
+
+        // 3. Capture the TurnContext that resumeApprovedTurnFromPending sees
+        org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
+                org.mockito.ArgumentCaptor.forClass(TurnContext.class);
+        when(chatService.resumeApprovedTurnFromPending(ctxCaptor.capture(), same(pending), same(sink)))
+                .thenReturn(new TurnOutcome.Success("ok", Map.of()));
+
+        // 4. Resume
+        turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        // 5. Assert ctx.channelSessionId() matches the seeded pid
+        TurnContext ctx = ctxCaptor.getValue();
+        assertThat(ctx.channelSessionId())
+                .as("rebuildContext should re-attach channel session via findByPid")
+                .isEqualTo(seeded.pid());
+    }
+
+    @Test
+    @DisplayName("GAP-295: pending without channelSessionPid (legacy) → ctx.channelSessionId stays null")
+    void resume_nullChannelSessionPid_keepsCtxNull() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        String pendingTurnId = "01HW3KGAP295LEGACY";
+        ChatSessionStore.PendingTool pending = buildPending(pendingTurnId, "tool-l", tenantId, userId);
+        // channelSessionPid intentionally not set on the pending payload
+        assertThat(pending.getChannelSessionPid()).isNull();
+        when(chatSessionStore.consumePending(eq(pendingTurnId))).thenReturn(pending);
+
+        org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
+                org.mockito.ArgumentCaptor.forClass(TurnContext.class);
+        when(chatService.resumeApprovedTurnFromPending(ctxCaptor.capture(), same(pending), same(sink)))
+                .thenReturn(new TurnOutcome.Success("ok", Map.of()));
+
+        turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        assertThat(ctxCaptor.getValue().channelSessionId())
+                .as("legacy pending without pid → no re-attach")
+                .isNull();
     }
 }
