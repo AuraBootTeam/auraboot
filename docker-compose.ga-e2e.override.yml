@@ -49,6 +49,13 @@ services:
       # Mount the worktree's plugins read-only so import-directory-sync
       # can resolve absolute paths like /app/plugins/<name>.
       - ./plugins:/app/plugins:ro
+      # Optional: mount the sibling enterprise repo's plugins so the same
+      # endpoint can reach /app/plugins-enterprise/<name>. Path resolved
+      # relative to this compose file's directory; the bind silently
+      # no-ops if the sibling worktree is absent (Docker creates an empty
+      # source dir at first up — operator can then either populate or
+      # comment this volume out).
+      - ../auraboot-enterprise/plugins:/app/plugins-enterprise:ro
     environment:
       # CORS allow-list covers the in-container vite/BFF host plus the
       # host-mapped variants (5174/3501) that Playwright targets.
