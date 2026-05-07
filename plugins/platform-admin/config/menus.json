@@ -178,7 +178,7 @@
     "component": null,
     "icon": "file-search",
     "type": 1,
-    "permissionCode": "audit_log_view",
+    "permissionCode": "meta.changelog.read",
     "orderNo": 83,
     "visible": true
   },
