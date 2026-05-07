@@ -1,9 +1,11 @@
 package com.auraboot.framework.promotion.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.environment.dao.entity.Environment;
 import com.auraboot.framework.environment.dao.mapper.EnvironmentMapper;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.promotion.dao.entity.Promotion;
@@ -66,6 +68,21 @@ public class PromotionServiceImpl implements PromotionService {
         }
         if (request.getUnits() == null || request.getUnits().isEmpty()) {
             throw new IllegalArgumentException("Promotion must include at least one unit");
+        }
+
+        // Validate that both source and target env IDs belong to the caller's tenant.
+        // selectById is already auto-filtered by tenant_id (ab_environment is not in
+        // ignoreTable), so a cross-tenant id returns null. The explicit getTenantId()
+        // compare is defense in depth against future ignoreTable changes.
+        Environment sourceEnv = environmentMapper.selectById(request.getSourceEnvId());
+        if (sourceEnv == null || !tenantId.equals(sourceEnv.getTenantId())) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "Source environment not found in tenant: " + request.getSourceEnvId());
+        }
+        Environment targetEnv = environmentMapper.selectById(request.getTargetEnvId());
+        if (targetEnv == null || !tenantId.equals(targetEnv.getTenantId())) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "Target environment not found in tenant: " + request.getTargetEnvId());
         }
 
         Promotion p = new Promotion();
