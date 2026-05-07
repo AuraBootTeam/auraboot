@@ -30,6 +30,19 @@
         {"field": "acs_rule_scope", "colSpan": 12, "extension": {"rows": 3, "placeholder:zh-CN": "JSON 格式的作用范围，例如：{\"models\": [\"*\"], \"commands\": [\"*\"]}", "placeholder:en": "JSON scope, e.g.: {\"models\": [\"*\"], \"commands\": [\"*\"]}"}},
         {"field": "acs_rule_description", "colSpan": 12}
       ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "save",
+          "action": {"type": "command", "command": "acs:create_safety_rule"}
+        },
+        {"code": "cancel", "label": "cancel"}
+      ]
     }
   ]
 }
