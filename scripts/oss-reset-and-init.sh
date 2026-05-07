@@ -42,7 +42,7 @@ for arg in "$@"; do
             echo ""
             echo "  (default)       Reset DB, start services, bootstrap system, import plugins, seed demo data"
             echo "  --no-bootstrap  Reset DB and start services only; system stays uninitialized"
-            echo "                  (visit http://localhost:5173/setup to bootstrap via the web wizard)"
+            echo "                  (visit ${AURA_VITE_BASE}/setup to bootstrap via the web wizard)"
             echo ""
             echo "Env vars:"
             echo "  SKIP_SEED=1     Skip Playwright showcase seed (step 8)"
@@ -59,6 +59,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 PLATFORM_DIR="$PROJECT_ROOT/platform"
 WEB_ADMIN_DIR="$PROJECT_ROOT/web-admin"
+
+# Port overrides — when targeting an isolated docker stack, source the per-stack
+# .env file or set these inline. Defaults match host-mode (auraboot dev singleton).
+#   BE_PORT      backend (default 6443)
+#   VITE_PORT    vite dev server (default 5173)
+#   BFF_PORT     remix BFF (default 3500)
+# Example: BE_PORT=6478 VITE_PORT=5208 BFF_PORT=3535 ./scripts/oss-reset-and-init.sh
+export BE_PORT="${BE_PORT:-6443}"
+export VITE_PORT="${VITE_PORT:-5173}"
+export BFF_PORT="${BFF_PORT:-3500}"
+export AURA_BE_BASE="http://localhost:${BE_PORT}"
+export AURA_VITE_BASE="http://localhost:${VITE_PORT}"
+export AURA_BFF_BASE="http://localhost:${BFF_PORT}"
 
 # shellcheck source=lib/multi-worktree-guard.sh
 source "$SCRIPT_DIR/lib/multi-worktree-guard.sh"
@@ -134,7 +147,7 @@ echo "   Waiting for backend to be ready..."
 MAX_WAIT=120
 WAITED=0
 while [ $WAITED -lt $MAX_WAIT ]; do
-    HTTP_CODE=$(NO_PROXY=localhost curl -s -o /dev/null -w "%{http_code}" http://localhost:6443/actuator/health 2>/dev/null || echo "000")
+    HTTP_CODE=$(NO_PROXY=localhost curl -s -o /dev/null -w "%{http_code}" ${AURA_BE_BASE}/actuator/health 2>/dev/null || echo "000")
 
     if [ "$HTTP_CODE" = "200" ]; then
         echo -e "${GREEN}   Backend is ready (took ${WAITED}s)${NC}"
@@ -159,18 +172,18 @@ fi
 # system_config or INSERTing tenants directly.
 if [ "$NO_BOOTSTRAP" = "1" ]; then
     echo -e "${YELLOW}Step 4.5: Skipping bootstrap (--no-bootstrap mode).${NC}"
-    echo "   System will remain uninitialized. Visit http://localhost:5173/setup to bootstrap."
+    echo "   System will remain uninitialized. Visit ${AURA_VITE_BASE}/setup to bootstrap."
 else
     echo -e "${YELLOW}Step 4.5: Bootstrapping system...${NC}"
 
-    BOOTSTRAP_STATUS=$(NO_PROXY=localhost curl -s http://localhost:6443/api/bootstrap/status 2>/dev/null || echo '{}')
+    BOOTSTRAP_STATUS=$(NO_PROXY=localhost curl -s ${AURA_BE_BASE}/api/bootstrap/status 2>/dev/null || echo '{}')
     IS_INITIALIZED=$(echo "$BOOTSTRAP_STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('initialized',False))" 2>/dev/null || echo "False")
 
     if [ "$IS_INITIALIZED" = "True" ]; then
         echo -e "${GREEN}   System already initialized, skipping bootstrap${NC}"
     else
         echo "   Calling /api/bootstrap/setup..."
-        BOOTSTRAP_RESP=$(NO_PROXY=localhost curl -s -w "\n%{http_code}" -X POST http://localhost:6443/api/bootstrap/setup \
+        BOOTSTRAP_RESP=$(NO_PROXY=localhost curl -s -w "\n%{http_code}" -X POST ${AURA_BE_BASE}/api/bootstrap/setup \
             -H "Content-Type: application/json" \
             -d '{
                 "companyName": "AuraBoot Dev",
@@ -201,7 +214,7 @@ fi
 if [ "$NO_BOOTSTRAP" != "1" ]; then
     # Verify login works
     echo "   Verifying admin login..."
-    LOGIN_RESP=$(NO_PROXY=localhost curl -s -X POST http://localhost:6443/api/auth/login \
+    LOGIN_RESP=$(NO_PROXY=localhost curl -s -X POST ${AURA_BE_BASE}/api/auth/login \
         -H "Content-Type: application/json" \
         -d '{"email":"admin@example.com","password":"Test2026x"}' 2>/dev/null)
 
@@ -219,7 +232,7 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
     if [ -z "$LOGIN_TENANT" ] || [ "$LOGIN_TENANT" = "None" ] || [ "$LOGIN_TENANT" = "" ]; then
         echo "   Login returned no tenantId, selecting space via API..."
         # Use /api/tenant-selection/my-spaces to find the business tenant, then select it
-        SPACES_RESP=$(NO_PROXY=localhost curl -s http://localhost:6443/api/tenant-selection/my-spaces \
+        SPACES_RESP=$(NO_PROXY=localhost curl -s ${AURA_BE_BASE}/api/tenant-selection/my-spaces \
             -H "Authorization: Bearer $LOGIN_JWT" 2>/dev/null)
         BIZ_TENANT_ID=$(echo "$SPACES_RESP" | python3 -c "
 import sys,json
@@ -236,7 +249,7 @@ for s in spaces:
         fi
 
         # Select the business space to get a JWT with tenantId
-        SELECT_RESP=$(NO_PROXY=localhost curl -s -X POST http://localhost:6443/api/tenant-selection/process \
+        SELECT_RESP=$(NO_PROXY=localhost curl -s -X POST ${AURA_BE_BASE}/api/tenant-selection/process \
             -H "Authorization: Bearer $LOGIN_JWT" -H "Content-Type: application/json" \
             -d "{\"action\":\"select\",\"tenantId\":$BIZ_TENANT_ID}" 2>/dev/null)
         NEW_JWT=$(echo "$SELECT_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('jwt',''))" 2>/dev/null || echo "")
@@ -273,8 +286,8 @@ echo "   Waiting for frontend and BFF to be ready..."
 MAX_WAIT_FE=30
 WAITED_FE=0
 while [ $WAITED_FE -lt $MAX_WAIT_FE ]; do
-    FRONTEND_HTTP_CODE=$(NO_PROXY=localhost curl -s -o /dev/null -w "%{http_code}" http://localhost:5173 2>/dev/null || echo "000")
-    BFF_HTTP_CODE=$(NO_PROXY=localhost curl -s -o /dev/null -w "%{http_code}" http://localhost:3500/health 2>/dev/null || echo "000")
+    FRONTEND_HTTP_CODE=$(NO_PROXY=localhost curl -s -o /dev/null -w "%{http_code}" ${AURA_VITE_BASE} 2>/dev/null || echo "000")
+    BFF_HTTP_CODE=$(NO_PROXY=localhost curl -s -o /dev/null -w "%{http_code}" ${AURA_BFF_BASE}/health 2>/dev/null || echo "000")
 
     if { [ "$FRONTEND_HTTP_CODE" = "200" ] || [ "$FRONTEND_HTTP_CODE" = "302" ] || [ "$FRONTEND_HTTP_CODE" = "304" ]; } && [ "$BFF_HTTP_CODE" = "200" ]; then
         echo -e "${GREEN}   Frontend+BFF are ready (took ${WAITED_FE}s)${NC}"
@@ -297,7 +310,7 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
     echo -e "${YELLOW}Step 6: Seeding test pages & dashboard...${NC}"
 
     AUTH_HEADER="Authorization: Bearer $LOGIN_JWT"
-    API_BASE="http://localhost:6443"
+    API_BASE="${AURA_BE_BASE}"
 
     # Helper: POST JSON with auth
     api_post() {
@@ -454,7 +467,7 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
     mkdir -p tests/storage
 
     # Login via BFF to get session cookie, then save storage state
-    BFF_LOGIN_RESP=$(NO_PROXY=localhost curl -s -D - -o /dev/null -X POST http://localhost:5173/login \
+    BFF_LOGIN_RESP=$(NO_PROXY=localhost curl -s -D - -o /dev/null -X POST ${AURA_VITE_BASE}/login \
         -H "Content-Type: application/x-www-form-urlencoded" \
         -d "email=admin@example.com&password=Test2026x&remember=on&redirectTo=/" 2>/dev/null)
     SESSION_COOKIE=$(echo "$BFF_LOGIN_RESP" | grep -i "set-cookie.*__session" | sed 's/.*__session=\([^;]*\).*/\1/' | head -1)
@@ -639,7 +652,7 @@ if [ "$NO_BOOTSTRAP" = "1" ]; then
     echo -e "${BLUE}=== Environment Ready (NOT initialized) ===${NC}"
     echo ""
     echo -e "${YELLOW}System is uninitialized. To complete setup:${NC}"
-    echo "  - Visit http://localhost:5173/setup in your browser"
+    echo "  - Visit ${AURA_VITE_BASE}/setup in your browser"
     echo "  - The banner on / will guide you there"
 else
     echo -e "${BLUE}=== Initialization Complete ===${NC}"
@@ -650,8 +663,8 @@ else
 fi
 echo ""
 echo -e "${YELLOW}Services running:${NC}"
-echo "  - Backend: http://localhost:6443"
-echo "  - Frontend: http://localhost:5173"
+echo "  - Backend: ${AURA_BE_BASE}"
+echo "  - Frontend: ${AURA_VITE_BASE}"
 echo ""
 echo -e "${BLUE}Logs:${NC}"
 echo "  - Backend: /tmp/aura-backend.log"
