@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
@@ -115,6 +117,17 @@ public class CommandFieldMapExecutor {
                 int deleted = dynamicDataMapper.delete(tableName, conditions);
                 results.put(targetModel + "_deleted", deleted);
             } else {
+                // Defense: reject delete/update without targetRecordId.
+                // Without this guard the code falls through to INSERT and silently
+                // creates a blank row (only DB NOT NULL constraints catch it, by accident).
+                if ("delete".equalsIgnoreCase(operationType)) {
+                    throw new BusinessException(ResponseCode.BadParam,
+                            "targetRecordId is required for delete operations");
+                }
+                if ("update".equalsIgnoreCase(operationType)) {
+                    throw new BusinessException(ResponseCode.BadParam,
+                            "targetRecordId is required for update operations");
+                }
                 // Default: INSERT - generate pid and set audit timestamps for new records
                 Instant now = Instant.now();
                 columnData.put("pid", UniqueIdGenerator.generate());
@@ -250,6 +263,17 @@ public class CommandFieldMapExecutor {
             results.put(modelCode + "_deleted", deleted);
             log.info("Implicit FIELD_MAP DELETE: {} rows in {} (command={})", deleted, modelCode, command.getCode());
         } else {
+            // Defense: reject delete/update without targetRecordId.
+            // Without this guard the code falls through to INSERT and silently
+            // creates a blank row (only DB NOT NULL constraints catch it, by accident).
+            if ("delete".equalsIgnoreCase(operationType)) {
+                throw new BusinessException(ResponseCode.BadParam,
+                        "targetRecordId is required for delete operations");
+            }
+            if ("update".equalsIgnoreCase(operationType) || "state_transition".equalsIgnoreCase(operationType)) {
+                throw new BusinessException(ResponseCode.BadParam,
+                        "targetRecordId is required for update operations");
+            }
             // INSERT: generate pid and set audit timestamps for new records
             String newPid = UniqueIdGenerator.generate();
             java.time.Instant now = java.time.Instant.now();
