@@ -14,10 +14,10 @@ import { useAuraBot } from '~/plugins/core-aurabot/components-shell';
 
 const CARDS = [
   {
-    title: 'Application Templates',
-    description: 'Pre-built apps ready to install',
+    title: 'Plugins',
+    description: 'Install business apps and extensions',
     icon: RocketLaunchIcon,
-    to: '/admin/templates',
+    to: '/plugins',
     color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
   },
   {
