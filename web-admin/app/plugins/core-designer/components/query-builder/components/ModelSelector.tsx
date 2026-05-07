@@ -1,5 +1,5 @@
 /**
- * ModelSelector — Select a model to query
+ * ModelSelector — Models rail with search and accent-bar selection.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -9,9 +9,11 @@ import { ResultHelper } from '~/utils/type';
 interface ModelSelectorProps {
   value?: string;
   onChange: (modelCode: string) => void;
+  /** Forwarded from parent so ⌘K can focus this input */
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
-export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange }) => {
+export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange, searchInputRef }) => {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,11 +22,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange })
     setLoading(true);
     try {
       const resp = await queryBuilderService.getModels(search || undefined);
-      if (ResultHelper.isSuccess(resp) && resp.data) {
-        setModels(resp.data);
-      }
+      if (ResultHelper.isSuccess(resp) && resp.data) setModels(resp.data);
     } catch {
-      // ignore
+      /* ignore */
     } finally {
       setLoading(false);
     }
@@ -35,35 +35,51 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange })
   }, [loadModels]);
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-medium text-gray-700">Model</h3>
+    <div className="flex h-full flex-col gap-3">
+      <div className="px-1">
+        <h2 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Data Models</h2>
+        <p className="mt-1 text-xs text-slate-400">Pick a model to start</p>
+      </div>
       <input
+        ref={searchInputRef}
         type="text"
-        placeholder="Search models..."
+        placeholder="Search models… (⌘K)"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none"
         data-testid="qb-model-search"
       />
-      <div className="max-h-48 overflow-y-auto rounded-md border border-gray-200">
-        {loading && <div className="px-3 py-2 text-sm text-gray-500">Loading...</div>}
-        {models.map((m) => (
-          <button
-            key={m.code}
-            type="button"
-            onClick={() => onChange(m.code)}
-            data-testid={`qb-model-${m.code}`}
-            className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
-              value === m.code ? 'bg-blue-100 font-medium text-blue-800' : 'text-gray-700'
-            }`}
-          >
-            <div className="font-medium">{m.name || m.code}</div>
-            <div className="text-xs text-gray-500">{m.code}</div>
-          </button>
-        ))}
+      <div className="-mr-1 flex-1 overflow-y-auto pr-1">
+        {loading && <div className="px-3 py-4 text-center text-xs text-slate-400">Loading…</div>}
         {!loading && models.length === 0 && (
-          <div className="px-3 py-2 text-sm text-gray-500">No models found</div>
+          <div className="px-3 py-4 text-center text-xs text-slate-400">No models found</div>
         )}
+        <div className="space-y-1">
+          {models.map((m) => {
+            const active = value === m.code;
+            return (
+              <button
+                key={m.code}
+                type="button"
+                onClick={() => onChange(m.code)}
+                data-testid={`qb-model-${m.code}`}
+                className={`relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
+                  active ? 'bg-blue-50 text-blue-900' : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span
+                  className={`absolute top-2 bottom-2 left-0 w-1 rounded-r ${
+                    active ? 'bg-blue-600' : 'bg-transparent'
+                  }`}
+                />
+                <div className="ml-2 min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{m.name || m.code}</div>
+                  <div className="truncate text-xs text-slate-500">{m.code}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
