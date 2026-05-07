@@ -58,18 +58,17 @@ async function navigateToList(page: Page, modelCode: 'acs_demo_request' | 'acs_s
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
   await expandAcpRoot(page);
 
-  const leafLink = page.locator(`nav a[href*="${modelCode}"]`).first();
+  // Match the exact /p/<modelCode> route to avoid catching form/detail variants
+  const leafLink = page
+    .locator(`nav a[href$="/p/${modelCode}"], nav a[href="/p/${modelCode}"]`)
+    .first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
 
-  const listResponsePromise = page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/dynamic/${modelCode}`) &&
-      r.url().includes('list') &&
-      r.status() === 200,
-    { timeout: 20_000 },
-  );
+  // Don't assume a specific list-API URL pattern (page may use NamedQuery, savedView,
+  // or POST list). Wait for URL change + table render instead.
   await leafLink.evaluate((el: HTMLElement) => el.click());
-  await listResponsePromise;
+  await page.waitForURL(new RegExp(`/p/${modelCode}(?:[/?#]|$)`), { timeout: 15_000 });
+  await page.locator('text=加载中...').first().waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => null);
 
   await expect(
     page.locator('table, [class*="ant-table"], [data-testid="dynamic-list"]').first(),
@@ -248,16 +247,34 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
     const records: any[] = (listBody as any)?.data?.records ?? [];
     const ours = records.find((r) => String(r.pid) === demoRequestPid);
     expect(ours, 'Submitted record findable in list').toBeTruthy();
-    expect(String(ours?.acs_req_status).toLowerCase()).toBe('submitted');
+    // After acs:submit_request, AcsShowcaseOrchestrator auto-progresses the record
+    // through grounding → planning → executing (and possibly to completed/failed/blocked
+    // depending on SafetyValve outcome). Assert the state machine moved off `draft`,
+    // not a specific terminal state.
+    const newStatus = String(ours?.acs_req_status).toLowerCase();
+    expect(newStatus, `status should move out of draft, got ${newStatus}`).not.toBe('draft');
+    expect(
+      ['submitted', 'grounding', 'planning', 'executing', 'completed', 'failed', 'blocked'],
+      `status ${newStatus} should be a valid post-submit state`,
+    ).toContain(newStatus);
 
-    // [D3] Tab filter: "进行中 / In Progress" tab should include our record
+    // [D3] Tab filter: pick the tab that matches actual terminal state.
+    // tabs: all / draft / in_progress (submitted|grounding|planning|executing) /
+    //       blocked / completed / failed_rejected (failed|rejected)
+    const tabRegex: RegExp = (() => {
+      if (['submitted', 'grounding', 'planning', 'executing'].includes(newStatus)) {
+        return /进行中|In Progress/i;
+      }
+      if (newStatus === 'completed') return /已完成|Completed/i;
+      if (newStatus === 'blocked') return /已阻断|Blocked/i;
+      if (['failed', 'rejected'].includes(newStatus)) return /失败|拒绝|Failed|Rejected/i;
+      return /全部|All/i;
+    })();
+
     await navigateToList(page, 'acs_demo_request');
-    const inProgressTab = page
-      .locator('[role="tab"], button')
-      .filter({ hasText: /进行中|In Progress/i })
-      .first();
-    if (await inProgressTab.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await inProgressTab.click();
+    const matchingTab = page.locator('[role="tab"], button').filter({ hasText: tabRegex }).first();
+    if (await matchingTab.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await matchingTab.click();
       await page
         .waitForResponse(
           (r) => r.url().includes('acs_demo_request') && r.url().includes('list') && r.status() === 200,
@@ -280,7 +297,9 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
           .catch(() => null);
       }
       const row = page.locator('tbody tr').filter({ hasText: demoRequestCode }).first();
-      await expect(row).toBeVisible({ timeout: 8_000 });
+      await expect(row, `record should appear in tab matching status=${newStatus}`).toBeVisible({
+        timeout: 8_000,
+      });
     }
   });
 
