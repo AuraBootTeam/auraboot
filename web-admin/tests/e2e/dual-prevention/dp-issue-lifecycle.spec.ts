@@ -555,8 +555,8 @@ test('DIL-007: Triage issue with no_action — status changes to no_action @crit
     await pageTriageBtn.click();
   }
 
-  // Triage form should open — wait for input field to appear (command input modal)
-  await page.waitForTimeout(800); // brief wait for modal animation
+  // Triage form should open — decisionField.isVisible({ timeout: 5_000 })
+  // below already polls, so a fixed sleep for "modal animation" is redundant.
 
   // Select decision: no_action using DSL testid-based approach
   const decisionField = page.locator('[data-testid="form-field-dp_triage_decision"]').first();
@@ -564,11 +564,11 @@ test('DIL-007: Triage issue with no_action — status changes to no_action @crit
     const selectEl = decisionField.locator('.ant-select, [role="combobox"]').first();
     if (await selectEl.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await selectEl.click();
-      await page.waitForTimeout(300);
       const noActionOpt = page
         .locator('.ant-select-dropdown:visible .ant-select-item-option, [role="option"]')
         .filter({ hasText: /无需整改|no_action/i })
         .first();
+      // noActionOpt.isVisible polls, so no separate dropdown-open sleep needed.
       if (await noActionOpt.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await noActionOpt.click();
       }
@@ -578,7 +578,6 @@ test('DIL-007: Triage issue with no_action — status changes to no_action @crit
     const pageDecisionField = page.locator('.ant-select, [role="combobox"]').first();
     if (await pageDecisionField.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await pageDecisionField.click();
-      await page.waitForTimeout(300);
       const noActionOpt = page
         .locator('[role="option"]')
         .filter({ hasText: /无需整改|no_action/i })
@@ -589,9 +588,10 @@ test('DIL-007: Triage issue with no_action — status changes to no_action @crit
     }
   }
 
-  // Close any open dropdown by pressing Escape before submitting
+  // Close any open dropdown by pressing Escape before submitting. The
+  // confirmTriage.evaluate() click below tolerates a transient dropdown,
+  // so the post-Escape sleep is unnecessary.
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
 
   // Confirm/submit triage — use evaluate to bypass any overlay
   const confirmTriage = page
@@ -679,7 +679,8 @@ test('DIL-008: Triage need_rectify — side-effect creates dp_rectification reco
   await expect(triageBtn).toBeVisible({ timeout: 8_000 });
   await triageBtn.evaluate((el: HTMLElement) => el.click());
 
-  await page.waitForTimeout(800); // brief wait for modal animation
+  // decisionField2.isVisible({ timeout: 5_000 }) below polls the modal in,
+  // so a fixed sleep for "modal animation" is redundant.
 
   // Select decision: need_rectify using DSL testid-based approach
   const decisionField2 = page.locator('[data-testid="form-field-dp_triage_decision"]').first();
@@ -687,7 +688,6 @@ test('DIL-008: Triage need_rectify — side-effect creates dp_rectification reco
     const selectEl2 = decisionField2.locator('.ant-select, [role="combobox"]').first();
     if (await selectEl2.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await selectEl2.click();
-      await page.waitForTimeout(300);
       const needRectifyOpt = page
         .locator('.ant-select-dropdown:visible .ant-select-item-option, [role="option"]')
         .filter({ hasText: /需要整改|need_rectify/i })
@@ -698,14 +698,13 @@ test('DIL-008: Triage need_rectify — side-effect creates dp_rectification reco
     }
   }
 
-  // Fill hazard level (conditionally visible after selecting need_rectify)
-  await page.waitForTimeout(500); // allow linkage rules to trigger
+  // Fill hazard level (conditionally visible after selecting need_rectify).
+  // hazardLevel.isVisible({ timeout: 2_000 }) handles the linkage delay.
   const hazardLevel = page.locator('[data-testid="form-field-dp_hazard_level"]').first();
   if (await hazardLevel.isVisible({ timeout: 2_000 }).catch(() => false)) {
     const hlSelect = hazardLevel.locator('.ant-select, [role="combobox"]').first();
     if (await hlSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await hlSelect.click();
-      await page.waitForTimeout(300);
       const generalOpt = page
         .locator('.ant-select-dropdown:visible .ant-select-item-option, [role="option"]')
         .filter({ hasText: /一般|general/i })
@@ -722,9 +721,9 @@ test('DIL-008: Triage need_rectify — side-effect creates dp_rectification reco
     .filter({ hasText: /确认|Confirm|提交|Submit/i })
     .first();
 
-  // Close any open dropdown before submitting
+  // Close any open dropdown before submitting. waitForResponse on
+  // /commands/execute below provides the actual timing barrier.
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
 
   const rectificationResp = page
     .waitForResponse(
