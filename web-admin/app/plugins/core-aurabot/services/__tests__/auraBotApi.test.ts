@@ -50,7 +50,7 @@ describe('auraBotApi SSE requests', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await auraBotApi.executeStream(
-      { sessionId: 'session-1', toolId: 'tool-1', confirmed: true },
+      { pendingTurnId: 'session-1', toolId: 'tool-1', confirmed: true },
       {
         onChunk: vi.fn(),
         onDone: vi.fn(),

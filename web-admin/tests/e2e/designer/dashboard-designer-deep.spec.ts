@@ -65,7 +65,7 @@ async function openDashboardWithWidget(page: Page): Promise<string> {
   await expect(widget).toBeVisible({ timeout: 8000 });
   await widget.click();
   await expect(page.getByTestId('widget-property-panel')).toBeVisible({ timeout: 5000 });
-  return pid;
+  return pid!;
 }
 
 /* ================================================================== */

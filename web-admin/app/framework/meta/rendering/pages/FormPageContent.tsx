@@ -753,7 +753,7 @@ export function FormPageContent(props: PageContentProps) {
                 rule.message ||
                 buildRequiredFieldMessage(label, {
                   dataType: meta?.dataType,
-                  component: field.component,
+                  component: rawField.component,
                   locale,
                   t,
                 });

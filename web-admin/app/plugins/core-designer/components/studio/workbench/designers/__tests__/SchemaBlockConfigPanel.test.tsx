@@ -1,14 +1,11 @@
-import { cleanup, render } from '@testing-library/react';
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { render } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import {
   SchemaBlockConfigPanel,
   type ExtendedPropertySchema,
 } from '../SchemaBlockConfigPanel';
 
 describe('SchemaBlockConfigPanel', () => {
-  afterEach(() => {
-    cleanup();
-  });
 
   const schemas: ExtendedPropertySchema<string>[] = [
     { key: 'name', label: 'Name', type: 'text', group: 'Basic' },

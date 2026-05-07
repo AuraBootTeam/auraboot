@@ -732,7 +732,7 @@ test.describe(
           message: `todo tasks must contain task_manager_approve for instance ${leaveInstanceId}`,
         },
       );
-      leaveTaskId = String(ourTask.instanceId ?? ourTask.taskId ?? ourTask.id ?? '');
+      leaveTaskId = String(ourTask.instanceId ?? ourTask.taskId ?? '');
       expect(leaveTaskId, 'task must expose an instanceId/taskId/id').toBeTruthy();
 
       // The TaskTable renders one row per todo task. processDefinitionKey and
@@ -848,7 +848,7 @@ test.describe(
             message: `G4 must resolve task_manager_approve for instance ${leaveInstanceId}`,
           },
         );
-        leaveTaskId = String(freshTask.instanceId ?? freshTask.taskId ?? freshTask.id ?? '');
+        leaveTaskId = String(freshTask.instanceId ?? freshTask.taskId ?? '');
       }
       expect(leaveTaskId, 'G4 must resolve the taskId before approving').toBeTruthy();
 

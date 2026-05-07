@@ -384,7 +384,9 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     await expect(priceInput).toHaveValue('123.45', { timeout: 3_000 });
 
     if (hasPrioritySelect) {
-      await prioritySelect.selectOption({ label: /高|High/i }).catch(async () => {
+      await prioritySelect.selectOption({ label: '高' }).catch(() =>
+        prioritySelect.selectOption({ label: 'High' })
+      ).catch(async () => {
         // Fallback: select by index.
         const options = await prioritySelect.locator('option').count();
         if (options > 1) await prioritySelect.selectOption({ index: 1 });

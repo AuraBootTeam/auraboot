@@ -478,7 +478,6 @@ function TemplateEditor({
           <PreviewTabContent
             template={template}
             sampleData={sampleData}
-            providerCode={config.providerCode}
           />
         )}
       </div>
