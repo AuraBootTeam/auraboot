@@ -1,9 +1,20 @@
 # AuraBoot Backend — Development Dockerfile
-# Uses Gradle bootRun with devtools for hot reload
+# Uses Gradle bootRun with devtools for hot reload.
+#
+# 2026-05-08: gradle/m2 caches relocated to /gradle-cache and /m2-cache so
+# docker-compose.isolated.yml can mount them as named volumes shared across
+# all isolated stacks. First-ever build still cold; subsequent stacks
+# (any worktree) reuse the populated cache, dropping image build from
+# 5-10 min → 30-90 s. See docs/plans/2026-05/2026-05-08-docker-warm-stack-and-suite-r2.md
+# Phase 1 §1A / §1B.
 
 FROM eclipse-temurin:21-jdk
 
 WORKDIR /app
+
+# Cache locations (shared across worktrees via named volumes).
+ENV GRADLE_USER_HOME=/gradle-cache
+ENV MAVEN_HOME=/m2-cache
 
 # Copy Gradle wrapper and config
 COPY gradlew gradlew
@@ -19,7 +30,9 @@ COPY platform-mq-rabbitmq/build.gradle platform-mq-rabbitmq/build.gradle
 
 RUN chmod +x gradlew
 
-# Download dependencies
+# Download dependencies — populates /gradle-cache + /m2-cache when those
+# volumes are empty. Subsequent builds skip this layer; the bind-mounted
+# volume serves cached artifacts directly.
 RUN ./gradlew dependencies --no-daemon || true
 
 # Copy source (will be overridden by volume mount in dev)

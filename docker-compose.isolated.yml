@@ -58,6 +58,11 @@ services:
       - ./plugins:/app/plugins:ro
       # Optional sibling enterprise plugins (no-op if absent).
       - ../auraboot-enterprise/plugins:/app/plugins-enterprise:ro
+      # Cross-stack shared caches — first stack populates, all others reuse.
+      # See Dockerfile.dev (GRADLE_USER_HOME=/gradle-cache, MAVEN_HOME=/m2-cache)
+      # and docs/plans/2026-05/2026-05-08-docker-warm-stack-and-suite-r2.md §1A/§1B.
+      - aura_gradle_cache:/gradle-cache
+      - aura_m2_cache:/m2-cache
     environment:
       # Talk to the redis container by service name (works because both are
       # in the same compose project network).
@@ -130,3 +135,12 @@ volumes:
   # (docker prefixes volumes with project name), so no manual suffixing here.
   isolated_node_modules:
   isolated_web_admin_node_modules:
+  # Shared volumes across all isolated stacks (NOT per-project) — gradle
+  # and m2 are content-addressed, so concurrent reads are safe and
+  # cross-worktree reuse cuts cold backend builds 5-10 min → 30-90 s.
+  aura_gradle_cache:
+    name: aura_gradle_cache
+    external: false
+  aura_m2_cache:
+    name: aura_m2_cache
+    external: false
