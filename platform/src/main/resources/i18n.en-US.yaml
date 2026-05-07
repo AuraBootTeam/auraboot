@@ -710,6 +710,25 @@ common:
   cancel: Cancel
   saving: Saving...
   currentTenant: Current Tenant
+  created_at: Created At
+  updated_at: Updated At
+  creator: Created By
+  modifier: Updated By
+  create: Create
+  new: New
+  edit: Edit
+  delete: Delete
+  view: View
+  detail: Detail
+  submit: Submit
+  sort: Sort
+  fields: Fields
+  filter: Filter
+  search: Search
+  add_filter: Add Filter
+  my_records: My Records
+  created_today: Created Today
+  modified_this_week: Modified This Week
 admin:
   org:
     title: Organization Management
