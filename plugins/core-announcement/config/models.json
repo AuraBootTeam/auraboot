@@ -12,6 +12,10 @@
       "tableName": "ab_announcement",
       "softDelete": true,
       "skipTableCreation": true
-    }
+    },
+    "semantic_description": "System-wide announcement broadcast to tenants: title, content, priority, target audience, schedule. Used for maintenance notices, feature updates, policy changes. Answers: what announcements are currently active and visible to which user segments?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → SCHEDULED → PUBLISHED → ARCHIVED (or WITHDRAWN)"
   }
 ]
