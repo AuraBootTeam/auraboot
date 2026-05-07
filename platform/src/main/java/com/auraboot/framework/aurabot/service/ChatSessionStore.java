@@ -239,8 +239,8 @@ public class ChatSessionStore {
         private String description;
         private String modelCode;
         private String toolSpanId;  // for trace: span ID of the pending tool
-        // agentCode lives in the identity tuple above (post-B.6); the fields
-        // below were added on main for tool-loop continuation.
+        // Phase B.6 + main: agentCode lives in the identity tuple above.
+        // The fields below were added on main for tool-loop continuation.
         private String runPid;
         private String taskPid;
         private List<AgentToolDefinition> agentToolDefinitions;
