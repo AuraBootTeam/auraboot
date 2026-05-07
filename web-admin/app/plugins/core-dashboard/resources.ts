@@ -23,7 +23,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Dashboards', zh: '仪表板' },
     icon: 'gauge',
     menu: { order: 10, group: 'dashboard' },
-    permission: 'dashboard.view',
     file: './plugins/core-dashboard/pages/dashboards/index.tsx',
   },
   {
@@ -32,7 +31,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Dashboard', zh: '仪表板详情' },
     menu: false,
     parentKey: 'dashboard.list',
-    permission: 'dashboard.view',
     file: './plugins/core-dashboard/pages/dashboards/view.$code.tsx',
   },
   {
@@ -41,7 +39,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Dashboard Designer', zh: '仪表板设计器' },
     menu: false,
     parentKey: 'dashboard.list',
-    permission: 'dashboard.view',
     file: './routes/dashboard-designer.tsx',
   },
   {
@@ -50,7 +47,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Edit Dashboard', zh: '编辑仪表板' },
     menu: false,
     parentKey: 'dashboard.list',
-    permission: 'dashboard.view',
     file: './routes/dashboard-designer.$id.tsx',
   },
 ]
