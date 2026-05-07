@@ -5,6 +5,16 @@
   "layout": { "type": "stack" },
   "blocks": [
     {
+      "id": "ai_fill",
+      "blockType": "ai-fill-banner",
+      "endpoint": "/api/wd-leave-request/ai-fill",
+      "examples": [
+        "下周三家里有事请假 2 天",
+        "下个月一号开始请 7 天年假",
+        "明天身体不舒服请病假 1 天"
+      ]
+    },
+    {
       "id": "basic",
       "blockType": "form-section",
       "title": { "zh-CN": "基本信息", "en": "Basic Information" },
