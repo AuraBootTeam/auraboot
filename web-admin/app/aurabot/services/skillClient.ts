@@ -40,6 +40,18 @@ export interface SkillClient {
 
 const BASE_PATH = '/api/aurabot/v2';
 
+/**
+ * Platform `ApiResponse<T>` envelope shape (per SPI Contract §2.1).
+ * Every backend response is wrapped — FE clients MUST unwrap `.data`.
+ */
+interface ApiResponse<T> {
+  code: string;
+  message?: string;
+  data: T;
+  context?: Record<string, unknown> | null;
+  timestamp?: number;
+}
+
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${BASE_PATH}${path}`, {
     method: 'POST',
@@ -51,7 +63,8 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     const text = await response.text().catch(() => '');
     throw new Error(`SkillClient ${path} failed: ${response.status} ${text}`);
   }
-  return (await response.json()) as T;
+  const envelope = (await response.json()) as ApiResponse<T>;
+  return envelope.data;
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -59,7 +72,8 @@ async function getJson<T>(path: string): Promise<T> {
   if (!response.ok) {
     throw new Error(`SkillClient ${path} failed: ${response.status}`);
   }
-  return (await response.json()) as T;
+  const envelope = (await response.json()) as ApiResponse<T>;
+  return envelope.data;
 }
 
 /** Default real-backend implementation. */
