@@ -113,17 +113,22 @@ ALTER TABLE ab_page_schema
 
 ---
 
-## 6. BFF `ALLOWED_DEV_PORTS` 改为环境变量驱动(本次新增)
+## 6. BFF `ALLOWED_DEV_PORTS` 改为环境变量驱动 ✅ DONE
 
-**What**:`web-admin/app/server/bff.server.ts` 的 `ALLOWED_DEV_PORTS` 是硬编码白名单(`['3000', '3500', '5173', '5174', '6443']`)。任何并行 dev session(worktree、PoC 实跑)如果用了非默认端口,BFF 都会用 `Invalid CORS request` 拒掉前端登录调用。
+**Status**:已交付 — 分支 `feat/bff-allowed-ports-env-driven` @ `d920001c`,push 到 `origin`。
 
-**Why 重要**:这是无声坑——前端控制台只看到 401 + 重定向,不查 BFF 日志根本不知道是 CORS 拒绝。本次 PoC 实跑就是被这个挡住的。
+**改动**:
+- 新增 `web-admin/app/server/utils/dev-cors-ports.ts` — `parseDevAllowedPorts(envValue)` 把 `BFF_ALLOWED_PORTS` env(逗号分隔)解析为 Set,**追加**到 canonical 默认 `['3000', '3500', '5173', '5174', '6443']`(不替换,标准 stack 不受影响)。
+- `bff.server.ts` CORS middleware 把 hardcoded Set 替换为 `parseDevAllowedPorts(process.env.BFF_ALLOWED_PORTS)`,同时 hoist 到 module scope(原代码每次请求 allocate 一次新 Set,顺手修了)。
+- 6 个 vitest 用例覆盖默认 / 空值 / 追加 / trim 非数字 / 全无效兜底 / 去重。
 
-**建议方案**:改成读 `BFF_ALLOWED_PORTS` 环境变量,默认值保留现有 5 项;并行 stack 启动脚本通过 `BFF_ALLOWED_PORTS=5175,6445` 注入。
+**冒烟验证**:`BFF_PORT=3599 BFF_ALLOWED_PORTS=5175,6445 npx tsx app/server/bff.server.ts`,
+- Origin `localhost:5175` 收到 `Access-Control-Allow-Origin: http://localhost:5175`(放行)
+- Origin `localhost:9999` 没有 `Access-Control-Allow-Origin` 头(拒绝)
 
-**估时**:30 分钟(单点改动 + 启动脚本协调)。
+**用法**:并行 worktree 启动时 `BFF_ALLOWED_PORTS=5175,6445 pnpm dev:full`;主 worktree 不需要任何改动。
 
-**Owner**:OSS 平台维护者。
+**与 Docker 隔离方案的关系**:`auraboot/docs/plans/2026-05/2026-05-07-docker-per-worktree-isolation-design.md` 是长期方向(每个 worktree 一个隔离 Docker stack)。本 fix 是非 Docker dev session 的 quick mitigation,两者并存 — 不打架。
 
 ---
 
