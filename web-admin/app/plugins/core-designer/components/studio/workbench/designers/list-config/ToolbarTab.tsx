@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ModelCapabilities } from '~/shared/hooks/useModelCapabilities';
-import { SchemaBlockConfigPanel } from '../SchemaBlockConfigPanel';
+import { SchemaBlockConfigPanel } from '~/shared/designer/SchemaBlockConfigPanel';
 import { customButtonSchemas } from './schema';
 import type {
   ListViewModel,

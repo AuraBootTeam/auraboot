@@ -17,6 +17,8 @@ import { PropertyFieldRenderer } from '~/shared/designer/PropertyFieldRenderer';
 import type { PropertySchema } from '~/shared/designer/types';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import { cn } from '~/utils/cn';
+import { getLocalizedText } from '~/utils/i18n';
+import { useI18n } from '~/contexts/I18nContext';
 
 /** Extended PropertySchema supporting `dependsOn.anyOf` for multi-value matching. */
 export interface ExtendedPropertySchema<TLabel = string>
@@ -39,7 +41,12 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
   readonly,
   className,
 }: SchemaBlockConfigPanelProps<T>) {
-  const grouped = useMemo(() => groupByKey(schemas), [schemas]);
+  const { locale } = useI18n();
+  const resolveGroup = (group: unknown): string | undefined => {
+    if (group == null) return undefined;
+    return getLocalizedText(group as string | Record<string, string>, locale) || undefined;
+  };
+  const grouped = useMemo(() => groupByKey(schemas, resolveGroup), [schemas, locale]);
   const latestValueRef = useRef(value);
 
   useEffect(() => {
@@ -135,10 +142,11 @@ function evaluateDependsOn(
 
 function groupByKey<TLabel>(
   schemas: ExtendedPropertySchema<TLabel>[],
+  resolveGroup: (group: TLabel | undefined) => string | undefined,
 ): [string | undefined, ExtendedPropertySchema<TLabel>[]][] {
   const map = new Map<string | undefined, ExtendedPropertySchema<TLabel>[]>();
   for (const s of schemas) {
-    const key = s.group as string | undefined;
+    const key = resolveGroup(s.group);
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(s);
   }

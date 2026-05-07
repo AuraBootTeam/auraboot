@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { SchemaBlockConfigPanel } from '../SchemaBlockConfigPanel';
+import { SchemaBlockConfigPanel } from '~/shared/designer/SchemaBlockConfigPanel';
 import { columnDetailSchemas } from './schema';
 import type { ListViewModel, ColumnConfig } from './mapper';
 
