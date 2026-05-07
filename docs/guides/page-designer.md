@@ -473,6 +473,6 @@ Notes:
 
 ## Next Steps
 
-- [Core Concepts: Data Models](../core-concepts/data-models.md) -- Understand models before designing pages
+- [Core Concepts: Models and Fields](../core-concepts/models-and-fields.md) -- Understand models before designing pages
 - [Dashboards Guide](dashboards.md) -- Build chart-based dashboard pages
-- [Plugin Development](../tutorials/first-plugin.md) -- Package pages into reusable plugins
+- [Plugin Development](../plugin-development/full-stack-plugin.md) -- Package pages into reusable plugins
