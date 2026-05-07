@@ -305,10 +305,14 @@ public class AgentRunController {
 
         // duration_ms preferred (set explicitly when run terminates); when it's
         // NULL but completed_at is set, derive from the timestamp delta.
-        Long storedDuration = (Long) rs.getObject("duration_ms");
+        // Cast to Number (not Long) so the same code works for both BIGINT and
+        // INTEGER columns — historic dev DBs have schema drift where
+        // duration_ms was created as INTEGER and PG JDBC returns Integer there,
+        // which would otherwise CCE on a hard (Long) cast.
+        Number storedDurationNum = (Number) rs.getObject("duration_ms");
         long durationMs;
-        if (storedDuration != null) {
-            durationMs = storedDuration;
+        if (storedDurationNum != null) {
+            durationMs = storedDurationNum.longValue();
         } else if (completedAt != null && createdAt != null) {
             durationMs = Duration.between(createdAt.toInstant(), completedAt.toInstant()).toMillis();
         } else {

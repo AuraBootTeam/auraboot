@@ -287,6 +287,70 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("durationMs: stored value preferred, derived fallback, then 0")
+    void list_durationMs_threeBranches() {
+        // Branch 1: stored duration_ms = 5000 (bound as BIGINT via Long literal).
+        String storedPid = UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_agent_run " +
+                        "(pid, tenant_id, task_id, agent_id, run_status, started_at, " +
+                        " completed_at, duration_ms, total_cost, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, 'aurabot', 'succeeded', NOW() - INTERVAL '5 minutes', " +
+                        "        NOW(), ?, 0.001, NOW(), NOW())",
+                storedPid, tenantId, UniqueIdGenerator.generate(), 5000L);
+
+        // Branch 2: duration_ms NULL, but created_at + completed_at present
+        // (fixed 7-second delta) — controller derives 7000 from the timestamps.
+        String derivedPid = UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_agent_run " +
+                        "(pid, tenant_id, task_id, agent_id, run_status, started_at, " +
+                        " completed_at, duration_ms, total_cost, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, 'aurabot', 'succeeded', " +
+                        "        TIMESTAMP '2026-01-01 00:00:00', " +
+                        "        TIMESTAMP '2026-01-01 00:00:07', " +
+                        "        NULL, 0.001, " +
+                        "        TIMESTAMP '2026-01-01 00:00:00', " +
+                        "        TIMESTAMP '2026-01-01 00:00:07')",
+                derivedPid, tenantId, UniqueIdGenerator.generate());
+
+        // Branch 3: duration_ms NULL and completed_at NULL — running row, falls
+        // through to the 0L default.
+        String zeroPid = UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_agent_run " +
+                        "(pid, tenant_id, task_id, agent_id, run_status, started_at, " +
+                        " completed_at, duration_ms, total_cost, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, 'aurabot', 'running', NOW(), " +
+                        "        NULL, NULL, 0.001, NOW(), NOW())",
+                zeroPid, tenantId, UniqueIdGenerator.generate());
+
+        ApiResponse<AgentRunPage> resp = controller.list(0, 50, null, null, null, null);
+        assertThat(resp.isSuccess()).isTrue();
+        AgentRunPage page = resp.getData();
+        assertThat(page.getTotal()).isEqualTo(3L);
+
+        AgentRunListItem stored = page.getItems().stream()
+                .filter(i -> storedPid.equals(i.getRunId())).findFirst().orElseThrow();
+        AgentRunListItem derived = page.getItems().stream()
+                .filter(i -> derivedPid.equals(i.getRunId())).findFirst().orElseThrow();
+        AgentRunListItem zero = page.getItems().stream()
+                .filter(i -> zeroPid.equals(i.getRunId())).findFirst().orElseThrow();
+
+        // Branch 1: stored value is preferred and propagated unchanged.
+        assertThat(stored.getDurationMs())
+                .as("non-null duration_ms must propagate as Long without ClassCastException")
+                .isEqualTo(5000L);
+
+        // Branch 2: derived from completed_at - created_at = 7 seconds.
+        assertThat(derived.getDurationMs())
+                .as("when duration_ms NULL, fallback derives from timestamps (7s = 7000ms)")
+                .isEqualTo(7000L);
+
+        // Branch 3: nothing to derive from — defaults to 0.
+        assertThat(zero.getDurationMs())
+                .as("when both duration_ms and completed_at NULL, durationMs defaults to 0")
+                .isEqualTo(0L);
+    }
+
+    @Test
     @DisplayName("tenant isolation — run from another tenant invisible to caller")
     void tenant_isolation_otherTenantRunInvisible() {
         Long otherTenant = TestIdGenerator.uniqueTenantId();
