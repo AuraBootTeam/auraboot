@@ -36,6 +36,7 @@ function automationContainsLlmNode(actions: AgentActionItem[]): boolean {
     return probe.includes('llm');
   });
 }
+import ChildRunTree from './ChildRunTree';
 
 interface Props {
   runId: string | null;
@@ -247,32 +248,17 @@ function InterruptsSection({ rows }: { rows: AgentInterruptItem[] }) {
 
 function ChildRunsSection({
   rows,
+  parentRunId,
   onSelectRun,
 }: {
   rows: AgentRunListItem[];
+  parentRunId: string;
   onSelectRun: (runId: string) => void;
 }) {
   return (
     <section data-testid="drawer-section-child-runs" className="border-b border-gray-200 p-4">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Child Runs ({rows.length})</h3>
-      {rows.length === 0 ? (
-        <div className="text-xs text-gray-500">No child runs.</div>
-      ) : (
-        <ul className="space-y-1">
-          {rows.map((c) => (
-            <li key={c.runId}>
-              <button
-                type="button"
-                onClick={() => onSelectRun(c.runId)}
-                className="text-xs font-mono text-blue-600 hover:underline"
-                data-testid={`child-run-${c.runId}`}
-              >
-                {shortPid(c.runId)} · {c.agentCode ?? '-'} · {c.runStatus}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ChildRunTree rows={rows} parentRunId={parentRunId} onSelectRun={onSelectRun} />
     </section>
   );
 }
@@ -432,6 +418,15 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
             {activeTab === 'live-stream' && showLiveStreamTab && (
               <LiveStreamSection runId={runId} actions={detail.actions} />
             )}
+            <MetadataSection run={detail.run} />
+            <ActionsSection actions={detail.actions} />
+            <InterruptsSection rows={detail.interruptLog} />
+            <ChildRunsSection
+              rows={detail.childRuns}
+              parentRunId={detail.run.runId}
+              onSelectRun={onSelectRun}
+            />
+            <BifSection bif={detail.bif} />
           </>
         )}
       </aside>
