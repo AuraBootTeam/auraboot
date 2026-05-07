@@ -264,6 +264,9 @@ class ParentJoinServiceJoinIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("cross-tenant spawn requires explicit grant")
                 .hasMessageContaining("denied_no_grant");
+        assertThatThrownBy(() -> parentJoinService.joinChildRun(parentRunPid, childRunPid, 5000L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not match");
         long elapsed = System.currentTimeMillis() - before;
         assertThat(elapsed).as("tenant guard must fail fast, not block").isLessThan(500L);
         // No leftover slot from the rejected call.
