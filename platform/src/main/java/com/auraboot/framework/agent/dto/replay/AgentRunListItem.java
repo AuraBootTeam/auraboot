@@ -21,6 +21,11 @@ import java.time.Instant;
  *   <li>{@code parentRunId}  ← {@code ab_agent_run.parent_run_id}</li>
  *   <li>{@code subtaskOrigin}← {@code ab_agent_run.subtask_origin}</li>
  *   <li>{@code costUsd}      ← {@code ab_agent_run.total_cost}</li>
+ *   <li>{@code childAggregateCostUsd}  ← {@code ab_agent_run.child_aggregate_cost}
+ *       (Backlog D.3 reverse rollup of direct-child run total_cost)</li>
+ *   <li>{@code childAggregateTokens}   ← {@code ab_agent_run.child_aggregate_tokens}
+ *       (Backlog D.3 reverse rollup of direct-child run input_tokens +
+ *       output_tokens)</li>
  *   <li>{@code durationMs}   ← stored {@code duration_ms} when present, else
  *       {@code completed_at - created_at} fallback</li>
  *   <li>{@code intentSummary}← {@code ab_agent_bif.intent} (first matching row
@@ -37,6 +42,8 @@ public class AgentRunListItem {
     private String parentRunId;
     private String subtaskOrigin;
     private BigDecimal costUsd;
+    private BigDecimal childAggregateCostUsd;
+    private Long childAggregateTokens;
     private Long durationMs;
     private Instant createdAt;
     private Instant completedAt;
