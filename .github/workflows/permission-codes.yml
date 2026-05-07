@@ -1,0 +1,61 @@
+name: Permission Codes CI
+
+# Phase 1 of the permission-code-naming reconciliation
+# (auraboot-enterprise/docs/standards/meta/permission-code-naming.md):
+# baseline-frozen drift gate. Fails CI only on permission-code drift NOT
+# present in scripts/permission-codes-baseline.json — i.e. NEW
+# regressions, not the 174 known historical hits.
+#
+# Runs in --oss-only mode so the OSS repo's CI doesn't need an
+# auraboot-enterprise checkout. Enterprise drift will be added once the
+# enterprise repo gets its own CI hook.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform/src/main/java/com/auraboot/framework/permission/constants/**'
+      - 'plugins/**/config/permissions.json'
+      - 'plugins/**/config/menus.json'
+      - 'platform/src/main/resources/tenant-templates/default-bootstrap.json'
+      - 'web-admin/app/plugins/**/resources.ts'
+      - 'scripts/validate-permission-codes.mjs'
+      - 'scripts/permission-codes-baseline.json'
+      - '.github/workflows/permission-codes.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform/src/main/java/com/auraboot/framework/permission/constants/**'
+      - 'plugins/**/config/permissions.json'
+      - 'plugins/**/config/menus.json'
+      - 'platform/src/main/resources/tenant-templates/default-bootstrap.json'
+      - 'web-admin/app/plugins/**/resources.ts'
+      - 'scripts/validate-permission-codes.mjs'
+      - 'scripts/permission-codes-baseline.json'
+      - '.github/workflows/permission-codes.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: permission-codes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Permission code drift gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate permission codes against baseline
+        run: node scripts/validate-permission-codes.mjs --oss-only --baseline=scripts/permission-codes-baseline.json
