@@ -155,6 +155,55 @@ class EnvLockGuardIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void matchesTable_handlesSqlVariations() {
+        // env-layering #5 follow-up — pure-logic edge case coverage for the whole-word table
+        // matcher inside EnvWriteLockGuardInnerInterceptor. Run inside this class so the
+        // already-loaded Spring context is amortized across cases (per-class Spring restart
+        // makes a standalone unit test class take >60 min in this project).
+        var matcher = com.auraboot.framework.application.database.mybatis.EnvWriteLockGuardInnerInterceptor.class;
+        java.lang.reflect.Method m;
+        try {
+            m = matcher.getDeclaredMethod("matchesTable", String.class, String.class);
+            m.setAccessible(true);
+        } catch (NoSuchMethodException e) {
+            throw new AssertionError("matchesTable signature changed", e);
+        }
+        java.util.function.BiFunction<String, String, Boolean> match = (sql, table) -> {
+            try { return (Boolean) m.invoke(null, sql.toLowerCase(), table); }
+            catch (Exception e) { throw new AssertionError(e); }
+        };
+
+        // Positive cases
+        assertThat(match.apply("delete from ab_page_schema where pid = ?", "ab_page_schema")).isTrue();
+        assertThat(match.apply("update ab_page_schema set name=?", "ab_page_schema")).isTrue();
+        assertThat(match.apply("delete from ab_page_schema_history where op_at < ?", "ab_page_schema_history")).isTrue();
+        assertThat(match.apply("update ab_page_schema p set name=? from ab_environment e where p.env_id=e.id", "ab_page_schema")).isTrue();
+        // Subquery: both tables present
+        assertThat(match.apply("delete from ab_page_schema where pid in (select pid from ab_page_schema_history)", "ab_page_schema")).isTrue();
+        assertThat(match.apply("delete from ab_page_schema where pid in (select pid from ab_page_schema_history)", "ab_page_schema_history")).isTrue();
+        // Batch IN
+        assertThat(match.apply("delete from ab_page_schema where pid in (?,?,?,?)", "ab_page_schema")).isTrue();
+        // Newline / tab boundaries
+        assertThat(match.apply("delete from ab_page_schema\n where deleted_flag=true", "ab_page_schema")).isTrue();
+        assertThat(match.apply("delete\tfrom\tab_page_schema\twhere id=?", "ab_page_schema")).isTrue();
+        // Comma separator
+        assertThat(match.apply("update ab_page_schema, ab_environment set ...", "ab_page_schema")).isTrue();
+        // Start-of-string + end-of-string boundaries
+        assertThat(match.apply("ab_page_schema", "ab_page_schema")).isTrue();
+        assertThat(match.apply("delete from ab_page_schema", "ab_page_schema")).isTrue();
+
+        // Negative cases — prefix / substring traps
+        assertThat(match.apply("delete from ab_page_schema_history where op_at < ?", "ab_page_schema")).isFalse();
+        assertThat(match.apply("delete from ab_page_schema_archive where ...", "ab_page_schema")).isFalse();
+        assertThat(match.apply("delete from foo_ab_page_schema where ...", "ab_page_schema")).isFalse();
+        assertThat(match.apply("delete from xab_page_schema where ...", "ab_page_schema")).isFalse();
+        assertThat(match.apply("select 1", "ab_page_schema")).isFalse();
+        // Empty inputs are safe
+        assertThat(match.apply("", "ab_page_schema")).isFalse();
+        assertThat(match.apply("delete from ab_page_schema", "")).isFalse();
+    }
+
+    @Test
     void promotionApply_toLockedTarget_succeedsViaFourEyesBypass() {
         Long sourceEnv = createEnv("src_lk_" + shortId());
         Long targetEnv = createEnv("tgt_lk_" + shortId());
