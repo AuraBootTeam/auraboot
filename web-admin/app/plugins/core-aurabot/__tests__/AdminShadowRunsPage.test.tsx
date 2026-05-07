@@ -13,7 +13,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const { listAggsMock, listRunsMock } = vi.hoisted(() => ({
   listAggsMock: vi.fn(),
-  listRunsMock: vi.fn(async () => [] as unknown[]),
+  listRunsMock: vi.fn(async (..._args: unknown[]) => [] as unknown[]),
 }));
 
 // Vitest in this repo runs with `isolate: false` (single-thread, shared
