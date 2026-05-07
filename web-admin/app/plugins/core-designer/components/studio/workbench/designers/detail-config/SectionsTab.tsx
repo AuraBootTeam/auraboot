@@ -7,7 +7,7 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { cn } from '~/utils/cn';
-import { SchemaBlockConfigPanel } from '../SchemaBlockConfigPanel';
+import { SchemaBlockConfigPanel } from '~/shared/designer/SchemaBlockConfigPanel';
 import { sectionDetailSchemas } from './schema';
 import { makeSectionId, type DetailViewModel, type SectionConfig } from './mapper';
 

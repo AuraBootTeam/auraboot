@@ -7,7 +7,7 @@
  * PropertyFieldRenderer via SchemaBlockConfigPanel.
  */
 
-import type { ExtendedPropertySchema } from '../SchemaBlockConfigPanel';
+import type { ExtendedPropertySchema } from '~/shared/designer/SchemaBlockConfigPanel';
 
 /** Per-column detail editor schema (applied when a column is selected). */
 export const columnDetailSchemas: ExtendedPropertySchema<string>[] = [
