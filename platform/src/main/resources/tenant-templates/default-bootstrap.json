@@ -423,6 +423,976 @@
       "resource": "org:team",
       "action": "manage",
       "resourceType": "function"
+    },
+    {
+      "code": "audit.field_audit.read",
+      "name": "Audit field_audit read",
+      "description": "Audit field_audit — read",
+      "type": "function",
+      "module": "audit",
+      "resource": "audit:field-audit",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "audit.field_audit.update",
+      "name": "Audit field_audit update",
+      "description": "Audit field_audit — update",
+      "type": "function",
+      "module": "audit",
+      "resource": "audit:field-audit",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "audit.trail.admin",
+      "name": "Audit trail admin",
+      "description": "Audit trail — admin",
+      "type": "function",
+      "module": "audit",
+      "resource": "audit:trail",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "audit.trail.read",
+      "name": "Audit trail read",
+      "description": "Audit trail — read",
+      "type": "function",
+      "module": "audit",
+      "resource": "audit:trail",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "automation.admin",
+      "name": "Automation automation admin",
+      "description": "Automation automation — admin",
+      "type": "function",
+      "module": "automation",
+      "resource": "automation:automation",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "automation.read",
+      "name": "Automation automation read",
+      "description": "Automation automation — read",
+      "type": "function",
+      "module": "automation",
+      "resource": "automation:automation",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "automation.update",
+      "name": "Automation automation update",
+      "description": "Automation automation — update",
+      "type": "function",
+      "module": "automation",
+      "resource": "automation:automation",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.config.update",
+      "name": "BPM config update",
+      "description": "BPM config — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:config",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.definition.update",
+      "name": "BPM definition update",
+      "description": "BPM definition — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:definition",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.form.update",
+      "name": "BPM form update",
+      "description": "BPM form — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:form",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.hook.update",
+      "name": "BPM hook update",
+      "description": "BPM hook — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:hook",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.monitor.update",
+      "name": "BPM monitor update",
+      "description": "BPM monitor — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:monitor",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.process.admin",
+      "name": "BPM process admin",
+      "description": "BPM process — admin",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:process",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.process.execute",
+      "name": "BPM process execute",
+      "description": "BPM process — execute",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:process",
+      "action": "execute",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.process.read",
+      "name": "BPM process read",
+      "description": "BPM process — read",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:process",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.process.update",
+      "name": "BPM process update",
+      "description": "BPM process — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:process",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.rule.update",
+      "name": "BPM rule update",
+      "description": "BPM rule — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:rule",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.signature.update",
+      "name": "BPM signature update",
+      "description": "BPM signature — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:signature",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.sla.update",
+      "name": "BPM sla update",
+      "description": "BPM sla — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:sla",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "bpm.task.update",
+      "name": "BPM task update",
+      "description": "BPM task — update",
+      "type": "function",
+      "module": "bpm",
+      "resource": "bpm:task",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "dashboard.read",
+      "name": "Dashboard dashboard read",
+      "description": "Dashboard dashboard — read",
+      "type": "function",
+      "module": "dashboard",
+      "resource": "dashboard:dashboard",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "dashboard.saved_view.read",
+      "name": "Dashboard saved_view read",
+      "description": "Dashboard saved_view — read",
+      "type": "function",
+      "module": "dashboard",
+      "resource": "dashboard:saved-view",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "dashboard.saved_view.team.update",
+      "name": "Dashboard saved_view_team update",
+      "description": "Dashboard saved_view_team — update",
+      "type": "function",
+      "module": "dashboard",
+      "resource": "dashboard:saved-view-team",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "dashboard.saved_view.update",
+      "name": "Dashboard saved_view update",
+      "description": "Dashboard saved_view — update",
+      "type": "function",
+      "module": "dashboard",
+      "resource": "dashboard:saved-view",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "dashboard.team.update",
+      "name": "Dashboard team update",
+      "description": "Dashboard team — update",
+      "type": "function",
+      "module": "dashboard",
+      "resource": "dashboard:team",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "dashboard.update",
+      "name": "Dashboard dashboard update",
+      "description": "Dashboard dashboard — update",
+      "type": "function",
+      "module": "dashboard",
+      "resource": "dashboard:dashboard",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.data_domain.update",
+      "name": "Data data_domain update",
+      "description": "Data data_domain — update",
+      "type": "function",
+      "module": "data",
+      "resource": "data:data-domain",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.datasource.read",
+      "name": "Data datasource read",
+      "description": "Data datasource — read",
+      "type": "function",
+      "module": "data",
+      "resource": "data:datasource",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.datasource.update",
+      "name": "Data datasource update",
+      "description": "Data datasource — update",
+      "type": "function",
+      "module": "data",
+      "resource": "data:datasource",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.edi.read",
+      "name": "Data edi read",
+      "description": "Data edi — read",
+      "type": "function",
+      "module": "data",
+      "resource": "data:edi",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.edi.update",
+      "name": "Data edi update",
+      "description": "Data edi — update",
+      "type": "function",
+      "module": "data",
+      "resource": "data:edi",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.ot_device.data",
+      "name": "Data ot_device data",
+      "description": "Data ot_device — data",
+      "type": "function",
+      "module": "data",
+      "resource": "data:ot-device",
+      "action": "data",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.ot_device.read",
+      "name": "Data ot_device read",
+      "description": "Data ot_device — read",
+      "type": "function",
+      "module": "data",
+      "resource": "data:ot-device",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.ot_device.update",
+      "name": "Data ot_device update",
+      "description": "Data ot_device — update",
+      "type": "function",
+      "module": "data",
+      "resource": "data:ot-device",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.reconciliation.read",
+      "name": "Data reconciliation read",
+      "description": "Data reconciliation — read",
+      "type": "function",
+      "module": "data",
+      "resource": "data:reconciliation",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.reconciliation.update",
+      "name": "Data reconciliation update",
+      "description": "Data reconciliation — update",
+      "type": "function",
+      "module": "data",
+      "resource": "data:reconciliation",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.sod.read",
+      "name": "Data sod read",
+      "description": "Data sod — read",
+      "type": "function",
+      "module": "data",
+      "resource": "data:sod",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.sod.update",
+      "name": "Data sod update",
+      "description": "Data sod — update",
+      "type": "function",
+      "module": "data",
+      "resource": "data:sod",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.category.read",
+      "name": "Meta category read",
+      "description": "Meta category — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:category",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.category.update",
+      "name": "Meta category update",
+      "description": "Meta category — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:category",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.command.execute",
+      "name": "Meta command execute",
+      "description": "Meta command — execute",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:command",
+      "action": "execute",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.command.read",
+      "name": "Meta command read",
+      "description": "Meta command — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:command",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.command.update",
+      "name": "Meta command update",
+      "description": "Meta command — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:command",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.component.read",
+      "name": "Meta component read",
+      "description": "Meta component — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:component",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.component.update",
+      "name": "Meta component update",
+      "description": "Meta component — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:component",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.decision.execute",
+      "name": "Meta decision execute",
+      "description": "Meta decision — execute",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:decision",
+      "action": "execute",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.decision.read",
+      "name": "Meta decision read",
+      "description": "Meta decision — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:decision",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.decision.update",
+      "name": "Meta decision update",
+      "description": "Meta decision — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:decision",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.designer.admin",
+      "name": "Meta designer admin",
+      "description": "Meta designer — admin",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:designer",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.designer.read",
+      "name": "Meta designer read",
+      "description": "Meta designer — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:designer",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.designer.update",
+      "name": "Meta designer update",
+      "description": "Meta designer — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:designer",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.dict.read",
+      "name": "Meta dict read",
+      "description": "Meta dict — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:dict",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.dict.update",
+      "name": "Meta dict update",
+      "description": "Meta dict — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:dict",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.event_store.admin",
+      "name": "Meta event_store admin",
+      "description": "Meta event_store — admin",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:event-store",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.event_store.read",
+      "name": "Meta event_store read",
+      "description": "Meta event_store — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:event-store",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.field.read",
+      "name": "Meta field read",
+      "description": "Meta field — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:field",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.field.update",
+      "name": "Meta field update",
+      "description": "Meta field — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:field",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.field_mask.update",
+      "name": "Meta field_mask update",
+      "description": "Meta field_mask — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:field-mask",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.filter.update",
+      "name": "Meta filter update",
+      "description": "Meta filter — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:filter",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.invariant.read",
+      "name": "Meta invariant read",
+      "description": "Meta invariant — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:invariant",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.invariant.update",
+      "name": "Meta invariant update",
+      "description": "Meta invariant — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:invariant",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.menu.read",
+      "name": "Meta menu read",
+      "description": "Meta menu — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:menu",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.menu.update",
+      "name": "Meta menu update",
+      "description": "Meta menu — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:menu",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.model.update",
+      "name": "Meta model update",
+      "description": "Meta model — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:model",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.page.read",
+      "name": "Meta page read",
+      "description": "Meta page — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:page",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.page.update",
+      "name": "Meta page update",
+      "description": "Meta page — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:page",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.permission.read",
+      "name": "Meta permission read",
+      "description": "Meta permission — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:permission",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.permission.update",
+      "name": "Meta permission update",
+      "description": "Meta permission — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:permission",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.print.generate",
+      "name": "Meta print generate",
+      "description": "Meta print — generate",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:print",
+      "action": "generate",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.publish.admin",
+      "name": "Meta publish admin",
+      "description": "Meta publish — admin",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:publish",
+      "action": "admin",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.publish.read",
+      "name": "Meta publish read",
+      "description": "Meta publish — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:publish",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.publish.update",
+      "name": "Meta publish update",
+      "description": "Meta publish — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:publish",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.query.read",
+      "name": "Meta query read",
+      "description": "Meta query — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:query",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.query.update",
+      "name": "Meta query update",
+      "description": "Meta query — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:query",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.report.generate",
+      "name": "Meta report generate",
+      "description": "Meta report — generate",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:report",
+      "action": "generate",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.state_graph.read",
+      "name": "Meta state_graph read",
+      "description": "Meta state_graph — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:state-graph",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.state_graph.update",
+      "name": "Meta state_graph update",
+      "description": "Meta state_graph — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:state-graph",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.template.read",
+      "name": "Meta template read",
+      "description": "Meta template — read",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:template",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.template.update",
+      "name": "Meta template update",
+      "description": "Meta template — update",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:template",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "org.role.read",
+      "name": "Organization role read",
+      "description": "Organization role — read",
+      "type": "function",
+      "module": "org",
+      "resource": "org:role",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "org.role.update",
+      "name": "Organization role update",
+      "description": "Organization role — update",
+      "type": "function",
+      "module": "org",
+      "resource": "org:role",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "org.tenant.read",
+      "name": "Organization tenant read",
+      "description": "Organization tenant — read",
+      "type": "function",
+      "module": "org",
+      "resource": "org:tenant",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "org.tenant.update",
+      "name": "Organization tenant update",
+      "description": "Organization tenant — update",
+      "type": "function",
+      "module": "org",
+      "resource": "org:tenant",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "org.user_role.read",
+      "name": "Organization user_role read",
+      "description": "Organization user_role — read",
+      "type": "function",
+      "module": "org",
+      "resource": "org:user-role",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "org.user_role.update",
+      "name": "Organization user_role update",
+      "description": "Organization user_role — update",
+      "type": "function",
+      "module": "org",
+      "resource": "org:user-role",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.async_task.read",
+      "name": "System async_task read",
+      "description": "System async_task — read",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:async-task",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.async_task.update",
+      "name": "System async_task update",
+      "description": "System async_task — update",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:async-task",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.cloud_config.update",
+      "name": "System cloud_config update",
+      "description": "System cloud_config — update",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:cloud-config",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.connector.update",
+      "name": "System connector update",
+      "description": "System connector — update",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:connector",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.plugin.read",
+      "name": "System plugin read",
+      "description": "System plugin — read",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:plugin",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.plugin.update",
+      "name": "System plugin update",
+      "description": "System plugin — update",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:plugin",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.release.read",
+      "name": "System release read",
+      "description": "System release — read",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:release",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.release.update",
+      "name": "System release update",
+      "description": "System release — update",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:release",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.repo.read",
+      "name": "System repo read",
+      "description": "System repo — read",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:repo",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.repo.update",
+      "name": "System repo update",
+      "description": "System repo — update",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:repo",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.scheduler.update",
+      "name": "System scheduler update",
+      "description": "System scheduler — update",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:scheduler",
+      "action": "update",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.webhook.update",
+      "name": "System webhook update",
+      "description": "System webhook — update",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:webhook",
+      "action": "update",
+      "resourceType": "function"
     }
   ],
   "roles": [

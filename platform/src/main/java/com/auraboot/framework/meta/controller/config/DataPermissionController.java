@@ -34,7 +34,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/meta/data-permissions")
 @RequiredArgsConstructor
-@RequirePermission(MetaPermission.META_PERMISSION_MANAGE)
+@RequirePermission(MetaPermission.PERMISSION_MANAGE)
 public class DataPermissionController {
 
     private final DataPermissionPolicyService policyService;
