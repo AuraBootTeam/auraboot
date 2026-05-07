@@ -56,4 +56,21 @@ public class Environment {
     private Long updatedBy;
 
     private Boolean deletedFlag;
+
+    // ---- env-layering extension (PoC) ----
+
+    /** Parent environment pid for promotion chain (e.g. dev → staging → prod). Null for root. */
+    private String parentPid;
+
+    /** Lock flag preventing direct edits; promotion to a locked env requires explicit unlock or four-eyes. */
+    private Boolean isLocked;
+
+    /** User id who locked the environment. Null when not locked. */
+    private Long lockedBy;
+
+    /** Timestamp when the environment was locked. */
+    private Date lockedAt;
+
+    /** Free-form reason captured at lock time for audit. */
+    private String lockedReason;
 }

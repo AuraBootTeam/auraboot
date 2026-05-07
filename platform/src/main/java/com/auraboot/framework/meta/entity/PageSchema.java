@@ -1,7 +1,9 @@
 package com.auraboot.framework.meta.entity;
 
 import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
+import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.auraboot.framework.meta.entity.common.AbstractMultiVersionEntity;
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -13,10 +15,14 @@ import java.time.Instant;
 /**
  * 页面Schema实体类
  * 对应表：ab_page_schema
+ *
+ * env-layering PoC: marked {@link EnvScoped} so the persistence layer applies env_id filter
+ * (read) and stamp (write) on top of tenant_id.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName(value = "ab_page_schema", autoResultMap = true)
+@EnvScoped
 public class PageSchema extends AbstractMultiVersionEntity {
 
     @TableField("page_key")
@@ -75,4 +81,12 @@ public class PageSchema extends AbstractMultiVersionEntity {
 
     @TableField("plugin_pid")
     private String pluginPid;
+
+    /**
+     * env-layering PoC: foreign key to ab_environment(id). Auto-filled on insert by
+     * {@code EnvIdMetaObjectHandler} from {@link com.auraboot.framework.application.tenant.MetaContext},
+     * with fallback to the tenant's default environment.
+     */
+    @TableField(value = "env_id", fill = FieldFill.INSERT)
+    private Long envId;
 }
