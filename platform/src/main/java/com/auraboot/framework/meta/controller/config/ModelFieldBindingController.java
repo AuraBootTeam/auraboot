@@ -46,7 +46,7 @@ public class ModelFieldBindingController {
      * POST /api/meta/models/{modelPid}/fields/{fieldPid}
      */
     @PostMapping("/{modelPid}/fields/{fieldPid}")
-    @RequirePermission(MetaPermission.META_MODEL_MANAGE)
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<MetaModelFieldBindingDTO> bindField(
             @PathVariable String modelPid,
             @PathVariable String fieldPid,
@@ -75,7 +75,7 @@ public class ModelFieldBindingController {
      * DELETE /api/meta/models/{modelPid}/fields/{fieldPid}
      */
     @DeleteMapping("/{modelPid}/fields/{fieldPid}")
-    @RequirePermission(MetaPermission.META_MODEL_MANAGE)
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<Boolean> unbindField(
             @PathVariable String modelPid,
             @PathVariable String fieldPid) {
@@ -101,7 +101,7 @@ public class ModelFieldBindingController {
      * GET /api/meta/models/{modelPid}/fields
      */
     @GetMapping("/{modelPid}/fields")
-    @RequirePermission(MetaPermission.META_MODEL_READ)
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<List<MetaFieldDTO>> getModelFields(@PathVariable String modelPid) {
         log.debug("Getting fields for model {}", modelPid);
         
@@ -116,7 +116,7 @@ public class ModelFieldBindingController {
      * GET /api/meta/models/{modelPid}/bindings
      */
     @GetMapping("/{modelPid}/bindings")
-    @RequirePermission(MetaPermission.META_MODEL_READ)
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<List<MetaModelFieldBindingDTO>> getModelBindings(@PathVariable String modelPid) {
         log.debug("Getting bindings for model {}", modelPid);
         
@@ -133,7 +133,7 @@ public class ModelFieldBindingController {
      * Request body: Map<String, Integer> - field PID to new display order
      */
     @PutMapping("/{modelPid}/fields/reorder")
-    @RequirePermission(MetaPermission.META_MODEL_MANAGE)
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<Integer> reorderFields(
             @PathVariable String modelPid,
             @RequestBody Map<String, Integer> fieldOrders) {
@@ -151,7 +151,7 @@ public class ModelFieldBindingController {
      * PUT /api/meta/models/{modelPid}/fields/{fieldPid}/config
      */
     @PutMapping("/{modelPid}/fields/{fieldPid}/config")
-    @RequirePermission(MetaPermission.META_MODEL_MANAGE)
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<MetaModelFieldBindingDTO> updateFieldConfig(
             @PathVariable String modelPid,
             @PathVariable String fieldPid,
@@ -180,7 +180,7 @@ public class ModelFieldBindingController {
      * Request body: List<String> - field PIDs
      */
     @PostMapping("/{modelPid}/fields/batch")
-    @RequirePermission(MetaPermission.META_MODEL_MANAGE)
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<Integer> batchBindFields(
             @PathVariable String modelPid,
             @RequestBody List<String> fieldPids) {
@@ -207,7 +207,7 @@ public class ModelFieldBindingController {
      * - Remarks
      */
     @PostMapping("/{modelPid}/fields/bind")
-    @RequirePermission(MetaPermission.META_MODEL_MANAGE)
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<MetaModelFieldBindingDTO> bindFieldWithConfig(
             @PathVariable String modelPid,
             @Valid @RequestBody FieldBindingRequest request) {
@@ -232,7 +232,7 @@ public class ModelFieldBindingController {
      * applied to all bindings.
      */
     @PostMapping("/{modelPid}/fields/bind-batch")
-    @RequirePermission(MetaPermission.META_MODEL_MANAGE)
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<List<MetaModelFieldBindingDTO>> batchBindFieldsWithConfig(
             @PathVariable String modelPid,
             @Valid @RequestBody BatchFieldBindingRequest request) {

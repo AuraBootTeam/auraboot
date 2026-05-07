@@ -24,7 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/data-domains")
 @RequiredArgsConstructor
-@RequirePermission(MetaPermission.META_PERMISSION_MANAGE)
+@RequirePermission(MetaPermission.PERMISSION_MANAGE)
 public class DataDomainController {
 
     private final DataDomainService dataDomainService;
