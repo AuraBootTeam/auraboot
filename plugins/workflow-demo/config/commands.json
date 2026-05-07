@@ -177,7 +177,14 @@
     "extension": {
       "confirmMessage:zh-CN": "确认撤销该请假申请？撤销后当前审批任务会被关闭。",
       "confirmMessage:en": "Cancel this leave request? The current approval task will be closed."
-    }
+    },
+    "postActions": [
+      {
+        "type": "withdraw_process",
+        "instanceIdField": "wd_req_process_instance",
+        "reason": "Applicant cancelled leave request"
+      }
+    ]
   },
   {
     "code": "wd:create_leave_balance",
