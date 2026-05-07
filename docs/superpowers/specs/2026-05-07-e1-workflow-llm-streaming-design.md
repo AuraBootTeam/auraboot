@@ -1,6 +1,6 @@
-# 2026-05-07 E.1 Workflow LLM Streaming — 设计草案
+# 2026-05-07 E.1 Workflow LLM Streaming — 设计
 
-> **状态:草稿,等 owner 决策开放问题。**
+> **状态:owner 已 lock 全部默认选项(Q1=B / Q2=仅 Anthropic / Q3=复用 drawer / Q4=重头读 / Q5=不 fallback / Q6=AuraBot 不切 / Q7=不暴露 partial / Q8=drop 不报错 / Q9=delta 透传 / Q10=admin role / Q11=不持久化)2026-05-07。**
 > **类型:一次性设计稿。** 实施完成后,长期跟踪进 `docs/backlog/2026-05-06-acp-p0-p1-followups.md`。
 
 ## 背景
