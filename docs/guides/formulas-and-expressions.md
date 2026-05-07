@@ -420,7 +420,7 @@ If `order` has a REFERENCE field `order_customer_id` pointing to `customer`:
 }
 ```
 
-The `_display` suffix is automatically populated by the reference enrichment system (see [Core Concepts: Fields](../core-concepts/fields-and-types.md)).
+The `_display` suffix is automatically populated by the reference enrichment system (see [Core Concepts: Models and Fields](../core-concepts/models-and-fields.md)).
 
 ---
 
