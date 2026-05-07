@@ -26,8 +26,10 @@ import org.springframework.web.servlet.HandlerInterceptor;
  *   <li>Tenant's default environment (auto-create if missing) — falls back via service</li>
  * </ol>
  *
- * <p>Runs after authentication so {@code MetaContext.getCurrentTenantId()} is populated. Must be
- * registered with order > permission interceptor so any handler reading env id has it ready.
+ * <p>Runs after authentication so {@code MetaContext.getCurrentTenantId()} is populated, and is
+ * registered <b>before</b> {@code PermissionInterceptor} so any @RequirePermission rule whose
+ * SQL hits @EnvScoped tables sees the resolved env_id (otherwise the env-scope WHERE clause
+ * sees null and silently evaluates cross-env -- slice 1 review P1-3, 2026-05-07).
  *
  * <p>Cleanup is handled by {@code TenantInterceptor.afterCompletion} which calls
  * {@link MetaContext#clear()} (clears both tenant and env ThreadLocals).
