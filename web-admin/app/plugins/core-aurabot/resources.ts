@@ -85,4 +85,10 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 100, group: 'aurabot' }, permission: 'aurabot.run.read',
     file: './plugins/core-aurabot/pages/admin/agent-runs.tsx',
   },
+  {
+    key: 'aurabot.admin.shadow-runs', path: '/admin/agent-runs/shadow-runs',
+    title: { en: 'Shadow Runs', zh: '影子运行比对' }, icon: 'git-compare',
+    menu: { order: 110, group: 'aurabot' }, permission: 'aurabot.run.read',
+    file: './plugins/core-aurabot/pages/admin/shadow-runs.tsx',
+  },
 ]
