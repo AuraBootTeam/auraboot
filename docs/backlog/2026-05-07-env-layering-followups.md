@@ -46,6 +46,23 @@ LOG=/tmp/pw-env-layering-$(date +%Y%m%d-%H%M%S).log
 
 **Out of scope of this spec**(单独 follow-up):full promotion lifecycle(validate → apply → diff visit)需要 PageSchema 源页面 fixture helper —— 当前没有公开测试工具创建 PageSchema。
 
+**尝试记录(2026-05-07)**:本次会话尝试了一次端到端实跑,**未成功**。流程与卡点:
+
+1. 端口冲突追逐:Docker 占 5174 → 切 5175;sibling worktree 占 5173/6443 → 切 5175/6445。BFF 默认 3501 也被占 → 切 3502。
+2. 启动了完整并行 stack:Spring Boot @ 6445(独立 DB `aura_boot_env_layering`)、Vite @ 5175、BFF @ 3502。
+3. **卡点**:BFF 对 `Origin: http://localhost:5175` 返回 `Invalid CORS request`,`auth.setup.ts` 三个步骤过了但 happy-path EL-001 跳到 `/login`。
+4. 诊断:`web-admin/app/server/bff.server.ts` 的 `ALLOWED_DEV_PORTS` 硬编码白名单不含 5175。用 sed 加进去后 BFF 仍拒,怀疑 tsx watch 没热加载或有第二条 CORS 通路。
+
+**结论**:**E2E 不能在并行 worktree 里轻量跑**——除了 DB 隔离(已知)还有:
+- BFF 的 `ALLOWED_DEV_PORTS` 白名单只认 5173/5174/6443,跑 5175 必须改源码并完整重启 BFF;
+- 多个 dev session 并存时端口需要主仓 + 至少 2 个非冲突值,且必须先 `lsof` 探测。
+
+**下次尝试建议**:
+- 退回主 worktree(端口默认 5173+3501+6443),停掉所有其他 dev session;或
+- 把 `bff.server.ts` 的 ALLOWED_DEV_PORTS 改成读环境变量(见下方 follow-up #6)。
+
+**当前进度**:`tests/e2e/admin/env-layering-happy-path.spec.ts` 已合入分支(7 cases);`auth.setup.ts` 在自定义端口下能过(说明 fixture 兼容性 OK);剩余卡点纯环境而非 spec 本身。
+
 ---
 
 ## 3. `lock` / `unlock` 操作接审计日志
@@ -93,6 +110,20 @@ ALTER TABLE ab_page_schema
 **建议触发**:做 production-grade 防漏判时,引入 JsqlParser 做正式 SQL 解析(MyBatis-Plus 已有这个依赖),从 `Statement` → `Update`/`Delete` 提取 target table 列表,逐个判 @EnvScoped。同时加 ≥ 5 个 edge case test。
 
 **估时**:中等(4-8 hours)。
+
+---
+
+## 6. BFF `ALLOWED_DEV_PORTS` 改为环境变量驱动(本次新增)
+
+**What**:`web-admin/app/server/bff.server.ts` 的 `ALLOWED_DEV_PORTS` 是硬编码白名单(`['3000', '3500', '5173', '5174', '6443']`)。任何并行 dev session(worktree、PoC 实跑)如果用了非默认端口,BFF 都会用 `Invalid CORS request` 拒掉前端登录调用。
+
+**Why 重要**:这是无声坑——前端控制台只看到 401 + 重定向,不查 BFF 日志根本不知道是 CORS 拒绝。本次 PoC 实跑就是被这个挡住的。
+
+**建议方案**:改成读 `BFF_ALLOWED_PORTS` 环境变量,默认值保留现有 5 项;并行 stack 启动脚本通过 `BFF_ALLOWED_PORTS=5175,6445` 注入。
+
+**估时**:30 分钟(单点改动 + 启动脚本协调)。
+
+**Owner**:OSS 平台维护者。
 
 ---
 
