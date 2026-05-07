@@ -43,16 +43,19 @@ public class WdLeaveAiController {
     @PostMapping("/ai-fill")
     public ResponseEntity<AiFillResponse> aiFill(@RequestBody AiFillRequest req) {
         if (req == null || req.nlInput() == null || req.nlInput().isBlank()) {
-            return ResponseEntity.badRequest().body(AiFillResponse.error("nlInput is required"));
+            return ResponseEntity.badRequest().body(AiFillResponse.error("ai.fill.nl_input_required"));
         }
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            return ResponseEntity.status(401).body(AiFillResponse.error("ai.fill.tenant_required"));
+        }
         String currentDate = req.currentDate() != null ? req.currentDate() : LocalDate.now().toString();
 
         WdLeaveAiFillService.AiFillResult result =
                 aiFillService.extractFields(req.nlInput(), currentDate, tenantId);
 
         Long targetId = req.targetId() != null ? req.targetId() : -1L;
-        Long annotationId = annotationRepository.upsertGrounding(
+        Long annotationId = annotationRepository.insertGrounding(
                 tenantId, TARGET_MODEL_CODE, targetId, result.turnId(),
                 req.nlInput(), result.fields());
 
@@ -71,21 +74,28 @@ public class WdLeaveAiController {
 
         if (req != null && req.targetId() != null && req.turnId() != null) {
             Long tenantId = MetaContext.getCurrentTenantId();
-            Map<String, Object> existing = annotationRepository.findByTarget(
-                    tenantId, TARGET_MODEL_CODE, req.targetId());
-            if (existing != null) {
-                annotationRepository.recordSafetyTrigger(
-                        ((Number) existing.get("id")).longValue(), triggers);
+            if (tenantId != null) {
+                Map<String, Object> existing = annotationRepository.findByTarget(
+                        tenantId, TARGET_MODEL_CODE, req.targetId());
+                if (existing != null) {
+                    annotationRepository.recordSafetyTrigger(
+                            ((Number) existing.get("id")).longValue(), triggers);
+                }
             }
         }
 
-        return ResponseEntity.ok(new SafetyCheckResponse(triggers, requiresEscalation,
-                requiresEscalation ? "天数超过 " + DAYS_THRESHOLD + " 天,提交后将升级为二级审批" : null));
+        SafetyMessageRef message = requiresEscalation
+                ? new SafetyMessageRef("ai.safety.days_over_threshold", Map.of("threshold", DAYS_THRESHOLD))
+                : null;
+        return ResponseEntity.ok(new SafetyCheckResponse(triggers, requiresEscalation, message));
     }
 
     @GetMapping("/{id}/ai-annotation")
     public ResponseEntity<Map<String, Object>> getAnnotation(@PathVariable("id") Long id) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            return ResponseEntity.status(401).build();
+        }
         Map<String, Object> row = annotationRepository.findByTarget(tenantId, TARGET_MODEL_CODE, id);
         if (row == null) {
             return ResponseEntity.notFound().build();
@@ -95,14 +105,19 @@ public class WdLeaveAiController {
 
     public record AiFillRequest(String nlInput, String currentDate, Long targetId) {}
 
+    /** errorKey is an i18n key the frontend resolves; never a hardcoded zh-CN string. */
     public record AiFillResponse(String turnId, Map<String, Object> fields, Long annotationId,
-                                  long totalTokens, double totalDollars, String error) {
-        public static AiFillResponse error(String message) {
-            return new AiFillResponse(null, Map.of(), null, 0, 0.0, message);
+                                  long totalTokens, double totalDollars, String errorKey) {
+        public static AiFillResponse error(String errorKey) {
+            return new AiFillResponse(null, Map.of(), null, 0, 0.0, errorKey);
         }
     }
 
     public record SafetyCheckRequest(Integer days, Long targetId, String turnId) {}
 
-    public record SafetyCheckResponse(List<String> triggers, boolean requiresEscalation, String message) {}
+    /** message is an i18n message reference; null when no escalation needed. */
+    public record SafetyCheckResponse(List<String> triggers, boolean requiresEscalation,
+                                       SafetyMessageRef message) {}
+
+    public record SafetyMessageRef(String key, Map<String, Object> args) {}
 }
