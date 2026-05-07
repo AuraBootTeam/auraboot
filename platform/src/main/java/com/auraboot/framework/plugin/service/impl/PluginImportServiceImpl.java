@@ -532,6 +532,27 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     private ImportPreviewResult createPreviewFromManifest(PluginManifestExtended manifest, String sourceName, String sourceType) {
+        // Fail-fast preview when the manifest is missing pluginId. The downstream
+        // ab_plugin_import_history.plugin_id column is NOT NULL; without this guard a
+        // malformed manifest (e.g. a plugin.json that uses `code` instead of `pluginId`,
+        // or `resources` instead of `resourceDirs`) hit a PSQL constraint error and
+        // surfaced to the caller as the generic "Internal system error" — burning hours
+        // of operator triage time. Returning a structured preview keeps the response
+        // shape consistent with other validation failures (controller wraps `errors`
+        // into `errorMessage`).
+        if (manifest.getPluginId() == null || manifest.getPluginId().isBlank()) {
+            return ImportPreviewResult.builder()
+                    .importId(UlidGenerator.generate())
+                    .valid(false)
+                    .errors(List.of("plugin manifest missing required field `pluginId` "
+                            + "(source=" + sourceName + ", type=" + sourceType + "). "
+                            + "Top-level keys must include `pluginId` — not `code` or `id`."))
+                    .warnings(new ArrayList<>())
+                    .changes(new HashMap<>())
+                    .actionCounts(new HashMap<>())
+                    .build();
+        }
+
         String importId = UlidGenerator.generate();
         Long tenantId = MetaContext.getCurrentTenantId();
 
