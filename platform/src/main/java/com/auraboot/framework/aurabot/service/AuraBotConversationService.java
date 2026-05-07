@@ -198,6 +198,10 @@ public class AuraBotConversationService {
                 .type(message.getMessageType())
                 .content(message.getContent())
                 .traceId(metadata.get("traceId"))
+                // D.1: surface persisted thinking so the frontend can render
+                // the reasoning pane after a page reload.
+                .thinkingContent(message.getThinkingContent())
+                .thinkingSignature(message.getThinkingSignature())
                 .createdAt(message.getCreatedAt())
                 .build();
     }

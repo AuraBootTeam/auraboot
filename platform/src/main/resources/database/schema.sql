@@ -7944,6 +7944,16 @@ CREATE TABLE IF NOT EXISTS ab_im_message (
     client_msg_id   VARCHAR(64),                                 -- client-generated dedup id
     recalled        BOOLEAN         NOT NULL DEFAULT FALSE,
     forwarded_from_id BIGINT,                                      -- original message id if forwarded
+    -- D.1 (2026-05-07) Anthropic Extended Thinking persistence:
+    -- thinking_content carries the full concatenated reasoning prose for the
+    -- assistant turn (one row = one turn → one block of reasoning, joined when
+    -- the upstream produced multiple thinking content blocks).
+    -- thinking_signature is the opaque verification token Anthropic returns
+    -- alongside thinking blocks; persisted so future replay-with-thinking
+    -- continuity hops can reattach it. Both NULL on turns that produced no
+    -- thinking (do not poison the column with empty strings).
+    thinking_content   TEXT,
+    thinking_signature TEXT,
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

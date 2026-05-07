@@ -180,7 +180,17 @@ const initialState: AuraBotState = {
   knowledgeBases: [],
 };
 
-function toSimpleMessage(message: AuraBotConversationMessage): SimpleMessage {
+/**
+ * Map a persisted {@link AuraBotConversationMessage} row to one or more
+ * {@link SimpleMessage}s. D.1 (2026-05-07) added the array return shape so a
+ * single assistant row that carries Anthropic Extended Thinking prose
+ * ({@code thinkingContent}) emits two ordered messages: the thinking pane
+ * first (rendered collapsed by default by {@code ThinkingBlock}), then the
+ * final assistant text. This mirrors the live SSE order — Anthropic emits
+ * thinking blocks before the answer text — so the rendered conversation
+ * looks identical whether it came in over SSE or hydrated from history.
+ */
+export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMessage[] {
   const sender: SimpleMessage['sender'] =
     message.sender === 'user'
       ? 'user'
@@ -195,14 +205,38 @@ function toSimpleMessage(message: AuraBotConversationMessage): SimpleMessage {
         ? 'text'
         : 'text';
 
-  return {
+  const baseTimestamp = new Date(message.createdAt).getTime();
+  const out: SimpleMessage[] = [];
+
+  // D.1: surface persisted thinking on assistant rows. We deliberately keep
+  // it null-safe — empty strings are filtered server-side, but a defensive
+  // check here prevents an empty-string column drift from ever rendering an
+  // empty reasoning pane in the UI.
+  if (
+    sender === 'bot'
+    && typeof message.thinkingContent === 'string'
+    && message.thinkingContent.length > 0
+  ) {
+    out.push({
+      id: `db-${message.id}-thinking`,
+      type: 'thinking',
+      sender,
+      // 1ms before the answer so render order matches the live SSE order
+      timestamp: baseTimestamp - 1,
+      content: message.thinkingContent,
+      thinkingSignature: message.thinkingSignature || undefined,
+    });
+  }
+
+  out.push({
     id: `db-${message.id}`,
     type: normalizedType,
     sender,
-    timestamp: new Date(message.createdAt).getTime(),
+    timestamp: baseTimestamp,
     content: message.content || '',
     traceId: message.traceId || undefined,
-  };
+  });
+  return out;
 }
 
 function toSessionSummary(item: AuraBotConversationItem): AuraBotSessionSummary {
@@ -491,7 +525,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             payload: {
               sessionId: generateSessionId(),
               conversationId: target.conversationId,
-              messages: messages.map(toSimpleMessage),
+              messages: messages.flatMap(toSimpleMessages),
               selectedAgentCode: target.selectedAgentCode,
             },
           });
@@ -556,7 +590,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
         payload: {
           sessionId: generateSessionId(),
           conversationId: session.conversationId,
-          messages: messages.map(toSimpleMessage),
+          messages: messages.flatMap(toSimpleMessages),
           selectedAgentCode: session.selectedAgentCode,
         },
       });

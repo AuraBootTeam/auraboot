@@ -133,6 +133,14 @@ export interface AuraBotConversationMessage {
   type: string;
   content: string;
   traceId?: string | null;
+  /**
+   * D.1 (2026-05-07): Anthropic Extended Thinking reasoning prose persisted
+   * server-side on the assistant row. Present when the row carries any
+   * reasoning; null/undefined for legacy rows, non-thinking turns, or
+   * non-Anthropic providers.
+   */
+  thinkingContent?: string | null;
+  thinkingSignature?: string | null;
   createdAt: string;
 }
 

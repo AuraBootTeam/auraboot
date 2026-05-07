@@ -67,6 +67,19 @@ public interface TurnSideEffects {
 
         Long persistOutbound(TurnContext ctx, TurnOutcome outcome);
 
+        /**
+         * D.1 (2026-05-07) overload that carries side-channel turn artifacts
+         * (Anthropic Extended Thinking prose + signature, future per-turn
+         * usage, etc.). Default impl ignores artifacts and delegates to the
+         * 2-arg method so legacy {@link Persistence} implementations keep
+         * compiling unchanged. {@link AuraBotTurnPersistence} overrides to
+         * actually persist {@code thinking_content} / {@code thinking_signature}
+         * onto the {@code ab_im_message} agent row.
+         */
+        default Long persistOutbound(TurnContext ctx, TurnOutcome outcome, TurnArtifacts artifacts) {
+            return persistOutbound(ctx, outcome);
+        }
+
         Persistence NOOP = new Persistence() {
             public Long persistInbound(TurnRequest request,
                                          com.auraboot.framework.agent.triage.TriageVerdict triageVerdict) {
