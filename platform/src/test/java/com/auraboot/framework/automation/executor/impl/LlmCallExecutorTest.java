@@ -5,10 +5,12 @@ import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.automation.entity.AutomationAction;
+import com.auraboot.framework.automation.event.AutomationRunStreamPublisher;
 import com.auraboot.framework.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -37,8 +39,23 @@ class LlmCallExecutorTest {
     @Mock
     private LlmProviderFactory llmProviderFactory;
 
-    @Mock
+    /**
+     * Use {@link Answers#CALLS_REAL_METHODS} so the default {@code streamChat}
+     * implementation on {@link LlmProvider} runs and forwards to the
+     * Mockito-stubbed sync {@code chat} method. Without this, the executor's
+     * E.1 switch from {@code chat()} to {@code streamChat()} would break
+     * every existing assertion that relies on {@code when(provider.chat(...))}.
+     */
+    @Mock(answer = Answers.CALLS_REAL_METHODS)
     private LlmProvider llmProvider;
+
+    /**
+     * Stream publisher is wired but unused by these unit tests (chunks fire
+     * into a no-op sink). Existence ensures Mockito can satisfy the
+     * {@link LlmCallExecutor} constructor's two-arg signature.
+     */
+    @Mock
+    private AutomationRunStreamPublisher streamPublisher;
 
     @InjectMocks
     private LlmCallExecutor executor;
