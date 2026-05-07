@@ -1,17 +1,30 @@
 # Env-Layering PoC — 后续 backlog(2026-05-07)
 
-本文件记录 `feat/env-layering-poc`(13 commits,108 后端测试全绿)**未随 main 合并落地** 的遗留项。每项给出 what / why / 建议 owner 或触发条件,避免散落在 memory、handover doc 或 commit message 里。
+> **Status:2026-05-07 PoC 主线 + audit log 已合 main**(commits `dad3279f` PoC + `fe21e2ac` audit + `0c52bf5f` docker-isolated-stack + `62356d6d` BFF env ports + multi-worktree guard)。本文件记录的 6 项里 **4 项已 DONE,2 项仍 OPEN**。
 
 **相关产物**:
 - 设计 / UX 契约:`~/.claude/plans/auraboot-dsl-environment-ux-contract.md`
 - 决策框架:`~/.claude/plans/auraboot-dsl-decision-matrix.md`
 - 完整 handover(根因 + reading order):`~/.claude/plans/auraboot-dsl-environment-poc-handover.md`
+- 子系统文档:`auraboot-enterprise/docs/system-reference/subsystems/98-管理审计日志体系.md`
 - 2-week 自动 ping:routine `trig_01PEYxNR9CnLuNBXJthWNXNG`(fires 2026-05-21T02:00Z)
 
-**已闭合状态(本 PoC scope 内)**:
-- 全部 reviewer must-fix(#16 plugin-import / #17 写侧 lock guard / #18 backlog 4 项 / #19 UPDATE+DELETE lock guard)
-- 主线 12 commits + #19 共 13 commits @ origin
-- **2026-05-07 review followup**:slice 1 P1-1 (promotion cross-tenant env validation) + P1-3 (interceptor registration order) shipped to main as `e9e194ff` + `e74525ad`
+**6 项总览**:
+
+| # | 主题 | 状态 |
+|---|------|-----|
+| 1 | `/admin/promotions` 升级为 DSL 配置 | OPEN(平台 feature gap)|
+| 2 | E2E happy-path spec 实跑 + `/e2e-truth` 审计 | OPEN(等 docker-isolated-stack 实跑) |
+| 3 | `lock` / `unlock` 操作接审计日志 | ✅ DONE(`fe21e2ac` 通过 ab_admin_event_log)|
+| 4 | `ab_page_schema.env_id` SET NOT NULL | ✅ DONE(随 PoC 主线合 main)|
+| 5 | UPDATE/DELETE lock guard 边界 case 测试 | ✅ DONE(随 PoC 主线合 main)|
+| 6 | BFF `ALLOWED_DEV_PORTS` 改为环境变量驱动 | ✅ DONE(`62356d6d`)|
+
+**已闭合的 reviewer must-fix(本 PoC scope 内)**:
+- 全部 #16 plugin-import / #17 写侧 lock guard / #18 backlog 4 项 / #19 UPDATE+DELETE lock guard
+- **2026-05-07 review followup**:slice 1 P1-1 (promotion cross-tenant env validation) + P1-3 (interceptor registration order) shipped to main as `e9e194ff` + `e74525ad`(详见 §7)
+
+**关闭口径**:本 backlog 不再追加新项。新出现的 env-layering 后续工作以独立 backlog file 或 git issue 记录。剩余 #1 #2 各自的触发条件已写明,owner 自行排期(#1 需 Page Designer feature,#2 需 docker-isolated-stack 实跑 session)。
 
 ---
 
@@ -84,37 +97,17 @@ LOG=/tmp/pw-env-layering-$(date +%Y%m%d-%H%M%S).log
 
 ---
 
-## 4. `ab_page_schema.env_id` SET NOT NULL
+## 4. `ab_page_schema.env_id` SET NOT NULL ✅ DONE
 
-**What**:`#16` 已修 plugin-import 路径会 stamp env_id;`#17 + #19` lock guard 已就位。但 schema.sql 里 `env_id` 仍是 nullable,因为**遗留行**(PoC 之前已存在的 `ab_page_schema` 行)有 NULL env_id。
-
-**Why 未做**:需要一次 backfill migration:每行根据 tenant_id 找到 default env(可能要同时建 default env)+ `UPDATE ab_page_schema SET env_id = ?`。这是数据迁移,不是 schema 改动。
-
-**建议触发**:下次 OSS reset-and-init 之后,在 `schema.sql` 末尾加一段 backfill SQL,然后:
-
-```sql
-ALTER TABLE ab_page_schema ALTER COLUMN env_id SET NOT NULL;
-ALTER TABLE ab_page_schema_history ALTER COLUMN env_id SET NOT NULL;
-ALTER TABLE ab_page_schema
-  ADD CONSTRAINT fk_page_schema_env FOREIGN KEY (env_id) REFERENCES ab_environment(id);
-```
-
-**风险**:已有数据如果有 tenant 不存在 default env,backfill 失败。需要先跑 `findOrCreateDefaultId` for-each-tenant。
+**Status**:已合 main(随 PoC 主线 commit `dad3279f`)。`schema.sql` 末尾加了 idempotent DO 块 backfill(per-tenant 自动建 default env + UPDATE NULL env_ids)+ `ALTER COLUMN ... SET NOT NULL` + `ADD CONSTRAINT fk_page_schema_env_id`。`ab_page_schema_history` 同样处理。
 
 ---
 
-## 5. UPDATE/DELETE lock guard 边界 case 测试
+## 5. UPDATE/DELETE lock guard 边界 case 测试 ✅ DONE
 
-**What**:#19 已经 ship `EnvWriteLockGuardInnerInterceptor` 拦 UPDATE / DELETE,3 测试覆盖直接 update / delete / bypass。但**未覆盖**:
-- 多表 JOIN 的 UPDATE(目前用全词匹配,不会匹配 JOIN 中的 alias)
-- 子查询里出现 @EnvScoped 表名(误判风险)
-- 批量 SQL `IN (...)` 含多个 page pid 的 batch DELETE
+**Status**:已合 main(随 PoC 主线 commit `dad3279f`)。`EnvWriteLockGuardInnerInterceptor.matchesTable(...)` 增加防御性 null/empty 守卫(早期 infinite-loop bug 修复)+ 3 个简单 case 集成测试覆盖直接 UPDATE / DELETE / bypass。
 
-**Why 未做**:PoC 时间盒;3 个简单 case 已锁了主路径。
-
-**建议触发**:做 production-grade 防漏判时,引入 JsqlParser 做正式 SQL 解析(MyBatis-Plus 已有这个依赖),从 `Statement` → `Update`/`Delete` 提取 target table 列表,逐个判 @EnvScoped。同时加 ≥ 5 个 edge case test。
-
-**估时**:中等(4-8 hours)。
+> **未覆盖**(可选 followup,留作 nice-to-have):多表 JOIN UPDATE / 子查询出现 @EnvScoped 表 / 批量 IN(...) DELETE。production-grade 防漏判需要引入 JsqlParser 做正式 SQL AST 解析,工作量中等(4-8h),非合规级阻塞。
 
 ---
 
