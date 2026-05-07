@@ -412,7 +412,7 @@ export const ListTable = React.memo(function ListTable({
                           <td
                             className={`px-2 ${rowHeightCfg.pyClass} sticky right-0 z-10 w-px border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50`}
                           >
-                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
                               <RowActionButtons
                                 buttons={actionColumn.buttons || []}
                                 record={record}
@@ -520,7 +520,7 @@ export const ListTable = React.memo(function ListTable({
                           <td
                             className={`px-2 ${rowHeightCfg.pyClass} sticky right-0 z-10 w-px border-l border-gray-200 bg-white shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)] group-hover:bg-gray-50`}
                           >
-                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[[data-row-actions-open=true]]:opacity-100">
                               <RowActionButtons
                                 buttons={actionColumn.buttons || []}
                                 record={record}
