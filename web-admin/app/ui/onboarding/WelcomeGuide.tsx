@@ -63,16 +63,16 @@ export function WelcomeGuide() {
         {/* Action cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Link
-            to="/admin/templates"
+            to="/plugins"
             className="group flex items-start gap-3 rounded-xl bg-white/10 p-4 backdrop-blur-sm transition-all hover:bg-white/20"
           >
             <div className="rounded-lg bg-white/20 p-2 transition-colors group-hover:bg-white/30">
               <RocketLaunchIcon className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="mb-0.5 text-sm font-semibold">Start from Template</h3>
+              <h3 className="mb-0.5 text-sm font-semibold">Browse Plugins</h3>
               <p className="text-xs leading-relaxed text-blue-100">
-                CRM, Project Management, HR, and more. One-click install.
+                Install business apps and extensions from the plugin catalog.
               </p>
             </div>
           </Link>

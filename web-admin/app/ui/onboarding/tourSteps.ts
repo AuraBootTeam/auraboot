@@ -41,11 +41,11 @@ export const TOUR_STEPS: TourStep[] = [
     placement: 'bottom',
   },
   {
-    id: 'templates',
-    target: '[data-testid="menu-templates"], [href="/admin/templates"]',
-    title: 'Application Templates',
+    id: 'plugins',
+    target: '[data-testid="menu-plugins"], [href="/plugins"]',
+    title: 'Plugins',
     content:
-      'Install pre-built application templates like CRM, Project Management, or HR with one click. Each template includes models, pages, and workflows.',
+      'Install business apps (CRM, HR, Project Management) and extensions from the plugin catalog. Each plugin ships with its models, pages, and workflows.',
     placement: 'right',
   },
   {
