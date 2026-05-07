@@ -917,6 +917,6 @@ The entire pipeline runs in a single database transaction (stages 1-19). Externa
 
 ## Related Documentation
 
-- [Models](./models.md) -- How models define the data structure that commands operate on
-- [Pages](./pages.md) -- How pages render forms and trigger commands from the UI
-- [Plugin Development Guide](../guides/plugin-development.md) -- How to create plugins with custom commands
+- [Models and Fields](./models-and-fields.md) -- How models define the data structure that commands operate on
+- [Pages and Layouts](./pages-and-layouts.md) -- How pages render forms and trigger commands from the UI
+- [Plugin Development Guide](../plugin-development/full-stack-plugin.md) -- How to create plugins with custom commands
