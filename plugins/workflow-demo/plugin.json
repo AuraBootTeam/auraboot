@@ -4,6 +4,10 @@
   "version": "1.0.0",
   "dslVersion": 1,
   "pluginType": "config",
+  "backend": {
+    "jarPath": "backend/build/libs/workflow-demo-plugin-1.0.0.jar",
+    "entryClass": "com.auraboot.plugins.workflowdemo.WorkflowDemoPlugin"
+  },
   "displayName": "Workflow Demo",
   "displayName:zh-CN": "工作流演示",
   "displayName:en": "Workflow Demo",
