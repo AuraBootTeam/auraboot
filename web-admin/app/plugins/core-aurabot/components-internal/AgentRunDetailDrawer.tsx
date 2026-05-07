@@ -331,7 +331,7 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
 
   return (
     <div
-      className="fixed inset-0 z-40 flex justify-end"
+      className="fixed inset-0 z-[60] flex justify-end"
       data-testid="agent-run-detail-drawer"
       role="dialog"
       aria-modal="true"

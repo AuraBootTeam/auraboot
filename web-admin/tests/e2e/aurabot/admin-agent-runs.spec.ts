@@ -566,12 +566,7 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     await expect(bifSection).toContainText('AgentRun');
 
     // Close drawer to keep state clean for AR-003 / AR-004.
-    // Sticky page header overlaps the drawer's close button at default
-    // viewport — use evaluate(el.click()) to bypass the pointer-events
-    // hit-test (real users dismiss via Esc / backdrop click anyway).
-    await page
-      .locator('[data-testid="drawer-close"]')
-      .evaluate((el: HTMLElement) => el.click());
+    await page.locator('[data-testid="drawer-close"]').click();
     await expect(drawer).toBeHidden({ timeout: 5_000 });
     expect(page.url()).not.toContain('runId=');
   });
