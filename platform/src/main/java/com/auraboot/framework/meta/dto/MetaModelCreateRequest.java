@@ -42,9 +42,25 @@ public class MetaModelCreateRequest {
      */
     private String modelCategory;
 
-      
+    /**
+     * Business meaning written for Agent / domain-aware tooling.
+     */
+    private String semanticDescription;
 
-    
+    /**
+     * Domain category (CRM, FINANCE, INVENTORY, HR, ...).
+     */
+    private String domainCategory;
+
+    /**
+     * Data sensitivity classification (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED).
+     */
+    private String dataSensitivity;
+
+    /**
+     * Lifecycle description (e.g. "DRAFT → SUBMITTED → APPROVED").
+     */
+    private String lifecycleDescription;
 
     /**
      * 租户ID

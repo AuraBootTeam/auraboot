@@ -290,6 +290,10 @@ public interface MetaModelMapper extends BaseMapper<Model> {
             plugin_pid = #{pluginPid},
             table_name = COALESCE(#{tableName}, table_name),
             model_category = #{modelCategory},
+            semantic_description = #{semanticDescription},
+            domain_category = #{domainCategory},
+            data_sensitivity = COALESCE(#{dataSensitivity}, data_sensitivity),
+            lifecycle_description = #{lifecycleDescription},
             updated_at = NOW()
         WHERE tenant_id = #{tenantId} AND code = #{code} AND deleted_flag = FALSE
         """)
@@ -297,6 +301,10 @@ public interface MetaModelMapper extends BaseMapper<Model> {
                               @Param("pluginPid") String pluginPid,
                               @Param("tableName") String tableName,
                               @Param("modelCategory") String modelCategory,
+                              @Param("semanticDescription") String semanticDescription,
+                              @Param("domainCategory") String domainCategory,
+                              @Param("dataSensitivity") String dataSensitivity,
+                              @Param("lifecycleDescription") String lifecycleDescription,
                               @Param("tenantId") Long tenantId,
                               @Param("code") String code);
 

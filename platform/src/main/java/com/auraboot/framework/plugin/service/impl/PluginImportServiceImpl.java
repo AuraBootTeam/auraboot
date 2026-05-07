@@ -476,20 +476,47 @@ public class PluginImportServiceImpl implements PluginImportService {
      */
     private <T> List<T> loadResourceListFromZip(Map<String, byte[]> files, String path, Class<T> clazz) {
         byte[] content = files.get(path);
-        if (content == null) {
-            log.debug("Resource file not found in ZIP: {}", path);
+        if (content != null) {
+            try {
+                com.fasterxml.jackson.databind.JavaType listType = objectMapper.getTypeFactory()
+                        .constructCollectionType(List.class, clazz);
+                return objectMapper.readValue(new String(content, StandardCharsets.UTF_8), listType);
+            } catch (Exception e) {
+                log.warn("Failed to parse resource file {}: {}", path, e.getMessage());
+                return List.of();
+            }
+        }
+
+        // Directory layout: aggregate every <path>/*.json entry. Each file may be either
+        // a single resource object OR an array of resources (mirrors PluginDirectoryLoader.parseResourceFile).
+        String prefix = path.endsWith("/") ? path : path + "/";
+        List<String> children = files.keySet().stream()
+                .filter(k -> k.startsWith(prefix) && k.endsWith(".json")
+                        && k.indexOf('/', prefix.length()) < 0)
+                .sorted()
+                .toList();
+        if (children.isEmpty()) {
+            log.debug("Resource path not found in ZIP (file or directory): {}", path);
             return List.of();
         }
 
-        try {
-            String jsonContent = new String(content, StandardCharsets.UTF_8);
-            com.fasterxml.jackson.databind.JavaType listType = objectMapper.getTypeFactory()
-                    .constructCollectionType(List.class, clazz);
-            return objectMapper.readValue(jsonContent, listType);
-        } catch (Exception e) {
-            log.warn("Failed to parse resource file {}: {}", path, e.getMessage());
-            return List.of();
+        com.fasterxml.jackson.databind.JavaType listType = objectMapper.getTypeFactory()
+                .constructCollectionType(List.class, clazz);
+        List<T> resources = new ArrayList<>();
+        for (String child : children) {
+            try {
+                var node = objectMapper.readTree(new String(files.get(child), StandardCharsets.UTF_8));
+                if (node == null || node.isNull()) continue;
+                if (node.isArray()) {
+                    resources.addAll(objectMapper.convertValue(node, listType));
+                } else {
+                    resources.add(objectMapper.convertValue(node, clazz));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse resource file {}: {}", child, e.getMessage());
+            }
         }
+        return resources;
     }
 
     /**
