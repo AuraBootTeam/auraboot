@@ -138,7 +138,7 @@ function groupByKey<TLabel>(
 ): [string | undefined, ExtendedPropertySchema<TLabel>[]][] {
   const map = new Map<string | undefined, ExtendedPropertySchema<TLabel>[]>();
   for (const s of schemas) {
-    const key = s.group;
+    const key = s.group as string | undefined;
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(s);
   }

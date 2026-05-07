@@ -25,10 +25,14 @@ export function PropertyField({ schema, nodeId }: PropertyFieldProps) {
     required: schema.required,
   });
 
-  // Resolve I18nText labels to plain strings for the shared renderer
-  const resolvedSchema = useMemo(
-    (): SharedPropertySchema<string> => ({
-      ...schema,
+  // Resolve I18nText labels to plain strings for the shared renderer.
+  // Destructure to exclude array-specific fields (itemSchema/itemLabel/addButtonLabel)
+  // which carry I18nText generics incompatible with PropertySchema<string>.
+  const resolvedSchema = useMemo((): SharedPropertySchema<string> => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { itemSchema: _is, itemLabel: _il, addButtonLabel: _ab, ...rest } = schema as any;
+    return {
+      ...rest,
       label: st(schema.label),
       placeholder: schema.placeholder ? st(schema.placeholder) : undefined,
       description: schema.description ? st(schema.description) : undefined,
@@ -36,9 +40,9 @@ export function PropertyField({ schema, nodeId }: PropertyFieldProps) {
         label: st(opt.label),
         value: opt.value,
       })),
-    }),
-    [schema, st],
-  );
+      group: schema.group != null ? st(schema.group) : undefined,
+    };
+  }, [schema, st]);
 
   return <PropertyFieldRenderer schema={resolvedSchema} adapter={adapter} />;
 }

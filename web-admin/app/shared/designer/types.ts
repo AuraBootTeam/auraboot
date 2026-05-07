@@ -33,7 +33,9 @@ export type PropertyType =
   | 'automation-select'
   | 'command-select'
   | 'localizedText'
-  | 'icon';
+  | 'icon'
+  | 'array'
+  | 'dict-select';
 
 /**
  * Property schema definition for designer configuration panels.
@@ -49,8 +51,18 @@ export interface PropertySchema<TLabel = string | I18nText> {
   description?: TLabel;
   defaultValue?: unknown;
   dependsOn?: { field: string; value?: unknown };
-  /** Group name for panel sectioning */
-  group?: string;
+  /** Group name for panel sectioning. TLabel for i18n parity. */
+  group?: TLabel;
+
+  /** type='array' only: schema for each item's fields. */
+  itemSchema?: PropertySchema<TLabel>[];
+  /** type='array' only: collapsed-header label. User-data interpolation; not translated. */
+  itemLabel?: (item: any, index: number) => string;
+  /** type='array' only: button label. Defaults to '+ Add'. */
+  addButtonLabel?: TLabel;
+
+  /** type='dict-select' only: optional whitelist of dict codes. */
+  dictCodeFilter?: string[];
 }
 
 // ==================== Validation ====================
