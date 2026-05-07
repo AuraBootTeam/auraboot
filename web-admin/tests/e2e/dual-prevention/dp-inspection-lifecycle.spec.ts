@@ -254,8 +254,9 @@ test('DIN-003: Inspection lifecycle — pending → in_progress → completed @c
 
   await completeBtn.evaluate((el: HTMLElement) => el.click());
 
-  // The complete command opens a modal form with inputFields — wait for it
-  await page.waitForTimeout(1000); // brief wait for modal animation
+  // The complete command opens a modal form with inputFields. The
+  // resultInput.isVisible({ timeout: 5_000 }) below already polls, so a
+  // fixed sleep for "modal animation" is redundant.
 
   // Result field should be required — fill it
   const resultInput = page
