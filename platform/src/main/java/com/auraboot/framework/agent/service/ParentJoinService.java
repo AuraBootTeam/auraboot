@@ -103,22 +103,6 @@ public class ParentJoinService {
      */
     private final ConcurrentHashMap<JoinKey, JoinSlot> slots = new ConcurrentHashMap<>();
 
-    /**
-     * Active join slots keyed by (parentRunId, childRunId). A slot exists only
-     * while at least one thread is awaiting that pair; the joiner removes its
-     * own slot in a {@code finally} block so the map cannot grow unboundedly.
-     *
-     * <p>Concurrency model: one slot per (parent, child) pair is shared by all
-     * threads calling {@link #joinChildRun} for the same pair. They all await
-     * the same {@link CountDownLatch} and read the same result reference, so
-     * each receives the same {@link ChildRunOutcome}. The first joiner to
-     * enter the {@code finally} block removes the slot; subsequent late
-     * arrivals (very rare — they'd need to enter while latch is still 0) re-
-     * register a fresh slot and immediately observe terminal state via the
-     * DB-readback path.
-     */
-    private final ConcurrentHashMap<JoinKey, JoinSlot> slots = new ConcurrentHashMap<>();
-
     @EventListener
     public void onSessionEnded(SessionEndedEvent event) {
         String childRunId = event.getRunId();

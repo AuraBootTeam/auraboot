@@ -427,16 +427,6 @@
   ],
   "roles": [
     {
-      "code": "platform_admin",
-      "name": "平台管理员",
-      "description": "平台管理员角色，可访问跨租户的基础设施与云配置端点（/api/admin/infrastructure/**, /api/admin/cloud-config/**）",
-      "type": "tenant",
-      "scopeType": "tenant",
-      "priority": 0,
-      "isDefault": false,
-      "isDeletable": false
-    },
-    {
       "code": "tenant_admin",
       "name": "租户管理员",
       "description": "租户管理员角色，拥有该租户的所有权限",

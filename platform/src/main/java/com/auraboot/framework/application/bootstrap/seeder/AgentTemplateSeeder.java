@@ -94,8 +94,6 @@ public class AgentTemplateSeeder {
                 3. 审批金额超过10万时，提醒需总经理二次确认
                 4. 拒绝时必须要求填写拒绝原因
                 始终用中文回复，审批操作前先确认关键信息。
-                """,
-                defaultExecutionConfig
 
                 Sub-agent delegation: when the user asks for an independent
                 side-task that can run in parallel with the current approval
@@ -107,7 +105,8 @@ public class AgentTemplateSeeder {
                 user approval before the child run starts; the parent
                 conversation does not block on the child. Do NOT delegate the
                 user's primary approval intent itself.
-                """
+                """,
+                defaultExecutionConfig
             },
             // data_entry_assistant
             {
@@ -122,8 +121,6 @@ public class AgentTemplateSeeder {
                 3. 发现错误时给出具体修正建议
                 4. 支持从Excel/CSV批量导入并预检数据质量
                 始终保持耐心，对错误给出清晰的修正指引。
-                """,
-                defaultExecutionConfig
 
                 Sub-agent delegation: when the user requests a long-running
                 independent side-task (for example, "kick off a bulk import
@@ -135,7 +132,8 @@ public class AgentTemplateSeeder {
                 conversation does not block on the child. Use only for
                 clearly separable side-tasks, not for the field the user
                 is currently editing.
-                """
+                """,
+                defaultExecutionConfig
             },
             // report_analysis — opt-in Extended Thinking for multi-hop analysis
             {
@@ -150,8 +148,6 @@ public class AgentTemplateSeeder {
                 3. 主动指出数据异常和关键变化点
                 4. 提供数据驱动的业务建议
                 数据查询结果优先以表格形式呈现，关键数字加粗标注。
-                """,
-                reportAnalysisExecutionConfig
 
                 Sub-agent delegation: when the user asks for an independent
                 heavy analysis side-task (for example, "delegate a full-year
@@ -163,7 +159,8 @@ public class AgentTemplateSeeder {
                 conversation does not block on the child. Do not delegate
                 cheap inline queries that finish quickly in the current
                 turn.
-                """
+                """,
+                reportAnalysisExecutionConfig
             },
             // crm_operations
             {
@@ -178,8 +175,6 @@ public class AgentTemplateSeeder {
                 3. 根据商机阶段给出推进建议
                 4. 汇总销售漏斗数据和关键指标
                 理解销售场景，用简洁的语言总结关键信息，避免信息过载。
-                """,
-                defaultExecutionConfig
 
                 Sub-agent delegation: when the user asks for an independent
                 bulk side-task (for example, "delegate a bulk export of all
@@ -190,7 +185,8 @@ public class AgentTemplateSeeder {
                 approval before the child run starts; the parent
                 conversation does not block on the child. Do not delegate
                 single-record lookups or activity logs.
-                """
+                """,
+                defaultExecutionConfig
             },
             // ops_inspector
             {
@@ -205,8 +201,6 @@ public class AgentTemplateSeeder {
                 3. 汇总运营日报/周报数据
                 4. 监控定时任务执行状态
                 对异常情况保持敏感，用数字和事实说话，不做主观猜测。
-                """,
-                defaultExecutionConfig
 
                 Sub-agent delegation: when the user asks for an independent
                 deep-dive side-task that should run alongside the current
@@ -218,7 +212,8 @@ public class AgentTemplateSeeder {
                 approval before the child run starts; the parent
                 conversation does not block on the child. Do not delegate
                 routine health checks that complete in the current turn.
-                """
+                """,
+                defaultExecutionConfig
             },
         };
 

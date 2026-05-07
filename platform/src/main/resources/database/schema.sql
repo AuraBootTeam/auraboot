@@ -8412,9 +8412,8 @@ CREATE INDEX IF NOT EXISTS idx_bitemporal_history
 COMMENT ON TABLE ab_bitemporal_record IS
   'Generic bi-temporal record store — (validTime × txTime) versioning keyed by (entityType, entityId).';
 
-<<<<<<< HEAD
-
--- ==============================================================-- env-layering #4 — env_id backfill + SET NOT NULL
+-- ==============================================================
+-- env-layering #4 — env_id backfill + SET NOT NULL
 --
 -- For fresh DBs (reset-and-init flow) this DO block is a no-op (ab_tenant
 -- empty). For dev DBs that accumulated legacy NULL env_id rows before #16
@@ -8469,7 +8468,7 @@ BEGIN
             FOREIGN KEY (env_id) REFERENCES ab_environment(id);
     END IF;
 END$$;
-=======
+
 -- ==========================================================================
 -- Admin Guard v2 — generic admin action audit log (2026-05-07)
 -- ==========================================================================
@@ -8492,7 +8491,6 @@ CREATE INDEX IF NOT EXISTS idx_admin_action_log_tenant_time
     ON ab_admin_action_log (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_action_log_actor_time
     ON ab_admin_action_log (actor_user_id, created_at DESC);
-=======
 -- ============================================================================
 -- C.2 Cross-Tenant Sub-Agent ACL — grant table + spawn audit
 -- See docs/superpowers/specs/2026-05-07-c2-cross-tenant-acl-design.md
@@ -8538,4 +8536,3 @@ CREATE INDEX IF NOT EXISTS ix_xtg_audit_child_time
 COMMENT ON TABLE ab_cross_tenant_spawn_audit IS
   'One row per cross-tenant spawn decision (allowed / denied_no_grant / '
   'denied_expired / denied_revoked / denied_feature_disabled).';
->>>>>>> a1f10874 (feat(security): cross-tenant sub-agent ACL with audit + admin grant page)
