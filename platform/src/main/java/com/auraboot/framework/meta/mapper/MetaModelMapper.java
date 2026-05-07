@@ -283,6 +283,10 @@ public interface MetaModelMapper extends BaseMapper<Model> {
      * Update model fields for plugin import (extension, plugin_pid, table_name, model_category).
      * table_name is only overwritten when the plugin explicitly provides one; a null value
      * preserves the existing column so that dynamic-table models (mt_*) are not cleared.
+     * The four agent-ready semantic fields (semantic_description, domain_category,
+     * data_sensitivity, lifecycle_description) all use COALESCE so that re-importing a
+     * plugin manifest that omits these fields does not silently wipe values that were
+     * populated previously (e.g., by a backfill job or a later manifest revision).
      */
     @Update("""
         UPDATE ab_meta_model SET
@@ -290,10 +294,10 @@ public interface MetaModelMapper extends BaseMapper<Model> {
             plugin_pid = #{pluginPid},
             table_name = COALESCE(#{tableName}, table_name),
             model_category = #{modelCategory},
-            semantic_description = #{semanticDescription},
-            domain_category = #{domainCategory},
+            semantic_description = COALESCE(#{semanticDescription}, semantic_description),
+            domain_category = COALESCE(#{domainCategory}, domain_category),
             data_sensitivity = COALESCE(#{dataSensitivity}, data_sensitivity),
-            lifecycle_description = #{lifecycleDescription},
+            lifecycle_description = COALESCE(#{lifecycleDescription}, lifecycle_description),
             updated_at = NOW()
         WHERE tenant_id = #{tenantId} AND code = #{code} AND deleted_flag = FALSE
         """)
