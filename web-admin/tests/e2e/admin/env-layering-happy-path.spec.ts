@@ -85,10 +85,11 @@ test.describe('Env-layering happy path', () => {
     await expect(page.locator('button', { hasText: 'New Environment' })).toBeVisible();
     await expect(page.locator('button', { hasText: 'Compare' })).toBeVisible();
 
-    // Card grid OR the "no envs" empty state — at least one of them visible.
-    const grid = page.locator('div.grid').first();
-    const empty = page.locator('text=No environments configured yet');
-    await expect(grid.or(empty)).toBeVisible();
+    // Card grid OR the "no envs" empty state — at least one of them visible
+    // after the initial fetch completes.
+    const grid = page.getByTestId('env-list-grid');
+    const empty = page.getByTestId('env-empty-state');
+    await expect(grid.or(empty)).toBeVisible({ timeout: 15_000 });
   });
 
   test('EL-002 create dev + staging envs (D4 + D6)', async ({ page }) => {

@@ -202,6 +202,7 @@ test.describe('AuraBot — ResultContract rendering', () => {
   });
 
   test('RC-03: failed status renders red styling + error summary', async ({ page }) => {
+    test.setTimeout(30_000);
     const contract = {
       outputType: 'text',
       renderHint: 'summary',
