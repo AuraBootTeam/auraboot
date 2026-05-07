@@ -1,40 +1,33 @@
 #!/usr/bin/env bash
 # ACP Showcase — Seed 7 Safety Valve Rules
 # Run after plugin import: bash plugins/acp-showcase/scripts/seed-safety-rules.sh
+#
+# Uses Aura CLI (`aura exec`) — first authenticate with `aura login` if needed.
 
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:6443}"
-EMAIL="${EMAIL:-admin@example.com}"
-PASSWORD="${PASSWORD:-Test2026x}"
-
-echo "=== ACP Showcase: Seeding Safety Rules ==="
-
-# Login
-TOKEN=$(NO_PROXY=localhost curl -sf -X POST "$BASE_URL/api/auth/login" \
-  -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['jwt'])")
-
-if [ -z "$TOKEN" ]; then
-  echo "ERROR: Login failed"
+if ! command -v aura >/dev/null 2>&1; then
+  echo "ERROR: aura CLI not found on PATH. Install: cd plugins/cli && npm link" >&2
   exit 1
 fi
 
-echo "  Logged in as $EMAIL"
+echo "=== ACP Showcase: Seeding Safety Rules ==="
 
-exec_cmd() {
-  local CMD="$1"
+create_rule() {
+  local DESC="$1"
   local PAYLOAD="$2"
-  NO_PROXY=localhost curl -sf -X POST "$BASE_URL/api/meta/commands/execute/$CMD" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Content-Type: application/json" \
-    -d "{\"payload\": $PAYLOAD}" > /dev/null
-  echo "  Created: $CMD"
+  local PID
+  PID=$(printf '%s' "$PAYLOAD" \
+    | aura exec acs:create_safety_rule --stdin --format json --agent-mode \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('recordId',''))")
+  if [ -z "$PID" ]; then
+    echo "  FAILED: $DESC" >&2
+    return 1
+  fi
+  echo "  Created: $DESC ($PID)"
 }
 
-# Rule 1: Approval Gate (L3+)
-exec_cmd "acs:create_safety_rule" '{
+create_rule "Approval Gate (L3+)" '{
   "acs_rule_code": "GATE_L3_PLUS",
   "acs_rule_name": "Approval Gate (L3+ Risk)",
   "acs_rule_type": "approval_gate",
@@ -46,8 +39,7 @@ exec_cmd "acs:create_safety_rule" '{
   "acs_rule_priority": 10
 }'
 
-# Rule 2: Cost Limit per Run
-exec_cmd "acs:create_safety_rule" '{
+create_rule "Cost Limit per Run (\$1.00)" '{
   "acs_rule_code": "COST_PER_RUN",
   "acs_rule_name": "Cost Limit per Run ($1.00)",
   "acs_rule_type": "cost_limit",
@@ -59,8 +51,7 @@ exec_cmd "acs:create_safety_rule" '{
   "acs_rule_priority": 20
 }'
 
-# Rule 3: Hallucination Circuit Breaker
-exec_cmd "acs:create_safety_rule" '{
+create_rule "Hallucination Circuit Breaker" '{
   "acs_rule_code": "HALLUCIN_BREAKER",
   "acs_rule_name": "Hallucination Circuit Breaker",
   "acs_rule_type": "hallucination_breaker",
@@ -72,8 +63,7 @@ exec_cmd "acs:create_safety_rule" '{
   "acs_rule_priority": 5
 }'
 
-# Rule 4: Iteration Limit
-exec_cmd "acs:create_safety_rule" '{
+create_rule "Tool Loop Iteration Limit (20)" '{
   "acs_rule_code": "ITER_LIMIT_20",
   "acs_rule_name": "Tool Loop Iteration Limit (20)",
   "acs_rule_type": "iteration_limit",
@@ -85,8 +75,7 @@ exec_cmd "acs:create_safety_rule" '{
   "acs_rule_priority": 15
 }'
 
-# Rule 5: Deletion Scope Guard
-exec_cmd "acs:create_safety_rule" '{
+create_rule "Deletion Scope Guard (>10)" '{
   "acs_rule_code": "DELETE_SCOPE_GUARD",
   "acs_rule_name": "Deletion Scope Guard (>10 records)",
   "acs_rule_type": "content_filter",
@@ -98,8 +87,7 @@ exec_cmd "acs:create_safety_rule" '{
   "acs_rule_priority": 12
 }'
 
-# Rule 6: Rate Limit
-exec_cmd "acs:create_safety_rule" '{
+create_rule "Rate Limit (100/hour)" '{
   "acs_rule_code": "RATE_100_PER_HOUR",
   "acs_rule_name": "Rate Limit (100 req/hour)",
   "acs_rule_type": "rate_limit",
@@ -111,8 +99,7 @@ exec_cmd "acs:create_safety_rule" '{
   "acs_rule_priority": 25
 }'
 
-# Rule 7: External API Monitor
-exec_cmd "acs:create_safety_rule" '{
+create_rule "External API Monitor" '{
   "acs_rule_code": "EXT_API_MONITOR",
   "acs_rule_name": "External API Call Monitor",
   "acs_rule_type": "scope_restriction",
@@ -126,4 +113,4 @@ exec_cmd "acs:create_safety_rule" '{
 
 echo ""
 echo "=== Done: 7 safety rules seeded ==="
-echo "  View at: ${BASE_URL}/p/acs_safety_rule"
+echo "  View at: http://localhost:5173/p/acs_safety_rule"
