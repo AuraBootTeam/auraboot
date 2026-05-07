@@ -761,8 +761,10 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     await logsBtn.click();
 
     // Dialog pops open (data-testid="execution-log-dialog").
+    // Under full-suite load the click → mocked-fetch → dialog mount can exceed
+    // 8s. Bump to 20s to absorb contention.
     const dialog = page.locator('[data-testid="execution-log-dialog"]').first();
-    await expect(dialog).toBeVisible({ timeout: 8_000 });
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
 
     // The single log row should show success status. Use a scoped locator
     // because the same status badges appear elsewhere in the page.

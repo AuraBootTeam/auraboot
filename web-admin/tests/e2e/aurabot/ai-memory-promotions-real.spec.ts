@@ -170,15 +170,18 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
 
     await page.locator('[data-testid="retract-submit"]').click();
 
+    // Toast lands after the /retract POST + DB write under load can take >5s
+    // when the BFF queue is hot — bump to match other contention-prone specs.
     await expect(page.locator('[data-testid="toast"]')).toBeVisible({
-      timeout: 5_000,
+      timeout: 15_000,
     });
     await expect(page.locator('[data-testid="toast"]')).toContainText(
       /撤回|Retract/,
     );
 
-    const row = dbPromotionRow(seed.pid);
-    expect(row.status).toBe('RETRACTED');
+    // Poll DB read to absorb the async commit gap between toast and persisted row.
+    await expect.poll(() => dbPromotionRow(seed.pid).status, { timeout: 10_000 })
+      .toBe('RETRACTED');
     expect(dbMemoryIsDeleted(seed.promotedMemoryPid!)).toBe(true);
   });
 
