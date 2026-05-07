@@ -1,11 +1,9 @@
-import { render, screen, cleanup } from '@testing-library/react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { SourceTypeBadge } from '~/shared/components/SourceTypeBadge';
 
+// @testing-library/react v14+ performs cleanup automatically via afterEach
 describe('SourceTypeBadge', () => {
-  afterEach(() => {
-    cleanup();
-  });
 
   it.each([
     ['physical', '物理表'],
