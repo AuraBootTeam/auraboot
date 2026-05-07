@@ -48,6 +48,12 @@ public class PostExecutionPhase implements CommandPhase {
     @Autowired(required = false)
     private com.auraboot.framework.bpm.service.BpmIntegrationService bpmIntegrationService;
 
+    @Autowired(required = false)
+    private com.auraboot.framework.bpm.service.WithdrawService withdrawService;
+
+    @Autowired(required = false)
+    private com.auraboot.smart.framework.engine.SmartEngine smartEngine;
+
     @Override public String name() { return "post_execution"; }
 
     @Override
@@ -212,6 +218,9 @@ public class PostExecutionPhase implements CommandPhase {
                 case com.auraboot.framework.meta.service.impl.pipeline.PreActionConstants.POST_TYPE_START_PROCESS -> {
                     executePostActionStartProcess(postAction, parentRecordId, payload, command);
                 }
+                case com.auraboot.framework.meta.service.impl.pipeline.PreActionConstants.POST_TYPE_WITHDRAW_PROCESS -> {
+                    executePostActionWithdrawProcess(postAction, parentRecordId, payload, command, tenantId);
+                }
                 case "start_approval_chain" -> {
                     String chainProcessKey = (String) postAction.get("chainProcessKey");
                     String businessKeyTemplate = (String) postAction.get("businessKey");
@@ -297,6 +306,92 @@ public class PostExecutionPhase implements CommandPhase {
                         command.getModelCode(), storeInstanceIdIn, e.getMessage());
             }
         }
+    }
+
+    /**
+     * Execute a {@code withdraw_process} postAction: resolves the BPM process
+     * instance recorded on the current row at field
+     * {@code instanceIdField} (default {@code wd_req_process_instance}),
+     * looks up its current pending task via
+     * {@link com.auraboot.smart.framework.engine.service.query.TaskQueryService#findAllPendingTaskList},
+     * and delegates to {@link com.auraboot.framework.bpm.service.WithdrawService#withdraw}
+     * which enforces initiator-only / policy gating and writes the
+     * {@code withdraw} audit event.
+     *
+     * <p>Used in tandem with a {@code state_transition} command that flips
+     * the business status to {@code cancelled} — the state mutation runs in
+     * the pipeline's earlier handler phase, this postAction wraps the
+     * downstream BPM termination so plugin authors do not need to ship a
+     * dedicated {@code CommandHandlerExtension} class for every cancellation
+     * shape.
+     */
+    @SuppressWarnings("unchecked")
+    private void executePostActionWithdrawProcess(Map<String, Object> postAction, String parentRecordId,
+                                                   Map<String, Object> payload, CommandDefinition command,
+                                                   Long tenantId) {
+        if (withdrawService == null) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "withdraw_process postAction requires WithdrawService");
+        }
+        if (smartEngine == null) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "withdraw_process postAction requires SmartEngine");
+        }
+
+        String instanceIdField = (String) postAction.getOrDefault("instanceIdField",
+                "wd_req_process_instance");
+        if (!StringUtils.hasText(instanceIdField)) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "withdraw_process postAction requires non-empty 'instanceIdField'");
+        }
+
+        // Resolve the current record so we can read the persisted process
+        // instance id. The state_transition pre-write that flipped status to
+        // cancelled has already committed to this row in the same outer
+        // transaction, so the field is visible to this read.
+        if (command == null || !StringUtils.hasText(command.getModelCode())
+                || !StringUtils.hasText(parentRecordId)) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "withdraw_process postAction requires modelCode and recordId on the current command");
+        }
+        Map<String, Object> record = dynamicDataService.getById(command.getModelCode(), parentRecordId);
+        if (record == null || record.isEmpty()) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "withdraw_process: record not found for model "
+                            + command.getModelCode() + " id=" + parentRecordId);
+        }
+
+        Object instanceValue = record.get(instanceIdField);
+        String processInstanceId = instanceValue == null ? null : String.valueOf(instanceValue).trim();
+        if (!StringUtils.hasText(processInstanceId) || "null".equals(processInstanceId)) {
+            throw new BusinessException(
+                    "withdraw_process: process instance not found on field "
+                            + instanceIdField + " for record " + parentRecordId);
+        }
+
+        // Active-task resolution mirrors WdCancelLeaveRequestHandler — pick
+        // the first pending task on the instance. SmartEngine's pending list
+        // is the authoritative source; do NOT bypass with raw SQL.
+        String tenantIdStr = tenantId == null ? null : String.valueOf(tenantId);
+        java.util.List<com.auraboot.smart.framework.engine.model.instance.TaskInstance> pendingTasks =
+                smartEngine.getTaskQueryService().findAllPendingTaskList(processInstanceId, tenantIdStr);
+        if (pendingTasks == null || pendingTasks.isEmpty()) {
+            throw new BusinessException(
+                    "withdraw_process: no active task found for process instance " + processInstanceId);
+        }
+
+        String reasonTemplate = (String) postAction.get("reason");
+        String reason = StringUtils.hasText(reasonTemplate)
+                ? resolveStartProcessTemplate(reasonTemplate, payload, parentRecordId, command)
+                : "Cancelled by initiator";
+
+        // Let WithdrawService throw — its initiator/policy/strict gates and
+        // any SmartEngine errors propagate to GlobalExceptionHandler so the
+        // outer command transaction rolls back the state_transition write.
+        withdrawService.withdraw(pendingTasks.get(0).getInstanceId(), reason);
+
+        log.info("withdraw_process postAction: withdrew processInstanceId={} for {} record={}",
+                processInstanceId, command.getModelCode(), parentRecordId);
     }
 
     /**
