@@ -472,7 +472,7 @@ public final class MetaPermission {
     /**
      * Change log read permission
      */
-    public static final String META_CHANGELOG_READ = "system.changelog.read";
+    public static final String META_CHANGELOG_READ = "meta.changelog.read";
 
     /**
      * Audit trail read permission

@@ -22,7 +22,7 @@ export const RESOURCES: PluginResource[] = [
   {
     key: 'ops.audit-logs', path: '/audit-logs',
     title: { en: 'Audit Logs', zh: '审计日志' }, icon: 'shield-alert',
-    menu: { order: 40, group: 'ops' }, permission: 'audit.read',
+    menu: { order: 40, group: 'ops' }, permission: 'meta.changelog.read',
     file: './plugins/core-ops/pages/audit-logs/index.tsx',
   },
   {
