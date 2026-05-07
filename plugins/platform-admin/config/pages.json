@@ -1935,6 +1935,34 @@
     },
     "blocks": [
       {
+        "id": "block_detail_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "edit",
+            "icon": "Edit",
+            "label": "edit",
+            "permissionCode": "system.scheduler.update",
+            "action": {
+              "type": "navigate",
+              "to": "scheduled_task_form"
+            }
+          },
+          {
+            "code": "delete",
+            "icon": "Trash",
+            "danger": true,
+            "label": "delete",
+            "permissionCode": "system.scheduler.delete",
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "admin:delete_scheduled_task"
+            }
+          }
+        ]
+      },
+      {
         "id": "basic",
         "blockType": "form-section",
         "title": {
