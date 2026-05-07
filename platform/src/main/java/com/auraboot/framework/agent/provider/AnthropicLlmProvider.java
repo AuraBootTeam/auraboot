@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -43,6 +44,37 @@ public class AnthropicLlmProvider implements LlmProvider {
 
     private static final Map<String, Object> EPHEMERAL_CACHE_CONTROL =
             Map.of("type", "ephemeral");
+
+    // =========================================================================
+    // ACP B.3 advanced — multi-segment system cache + 1h cache TTL.
+    //
+    // Anthropic's prompt cache has a 1024-token MINIMUM per cacheable block —
+    // shorter prefixes are still sent on the wire but never actually cache,
+    // so attaching {@code cache_control} to them just wastes the marker slot.
+    // We approximate token count with a 4-chars-per-token heuristic (matches
+    // Anthropic's English-language average closely enough for a preflight
+    // gate; we err on the side of NOT caching when in doubt).
+    //
+    // The 1024-token floor only applies to the multi-segment path — the
+    // legacy single-string {@link #convertSystem(String)} keeps unconditional
+    // cache_control because (a) callers using the simple path expect the
+    // existing baseline behaviour and (b) the single-string production
+    // callers (agent system prompts) are typically far above 1024 tokens
+    // already.
+    //
+    // Long-TTL (1h) cache is gated by {@code agent.anthropic.cache.long-ttl}
+    // (default false). When enabled, we send an additional
+    // {@code anthropic-beta: extended-cache-ttl-2025-04-11} header AND set
+    // {@code cache_control.ttl=1h} on every emitted marker. The 1h cache
+    // costs more on creation (still 1.25x but for a longer-lived entry) so
+    // it MUST stay opt-in — never silently switch.
+    // =========================================================================
+    static final int CACHE_MIN_TOKENS = 1024;
+    private static final int CHARS_PER_TOKEN_APPROX = 4;
+    private static final int CACHE_MIN_CHARS = CACHE_MIN_TOKENS * CHARS_PER_TOKEN_APPROX;
+    private static final String LONG_TTL_BETA_HEADER = "extended-cache-ttl-2025-04-11";
+    private static final String CACHE_TTL_5M = "5m";
+    private static final String CACHE_TTL_1H = "1h";
 
     /** Anthropic bills tokens written to the ephemeral cache at 1.25x base input. */
     private static final double CACHE_WRITE_MULTIPLIER = 1.25;
@@ -170,6 +202,17 @@ public class AnthropicLlmProvider implements LlmProvider {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
 
+    /**
+     * ACP B.3 advanced — opt-in 1h ephemeral cache TTL. Default OFF: long TTL
+     * pays the same 1.25x write multiplier but for a longer-lived entry, so
+     * it only nets out for genuinely long-running agent sessions. Toggle in
+     * {@code application.yml} as {@code agent.anthropic.cache.long-ttl: true}.
+     * Field is package-private so unit tests can flip it via
+     * {@link org.springframework.test.util.ReflectionTestUtils}.
+     */
+    @Value("${agent.anthropic.cache.long-ttl:false}")
+    boolean cacheLongTtl;
+
     public AnthropicLlmProvider(@Qualifier("aiWebClient") WebClient webClient,
                                 ObjectMapper objectMapper,
                                 MeterRegistry meterRegistry) {
@@ -227,11 +270,20 @@ public class AnthropicLlmProvider implements LlmProvider {
         java.util.List<String> warnings = new java.util.ArrayList<>();
         AnthropicRequest anthropicReq = buildAnthropicRequest(request, warnings);
 
-        String responseBody = webClient.post()
+        org.springframework.web.reactive.function.client.WebClient.RequestBodySpec spec = webClient.post()
                 .uri(baseUrl + "/v1/messages")
                 .header("x-api-key", apiKey)
                 .header("anthropic-version", "2023-06-01")
-                .header("content-type", "application/json")
+                .header("content-type", "application/json");
+        // B.3-advanced: send the extended-cache-ttl beta header only when the
+        // operator opts into 1h cache. Sending it unconditionally is harmless
+        // on Anthropic's side, but we keep the wire footprint exactly equal
+        // to the pre-feature baseline when long-ttl is off so existing
+        // golden-snapshot tests stay byte-identical.
+        if (cacheLongTtl) {
+            spec = spec.header("anthropic-beta", LONG_TTL_BETA_HEADER);
+        }
+        String responseBody = spec
                 .bodyValue(objectMapper.writeValueAsString(anthropicReq))
                 .retrieve()
                 .bodyToMono(String.class)
@@ -506,11 +558,17 @@ public class AnthropicLlmProvider implements LlmProvider {
         int creation = usage.getCache_creation_input_tokens();
         String modelTag = (requestedModel == null || requestedModel.isBlank())
                 ? UNKNOWN_MODEL_TAG : requestedModel;
+        // B.3-advanced: tag with the cache TTL the request was issued under so
+        // dashboards can split hit-rate by 5m vs 1h cache lifetime. The TTL is
+        // a deployment-level knob, not a per-request choice, so the cardinality
+        // stays at 2 values (5m / 1h) — Prometheus-safe.
+        String ttlTag = cacheLongTtl ? CACHE_TTL_1H : CACHE_TTL_5M;
         if (read > 0) {
             Counter.builder(CACHE_HIT_NAME)
                     .description("Anthropic chat() responses where usage.cache_read_input_tokens > 0")
                     .tag("provider", CACHE_PROVIDER_TAG)
                     .tag("model", modelTag)
+                    .tag("ttl", ttlTag)
                     .register(meterRegistry)
                     .increment();
         } else if (creation > 0) {
@@ -518,6 +576,7 @@ public class AnthropicLlmProvider implements LlmProvider {
                     .description("Anthropic chat() responses where cache_creation_input_tokens > 0 and cache_read_input_tokens == 0")
                     .tag("provider", CACHE_PROVIDER_TAG)
                     .tag("model", modelTag)
+                    .tag("ttl", ttlTag)
                     .register(meterRegistry)
                     .increment();
         }
@@ -629,10 +688,17 @@ public class AnthropicLlmProvider implements LlmProvider {
                     .build();
         }
 
+        Object systemBlocks;
+        List<LlmChatRequest.SystemSegment> segments = request.getSystemSegments();
+        if (segments != null && !segments.isEmpty()) {
+            systemBlocks = convertSystemFromSegments(segments);
+        } else {
+            systemBlocks = convertSystem(request.getSystemPrompt());
+        }
         return AnthropicRequest.builder()
                 .model(request.getModel())
                 .max_tokens(maxTokens)
-                .system(convertSystem(request.getSystemPrompt()))
+                .system(systemBlocks)
                 .messages(convertMessages(request.getMessages()))
                 .tools(convertTools(request.getTools()))
                 .thinking(thinkingBlock)
@@ -765,7 +831,7 @@ public class AnthropicLlmProvider implements LlmProvider {
         // cache_control marker, so we mark only the LAST tool. This caches the
         // entire tools array as a single unit.
         AnthropicRequest.Tool last = converted.get(converted.size() - 1);
-        last.setCache_control(new HashMap<>(EPHEMERAL_CACHE_CONTROL));
+        last.setCache_control(buildCacheControl());
         if (log.isDebugEnabled()) {
             log.debug("Anthropic prompt cache: tools.size={}, lastTool={}",
                     converted.size(), last.getName());
@@ -788,8 +854,77 @@ public class AnthropicLlmProvider implements LlmProvider {
         Map<String, Object> block = new LinkedHashMap<>();
         block.put("type", "text");
         block.put("text", systemPrompt);
-        block.put("cache_control", new HashMap<>(EPHEMERAL_CACHE_CONTROL));
+        block.put("cache_control", buildCacheControl());
         return List.of(block);
+    }
+
+    /**
+     * Multi-segment system prompt converter (ACP B.3 advanced). Each
+     * {@link LlmChatRequest.SystemSegment} becomes its own Anthropic content
+     * block; segments flagged {@code cacheable=true} get a {@code cache_control}
+     * marker iff their text passes the {@link #CACHE_MIN_CHARS} preflight
+     * (Anthropic's 1024-token floor approximated at 4 chars/token). Sub-floor
+     * segments still ship as plain text — they just don't carry a cache hint
+     * because Anthropic would silently ignore it anyway, and emitting the
+     * marker would muddy the operator's mental model of "every cache_control
+     * marker = a real cache slot".
+     *
+     * <p>Anthropic supports multiple cache_control markers per request — the
+     * whole array up to (and including) each marker becomes its own cache
+     * entry. Tenants can therefore split system prompt into:
+     * <ol>
+     *   <li>tenant-level template (cacheable=true, big — hits the cache)</li>
+     *   <li>session-level details (cacheable=false — keeps the prefix cache
+     *       valid even when this segment changes)</li>
+     * </ol>
+     *
+     * <p>Returns {@code null} when the segments list is empty or contains
+     * only blank text — same null contract as the single-string overload so
+     * the {@code AnthropicRequest.system} field gets omitted via
+     * {@code @JsonInclude(NON_NULL)}.
+     */
+    private Object convertSystemFromSegments(List<LlmChatRequest.SystemSegment> segments) {
+        List<Map<String, Object>> blocks = new ArrayList<>(segments.size());
+        for (LlmChatRequest.SystemSegment seg : segments) {
+            if (seg == null) continue;
+            String text = seg.getText();
+            if (text == null || text.isBlank()) continue;
+            Map<String, Object> block = new LinkedHashMap<>();
+            block.put("type", "text");
+            block.put("text", text);
+            if (seg.isCacheable()) {
+                if (text.length() >= CACHE_MIN_CHARS) {
+                    block.put("cache_control", buildCacheControl());
+                } else if (log.isDebugEnabled()) {
+                    log.debug("Anthropic prompt cache: segment skipped cache_control "
+                                    + "(len={} chars < {} ≈ {} tokens minimum)",
+                            text.length(), CACHE_MIN_CHARS, CACHE_MIN_TOKENS);
+                }
+            }
+            blocks.add(block);
+        }
+        return blocks.isEmpty() ? null : blocks;
+    }
+
+    /**
+     * Build the {@code cache_control} marker map. Returns
+     * {@code {"type":"ephemeral"}} by default; when {@link #cacheLongTtl} is
+     * on, also adds {@code "ttl":"1h"} to upgrade the cache lifetime from
+     * Anthropic's default 5-minute to the 1-hour beta tier (requires the
+     * {@code anthropic-beta: extended-cache-ttl-2025-04-11} request header,
+     * which {@link #chat} attaches in the same conditional).
+     *
+     * <p>Each call returns a NEW map — the marker is mutated by Jackson during
+     * serialization in some code paths and we want every emitted marker to be
+     * independent so a downstream mutation never bleeds into another block.
+     */
+    private Map<String, Object> buildCacheControl() {
+        Map<String, Object> cc = new LinkedHashMap<>();
+        cc.put("type", "ephemeral");
+        if (cacheLongTtl) {
+            cc.put("ttl", CACHE_TTL_1H);
+        }
+        return cc;
     }
 
     private LlmChatResponse convertResponse(AnthropicResponse resp) {
