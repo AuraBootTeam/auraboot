@@ -92,8 +92,9 @@ export function useDictWithExtras(
         setItems(raws.map(flattenItem));
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
         if (requestId !== requestIdRef.current) return;
+        console.error(`[useDictWithExtras] fetch failed for dict "${dictCode}"`, err);
         setItems([]);
         setLoading(false);
       });
