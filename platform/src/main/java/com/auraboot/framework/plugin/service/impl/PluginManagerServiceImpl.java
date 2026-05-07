@@ -40,6 +40,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
     private final PluginRecordMapper pluginRecordMapper;
     private final AuraPluginManager auraPluginManager;
     private final ExtensionRegistry extensionRegistry;
+    private final com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
 
     /**
      * In-memory cache of Plugin instances.
@@ -118,10 +119,24 @@ public class PluginManagerServiceImpl implements PluginManagerService {
             }
 
             log.info("Plugin installed successfully: {} (PID: {})", manifest.getPluginId(), record.getPid());
+            adminEventLogService.record(com.auraboot.framework.audit.entity.AdminEventLog.builder()
+                    .actionType("plugin.install")
+                    .resourceType("plugin")
+                    .resourcePid(manifest.getPluginId())
+                    .success(true)
+                    .reason(manifest.getNamespace() + "@" + manifest.getVersion())
+                    .build());
             return PluginOperationResult.installSuccess(record.getPid(), manifest.getPluginId(), manifest.getNamespace());
 
         } catch (Exception e) {
             log.error("Failed to install plugin: {}", manifest.getPluginId(), e);
+            adminEventLogService.record(com.auraboot.framework.audit.entity.AdminEventLog.builder()
+                    .actionType("plugin.install")
+                    .resourceType("plugin")
+                    .resourcePid(manifest.getPluginId())
+                    .success(false)
+                    .reason(e.getMessage())
+                    .build());
             return PluginOperationResult.failure(
                     PluginOperationResult.OperationType.INSTALL,
                     manifest.getPluginId(),
@@ -280,10 +295,24 @@ public class PluginManagerServiceImpl implements PluginManagerService {
             pluginInstances.remove(pluginId);
 
             log.info("Plugin uninstalled successfully: {}", pluginId);
+            adminEventLogService.record(com.auraboot.framework.audit.entity.AdminEventLog.builder()
+                    .actionType("plugin.uninstall")
+                    .resourceType("plugin")
+                    .resourcePid(pluginId)
+                    .success(true)
+                    .reason(removeData ? "uninstall+remove-data" : "uninstall")
+                    .build());
             return PluginOperationResult.uninstallSuccess(record.getPid(), pluginId, record.getNamespace());
 
         } catch (Exception e) {
             log.error("Failed to uninstall plugin: {}", pluginId, e);
+            adminEventLogService.record(com.auraboot.framework.audit.entity.AdminEventLog.builder()
+                    .actionType("plugin.uninstall")
+                    .resourceType("plugin")
+                    .resourcePid(pluginId)
+                    .success(false)
+                    .reason(e.getMessage())
+                    .build());
             throw PluginLifecycleException.uninstallFailed(pluginId, record.getNamespace(), currentStatus, e);
         }
     }
