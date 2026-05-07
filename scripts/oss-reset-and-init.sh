@@ -463,8 +463,8 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
         cat > tests/storage/admin.json << STORAGEJSON
 {
   "cookies": [
-    {"name":"__session","value":"$SESSION_COOKIE","domain":"localhost","path":"/","httpOnly":true,"sameSite":"Lax","expires":$(python3 -c "import time; print(int(time.time())+604800)")},
-    {"name":"__session","value":"$SESSION_COOKIE","domain":"127.0.0.1","path":"/","httpOnly":true,"sameSite":"Lax","expires":$(python3 -c "import time; print(int(time.time())+604800)")}
+    {"name":"__session","value":"$SESSION_COOKIE","domain":"localhost","path":"/","httpOnly":true,"secure":false,"sameSite":"Lax","expires":$(python3 -c "import time; print(int(time.time())+604800)")},
+    {"name":"__session","value":"$SESSION_COOKIE","domain":"127.0.0.1","path":"/","httpOnly":true,"secure":false,"sameSite":"Lax","expires":$(python3 -c "import time; print(int(time.time())+604800)")}
   ],
   "origins": []
 }

@@ -262,7 +262,7 @@ test.describe('BPM Publish -> Run -> Instance Detail', () => {
     const headerRow = page.locator('thead tr').first();
     const headerText = await headerRow.textContent();
     expect(headerText).toMatch(/任务名称/);
-    expect(headerText).toMatch(/流程/);
+    expect(headerText).toMatch(/业务单号/);
     expect(headerText).toMatch(/优先级/);
     expect(headerText).toMatch(/创建时间/);
     expect(headerText).toMatch(/操作/);

@@ -117,7 +117,9 @@
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts",
     "tests/e2e/user/user-management.spec.ts",
 
-    "tests/e2e/bpm/bpm-form-integration.spec.ts"
+    "tests/e2e/bpm/bpm-form-integration.spec.ts",
+
+    "tests/e2e/aurabot/pcba-procurement-agent-entry.spec.ts"
   ],
 
   "test_excludes_rationale": {
@@ -138,6 +140,7 @@
     "tests/e2e/plugin/pm-task-associations.spec.ts": "[A] project-management plugin (enterprise)",
     "tests/e2e/plugin/pm-workspace-interactions.spec.ts": "[A] project-management plugin (enterprise)",
     "tests/e2e/plugin/pcba-plugin.spec.ts": "[A] pcba-manufacturing plugin (enterprise)",
+    "tests/e2e/aurabot/pcba-procurement-agent-entry.spec.ts": "[A] pcba-procurement plugin is enterprise (auraboot-enterprise/plugins/pcba-procurement) — spec navigates to PCBA ERP sidebar + /p/pe_procurement_comparison which only exist in enterprise overlay.",
     "tests/e2e/designer/designer-unified-architecture.spec.ts": "[A] enterprise designer",
     "tests/e2e/designer/designer-lifecycle.spec.ts": "[A] enterprise designer",
     "tests/e2e/dashboard/dashboard.spec.ts": "[A] enterprise dashboard features",
