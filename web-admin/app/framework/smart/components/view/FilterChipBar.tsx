@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import type { ViewFilterConfig, SortConfig } from '~/framework/smart/types/savedView';
+import { useI18n } from '~/contexts/I18nContext';
 
 /** Metadata for resolving field labels and display hints */
 interface FieldMeta {
@@ -150,6 +151,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
   onChipClick,
   onClearAll,
 }) {
+  const { t } = useI18n();
   // Build a lookup map: fieldCode → label
   const labelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -232,7 +234,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
         onClick={(e) => onAddFilter(e)}
         className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-blue-300 bg-white px-2 py-1 text-sm text-blue-600 transition-colors hover:border-blue-400 hover:bg-blue-50"
       >
-        + Add Filter
+        + {t('common.add_filter', undefined, 'Add Filter')}
       </button>
 
       {/* Clear All */}
