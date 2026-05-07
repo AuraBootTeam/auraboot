@@ -4,7 +4,13 @@
 
 **Goal:** Rewrite `acs_dashboard.json` from a single welcome rich-text into a 15-widget storytelling page that explains ACP's 7-layer semantic pipeline, tipping points, and safety valves, driven entirely by existing named queries.
 
-**Architecture:** Pure declarative — no frontend tsx changes. The dashboard JSON references existing widgets (`smart-rich-text` / `smart-number-card` / `smart-bar-chart` / `smart-pie-chart` / `smart-line-chart` / `smart-combo-chart` / `smart-table-chart` / `smart-shortcuts`) and consumes 5 existing + 1 new named query. The 7-layer pipeline diagram is inline SVG inside `smart-rich-text`.
+**Architecture:** Two small platform changes (WidgetRenderer wrapper attribute + sanitizer SVG/data-attr allowlist) unblock a fully declarative dashboard. The dashboard JSON references existing widgets (`smart-rich-text` / `smart-number-card` / `smart-bar-chart` / `smart-pie-chart` / `smart-line-chart` / `smart-combo-chart` / `smart-table-chart` / `smart-shortcuts`) and consumes 5 existing + 1 new named query. The 7-layer pipeline diagram is inline SVG inside `smart-rich-text`.
+
+**Pre-flight findings (Task 1, locked):**
+- `SmartRichText` runs content through `sanitizeHtml` (DOMPurify); current allowlist strips `<svg>` and all `data-*` attrs → addressed in **Task 1b**
+- `WidgetRenderer` does not wrap widgets with `data-widget-id` (E2E selectors broken without it) → addressed in **Task 1a**
+- `smart-shortcuts` widget supports only `path` navigation (no `command` dispatch) → CTA #1 routes to `/p/acs_demo_request/new`
+- DB name is `aura_boot` (NOT `auraboot_oss`); `mt_acs_demo_request` and `mt_acs_execution_log` exist with 0 rows (empty-state path will be exercised)
 
 **Tech Stack:** AuraBoot plugin DSL JSON, Playwright E2E, no new runtime code.
 
@@ -65,6 +71,160 @@ Expected: numeric count (may be 0 — that's fine; empty state is part of the de
 - [ ] **Step 4: Commit pre-flight log**
 
 No code change in this task. Record findings inline in subsequent task commits.
+
+---
+
+## Task 1a: Add `data-widget-id` Wrapper to WidgetRenderer
+
+**Goal:** Every dashboard widget gets a stable testid based on its config `id`. General platform improvement; benefits all dashboards' E2E.
+
+**Files:**
+- Modify: `auraboot/web-admin/app/plugins/core-dashboard/components/WidgetRenderer.tsx`
+
+- [ ] **Step 1: Read current `renderWidget` implementation**
+
+Confirm function signature still returns `React.ReactNode` and the early-return for unknown widget type wraps in a div.
+
+- [ ] **Step 2: Wrap output**
+
+Find the line where `<Component {...props} />` (or equivalent) is returned. Wrap the existing return in a div carrying the data attribute. Example diff (adapt to actual code shape):
+
+```tsx
+// Before
+return <Component {...props} />;
+
+// After
+return (
+  <div data-widget-id={widget.id} className="h-full">
+    <Component {...props} />
+  </div>
+);
+```
+
+The unknown-widget branch already returns a div — just add `data-widget-id={widget.id}` to its props.
+
+- [ ] **Step 3: Type-check**
+
+Run:
+```bash
+cd /Users/ghj/work/auraboot/auraboot/web-admin && npx tsc --noEmit 2>&1 | tail -10
+```
+Expected: zero new errors. (Pre-existing errors are OK to ignore — diff against baseline if uncertain.)
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd /Users/ghj/work/auraboot/auraboot/.worktrees/acs-dashboard-redesign
+git add web-admin/app/plugins/core-dashboard/components/WidgetRenderer.tsx
+git commit -m "feat(core-dashboard): wrap rendered widgets with data-widget-id for E2E"
+```
+
+---
+
+## Task 1b: Allowlist SVG + data-* Attrs in `sanitizeHtml`
+
+**Goal:** Permit inline SVG diagrams and `data-*` test selectors in user-rendered HTML. Tight tag/attr whitelist limits XSS surface.
+
+**Files:**
+- Modify: `auraboot/web-admin/app/framework/meta/utils/sanitizeHtml.ts`
+- Modify (if a unit test for this util exists): `auraboot/web-admin/app/framework/meta/utils/__tests__/sanitizeHtml.test.ts`
+
+- [ ] **Step 1: Add SVG tags + data-* attrs to allowlist**
+
+Edit `sanitizeHtml.ts`:
+
+```typescript
+import DOMPurify from 'dompurify';
+
+export function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'b', 'i', 'em', 'strong', 'u', 's', 'strike', 'del',
+      'p', 'br', 'hr', 'div', 'span',
+      'ul', 'ol', 'li',
+      'a', 'img',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      'pre', 'code', 'blockquote',
+      'sub', 'sup', 'small',
+      // SVG primitives — diagram support
+      'svg', 'g', 'defs', 'marker',
+      'path', 'rect', 'circle', 'ellipse',
+      'line', 'polyline', 'polygon',
+      'text', 'tspan', 'title',
+    ],
+    ALLOWED_ATTR: [
+      'href', 'target', 'rel', 'src', 'alt', 'title', 'class',
+      'width', 'height', 'colspan', 'rowspan',
+      // SVG attrs (presentation only — no event handlers)
+      'viewBox', 'preserveAspectRatio',
+      'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+      'cx', 'cy', 'r', 'rx', 'ry',
+      'x', 'y', 'x1', 'y1', 'x2', 'y2',
+      'points', 'transform', 'opacity',
+      'text-anchor', 'font-size', 'font-family', 'font-weight',
+      'marker-start', 'marker-end', 'marker-mid',
+      'refX', 'refY', 'markerWidth', 'markerHeight', 'orient',
+      'role',
+    ],
+    ADD_ATTR: ['target'],
+    ALLOW_DATA_ATTR: true,
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+  });
+}
+```
+
+Note: `ALLOW_DATA_ATTR: true` is DOMPurify's flag — preferred over enumerating individual `data-*` names. Inert by definition (no script execution).
+
+- [ ] **Step 2: If unit tests exist, extend coverage**
+
+Run:
+```bash
+ls /Users/ghj/work/auraboot/auraboot/web-admin/app/framework/meta/utils/__tests__/sanitizeHtml*.* 2>/dev/null
+```
+If a test file exists, add cases:
+```typescript
+it('preserves inline SVG with safe attrs', () => {
+  const out = sanitizeHtml('<svg viewBox="0 0 10 10"><rect x="0" y="0" width="10" height="10" fill="red"/></svg>');
+  expect(out).toContain('<svg');
+  expect(out).toContain('<rect');
+  expect(out).toContain('viewBox="0 0 10 10"');
+});
+it('preserves data-* attributes', () => {
+  const out = sanitizeHtml('<div data-layer="L0">x</div>');
+  expect(out).toContain('data-layer="L0"');
+});
+it('still strips script tags', () => {
+  const out = sanitizeHtml('<svg onload="alert(1)"><script>alert(2)</script></svg>');
+  expect(out).not.toContain('onload');
+  expect(out).not.toContain('<script>');
+});
+```
+
+If no test file exists, skip — no need to author one for this task.
+
+- [ ] **Step 3: Run tests if any**
+
+```bash
+cd /Users/ghj/work/auraboot/auraboot/web-admin && npx vitest run app/framework/meta/utils/__tests__/sanitizeHtml 2>&1 | tail -10
+```
+Expected: pass (or "no tests found" if no test file).
+
+- [ ] **Step 4: Type-check**
+
+```bash
+cd /Users/ghj/work/auraboot/auraboot/web-admin && npx tsc --noEmit 2>&1 | tail -5
+```
+Expected: zero new errors.
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd /Users/ghj/work/auraboot/auraboot/.worktrees/acs-dashboard-redesign
+git add web-admin/app/framework/meta/utils/sanitizeHtml.ts web-admin/app/framework/meta/utils/__tests__/sanitizeHtml.test.ts 2>/dev/null
+git commit -m "feat(meta): allowlist SVG + data-* attrs in sanitizeHtml"
+```
 
 ---
 
