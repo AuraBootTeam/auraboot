@@ -346,10 +346,15 @@ public class SkillEngine {
         agentDef.put("model", null);
 
         try {
+            // F.2 wiring: pass the skill row so StepLoopService can merge
+            // ab_agent_skill.execution_config (e.g. seeded report_analysis
+            // thinking_enabled=true) onto the agent-level execution_config.
+            // Skill keys win on conflict; null skillDef preserves agent-only
+            // semantics.
             AgentRunService.AgentLoopResult loopResult = stepLoopService.executeAgentLoop(
                     tenantId, runPid, null, null,
                     systemPrompt, userMessage,
-                    tools, agentDef,
+                    tools, agentDef, skill,
                     provider, config,
                     traceCtx, maxSteps);
 

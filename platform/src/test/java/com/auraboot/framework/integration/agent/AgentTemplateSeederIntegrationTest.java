@@ -94,17 +94,108 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(4)
     void builtinSkills_idempotent_noduplicatesOnRerun() {
-        // Calling seed() a second time should not insert duplicates (ON CONFLICT DO NOTHING)
+        // Calling seed() a second time should not insert duplicates (ON CONFLICT DO UPDATE
+        // only refreshes execution_config + updated_at, never inserts new rows).
         Integer beforeCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
                 Integer.class,
                 SYSTEM_TENANT_ID);
-        // Re-run the seeder via direct SQL to simulate re-seed
+        // Re-run the seeder explicitly to confirm upsert is idempotent on row count
+        agentTemplateSeeder.seed();
         Integer afterCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
                 Integer.class,
                 SYSTEM_TENANT_ID);
         assertThat(afterCount).isEqualTo(beforeCount);
+    }
+
+    // =========================================================================
+    // execution_config (F.2) — Extended Thinking opt-in for report_analysis
+    // =========================================================================
+
+    /**
+     * F.2: report_analysis is a multi-hop reasoning skill — its execution_config
+     * must opt in to Anthropic Extended Thinking with a 8000-token budget so
+     * StepLoopService.resolveThinkingConfig surfaces a non-null ThinkingConfig.
+     */
+    @Test
+    @Order(20)
+    void seed_reportAnalysisSkill_hasThinkingEnabledExecutionConfig() {
+        Boolean thinkingEnabled = jdbcTemplate.queryForObject(
+                "SELECT (execution_config->>'thinking_enabled')::boolean " +
+                "FROM ab_agent_skill " +
+                "WHERE tenant_id = ? AND skill_code = 'report_analysis'",
+                Boolean.class,
+                SYSTEM_TENANT_ID);
+        Integer budget = jdbcTemplate.queryForObject(
+                "SELECT (execution_config->>'thinking_budget_tokens')::int " +
+                "FROM ab_agent_skill " +
+                "WHERE tenant_id = ? AND skill_code = 'report_analysis'",
+                Integer.class,
+                SYSTEM_TENANT_ID);
+
+        assertThat(thinkingEnabled)
+                .as("report_analysis skill must opt in to Extended Thinking")
+                .isTrue();
+        assertThat(budget)
+                .as("report_analysis thinking budget must be 8000 tokens")
+                .isEqualTo(8000);
+    }
+
+    /**
+     * F.2 negative case: the four non-analytical skills must keep execution_config = {}.
+     * Guarantees we did not accidentally enable thinking on workflow skills where
+     * Anthropic billing or non-thinking-capable models would produce HTTP 400.
+     */
+    @Test
+    @Order(21)
+    void seed_otherSkills_keepEmptyExecutionConfig() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT skill_code, execution_config::text AS cfg " +
+                "FROM ab_agent_skill " +
+                "WHERE tenant_id = ? AND is_builtin = TRUE " +
+                "AND skill_code IN ('approval_workflow','data_entry_assistant','crm_operations','ops_inspector') " +
+                "ORDER BY skill_code",
+                SYSTEM_TENANT_ID);
+
+        assertThat(rows).hasSize(4);
+        for (Map<String, Object> row : rows) {
+            String code = (String) row.get("skill_code");
+            String cfg = (String) row.get("cfg");
+            assertThat(cfg)
+                    .as("execution_config for non-analytical skill '%s' must be empty JSON {}", code)
+                    .isEqualTo("{}");
+        }
+    }
+
+    /**
+     * F.2 idempotency: re-running the seeder must NOT corrupt the report_analysis
+     * execution_config. The ON CONFLICT DO UPDATE clause refreshes execution_config
+     * to the seeder's canonical value, so the second run still sees thinking_enabled=true.
+     */
+    @Test
+    @Order(22)
+    void seed_executionConfig_isIdempotentAcrossReseeds() {
+        // First re-run
+        agentTemplateSeeder.seed();
+        Boolean firstRun = jdbcTemplate.queryForObject(
+                "SELECT (execution_config->>'thinking_enabled')::boolean " +
+                "FROM ab_agent_skill " +
+                "WHERE tenant_id = ? AND skill_code = 'report_analysis'",
+                Boolean.class,
+                SYSTEM_TENANT_ID);
+
+        // Second re-run
+        agentTemplateSeeder.seed();
+        Boolean secondRun = jdbcTemplate.queryForObject(
+                "SELECT (execution_config->>'thinking_enabled')::boolean " +
+                "FROM ab_agent_skill " +
+                "WHERE tenant_id = ? AND skill_code = 'report_analysis'",
+                Boolean.class,
+                SYSTEM_TENANT_ID);
+
+        assertThat(firstRun).isTrue();
+        assertThat(secondRun).isTrue();
     }
 
     // =========================================================================

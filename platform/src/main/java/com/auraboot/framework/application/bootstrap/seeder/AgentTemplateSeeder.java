@@ -58,22 +58,27 @@ public class AgentTemplateSeeder {
     // =========================================================================
 
     private void seedSkills() {
-        Integer existing = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
-                Integer.class,
-                SYSTEM_TENANT_ID);
-        if (existing != null && existing > 0) {
-            log.info("AgentTemplateSeeder: skipped skills (already seeded: {})", existing);
-            return;
-        }
-
+        // Always run upsert so subsequent boots refresh execution_config (e.g. when
+        // we change the report_analysis thinking budget). The ON CONFLICT clause
+        // guarantees idempotency and only touches execution_config + updated_at.
         String sql = """
                 INSERT INTO ab_agent_skill
                 (pid, tenant_id, skill_code, skill_name, skill_description, skill_level,
-                 skill_category, skill_icon, skill_tools, prompt_template, is_builtin, skill_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, TRUE, 'active')
-                ON CONFLICT (tenant_id, skill_code) DO NOTHING
+                 skill_category, skill_icon, skill_tools, prompt_template, execution_config,
+                 is_builtin, skill_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?::jsonb, TRUE, 'active')
+                ON CONFLICT (tenant_id, skill_code) DO UPDATE SET
+                    execution_config = EXCLUDED.execution_config,
+                    updated_at = CURRENT_TIMESTAMP
                 """;
+
+        // Default execution_config for skills without special opt-in.
+        String defaultExecutionConfig = "{}";
+        // report_analysis is a multi-hop reasoning skill — opt it in to Anthropic
+        // Extended Thinking by default. Read by StepLoopService.resolveThinkingConfig
+        // (mirrors ab_agent_definition.execution_config contract).
+        String reportAnalysisExecutionConfig =
+                "{\"thinking_enabled\":true,\"thinking_budget_tokens\":8000}";
 
         Object[][] skills = {
             // approval_workflow
@@ -89,7 +94,8 @@ public class AgentTemplateSeeder {
                 3. 审批金额超过10万时，提醒需总经理二次确认
                 4. 拒绝时必须要求填写拒绝原因
                 始终用中文回复，审批操作前先确认关键信息。
-                """
+                """,
+                defaultExecutionConfig
             },
             // data_entry_assistant
             {
@@ -104,9 +110,10 @@ public class AgentTemplateSeeder {
                 3. 发现错误时给出具体修正建议
                 4. 支持从Excel/CSV批量导入并预检数据质量
                 始终保持耐心，对错误给出清晰的修正指引。
-                """
+                """,
+                defaultExecutionConfig
             },
-            // report_analysis
+            // report_analysis — opt-in Extended Thinking for multi-hop analysis
             {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
                 "report_analysis", "报表分析助手", "生成业务报表、解读图表数据、发现趋势与异常",
@@ -119,7 +126,8 @@ public class AgentTemplateSeeder {
                 3. 主动指出数据异常和关键变化点
                 4. 提供数据驱动的业务建议
                 数据查询结果优先以表格形式呈现，关键数字加粗标注。
-                """
+                """,
+                reportAnalysisExecutionConfig
             },
             // crm_operations
             {
@@ -134,7 +142,8 @@ public class AgentTemplateSeeder {
                 3. 根据商机阶段给出推进建议
                 4. 汇总销售漏斗数据和关键指标
                 理解销售场景，用简洁的语言总结关键信息，避免信息过载。
-                """
+                """,
+                defaultExecutionConfig
             },
             // ops_inspector
             {
@@ -149,17 +158,17 @@ public class AgentTemplateSeeder {
                 3. 汇总运营日报/周报数据
                 4. 监控定时任务执行状态
                 对异常情况保持敏感，用数字和事实说话，不做主观猜测。
-                """
+                """,
+                defaultExecutionConfig
             },
         };
 
         int count = 0;
         for (Object[] skill : skills) {
             count += jdbcTemplate.update(sql, skill[0], skill[1], skill[2], skill[3],
-                    skill[4], skill[5], skill[6], skill[7], skill[8], skill[9]);
+                    skill[4], skill[5], skill[6], skill[7], skill[8], skill[9], skill[10]);
         }
-        log.info("AgentTemplateSeeder: seeded {} built-in skills (skipped {} existing)",
-                count, skills.length - count);
+        log.info("AgentTemplateSeeder: upserted {} built-in skills (re-applies execution_config)", count);
     }
 
     // =========================================================================
