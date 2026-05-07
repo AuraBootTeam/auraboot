@@ -410,8 +410,10 @@ export default function ReviewSection({ targetType, targetId }: ReviewSectionPro
         const list: Review[] = json.data?.records ?? json.data ?? json ?? [];
         setReviews(buildTree(Array.isArray(list) ? list : []));
       }
-    } catch {
-      // silently ignore — backend may be unavailable
+    } catch (err) {
+      // Backend may be unavailable; surface to console so a regression is
+      // diagnosable in DevTools instead of looking like a "no reviews" state.
+      console.error('[ReviewSection] fetchReviews failed', err);
     } finally {
       setLoading(false);
     }
@@ -427,8 +429,8 @@ export default function ReviewSection({ targetType, targetId }: ReviewSectionPro
         const json = await res.json();
         setSummary(json.data ?? json);
       }
-    } catch {
-      // silently ignore
+    } catch (err) {
+      console.error('[ReviewSection] fetchSummary failed', err);
     } finally {
       setSummaryLoading(false);
     }
@@ -475,8 +477,8 @@ export default function ReviewSection({ targetType, targetId }: ReviewSectionPro
         method: 'post',
       });
       await fetchReviews();
-    } catch {
-      // silently ignore
+    } catch (err) {
+      console.error('[ReviewSection] handleVote failed', err);
     }
   };
 
