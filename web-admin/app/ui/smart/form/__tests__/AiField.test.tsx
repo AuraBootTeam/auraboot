@@ -28,8 +28,7 @@ class MockFileReader {
 }
 
 beforeEach(() => {
-  // @ts-expect-error — overriding browser global for test
-  global.FileReader = MockFileReader;
+  global.FileReader = MockFileReader as unknown as typeof FileReader;
 });
 
 afterEach(() => {
@@ -63,7 +62,6 @@ describe('AiField — F.3 vision input', () => {
 
   it('selecting a file shows preview and includes base64 in next AI request', async () => {
     const fetchMock = makeFetchMock();
-    // @ts-expect-error — overriding browser global for test
     global.fetch = fetchMock;
 
     const onChange = vi.fn();
@@ -103,7 +101,6 @@ describe('AiField — F.3 vision input', () => {
 
   it('removing the image → next AI request has no images field', async () => {
     const fetchMock = makeFetchMock();
-    // @ts-expect-error — overriding browser global for test
     global.fetch = fetchMock;
 
     render(<AiField imageInput />);
@@ -130,7 +127,6 @@ describe('AiField — F.3 vision input', () => {
 
   it('imageInput=false (default) → AI request contains no images field', async () => {
     const fetchMock = makeFetchMock();
-    // @ts-expect-error — overriding browser global for test
     global.fetch = fetchMock;
 
     render(<AiField />);

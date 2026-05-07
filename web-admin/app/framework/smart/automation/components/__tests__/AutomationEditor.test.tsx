@@ -76,7 +76,7 @@ const buildFlowData = (suffix: string): FlowData => ({
       id: `node_${suffix}`,
       type: 'trigger.scheduled',
       position: { x: 0, y: 0 },
-      data: { label: 'Trigger' },
+      data: { label: 'Trigger', config: {} },
     },
   ],
   edges: [],

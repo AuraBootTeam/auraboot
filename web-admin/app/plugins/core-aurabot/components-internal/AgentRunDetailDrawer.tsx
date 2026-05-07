@@ -411,7 +411,7 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
                 <MetadataSection run={detail.run} />
                 <ActionsSection actions={detail.actions} />
                 <InterruptsSection rows={detail.interruptLog} />
-                <ChildRunsSection rows={detail.childRuns} onSelectRun={onSelectRun} />
+                <ChildRunsSection rows={detail.childRuns} parentRunId={detail.run.runId} onSelectRun={onSelectRun} />
                 <BifSection bif={detail.bif} />
               </>
             )}
