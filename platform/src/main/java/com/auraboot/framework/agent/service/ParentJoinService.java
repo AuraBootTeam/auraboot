@@ -43,19 +43,40 @@ import java.util.concurrent.atomic.AtomicReference;
  * latch that no event will ever signal.
  *
  * <p>Listener semantics (unchanged):
+ * <p>Backlog D.3 — child cost reverse rollup:
  * <ul>
- *   <li>SELECT {@code parent_run_id, tenant_id} from {@code ab_agent_run}
- *       for the run id in the {@code SessionEndedEvent}.</li>
+ *   <li>The bridge SELECT now also pulls {@code total_cost / input_tokens /
+ *       output_tokens} from the child row and forwards them on the event so
+ *       any listener (rollup, future shadow-run replay) sees the full cost
+ *       picture without re-querying.</li>
+ *   <li>{@link #onChildCompleted(ChildRunCompletedEvent)} performs an atomic
+ *       single-statement {@code UPDATE} on the parent row, incrementing
+ *       {@code child_aggregate_cost} and {@code child_aggregate_tokens}. The
+ *       UPDATE runs even when the parent row is already terminal — the
+ *       rollup column is independent of {@code run_status}, so finance /
+ *       quota accounting reconciles regardless of finish-order.</li>
+ *   <li>Cross-tenant defence: the rollup UPDATE filters on
+ *       {@code tenant_id = ?} from the event; a malformed event whose tenant
+ *       does not match the parent row would update zero rows (logged at WARN,
+ *       no fallback).</li>
+ * </ul>
+ *
+ * <p>Listener semantics for the bridge:
+ * <ul>
+ *   <li>SELECT {@code parent_run_id, tenant_id, total_cost, input_tokens,
+ *       output_tokens} from {@code ab_agent_run} for the run id in the
+ *       {@code SessionEndedEvent}.</li>
  *   <li>If the row is missing or {@code parent_run_id IS NULL} (root run):
  *       short-circuit, no event published.</li>
- *   <li>Otherwise publish {@code ChildRunCompletedEvent} carrying the parent
- *       run pid + child run pid + outcome label (lowercase of the
- *       {@link SessionEndedEvent.TerminalOutcome}).</li>
+ *   <li>Otherwise publish {@code ChildRunCompletedEvent} carrying parent pid +
+ *       child pid + outcome label + cost + total tokens.</li>
  * </ul>
  *
  * <p>Red-line: no fallback / placeholder values; if a row is malformed
  * (missing tenant_id), the listener logs and skips. The bridge is
- * non-transactional — it only does a SELECT + publish.
+ * non-transactional — it only does a SELECT + publish. The rollup listener
+ * is also non-transactional — it relies on the atomicity of the single
+ * {@code UPDATE} statement, not on the surrounding tx.
  */
 @Slf4j
 @Service
@@ -106,8 +127,11 @@ public class ParentJoinService {
             return;
         }
 
+        // D.3: SELECT now pulls cost / tokens too so the rollup event carries
+        // the full payload without a second round-trip.
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT parent_run_id, tenant_id FROM ab_agent_run WHERE pid = ?",
+                "SELECT parent_run_id, tenant_id, total_cost, input_tokens, output_tokens " +
+                        "FROM ab_agent_run WHERE pid = ?",
                 childRunId);
         if (rows.isEmpty()) {
             log.debug("ParentJoinService: run {} not found, skipping (already deleted?)", childRunId);
@@ -143,13 +167,71 @@ public class ParentJoinService {
                 return;
             }
         }
+        // Zero-normalise nullable numeric columns. Column DEFAULTs are 0 in
+        // schema.sql, but defence-in-depth in case a row was inserted from
+        // an external loader that bypassed the default.
+        BigDecimal totalCost = row.get("total_cost") == null
+                ? BigDecimal.ZERO : new BigDecimal(row.get("total_cost").toString());
+        long inputTokens = row.get("input_tokens") == null
+                ? 0L : ((Number) row.get("input_tokens")).longValue();
+        long outputTokens = row.get("output_tokens") == null
+                ? 0L : ((Number) row.get("output_tokens")).longValue();
+        long totalTokens = inputTokens + outputTokens;
 
         String outcome = event.getOutcome() == null
                 ? "unknown" : event.getOutcome().name().toLowerCase();
         eventPublisher.publishEvent(new ChildRunCompletedEvent(
-                tenantId, parentRunId, childRunId, outcome));
-        log.info("ParentJoinService: child={} → parent={} outcome={}",
-                childRunId, parentRunId, outcome);
+                tenantId, parentRunId, childRunId, outcome, totalCost, totalTokens));
+        log.info("ParentJoinService: child={} → parent={} outcome={} cost={} tokens={}",
+                childRunId, parentRunId, outcome, totalCost, totalTokens);
+    }
+
+    /**
+     * Backlog D.3 — reverse rollup of child run cost / tokens into the parent.
+     *
+     * <p>Atomic single-statement {@code UPDATE} keyed on {@code (tenant_id,
+     * pid)}. Runs regardless of parent {@code run_status} (the parent may
+     * already be terminal — late-arrival is the whole point of D.3). The
+     * cross-tenant filter is defence-in-depth: a malformed event whose
+     * {@code tenantId} does not match the parent row updates zero rows.
+     *
+     * <p>Skips zero-amount events to avoid pointless UPDATEs (no-op rows
+     * still flush WAL). When both cost and tokens are zero, the child either
+     * never made an LLM call or the row was reset before terminal — either
+     * way nothing to roll up.
+     */
+    @EventListener
+    public void onChildCompleted(ChildRunCompletedEvent event) {
+        BigDecimal cost = event.getTotalCost();
+        long tokens = event.getTotalTokens();
+        if (cost.signum() == 0 && tokens == 0L) {
+            log.debug("ParentJoinService: child={} → parent={} zero cost/tokens, skipping rollup",
+                    event.getChildRunId(), event.getParentRunId());
+            return;
+        }
+
+        // Atomic add-and-set on the parent row. COALESCE guards against any
+        // legacy NULL that escaped the column DEFAULT (e.g. row inserted
+        // before the migration ran on a stale environment).
+        int updated = jdbcTemplate.update(
+                "UPDATE ab_agent_run SET " +
+                        "  child_aggregate_cost   = COALESCE(child_aggregate_cost,   0) + ?, " +
+                        "  child_aggregate_tokens = COALESCE(child_aggregate_tokens, 0) + ?, " +
+                        "  updated_at             = CURRENT_TIMESTAMP " +
+                        " WHERE pid = ? AND tenant_id = ?",
+                cost, tokens, event.getParentRunId(), event.getTenantId());
+
+        if (updated == 0) {
+            // Parent row missing OR cross-tenant mismatch. Either way no
+            // rollup happened — log so the gap is visible. No fallback /
+            // retry: a real bug should surface, not silently no-op.
+            log.warn("ParentJoinService: rollup updated 0 rows — parent={} tenant={} child={} "
+                            + "(parent missing or cross-tenant?)",
+                    event.getParentRunId(), event.getTenantId(), event.getChildRunId());
+            return;
+        }
+        log.debug("ParentJoinService: rolled up child={} cost={} tokens={} into parent={}",
+                event.getChildRunId(), cost, tokens, event.getParentRunId());
     }
 
     /**

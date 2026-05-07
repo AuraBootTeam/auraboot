@@ -4792,6 +4792,8 @@ CREATE TABLE IF NOT EXISTS ab_agent_run (
   session_ended_published_at TIMESTAMPTZ,          -- Idempotency guard for SessionEndedEvent (memory L1->L2 promoter). Atomic flip from NULL -> NOW() on first terminal-state publish; second publish sees non-null and skips.
   parent_run_id   VARCHAR(26),                      -- ACP §6.10 multi-agent spawn: pid of parent run when this run was forked from an interrupt-driven subtask. NULL for root user-initiated runs.
   subtask_origin  VARCHAR(32),                      -- Audit label for parent_run_id: 'interrupt_subtask' (InterruptDispatcher INSERT_SUBTASK), 'delegate_task' (§6.10 tool), 'scheduled_split' (scheduler). NULL when parent_run_id IS NULL. CHECK constraint added below.
+  child_aggregate_cost   DECIMAL(10,6) DEFAULT 0,   -- Backlog D.3: reverse rollup of every direct-child run's total_cost. ChildRunCompletedEvent listener atomically increments on each child terminal — finance / quota accounting stays consistent even when the parent reaches terminal before children. Direct children only (no grandchild flattening), so the parent of a chain accumulates one hop at a time and the full subtree cost is reconstructed by recursive sum at read time.
+  child_aggregate_tokens INTEGER DEFAULT 0,         -- Backlog D.3: reverse rollup of every direct-child run's input_tokens + output_tokens. Same semantics as child_aggregate_cost — atomic increment, direct-children only, late-arrival rolls up regardless of parent run_status.
   created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   created_by     BIGINT,
