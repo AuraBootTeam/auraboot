@@ -77,6 +77,36 @@ into real passes.
 - **Action**: instrument once and add either a real create command field-binding
   fix or a more robust Radix-select fill helper.
 
+## G-7..G-9 — backend validation / delete gaps surfaced by ST cascade
+
+After G-2 was applied (toolbar added) and ST-004 unblocked, three further
+backend gaps surfaced one after another in the scheduled_task suite:
+
+### G-7. `admin:create_scheduled_task` accepts arbitrary cron strings
+
+- **Symptom**: posting `cron_expression: "every-minute-please"` returns
+  `code=0` (accepted).
+- **Fix**: validate with `org.springframework.scheduling.support.CronExpression.parse()`
+  in the create/update handler before persisting.
+- **Re-enable**: drop fixme on ST-006.
+
+### G-8. No unique constraint on `scheduled_task.name`
+
+- **Symptom**: creating two tasks with the same name both succeed with `code=0`.
+- **Fix**: add `@unique` on `scheduled_task.name` in `models.json` AND a
+  `UNIQUE INDEX` in `schema.sql`, or enforce duplicate-name check in the
+  create handler.
+- **Re-enable**: drop fixme on ST-007.
+
+### G-9. Row delete does not remove row from list
+
+- **Symptom**: after row-action delete + confirm, the deleted row remains
+  visible (12 retries). Either delete fails silently, soft-delete leaks into
+  list query, or list cache is stale.
+- **Fix**: investigate `admin:delete_scheduled_task` handler and the list
+  endpoint's `deleted_flag` filter.
+- **Re-enable**: drop fixme on ST-009.
+
 ## Dead menus (no React component bound)
 
 These menu entries route to paths that have **no implementation** (frontend
