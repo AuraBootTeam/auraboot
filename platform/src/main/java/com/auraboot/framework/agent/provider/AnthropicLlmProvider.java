@@ -7,6 +7,8 @@ import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.LlmChunk;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
@@ -129,12 +131,51 @@ public class AnthropicLlmProvider implements LlmProvider {
      */
     private static final int THINKING_FALLBACK_MAX_TOKENS = 4096;
 
+    // =========================================================================
+    // ACP B.3-3 — Anthropic ephemeral prompt cache hit/miss counters.
+    //
+    // Until now, the provider only emitted a DEBUG log line listing tools.size
+    // and the last tool name. Cache hit ratio was therefore unobservable in
+    // Grafana / actuator and the "P0-1 saves money" claim could not be backed
+    // up with operational data. The two counters below give operators a
+    // running tally per (provider, model) of how often a chat() round-trip
+    // served tokens from the ephemeral cache vs. wrote new ones.
+    //
+    //   - aura_agent_anthropic_cache_hit_total{provider,model}
+    //       incremented when usage.cache_read_input_tokens > 0
+    //
+    //   - aura_agent_anthropic_cache_miss_total{provider,model}
+    //       incremented when usage.cache_creation_input_tokens > 0 AND
+    //       usage.cache_read_input_tokens == 0 (i.e. fresh cache write with
+    //       no read served on the same call)
+    //
+    // The "neither" case (no cache fields, e.g. Anthropic returned 0 for both)
+    // is intentionally NOT counted on either side: it represents a request
+    // that did not exercise the cache at all (e.g. a one-off call without
+    // enough prefix to cache), and rolling it into either bucket would skew
+    // the hit-rate ratio. Operators should compute hit_rate as
+    //   hit_total / (hit_total + miss_total)
+    // and not include uncached calls in the denominator.
+    //
+    // Cardinality: O(distinct model codes) per provider tag. Anthropic ships
+    // a small fixed family (sonnet/opus/haiku x version), so cardinality is
+    // single-digit per tenant — Prometheus-safe.
+    // =========================================================================
+    public static final String CACHE_HIT_NAME = "aura_agent_anthropic_cache_hit_total";
+    public static final String CACHE_MISS_NAME = "aura_agent_anthropic_cache_miss_total";
+    private static final String CACHE_PROVIDER_TAG = "anthropic";
+    private static final String UNKNOWN_MODEL_TAG = "unknown";
+
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
-    public AnthropicLlmProvider(@Qualifier("aiWebClient") WebClient webClient, ObjectMapper objectMapper) {
+    public AnthropicLlmProvider(@Qualifier("aiWebClient") WebClient webClient,
+                                ObjectMapper objectMapper,
+                                MeterRegistry meterRegistry) {
         this.webClient = webClient;
         this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -198,6 +239,7 @@ public class AnthropicLlmProvider implements LlmProvider {
 
         AnthropicResponse anthropicResp = objectMapper.readValue(responseBody, AnthropicResponse.class);
         LlmChatResponse out = convertResponse(anthropicResp);
+        recordCacheMetrics(request.getModel(), anthropicResp.getUsage());
         if (!warnings.isEmpty()) {
             out.setWarnings(warnings);
         }
@@ -439,6 +481,45 @@ public class AnthropicLlmProvider implements LlmProvider {
                 out.setWarnings(warnings);
             }
             return out;
+     * Increment the Anthropic prompt cache hit/miss counters based on the
+     * usage block returned by the API. See the field-level comment on
+     * {@link #CACHE_HIT_NAME} for the exact semantics; in short:
+     *
+     * <ul>
+     *   <li>{@code cache_read_input_tokens > 0} → hit (cache served tokens).</li>
+     *   <li>{@code cache_creation_input_tokens > 0 && cache_read_input_tokens == 0}
+     *       → miss (cache freshly written, no read on this call).</li>
+     *   <li>Both zero → uncached call, neither counter is incremented.</li>
+     * </ul>
+     *
+     * <p>The method silently no-ops when {@code meterRegistry} is null (some
+     * legacy unit-test paths construct the provider without a registry) or
+     * when the response carries no {@code usage} block (defensive against an
+     * Anthropic shape change). It does NOT throw — observability must never
+     * crash the request flow.
+     */
+    private void recordCacheMetrics(String requestedModel, AnthropicResponse.Usage usage) {
+        if (meterRegistry == null || usage == null) {
+            return;
+        }
+        int read = usage.getCache_read_input_tokens();
+        int creation = usage.getCache_creation_input_tokens();
+        String modelTag = (requestedModel == null || requestedModel.isBlank())
+                ? UNKNOWN_MODEL_TAG : requestedModel;
+        if (read > 0) {
+            Counter.builder(CACHE_HIT_NAME)
+                    .description("Anthropic chat() responses where usage.cache_read_input_tokens > 0")
+                    .tag("provider", CACHE_PROVIDER_TAG)
+                    .tag("model", modelTag)
+                    .register(meterRegistry)
+                    .increment();
+        } else if (creation > 0) {
+            Counter.builder(CACHE_MISS_NAME)
+                    .description("Anthropic chat() responses where cache_creation_input_tokens > 0 and cache_read_input_tokens == 0")
+                    .tag("provider", CACHE_PROVIDER_TAG)
+                    .tag("model", modelTag)
+                    .register(meterRegistry)
+                    .increment();
         }
     }
 
