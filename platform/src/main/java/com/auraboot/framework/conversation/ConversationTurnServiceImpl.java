@@ -111,18 +111,23 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         TurnContext ctx = beginTurn(request);
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
 
+        // D.1: wrap the sink so Anthropic Extended Thinking blocks emitted via
+        // {@code onThinking} are captured for persistence at finalizeTurn time
+        // while still being forwarded to the SSE transport unchanged.
+        ThinkingCapturingResponseSink capturingSink = new ThinkingCapturingResponseSink(sink);
+
         TurnOutcome outcome;
         try {
             ChatRequest legacyRequest = request.legacyRequest();
             String agentCode = request.agentCode();
             if (isAuraBotPath(agentCode)) {
                 if (shouldDispatchToAcpRuntime(ctx)) {
-                    outcome = dispatchToAcpRun(ctx, legacyRequest, sink);
+                    outcome = dispatchToAcpRun(ctx, legacyRequest, capturingSink);
                 } else {
-                    outcome = chatService.executeAuraBotTurn(ctx, legacyRequest, sink);
+                    outcome = chatService.executeAuraBotTurn(ctx, legacyRequest, capturingSink);
                 }
             } else {
-                outcome = dispatchToNamedAgent(ctx, request, legacyRequest, sink, agentCode);
+                outcome = dispatchToNamedAgent(ctx, request, legacyRequest, capturingSink, agentCode);
             }
             if (outcome == null) {
                 // Defensive: chat impls always return non-null, but if a future
@@ -137,7 +142,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
 
         try {
-            finalizeTurn(ctx, outcome);
+            finalizeTurn(ctx, outcome, TurnArtifacts.of(
+                    capturingSink.capturedContent(), capturingSink.capturedSignature()));
         } catch (Exception e) {
             // Side effects must never block the outcome from being returned to the caller.
             log.warn("finalizeTurn threw, swallowing: {}", e.getMessage(), e);
@@ -203,19 +209,23 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         TurnContext ctx = rebuildContext(pending);
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
 
+        // D.1: same wrapping discipline as runTurn — the resumed Anthropic
+        // stream may still emit thinking blocks before its text answer.
+        ThinkingCapturingResponseSink capturingSink = new ThinkingCapturingResponseSink(sink);
+
         // 3. Dispatch by decision.
         TurnOutcome outcome;
         try {
             outcome = switch (decision) {
-                case APPROVED -> chatService.resumeApprovedTurnFromPending(ctx, pending, sink);
+                case APPROVED -> chatService.resumeApprovedTurnFromPending(ctx, pending, capturingSink);
                 case DENIED -> {
                     String reason = "User denied the operation";
-                    sink.onDone("", null);
+                    capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted(reason, "user_denied");
                 }
                 case CANCELLED -> {
                     String reason = "User cancelled the operation";
-                    sink.onDone("", null);
+                    capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted(reason, "user_cancelled");
                 }
             };
@@ -230,7 +240,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
 
         try {
-            finalizeTurn(ctx, outcome);
+            finalizeTurn(ctx, outcome, TurnArtifacts.of(
+                    capturingSink.capturedContent(), capturingSink.capturedSignature()));
         } catch (Exception e) {
             log.warn("resumeTurn finalizeTurn threw, swallowing: {}", e.getMessage(), e);
         }
@@ -291,6 +302,9 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 java.time.Instant.now());
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
 
+        // D.1: capture thinking from any Anthropic streams the ACP resume runs.
+        ThinkingCapturingResponseSink capturingSink = new ThinkingCapturingResponseSink(sink);
+
         TurnOutcome outcome;
         try {
             outcome = switch (decision) {
@@ -299,31 +313,32 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                             tenantId, approvalPid, approverId, /*triggerAutoResume=*/ false);
                     if (approved == null) {
                         String msg = "Approval " + approvalPid + " could not be approved (terminal state)";
-                        sink.onError(msg, null);
+                        capturingSink.onError(msg, null);
                         yield new TurnOutcome.Failed(msg, null);
                     }
-                    yield syncResumeAcpRun(ctx, taskPid, runPid, sink);
+                    yield syncResumeAcpRun(ctx, taskPid, runPid, capturingSink);
                 }
                 case DENIED -> {
                     agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User denied the operation");
-                    sink.onDone("", null);
+                    capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted("User denied the operation", "user_denied");
                 }
                 case CANCELLED -> {
                     agentApprovalGateService.reject(tenantId, approvalPid, approverId, "User cancelled the operation");
-                    sink.onDone("", null);
+                    capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted("User cancelled the operation", "user_cancelled");
                 }
             };
         } catch (Exception e) {
             log.error("resumeAcpApproval failed: {}", e.getMessage(), e);
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            sink.onError(msg, null);
+            capturingSink.onError(msg, null);
             outcome = new TurnOutcome.Failed(msg, e);
         }
 
         try {
-            finalizeTurn(ctx, outcome);
+            finalizeTurn(ctx, outcome, TurnArtifacts.of(
+                    capturingSink.capturedContent(), capturingSink.capturedSignature()));
         } catch (Exception e) {
             log.warn("resumeAcpApproval finalizeTurn threw, swallowing: {}", e.getMessage(), e);
         }
@@ -821,13 +836,18 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     }
 
     private void finalizeTurn(TurnContext ctx, TurnOutcome outcome) {
+        finalizeTurn(ctx, outcome, TurnArtifacts.EMPTY);
+    }
+
+    private void finalizeTurn(TurnContext ctx, TurnOutcome outcome, TurnArtifacts artifacts) {
+        TurnArtifacts effective = artifacts != null ? artifacts : TurnArtifacts.EMPTY;
         switch (outcome) {
             case TurnOutcome.Success s -> {
-                sideEffects.persistence().persistOutbound(ctx, s);
+                sideEffects.persistence().persistOutbound(ctx, s, effective);
                 sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, s));
             }
             case TurnOutcome.Interrupted i -> {
-                sideEffects.persistence().persistOutbound(ctx, i);
+                sideEffects.persistence().persistOutbound(ctx, i, effective);
                 sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, i));
             }
             case TurnOutcome.Failed f -> {
@@ -840,7 +860,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 // the suspension event. Phase B will additionally chatSessionStore.savePending
                 // the pending tool payload keyed by ctx.turnId().
                 if (pc.partialResponse() != null && !pc.partialResponse().isBlank()) {
-                    sideEffects.persistence().persistOutbound(ctx, pc);
+                    sideEffects.persistence().persistOutbound(ctx, pc, effective);
                 }
                 sideEffects.eventEmitter().emit(new TurnSuspendedEvent(ctx, pc));
             }

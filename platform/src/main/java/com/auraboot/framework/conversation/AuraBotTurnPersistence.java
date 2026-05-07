@@ -121,22 +121,32 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
 
     @Override
     public Long persistOutbound(TurnContext ctx, TurnOutcome outcome) {
+        return persistOutbound(ctx, outcome, TurnArtifacts.EMPTY);
+    }
+
+    @Override
+    public Long persistOutbound(TurnContext ctx, TurnOutcome outcome, TurnArtifacts artifacts) {
         if (ctx == null || ctx.conversationId() == null) {
             log.debug("persistOutbound: missing conversationId, skipping");
             return null;
         }
+        TurnArtifacts effective = artifacts != null ? artifacts : TurnArtifacts.EMPTY;
         try {
             return switch (outcome) {
                 case TurnOutcome.Success s ->
-                        writeAgentRow(ctx, "ai_response", s.finalResponse(), null);
+                        writeAgentRow(ctx, "ai_response", s.finalResponse(), null, effective);
                 case TurnOutcome.Interrupted i ->
-                        writeAgentRow(ctx, "ai_response", i.partialResponse(), null);
+                        writeAgentRow(ctx, "ai_response", i.partialResponse(), null, effective);
                 case TurnOutcome.PendingConfirmation pc ->
-                        writeAgentRow(ctx, "ai_response", pc.partialResponse(), null);
+                        writeAgentRow(ctx, "ai_response", pc.partialResponse(), null, effective);
                 case TurnOutcome.Failed f ->
                         // Failure outbound is recorded as a system message so the UI
                         // renders the error consistently with the historical
-                        // appendAssistantMessage(error=true) path.
+                        // appendAssistantMessage(error=true) path. Failed turns do
+                        // not carry thinking — Anthropic emits thinking before the
+                        // text answer, and a Failed outcome means the stream broke
+                        // before message_stop, so any captured thinking is partial
+                        // / inconsistent and we drop it on the floor.
                         writeSystemRow(ctx, f.errorMessage());
             };
         } catch (Exception e) {
@@ -150,7 +160,8 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
         }
     }
 
-    private Long writeAgentRow(TurnContext ctx, String messageType, String content, String cardPayload) {
+    private Long writeAgentRow(TurnContext ctx, String messageType, String content, String cardPayload,
+                                TurnArtifacts artifacts) {
         // DC.3c Fix 2: resolve agent identity from ctx.agentCode (chokepoint
         // beginTurn fills it from request.agentCode). Falls back to
         // DEFAULT_AGENT_CODE when null for legacy code paths. Without this
@@ -167,7 +178,9 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
                 messageType,
                 content,
                 cardPayload,
-                outboundClientMsgId(ctx));
+                outboundClientMsgId(ctx),
+                artifacts != null ? artifacts.thinkingContent() : null,
+                artifacts != null ? artifacts.thinkingSignature() : null);
         return saved != null ? saved.getId() : null;
     }
 
