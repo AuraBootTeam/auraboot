@@ -1,6 +1,4 @@
-// @ts-expect-error -- optional MCP demo dependency, not installed in CI
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-// @ts-expect-error -- optional MCP demo dependency, not installed in CI
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { execSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { resolve } from 'node:path';
