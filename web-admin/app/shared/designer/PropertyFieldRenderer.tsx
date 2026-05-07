@@ -28,6 +28,7 @@ import { DependentFieldSelect } from './DependentFieldSelect';
 import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
 import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
+import { ArrayItemEditor } from './ArrayItemEditor';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema } from './types';
 
@@ -297,6 +298,65 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         />
       );
 
+    case 'array': {
+      const items: Record<string, unknown>[] = Array.isArray(adapter.value)
+        ? (adapter.value as Record<string, unknown>[])
+        : [];
+
+      const addLabel =
+        typeof schema.addButtonLabel === 'string' ? schema.addButtonLabel : '+ Add';
+      const emptyPlaceholder =
+        typeof schema.placeholder === 'string' ? schema.placeholder : undefined;
+
+      const buildDefaultItem = (): Record<string, unknown> => {
+        const obj: Record<string, unknown> = {};
+        for (const field of schema.itemSchema ?? []) {
+          obj[field.key] = field.defaultValue !== undefined
+            ? field.defaultValue
+            : defaultForType(field.type);
+        }
+        return obj;
+      };
+
+      return (
+        <div>
+          {items.length === 0 && emptyPlaceholder && (
+            <p className="text-sm text-gray-400">{emptyPlaceholder}</p>
+          )}
+          {items.map((item, idx) => {
+            const resolvedLabel = schema.itemLabel
+              ? schema.itemLabel(item, idx)
+              : `Item ${idx + 1}`;
+            return (
+              <ArrayItemEditor
+                key={idx}
+                itemSchema={(schema.itemSchema ?? []) as PropertySchema<string>[]}
+                value={item as any}
+                onChange={(next) => {
+                  const updated = items.map((it, i) => (i === idx ? next : it));
+                  (adapter as FieldAdapter<unknown>).setValue(updated);
+                }}
+                onRemove={() => {
+                  const updated = items.filter((_, i) => i !== idx);
+                  (adapter as FieldAdapter<unknown>).setValue(updated);
+                }}
+                itemLabel={resolvedLabel}
+              />
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => {
+              (adapter as FieldAdapter<unknown>).setValue([...items, buildDefaultItem()]);
+            }}
+            className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+          >
+            {addLabel}
+          </button>
+        </div>
+      );
+    }
+
     default:
       return (
         <BaseInput
@@ -381,6 +441,31 @@ function JsonField({
       className="font-mono"
     />
   );
+}
+
+// ---------------------------------------------------------------------------
+// 'array' helpers
+// ---------------------------------------------------------------------------
+
+/** Return a sensible empty default for a given PropertyType. */
+function defaultForType(type: string): unknown {
+  switch (type) {
+    case 'text':
+    case 'textarea':
+    case 'expression':
+    case 'formula':
+    case 'json':
+      return '';
+    case 'number':
+      return 0;
+    case 'boolean':
+      return false;
+    case 'multiselect':
+    case 'array':
+      return [];
+    default:
+      return undefined;
+  }
 }
 
 export default PropertyFieldRenderer;
