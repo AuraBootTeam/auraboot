@@ -1,4 +1,7 @@
 import '@testing-library/jest-dom';
+// Without explicit cleanup, DOM state leaks across tests (e.g., bpm-withdraw-reason
+// found multiple times). Auto-cleanup requires vitest globals which we don't enable.
+import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
 // Mock React Router
@@ -31,7 +34,9 @@ vi.mock('react-router', async () => {
   };
 });
 
-// @testing-library/react auto-runs cleanup after each test in React 16+
+afterEach(() => {
+  cleanup();
+});
 
 function createStorageMock() {
   const storage = new Map<string, string>();
