@@ -61,6 +61,7 @@ export type SSEEventType =
   | 'preview'
   | 'result'
   | 'confirm_required'
+  | 'warning'
   | 'error'
   | 'done';
 
@@ -112,6 +113,14 @@ export interface ChatStreamOptions {
    * carried through for forward compatibility (Phase P1).
    */
   onThinking?: (content: string, tokens: number, signature?: string) => void;
+  /**
+   * D.2: non-fatal advisories from the LLM provider (e.g. Anthropic
+   * auto-extending max_tokens when Extended Thinking budget exceeds the
+   * caller's value). Each string surfaces as a yellow toast on the panel.
+   * The default handler dispatches `aura:toast` window events; callers can
+   * override to suppress or relabel.
+   */
+  onWarning?: (warnings: string[]) => void;
 }
 
 export interface AuraBotConversationItem {
@@ -642,6 +651,33 @@ async function processSSEStream(
                   typeof data.signature === 'string' ? data.signature : undefined,
                 );
                 break;
+              case 'warning': {
+                // D.2: provider-side advisories (e.g. max_tokens auto-extension).
+                // Backend emits one `warning` SSE event per LLM round that
+                // produced a non-empty LlmChatResponse.warnings list; we toast
+                // each string individually with neutral severity. Callers may
+                // override `onWarning` to suppress or relabel.
+                const list = Array.isArray((data as { warnings?: unknown }).warnings)
+                  ? ((data as { warnings: string[] }).warnings.filter(
+                      (s) => typeof s === 'string' && s.length > 0,
+                    ) as string[])
+                  : [];
+                if (list.length === 0) break;
+                if (callbacks.onWarning) {
+                  callbacks.onWarning(list);
+                } else {
+                  // Default: dispatch a yellow toast per warning so users see
+                  // them even when the panel did not register a custom handler.
+                  for (const msg of list) {
+                    window.dispatchEvent(
+                      new CustomEvent('aura:toast', {
+                        detail: { message: msg, variant: 'warning' },
+                      }),
+                    );
+                  }
+                }
+                break;
+              }
               case 'confirm_required':
                 callbacks.onConfirmRequired?.(
                   data.toolId,
