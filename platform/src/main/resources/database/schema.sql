@@ -8586,3 +8586,58 @@ CREATE INDEX IF NOT EXISTS ix_xtg_audit_child_time
 COMMENT ON TABLE ab_cross_tenant_spawn_audit IS
   'One row per cross-tenant spawn decision (allowed / denied_no_grant / '
   'denied_expired / denied_revoked / denied_feature_disabled).';
+
+-- ============================================================================
+-- C-2 AuraBot Skill SPI — execution log + idempotency anchor
+-- See docs/superpowers/specs/2026-05-08-aurabot-skill-spi-contract.md §8
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_aurabot_skill_run (
+    pid               VARCHAR(64)   PRIMARY KEY,
+    tenant_id         BIGINT        NOT NULL,
+    skill_name        VARCHAR(128)  NOT NULL,
+    params_json       JSONB,
+    before_snapshot   JSONB,
+    after_snapshot    JSONB,
+    idempotency_key   VARCHAR(128),
+    undo_token        VARCHAR(64),
+    batch_id          VARCHAR(64),
+    -- Stored via SkillRunStatus.code() (lowercase): success / undone / failed.
+    status            VARCHAR(16)   NOT NULL,
+    -- Stored via RiskLevel.code() (lowercase): low / medium / high / critical.
+    risk_level        VARCHAR(16)   NOT NULL,
+    created_by        VARCHAR(64),
+    created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    undone_at         TIMESTAMPTZ,
+    deleted_flag      BOOLEAN       NOT NULL DEFAULT FALSE
+);
+
+-- Lookup paths (Contract §7, §11):
+--   1. tenant + idempotency window — replay short-circuit
+--   2. undo by token
+--   3. batch reverse-undo
+--   4. tenant rate sampling
+CREATE INDEX IF NOT EXISTS idx_aurabot_skill_run_tenant_skill_time
+    ON ab_aurabot_skill_run (tenant_id, skill_name, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_aurabot_skill_run_undo_token
+    ON ab_aurabot_skill_run (undo_token)
+    WHERE undo_token IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_aurabot_skill_run_batch_id
+    ON ab_aurabot_skill_run (batch_id, created_at)
+    WHERE batch_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_aurabot_skill_run_tenant_time
+    ON ab_aurabot_skill_run (tenant_id, created_at DESC);
+
+-- Idempotency anchor — only constrains LIVE rows so soft-deletes don't
+-- prevent legitimate re-claims after the deleted_flag flip.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_aurabot_skill_idemp
+    ON ab_aurabot_skill_run (tenant_id, skill_name, idempotency_key)
+    WHERE idempotency_key IS NOT NULL AND deleted_flag = FALSE;
+
+COMMENT ON TABLE ab_aurabot_skill_run IS
+  'AuraBot skill execution audit log; backs undo / batch-undo and the DB-side '
+  'half of the idempotency contract (Redis SETNX is the fast path, '
+  'uq_aurabot_skill_idemp is the durable backstop).';
+COMMENT ON COLUMN ab_aurabot_skill_run.status IS
+  'SkillRunStatus.code() — one of success / undone / failed. Never store enum.name() directly.';
+COMMENT ON COLUMN ab_aurabot_skill_run.risk_level IS
+  'RiskLevel.code() snapshot at execute time — one of low / medium / high / critical.';
