@@ -29,7 +29,7 @@ async function getAccountWithLinkedContact(
   );
   if (!linkedContact) return null;
 
-  const account = accountByPid.get(String(linkedContact.crm_ct_account_id));
+  const account = accountByPid.get(String(linkedContact.crm_ct_account_id)) as any;
   if (!account?.pid || !linkedContact?.crm_ct_name) return null;
 
   return {

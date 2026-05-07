@@ -1,5 +1,4 @@
 import '@testing-library/jest-dom';
-import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
 // Mock React Router
@@ -32,9 +31,8 @@ vi.mock('react-router', async () => {
   };
 });
 
-afterEach(() => {
-  cleanup();
-});
+// @testing-library/react v14+ performs cleanup automatically via afterEach
+// in its own setup, so no explicit cleanup() call is needed here.
 
 function createStorageMock() {
   const storage = new Map<string, string>();

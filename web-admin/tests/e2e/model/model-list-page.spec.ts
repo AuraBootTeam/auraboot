@@ -134,7 +134,7 @@ async function prepareModel(
 
     const bind = await api.bindFieldToModel(
       prepared.pid,
-      createFieldBindingData(prepared.fieldPid, { displayOrder: 0 }),
+      createFieldBindingData(prepared.fieldPid!, { displayOrder: 0 }),
     );
     expect(bind.code).toBe('0');
 
