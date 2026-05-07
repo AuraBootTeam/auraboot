@@ -96,6 +96,18 @@ public class AgentTemplateSeeder {
                 始终用中文回复，审批操作前先确认关键信息。
                 """,
                 defaultExecutionConfig
+
+                Sub-agent delegation: when the user asks for an independent
+                side-task that can run in parallel with the current approval
+                conversation (for example, "also generate a monthly approval
+                summary report while I keep reviewing this batch"), call the
+                tool `platform.delegate_task` with `{ "subtaskMessage":
+                "<clear description of the side-task>" }` and optionally
+                `agentCode` to override the child agent. The call requires
+                user approval before the child run starts; the parent
+                conversation does not block on the child. Do NOT delegate the
+                user's primary approval intent itself.
+                """
             },
             // data_entry_assistant
             {
@@ -112,6 +124,18 @@ public class AgentTemplateSeeder {
                 始终保持耐心，对错误给出清晰的修正指引。
                 """,
                 defaultExecutionConfig
+
+                Sub-agent delegation: when the user requests a long-running
+                independent side-task (for example, "kick off a bulk import
+                of this 50k-row CSV in the background while I keep entering
+                today's records"), invoke `platform.delegate_task` with
+                `{ "subtaskMessage": "<describe the import / validation
+                job>" }` and optionally `agentCode`. The call requires
+                user approval before the child run starts; the parent
+                conversation does not block on the child. Use only for
+                clearly separable side-tasks, not for the field the user
+                is currently editing.
+                """
             },
             // report_analysis — opt-in Extended Thinking for multi-hop analysis
             {
@@ -128,6 +152,18 @@ public class AgentTemplateSeeder {
                 数据查询结果优先以表格形式呈现，关键数字加粗标注。
                 """,
                 reportAnalysisExecutionConfig
+
+                Sub-agent delegation: when the user asks for an independent
+                heavy analysis side-task (for example, "delegate a full-year
+                aggregation across all regions while I keep reviewing this
+                quarter's chart"), call `platform.delegate_task` with
+                `{ "subtaskMessage": "<describe the aggregation / report
+                job>" }` and optionally `agentCode`. The call requires user
+                approval before the child run starts; the parent
+                conversation does not block on the child. Do not delegate
+                cheap inline queries that finish quickly in the current
+                turn.
+                """
             },
             // crm_operations
             {
@@ -144,6 +180,17 @@ public class AgentTemplateSeeder {
                 理解销售场景，用简洁的语言总结关键信息，避免信息过载。
                 """,
                 defaultExecutionConfig
+
+                Sub-agent delegation: when the user asks for an independent
+                bulk side-task (for example, "delegate a bulk export of all
+                opportunities in stage=Negotiation while I keep logging
+                today's calls"), invoke `platform.delegate_task` with
+                `{ "subtaskMessage": "<describe the export / batch update
+                job>" }` and optionally `agentCode`. The call requires user
+                approval before the child run starts; the parent
+                conversation does not block on the child. Do not delegate
+                single-record lookups or activity logs.
+                """
             },
             // ops_inspector
             {
@@ -160,6 +207,18 @@ public class AgentTemplateSeeder {
                 对异常情况保持敏感，用数字和事实说话，不做主观猜测。
                 """,
                 defaultExecutionConfig
+
+                Sub-agent delegation: when the user asks for an independent
+                deep-dive side-task that should run alongside the current
+                inspection (for example, "delegate a full error-log scan
+                across the last 7 days while I keep watching today's
+                metrics"), call `platform.delegate_task` with
+                `{ "subtaskMessage": "<describe the scan / report job>" }`
+                and optionally `agentCode`. The call requires user
+                approval before the child run starts; the parent
+                conversation does not block on the child. Do not delegate
+                routine health checks that complete in the current turn.
+                """
             },
         };
 
