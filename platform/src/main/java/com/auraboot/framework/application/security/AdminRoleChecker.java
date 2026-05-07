@@ -69,11 +69,6 @@ public class AdminRoleChecker {
                 k -> lookupFromDb(k.tenantId(), k.userId(), k.roleCode()));
     }
 
-    /** Convenience: {@link #hasRole(Long, Long, String)} with {@link RoleCodes#TENANT_ADMIN}. */
-    public boolean isTenantAdmin(Long tenantId, Long userId) {
-        return hasRole(tenantId, userId, RoleCodes.TENANT_ADMIN);
-    }
-
     // -------------------------------------------------------------------------
     // Cache management (package-visible for test cleanup)
     // -------------------------------------------------------------------------
