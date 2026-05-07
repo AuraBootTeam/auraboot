@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { cn } from '~/utils/cn';
 import { commandActionService } from '~/plugins/core-designer/components/studio/services/command/CommandActionService';
-import { SchemaBlockConfigPanel } from '../SchemaBlockConfigPanel';
+import { SchemaBlockConfigPanel } from '~/shared/designer/SchemaBlockConfigPanel';
 import { CommandSelector } from '../../panels/actions/CommandSelector';
 import { detailCustomButtonSchemas } from './schema';
 import type { DetailViewModel, CustomButton } from './mapper';

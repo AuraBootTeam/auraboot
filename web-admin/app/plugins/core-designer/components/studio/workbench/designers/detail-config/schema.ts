@@ -1,4 +1,4 @@
-import type { ExtendedPropertySchema } from '../SchemaBlockConfigPanel';
+import type { ExtendedPropertySchema } from '~/shared/designer/SchemaBlockConfigPanel';
 
 export const sectionDetailSchemas: ExtendedPropertySchema<string>[] = [
   { key: 'title', label: '分组标题', type: 'text', required: true, group: '基础' },

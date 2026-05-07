@@ -24,3 +24,6 @@ export { DesignerEmptyState } from './DesignerEmptyState';
 export type { DesignerEmptyStateProps } from './DesignerEmptyState';
 
 export { DESIGNER_I18N, resolveDesignerText } from './designerI18n';
+
+export { SchemaBlockConfigPanel } from './SchemaBlockConfigPanel';
+export type { ExtendedPropertySchema, SchemaBlockConfigPanelProps } from './SchemaBlockConfigPanel';

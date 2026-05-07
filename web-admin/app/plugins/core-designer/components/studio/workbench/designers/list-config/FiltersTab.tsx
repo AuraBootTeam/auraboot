@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { ModelCapabilities } from '~/shared/hooks/useModelCapabilities';
-import { SchemaBlockConfigPanel } from '../SchemaBlockConfigPanel';
+import { SchemaBlockConfigPanel } from '~/shared/designer/SchemaBlockConfigPanel';
 import { filterDetailSchemas } from './schema';
 import type { ListViewModel, FilterConfig } from './mapper';
 import type { ResolvedFieldLite } from './ColumnsTab';
