@@ -1,8 +1,8 @@
 package com.auraboot.framework.audit.integration;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.audit.entity.AdminActionLog;
-import com.auraboot.framework.audit.service.AdminActionLogService;
+import com.auraboot.framework.audit.entity.AdminEventLog;
+import com.auraboot.framework.audit.service.AdminEventLogService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.environment.dao.entity.Environment;
 import com.auraboot.framework.environment.dao.mapper.EnvironmentMapper;
@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Asserts:
  * <ol>
- *   <li>Direct {@link AdminActionLogService#record} call writes a row with all
+ *   <li>Direct {@link AdminEventLogService#record} call writes a row with all
  *       fields populated, defaults filled from {@link MetaContext}, and JSONB
  *       payload round-tripping.</li>
  *   <li>Lock + unlock through {@code EnvironmentService} produces the
@@ -33,13 +33,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>Audit-write failure must not propagate to the caller (fire-and-forget
  *       contract). Smoke-tested by passing a deliberately invalid record
  *       (blank actionType) — record() returns silently.</li>
- *   <li>{@link AdminActionLogService#byResource} filters by tenant + resource.</li>
+ *   <li>{@link AdminEventLogService#byResource} filters by tenant + resource.</li>
  * </ol>
  */
-class AdminActionLogServiceIntegrationTest extends BaseIntegrationTest {
+class AdminEventLogServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
-    private AdminActionLogService adminActionLogService;
+    private AdminEventLogService adminEventLogService;
 
     @Autowired
     private EnvironmentService environmentService;
@@ -65,7 +65,7 @@ class AdminActionLogServiceIntegrationTest extends BaseIntegrationTest {
         payload.put("after", "applied");
 
         String resourcePid = "rsrc-" + UniqueIdGenerator.generate();
-        adminActionLogService.record(AdminActionLog.builder()
+        adminEventLogService.record(AdminEventLog.builder()
                 .actionType("test.action")
                 .resourceType("test-resource")
                 .resourcePid(resourcePid)
@@ -74,10 +74,10 @@ class AdminActionLogServiceIntegrationTest extends BaseIntegrationTest {
                 .payload(payload)
                 .build());
 
-        List<AdminActionLog> rows = adminActionLogService.byResource(
+        List<AdminEventLog> rows = adminEventLogService.byResource(
                 tenantId, "test-resource", resourcePid, 10);
         assertThat(rows).hasSize(1);
-        AdminActionLog row = rows.get(0);
+        AdminEventLog row = rows.get(0);
         assertThat(row.getActionType()).isEqualTo("test.action");
         assertThat(row.getResourceType()).isEqualTo("test-resource");
         assertThat(row.getResourcePid()).isEqualTo(resourcePid);
@@ -100,7 +100,7 @@ class AdminActionLogServiceIntegrationTest extends BaseIntegrationTest {
         MetaContext.setCurrentUserId(67890L);
 
         // Should not throw — fire-and-forget contract.
-        adminActionLogService.record(AdminActionLog.builder()
+        adminEventLogService.record(AdminEventLog.builder()
                 .actionType("")
                 .resourceType("test-resource")
                 .resourcePid("anything")
@@ -108,7 +108,7 @@ class AdminActionLogServiceIntegrationTest extends BaseIntegrationTest {
                 .build());
 
         // No rows should be persisted for this tenant.
-        assertThat(adminActionLogService.recentByTenant(tenantId, 10)).isEmpty();
+        assertThat(adminEventLogService.recentByTenant(tenantId, 10)).isEmpty();
     }
 
     @Test
@@ -122,7 +122,7 @@ class AdminActionLogServiceIntegrationTest extends BaseIntegrationTest {
         EnvironmentRequest req = new EnvironmentRequest();
         req.setCode("audit-test-" + UniqueIdGenerator.generate().substring(0, 8));
         req.setName("Audit Test Env");
-        req.setDescription("created by AdminActionLogServiceIntegrationTest");
+        req.setDescription("created by AdminEventLogServiceIntegrationTest");
         environmentService.create(req, tenantId, actorId);
 
         Environment env = environmentMapper.findByTenantAndCode(tenantId, req.getCode());
@@ -132,10 +132,10 @@ class AdminActionLogServiceIntegrationTest extends BaseIntegrationTest {
         // Lock with reason.
         environmentService.lock(envPid, tenantId, actorId, "freezing for prod cut");
 
-        List<AdminActionLog> afterLock = adminActionLogService.byResource(
+        List<AdminEventLog> afterLock = adminEventLogService.byResource(
                 tenantId, "environment", envPid, 10);
         assertThat(afterLock).hasSize(1);
-        AdminActionLog lockEntry = afterLock.get(0);
+        AdminEventLog lockEntry = afterLock.get(0);
         assertThat(lockEntry.getActionType()).isEqualTo("environment.lock");
         assertThat(lockEntry.getActorUserId()).isEqualTo(actorId);
         assertThat(lockEntry.getReason()).isEqualTo("freezing for prod cut");
@@ -144,11 +144,11 @@ class AdminActionLogServiceIntegrationTest extends BaseIntegrationTest {
         // Unlock.
         environmentService.unlock(envPid, tenantId, actorId, "release shipped");
 
-        List<AdminActionLog> afterUnlock = adminActionLogService.byResource(
+        List<AdminEventLog> afterUnlock = adminEventLogService.byResource(
                 tenantId, "environment", envPid, 10);
         assertThat(afterUnlock).hasSize(2);
         // Newest first.
-        AdminActionLog unlockEntry = afterUnlock.get(0);
+        AdminEventLog unlockEntry = afterUnlock.get(0);
         assertThat(unlockEntry.getActionType()).isEqualTo("environment.unlock");
         assertThat(unlockEntry.getReason()).isEqualTo("release shipped");
         assertThat(unlockEntry.getSuccess()).isTrue();

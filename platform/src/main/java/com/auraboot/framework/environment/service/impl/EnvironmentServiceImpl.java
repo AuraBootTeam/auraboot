@@ -26,7 +26,7 @@ public class EnvironmentServiceImpl implements EnvironmentService {
     private EnvironmentMapper environmentMapper;
 
     @Autowired
-    private com.auraboot.framework.audit.service.AdminActionLogService adminActionLogService;
+    private com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
 
     @Override
     public List<EnvironmentResponse> listAll(Long tenantId) {
@@ -318,7 +318,7 @@ public class EnvironmentServiceImpl implements EnvironmentService {
         environmentMapper.updateById(env);
         log.info("Locked environment: pid={}, code={}, reason={}", pid, env.getCode(), reason);
 
-        adminActionLogService.record(com.auraboot.framework.audit.entity.AdminActionLog.builder()
+        adminEventLogService.record(com.auraboot.framework.audit.entity.AdminEventLog.builder()
                 .tenantId(tenantId)
                 .actorUserId(userId)
                 .actionType("environment.lock")
@@ -362,7 +362,7 @@ public class EnvironmentServiceImpl implements EnvironmentService {
         env.setUpdatedBy(userId);
         log.info("Unlocked environment: pid={}, code={}, reason={}", pid, env.getCode(), reason);
 
-        adminActionLogService.record(com.auraboot.framework.audit.entity.AdminActionLog.builder()
+        adminEventLogService.record(com.auraboot.framework.audit.entity.AdminEventLog.builder()
                 .tenantId(tenantId)
                 .actorUserId(userId)
                 .actionType("environment.unlock")

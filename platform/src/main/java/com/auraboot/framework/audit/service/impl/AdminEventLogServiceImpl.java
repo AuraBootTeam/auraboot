@@ -1,9 +1,9 @@
 package com.auraboot.framework.audit.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.audit.entity.AdminActionLog;
-import com.auraboot.framework.audit.mapper.AdminActionLogMapper;
-import com.auraboot.framework.audit.service.AdminActionLogService;
+import com.auraboot.framework.audit.entity.AdminEventLog;
+import com.auraboot.framework.audit.mapper.AdminEventLogMapper;
+import com.auraboot.framework.audit.service.AdminEventLogService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -15,22 +15,22 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Default implementation of {@link AdminActionLogService}.
+ * Default implementation of {@link AdminEventLogService}.
  *
  * <p>Fire-and-forget contract — exceptions during persistence are logged at WARN
  * and swallowed so audit-write failures cannot break the underlying action.
  */
 @Slf4j
 @Service
-public class AdminActionLogServiceImpl implements AdminActionLogService {
+public class AdminEventLogServiceImpl implements AdminEventLogService {
 
     private static final int MAX_LIMIT = 1000;
 
     @Autowired
-    private AdminActionLogMapper adminActionLogMapper;
+    private AdminEventLogMapper adminEventLogMapper;
 
     @Override
-    public void record(AdminActionLog logEntry) {
+    public void record(AdminEventLog logEntry) {
         if (logEntry == null) {
             return;
         }
@@ -52,7 +52,7 @@ public class AdminActionLogServiceImpl implements AdminActionLogService {
                 logEntry.setPid(UniqueIdGenerator.generate());
             }
             if (logEntry.getActionType() == null || logEntry.getActionType().isBlank()) {
-                log.warn("AdminActionLog.record called with blank actionType — dropping entry");
+                log.warn("AdminEventLog.record called with blank actionType — dropping entry");
                 return;
             }
             if (logEntry.getSuccess() == null) {
@@ -60,13 +60,13 @@ public class AdminActionLogServiceImpl implements AdminActionLogService {
             }
             if (logEntry.getTenantId() == null) {
                 // Cannot persist a multi-tenant audit row without tenant context.
-                log.warn("AdminActionLog.record called with no tenantId in MetaContext — dropping entry actionType={}", logEntry.getActionType());
+                log.warn("AdminEventLog.record called with no tenantId in MetaContext — dropping entry actionType={}", logEntry.getActionType());
                 return;
             }
 
-            adminActionLogMapper.insertActionLog(logEntry);
+            adminEventLogMapper.insertEventLog(logEntry);
         } catch (Exception e) {
-            log.warn("AdminActionLog persist failed (action={}, resource={}/{}): {}",
+            log.warn("AdminEventLog persist failed (action={}, resource={}/{}): {}",
                     logEntry.getActionType(),
                     logEntry.getResourceType(),
                     logEntry.getResourcePid(),
@@ -75,31 +75,31 @@ public class AdminActionLogServiceImpl implements AdminActionLogService {
     }
 
     @Override
-    public List<AdminActionLog> recentByTenant(Long tenantId, int limit) {
+    public List<AdminEventLog> recentByTenant(Long tenantId, int limit) {
         if (tenantId == null) {
             return Collections.emptyList();
         }
         int safeLimit = clamp(limit);
-        QueryWrapper<AdminActionLog> qw = new QueryWrapper<>();
+        QueryWrapper<AdminEventLog> qw = new QueryWrapper<>();
         qw.eq("tenant_id", tenantId)
                 .orderByDesc("created_at")
                 .last("LIMIT " + safeLimit);
-        return adminActionLogMapper.selectList(qw);
+        return adminEventLogMapper.selectList(qw);
     }
 
     @Override
-    public List<AdminActionLog> byResource(Long tenantId, String resourceType, String resourcePid, int limit) {
+    public List<AdminEventLog> byResource(Long tenantId, String resourceType, String resourcePid, int limit) {
         if (tenantId == null || resourceType == null || resourcePid == null) {
             return Collections.emptyList();
         }
         int safeLimit = clamp(limit);
-        QueryWrapper<AdminActionLog> qw = new QueryWrapper<>();
+        QueryWrapper<AdminEventLog> qw = new QueryWrapper<>();
         qw.eq("tenant_id", tenantId)
                 .eq("resource_type", resourceType)
                 .eq("resource_pid", resourcePid)
                 .orderByDesc("created_at")
                 .last("LIMIT " + safeLimit);
-        return adminActionLogMapper.selectList(qw);
+        return adminEventLogMapper.selectList(qw);
     }
 
     private static int clamp(int limit) {
