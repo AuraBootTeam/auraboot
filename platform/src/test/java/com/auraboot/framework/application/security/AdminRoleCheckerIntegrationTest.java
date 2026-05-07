@@ -5,7 +5,10 @@ import com.auraboot.framework.integration.TestIdGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
@@ -32,13 +35,17 @@ class AdminRoleCheckerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private AdminRoleChecker adminRoleChecker;
 
-    @Autowired
+    // SpyBean so cache tests can clear invocations and verify JDBC call count.
+    // Delegates to the real bean for all seeding writes in existing tests.
+    @SpyBean
     private JdbcTemplate jdbc;
 
     private Long tenantId;
 
     @AfterEach
     void cleanup() {
+        // Invalidate cache so seeded keys from one test never bleed into the next.
+        adminRoleChecker.invalidateAll();
         if (tenantId != null) {
             jdbc.update("DELETE FROM ab_user_role WHERE tenant_id = ?", tenantId);
             jdbc.update("DELETE FROM ab_role WHERE tenant_id = ?", tenantId);
@@ -97,6 +104,37 @@ class AdminRoleCheckerIntegrationTest extends BaseIntegrationTest {
         assertThat(result)
                 .as("unknown role code should always return false")
                 .isFalse();
+    }
+
+    // =========================================================================
+    // Test 4: second call hits Caffeine cache — JDBC called only once
+    // =========================================================================
+
+    @Test
+    @DisplayName("hasRole second call hits cache and skips JDBC")
+    void hasRole_secondCallHitsCache_skipsJdbc() {
+        tenantId = TestIdGenerator.uniqueTenantId();
+        seedTenantAdminRole(tenantId, testUser.getId());
+
+        // Clear spy invocations accumulated during seed writes so only the
+        // hasRole() calls are counted below.
+        Mockito.clearInvocations(jdbc);
+
+        // When: same (tenantId, userId, roleCode) triple called twice
+        boolean r1 = adminRoleChecker.hasRole(tenantId, testUser.getId(), "tenant_admin");
+        boolean r2 = adminRoleChecker.hasRole(tenantId, testUser.getId(), "tenant_admin");
+
+        // Then: both return true and the COUNT query hits JDBC exactly once
+        assertThat(r1).as("first call should return true").isTrue();
+        assertThat(r2).as("second call should return true (from cache)").isTrue();
+
+        Mockito.verify(jdbc, Mockito.times(1))
+                .queryForObject(
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.eq(Long.class),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any());
     }
 
     // =========================================================================
