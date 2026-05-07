@@ -396,8 +396,6 @@ export interface DslButton {
   mode?: 'drawer' | 'modal' | 'page'; // for create/edit
   confirm?: boolean | string; // confirmation message
   id?: string; // for row actions
-  /** Display label — overrides the standard-action default. Accepts LocalizedText. */
-  label?: string | { [locale: string]: string };
 }
 
 // =============================================================================

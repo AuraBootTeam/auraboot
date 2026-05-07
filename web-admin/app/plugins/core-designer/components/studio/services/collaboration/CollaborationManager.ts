@@ -218,7 +218,7 @@ export class CollaborationManager extends EventEmitter {
 
         this.once('error', (_error) => {
           clearTimeout(timeout);
-          reject(error);
+          reject(_error);
         });
       });
     } catch (error) {

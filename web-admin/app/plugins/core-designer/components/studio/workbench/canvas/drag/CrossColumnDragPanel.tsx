@@ -6,8 +6,8 @@
 import React, { useState, useCallback } from 'react';
 import {
   CrossColumnDragEnginePresets,
-  CrossColumnDragConfig,
-  ResizeTarget,
+  type CrossColumnDragConfig,
+  type ResizeTarget,
 } from '~/plugins/core-designer/components/studio/services/layout/resize/CrossColumnDragEngine';
 import { useCrossColumnDragConfig } from '~/plugins/core-designer/components/studio/hooks/drag/useCrossColumnDrag';
 

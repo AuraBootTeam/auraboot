@@ -17,15 +17,15 @@ import type {
   ButtonConfig,
   BlockConfig,
 } from '~/framework/meta/schemas/types';
-import type {
-  TemplateModelMeta,
-  TemplateOptions,
-  TemplateFieldMeta,
-  TemplateGenerator,
-  TemplateAction,
-  TemplateClassOverrides,
-  TemplateStyleSet,
+import {
   TEMPLATE_STYLES,
+  type TemplateModelMeta,
+  type TemplateOptions,
+  type TemplateFieldMeta,
+  type TemplateGenerator,
+  type TemplateAction,
+  type TemplateClassOverrides,
+  type TemplateStyleSet,
 } from '../types';
 import { mapFieldToValueType } from '../utils';
 

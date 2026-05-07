@@ -1061,5 +1061,25 @@ export function useAuraBot(): AuraBotContextValue {
   return context;
 }
 
+/**
+ * Returns true only when auto-hydration should proceed: the current session
+ * matches the session that triggered the hydration request, no conversation
+ * has been started yet, and the message list is still empty.
+ */
+export function shouldAutoHydrateConversation(
+  state: {
+    sessionId: string;
+    currentConversationId: number | null;
+    messages: { id: string }[];
+  },
+  requestedSessionId: string,
+): boolean {
+  return (
+    state.sessionId === requestedSessionId &&
+    state.currentConversationId === null &&
+    state.messages.length === 0
+  );
+}
+
 export type { PanelState, SimpleMessage, AuraBotState, AuraBotContextValue, KnowledgeBaseInfo };
 export default AuraBotProvider;
