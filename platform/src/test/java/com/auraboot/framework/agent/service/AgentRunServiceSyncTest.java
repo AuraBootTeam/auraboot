@@ -209,7 +209,7 @@ class AgentRunServiceSyncTest {
         ok.totalOutputTokens = 45;
         ok.totalCost = 0.0123d;
         when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), any(), any(), any(), any(), any(), anyBoolean()))
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(ok);
         // completeRunRecord — caller of completeRun expects this to return true on success
         when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
@@ -234,7 +234,7 @@ class AgentRunServiceSyncTest {
         // chokepoint can use it as the resumption token on the
         // confirm_required SSE event.
         when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), any(), any(), any(), any(), any(), anyBoolean()))
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenThrow(new AgentApprovalPendingException(
                         "APPROVAL_PID_42", "Step 2 awaits approval"));
 
@@ -258,7 +258,7 @@ class AgentRunServiceSyncTest {
     void planLoopPending_legacyConstructor_nullApprovalPid() throws Exception {
         primeHappyPath();
         when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), any(), any(), any(), any(), any(), anyBoolean()))
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenThrow(new AgentApprovalPendingException("legacy message"));
 
         RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
@@ -274,7 +274,7 @@ class AgentRunServiceSyncTest {
     void planLoopThrows_returnsFailed() throws Exception {
         primeHappyPath();
         when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), any(), any(), any(), any(), any(), anyBoolean()))
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenThrow(new RuntimeException("LLM provider exploded"));
 
         RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
