@@ -65,17 +65,21 @@ LOG=/tmp/pw-env-layering-$(date +%Y%m%d-%H%M%S).log
 
 ---
 
-## 3. `lock` / `unlock` 操作接审计日志
+## 3. `lock` / `unlock` 操作接审计日志 ✅ DONE
 
-**What**:`Environment.locked_by` / `locked_at` / `locked_reason` 字段记录在 entity 上,`/api/admin/environments/{pid}/lock` 端点写日志到 `log.info`。但**没有写入** `ab_permission_audit_log`。
+**Status**:已交付 — 通过 [PR #52](https://github.com/AuraBootTeam/auraboot/pull/52) 关闭(分支 `feat/env-layering-audit-log`)。
 
-**Why 未做**:#18 review 把它列为 backlog 但 PoC 时间盒只关了前 4 项(race / classpath scan / nested bypass / 404 envelope)。
+**实际方案与原建议有别**:没有用 `ab_permission_audit_log`(那张表的契约是"DENY 决策才写"),而是新建了 **领域事件审计** 表 `ab_admin_event_log` —— 与 PR #45 同期引入的 HTTP-shape `ab_admin_action_log` 共存,语义不同(domain-event vs HTTP-request)。
 
-**建议触发**:做 `@RequirePermission("environment:lock")` 注解时一并把 `EnvironmentController.lock/unlock` 改成走 `AuditLogService.record(...)`。需要看现有 `ab_permission_audit_log` schema(如果还没有,先建)。
+**这一 PR 同时关闭了**:
+- 本项(`environment.lock` / `environment.unlock`)
+- `promotion.apply`(success + failure 双分支)
+- `plugin.install` / `plugin.uninstall`(success + failure 双分支)
+- USP backlog §5("admin action audit log"建议项)
 
-**合规价值**:lockedReason 已经落到 `ab_environment` 表里,但事后能否从 audit log 查"谁在何时锁/解锁了哪个环境 + 原因"是合规审计的标准要求。
+5 个 action_type 全部命中 `domain.action` 命名约定。每个事件类型 ~5 LOC 服务端 + ~4 LOC IT 断言。
 
-**估时**:小到中等(2-4 hours),取决于审计日志表是否已存在。
+**详见**:`auraboot-enterprise/docs/system-reference/subsystems/98-管理审计日志体系.md`(5 表语义边界 + 接入 playbook)。
 
 ---
 
