@@ -23,7 +23,7 @@ export default defineConfig({
     poolOptions: {
       threads: {
         singleThread: true, // 使用单线程避免内存问题
-        isolate: false, // 减少隔离开销
+        isolate: true, // 每个测试文件独立模块注册表，保证 vi.mock 正确性
         minThreads: 1,
         maxThreads: 1, // 限制为单线程
       },
