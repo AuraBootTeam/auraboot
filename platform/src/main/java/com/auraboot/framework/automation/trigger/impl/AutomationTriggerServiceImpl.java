@@ -303,6 +303,11 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 Map<String, Object> context = new HashMap<>(triggerPayload);
                 context.put("recordId", recordId);
                 context.put("automationPid", automation.getPid());
+                // Expose the run id so action executors that emit live
+                // observability events (E.1: LlmCallExecutor →
+                // AutomationRunStreamPublisher) can key per-run subscribers
+                // without adding a new SPI argument.
+                context.put("runPid", logEntry.getPid());
 
                 Instant deadline = Instant.now().plus(EXECUTION_TIMEOUT);
 
