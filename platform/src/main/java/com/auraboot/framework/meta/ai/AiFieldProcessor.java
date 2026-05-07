@@ -68,13 +68,42 @@ public class AiFieldProcessor {
 
             // 3. Build LlmChatRequest
             int maxTokens = request.getMaxTokens() != null ? request.getMaxTokens() : 500;
+
+            // F.3 vision: when caller attaches images, materialise one user
+            // message per image (image first + accompanying text on the last
+            // image only, mirroring the chat path). Empty/null list keeps the
+            // text-only path byte-identical with the pre-F.3 behaviour.
+            List<ImageInput> images = request.getImages();
+            List<LlmChatRequest.Message> messages;
+            if (images != null && !images.isEmpty()) {
+                messages = new java.util.ArrayList<>(images.size());
+                for (int i = 0; i < images.size(); i++) {
+                    ImageInput img = images.get(i);
+                    if (img == null || img.getData() == null || img.getData().isBlank()) {
+                        continue;
+                    }
+                    String mediaType = img.getMediaType() != null ? img.getMediaType() : "image/png";
+                    // Attach prompt text only on the final image so the model
+                    // sees [img1, img2, ..., imgN, text] — Anthropic best
+                    // practice for multi-image OCR.
+                    String textForBlock = (i == images.size() - 1) ? prompt : null;
+                    messages.add(LlmChatRequest.Message.imageBase64(
+                            "user", mediaType, img.getData(), textForBlock));
+                }
+                if (messages.isEmpty()) {
+                    // All entries were null/blank — fall back to text path so
+                    // callers still get a usable response instead of an empty
+                    // message list (which Anthropic rejects).
+                    messages = List.of(LlmChatRequest.Message.text("user", prompt));
+                }
+            } else {
+                messages = List.of(LlmChatRequest.Message.text("user", prompt));
+            }
+
             LlmChatRequest chatRequest = LlmChatRequest.builder()
                     .model(config.getDefaultModel())
                     .systemPrompt("You are a helpful assistant that generates structured data.")
-                    .messages(List.of(LlmChatRequest.Message.builder()
-                            .role("user")
-                            .content(prompt)
-                            .build()))
+                    .messages(messages)
                     .maxTokens(maxTokens)
                     .build();
 
@@ -185,6 +214,28 @@ public class AiFieldProcessor {
         private Integer maxTokens;
         /** Temperature for generation (0.0 - 1.0) */
         private Double temperature;
+        /**
+         * F.3 vision: optional inline image attachments (base64-encoded). When
+         * non-empty the processor switches to multi-modal message construction
+         * and the underlying provider must support vision (Anthropic only at
+         * present — OpenAI-compat throws explicitly).
+         */
+        private List<ImageInput> images;
+    }
+
+    /**
+     * Inline image attachment for AI field vision input. {@code data} is raw
+     * base64 (NO {@code data:} URI prefix — strip it on the client).
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ImageInput {
+        /** MIME type: image/jpeg, image/png, image/gif, image/webp */
+        private String mediaType;
+        /** Raw base64-encoded bytes (no data: prefix) */
+        private String data;
     }
 
     /**
