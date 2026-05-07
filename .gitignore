@@ -102,3 +102,7 @@ AGENTS.md
 
 # Test coverage artifacts (D11 vitest --coverage output)
 plugins/cli/coverage/
+
+# Per-worktree isolated docker stack state (slug-keyed env files written by
+# scripts/dev/start-isolated.sh; transient and worktree-local).
+.aura-stack/
