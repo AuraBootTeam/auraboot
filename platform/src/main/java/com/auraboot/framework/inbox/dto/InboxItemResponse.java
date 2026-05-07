@@ -33,7 +33,46 @@ public class InboxItemResponse {
     private Long recordId;
     private String sourceRecordId;
     private String cardPayload;
+
+    /**
+     * Free-form card payload parsed from {@link #cardPayload}, scoped per
+     * {@code itemType} / industry template (CRM / ERP / ...).
+     *
+     * <h3>Reserved key — {@code actions[]}</h3>
+     *
+     * Mobile and web clients render quick-action buttons on each inbox card
+     * by reading {@code cardData.actions}. The shape is fixed across all
+     * industry templates:
+     *
+     * <pre>
+     * "actions": [
+     *   { "action": "approve", "label": "Approve", "style": "primary" },
+     *   { "action": "reject",  "label": "Reject",  "style": "destructive" }
+     * ]
+     * </pre>
+     *
+     * <ul>
+     *   <li>{@code action} <i>(required, non-blank)</i> — action verb consumed
+     *       by the client (typically maps to a backend command id or to a
+     *       client-side intent like {@code approve} / {@code reject} /
+     *       {@code follow_up}).</li>
+     *   <li>{@code label} <i>(required, non-blank)</i> — display text. Use
+     *       {@code $i18n:key} or a {@code LocalizedText} object when
+     *       internationalisation is required.</li>
+     *   <li>{@code style} <i>(optional, default {@code "secondary"})</i> —
+     *       one of {@link CardActionStyle#PRIMARY},
+     *       {@link CardActionStyle#SECONDARY},
+     *       {@link CardActionStyle#DESTRUCTIVE}. Unknown values fall back
+     *       to {@code secondary}.</li>
+     * </ul>
+     *
+     * Other keys in {@code cardData} are template-specific and may be added
+     * without breaking the {@code actions[]} contract. See
+     * {@code docs/mobile/ux/shared/21-industry-layout-config.md} for the
+     * per-template field catalogue.
+     */
     private Map<String, Object> cardData;
+
     private String actionTaken;
     private Instant actedAt;
     private String deepLink;
@@ -79,6 +118,23 @@ public class InboxItemResponse {
             return CARD_PAYLOAD_MAPPER.readValue(raw, new TypeReference<>() {});
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    /**
+     * Allowed {@code style} values for entries in {@code cardData.actions[]}.
+     * Mirrors web/mobile renderers (Android {@code InboxCardAction.Style},
+     * iOS {@code CardAction.Style}). Producers of inbox card payloads MUST
+     * use one of these values; consumers MUST treat unknown values as
+     * {@link #SECONDARY}.
+     */
+    public enum CardActionStyle {
+        PRIMARY,
+        SECONDARY,
+        DESTRUCTIVE;
+
+        public String wireValue() {
+            return name().toLowerCase();
         }
     }
 }
