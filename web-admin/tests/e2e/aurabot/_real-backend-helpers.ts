@@ -347,6 +347,110 @@ export function cleanupMissionControlMenus(_ids: SeededMenus): void {
 }
 
 // ---------------------------------------------------------------------------
+// Shadow Run seeding + menu (D.5 Phase 1)
+// ---------------------------------------------------------------------------
+
+export interface SeededShadowRunFixture {
+  draftPid: string;
+  draftSkillCode: string;
+  shadowRunPids: string[];
+}
+
+/**
+ * Seed one Skill Draft + N shadow runs for D.5 Phase 1 E2E.
+ *
+ * Returns the draft pid + the shadow run pids so afterEach can clean up.
+ * Variants follow the controller's KPI math: 1 fidelity match + 1 fidelity
+ * miss + 2 output matches by default → fidelity_rate=0.5 / output_rate=1.0.
+ */
+export function seedShadowRunFixture(): SeededShadowRunFixture {
+  const draftPid = randomPid('E2ESHD');
+  const draftSkillCode = `auto.shadow.${Date.now()}`;
+  // Insert the draft first so the FK to ab_agent_skill_draft satisfies.
+  psql(`
+    INSERT INTO ab_agent_skill_draft
+      (pid, tenant_id, draft_skill_code, source_pattern_hash, contract_yaml, status, created_at)
+    VALUES
+      ('${draftPid}', ${ADMIN_TENANT_ID}, '${draftSkillCode}', 'h_${draftPid}',
+       $$skill_code: ${draftSkillCode}$$, 'SHADOW_RUNNING', NOW());
+  `);
+  const shadowRunPids: string[] = [];
+  // Run 1 — fidelity match + output match. Cost +0.0010 vs prod.
+  const r1 = randomPid('E2ESHR');
+  shadowRunPids.push(r1);
+  psql(`
+    INSERT INTO ab_agent_shadow_run
+      (pid, tenant_id, draft_id, original_run_id,
+       shadow_status, shadow_duration_ms, shadow_cost_usd, shadow_tokens, shadow_output_hash,
+       original_status, original_duration_ms, original_cost_usd, original_output_hash,
+       output_match, fidelity_match, output_diff, created_at)
+    VALUES
+      ('${r1}', ${ADMIN_TENANT_ID}, '${draftPid}', '${r1.slice(0, 22)}_OR',
+       'success', 1200, 0.0050, 42, 'sh_${r1}',
+       'success', 1500, 0.0040, 'or_${r1}',
+       TRUE, TRUE, NULL, NOW() - INTERVAL '15 minutes');
+  `);
+  // Run 2 — fidelity MISS + output match. Output diff present.
+  const r2 = randomPid('E2ESHR');
+  shadowRunPids.push(r2);
+  psql(`
+    INSERT INTO ab_agent_shadow_run
+      (pid, tenant_id, draft_id, original_run_id,
+       shadow_status, shadow_duration_ms, shadow_cost_usd, shadow_tokens, shadow_output_hash,
+       original_status, original_duration_ms, original_cost_usd, original_output_hash,
+       output_match, fidelity_match, output_diff, created_at)
+    VALUES
+      ('${r2}', ${ADMIN_TENANT_ID}, '${draftPid}', '${r2.slice(0, 22)}_OR',
+       'success', 1100, 0.0030, 35, 'sh_${r2}',
+       'success', 1300, 0.0040, 'or_${r2}',
+       TRUE, FALSE,
+       $$[{"path":"/items/0/score","shadow":0.81,"production":0.83}]$$::jsonb,
+       NOW() - INTERVAL '5 minutes');
+  `);
+  return { draftPid, draftSkillCode, shadowRunPids };
+}
+
+export function cleanupShadowRunFixture(fixture: SeededShadowRunFixture): void {
+  if (!fixture) return;
+  // CASCADE delete on draft would clean shadow runs, but be explicit.
+  psql(
+    `DELETE FROM ab_agent_shadow_run WHERE pid IN (${fixture.shadowRunPids
+      .map((p) => `'${p}'`)
+      .join(',')});`,
+  );
+  psql(
+    `DELETE FROM ab_agent_skill_draft WHERE pid = '${fixture.draftPid}';`,
+  );
+}
+
+export interface SeededShadowRunsMenu {
+  menuId: string;
+  ownedIds: string[];
+}
+
+/**
+ * Seed the "Shadow Runs" leaf under AI 中心 so the sidebar shows it. The
+ * page itself sits at /admin/agent-runs/shadow-runs (not /aurabot/*) so we
+ * pick a unique path for the menu row that matches the React route.
+ */
+export function seedShadowRunsMenu(): SeededShadowRunsMenu {
+  const rand = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+  const pid = `E2EM_SH_${rand()}${rand()}`.slice(0, 26);
+  const r = upsertMenu({
+    pid,
+    code: 'aurabot.admin.shadow-runs',
+    name: '影子运行比对',
+    path: '/admin/agent-runs/shadow-runs',
+    order: 110,
+  });
+  return { menuId: r.id, ownedIds: r.didInsert ? [r.id] : [] };
+}
+
+export function cleanupShadowRunsMenu(_menu: SeededShadowRunsMenu): void {
+  // No-op: centralized teardown sweeps E2EM_* menu pids.
+}
+
+// ---------------------------------------------------------------------------
 // Memory Promotion seeding (PR-69 Phase 5)
 // ---------------------------------------------------------------------------
 
