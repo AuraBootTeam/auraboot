@@ -72,6 +72,23 @@ public class WebMvcConfig implements WebMvcConfigurer {
             .addPathPatterns("/api/admin/**");
         log.info("AdminRoleInterceptor registered for /api/admin/**");
 
+        // env-layering: resolve env from ?env / X-Environment header BEFORE PermissionInterceptor.
+        // AdminRole only needs tenantId (already populated by auth filter), so envId resolution
+        // can run after it. But PermissionInterceptor evaluates @RequirePermission rules that may
+        // bind to @EnvScoped tables (today: PageSchema, ResourceReference; tomorrow: command and
+        // role-binding tables are likely candidates). If envId is unresolved at permission-eval
+        // time the @EnvScoped WHERE clause sees env_id=null and silently makes permission
+        // decisions cross-env -- a latent leak with no test coverage. Reorder closes the gap
+        // proactively before the @EnvScoped set grows. (Slice 1 review P1-3, 2026-05-07.)
+        registry.addInterceptor(environmentResolverInterceptor)
+            .addPathPatterns("/api/**")
+            .excludePathPatterns(
+                "/api/auth/**",
+                "/api/public/**",
+                "/actuator/**"
+            );
+        log.info("EnvironmentResolverInterceptor registered for /api/**");
+
         log.info("Registering PermissionInterceptor");
         registry.addInterceptor(permissionInterceptor)
             .addPathPatterns("/api/**")
@@ -81,17 +98,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/actuator/**"       // Actuator endpoints (health, metrics, etc.)
             );
         log.info("PermissionInterceptor registered successfully");
-
-        // env-layering: resolve env from ?env / X-Environment header AFTER permission check (so
-        // tenantId is set + caller is authorized) but BEFORE controller handlers.
-        registry.addInterceptor(environmentResolverInterceptor)
-            .addPathPatterns("/api/**")
-            .excludePathPatterns(
-                "/api/auth/**",
-                "/api/public/**",
-                "/actuator/**"
-            );
-        log.info("EnvironmentResolverInterceptor registered for /api/**");
     }
 
     /**
