@@ -10,6 +10,7 @@ import { bffFlowDesignerService } from '~/server/services/BffFlowDesignerService
 
 import uploadRouter from '~/server/routes/upload';
 import { config } from '~/server/utils/config';
+import { parseDevAllowedPorts } from '~/server/utils/dev-cors-ports';
 import { requestLogger, errorLogger } from '~/server/middlewares/RequestLogger';
 import { register, proxyDurationHistogram } from './metrics.server';
 
@@ -83,6 +84,10 @@ app.disable('x-powered-by');
 // CORS configuration from config file
 const corsConfig = config.cors;
 
+// Dev-mode allowlist resolved once at boot. Set BFF_ALLOWED_PORTS=<csv> to
+// extend the default canonical ports (e.g. parallel worktrees on 5175/6445).
+const ALLOWED_DEV_PORTS = parseDevAllowedPorts(process.env.BFF_ALLOWED_PORTS);
+
 // CORS middleware with externalized configuration
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -94,8 +99,6 @@ app.use((req, res, next) => {
       res.header('Access-Control-Allow-Credentials', 'true');
     }
   } else if (config.server.env === 'development' && origin) {
-    // Development mode: allow known localhost ports only
-    const ALLOWED_DEV_PORTS = new Set(['3000', '3500', '5173', '5174', '6443']);
     try {
       const url = new URL(origin);
       if (
