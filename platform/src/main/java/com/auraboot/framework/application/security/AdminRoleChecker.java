@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.security;
 
 import com.auraboot.framework.permission.enums.RoleCodes;
+import com.auraboot.framework.rbac.constant.RoleConstants;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -83,18 +84,25 @@ public class AdminRoleChecker {
     // -------------------------------------------------------------------------
 
     private boolean lookupFromDb(Long tenantId, Long userId, String roleCode) {
-        Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_user_role ur " +
-                        " JOIN ab_tenant_member tm ON ur.member_id = tm.id " +
-                        " JOIN ab_role r ON ur.role_id = r.id " +
-                        " WHERE tm.user_id = ? " +
-                        "   AND ur.tenant_id = ? " +
-                        "   AND r.code = ? " +
-                        "   AND (ur.deleted_flag = FALSE OR ur.deleted_flag IS NULL) " +
-                        "   AND ur.status = 'active' " +
-                        "   AND (r.deleted_flag = FALSE OR r.deleted_flag IS NULL) " +
-                        "   AND r.status = 'active'",
-                Long.class, userId, tenantId, roleCode);
+        // Platform-only roles (e.g. platform_admin) live in System Tenant with
+        // scope_type=global and apply across the user's MetaContext regardless
+        // of which business tenant the request is currently scoped to. Drop
+        // the tenant_id filter for these so a System-Tenant grant satisfies a
+        // request whose MetaContext is a business tenant.
+        boolean platformOnly = RoleConstants.isPlatformOnly(roleCode);
+        String sql = "SELECT COUNT(*) FROM ab_user_role ur " +
+                " JOIN ab_tenant_member tm ON ur.member_id = tm.id " +
+                " JOIN ab_role r ON ur.role_id = r.id " +
+                " WHERE tm.user_id = ? " +
+                (platformOnly ? "" : "   AND ur.tenant_id = ? ") +
+                "   AND r.code = ? " +
+                "   AND (ur.deleted_flag = FALSE OR ur.deleted_flag IS NULL) " +
+                "   AND ur.status = 'active' " +
+                "   AND (r.deleted_flag = FALSE OR r.deleted_flag IS NULL) " +
+                "   AND r.status = 'active'";
+        Long count = platformOnly
+                ? jdbcTemplate.queryForObject(sql, Long.class, userId, roleCode)
+                : jdbcTemplate.queryForObject(sql, Long.class, userId, tenantId, roleCode);
         return count != null && count > 0;
     }
 
