@@ -46,6 +46,9 @@ class PromotionApplyIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private PromotionMapper promotionMapper;
 
+    @Autowired
+    private com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
+
     @AfterEach
     void clearEnv() {
         MetaContext.setEnvironmentId(null);
@@ -82,6 +85,15 @@ class PromotionApplyIntegrationTest extends BaseIntegrationTest {
         assertThat(targetPage.getVersion()).isEqualTo(1);
         assertThat(targetPage.getIsCurrent()).isTrue();
         assertSameJson(targetPage.getBlocks(), sourcePage.getBlocks());
+
+        // Audit event recorded: promotion.apply / success=true / reason carries through.
+        List<com.auraboot.framework.audit.entity.AdminEventLog> events =
+                adminEventLogService.byResource(testTenant.getId(), "promotion", draft.getPid(), 10);
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).getActionType()).isEqualTo("promotion.apply");
+        assertThat(events.get(0).getSuccess()).isTrue();
+        assertThat(events.get(0).getReason()).isEqualTo("ship to staging");
+        assertThat(events.get(0).getActorUserId()).isEqualTo(testUser.getId());
     }
 
     private static void assertSameJson(String actualJson, String expectedJson) {
