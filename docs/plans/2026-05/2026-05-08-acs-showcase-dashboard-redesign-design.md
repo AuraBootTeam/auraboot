@@ -215,3 +215,60 @@ LIMIT 10
 
 - 若 ACP Showcase 之后被频繁要求加联动(hover 高亮 / 点节点跳详情),再启动"提取 `pipeline-flow` 平台 widget"项目;现在不预演
 - 若 demo 数据缺失成为高频抱怨,补 `seed-data.sh` 脚本(本次先用 footer 文案引导手跑)
+
+---
+
+## 实施收尾(2026-05-08 update)
+
+### 计划外的平台微改(均通用,非 ACP-only)
+
+预诊断阶段(Task 1)发现"纯声明式"假设站不住,JSON 配置字段大量与 widget 实际 props 错位。owner 同意走 5 项小改:
+
+| commit | 文件 | 改动 | 长期价值 |
+|---|---|---|---|
+| `45bad4fc` | `core-dashboard/components/WidgetRenderer.tsx` | 包 `<div data-widget-id={widget.id}>` | 任何 dashboard E2E 都可用 widget 维度 selector |
+| `a7130d5b` | `framework/meta/utils/sanitizeHtml.ts` | DOMPurify 允许 SVG 14 个 tag + 30+ presentation attr + `ALLOW_DATA_ATTR: true` | rich-text 可承载内联流程图 / data-* 测试钩子 |
+| `743d05b8` | `framework/smart/components/charts/SmartNumberCard.tsx` | 新 `metricField?: string` + `prefix?: string` | 单 named query 可喂多张 KPI 卡;货币符号支持 |
+| `293d69df` | `framework/smart/components/charts/SmartTableChart.tsx` | 新 `columns?: Array<{field, label}>`,有则覆盖 auto-derive | 表格表头 i18n |
+| (无新 commit) | `SmartComboChart` | 复用现有 `seriesConfig: [{metricIndex, chartType, yAxisIndex?}]` | 仅 JSON 调整 |
+
+### 实际交付清单(commit 序)
+
+```
+f35323b2 docs(acp-showcase): dashboard redesign implementation plan
+e04a1374 docs(acp-showcase): add Task 1a/1b for platform sanitizer + WidgetRenderer
+45bad4fc feat(core-dashboard): wrap rendered widgets with data-widget-id for E2E
+a7130d5b feat(meta): allowlist SVG + data-* attrs in sanitizeHtml
+c8e984c9 feat(acp-showcase): add acs_showcase_recent_logs named query
+688c6e0f feat(acp-showcase): add dashboard i18n keys (zh-CN + en-US)  [+39 keys]
+223603e2 feat(acp-showcase): dashboard top half (hero + kpi + pipeline + cta)
+3b3f304a feat(acp-showcase): dashboard bottom half (charts + trend + table + footer)
+4ef0b135 test(acp-showcase): add dashboard e2e (red — runtime verify deferred)
+743d05b8 feat(smart-number-card): add metricField selector + prefix prop
+293d69df feat(smart-table-chart): add explicit columns config with i18n labels
+7c43c129 feat(acp-showcase): wire dashboard JSON to new metricField/columns/seriesConfig schemas
+```
+
+12 commit,push 在 `origin/feat/acs-dashboard-redesign`。
+
+### 已通过的静态校验
+
+- [x] 所有 JSON 文件 `python3 json.load` 通过
+- [x] dashboard JSON 共 15 widget,assertion script 全通过(metricField 在顶层、prefix 在顶层、seriesConfig 用 metricIndex)
+- [x] `$i18n:` 引用 ↔ i18n.json 定义 cross-check 零未匹配
+- [x] `npx tsc --noEmit` 无新增错误(对 5 个改动文件)
+
+### 仍需 dev stack 验证(deferred,不算"完成")
+
+按 testing-e2e-web 红线 #2,以下未跑前**禁止**声称"功能完成":
+
+1. **NamedQuery 响应 meta 形态** — 后端给 namedQuery 类型的响应里 `meta.dimensions` / `meta.metrics` 怎么划分?影响 combo-chart 的 `metricIndex 0` 是否真对应 `success` 字段。可能要前端 normalize 或改后端响应
+2. **6 KPI 卡复用单查询** — `metricField` 选不同列要在浏览器里看到 6 个不同数字,而不是 6 个相同数字
+3. **7 层 SVG** — sanitizer 放行后,在 rich-text 里实际渲染是否完整(IDs / markers / data-layer 全留下)
+4. **CTA 跳转** — `/p/acs_demo_request/new` 路由真存在(Page Designer 自动生成)且渲染表单有 i18n label
+5. **暗色主题** — pipeline SVG 用了固定 hex(`#eef2ff` / `#312e81` 等),实际暗色下对比度需肉眼检
+6. **响应式** — 1280 / 1920 视宽下 SVG `viewBox` 自适应是否真不溢出
+7. **E2E spec 类名兼容** — recharts DOM 类名(`recharts-bar-rectangle` 等)实际是否如 spec 假设
+8. **Lighthouse a11y** — SVG `<title>` + `role="img"` 是否凑足 ≥90 分
+
+owner 已确认在自己 dev 环境完成上述 8 项后再合 main(`默认直推 main` 红线下,但"测试缺失=未完成"红线优先)。
