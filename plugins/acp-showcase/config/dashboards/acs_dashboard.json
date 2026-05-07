@@ -1,7 +1,7 @@
 {
   "code": "acs_dashboard",
-  "title": "ACP Showcase Dashboard",
-  "description": "ACP showcase demo dashboard.",
+  "title": "$i18n:acs.dashboard.hero.title",
+  "description": "$i18n:acs.dashboard.hero.subtitle",
   "scope": "global",
   "status": "published",
   "layoutConfig": {
@@ -11,16 +11,75 @@
   },
   "widgets": [
     {
-      "id": "welcome",
+      "id": "hero",
       "type": "smart-rich-text",
-      "x": 0,
-      "y": 0,
-      "w": 12,
-      "h": 2,
-      "title": "ACP Showcase",
+      "x": 0, "y": 0, "w": 12, "h": 2,
       "config": {
-        "title": "ACP Showcase",
-        "content": "<h2>ACP Showcase</h2><p>Agent Control Plane showcase dashboard.</p>"
+        "content": "<div class=\"relative overflow-hidden rounded-xl px-8 py-6 text-white shadow-lg\" style=\"\"><div class=\"flex items-center justify-between\"><div><h1 class=\"text-2xl font-semibold\">$i18n:acs.dashboard.hero.title</h1><p class=\"mt-2 text-sm opacity-90\">$i18n:acs.dashboard.hero.subtitle</p></div><span class=\"inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs\"><span class=\"h-2 w-2 rounded-full bg-emerald-300\"></span>$i18n:acs.dashboard.hero.badge_running</span></div></div>"
+      }
+    },
+    {
+      "id": "kpi_total_requests",
+      "type": "smart-number-card",
+      "x": 0, "y": 2, "w": 3, "h": 2,
+      "config": {
+        "title": "$i18n:acs.dashboard.kpi.total_requests",
+        "icon": "Rocket",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "total_requests" }
+      }
+    },
+    {
+      "id": "kpi_success_rate",
+      "type": "smart-number-card",
+      "x": 3, "y": 2, "w": 3, "h": 2,
+      "config": {
+        "title": "$i18n:acs.dashboard.kpi.success_rate",
+        "icon": "TrendingUp",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "success_rate" },
+        "visualization": { "suffix": "%" }
+      }
+    },
+    {
+      "id": "kpi_avg_duration",
+      "type": "smart-number-card",
+      "x": 6, "y": 2, "w": 3, "h": 2,
+      "config": {
+        "title": "$i18n:acs.dashboard.kpi.avg_duration",
+        "icon": "Clock",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "avg_duration_ms" },
+        "visualization": { "suffix": " ms" }
+      }
+    },
+    {
+      "id": "kpi_safety_triggers",
+      "type": "smart-number-card",
+      "x": 9, "y": 2, "w": 3, "h": 2,
+      "config": {
+        "title": "$i18n:acs.dashboard.kpi.safety_triggers",
+        "icon": "ShieldCheck",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "safety_triggers" }
+      }
+    },
+    {
+      "id": "pipeline_diagram",
+      "type": "smart-rich-text",
+      "x": 0, "y": 4, "w": 12, "h": 4,
+      "config": {
+        "title": "$i18n:acs.dashboard.pipeline.title",
+        "content": "<div class=\"rounded-xl bg-white p-6 shadow-sm dark:bg-slate-900\"><div class=\"mb-3 flex items-center justify-between\"><h3 class=\"text-base font-semibold\">$i18n:acs.dashboard.pipeline.title</h3><div class=\"flex gap-3 text-xs text-slate-500\"><span>$i18n:acs.dashboard.pipeline.legend_trigger</span><span>$i18n:acs.dashboard.pipeline.legend_valve</span></div></div><svg role=\"img\" viewBox=\"0 0 1200 240\" preserveAspectRatio=\"xMidYMid meet\" class=\"w-full h-auto\"><title>$i18n:acs.dashboard.pipeline.svg_title</title><defs><marker id=\"arr\" viewBox=\"0 0 10 10\" refX=\"10\" refY=\"5\" markerWidth=\"6\" markerHeight=\"6\" orient=\"auto\"><path d=\"M0,0 L10,5 L0,10 z\" fill=\"#6366f1\"/></marker></defs><g font-family=\"system-ui\" font-size=\"14\"><rect data-layer=\"L5\" x=\"20\" y=\"40\" width=\"180\" height=\"60\" rx=\"10\" fill=\"#eef2ff\" stroke=\"#6366f1\" stroke-width=\"2\"/><text x=\"110\" y=\"75\" text-anchor=\"middle\" fill=\"#312e81\">$i18n:acs.dashboard.pipeline.layers.l5</text><line x1=\"200\" y1=\"70\" x2=\"320\" y2=\"70\" stroke=\"#6366f1\" stroke-width=\"2\" marker-end=\"url(#arr)\"/><text x=\"260\" y=\"60\" text-anchor=\"middle\" font-size=\"18\">⚡</text><rect data-layer=\"L4\" x=\"320\" y=\"40\" width=\"180\" height=\"60\" rx=\"10\" fill=\"#eef2ff\" stroke=\"#6366f1\" stroke-width=\"2\"/><text x=\"410\" y=\"75\" text-anchor=\"middle\" fill=\"#312e81\">$i18n:acs.dashboard.pipeline.layers.l4</text><line x1=\"500\" y1=\"70\" x2=\"620\" y2=\"70\" stroke=\"#6366f1\" stroke-width=\"2\" marker-end=\"url(#arr)\"/><text x=\"560\" y=\"60\" text-anchor=\"middle\" font-size=\"18\">🛡</text><rect data-layer=\"L3\" x=\"620\" y=\"40\" width=\"180\" height=\"60\" rx=\"10\" fill=\"#eef2ff\" stroke=\"#6366f1\" stroke-width=\"2\"/><text x=\"710\" y=\"75\" text-anchor=\"middle\" fill=\"#312e81\">$i18n:acs.dashboard.pipeline.layers.l3</text><path d=\"M800,70 Q900,70 900,140 Q900,170 800,170\" stroke=\"#6366f1\" stroke-width=\"2\" fill=\"none\" marker-end=\"url(#arr)\"/><rect data-layer=\"L2\" x=\"620\" y=\"140\" width=\"180\" height=\"60\" rx=\"10\" fill=\"#ecfeff\" stroke=\"#06b6d4\" stroke-width=\"2\"/><text x=\"710\" y=\"175\" text-anchor=\"middle\" fill=\"#155e75\">$i18n:acs.dashboard.pipeline.layers.l2</text><line x1=\"620\" y1=\"170\" x2=\"500\" y2=\"170\" stroke=\"#06b6d4\" stroke-width=\"2\" marker-end=\"url(#arr)\"/><text x=\"560\" y=\"160\" text-anchor=\"middle\" font-size=\"18\">🛡</text><rect data-layer=\"L1\" x=\"320\" y=\"140\" width=\"180\" height=\"60\" rx=\"10\" fill=\"#ecfeff\" stroke=\"#06b6d4\" stroke-width=\"2\"/><text x=\"410\" y=\"175\" text-anchor=\"middle\" fill=\"#155e75\">$i18n:acs.dashboard.pipeline.layers.l1</text><line x1=\"320\" y1=\"170\" x2=\"200\" y2=\"170\" stroke=\"#06b6d4\" stroke-width=\"2\" marker-end=\"url(#arr)\"/><text x=\"260\" y=\"160\" text-anchor=\"middle\" font-size=\"18\">🛡</text><rect data-layer=\"L0\" x=\"20\" y=\"140\" width=\"180\" height=\"60\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#16a34a\" stroke-width=\"2\"/><text x=\"110\" y=\"175\" text-anchor=\"middle\" fill=\"#166534\">$i18n:acs.dashboard.pipeline.layers.l0</text></g></svg></div>"
+      }
+    },
+    {
+      "id": "cta_strip",
+      "type": "smart-shortcuts",
+      "x": 0, "y": 8, "w": 12, "h": 2,
+      "config": {
+        "title": "",
+        "shortcuts": [
+          { "label": "$i18n:acs.dashboard.cta.run_demo", "icon": "🚀", "path": "/p/acs_demo_request/new", "color": "bg-indigo-50" },
+          { "label": "$i18n:acs.dashboard.cta.view_requests", "icon": "📋", "path": "/p/acs_demo_request", "color": "bg-blue-50" },
+          { "label": "$i18n:acs.dashboard.cta.view_rules", "icon": "🛡", "path": "/p/acs_safety_rule", "color": "bg-emerald-50" }
+        ]
       }
     }
   ]
