@@ -112,8 +112,12 @@ test.describe('Real-Time Data Push', () => {
       e2et_order_type: 'normal',
     });
 
-    // Wait for SSE event to arrive
-    await page.waitForTimeout(2000);
+    // Wait for the SSE event to arrive (or short-circuit if it never does —
+    // self-change suppression may legitimately drop it). 3s is enough for the
+    // gateway → SSE round-trip on a healthy stack.
+    await page
+      .waitForFunction(() => (window as any).__dataSyncEvents?.length > 0, { timeout: 3000 })
+      .catch(() => {});
 
     const receivedEvents = await page.evaluate(() => (window as any).__dataSyncEvents);
 
