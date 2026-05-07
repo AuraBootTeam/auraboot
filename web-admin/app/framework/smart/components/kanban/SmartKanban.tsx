@@ -17,7 +17,9 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Check, X } from 'lucide-react';
 import { useKanbanData } from '~/framework/smart/hooks/useKanbanData';
+import { useDictWithExtras } from '~/framework/smart/hooks/useDictWithExtras';
 import { KanbanCardItem } from './KanbanCardItem';
 import type { SmartKanbanProps, KanbanCard, KanbanColumn } from '~/framework/smart/types/kanban';
 import { cn } from '~/utils/cn';
@@ -63,6 +65,8 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
   onCardClick,
   onCardMove,
   linkageFilters,
+  groupByDictCode,
+  terminalStages,
   className,
   style,
 }) => {
@@ -75,6 +79,38 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
     dataSource,
     linkageFilters,
   });
+
+  // Resolve per-stage color / terminal from dict extension (no-op when dictCode absent).
+  const { items: dictItems } = useDictWithExtras(groupByDictCode);
+
+  /**
+   * Enrich columns with color/terminal:
+   *   - viewConfig.terminalStages takes precedence (per-pipeline override)
+   *   - falls back to dict item's flattened terminal
+   *   - color is dict-derived when present, falling back to whatever the
+   *     column already carries (e.g. seeded from dataSource).
+   */
+  const enrichedColumns = useMemo<KanbanColumn[]>(() => {
+    if (dictItems.length === 0 && !terminalStages) {
+      return columns;
+    }
+    const dictByValue = new Map(dictItems.map((it) => [it.value, it]));
+    const wonSet = new Set(terminalStages?.won ?? []);
+    const lostSet = new Set(terminalStages?.lost ?? []);
+    return columns.map((col) => {
+      const dictItem = dictByValue.get(col.id);
+      const terminalFromConfig: 'won' | 'lost' | undefined = wonSet.has(col.id)
+        ? 'won'
+        : lostSet.has(col.id)
+          ? 'lost'
+          : undefined;
+      return {
+        ...col,
+        color: dictItem?.color ?? col.color,
+        terminal: terminalFromConfig ?? dictItem?.terminal ?? col.terminal,
+      };
+    });
+  }, [columns, dictItems, terminalStages]);
 
   // Configure drag sensors
   const sensors = useSensors(
@@ -90,7 +126,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
    */
   const findCardAndColumn = useCallback(
     (cardId: string): { card: KanbanCard; columnId: string } | null => {
-      for (const column of columns) {
+      for (const column of enrichedColumns) {
         const card = column.cards.find((c) => c.id === cardId);
         if (card) {
           return { card, columnId: column.id };
@@ -98,7 +134,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
       }
       return null;
     },
-    [columns],
+    [enrichedColumns],
   );
 
   /**
@@ -139,7 +175,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
       let targetIndex = 0;
 
       // Check if overId is a column ID
-      const targetColumn = columns.find((col) => col.id === overId);
+      const targetColumn = enrichedColumns.find((col) => col.id === overId);
       if (targetColumn) {
         targetColumnId = targetColumn.id;
         targetIndex = targetColumn.cards.length;
@@ -148,7 +184,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
         const result = findCardAndColumn(overId);
         if (result) {
           targetColumnId = result.columnId;
-          const column = columns.find((col) => col.id === targetColumnId);
+          const column = enrichedColumns.find((col) => col.id === targetColumnId);
           if (column) {
             targetIndex = column.cards.findIndex((c) => c.id === overId);
           }
@@ -173,7 +209,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
       setActiveCard(null);
       setActiveColumnId(null);
     },
-    [activeColumnId, columns, findCardAndColumn, moveCard, onCardMove],
+    [activeColumnId, enrichedColumns, findCardAndColumn, moveCard, onCardMove],
   );
 
   /**
@@ -183,15 +219,43 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
     (column: KanbanColumn) => {
       const cardIds = column.cards.map((c) => c.id);
 
+      const headerClass = cn(
+        'rounded-t-lg border-b p-3',
+        column.terminal === 'won' && 'bg-green-50 text-green-800',
+        column.terminal === 'lost' && 'bg-gray-100 text-gray-600',
+        !column.terminal && 'bg-gray-50',
+      );
+      // Dict-derived hex color is applied as a tinted background only when there
+      // is no terminal-state styling claiming the header. The `${color}20` hex
+      // alpha suffix matches what other dict-color consumers in the platform use.
+      const headerStyle =
+        !column.terminal && column.color
+          ? { backgroundColor: `${column.color}20`, color: column.color }
+          : undefined;
+      const titleClass = cn(
+        'truncate text-sm font-medium',
+        !column.terminal && !column.color && 'text-gray-700',
+      );
+
       return (
         <div
           key={column.id}
           className="flex max-h-full w-72 shrink-0 flex-col rounded-lg bg-gray-100"
         >
           {/* Column header */}
-          <div className="rounded-t-lg border-b bg-gray-50 p-3">
+          <div
+            className={headerClass}
+            style={headerStyle}
+            data-testid="kanban-column-header"
+            data-column-id={column.id}
+            data-column-terminal={column.terminal ?? ''}
+          >
             <div className="flex items-center justify-between">
-              <span className="truncate text-sm font-medium text-gray-700">{column.title}</span>
+              <span className={titleClass}>
+                {column.terminal === 'won' && <Check className="mr-1 inline h-4 w-4" />}
+                {column.terminal === 'lost' && <X className="mr-1 inline h-4 w-4" />}
+                {column.title}
+              </span>
               {showCount && (
                 <span className="ml-2 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-gray-200 px-1.5 text-xs font-medium text-gray-600">
                   {column.count}
@@ -239,7 +303,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
   );
 
   // All column IDs for droppable targets
-  const columnIds = useMemo(() => columns.map((col) => col.id), [columns]);
+  const columnIds = useMemo(() => enrichedColumns.map((col) => col.id), [enrichedColumns]);
 
   // Loading state
   if (loading) {
@@ -296,7 +360,9 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={columnIds} strategy={verticalListSortingStrategy}>
-            <div className="flex gap-4 overflow-x-auto pb-2">{columns.map(renderColumn)}</div>
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {enrichedColumns.map(renderColumn)}
+            </div>
           </SortableContext>
 
           {/* Drag overlay - shows card preview while dragging */}
@@ -317,7 +383,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
       </div>
 
       {/* Empty state */}
-      {columns.length === 0 && (
+      {enrichedColumns.length === 0 && (
         <div className="p-8 text-center text-gray-500">No data available</div>
       )}
     </div>

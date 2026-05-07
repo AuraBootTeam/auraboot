@@ -121,6 +121,18 @@ export interface SmartKanbanProps {
   onCardMove?: (event: KanbanCardMoveEvent) => void;
   /** External filters from dashboard linkage */
   linkageFilters?: FilterConfig[];
+  /**
+   * Dict code bound to the groupBy field. When supplied, SmartKanban resolves
+   * per-stage color and terminal flags from the dict's `extension` field and
+   * applies them to the column header.
+   */
+  groupByDictCode?: string;
+  /**
+   * Explicit terminal-stage overrides (column id arrays). Takes precedence
+   * over dict-derived `terminal`. Used when the same dict is reused across
+   * pipelines that close on different stages.
+   */
+  terminalStages?: { won?: string[]; lost?: string[] };
   /** Additional CSS class */
   className?: string;
   /** Inline styles */
