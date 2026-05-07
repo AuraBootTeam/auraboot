@@ -109,6 +109,74 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
         assertThat(afterCount).isEqualTo(beforeCount);
     }
 
+    @Test
+    @Order(4)
+    void builtinSkills_promptTemplate_mentionsDelegateTask() {
+        // C.4: each of the 5 workflow-level builtin skills must teach the LLM
+        // about platform.delegate_task so it can spawn child runs.
+        // Re-seed in this @Transactional method to pick up the latest
+        // prompt_template constants from source (seeder is INSERT ... ON
+        // CONFLICT DO NOTHING and is normally short-circuited when rows
+        // already exist; the surrounding rollback isolates this delete).
+        jdbcTemplate.update(
+                "DELETE FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
+                SYSTEM_TENANT_ID);
+        agentTemplateSeeder.seed();
+
+        List<String> workflowSkillCodes = List.of(
+                "approval_workflow",
+                "data_entry_assistant",
+                "report_analysis",
+                "crm_operations",
+                "ops_inspector");
+
+        for (String code : workflowSkillCodes) {
+            String promptTemplate = jdbcTemplate.queryForObject(
+                    "SELECT prompt_template FROM ab_agent_skill " +
+                    "WHERE tenant_id = ? AND skill_code = ? AND is_builtin = TRUE",
+                    String.class,
+                    SYSTEM_TENANT_ID, code);
+
+            assertThat(promptTemplate)
+                    .as("prompt_template for skill '%s'", code)
+                    .isNotNull()
+                    .contains("platform.delegate_task")
+                    .contains("subtaskMessage");
+        }
+    }
+
+    @Test
+    @Order(4)
+    void builtinSkills_atomicSkills_doNotMentionDelegateTask() {
+        // Atomic skills (dsl.command, dsl.query) are leaf primitives; they
+        // are not allowed to delegate further. Their prompt_template (if any)
+        // must NOT advertise platform.delegate_task.
+        // dsl.command / dsl.query are seeded by a separate atomic-skill
+        // seeder; we do not reset them here. We only assert that any
+        // existing prompt_template for these atomic codes does NOT
+        // advertise platform.delegate_task.
+        for (String code : List.of("dsl.command", "dsl.query")) {
+            List<String> rows = jdbcTemplate.queryForList(
+                    "SELECT prompt_template FROM ab_agent_skill " +
+                    "WHERE tenant_id = ? AND skill_code = ? AND is_builtin = TRUE",
+                    String.class,
+                    SYSTEM_TENANT_ID, code);
+
+            assertThat(rows)
+                    .as("atomic skill '%s' must be seeded as builtin", code)
+                    .isNotEmpty();
+
+            String promptTemplate = rows.get(0);
+            // prompt_template may legitimately be null for atomic skills;
+            // if present, it must not reference delegate_task.
+            if (promptTemplate != null) {
+                assertThat(promptTemplate)
+                        .as("atomic skill '%s' prompt_template must not delegate", code)
+                        .doesNotContain("platform.delegate_task");
+            }
+        }
+    }
+
     // =========================================================================
     // execution_config (F.2) — Extended Thinking opt-in for report_analysis
     // =========================================================================
