@@ -44,8 +44,12 @@ public class FieldMapPhase implements CommandPhase {
                     ctx.getTenantId(), ctx.getCommand().getModelCode(), ctx.getRequest().getTargetRecordId()));
         }
 
-        // Cascade delete
-        if ("delete".equalsIgnoreCase(ctx.getRequest().getOperationType())) {
+        // Cascade delete — accept type=delete from execConfig as well so the
+        // request need not redundantly carry operationType.
+        Object execType = ctx.getExecConfig() != null ? ctx.getExecConfig().get("type") : null;
+        boolean isDeleteOperation = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
+                || (execType instanceof String s && "delete".equalsIgnoreCase(s));
+        if (isDeleteOperation) {
             cascadeDeleteExecutor.executeCascadeDeletePhase(ctx.getExecConfig(), ctx.getTenantId(), ctx.getRequest());
         }
 
@@ -68,6 +72,8 @@ public class FieldMapPhase implements CommandPhase {
             // implicit field-map path entirely, hit the empty-binding-rules
             // branch in executeFieldMapPhase, and silently no-op while
             // returning phaseReached=completed. Same for `--target` flows.
+            // (Also reported via E2E backlog G-9: row-action delete on
+            // scheduled_task left rows visible in the list.)
             boolean isDeleteOp = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
                     || "delete".equalsIgnoreCase(cmdType);
             boolean isStateTransition = "state_transition".equalsIgnoreCase(cmdType);

@@ -84,6 +84,15 @@ public class ScheduledTaskServiceImpl implements ScheduledTaskService {
             throw new IllegalArgumentException("Scheduled task not found: " + pid);
         }
 
+        // G-7: validate cron expression syntax before persisting (mirrors create()).
+        if ("cron".equals(request.getTaskType()) && request.getCronExpression() != null) {
+            try {
+                org.springframework.scheduling.support.CronExpression.parse(request.getCronExpression());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid cron expression: " + e.getMessage());
+            }
+        }
+
         existing.setName(request.getName());
         existing.setDescription(request.getDescription());
         existing.setTaskType(request.getTaskType());
