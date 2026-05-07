@@ -58,5 +58,21 @@
       {"code": "success", "columnExpr": "success", "dataType": "number"},
       {"code": "failed", "columnExpr": "failed", "dataType": "number"}
     ]
+  },
+  {
+    "code": "acs_showcase_recent_logs",
+    "name:zh-CN": "最近执行日志",
+    "name:en": "Recent Execution Logs",
+    "description": "Most recent 10 execution log entries for ACP showcase dashboard",
+    "fromSql": "SELECT acs_log_timestamp AS log_time, acs_log_layer AS layer, acs_log_action_type AS action_type, acs_log_status AS status, acs_log_risk_level AS risk_level, acs_log_safety_triggered AS safety_triggered, acs_log_duration_ms AS duration_ms FROM mt_acs_execution_log WHERE tenant_id = #{params.tenantId} ORDER BY acs_log_timestamp DESC LIMIT 10",
+    "outputFields": [
+      {"code": "log_time", "columnExpr": "log_time", "dataType": "datetime"},
+      {"code": "layer", "columnExpr": "layer", "dataType": "string"},
+      {"code": "action_type", "columnExpr": "action_type", "dataType": "string"},
+      {"code": "status", "columnExpr": "status", "dataType": "string"},
+      {"code": "risk_level", "columnExpr": "risk_level", "dataType": "string"},
+      {"code": "safety_triggered", "columnExpr": "safety_triggered", "dataType": "boolean"},
+      {"code": "duration_ms", "columnExpr": "duration_ms", "dataType": "number"}
+    ]
   }
 ]
