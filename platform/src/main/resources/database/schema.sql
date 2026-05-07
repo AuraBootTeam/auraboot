@@ -8398,8 +8398,7 @@ COMMENT ON TABLE ab_bitemporal_record IS
 
 <<<<<<< HEAD
 
--- =====================================================================
--- env-layering #4 — env_id backfill + SET NOT NULL
+-- ==============================================================-- env-layering #4 — env_id backfill + SET NOT NULL
 --
 -- For fresh DBs (reset-and-init flow) this DO block is a no-op (ab_tenant
 -- empty). For dev DBs that accumulated legacy NULL env_id rows before #16
@@ -8477,4 +8476,50 @@ CREATE INDEX IF NOT EXISTS idx_admin_action_log_tenant_time
     ON ab_admin_action_log (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_action_log_actor_time
     ON ab_admin_action_log (actor_user_id, created_at DESC);
->>>>>>> 2fa85b87 (feat(admin-guard): add AdminAuditService with async write to ab_admin_action_log)
+=======
+-- ============================================================================
+-- C.2 Cross-Tenant Sub-Agent ACL — grant table + spawn audit
+-- See docs/superpowers/specs/2026-05-07-c2-cross-tenant-acl-design.md
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ab_cross_tenant_grant (
+    id               BIGSERIAL PRIMARY KEY,
+    parent_tenant_id BIGINT NOT NULL,
+    child_tenant_id  BIGINT NOT NULL,
+    grant_type       VARCHAR(20) NOT NULL,
+    granted_by       BIGINT NOT NULL,
+    granted_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at       TIMESTAMPTZ,
+    revoked_at       TIMESTAMPTZ,
+    revoked_by       BIGINT,
+    note             TEXT
+);
+-- Partial unique index: only "active" (not-yet-revoked) rows are constrained,
+-- so revoke + re-grant of the same tenant pair leaves the old audit row in
+-- place and the new row enters the table cleanly.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cross_tenant_grant_active_unique
+    ON ab_cross_tenant_grant (parent_tenant_id, child_tenant_id, grant_type)
+    WHERE revoked_at IS NULL;
+COMMENT ON TABLE ab_cross_tenant_grant IS
+  'Cross-tenant sub-agent spawn ACL: parent_tenant may spawn child runs in '
+  'child_tenant when grant_type matches, expires_at in the future (or NULL), '
+  'and revoked_at IS NULL. Default-deny.';
+
+CREATE TABLE IF NOT EXISTS ab_cross_tenant_spawn_audit (
+    id               BIGSERIAL PRIMARY KEY,
+    grant_id         BIGINT REFERENCES ab_cross_tenant_grant(id),
+    parent_tenant_id BIGINT NOT NULL,
+    child_tenant_id  BIGINT NOT NULL,
+    parent_run_pid   VARCHAR(26) NOT NULL,
+    child_run_pid    VARCHAR(26),
+    decision         VARCHAR(32) NOT NULL,
+    spawn_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    error_message    TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_xtg_audit_parent_time
+    ON ab_cross_tenant_spawn_audit(parent_tenant_id, spawn_at);
+CREATE INDEX IF NOT EXISTS ix_xtg_audit_child_time
+    ON ab_cross_tenant_spawn_audit(child_tenant_id,  spawn_at);
+COMMENT ON TABLE ab_cross_tenant_spawn_audit IS
+  'One row per cross-tenant spawn decision (allowed / denied_no_grant / '
+  'denied_expired / denied_revoked / denied_feature_disabled).';
+>>>>>>> a1f10874 (feat(security): cross-tenant sub-agent ACL with audit + admin grant page)

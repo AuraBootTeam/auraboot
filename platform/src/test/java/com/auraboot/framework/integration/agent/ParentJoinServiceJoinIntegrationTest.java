@@ -256,9 +256,14 @@ class ParentJoinServiceJoinIntegrationTest extends BaseIntegrationTest {
                 childRunPid, otherTenant, childTaskPid, parentRunPid, testUser.getId());
 
         long before = System.currentTimeMillis();
+        // C.2 broadens the cross-tenant policy: instead of a hard refuse,
+        // the join now consults CrossTenantAclService. With no grant, the
+        // service returns denied_no_grant which surfaces as
+        // CrossTenantAclDeniedException (still IllegalStateException).
         assertThatThrownBy(() -> parentJoinService.joinChildRun(parentRunPid, childRunPid, 5000L))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("does not match");
+                .hasMessageContaining("cross-tenant spawn requires explicit grant")
+                .hasMessageContaining("denied_no_grant");
         long elapsed = System.currentTimeMillis() - before;
         assertThat(elapsed).as("tenant guard must fail fast, not block").isLessThan(500L);
         // No leftover slot from the rejected call.
