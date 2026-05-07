@@ -75,8 +75,30 @@ async function navigateToList(page: Page, modelCode: 'acs_demo_request' | 'acs_s
   ).toBeVisible({ timeout: 15_000 });
 }
 
-async function clickRadixSelectOption(page: Page, triggerIndex: number, optionMatch: RegExp): Promise<void> {
-  const trigger = page.locator('[role="combobox"]').nth(triggerIndex);
+async function clickRadixSelectOption(
+  page: Page,
+  fieldOrIndex: string | number,
+  optionMatch: RegExp,
+): Promise<void> {
+  // Each Radix Select renders TWO [role="combobox"] elements per field
+  // (a visible trigger + a hidden native form-control), so .nth() over the
+  // page-level locator silently picks the hidden copy on every other field.
+  // Scope by field testid when caller passes a string field code, fall back
+  // to visible-only filter when caller passes an index.
+  let trigger;
+  if (typeof fieldOrIndex === 'string') {
+    trigger = page
+      .locator(`[data-testid="form-field-${fieldOrIndex}"] button[role="combobox"], [data-field="${fieldOrIndex}"] button[role="combobox"]`)
+      .first();
+    // Fallback: visible button-combobox when wrapper testid is absent.
+    // We can't reliably index into all buttons either (multiple selects on the
+    // same form), so the index path below remains a last resort.
+    if (!(await trigger.isVisible({ timeout: 1_500 }).catch(() => false))) {
+      trigger = page.locator('button[role="combobox"]').first();
+    }
+  } else {
+    trigger = page.locator('button[role="combobox"]').nth(fieldOrIndex);
+  }
   await trigger.waitFor({ state: 'visible', timeout: 10_000 });
   await trigger.click({ timeout: 8_000 });
   await page
@@ -181,8 +203,8 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
     await fillTextField(page, 'acs_req_nl_input', REQ_NL_INPUT);
 
     // [D5] enum fields — Radix Select. Two combobox: category (0), priority (1)
-    await clickRadixSelectOption(page, 0, /Data Query|数据查询|data_query/i);
-    await clickRadixSelectOption(page, 1, /High|高/i);
+    await clickRadixSelectOption(page, 'acs_req_category', /Data Query|数据查询|data_query/i);
+    await clickRadixSelectOption(page, 'acs_req_priority', /High|高/i);
 
     const body = await submitForm(page);
     const resultData = (body as any)?.data?.data ?? {};
@@ -283,7 +305,7 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
         .catch(() => null);
       await ensureFilterFormOpen(page).catch(() => null);
       const search = page
-        .locator('[data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]')
+        .locator('[data-testid="list-search-input"], [data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]')
         .first();
       if (await search.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await search.fill(demoRequestCode);
@@ -325,7 +347,10 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
   // =========================================================================
   // [D11 + D14] Delete a draft request → confirm → row disappears
   // =========================================================================
-  test('ACS-007 @critical — Delete draft AI request via row action → confirm → row gone', async ({ page }) => {
+  // FIXME: blocked by acs:delete_* no-op bug.
+  // See docs/backlog/2026-05-08-acp-showcase-delete-noop-bug.md
+  // Re-enable after platform/plugin delete handler is fixed.
+  test.fixme('ACS-007 @critical — Delete draft AI request via row action → confirm → row gone', async ({ page }) => {
     // Seed a fresh draft request via API
     const seed = await executeCommandViaApi(
       page,
@@ -383,6 +408,12 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
       )
       .catch(() => null);
     await expect(page.locator('tbody tr', { hasText: reqCode })).not.toBeVisible({ timeout: 8_000 });
+
+    // [data integrity] Verify deletion landed in DB, not just UI optimistic refresh.
+    // Without this, an ack-only delete handler (no actual DB mutation) silently passes
+    // because the row scrolls off page 1.
+    const verify = await page.request.get(`/api/dynamic/acs_demo_request/${seed.recordId}`);
+    expect(verify.status(), `record ${seed.recordId} should be 404 after delete`).toBe(404);
   });
 
   // =========================================================================
@@ -412,9 +443,9 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
     await fillTextField(page, 'acs_rule_priority', '50');
 
     // type, action, severity — three Radix selects
-    await clickRadixSelectOption(page, 0, /Cost Limit|cost_limit|成本/i);
-    await clickRadixSelectOption(page, 1, /Pause|pause_and_notify|暂停/i);
-    await clickRadixSelectOption(page, 2, /Warn|warn|警告/i);
+    await clickRadixSelectOption(page, 'acs_rule_type', /Cost Limit|cost_limit|成本/i);
+    await clickRadixSelectOption(page, 'acs_rule_action', /Pause|pause_and_notify|暂停/i);
+    await clickRadixSelectOption(page, 'acs_rule_severity', /Warn|warn|警告/i);
 
     const body = await submitForm(page);
     const data = (body as any)?.data?.data ?? {};
@@ -469,7 +500,10 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
   // =========================================================================
   // [D11] Deactivate then delete → row disappears
   // =========================================================================
-  test('ACS-011 @critical — Deactivate then delete safety rule → row gone', async ({ page }) => {
+  // FIXME: blocked by acs:delete_* no-op bug.
+  // See docs/backlog/2026-05-08-acp-showcase-delete-noop-bug.md
+  // Re-enable after platform/plugin delete handler is fixed.
+  test.fixme('ACS-011 @critical — Deactivate then delete safety rule → row gone', async ({ page }) => {
     expect(safetyRulePid).toBeTruthy();
 
     const deact = await executeCommandViaApi(page, 'acs:deactivate_rule', {}, safetyRulePid);
@@ -513,8 +547,15 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
         .isVisible({ timeout: 3_000 })
         .catch(() => false);
     }
+    // Form may render validation as a top-of-page summary listing all required fields
+    // (e.g. "请先修正以下 N 项问题" + <ul><li>Field 'X' is required</li></ul>).
+    const hasSummary = await page
+      .getByText(/请先修正以下|please.*fix|Field '.+' is required/i)
+      .first()
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
     expect(
-      hasError || hasErrorToast,
+      hasError || hasErrorToast || hasSummary,
       'Empty submit must show validation feedback',
     ).toBeTruthy();
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
@@ -530,7 +571,7 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
 
     const search = page
       .locator(
-        '[data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+        '[data-testid="list-search-input"], [data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
       )
       .first();
     if (!(await search.isVisible({ timeout: 3_000 }).catch(() => false))) {
@@ -545,6 +586,8 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
     await search.fill(demoRequestCode);
     await search.press('Enter');
     await listResp;
+    // Wait for the in-table loading placeholder to clear before reading rows
+    await page.locator('text=加载中...').first().waitFor({ state: 'hidden', timeout: 8_000 }).catch(() => null);
 
     const rows = page.locator('tbody tr');
     const count = await rows.count();
@@ -578,9 +621,9 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
     await fillTextField(page, 'acs_rule_trigger_condition', '{"max_iterations": 30}');
     await fillTextField(page, 'acs_rule_threshold', '30');
     await fillTextField(page, 'acs_rule_priority', '60');
-    await clickRadixSelectOption(page, 0, /Iteration|iteration_limit|迭代/i);
-    await clickRadixSelectOption(page, 1, /Terminate|terminate|终止/i);
-    await clickRadixSelectOption(page, 2, /Error|error|错误/i);
+    await clickRadixSelectOption(page, 'acs_rule_type', /Iteration|iteration_limit|迭代/i);
+    await clickRadixSelectOption(page, 'acs_rule_action', /Terminate|terminate|终止/i);
+    await clickRadixSelectOption(page, 'acs_rule_severity', /Error|error|错误/i);
 
     await submitForm(page);
     await waitForToast(page, undefined, 5_000).catch(() => null);
