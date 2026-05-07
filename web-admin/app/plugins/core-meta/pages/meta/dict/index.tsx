@@ -209,7 +209,7 @@ export default function DictListPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl p-6" data-testid="dictionary-list">
+    <div className="mx-auto w-full px-2 py-3" data-testid="dictionary-list">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
