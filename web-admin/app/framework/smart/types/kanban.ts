@@ -33,6 +33,10 @@ export interface KanbanColumn {
   count: number;
   /** Aggregation results for this column */
   aggregations?: Record<string, number>;
+  /** Column accent color (resolved from dict extras or view config) */
+  color?: string;
+  /** Terminal stage marker for visual treatment (won/lost) */
+  terminal?: 'won' | 'lost';
 }
 
 /**
@@ -56,9 +60,13 @@ export interface KanbanCardField {
   /** Display label */
   label?: string;
   /** Display type for formatting */
-  type?: 'text' | 'number' | 'date' | 'tag' | 'avatar';
+  type?: 'text' | 'number' | 'tag' | 'date' | 'currency' | 'avatar' | 'progress' | 'date-relative';
   /** Format string (e.g., date format) */
   format?: string;
+  /** ISO 4217 currency code (only used when type='currency') */
+  currencyCode?: string;
+  /** Maximum value for progress rendering (only used when type='progress', defaults to 100) */
+  max?: number;
 }
 
 /**
@@ -113,6 +121,18 @@ export interface SmartKanbanProps {
   onCardMove?: (event: KanbanCardMoveEvent) => void;
   /** External filters from dashboard linkage */
   linkageFilters?: FilterConfig[];
+  /**
+   * Dict code bound to the groupBy field. When supplied, SmartKanban resolves
+   * per-stage color and terminal flags from the dict's `extension` field and
+   * applies them to the column header.
+   */
+  groupByDictCode?: string;
+  /**
+   * Explicit terminal-stage overrides (column id arrays). Takes precedence
+   * over dict-derived `terminal`. Used when the same dict is reused across
+   * pipelines that close on different stages.
+   */
+  terminalStages?: { won?: string[]; lost?: string[] };
   /** Additional CSS class */
   className?: string;
   /** Inline styles */

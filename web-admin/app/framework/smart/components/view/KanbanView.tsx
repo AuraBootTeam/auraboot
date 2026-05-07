@@ -104,6 +104,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
       onCardClick={onCardClick}
       onCardMove={onCardMove}
       linkageFilters={linkageFilters}
+      groupByDictCode={viewConfig?.groupByDictCode}
+      terminalStages={viewConfig?.terminalStages}
       className={className}
     />
   );
