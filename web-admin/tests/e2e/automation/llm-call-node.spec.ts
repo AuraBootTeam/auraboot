@@ -537,6 +537,15 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
       const panel = page.locator('.w-80.border-l').first();
       await expect(panel.getByText(/选择一个节点|Select a node/i)).toBeHidden({ timeout: 5_000 });
     };
+    // ACP H.1 fix (AutomationEditor.tsx): `initialData` is now memoised on
+    // the prop reference, so editing a property field NO LONGER retriggers
+    // FlowDesigner.importData() and the property panel stays mounted across
+    // the full edit sequence. The previous re-click-after-each-edit
+    // workaround has been removed.
+    const propertyPanel = page.locator('.w-80.border-l').first();
+    await expect(propertyPanel.getByText(/选择一个节点|Select a node/i)).toBeHidden({
+      timeout: 5_000,
+    });
 
     // 1) Edit userPromptTemplate (textarea).
     const newPrompt = `Edited via UI ${UID}: \${trigger.text}`;
@@ -554,6 +563,8 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     await reSelectLlmNode();
 
     // 2) Edit outputVariableName (single-line input).
+    // 2) Edit outputVariableName (single-line input).
+    // After H.1, the panel must remain mounted between edits — no re-click.
     const newOutputVar = `summary_${UID.toLowerCase()}`;
     const outputVarInput = page
       .locator('input#outputVariableName, [id="outputVariableName"]')
@@ -569,6 +580,12 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     await reSelectLlmNode();
 
     // Verify in-memory the values stuck before saving.
+    // Verify in-memory the values stuck before saving.
+    // The property panel must STILL be mounted (selection preserved) — this
+    // is the ACP H.1 invariant.
+    await expect(propertyPanel.getByText(/选择一个节点|Select a node/i)).toBeHidden({
+      timeout: 5_000,
+    });
     userPromptInput = page
       .locator('textarea#userPromptTemplate, [id="userPromptTemplate"]')
       .first();
