@@ -11,6 +11,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 SCHEMA_FILE="$PROJECT_ROOT/platform/src/main/resources/database/schema.sql"
 
+# shellcheck source=lib/multi-worktree-guard.sh
+source "$SCRIPT_DIR/lib/multi-worktree-guard.sh"
+aura_multi_worktree_guard "reset-db.sh"
+
 echo "=== AuraBoot Database Reset ==="
 echo ""
 
