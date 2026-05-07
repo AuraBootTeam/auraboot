@@ -11,6 +11,7 @@
 **已闭合状态(本 PoC scope 内)**:
 - 全部 reviewer must-fix(#16 plugin-import / #17 写侧 lock guard / #18 backlog 4 项 / #19 UPDATE+DELETE lock guard)
 - 主线 12 commits + #19 共 13 commits @ origin
+- **2026-05-07 review followup**:slice 1 P1-1 (promotion cross-tenant env validation) + P1-3 (interceptor registration order) shipped to main as `e9e194ff` + `e74525ad`
 
 ---
 
@@ -133,6 +134,26 @@ ALTER TABLE ab_page_schema
 **用法**:并行 worktree 启动时 `BFF_ALLOWED_PORTS=5175,6445 pnpm dev:full`;主 worktree 不需要任何改动。
 
 **与 Docker 隔离方案的关系**:`auraboot/docs/plans/2026-05/2026-05-07-docker-per-worktree-isolation-design.md` 是长期方向(每个 worktree 一个隔离 Docker stack)。本 fix 是非 Docker dev session 的 quick mitigation,两者并存 — 不打架。
+
+---
+
+## 7. Slice 1 review residuals(2026-05-07 4-slice review session 出口)
+
+**已闭合**:
+- ✅ **P1-1 promotion source/target env tenant validation** → `e9e194ff` on main
+- ✅ **P1-3 EnvironmentResolverInterceptor 注册顺序** → `e74525ad` on main
+
+**剩余 deferred**:
+- **P1-2 `EnvWriteLockGuardInnerInterceptor.matchesTable` SQL string-literal 排除**:被本文档 §5(`UPDATE/DELETE lock guard 边界 case`)覆盖,JsqlParser 替换时一并解决,不另开
+- **P1-4 `EnvLockGuard.assertWritable` 每 INSERT 一次 `selectById`**:bulk 导入 N+1 性能问题(非生产路径),建议 ThreadLocal 或 Caffeine 10s 缓存 ~2h。机会主义带过去,无独立 PR 必要
+- **P2-1 `PageSchemaMapper.insertIdempotent` / `insertForProjection` env_id-less SQL**:dead code,delete 或 plumb env_id ~0.5h
+- **P2-2 locked env metadata 仍可改**(`EnvironmentServiceImpl.update` 不查 isLocked):用户期望"locked = frozen",~2h 加 force+four-eyes
+- **P2-3 `EnvLockGuard.assertWritable` 错误消息 URL** `/api/promotions` → `/api/admin/promotions`:1 行修
+- **P2-4 `EnvironmentResolverInterceptor` 用 `ResponseCode.PluginNotFound` 报 env-not-found**:加 `EnvironmentNotFound` 枚举,~0.5h
+- **P2-5 `AdminRoleInterceptor` JavaDoc count drift**(本 PoC 加 2 个 controller,JavaDoc 仍说"exactly 9"):0.1h
+- **P3-1/P3-2/P3-3 PromotionServiceImpl 杂项**(magic-string status / `catch(Throwable)` / metric)
+
+完整 slice 1 review 报告:`/tmp/review-2026-05-07-slice1-env-layering.md`(session-local,如需保存请 cp 到 docs)。
 
 ---
 
