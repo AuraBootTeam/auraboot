@@ -58,6 +58,18 @@
 
 **工时**:3h(看代码 + 加注册逻辑 + 集成测试触发 trigger 后看到 next_run_at 非空)
 
+### F-4 `CommandFieldMapExecutor.injectExistingJsonbData` SQL 拼接(P1 安全)
+
+**症状**:`platform/src/main/java/com/auraboot/framework/meta/service/impl/CommandFieldMapExecutor.java:452` 区域,`injectExistingJsonbData` 用字符串拼接构造 `whereClause = idEntry.getKey() + " = '" + idEntry.getValue() + "'"`,其中 `idEntry.getValue()` 间接来自 controller 层 `targetRecordId`(用户可控,虽 controller 校验 pid 字符集但不严)。
+
+**风险**:若任何上游放宽 pid 校验或新增 id 字段类型(如 string code),此处会变成 SQL injection 入口。
+
+**修法**:改用参数化 — 已存在 `DynamicDataMapper` 的 `selectByCondition` 风格 API,把 `whereClause` 改成 `Map<String, Object> conditions`(同其他分支)。
+
+**工时**:1h(改 1 个方法 + 1 条集成测试覆盖恶意 pid 不会执行注入语句)
+
+来源:`fix-delete-defense` subagent 顺手发现,与本会话主任务无关但同一文件。
+
 ## 关联
 
 - `web-admin/tests/e2e/platform-admin/scheduled-task-dsl.spec.ts` 已覆盖 list → create → detail → edit → delete 全链路;F-1/F-2/F-3 修完应在该 spec 里加对应断言(F-3:create 后 detail 页 `下次运行` 不为 —;F-1:从 detail→edit 流程不再 422;F-2:Network 监听 dict 调用 ≤ N)
