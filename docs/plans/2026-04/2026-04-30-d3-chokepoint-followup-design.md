@@ -1,6 +1,7 @@
 # D.3-chokepoint Follow-up — HandoffToolProvider × AgentChatPort SPI Integration
 
-> **Status**: v5 (2026-04-30) — owner reviewed v4 §10 from long-term-evolution lens; locked **A'**: caller-owned context via **server-only `AgentTurnOverrides`**, NOT public `ChatRequest` fields. v5 §10.7 captures the 5 must-fix issues that v4 missed (security boundary on ChatRequest, named-agent outbound identity drift, task lifecycle protocol, handoff schema field-name bug, DC.4 underestimation). v5 §10.8 refines the PR sequence accordingly.
+> **Status**: v6 closure (2026-05-07) — DC.1–DC.4 + GAP-311 follow-up all landed (OSS commits `131f8890 → d7f9175b → 780fc027 → f4b9dede → c4e3e5a4 → d5093130 → 372b9272 → 89039d0f` + enterprise `e922c3789`). §11 contains the commit-hash table, long-term-evolution actual-vs-claim audit, v5 → v6 deviation log, final test snapshot, and deferred-item routing. **No new decisions in v6**; this version is the design's archival closure.
+> **v5 (2026-04-30)** — owner reviewed v4 §10 from long-term-evolution lens; locked **A'**: caller-owned context via **server-only `AgentTurnOverrides`**, NOT public `ChatRequest` fields. v5 §10.7 captures the 5 must-fix issues that v4 missed (security boundary on ChatRequest, named-agent outbound identity drift, task lifecycle protocol, handoff schema field-name bug, DC.4 underestimation). v5 §10.8 refines the PR sequence accordingly.
 > **Predecessor**: [`2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md`](./2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md) v3 §8 row D.3 deferral note.
 
 ## 0. 摘要
@@ -717,8 +718,82 @@ A' 在长期演进上与 A 完全等价（chokepoint claim 真实 / SRP / 跨模
 
 ---
 
+## 11. v6 Closure (2026-05-07)
+
+> v5 锁定的 DC.1–DC.4 + post-DC.4 GAP-311 followup 全部 land。v6 不引入新决策,只做交付审计 + 长期演进 actual-vs-claim audit + 推迟项的去向。
+
+### 11.1 DC.1–DC.4 + GAP-311 commit 表
+
+| Step | 范围 | OSS commit | 状态 |
+|---|---|---|---|
+| DC.1 | HandoffToolProvider × ToolProviderRegistry 分层(Q-DC.1=β) + AgentChatPort.runAgentTurn extraTools 参数 | `131f8890` | ✅ |
+| DC.2 | transfer_to_agent 命中 → Success.meta._handoff_to(Q-DC.2=α) | `d7f9175b` | ✅ |
+| DC.3a | server-only AgentTurnOverrides + SPI 第 5 参数 + security tests(v5 Fix 1) | `780fc027` | ✅ |
+| DC.3b | rename AgentReplyContext → GroupChatTurnContextAssembler + tests | `f4b9dede` | ✅ |
+| DC.3c | chokepoint owns task lifecycle + AgentReplyTask 走 runTurn(v5 Fix 2 + Fix 3) | `c4e3e5a4` | ✅ |
+| DC.3d | handoff schema bug + caller_overrides_used metric + sunset doc(v5 Fix 4) | `d5093130` | ✅ |
+| DC.4-OSS | OSS 删 SSE transport,统一 ImMessageBroadcaster WS(v5 Fix 5,β 一次性) | `372b9272` | ✅ |
+| DC.4-EE | enterprise ent-im-chat 适配 WS frame | `e922c3789` (enterprise) | ✅ |
+| GAP-311 | post-runTurn MESSAGE broadcast + ImMessageSentEvent publisher 接线 | `89039d0f` (`feat/conv-turn-svc-followup`) | ✅ pending E2E |
+
+### 11.2 长期演进 actual-vs-claim audit
+
+> 对应 v5 §10.5 的"长期演进价值"主张,逐条核对兑现证据。
+
+| 维度 | v5 claim | actual | 验证锚点 |
+|---|---|---|---|
+| chokepoint 真实(non-decorative) | "1 个 chokepoint vs 8 物理路径" | ✅ 群聊路径全经 runTurn;AgentReplyTask / ImAiService / AuraBotController 同入口 | grep `turnService.runTurn` 主路径全覆盖 |
+| god-class 反模式避免 | 选 A' 不选 B,避免 AgentChatPortImpl 累积 channel-driven 分支 | ✅ AgentChatPortImpl 仍纯接口实现;channel 语境在 caller 层(AgentReplyTask 通过 GroupChatTurnContextAssembler) | 文件 LOC 监控 |
+| parallel-impl 反模式避免 | 选 A' 不选 C,避免 GroupChatAgentChatPort 子接口 | ✅ 仅 1 个 AgentChatPort impl | 没有 GroupChat- 前缀的 AgentChatPort 子类 |
+| security boundary 修(v5 Fix 1) | "ChatRequest 不暴露 systemPromptOverride 等字段" | ✅ HTTP 控制器永远传 null overrides;DC.3a security test 覆盖 | DC.3a `780fc027` |
+| outbound identity 正确(v5 Fix 2) | "群聊 outbound row sender_id = Alpha/Beta agentId,不再硬编 aurabot" | ✅ TurnContext.agentCode + AuraBotAgentResolver.resolve 链路 | DC.3c `c4e3e5a4` + AuraBotTurnPersistence:163 |
+| task lifecycle 协议(v5 Fix 3) | "chokepoint 创建/关闭,handoff parent_id 链" | ✅ DC.3c.taskPid + AgentReplyTask handoff 透传 parentTaskPid | DC.3c |
+| handoff schema 字段名(v5 Fix 4) | "agent_code,non-targetAgentCode" | ✅ + 端到端 schema test | DC.3d `d5093130` |
+| dual-transport sunset(v5 Fix 5,β 决策) | "OSS 删 SseEmitterManager + enterprise 同步迁 WS,不留 dual-publish 维护负担" | ✅ DC.4-OSS + DC.4-EE 同 batch land | `372b9272` + `e922c3789` |
+| group-chat reply visibility | "持久化后 WS 自动推送(对齐 ImAiService 模式)" | ✅ GAP-311 batch | `89039d0f`;E2E pending |
+| metric 自我监督 | "`agentchatport.caller_overrides_used{field=...}` 工具能识别 caller 侵占面" | ✅ DC.3d 加 metric | `d5093130` |
+
+### 11.3 v5 → v6 偏离记录
+
+| 偏离 | v5 假设 | actual | 影响 |
+|---|---|---|---|
+| PR 数 | "DC.3a/b/c/d + DC.4 共 5 PR" | OSS 7 + EE 1 = 8 commit(DC.3 拆 a/b/c/d 4 PR;DC.4 OSS + EE 各 1) | 无功能差异;符合 v5 §10.8 表 |
+| GAP-311 group-chat reply broadcast 时序 | v5 §6 不在范围,留作"未涉及"项 | post-DC.4 立即开 GAP-311 followup;Phase 1 探索发现 publisher 链路全仓 0 publisher,scope 主动扩到 publisher 接线 | 揭出 v5 没看到的更深 gap;ConvTurnSvc 链路最终能真正端到端工作 |
+| ImMessageSentEvent 字段 | v5 未触及 | GAP-311 加 `Long seq` 字段(post-runTurn 持久化行查询用) | event v1 → v2 |
+| TurnContext.channelSessionId | v5 未涉及 | GAP-295 同链路同时收口:ChannelSessionResolver 接 beginTurn 后非 null | 与 v5 正交但同链路一并 ship |
+| AuraBotAgentResolver bootstrap | v5 假设 lazy seed 兜底足够 | GAP-296 补 reset 脚本 Step 7.9 per-tenant INSERT(lazy 兜底保留) | hot path 不再触发 lazy 分支 |
+
+### 11.4 final test count snapshot (2026-05-07)
+
+- **单测(scope:conversation + agentchat + im.service.ImAiServiceTest):118/118 全绿**
+- 关键集合:
+  - `ConversationTurnServiceImplDispatchTest` 8/8(含 GAP-295 channelSessionId × 2)
+  - `AgentReplyTaskChokepointTest` 10/10(含 GAP-311 broadcast × 3)
+  - `GroupChatAgentRouterTest` 5/5(全新,锁 seq 透传)
+  - `ImAiServiceTest` 6/6(D.2 chokepoint 路径)
+  - `SseResponseSink` 12/12(byte 基线)
+  - `TurnCompletionMemoryListener` 9/9(C.2 gates,ship 在 DC.* 之外)
+- **E2E**:`web-admin/tests/e2e/aurabot/group-chat-agent-reply.spec.ts` 已写,docker isolated stack 实跑 deferred — 跑通后 GAP-311 状态翻 DONE。
+
+### 11.5 推迟项归宿
+
+| 项 | 去向 |
+|---|---|
+| Phase B+ group-chat-adapter sub-design | GAP-294 独立立项(P2);设计提议路径 `enterprise/docs/agent/contracts/group-chat-adapter.md` |
+| Phase C.1 PreGroundingTriage 接入 | Phase B 验收报告 §6 候选项;PreGroundingTriage SPI 已在 OSS,仅缺 dispatch 前接入 |
+| Phase C.2 Memory L1 writeback | `TurnCompletionMemoryListener` 已 ship(独立批次,本批仅跑测试覆盖) |
+| Phase C.3 ACP Phase 3-4 集成 | Phase B 验收报告 §6 候选项;ACP Stage Lifecycle 替换 aurabot tool loop |
+| TurnSuspendedEvent 无消费方 | Phase B 验收报告 §5 low — Phase C 接 memory L1 时再订阅 |
+| TurnContext.traceId 仍 null | Phase B 验收报告 §5 medium — outbound row card_payload 带 traceId 需 trace 链路 |
+| resumeTurn toolId 不带 | Phase B 验收报告 §5 low — 多 pending 场景再加 |
+| ConfirmDecision CANCELLED 前端 trigger | Phase B 验收报告 §5 low — 当前 cancelTool 走 DENIED |
+| GAP-295 resume 路径 channelSessionId | 子 followup — PendingTool 加 `channelSessionPid` 字段后跨 resume 重 attach;本批仅 dispatch 路径覆盖 |
+
+---
+
 ## CHANGELOG
 
+- 2026-05-07 v6 closure DC.1–DC.4 + GAP-311 follow-up 全部 land;§11 写交付审计 + 长期演进 actual-vs-claim audit + v5→v6 偏离 + final test snapshot + 推迟项归宿。无新决策。本设计文档自此进入 archival 状态。
 - 2026-04-30 v5 owner reviewed v4 长期方向接受；落地形状 lock 为 **A'**（server-only `AgentTurnOverrides` 替代公开 ChatRequest 字段，安全边界修正）；§10.7 列 5 项 must-fix（含 DC.2 真实 bug：handoff schema 字段名 agent_code vs targetAgentCode）；§10.8 PR 切片调整为 DC.3a-d + DC.4 共 5 PR。
 - 2026-04-30 v4 §10 三个 sub-design 选项详细对比 + 6/12 个月演进预测 + steel-man + v4 倾向 (选项 A) + DC.3a-d 落地切片. **Pending owner review.**
 - 2026-04-30 v3 DC.1 + DC.2 landed (`131f8890` + `d7f9175b`); DC.3 + DC.4 deferred pending §9 sub-design — AgentReplyContext 群聊语境 absorption (3 选项) 需要单独设计 lock
