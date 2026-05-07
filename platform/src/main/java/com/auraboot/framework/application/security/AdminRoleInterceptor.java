@@ -65,6 +65,13 @@ import java.util.List;
  * {@link MetaContext}) and before Spring MVC dispatch. If {@code MetaContext}
  * has no {@code tenantId} or {@code userId} we return 409 (not 401 — the filter
  * chain has already accepted the caller as authenticated).
+ *
+ * <p><b>Audit:</b> after every request (accepted or rejected), one row is written
+ * to {@code ab_admin_action_log} via {@link AdminAuditService}. Accepted requests
+ * are audited in {@code afterCompletion}; rejected requests are audited inline at
+ * the end of {@code preHandle} (Spring does not call {@code afterCompletion} for
+ * an interceptor whose {@code preHandle} returned {@code false}). Body summarization
+ * captures only top-level JSON keys (no values).
  */
 @Slf4j
 @Component
@@ -74,6 +81,15 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
     public static final String DENY_MESSAGE = "admin role required";
     public static final int DENY_CODE = 409;
 
+    /** Request attribute: the role code that was required for this path. */
+    public static final String ATTR_RESOLVED_ROLE = "auraboot.admin.resolved_role";
+    /** Request attribute: wall-clock start time in milliseconds (set on accept path). */
+    public static final String ATTR_START_TIME_MS = "auraboot.admin.start_time_ms";
+    /** Request attribute: tenant id captured in preHandle for use in afterCompletion. */
+    static final String ATTR_TENANT_ID = "auraboot.admin.tenant_id";
+    /** Request attribute: user id captured in preHandle for use in afterCompletion. */
+    static final String ATTR_USER_ID = "auraboot.admin.user_id";
+
     /** Paths whose required role is {@code platform_admin} (disjoint from tenant_admin). */
     private static final List<PathPattern> PLATFORM_ADMIN_PATHS = List.of(
             new PathPatternParser().parse("/api/admin/infrastructure/**"),
@@ -82,6 +98,8 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
 
     private final AdminRoleChecker adminRoleChecker;
     private final ObjectMapper objectMapper;
+    private final AdminAuditService auditService;
+    private final RequestBodySummarizer bodySummarizer;
 
     @Override
     public boolean preHandle(HttpServletRequest request,
@@ -108,14 +126,57 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
             writeDenied(response);
             return false;
         }
+        // Stash tenantId/userId in request attributes so afterCompletion can use them
+        // even if MetaContext has been cleared by another interceptor running earlier.
+        request.setAttribute(ATTR_TENANT_ID, tenantId);
+        request.setAttribute(ATTR_USER_ID, userId);
         String requiredRole = resolveRequiredRole(request.getRequestURI());
+        // Set resolved role before any deny so afterCompletion always sees what was required.
+        request.setAttribute(ATTR_RESOLVED_ROLE, requiredRole);
         if (!adminRoleChecker.hasRole(tenantId, userId, requiredRole)) {
             log.warn("AdminRoleInterceptor: rejected (requires={}) for {} (tenantId={}, userId={})",
                     requiredRole, request.getRequestURI(), tenantId, userId);
             writeDenied(response);
+            // Spring does NOT call afterCompletion for an interceptor whose preHandle
+            // returns false, so we write the audit row here for rejected requests.
+            auditService.logAdminAction(
+                    tenantId,
+                    userId,
+                    requiredRole,
+                    request.getRequestURI(),
+                    request.getMethod(),
+                    DENY_CODE,
+                    bodySummarizer.summarize(request),
+                    0);
             return false;
         }
+        request.setAttribute(ATTR_START_TIME_MS, System.currentTimeMillis());
         return true;
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest req, HttpServletResponse resp,
+                                Object handler, Exception ex) {
+        // Read from request attributes set in preHandle — do NOT read MetaContext here
+        // because another interceptor (e.g. TenantInterceptor) may have already cleared it
+        // by the time afterCompletion runs in the reverse-order phase.
+        Long tenantId = (Long) req.getAttribute(ATTR_TENANT_ID);
+        Long userId = (Long) req.getAttribute(ATTR_USER_ID);
+        if (tenantId == null || userId == null) return;
+
+        String resolvedRole = (String) req.getAttribute(ATTR_RESOLVED_ROLE);
+        Long startMs = (Long) req.getAttribute(ATTR_START_TIME_MS);
+        int latencyMs = startMs != null ? (int) (System.currentTimeMillis() - startMs) : 0;
+
+        auditService.logAdminAction(
+                tenantId,
+                userId,
+                resolvedRole != null ? resolvedRole : "unknown",
+                req.getRequestURI(),
+                req.getMethod(),
+                resp.getStatus(),
+                bodySummarizer.summarize(req),
+                latencyMs);
     }
 
     /**

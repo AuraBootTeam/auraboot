@@ -3,6 +3,7 @@ package com.auraboot.framework.application.security;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.integration.TestIdGenerator;
 import com.auraboot.framework.integration.security.AdminGuardTestSupport;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Duration;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -64,6 +69,8 @@ class AdminRoleInterceptorPathScopeIntegrationTest extends BaseIntegrationTest {
     void cleanup() {
         adminRoleChecker.invalidateAll();
         if (tenantId != null) {
+            // Remove audit log rows for this test's user before role/tenant rows
+            jdbc.update("DELETE FROM ab_admin_action_log WHERE tenant_id = ?", tenantId);
             AdminGuardTestSupport.cleanupTenant(jdbc, tenantId);
         }
     }
@@ -158,5 +165,71 @@ class AdminRoleInterceptorPathScopeIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("409"))
                 .andExpect(jsonPath("$.message").value("admin role required"));
+    }
+
+    // =========================================================================
+    // T6: afterCompletion writes one audit row for an accepted request
+    // =========================================================================
+
+    @Test
+    @DisplayName("T6: afterCompletion writes audit row for accepted request (tenant_admin on /api/admin/users)")
+    void afterCompletion_writesAuditRow_forAcceptedRequest() throws Exception {
+        tenantId = TestIdGenerator.uniqueTenantId();
+        AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
+
+        mockMvc().perform(get(USERS_URL).contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(3))
+                .pollInterval(Duration.ofMillis(100))
+                .untilAsserted(() -> {
+                    // Use queryForList so EmptyResultDataAccessException is not thrown
+                    // (Awaitility only retries on AssertionError, not RuntimeException).
+                    var rows = jdbc.queryForList(
+                            "SELECT * FROM ab_admin_action_log " +
+                            "WHERE tenant_id = ? AND actor_user_id = ? " +
+                            "ORDER BY created_at DESC LIMIT 1",
+                            tenantId, testUser.getId().toString());
+                    assertThat(rows).hasSize(1);
+                    Map<String, Object> row = rows.get(0);
+                    assertThat(row.get("actor_role")).isEqualTo("tenant_admin");
+                    assertThat((String) row.get("path")).startsWith("/api/admin/users");
+                    assertThat(row.get("method")).isEqualTo("GET");
+                });
+    }
+
+    // =========================================================================
+    // T7: afterCompletion writes one audit row for a rejected request (path-scope mismatch)
+    // =========================================================================
+
+    @Test
+    @DisplayName("T7: afterCompletion writes audit row for rejected request (tenant_admin on /api/admin/infrastructure)")
+    void afterCompletion_writesAuditRow_forRejectedRequest() throws Exception {
+        tenantId = TestIdGenerator.uniqueTenantId();
+        // Grant tenant_admin — insufficient for infrastructure (requires platform_admin)
+        AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
+
+        mockMvc().perform(get(INFRA_URL).contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("409"));
+
+        // Required role resolved for /api/admin/infrastructure/** is platform_admin
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(3))
+                .pollInterval(Duration.ofMillis(100))
+                .untilAsserted(() -> {
+                    var rows = jdbc.queryForList(
+                            "SELECT * FROM ab_admin_action_log " +
+                            "WHERE tenant_id = ? AND actor_user_id = ? " +
+                            "AND path LIKE '/api/admin/infrastructure/%' " +
+                            "ORDER BY created_at DESC LIMIT 1",
+                            tenantId, testUser.getId().toString());
+                    assertThat(rows).hasSize(1);
+                    Map<String, Object> row = rows.get(0);
+                    assertThat(row.get("actor_role")).isEqualTo("platform_admin");
+                    assertThat(row.get("method")).isEqualTo("GET");
+                });
     }
 }
