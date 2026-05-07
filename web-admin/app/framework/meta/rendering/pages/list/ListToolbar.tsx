@@ -9,6 +9,7 @@ import { RowHeightSelector } from '~/framework/smart/components/view/RowHeightSe
 import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
 import type { SortConfig, ViewFilterConfig, RowHeight } from '~/framework/smart/types/savedView';
 import { SortPopover, type SortableColumn } from './SortPopover';
+import { useI18n } from '~/contexts/I18nContext';
 
 type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
 
@@ -76,6 +77,7 @@ export function ListToolbar({
   onFilterFormToggle,
   hasFilterBlock,
 }: ListToolbarProps) {
+  const { t } = useI18n();
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') onSearch();
@@ -84,9 +86,13 @@ export function ListToolbar({
   );
 
   const quickFilters: Array<{ key: QuickFilterKey; label: string; icon: string }> = [
-    { key: 'my_records', label: 'My Records', icon: '\uD83D\uDC64' },
-    { key: 'created_today', label: 'Created Today', icon: '\uD83D\uDCC5' },
-    { key: 'modified_this_week', label: 'Modified This Week', icon: '\uD83D\uDD50' },
+    { key: 'my_records', label: t('common.my_records', undefined, 'My Records'), icon: '\uD83D\uDC64' },
+    { key: 'created_today', label: t('common.created_today', undefined, 'Created Today'), icon: '\uD83D\uDCC5' },
+    {
+      key: 'modified_this_week',
+      label: t('common.modified_this_week', undefined, 'Modified This Week'),
+      icon: '\uD83D\uDD50',
+    },
   ];
 
   return (
@@ -104,7 +110,7 @@ export function ListToolbar({
             value={keyword}
             onChange={(e) => onKeywordChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search..."
+            placeholder={t('common.search', undefined, 'Search') + '...'}
             className="h-8 w-[240px] rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:outline-none"
             data-testid="list-search-input"
           />
@@ -149,7 +155,7 @@ export function ListToolbar({
                 d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
               />
             </svg>
-            Sort
+            {t('common.sort', undefined, 'Sort')}
             {activeSorts.length > 0 && (
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
                 {activeSorts.length}
@@ -179,7 +185,7 @@ export function ListToolbar({
               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
             />
           </svg>
-          Fields
+          {t('common.fields', undefined, 'Fields')}
         </button>
 
         {/* Filter form toggle button — only shown when a filter block exists */}
@@ -202,7 +208,7 @@ export function ListToolbar({
                 d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
               />
             </svg>
-            Filter
+            {t('common.filter', undefined, 'Filter')}
             <svg
               className={`h-3 w-3 transition-transform ${filterFormVisible ? 'rotate-180' : ''}`}
               fill="none"
