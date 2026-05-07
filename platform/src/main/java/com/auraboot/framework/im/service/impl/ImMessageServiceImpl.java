@@ -190,6 +190,16 @@ public class ImMessageServiceImpl implements ImMessageService {
     public ImMessage sendAgentMessage(Long conversationId, Long tenantId, Long agentId,
                                         String messageType, String content,
                                         String cardPayload, String clientMsgId) {
+        return sendAgentMessage(conversationId, tenantId, agentId, messageType, content,
+                cardPayload, clientMsgId, null, null);
+    }
+
+    @Override
+    @Transactional
+    public ImMessage sendAgentMessage(Long conversationId, Long tenantId, Long agentId,
+                                        String messageType, String content,
+                                        String cardPayload, String clientMsgId,
+                                        String thinkingContent, String thinkingSignature) {
         // Dedup by clientMsgId — same idempotency contract as sendSystemMessage.
         if (clientMsgId != null) {
             ImMessage existing = messageMapper.findByClientMsgId(conversationId, tenantId, clientMsgId);
@@ -215,6 +225,12 @@ public class ImMessageServiceImpl implements ImMessageService {
         message.setClientMsgId(clientMsgId);
         message.setRecalled(false);
         message.setCreatedAt(Instant.now());
+        // Phase D.1: persist Anthropic Extended Thinking. NULL preserved when
+        // caller passed null/empty — do not coerce empty string.
+        message.setThinkingContent(
+                (thinkingContent != null && !thinkingContent.isEmpty()) ? thinkingContent : null);
+        message.setThinkingSignature(
+                (thinkingSignature != null && !thinkingSignature.isEmpty()) ? thinkingSignature : null);
 
         messageMapper.insert(message);
         return message;
