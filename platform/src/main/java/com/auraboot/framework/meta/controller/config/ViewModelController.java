@@ -34,7 +34,7 @@ public class ViewModelController {
 
     @GetMapping("/{code}/resolved-fields")
     @Operation(summary = "Get resolved fields", description = "Returns the three-layer merged field list for a ViewModel")
-    @RequirePermission(MetaPermission.META_MODEL_READ)
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<List<ResolvedFieldDTO>> getResolvedFields(
             @Parameter(description = "ViewModel code") @PathVariable @NotBlank String code) {
         log.info("Resolving view fields for: {}", code);
@@ -44,7 +44,7 @@ public class ViewModelController {
 
     @PostMapping("/{code}/query")
     @Operation(summary = "Query view data", description = "Execute a data query against the ViewModel's underlying data source")
-    @RequirePermission(MetaPermission.META_MODEL_READ)
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<PaginationResult<Map<String, Object>>> queryViewData(
             @Parameter(description = "ViewModel code") @PathVariable @NotBlank String code,
             @Valid @RequestBody NamedQueryTestRequest request) {
@@ -55,7 +55,7 @@ public class ViewModelController {
 
     @GetMapping("/{code}/summary")
     @Operation(summary = "Get ViewModel summary", description = "Returns summary information for a ViewModel")
-    @RequirePermission(MetaPermission.META_MODEL_READ)
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<ViewModelSummaryDTO> getSummary(
             @Parameter(description = "ViewModel code") @PathVariable @NotBlank String code) {
         log.info("Getting ViewModel summary for: {}", code);
@@ -65,7 +65,7 @@ public class ViewModelController {
 
     @PostMapping("/{code}/validate")
     @Operation(summary = "Validate ViewModel config", description = "Check ViewModel configuration for completeness and correctness")
-    @RequirePermission(MetaPermission.META_MODEL_READ)
+    @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<ViewModelValidationResult> validateConfig(
             @Parameter(description = "ViewModel code") @PathVariable @NotBlank String code) {
         log.info("Validating ViewModel config for: {}", code);
@@ -75,7 +75,7 @@ public class ViewModelController {
 
     @PostMapping("/cache/evict")
     @Operation(summary = "Evict ViewModel cache", description = "Clear all ViewModel field and summary caches")
-    @RequirePermission(MetaPermission.META_MODEL_MANAGE)
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<Void> evictCache() {
         log.info("Evicting all ViewModel caches");
         viewModelService.evictAllCache();
