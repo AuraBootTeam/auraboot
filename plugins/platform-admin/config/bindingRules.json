@@ -1,0 +1,51 @@
+[
+  {
+    "commandCode": "admin:approve_member",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "admin:reject_member",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "admin:suspend_member",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "admin:restore_member",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "admin:leave_member",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "admin:delete_member",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "admin:reset_member_password",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  }
+]
