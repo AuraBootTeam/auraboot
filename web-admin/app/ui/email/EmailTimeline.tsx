@@ -105,7 +105,6 @@ function EmailTimelineItem({ message }: EmailTimelineItemProps) {
                   {message.bodyHtml ? (
                     <div
                       className="prose prose-xs dark:prose-invert max-w-none"
-                      // eslint-disable-next-line react/no-danger
                       dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.bodyHtml) }}
                     />
                   ) : (
