@@ -285,6 +285,12 @@ export interface ViewConfig {
   showCount?: boolean;
   /** Whether to show aggregation values */
   showAggregations?: boolean;
+  /** dict code used to resolve column color/terminal extras. If absent, derived from modelCode + groupByField via dict binding. */
+  groupByDictCode?: string;
+  /** dict values marking terminal stages. Overrides dict extra.terminal. */
+  terminalStages?: { won?: string[]; lost?: string[] };
+  /** When set, drag persistence dispatches this command instead of PUT /api/dynamic/{pageKey}/{pid}. */
+  moveCommand?: string;
 
   // ==================== Calendar Fields ====================
 
