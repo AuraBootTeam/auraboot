@@ -158,6 +158,7 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
       const raw: Record<string, any> = {
         kind: pageSchemaDTO.kind,
         title: pageSchemaDTO.title,
+        name: pageSchemaDTO.name,
         blocks: pageSchemaDTO.blocks || [],
         layout: pageSchemaDTO.layout || { type: 'stack' },
         profile: pageSchemaDTO.profile || 'admin',
