@@ -18,10 +18,10 @@ import com.auraboot.framework.aurabot.skill.entity.SkillRun;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
-import com.auraboot.framework.permission.util.PermissionCodeAliasResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -173,7 +173,7 @@ public class AuraBotSkillController {
 
         log.info("AUDIT skill={} action=dry-run tenantId={} userId={} riskLevel={}",
                 skill.name(), tenantId, MetaContext.getCurrentUserId(), skill.riskLevel().code());
-        return ApiResponse.success(envelope);
+        return ApiResponse.success(ensureTraceId(envelope));
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -236,7 +236,7 @@ public class AuraBotSkillController {
 
         log.info("AUDIT skill={} action=execute tenantId={} userId={} pid={} status={}",
                 skill.name(), tenantId, MetaContext.getCurrentUserId(), row.getPid(), row.getStatus());
-        return ApiResponse.success(result);
+        return ApiResponse.success(ensureTraceId(result));
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -287,7 +287,7 @@ public class AuraBotSkillController {
 
         log.info("AUDIT skill={} action=undo tenantId={} userId={} pid={}",
                 skill.name(), row.getTenantId(), MetaContext.getCurrentUserId(), row.getPid());
-        return ApiResponse.success(result);
+        return ApiResponse.success(ensureTraceId(result));
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ public class AuraBotSkillController {
         log.info("AUDIT action=batch-undo tenantId={} userId={} batchId={} undone={} failed={}",
                 tenantId, MetaContext.getCurrentUserId(), body.getBatchId(),
                 undonePids.size(), failed.size());
-        return ApiResponse.success(result);
+        return ApiResponse.success(ensureTraceId(result));
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -383,7 +383,10 @@ public class AuraBotSkillController {
                 .map(Permission::getCode)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
-        return PermissionCodeAliasResolver.expandCodes(codes);
+        // Permission code alias resolver was dropped from main (zombie alias
+        // cleanup, OSS commit 6bb0a30d). Permission codes are now canonical;
+        // pass through as-is.
+        return codes;
     }
 
     /** SHA-1 of serialised meta list. Quote-wrapped per RFC 7232. */
@@ -402,12 +405,30 @@ public class AuraBotSkillController {
     }
 
     /**
+     * Ensure every {@link SkillResult} carries a non-null traceId.
+     *
+     * <p>Per SPI Contract §4 the traceId is an envelope-level correlation id
+     * that must always be present, regardless of whether the skill streams.
+     * Skills are not required to set it; the controller is the canonical
+     * place to mint it before the response leaves the server.
+     */
+    private SkillResult ensureTraceId(SkillResult result) {
+        if (result == null) {
+            return null;
+        }
+        if (result.getTraceId() == null || result.getTraceId().isBlank()) {
+            result.setTraceId("trace_" + UniqueIdGenerator.generate());
+        }
+        return result;
+    }
+
+    /**
      * Wrap a replay {@link SkillResult} as an HTTP 200 envelope tagged with
      * {@link SkillErrorCode#IDEMPOTENCY_REPLAY} so the FE can distinguish a
      * replay from a fresh execute without inspecting headers.
      */
     private ApiResponse<SkillResult> wrapReplay(SkillResult prior) {
-        ApiResponse<SkillResult> r = ApiResponse.success(prior);
+        ApiResponse<SkillResult> r = ApiResponse.success(ensureTraceId(prior));
         // ApiResponse exposes ResponseCode-derived code; overwrite via explicit
         // setter so the FE sees the SPI-specific replay marker.
         r.setCode(SkillErrorCode.IDEMPOTENCY_REPLAY.code());

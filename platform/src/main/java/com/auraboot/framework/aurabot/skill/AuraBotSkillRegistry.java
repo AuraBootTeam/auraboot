@@ -205,7 +205,7 @@ public class AuraBotSkillRegistry implements ApplicationContextAware {
                 .name(s.name())
                 .displayName(s.displayName())
                 .category(s.category())
-                .riskLevel(s.riskLevel().code())
+                .riskLevel(s.riskLevel().name())
                 .paramsSchema(s.paramsSchema())
                 .requiredPermissions(perms)
                 .supportsUndo(s.supportsUndo())
