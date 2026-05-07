@@ -9,6 +9,12 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '~/utils/cn';
 import type { KanbanCard, KanbanCardField } from '~/framework/smart/types/kanban';
+import {
+  AvatarField,
+  CurrencyField,
+  DateRelativeField,
+  ProgressField,
+} from './cardFields';
 
 /**
  * Props for KanbanCardItem component
@@ -29,42 +35,52 @@ export interface KanbanCardItemProps {
 }
 
 /**
- * Format a field value based on its type
+ * Render a field value based on its declared type. Dispatches to the
+ * dedicated cardFields components for currency / avatar / progress /
+ * date-relative; keeps inline rendering for legacy text / number / date / tag.
  */
-function formatFieldValue(value: unknown, type?: KanbanCardField['type']): React.ReactNode {
-  if (value === null || value === undefined) {
-    return '-';
-  }
-
-  switch (type) {
+function renderFieldValue(field: KanbanCardField, value: unknown): React.ReactNode {
+  switch (field.type) {
+    case 'currency':
+      return (
+        <CurrencyField
+          value={value as number | string | null | undefined}
+          currencyCode={field.currencyCode}
+        />
+      );
+    case 'avatar':
+      return <AvatarField value={value === null || value === undefined ? null : String(value)} />;
+    case 'progress':
+      return (
+        <ProgressField
+          value={value as number | string | null | undefined}
+          max={field.max}
+        />
+      );
+    case 'date-relative':
+      return (
+        <DateRelativeField value={value as string | Date | null | undefined} />
+      );
     case 'date': {
+      if (value === null || value === undefined) return '-';
       const date = value instanceof Date ? value : new Date(String(value));
       return isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('zh-CN');
     }
     case 'number': {
+      if (value === null || value === undefined) return '-';
       const num = typeof value === 'number' ? value : parseFloat(String(value));
       return isNaN(num) ? String(value) : new Intl.NumberFormat('zh-CN').format(num);
     }
     case 'tag': {
+      if (value === null || value === undefined) return '-';
       return (
         <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
           {String(value)}
         </span>
       );
     }
-    case 'avatar': {
-      const name = String(value);
-      const initial = name.charAt(0).toUpperCase();
-      return (
-        <span
-          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600"
-          title={name}
-        >
-          {initial}
-        </span>
-      );
-    }
     default:
+      if (value === null || value === undefined) return '-';
       return String(value);
   }
 }
@@ -135,12 +151,20 @@ export function KanbanCardItem({
         <div className="mt-2 flex flex-wrap gap-2">
           {cardFields.map((field) => {
             const value = card[field.field];
-            if (value === undefined || value === null) return null;
+            const isNewFieldType =
+              field.type === 'currency' ||
+              field.type === 'avatar' ||
+              field.type === 'progress' ||
+              field.type === 'date-relative';
+            // Legacy field types skip rendering when null/undefined to preserve
+            // existing card layout; new field types render their own em-dash
+            // placeholders for visual consistency.
+            if (!isNewFieldType && (value === undefined || value === null)) return null;
 
             return (
               <div key={field.field} className="flex items-center gap-1 text-xs text-gray-600">
                 {field.label && <span className="text-gray-400">{field.label}:</span>}
-                <span>{formatFieldValue(value, field.type)}</span>
+                <span>{renderFieldValue(field, value)}</span>
               </div>
             );
           })}
