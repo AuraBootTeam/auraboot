@@ -20,7 +20,14 @@ public enum SkillErrorCode {
     /** Returned with HTTP 200 — body envelope carries prior result + this code. */
     IDEMPOTENCY_REPLAY("IDEMPOTENCY_REPLAY", HttpStatus.OK),
     SKILL_INTERNAL_ERROR("SKILL_INTERNAL_ERROR", HttpStatus.INTERNAL_SERVER_ERROR),
-    STREAMING_NOT_AVAILABLE("STREAMING_NOT_AVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
+    STREAMING_NOT_AVAILABLE("STREAMING_NOT_AVAILABLE", HttpStatus.SERVICE_UNAVAILABLE),
+    /**
+     * Caller invoked {@code POST /skill/dry-run} on a skill whose
+     * {@link com.auraboot.framework.aurabot.skill.AuraBotSkill#supportsDryRun()}
+     * returns {@code false}. Surfaced as 422 so the FE can disable the preview
+     * button instead of treating it as a transient failure.
+     */
+    DRY_RUN_NOT_SUPPORTED("DRY_RUN_NOT_SUPPORTED", HttpStatus.UNPROCESSABLE_ENTITY);
 
     private final String code;
     private final HttpStatus httpStatus;

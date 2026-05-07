@@ -145,6 +145,16 @@ public class AuraBotSkillController {
 
         ValidatedRequest validated = validator.validate(req, perms, tenantId, ValidationMode.DRY_RUN);
         AuraBotSkill skill = validated.skill();
+        // Reject dry-run for skills that opt out of the preview path. The
+        // SPI treats supportsDryRun=false as a contract — the FE relies on
+        // SkillMeta.supportsDryRun to gate the preview button, but a hostile
+        // or out-of-date client can still POST here. Surfacing a typed 422
+        // (DRY_RUN_NOT_SUPPORTED) is preferred over the underlying skill's
+        // UnsupportedOperationException so FE switch-cases stay stable.
+        if (!skill.supportsDryRun()) {
+            throw new SkillSpiException(SkillErrorCode.DRY_RUN_NOT_SUPPORTED,
+                    "skill " + skill.name() + " does not support dry-run");
+        }
 
         SkillResult preview = skill.dryRun(req);
         // Mint preview token regardless of risk level — execute path will only
