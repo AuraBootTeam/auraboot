@@ -8249,3 +8249,61 @@ ALTER TABLE ab_im_message
 CREATE INDEX IF NOT EXISTS idx_im_msg_triage_bucket
   ON ab_im_message(triage_bucket)
   WHERE triage_bucket IS NOT NULL;
+
+
+-- =====================================================================
+-- env-layering #4 — env_id backfill + SET NOT NULL
+--
+-- For fresh DBs (reset-and-init flow) this DO block is a no-op (ab_tenant
+-- empty). For dev DBs that accumulated legacy NULL env_id rows before #16
+-- landed, it ensures every tenant has a 'default' env, then UPDATEs all
+-- NULL env_ids on ab_page_schema + ab_page_schema_history. Idempotent.
+-- =====================================================================
+DO $$
+DECLARE
+    t RECORD;
+    default_env_id BIGINT;
+BEGIN
+    FOR t IN SELECT id FROM ab_tenant WHERE deleted_flag = FALSE LOOP
+        SELECT id INTO default_env_id
+            FROM ab_environment
+            WHERE tenant_id = t.id AND code = 'default' AND deleted_flag = FALSE
+            LIMIT 1;
+        IF default_env_id IS NULL THEN
+            INSERT INTO ab_environment (
+                pid, tenant_id, code, name, status, is_default, sort_order,
+                deleted_flag, is_locked
+            )
+            VALUES (
+                SUBSTRING(REPLACE(gen_random_uuid()::text, '-', ''), 1, 26),
+                t.id, 'default', 'Default', 'active', TRUE, 0, FALSE, FALSE
+            )
+            RETURNING id INTO default_env_id;
+        END IF;
+        UPDATE ab_page_schema
+            SET env_id = default_env_id
+            WHERE tenant_id = t.id AND env_id IS NULL;
+        UPDATE ab_page_schema_history
+            SET env_id = default_env_id
+            WHERE tenant_id = t.id AND env_id IS NULL;
+    END LOOP;
+END$$;
+
+-- After backfill, tighten the column. SET NOT NULL is idempotent in PG.
+ALTER TABLE ab_page_schema ALTER COLUMN env_id SET NOT NULL;
+ALTER TABLE ab_page_schema_history ALTER COLUMN env_id SET NOT NULL;
+
+-- FK with idempotent guard (PG doesn't support ADD CONSTRAINT IF NOT EXISTS).
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_page_schema_env_id') THEN
+        ALTER TABLE ab_page_schema
+            ADD CONSTRAINT fk_page_schema_env_id
+            FOREIGN KEY (env_id) REFERENCES ab_environment(id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_page_schema_history_env_id') THEN
+        ALTER TABLE ab_page_schema_history
+            ADD CONSTRAINT fk_page_schema_history_env_id
+            FOREIGN KEY (env_id) REFERENCES ab_environment(id);
+    END IF;
+END$$;

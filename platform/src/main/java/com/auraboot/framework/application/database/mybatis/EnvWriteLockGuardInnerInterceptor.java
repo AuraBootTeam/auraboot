@@ -97,6 +97,10 @@ public class EnvWriteLockGuardInnerInterceptor implements InnerInterceptor {
      * match still correctly fires the guard, the precise check is cleaner).
      */
     static boolean matchesTable(String sql, String tableName) {
+        if (tableName == null || tableName.isEmpty() || sql == null || sql.isEmpty()) {
+            // Defensive: indexOf("", n) returns n, which would infinite-loop below.
+            return false;
+        }
         int idx = 0;
         while ((idx = sql.indexOf(tableName, idx)) >= 0) {
             int before = idx - 1;
