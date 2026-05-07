@@ -571,6 +571,18 @@ public class AuraBotChatService {
                 return new TurnOutcome.Failed(msg, null);
             }
 
+            // D.2: surface provider-side warnings (e.g. AnthropicLlmProvider's
+            // max_tokens auto-extension when Extended Thinking budget exceeds
+            // the caller's value). Previously these landed only in log.warn;
+            // forwarding to the sink lets SseResponseSink emit a `warning`
+            // event so the frontend toasts the user. Position is deterministic:
+            // emitted BEFORE any tool_start (tool_use round) or before
+            // streamFinalResponse's done (end_turn/max_tokens round) — i.e.
+            // ... → warning → tool_start ...  OR  ... → warning → done.
+            if (response.getWarnings() != null && !response.getWarnings().isEmpty()) {
+                sink.onWarnings(response.getWarnings());
+            }
+
             String stopReason = response.getStopReason();
 
             if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason)) {

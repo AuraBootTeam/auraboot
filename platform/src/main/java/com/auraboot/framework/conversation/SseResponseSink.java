@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -91,6 +92,19 @@ public class SseResponseSink implements ResponseSink {
             payload.put("signature", signature);
         }
         sendJsonString("thinking", payload);
+    }
+
+    @Override
+    public void onWarnings(List<String> warnings) {
+        // D.2: non-fatal provider advisories (e.g. max_tokens auto-extension).
+        // Wire shape mirrors `thinking` / `tool_start` (JSON-string body) so the
+        // frontend's processSSEStream switch-case stays uniform: one event per
+        // call carrying {warnings: [..]}. Caller in the chokepoint MUST skip
+        // when the list is null/empty (no toast spam — see ResponseSink javadoc).
+        if (warnings == null || warnings.isEmpty()) {
+            return;
+        }
+        sendJsonString("warning", Map.of("warnings", warnings));
     }
 
     @Override
