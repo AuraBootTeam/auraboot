@@ -31,7 +31,7 @@ import java.util.Set;
  */
 @Slf4j
 @Component
-@Profile({"dev", "test"})
+@Profile({"dev", "test", "integration-test"})
 public class EchoSkill implements AuraBotSkill {
 
     private static final String SCHEMA_JSON = "{"
@@ -88,7 +88,20 @@ public class EchoSkill implements AuraBotSkill {
 
     @Override
     public boolean supportsDryRun() {
-        return false;
+        // EchoSkill is the built-in dev/test diagnostic — dry-run returns the
+        // would-be echo payload without side effects. This also lets the IT
+        // suite exercise the MEDIUM-risk preview-token path without inventing
+        // a separate skill bean. Real production skills should override this
+        // to reflect their own preview semantics.
+        return true;
+    }
+
+    @Override
+    public SkillResult dryRun(SkillRequest req) {
+        // Same shape as execute(), but flagged NEEDS_CONFIRM by the controller
+        // wrapper. Returning the input verbatim is sufficient for echo: there
+        // are no side effects to preview.
+        return execute(req);
     }
 
     @Override
