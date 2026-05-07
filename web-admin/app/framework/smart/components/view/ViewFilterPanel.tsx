@@ -10,6 +10,7 @@ import type { ViewConfig, ViewFilterConfig } from '~/framework/smart/types/saved
 import type { FieldOption } from './KanbanConfigPanel';
 import { FormulaEditor } from '~/framework/smart/components/formula/FormulaEditor';
 import { cn } from '~/utils/cn';
+import { useI18n } from '~/contexts/I18nContext';
 
 /**
  * Props for ViewFilterPanel component
@@ -49,6 +50,7 @@ export const ViewFilterPanel: React.FC<ViewFilterPanelProps> = ({
   fields,
   className,
 }) => {
+  const { t } = useI18n();
   const filters = viewConfig.filters || [];
 
   const updateFilters = useCallback(
@@ -226,7 +228,7 @@ export const ViewFilterPanel: React.FC<ViewFilterPanelProps> = ({
         onClick={handleAddFilter}
         className="w-full py-1.5 text-sm text-blue-600 hover:text-blue-700"
       >
-        + Add Filter
+        + {t('common.add_filter', undefined, 'Add Filter')}
       </button>
     </div>
   );
