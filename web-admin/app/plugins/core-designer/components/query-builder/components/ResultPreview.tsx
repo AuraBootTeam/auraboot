@@ -1,99 +1,133 @@
 /**
- * ResultPreview — Display query results as table or chart
+ * ResultPreview — Docked results panel with KPI status bar and zebra table.
  */
-
-import { useState } from 'react';
-
-type ViewMode = 'table' | 'bar' | 'line';
 
 interface ResultPreviewProps {
   data: Record<string, unknown>[];
   loading: boolean;
   error?: string;
+  /** Latency in ms for last successful query, or undefined when never run / running */
+  latencyMs?: number;
+  /** Number of selected fields shown in the result, used for KPI display */
+  fieldsCount: number;
+  /** Currently selected model code, used for KPI display */
+  modelCode?: string;
 }
 
-export const ResultPreview: React.FC<ResultPreviewProps> = ({ data, loading, error }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+const formatCell = (v: unknown): string => {
+  if (v == null) return '—';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+};
 
+export const ResultPreview: React.FC<ResultPreviewProps> = ({
+  data,
+  loading,
+  error,
+  latencyMs,
+  fieldsCount,
+  modelCode,
+}) => {
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
+  const rows = data.length;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-700">
-          Results {data.length > 0 && <span className="text-gray-400">({data.length} rows)</span>}
-        </h3>
-        <div className="flex items-center gap-1 rounded-md bg-gray-100 p-0.5">
-          {(['table', 'bar', 'line'] as ViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setViewMode(mode)}
-              data-testid={`qb-view-${mode}`}
-              className={`rounded px-2 py-1 text-xs ${
-                viewMode === mode
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {mode === 'table' ? 'Table' : mode === 'bar' ? 'Bar' : 'Line'}
-            </button>
-          ))}
-        </div>
+    <div className="flex h-full flex-col">
+      <div
+        data-testid="qb-result-status"
+        data-rows={rows}
+        data-latency-ms={latencyMs ?? ''}
+        className="grid shrink-0 grid-cols-2 gap-3 border-b border-slate-200 bg-white px-5 py-3 sm:grid-cols-4"
+      >
+        <KpiCard
+          label="Rows"
+          value={rows.toLocaleString()}
+          tone={error ? 'error' : rows > 0 ? 'success' : 'muted'}
+        />
+        <KpiCard label="Latency" value={latencyMs == null ? '—' : `${latencyMs} ms`} />
+        <KpiCard label="Fields" value={`${fieldsCount || (columns.length ?? 0)}`} />
+        <KpiCard label="Source" value={modelCode || '—'} mono />
       </div>
 
-      {loading && (
-        <div className="flex h-48 items-center justify-center text-gray-500">
-          <span className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-          Running query...
-        </div>
-      )}
+      <div className="flex-1 overflow-auto bg-slate-50">
+        {loading && (
+          <div className="space-y-2 p-5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-7 animate-pulse rounded bg-slate-200" />
+            ))}
+          </div>
+        )}
 
-      {error && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+        {!loading && error && (
+          <div className="m-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="font-medium">Query failed</div>
+            <div className="mt-0.5 text-xs">{error}</div>
+          </div>
+        )}
 
-      {!loading && !error && data.length === 0 && (
-        <div className="flex h-48 items-center justify-center text-sm text-gray-400">
-          No results. Configure your query and click Run.
-        </div>
-      )}
+        {!loading && !error && rows === 0 && (
+          <div className="flex h-full min-h-[160px] items-center justify-center text-sm text-slate-400">
+            {modelCode ? 'No rows returned. Adjust filters or click Run.' : 'Pick a model and click Run to see results.'}
+          </div>
+        )}
 
-      {!loading && !error && data.length > 0 && viewMode === 'table' && (
-        <div className="max-h-[500px] overflow-auto rounded-md border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="sticky top-0 bg-gray-50">
+        {!loading && !error && rows > 0 && (
+          <table data-testid="qb-result-table" className="min-w-full text-sm">
+            <thead className="sticky top-0 bg-white shadow-[0_1px_0_0_rgb(226_232_240)]">
               <tr>
                 {columns.map((col) => (
                   <th
                     key={col}
-                    className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+                    className="px-4 py-2 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase"
                   >
                     {col}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody>
               {data.map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50">
+                <tr
+                  key={i}
+                  className={i % 2 === 0 ? 'bg-white hover:bg-blue-50/40' : 'bg-slate-50 hover:bg-blue-50/40'}
+                >
                   {columns.map((col) => (
-                    <td key={col} className="px-3 py-2 text-sm whitespace-nowrap text-gray-700">
-                      {row[col] == null ? '—' : String(row[col])}
+                    <td key={col} className="px-4 py-2 whitespace-nowrap text-slate-700">
+                      {formatCell(row[col])}
                     </td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  );
+};
 
-      {!loading && !error && data.length > 0 && (viewMode === 'bar' || viewMode === 'line') && (
-        <div className="flex h-64 items-center justify-center rounded-md border border-gray-200 p-4 text-sm text-gray-400">
-          Chart view requires data with at least one dimension and one metric.
-          <br />
-          Full chart rendering will use the dashboard chart components.
-        </div>
-      )}
+interface KpiCardProps {
+  label: string;
+  value: string;
+  tone?: 'success' | 'error' | 'muted';
+  mono?: boolean;
+}
+
+const KpiCard: React.FC<KpiCardProps> = ({ label, value, tone, mono }) => {
+  const valueClass =
+    tone === 'success'
+      ? 'text-emerald-600'
+      : tone === 'error'
+        ? 'text-rose-600'
+        : tone === 'muted'
+          ? 'text-slate-400'
+          : 'text-slate-800';
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
+      <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">{label}</div>
+      <div className={`mt-0.5 truncate text-lg font-semibold ${mono ? 'font-mono text-base' : ''} ${valueClass}`}>
+        {value}
+      </div>
     </div>
   );
 };
