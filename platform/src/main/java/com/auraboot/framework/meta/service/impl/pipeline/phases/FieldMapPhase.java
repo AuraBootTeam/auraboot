@@ -44,8 +44,12 @@ public class FieldMapPhase implements CommandPhase {
                     ctx.getTenantId(), ctx.getCommand().getModelCode(), ctx.getRequest().getTargetRecordId()));
         }
 
-        // Cascade delete
-        if ("delete".equalsIgnoreCase(ctx.getRequest().getOperationType())) {
+        // Cascade delete — accept type=delete from execConfig as well so the
+        // request need not redundantly carry operationType.
+        Object execType = ctx.getExecConfig() != null ? ctx.getExecConfig().get("type") : null;
+        boolean isDeleteOperation = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
+                || (execType instanceof String s && "delete".equalsIgnoreCase(s));
+        if (isDeleteOperation) {
             cascadeDeleteExecutor.executeCascadeDeletePhase(ctx.getExecConfig(), ctx.getTenantId(), ctx.getRequest());
         }
 
@@ -60,8 +64,13 @@ public class FieldMapPhase implements CommandPhase {
             Map<String, Object> ec = ctx.getExecConfig();
             boolean hasInputFields = ec.containsKey("inputFields");
             boolean hasAutoSetFields = ec.containsKey("autoSetFields");
-            boolean isDeleteOp = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType());
             String cmdType = (String) ec.get("type");
+            // G-9: A type=delete command must trigger the implicit FIELD_MAP path
+            // even when the request does not carry operationType="delete". The
+            // implicit executor reads operationType from execConfig.type as a
+            // fallback, so we mirror that semantic here at the phase entry.
+            boolean isDeleteOp = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
+                    || "delete".equalsIgnoreCase(cmdType);
             boolean isStateTransition = "state_transition".equalsIgnoreCase(cmdType);
             boolean isCreateOrUpdate = "create".equalsIgnoreCase(cmdType) || "update".equalsIgnoreCase(cmdType);
 

@@ -135,7 +135,8 @@
       "titleField": "name",
       "subtitleField": "task_type",
       "tableName": "ab_scheduled_task",
-      "softDelete": false
+      "softDelete": false,
+      "uniqueFields": ["name"]
     },
     "semantic_description": "Configurable background task definition specifying trigger (cron / interval), target handler bean/method, retry policy, and execution timeout. Answers: which recurring or delayed operations should execute automatically, with what frequency and constraints?",
     "domain_category": "platform",
