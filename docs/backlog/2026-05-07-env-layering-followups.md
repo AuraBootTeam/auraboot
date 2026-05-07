@@ -132,6 +132,36 @@ ALTER TABLE ab_page_schema
 
 ---
 
+## 7. interceptor-order + tenant validation followups (2026-05-07 EOD)
+
+**Status**: 待 PR — 4 commit 在本地 `fix/env-resolver-interceptor-order` 分支末尾,**未进 main**。
+
+**背景**: 2026-05-07 当天 PR #51 (`feat(env-layering): PoC ... (#51)` @ `dad3279f`) 把 env-layering PoC 主线合到 `origin/main`。本地分支 `fix/env-resolver-interceptor-order` 是从 PoC 分支基础上继续做的,前 16 个 commit 与 PR #51 内容等价(commit hash 不同),最近 4 个是 PR #51 之后的真正新增:
+
+```
+952dac2a fix(promotion): validate source/target env belong to caller tenant
+faf76a4e fix(env-layering): register EnvironmentResolverInterceptor before PermissionInterceptor
+f68d249d docs(backlog): close #6 (BFF env-driven CORS ports) — shipped on feat/bff-allowed-ports-env-driven
+4ebff8cb docs(backlog): record env-layering E2E run attempt + new BFF port follow-up
+```
+
+**为什么不直接合并**:
+- 直接 `git merge origin/main` 触发 add/add 冲突在 `EnvironmentResolverInterceptor.java` + `PromotionServiceImpl.java`,因为本地分支和 PR #51 都新建了这两个文件(同名同路径,内容大同小异)。
+- 这两个文件涉及 tenant 隔离 + promotion state machine,自动冲突解决有破坏权限边界风险。
+
+**建议落地步骤**:
+1. 新建 worktree(避开本地分支当前的 21-ahead 状态):`git worktree add ../auraboot-wt/interceptor-followup -b fix/interceptor-order-and-tenant-validation origin/main`
+2. Cherry-pick 4 commit:`git cherry-pick 4ebff8cb f68d249d faf76a4e 952dac2a`(按时间正序)
+3. 解决 cherry-pick 期间的 small 冲突(PR #51 review 中可能微调过 interceptor 注册位置 / promotion validate 签名)
+4. Push 新分支 + 开 PR `interceptor-order-and-tenant-validation`
+5. 旧本地分支 `fix/env-resolver-interceptor-order` 完成使命后可删
+
+**估时**: 30-60 min(含解小冲突)。
+
+**Why**: PR #51 已 land,这 2 个 fix 是它的安全边界补丁(interceptor 顺序错会让 PermissionInterceptor 提前看不到 env 上下文; promotion 不校验 tenant 可能让一个租户的 promotion 跨到另一个 tenant 的环境)。**应当尽快进 main**,不应作为长期 backlog。
+
+---
+
 ## 备注:不是 PoC 范围内的 deferred
 
 以下事项虽然在过程中讨论过但**不在本 PoC 关注**,owner 自行决定 priority:
