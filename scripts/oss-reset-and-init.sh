@@ -60,6 +60,10 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 PLATFORM_DIR="$PROJECT_ROOT/platform"
 WEB_ADMIN_DIR="$PROJECT_ROOT/web-admin"
 
+# shellcheck source=lib/multi-worktree-guard.sh
+source "$SCRIPT_DIR/lib/multi-worktree-guard.sh"
+aura_multi_worktree_guard "oss-reset-and-init.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
