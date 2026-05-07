@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.config;
 
 import com.auraboot.framework.application.security.AdminRoleInterceptor;
+import com.auraboot.framework.environment.web.EnvironmentResolverInterceptor;
 import com.auraboot.framework.permission.interceptor.PermissionInterceptor;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     //todo confirm add doc WebMvcConfigurer
     private final PermissionInterceptor permissionInterceptor;
     private final AdminRoleInterceptor adminRoleInterceptor;
+    private final EnvironmentResolverInterceptor environmentResolverInterceptor;
     
     /**
      * Add interceptors to the registry
@@ -79,6 +81,17 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/actuator/**"       // Actuator endpoints (health, metrics, etc.)
             );
         log.info("PermissionInterceptor registered successfully");
+
+        // env-layering: resolve env from ?env / X-Environment header AFTER permission check (so
+        // tenantId is set + caller is authorized) but BEFORE controller handlers.
+        registry.addInterceptor(environmentResolverInterceptor)
+            .addPathPatterns("/api/**")
+            .excludePathPatterns(
+                "/api/auth/**",
+                "/api/public/**",
+                "/actuator/**"
+            );
+        log.info("EnvironmentResolverInterceptor registered for /api/**");
     }
 
     /**

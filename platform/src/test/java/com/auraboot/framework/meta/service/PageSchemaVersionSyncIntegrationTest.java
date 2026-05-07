@@ -132,6 +132,7 @@ class PageSchemaVersionSyncIntegrationTest extends BaseIntegrationTest {
         pageSchemaMapper.insertForPluginImport(
                 pid,
                 getTestTenant().getId(),
+                null,  // envId (env-layering #16)
                 "published",
                 pageKey,
                 modelCode,
@@ -157,6 +158,7 @@ class PageSchemaVersionSyncIntegrationTest extends BaseIntegrationTest {
         pageSchemaMapper.insertForPluginImport(
                 pid,
                 getTestTenant().getId(),
+                null,  // envId (env-layering #16)
                 "draft",
                 pageKey,
                 modelCode,
