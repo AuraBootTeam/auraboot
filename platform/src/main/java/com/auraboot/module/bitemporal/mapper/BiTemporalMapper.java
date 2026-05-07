@@ -46,6 +46,13 @@ public interface BiTemporalMapper extends BaseMapper<BiTemporalRecord> {
 
     /**
      * Find the current version: valid now and latest transaction.
+     *
+     * <p>Read-only variant — does NOT acquire a row lock. Safe for read paths
+     * such as {@code getCurrent}. Mutating callers ({@code correct},
+     * {@code terminate}) MUST use {@link #findCurrentForUpdate} instead, otherwise
+     * two concurrent close-and-insert sequences may both observe the same
+     * "current" row and break the invariant of a single open transaction
+     * period (REVIEW-BE8-002).
      */
     @Select("""
         SELECT * FROM ab_bitemporal_record
@@ -61,6 +68,38 @@ public interface BiTemporalMapper extends BaseMapper<BiTemporalRecord> {
     @ResultMap("biTemporalResultMap")
     BiTemporalRecord findCurrent(@Param("entityType") String entityType,
                                  @Param("entityId") String entityId);
+
+    /**
+     * Find the current version with {@code FOR UPDATE} row lock.
+     *
+     * <p>Used by {@code correct} / {@code terminate} so that concurrent
+     * close-and-insert sequences against the same {@code (entityType, entityId)}
+     * are serialized at the database level. The second writer blocks until the
+     * first transaction commits, then re-reads the new current row and proceeds
+     * — preserving the invariant that exactly one row per entity carries
+     * {@code tx_to = INFINITY}.
+     *
+     * <p>MUST be called from inside a transaction (the {@code FOR UPDATE} lock
+     * is released only at commit/rollback). The two existing service callers
+     * are both annotated {@code @Transactional}.
+     *
+     * @see #findCurrent for the lock-free read-only counterpart
+     */
+    @Select("""
+        SELECT * FROM ab_bitemporal_record
+        WHERE entity_type = #{entityType}
+          AND entity_id = #{entityId}
+          AND valid_from <= NOW()
+          AND valid_to > NOW()
+          AND tx_to = '9999-12-31 23:59:59'
+          AND deleted_flag = FALSE
+        ORDER BY tx_from DESC
+        LIMIT 1
+        FOR UPDATE
+        """)
+    @ResultMap("biTemporalResultMap")
+    BiTemporalRecord findCurrentForUpdate(@Param("entityType") String entityType,
+                                          @Param("entityId") String entityId);
 
     /**
      * Find all versions of an entity, ordered by valid_from and tx_from.
