@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.AnthropicResponse;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -35,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AnthropicLlmProviderThinkingTest {
 
     private AnthropicLlmProvider createProvider() {
-        return new AnthropicLlmProvider(null, new ObjectMapper());
+        return new AnthropicLlmProvider(null, new ObjectMapper(), new SimpleMeterRegistry());
     }
 
     private AnthropicRequest buildRequest(AnthropicLlmProvider provider, LlmChatRequest req) throws Exception {
