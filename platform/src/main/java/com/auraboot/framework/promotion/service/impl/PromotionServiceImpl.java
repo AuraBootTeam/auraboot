@@ -57,6 +57,7 @@ public class PromotionServiceImpl implements PromotionService {
     private final PageSchemaDiffService pageSchemaDiffService;
     private final ResourceReferenceService resourceReferenceService;
     private final PlatformTransactionManager transactionManager;
+    private final com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
 
     @Override
     @Transactional
@@ -241,12 +242,30 @@ public class PromotionServiceImpl implements PromotionService {
                 log.warn("Could not persist FAILED status for promotion {} (original failure: {}): {}",
                         pid, failure.getMessage(), markFailEx.getMessage());
             }
+            adminEventLogService.record(com.auraboot.framework.audit.entity.AdminEventLog.builder()
+                    .tenantId(tenantId)
+                    .actorUserId(approverId)
+                    .actionType("promotion.apply")
+                    .resourceType("promotion")
+                    .resourcePid(pid)
+                    .success(false)
+                    .reason(failure.getMessage())
+                    .build());
             log.warn("Promotion {} failed during apply: {}", pid, failure.getMessage());
             if (failure instanceof RuntimeException re) throw re;
             throw new RuntimeException("Promotion apply failed", failure);
         }
 
         // Success: status was set inside the tx
+        adminEventLogService.record(com.auraboot.framework.audit.entity.AdminEventLog.builder()
+                .tenantId(tenantId)
+                .actorUserId(approverId)
+                .actionType("promotion.apply")
+                .resourceType("promotion")
+                .resourcePid(pid)
+                .success(true)
+                .reason(reason)
+                .build());
         return toResponse(findByPidOrThrow(pid, tenantId));
     }
 
