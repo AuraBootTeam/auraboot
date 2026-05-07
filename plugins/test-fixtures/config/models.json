@@ -72,7 +72,11 @@
         "lineAmountField": "e2et_subtotal",
         "stateMachine": "full"
       }
-    }
+    },
+    "semantic_description": "Comprehensive test order model covering state machine, parent-child, cascadeDelete, sideEffects, HAS_CHILDREN, computedFields, AGGREGATE, REFERENCE, BOOLEAN, ENUM, DATE. Used by integration test suite to verify Command pipeline features end-to-end.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → SUBMITTED → APPROVED → SHIPPED → COMPLETED (or CANCELLED; for state machine testing)"
   },
   {
     "code": "e2et_order_item",
@@ -84,7 +88,11 @@
     "extension": {
       "parentModel": "e2et_order",
       "parentField": "e2et_order_id"
-    }
+    },
+    "semantic_description": "Child table for test orders covering SubTable CRUD, computed subtotal, and AGGREGATE sideEffect tests.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No independent lifecycle — child entity inherits parent test order."
   },
   {
     "code": "e2et_order_log",
@@ -96,7 +104,11 @@
     "extension": {
       "parentModel": "e2et_order",
       "parentField": "e2et_log_order_id"
-    }
+    },
+    "semantic_description": "Audit log created by sideEffects on state transitions, used to verify event-driven side-effect mechanics.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — immutable transaction log per state transition."
   },
   {
     "code": "e2et_customer",
@@ -108,7 +120,11 @@
     "extension": {
       "titleField": "e2et_cust_name",
       "subtitleField": "e2et_cust_code"
-    }
+    },
+    "semantic_description": "Self-contained reference target for REFERENCE field and UNIQUE_COMPOSITE validation testing.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — long-lived test reference master."
   },
   {
     "code": "e2et_payment",
@@ -119,7 +135,11 @@
     "modelCategory": "document",
     "extension": {
       "titleField": "e2et_pay_no"
-    }
+    },
+    "semantic_description": "Payment model for BPM approval workflow and UPDATE_RECORD sideEffect testing.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → SUBMITTED → APPROVED → PAID (or REJECTED)"
   },
   {
     "code": "e2et_record",
@@ -130,6 +150,10 @@
     "modelCategory": "basic",
     "extension": {
       "titleField": "e2et_name"
-    }
+    },
+    "semantic_description": "Simple record model for Android E2E tests with status, count, due date fields. Minimal surface for mobile platform integration testing.",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "OPEN → IN_PROGRESS → DONE (simple state machine for mobile test scenarios)"
   }
 ]

@@ -11,7 +11,11 @@
       "category": "crm",
       "titleField": "crm_acc_name",
       "subtitleField": "crm_acc_code"
-    }
+    },
+    "semantic_description": "A company or organization record. Central entity linking contacts and opportunities. Master data with indefinite lifecycle — no status progression, treated as long-lived reference.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — accounts are long-lived master entities."
   },
   {
     "code": "crm_contact",
@@ -25,7 +29,11 @@
       "category": "crm",
       "titleField": "crm_ct_name",
       "subtitleField": "crm_ct_email"
-    }
+    },
+    "semantic_description": "A person at a customer company. Linked to an account for organizational context. May participate in multiple opportunities and activities.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — long-lived master entity."
   },
   {
     "code": "crm_lead",
@@ -39,7 +47,11 @@
       "category": "crm",
       "titleField": "crm_lead_company",
       "subtitleField": "crm_lead_code"
-    }
+    },
+    "semantic_description": "A sales prospect representing early interest from a potential customer. Tracked from initial capture through contact attempts, qualification assessment, and conversion to an opportunity or loss.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "NEW → CONTACTED → QUALIFIED → CONVERTED (to opportunity) / LOST"
   },
   {
     "code": "crm_opportunity",
@@ -53,7 +65,11 @@
       "category": "crm",
       "titleField": "crm_opp_name",
       "subtitleField": "crm_opp_code"
-    }
+    },
+    "semantic_description": "A sales deal opportunity representing a qualified prospect progressing through the sales pipeline. Tracked from discovery through proposal, negotiation, and close (won or lost).",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "DISCOVERY → QUALIFICATION → PROPOSAL → NEGOTIATION → CLOSED_WON / CLOSED_LOST"
   },
   {
     "code": "crm_activity",
@@ -67,7 +83,11 @@
       "category": "crm",
       "titleField": "crm_act_subject",
       "subtitleField": "crm_act_type"
-    }
+    },
+    "semantic_description": "A unified activity record capturing all customer interactions: tasks, calls, emails, meetings, notes, and visits. Each activity has a type, subject, date, and optional assignment.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "OPEN → IN_PROGRESS → DONE / CANCELLED (for task type). Other activity types (call/email/meeting/visit/note) are primarily logged."
   },
   {
     "code": "crm_campaign",
@@ -81,6 +101,10 @@
       "category": "crm",
       "titleField": "crm_cpn_name",
       "subtitleField": "crm_cpn_code"
-    }
+    },
+    "semantic_description": "A marketing campaign representing a planned or active lead generation or customer engagement initiative. Tracks campaign type, date range, budget, and status.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "PLANNED → ACTIVE → COMPLETED / CANCELLED"
   }
 ]

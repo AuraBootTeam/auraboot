@@ -11,7 +11,11 @@
       "category": "organization",
       "titleField": "org_dept_name",
       "subtitleField": "org_dept_code"
-    }
+    },
+    "semantic_description": "Organization department tree structure capturing hierarchical units: department name, code, parent department (recursive tree), status. Primary key for approval workflow routing, cost center allocation, and organizational visibility. Supports multi-level nesting.",
+    "domain_category": "hr",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "ACTIVE ↔ INACTIVE (binary toggle; no multi-step workflow)"
   },
   {
     "code": "org_position",
@@ -25,7 +29,11 @@
       "category": "organization",
       "titleField": "org_pos_name",
       "subtitleField": "org_pos_code"
-    }
+    },
+    "semantic_description": "Position definition within organization hierarchy: position name, code, associated department, level (staff/supervisor/manager/director/VP/CEO), job description. Master data for employee assignment, approval authority matrix, and role-based access control.",
+    "domain_category": "hr",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "ACTIVE ↔ INACTIVE (binary toggle on organizational restructure)"
   },
   {
     "code": "org_employee",
@@ -39,6 +47,10 @@
       "category": "organization",
       "titleField": "org_emp_name",
       "subtitleField": "org_emp_code"
-    }
+    },
+    "semantic_description": "Employee record with identity, assignment, and reporting line: employee name, code, department, position, hire date, employee type (full-time/part-time/contractor), contact (email, phone), report-to manager (self-referential FK), status. Critical data subject for approval routing and organizational visibility.",
+    "domain_category": "hr",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "ACTIVE → ON_LEAVE ↔ ACTIVE (reversible) / ACTIVE"
   }
 ]

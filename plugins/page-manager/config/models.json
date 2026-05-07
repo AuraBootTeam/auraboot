@@ -12,6 +12,10 @@
       "tableName": "ab_page_schema",
       "softDelete": true,
       "icon": "Layout"
-    }
+    },
+    "semantic_description": "Page schema management for the Page Designer: stores DSL configuration (kind, blocks, layout, profile) per page key per tenant. Drives runtime rendering at /p/{pageKey}. Answers: what pages exist in this tenant, what is their DSL definition, and which version is active?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → PUBLISHED → ARCHIVED (page versioning; only PUBLISHED schemas serve runtime requests)"
   }
 ]

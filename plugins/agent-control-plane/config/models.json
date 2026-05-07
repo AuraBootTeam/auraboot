@@ -11,7 +11,11 @@
       "subtitleField": "agent_code",
       "tableName": "ab_agent_definition",
       "softDelete": true
-    }
+    },
+    "semantic_description": "AI agent blueprint capturing identity, capability constraints, and guardrails. Defines soul_profile (personality/values), model/provider, system_prompt, risk_level, and which tools are available. Grounds: who is this agent and what authority does it have?",
+    "domain_category": "platform",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "DRAFT → ACTIVE → SUSPENDED → ARCHIVED (agent instance lifecycle; controls whether new runs can be dispatched)"
   },
   {
     "code": "mission",
@@ -24,7 +28,11 @@
       "titleField": "title",
       "tableName": "ab_mission",
       "softDelete": true
-    }
+    },
+    "semantic_description": "High-level mission/goal decomposing into one or more agent_task entries. Captures intent, expected outcome, and success criteria. Grounds: what is the business objective we're trying to accomplish?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → ACTIVE → COMPLETED / CANCELLED → ARCHIVED (mission lifecycle; parallel to task status but at aggregation level)"
   },
   {
     "code": "agent_task",
@@ -38,7 +46,11 @@
       "subtitleField": "task_status",
       "tableName": "ab_agent_task",
       "softDelete": true
-    }
+    },
+    "semantic_description": "Individual task assigned to an agent or human: work item capturing input requirements, owner, deadline, and status. May be part of a mission or standalone. Grounds: what discrete unit of work needs to be done?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → ASSIGNED → IN_PROGRESS → COMPLETED / FAILED / REASSIGNED → ARCHIVED (task state machine; reassignment changes owner but preserves task history)"
   },
   {
     "code": "agent_run",
@@ -52,7 +64,11 @@
       "subtitleField": "run_status",
       "tableName": "ab_agent_run",
       "softDelete": false
-    }
+    },
+    "semantic_description": "Execution trace of one agent task: plan (steps), tool calls (input/output), token/cost accounting, state transitions, and final outcome. Immutable audit record. Grounds: what happened when we executed this task and how many resources were consumed?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "QUEUED → RUNNING → COMPLETED / FAILED / CANCELLED / PAUSED_FOR_APPROVAL (run execution lifecycle; once terminal, immutable)"
   },
   {
     "code": "agent_artifact",
@@ -66,7 +82,11 @@
       "subtitleField": "artifact_type",
       "tableName": "ab_agent_artifact",
       "softDelete": true
-    }
+    },
+    "semantic_description": "Output artifact produced by agent run: generated document, code snippet, report, or data export. Linked to originating run_id and includes metadata (mime_type, size, storage_url). Grounds: what tangible asset did the agent create and where can I access it?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → FINALIZED → PUBLISHED → ARCHIVED (artifact lifecycle; DRAFT artifacts are temporary until run succeeds; PUBLISHED means made available to users; ARCHIVED means moved to cold storage)"
   },
   {
     "code": "agent_schedule",
@@ -80,7 +100,11 @@
       "subtitleField": "schedule_type",
       "tableName": "ab_agent_schedule",
       "softDelete": true
-    }
+    },
+    "semantic_description": "Scheduled or event-triggered agent task execution: cron expression, enabled flag, and linked agent_definition. Controls when agent wakes up and auto-dispatches. Grounds: when should this agent run autonomously?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → ACTIVE → PAUSED → ARCHIVED (schedule lifecycle; PAUSED prevents triggers but preserves schedule config; ARCHIVED marks obsolete schedules)"
   },
   {
     "code": "approval_policy",
@@ -93,7 +117,11 @@
       "titleField": "policy_name",
       "tableName": "ab_approval_policy",
       "softDelete": true
-    }
+    },
+    "semantic_description": "Policy governing when agent actions require human approval: risk_level threshold, field pattern matching, or tool-specific gates. Evaluated during EXECUTE phase of event loop. Grounds: which agent actions are risky enough to block and require human authorization?",
+    "domain_category": "platform",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "DRAFT → PUBLISHED → ACTIVE → DEPRECATED → ARCHIVED"
   },
   {
     "code": "agent_approval",
@@ -107,7 +135,11 @@
       "subtitleField": "approval_status",
       "tableName": "ab_agent_approval",
       "softDelete": false
-    }
+    },
+    "semantic_description": "Human-in-the-loop approval request for a risky agent action: queued action_id, requested_by (agent), assigned_to (human), deadline, and approval_result (approved/rejected/expired). Immutable audit record. Grounds: is this dangerous action authorized?",
+    "domain_category": "platform",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "PENDING → APPROVED / REJECTED / EXPIRED → CLOSED (approval request lifecycle; once terminal, triggers resumption or abort of paused agent run)"
   },
   {
     "code": "agent_memory",
@@ -120,7 +152,11 @@
       "titleField": "memory_title",
       "subtitleField": "memory_type",
       "tableName": "ab_agent_memory"
-    }
+    },
+    "semantic_description": "Persistent memory entry capturing facts, preferences, or lessons for agents (Mem0 three-layer: session/user/agent). append-only, tagged with importance/validity_window/source_run_id. Grounds: what should the agent remember from prior experience to improve future decisions?",
+    "domain_category": "platform",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "No status lifecycle — append-only memories. Session memories: 24h TTL auto-delete. User memories: persistent until explicitly deleted. Agent memories: persist until purged (org policy controls)."
   },
   {
     "code": "agent_observation",
@@ -134,7 +170,11 @@
       "subtitleField": "observation_type",
       "tableName": "ab_agent_observation",
       "softDelete": false
-    }
+    },
+    "semantic_description": "System metrics, costs, and observations during agent execution: token_count, latency_ms, cost_usd, error_messages, LLM model used. Grounds: is the agent performing within budget and latency SLA?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — append-only observability metrics. Automatically aged/archived after 90 days."
   },
   {
     "code": "agent_tool",
@@ -148,7 +188,11 @@
       "subtitleField": "tool_type",
       "tableName": "ab_agent_tool",
       "softDelete": true
-    }
+    },
+    "semantic_description": "Executable tool definition available to agents: DSL command, HTTP API, MCP server endpoint, or LLM-native function. Includes parameter schema, requires_approval flag, cost model, and risk_level. Grounds: what single capability can this agent invoke and with what constraints?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → AVAILABLE → DEPRECATED → REMOVED (tool availability lifecycle; when deprecated, agents can still use existing runs but new runs cannot select it)"
   },
   {
     "code": "agent_skill",
@@ -162,7 +206,11 @@
       "subtitleField": "skill_level",
       "tableName": "ab_agent_skill",
       "softDelete": true
-    }
+    },
+    "semantic_description": "Reusable skill bundle packaging atomic tools and workflow patterns. Includes instructions, example uses, and bundled tools. Can be deployed to agent as a group or individually. Grounds: what is this skill and when should the agent invoke it as a unit?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → PUBLISHED → DEPRECATED → ARCHIVED (skill versioning; version bump triggers retraining of skill selector weights)"
   },
   {
     "code": "agent_action",
@@ -176,7 +224,11 @@
       "subtitleField": "action_status",
       "tableName": "ab_agent_action",
       "softDelete": false
-    }
+    },
+    "semantic_description": "ACP ActionEngine audit trail: every tool execution, approval decision, or state change is logged. Captures actor (agent_code or user_id), action_type, payload_before/after, and timestamp. Immutable audit for compliance. Grounds: who did what when and what changed?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "CREATED → COMPLETED / FAILED → ARCHIVED (audit log lifecycle; once created, immutable; aged/archived after 7 years per regulatory)"
   },
   {
     "code": "object_alias",
@@ -190,7 +242,11 @@
       "subtitleField": "model_code",
       "tableName": "ab_object_alias",
       "softDelete": false
-    }
+    },
+    "semantic_description": "D1 Grounding alias mapping: natural language synonyms/abbreviations to canonical model codes (e.g., 'customer' → 'tcrm_account', 'PO' → 'pr_purchase_order'). Enables LLM to understand user intent from synonyms. Grounds: when the user says X, which data model do they mean?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → ACTIVE → DEPRECATED → REMOVED (alias availability; deprecation allows smooth transition when models renamed)"
   },
   {
     "code": "semantic_term",
@@ -204,7 +260,11 @@
       "subtitleField": "term_type",
       "tableName": "ab_semantic_term",
       "softDelete": false
-    }
+    },
+    "semantic_description": "D1 Grounding semantic term definition: domain-specific jargon (e.g., 'MRR' = Monthly Recurring Revenue, 'SKU' = Stock Keeping Unit) with definition and usage context. Injected into LLM system prompt to prevent hallucinations. Grounds: what does this industry term mean in our context?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → ACTIVE → DEPRECATED → REMOVED (term availability; deprecation for legacy jargon no longer used)"
   },
   {
     "code": "mcp_server",
@@ -218,6 +278,10 @@
       "subtitleField": "server_url",
       "tableName": "ab_agent_mcp_server",
       "softDelete": true
-    }
+    },
+    "semantic_description": "External MCP (Model Context Protocol) server registry: hostname, port, protocol, authentication. Decouples tool hosting from AuraBoot platform. Grounds: where is this tool provider located and how does the agent reach it?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → REGISTERED → HEALTH_CHECK_FAILED → DEREGISTERED (MCP server availability; health checks periodically; HEALTH_CHECK_FAILED is transient, agent may retry or skip)"
   }
 ]
