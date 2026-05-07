@@ -2,6 +2,11 @@ package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.dto.LlmChunk;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 /**
  * Abstraction for LLM providers (Anthropic, OpenAI, DeepSeek, Qianwen, etc.).
@@ -21,6 +26,32 @@ public interface LlmProvider {
 
     /** Call the LLM API and return a unified response */
     LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception;
+
+    /**
+     * Streaming variant of {@link #chat} (E.1 Phase 1).
+     *
+     * <p>Returns a {@link Flux} of {@link LlmChunk} values: zero or more
+     * incremental delta chunks followed by exactly one terminal chunk where
+     * {@code done=true} and {@code aggregateResponse} carries the equivalent
+     * of the synchronous {@link #chat} return value.
+     *
+     * <p><b>Default implementation</b> wraps the synchronous {@link #chat}
+     * call in a single-chunk Flux so providers that have not yet implemented
+     * real streaming continue to work transparently — callers receive one
+     * terminal chunk after the full response arrives. Providers that support
+     * a real streaming wire protocol (e.g. Anthropic
+     * {@code /v1/messages stream:true}) override this method.
+     *
+     * <p><b>Important:</b> the synchronous {@link #chat} method does NOT
+     * delegate to this stream variant; it remains the canonical sync path so
+     * that overriding only {@code streamChat} cannot accidentally introduce a
+     * recursive loop. Per spec Q5 there is no fallback from streaming to
+     * sync — streaming failures must surface as {@code Flux.error}.
+     */
+    default Flux<LlmChunk> streamChat(LlmChatRequest request, String apiKey, String baseUrl) {
+        return Mono.fromCallable(() -> chat(request, apiKey, baseUrl))
+                .flatMapMany(response -> Flux.fromIterable(List.of(LlmChunk.fromFinal(response))));
+    }
 
     /** Estimate cost in USD for given token usage */
     double estimateCost(String model, int inputTokens, int outputTokens);
