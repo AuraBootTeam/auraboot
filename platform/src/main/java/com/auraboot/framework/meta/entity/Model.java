@@ -50,6 +50,31 @@ public class Model extends AbstractMultiVersionEntity {
     private String modelCategory;
 
     /**
+     * Business meaning written for Agent / domain-aware tooling.
+     */
+    @TableField("semantic_description")
+    private String semanticDescription;
+
+    /**
+     * Domain category (CRM, FINANCE, INVENTORY, HR, PROJECT, ...).
+     */
+    @TableField("domain_category")
+    private String domainCategory;
+
+    /**
+     * Data sensitivity classification (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED).
+     * DB default is 'internal'.
+     */
+    @TableField("data_sensitivity")
+    private String dataSensitivity;
+
+    /**
+     * Lifecycle description, e.g. "DRAFT → SUBMITTED → APPROVED".
+     */
+    @TableField("lifecycle_description")
+    private String lifecycleDescription;
+
+    /**
      * Model source type: physical | namedQuery | endpoint | sqlView (Phase 1).
      * Defaults to "physical" at DB level.
      */

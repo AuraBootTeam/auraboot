@@ -508,6 +508,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             model.setModelCategory((String) extensionData.get("modelCategory"));
         }
 
+        // Agent-ready semantic fields (first-class columns on ab_meta_model)
+        model.setSemanticDescription(request.getSemanticDescription());
+        model.setDomainCategory(request.getDomainCategory());
+        if (StringUtils.hasText(request.getDataSensitivity())) {
+            model.setDataSensitivity(request.getDataSensitivity());
+        }
+        model.setLifecycleDescription(request.getLifecycleDescription());
+
         // Set plugin_pid if provided
         if (StringUtils.hasText(request.getPluginPid())) {
             model.setPluginPid(request.getPluginPid());
