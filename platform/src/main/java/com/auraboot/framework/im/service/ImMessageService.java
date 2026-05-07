@@ -64,6 +64,22 @@ public interface ImMessageService {
                                 String cardPayload, String clientMsgId);
 
     /**
+     * Phase D.1 overload: persist Anthropic Extended Thinking reasoning prose
+     * + signature alongside the agent row so they survive a page reload. Both
+     * thinking parameters are nullable; passing null on either leaves the
+     * corresponding column NULL (do not poison with empty strings — see
+     * {@code ab_im_message.thinking_content} schema doc).
+     *
+     * <p>Idempotency contract is identical to the 7-arg overload — same
+     * {@code (conversation_id, client_msg_id)} dedup. The 7-arg overload
+     * delegates here passing nulls for thinking_*.
+     */
+    ImMessage sendAgentMessage(Long conversationId, Long tenantId, Long agentId,
+                                String messageType, String content,
+                                String cardPayload, String clientMsgId,
+                                String thinkingContent, String thinkingSignature);
+
+    /**
      * Recall a message. Only the original sender can recall.
      * Sets recalled=true and clears content/payload fields.
      * Returns the recalled message, or null if not found / not authorized.

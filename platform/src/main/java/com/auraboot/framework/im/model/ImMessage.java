@@ -74,4 +74,21 @@ public class ImMessage {
 
     @TableField(value = "triage_reason_codes", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
     private String triageReasonCodes;
+
+    /**
+     * Phase D.1 (ACP backlog 2026-05-07): Anthropic Extended Thinking reasoning
+     * prose for this assistant row, concatenated across all thinking content
+     * blocks the turn produced. Null on turns that produced no thinking (we
+     * deliberately do not poison with empty strings — see schema column doc).
+     */
+    @TableField("thinking_content")
+    private String thinkingContent;
+
+    /**
+     * Phase D.1: Anthropic's opaque resume / verification signature for the
+     * thinking block. Null when no thinking was produced or when the upstream
+     * stream did not surface a {@code signature_delta}.
+     */
+    @TableField("thinking_signature")
+    private String thinkingSignature;
 }
