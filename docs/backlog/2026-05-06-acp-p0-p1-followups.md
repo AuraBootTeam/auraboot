@@ -1,5 +1,8 @@
 # ACP P0/P1 会话后续 backlog(2026-05-06)
 
+> **文档类型:长期 backlog(持续更新)。** 跟踪 ACP P0/P1 ship 后的所有未做项 + 后续批次次生 followup。
+> 一次性的批次实施设计稿(已 close)在 → [`docs/superpowers/specs/2026-05-06-acp-followup-parallel-batch-design.md`](../superpowers/specs/2026-05-06-acp-followup-parallel-batch-design.md)。
+
 本文件记录 2026-04-30 ~ 2026-05-06 一批 ACP capability 落地(P0 5 项 + P1 6 项,12 个 commit `164fb5ef → 94b97ad6`)中**没有随 main 合并落地**的遗留项。每项 what / why / 建议 owner 或触发条件,避免散落在 commit message。
 
 相关 commit:
