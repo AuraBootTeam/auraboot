@@ -533,6 +533,10 @@ public class AnthropicLlmProvider implements LlmProvider {
                 out.setWarnings(warnings);
             }
             return out;
+        }
+    }
+
+    /**
      * Increment the Anthropic prompt cache hit/miss counters based on the
      * usage block returned by the API. See the field-level comment on
      * {@link #CACHE_HIT_NAME} for the exact semantics; in short:
