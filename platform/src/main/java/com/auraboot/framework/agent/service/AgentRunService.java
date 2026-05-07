@@ -363,8 +363,15 @@ public class AgentRunService {
                 boolean skipApprovalForResumedStep = resumeFromRunPid != null
                         && startStep < plan.size()
                         && plan.get(startStep).getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL;
+                // H.3 wiring: pre-load every skill row referenced by the plan
+                // so StepLoopService can overlay ab_agent_skill.execution_config
+                // onto the agent baseline for thinking-config resolution. We
+                // intentionally load once here (not per-step) to keep the hot
+                // loop free of DB round-trips. Missing skills are tolerated —
+                // the lookup helper treats them as "no skill overlay".
+                Map<String, Map<String, Object>> skillByCode = loadSkillsForPlan(tenantId, plan);
                 result = stepLoopService.executePlanSteps(plan, startStep, tenantId, runPid, taskPid, agentCode,
-                        systemPrompt, userMessage, tools, agentDef, provider, config, traceCtx,
+                        systemPrompt, userMessage, tools, agentDef, skillByCode, provider, config, traceCtx,
                         skipApprovalForResumedStep);
 
                 // Persist final plan state
@@ -431,6 +438,38 @@ public class AgentRunService {
         }
     }
 
+
+    /**
+     * H.3 wiring: pre-load all skill rows referenced by the current plan, so
+     * {@link StepLoopService#executePlanSteps} can overlay
+     * {@code ab_agent_skill.execution_config} onto the agent baseline when
+     * resolving per-step thinking config. Returns an empty map (never null)
+     * — empty also signals "no skill overlay" in the lookup helper.
+     *
+     * <p>Resolution mirrors {@code lookupSkillForStep}: prefer
+     * {@link AgentPlanStep#getSkillCode()} then fall back to
+     * {@link AgentPlanStep#getToolCode()}.
+     */
+    private Map<String, Map<String, Object>> loadSkillsForPlan(Long tenantId, List<AgentPlanStep> plan) {
+        if (plan == null || plan.isEmpty()) return Map.of();
+        Map<String, Map<String, Object>> out = new HashMap<>();
+        for (AgentPlanStep step : plan) {
+            String code = step.getSkillCode();
+            if (code == null || code.isBlank()) code = step.getToolCode();
+            if (code == null || code.isBlank()) continue;
+            if (out.containsKey(code)) continue;
+            try {
+                Map<String, Object> skill = skillService.loadSkill(tenantId, code);
+                if (skill != null) out.put(code, skill);
+            } catch (Exception e) {
+                // Tolerate lookup failure — falls back to agent-only thinking
+                // for that step. Loud enough to debug, quiet enough to not
+                // break a run that does not actually depend on the skill row.
+                log.debug("loadSkillsForPlan: skill {} not loadable: {}", code, e.getMessage());
+            }
+        }
+        return out;
+    }
 
     private boolean attemptReplan(List<AgentPlanStep> plan, int failedStepIndex, String errorMessage,
                                    LlmProvider provider, LlmProviderFactory.ProviderConfig config,
