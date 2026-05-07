@@ -61,6 +61,9 @@ export interface BehaviorConfig {
   multiSelect: boolean;
   rowClickAction?: 'detail' | 'drawer' | 'none';
   emptyStateText?: string;
+  enableSorting?: boolean;
+  enablePagination?: boolean;
+  enableMultiView?: boolean;
 }
 
 export interface ListViewModel {

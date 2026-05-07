@@ -3,19 +3,19 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type {
-  Version,
-  VersionQueryParams,
-  CreateVersionRequest,
-  UpdateVersionRequest,
-  PublishVersionRequest,
-  RollbackVersionRequest,
-  VersionEvent,
-  VersionEventListener,
-  VersionSync,
+import {
   VersionStatus,
   VersionEventType,
   SyncStatus,
+  type Version,
+  type VersionQueryParams,
+  type CreateVersionRequest,
+  type UpdateVersionRequest,
+  type PublishVersionRequest,
+  type RollbackVersionRequest,
+  type VersionEvent,
+  type VersionEventListener,
+  type VersionSync,
 } from '~/plugins/core-designer/components/studio/domain/metadata/types';
 import { getVersionManager } from '~/plugins/core-designer/components/studio/services/managers';
 import { useAuth } from '~/contexts/AuthContext';
