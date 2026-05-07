@@ -399,6 +399,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     }
 
     private TurnContext rebuildContext(ChatSessionStore.PendingTool pending) {
+        // GAP-295 resume path: re-attach the channel session captured at
+        // suspend. We trust the stored pid (PendingTool already passed
+        // identity validation in validateIdentity) but defensively use
+        // findByPid so a stale/missing row falls back to null instead of
+        // propagating a phantom pid into TurnContext.
+        String channelSessionId = resolveResumeChannelSessionId(
+                pending.getChannelSessionPid(), pending.getTenantId());
         return new TurnContext(
                 pending.getTurnId(),
                 pending.getTenantId(),
@@ -406,13 +413,36 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 pending.getHumanMemberId(),
                 null,                                  // agentId — Phase B/B+ AuraBotAgentResolver
                 pending.getAgentCode(),                // DC.3c Fix 2: preserve named-agent identity across resume
-                null,                                  // channelSessionId — Phase B+ ChannelSessionResolver
+                channelSessionId,                      // GAP-295 resume: re-attached via findByPid
                 pending.getConversationId(),
                 null,                                  // inboundMessageId — already persisted at suspend time
                 null,                                  // triageBucket
                 null,                                  // traceId — chat impl re-attaches via aiTraceService.findActiveTrace
                 null,                                  // taskPid — resume reuses original task on chokepoint side; DC.3c+ closure protocol
                 java.time.Instant.now());
+    }
+
+    /**
+     * GAP-295 resume path: re-attach the channel session pid captured on the
+     * pending state. Returns null when the resolver bean is absent (test
+     * contexts), the pid is null (pre-GAP-295 pending entries that leaked
+     * through), or the row no longer exists (TTL / cleanup). Failures keep
+     * resume working — channel session is observability state, not a hard
+     * dependency.
+     */
+    private String resolveResumeChannelSessionId(String channelSessionPid, Long tenantId) {
+        if (channelSessionResolver == null || channelSessionPid == null || tenantId == null) {
+            return null;
+        }
+        try {
+            return channelSessionResolver.findByPid(channelSessionPid, tenantId)
+                    .map(ChannelSessionResolver.ChannelSession::pid)
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("GAP-295 resume: findByPid failed for pid={} tenantId={}: {}",
+                    channelSessionPid, tenantId, e.getMessage());
+            return null;
+        }
     }
 
     /**
