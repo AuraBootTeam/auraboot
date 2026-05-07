@@ -1093,7 +1093,20 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await clickEditOnRow(page, memoryTitle);
     await waitForFormReady(page);
 
-    await page.getByRole('textbox', { name: /^内容\*?$/ }).fill(updatedContent);
+    // Use the shared fillFormField helper (same path as CRUD-13 create) so we
+    // hit the [data-testid="field-memory_content"] container's input/textarea
+    // directly. The previous `getByRole('textbox', { name: /^内容\*?$/ })`
+    // selector matched a non-React-controlled element under load, which let
+    // .fill() succeed without triggering form state, hiding the bad assertion
+    // until full-suite contention surfaced it. Mirrors CRUD-23 incident fix.
+    await fillFormField(page, 'memory_content', updatedContent);
+    // Sanity check: confirm the value actually landed in form state before save.
+    const contentLocator = page
+      .locator(
+        '[data-testid="field-memory_content"] textarea, [data-testid="form-field-memory_content"] textarea, textarea[name="memory_content"]',
+      )
+      .first();
+    await expect(contentLocator).toHaveValue(updatedContent, { timeout: 5_000 });
 
     const cmdPromise = page.waitForResponse(
       (r) => r.url().includes('/api/meta/commands/execute/') && r.request().method().toLowerCase() === 'post',

@@ -83,16 +83,28 @@ test.describe('Unified Inbox', () => {
   });
 
   test('tab filtering changes displayed items', async ({ page }) => {
+    // Tab state is driven by URL search params; under full-suite contention the
+    // setSearchParams → useEffect → setState round-trip can take >5s, so poll
+    // generously instead of the default 5s.
     await page.getByTestId('inbox-tab-approval').click();
-    await expect(page.getByTestId('inbox-tab-approval')).toHaveClass(/bg-blue-50|bg-blue-900/);
+    await expect(page.getByTestId('inbox-tab-approval')).toHaveClass(
+      /bg-blue-50|bg-blue-900/,
+      { timeout: 15_000 },
+    );
     await waitForInboxListSettled(page);
 
     await page.getByTestId('inbox-tab-alert').click();
-    await expect(page.getByTestId('inbox-tab-alert')).toHaveClass(/bg-blue-50|bg-blue-900/);
+    await expect(page.getByTestId('inbox-tab-alert')).toHaveClass(
+      /bg-blue-50|bg-blue-900/,
+      { timeout: 15_000 },
+    );
     await waitForInboxListSettled(page);
 
     await page.getByTestId('inbox-tab-all').click();
-    await expect(page.getByTestId('inbox-tab-all')).toHaveClass(/bg-blue-50|bg-blue-900/);
+    await expect(page.getByTestId('inbox-tab-all')).toHaveClass(
+      /bg-blue-50|bg-blue-900/,
+      { timeout: 15_000 },
+    );
     await waitForInboxListSettled(page);
   });
 
