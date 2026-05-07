@@ -35,6 +35,8 @@ NO_PROXY=localhost npx playwright test tests/e2e/user-soul-profile/real-parallel
 
 **建议 owner**：Platform 组下一个迭代；引入 `platform_admin` 角色 + `adminPathScopes` 配置，路径级白名单决定 required role。
 
+**Closure (2026-05-07)**：✅ 由 [PR #45](https://github.com/AuraBootTeam/auraboot/pull/45) 落地。`platform_admin` role 通过 `default-bootstrap.json` per-tenant 模板创建（priority=0）;`AdminRoleInterceptor` path-scope 决议 `/api/admin/infrastructure/**` + `/api/admin/cloud-config/**` 走 `platform_admin`,其余 `tenant_admin`;OSS reset 脚本绑双角色。详见 `docs/plans/2026-05/2026-05-07-admin-guard-v2-and-followups-design.md`。
+
 ---
 
 ## 3. ~~`TimezoneMigrationController` 生命周期~~ (DONE — renamed to `TenantTimezoneController`)
@@ -51,6 +53,8 @@ NO_PROXY=localhost npx playwright test tests/e2e/user-soul-profile/real-parallel
 
 **建议**：`(userId, tenantId, role) → boolean` 60s TTL Caffeine cache；缓存 miss 走现行 JDBC 路径。改动窄、风险低，任何 Plan C 审阅者都能完成。
 
+**Closure (2026-05-07)**：✅ 由 [PR #45](https://github.com/AuraBootTeam/auraboot/pull/45) 落地。`AdminRoleChecker.hasRole()` 包 Caffeine 60s TTL + 10K 上限 + Micrometer gauge `aura.admin.role_check.cache.{hit,miss,size}`。
+
 ---
 
 ## 5. 通用 admin 访问审计表
@@ -60,6 +64,8 @@ NO_PROXY=localhost npx playwright test tests/e2e/user-soul-profile/real-parallel
 **Why**：GDPR 只强制"取得个人数据时"审计，USP 是唯一直接返回用户画像的 admin；但 Infrastructure / CloudConfig 的操作性访问也值得留痕——尤其是未来外部审计来查。
 
 **建议 owner**：Platform 组；最小方案是新增 `ab_admin_action_log(tenant_id, actor_user_id, path, method, status, created_at)` + interceptor 旁路写一行。不阻塞功能，属于 ops 可观测性增强。
+
+**Closure (2026-05-07)**：✅ 由 [PR #45](https://github.com/AuraBootTeam/auraboot/pull/45) 落地。新增 `ab_admin_action_log` 表(9 字段:补 `actor_role`/`request_body_summary`/`latency_ms`),`AdminAuditService.@Async` 异步写入,accept + reject 都审计;`RequestBodySummarizer` 仅记录顶层 JSON keys 不含 value(2048 上限)。USP 现有专用表保留并存。
 
 ---
 
@@ -90,6 +96,8 @@ NO_PROXY=localhost npx playwright test tests/e2e/user-soul-profile/real-parallel
 **Why**：worktree 执行 `./gradlew` 必须带 jar；每次手动 `cp` from 主仓库容易漏。
 
 **建议**：追加到 `.gitattributes` 强制 binary 跟踪，或者确认 `.gitignore` 中 jar 的排除规则没误伤 `gradle-wrapper.jar`。任何 DevEx 维护者可做。
+
+**Closure (2026-05-07)**：✅ 由 [PR #43](https://github.com/AuraBootTeam/auraboot/pull/43) 落地。`.gitignore` 加 `!gradle/wrapper/gradle-wrapper.jar` + `!**/gradle/wrapper/gradle-wrapper.jar` 例外,把 jar 加入 git tracking(43KB)。新 worktree `./gradlew --version` 直接可用。
 
 ---
 
