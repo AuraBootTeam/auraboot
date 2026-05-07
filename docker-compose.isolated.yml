@@ -1,0 +1,141 @@
+# Per-worktree isolated dev/E2E stack.
+#
+# Goal:
+#   Allow each git worktree of this repo to bring up its own self-contained
+#   docker stack (postgres + backend + vite/BFF + redis) on a per-worktree
+#   port offset. Two worktrees can run their full main-path (reset-db,
+#   bootRun, pnpm dev:full, Playwright) in parallel without colliding on
+#   the shared host singletons (Postgres :5432 / m2 / :6443 / :5173:3500
+#   / Redis :6379).
+#
+# Difference vs docker-compose.ga-e2e.override.yml:
+#   - Host ports are env-var driven (PG_PORT / BE_PORT / VITE_PORT /
+#     BFF_PORT / REDIS_PORT) instead of hardcoded 5433/6444/5174/3501.
+#   - container_name is intentionally OMITTED. Compose will derive
+#     `<project>-<service>-<idx>` automatically; that gives every stack
+#     a unique container name based on COMPOSE_PROJECT_NAME=auraboot-<slug>
+#     without us having to template names. Two stacks can run side by side.
+#   - Volumes are NOT named with `ga_e2e_` prefix; project-scoped volume
+#     names (auraboot-<slug>_<volume>) are derived by compose from
+#     COMPOSE_PROJECT_NAME. Each stack gets its own named volumes.
+#   - Adds redis under the `cache` profile (the GA-E2E override never
+#     needed Redis; multi-worktree dev paths sometimes do).
+#
+# The GA-E2E single-instance stack stays in docker-compose.ga-e2e.override.yml
+# unchanged for CI and existing manual ops.
+#
+# Usage (from this worktree root, via scripts/dev/start-isolated.sh):
+#   COMPOSE_PROJECT_NAME=auraboot-<slug> \
+#     docker compose -f docker-compose.yml -f docker-compose.isolated.yml \
+#     --env-file .aura-stack/<slug>.env \
+#     --profile full --profile cache up -d
+
+services:
+  postgres:
+    # Compose merges scalar fields by overwriting; the base file pins
+    # `container_name: auraboot-postgres` which would collide across
+    # stacks. Re-bind to a project-scoped name so each
+    # COMPOSE_PROJECT_NAME=auraboot-<slug> stack gets its own container.
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot-isolated}-postgres
+    # Compose merges list-typed fields by appending. Use !override to
+    # replace the base file's "5432:5432" mapping with our parameterized
+    # port. Fallback default (5433) matches the GA-E2E preset.
+    ports: !override
+      - "${PG_PORT:-5433}:5432"
+
+  redis:
+    profiles: [cache]
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot-isolated}-redis
+    ports: !override
+      - "${REDIS_PORT:-6479}:6379"
+
+  backend:
+    # Compose appends profile lists; this gives backend [full, isolated-stack].
+    profiles:
+      - isolated-stack
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot-isolated}-backend
+    build:
+      dockerfile: ${ISOLATED_BACKEND_DOCKERFILE:-Dockerfile}
+    ports: !override
+      - "${BE_PORT:-6444}:6443"
+    volumes:
+      # Mount the worktree's plugins read-only so import-directory-sync
+      # can resolve absolute paths like /app/plugins/<name>.
+      - ./plugins:/app/plugins:ro
+      # Optional: mount the sibling enterprise repo's plugins so the same
+      # endpoint can reach /app/plugins-enterprise/<name>. Path resolved
+      # relative to this compose file's directory; the bind silently
+      # no-ops if the sibling worktree is absent.
+      - ../auraboot-enterprise/plugins:/app/plugins-enterprise:ro
+    environment:
+      # CORS allow-list covers the in-container vite/BFF host plus the
+      # host-mapped variants that Playwright targets.
+      FRONTEND_BASE_URL: http://localhost:${VITE_PORT:-5174}
+      CORS_ALLOWED_ORIGINS: "http://isolated-frontend:5173,http://isolated-frontend:3500,http://localhost:${VITE_PORT:-5174},http://127.0.0.1:${VITE_PORT:-5174},http://localhost:${BFF_PORT:-3501},http://127.0.0.1:${BFF_PORT:-3501},http://localhost:5173,http://localhost:3500"
+
+  # Vite + BFF dev server in a browser-capable Node container.
+  # Distinct service name (`isolated-frontend`, not `frontend`) so compose
+  # does not merge the base file's `frontend.build:` block into us.
+  isolated-frontend:
+    image: ${ISOLATED_FRONTEND_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-noble}
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot-isolated}-frontend
+    user: root
+    profiles:
+      - isolated-stack
+    working_dir: /repo/web-admin
+    ports:
+      - "${VITE_PORT:-5174}:5173"
+      - "${BFF_PORT:-3501}:3500"
+    environment:
+      SPRING_BOOT_URL: http://backend:6443
+      BFF_PORT: "3500"
+      VITE_PORT: "5173"
+      VITE_ALLOWED_HOSTS: "isolated-frontend,localhost,127.0.0.1"
+      HOST: "0.0.0.0"
+      CI: "true"
+      NODE_ENV: development
+      # SSR-side fetch base URL. Without this, app/shared/services/http-client
+      # falls back to "use the incoming request origin", which becomes the
+      # host port (VITE_PORT) - unreachable from inside the container - so
+      # SSR actions like the /login form submit fail with ECONNREFUSED. Use
+      # 127.0.0.1 instead of localhost because Alpine resolves localhost to
+      # ::1 first while the dev BFF binds IPv4.
+      BFF_INTERNAL_URL: http://127.0.0.1:3500
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+    volumes:
+      - ./:/repo:cached
+      # Use named volumes for node_modules so the host's macOS pnpm store
+      # does not leak into the container (osxfs perf + symlink quirks).
+      # Compose prefixes these with COMPOSE_PROJECT_NAME so each stack
+      # gets its own.
+      - isolated_node_modules:/repo/node_modules
+      - isolated_web_admin_node_modules:/repo/web-admin/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: >-
+      sh -c "
+      set -e;
+      if command -v pnpm >/dev/null 2>&1; then
+        pnpm --version;
+      else
+        corepack enable;
+        corepack prepare pnpm@9 --activate;
+      fi;
+      cd /repo;
+      pnpm install --no-frozen-lockfile --prefer-offline;
+      cd web-admin;
+      sh ../scripts/sync-platform-plugins.sh;
+      node ../scripts/generate-plugin-routes.mjs;
+      pnpm exec concurrently --names 'web,bff' --prefix-colors 'cyan,green' --restart-tries 5 --restart-after 2000 'pnpm dev:web' 'pnpm dev:bff'
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5173 >/dev/null 2>&1 && wget -q -O- http://127.0.0.1:3500/health >/dev/null 2>&1 || wget -q -O- http://127.0.0.1:3500 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 5m
+
+volumes:
+  isolated_node_modules:
+  isolated_web_admin_node_modules:
