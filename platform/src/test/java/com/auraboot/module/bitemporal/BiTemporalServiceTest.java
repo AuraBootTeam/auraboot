@@ -163,7 +163,8 @@ class BiTemporalServiceTest {
         currentRecord.setEntityType(ENTITY_TYPE);
         currentRecord.setEntityId(ENTITY_ID);
 
-        when(mapper.findCurrent(ENTITY_TYPE, ENTITY_ID)).thenReturn(currentRecord);
+        // correct() now uses findCurrentForUpdate (REVIEW-BE8-002).
+        when(mapper.findCurrentForUpdate(ENTITY_TYPE, ENTITY_ID)).thenReturn(currentRecord);
         when(mapper.closeTxPeriod(eq(10L), any(LocalDateTime.class))).thenReturn(1);
         when(mapper.insert(any(BiTemporalRecord.class))).thenReturn(1);
 
@@ -194,7 +195,8 @@ class BiTemporalServiceTest {
     void correct_shouldThrowWhenNoCurrentRecord() {
         // Given
         ObjectNode payload = objectMapper.createObjectNode();
-        when(mapper.findCurrent(ENTITY_TYPE, ENTITY_ID)).thenReturn(null);
+        // correct() uses findCurrentForUpdate (REVIEW-BE8-002).
+        when(mapper.findCurrentForUpdate(ENTITY_TYPE, ENTITY_ID)).thenReturn(null);
 
         // When/Then
         assertThrows(IllegalStateException.class, () ->
@@ -214,7 +216,8 @@ class BiTemporalServiceTest {
         currentRecord.setValidFrom(VALID_FROM);
         currentRecord.setValidTo(VALID_TO);
 
-        when(mapper.findCurrent(ENTITY_TYPE, ENTITY_ID)).thenReturn(currentRecord);
+        // terminate() now uses findCurrentForUpdate (REVIEW-BE8-002).
+        when(mapper.findCurrentForUpdate(ENTITY_TYPE, ENTITY_ID)).thenReturn(currentRecord);
         when(mapper.closeTxPeriod(eq(5L), any(LocalDateTime.class))).thenReturn(1);
         when(mapper.insert(any(BiTemporalRecord.class))).thenReturn(1);
 
@@ -239,7 +242,8 @@ class BiTemporalServiceTest {
     void terminate_shouldThrowWhenNoCurrentRecord() {
         // Given
         LocalDateTime terminateTime = LocalDateTime.of(2026, 6, 30, 0, 0, 0);
-        when(mapper.findCurrent(ENTITY_TYPE, ENTITY_ID)).thenReturn(null);
+        // terminate() uses findCurrentForUpdate (REVIEW-BE8-002).
+        when(mapper.findCurrentForUpdate(ENTITY_TYPE, ENTITY_ID)).thenReturn(null);
 
         // When/Then
         assertThrows(IllegalStateException.class, () ->
