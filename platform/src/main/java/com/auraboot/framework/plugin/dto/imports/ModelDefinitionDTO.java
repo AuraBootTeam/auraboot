@@ -76,6 +76,33 @@ public class ModelDefinitionDTO {
      */
     private Map<String, Object> extension;
 
+    /**
+     * Business meaning written for Agent / domain-aware tooling.
+     * Persisted to ab_meta_model.semantic_description.
+     */
+    @JsonProperty("semantic_description")
+    private String semanticDescription;
+
+    /**
+     * Domain category (e.g. CRM, FINANCE, INVENTORY, HR). Persisted to ab_meta_model.domain_category.
+     */
+    @JsonProperty("domain_category")
+    private String domainCategory;
+
+    /**
+     * Data sensitivity (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED).
+     * Persisted to ab_meta_model.data_sensitivity (default 'internal' at DB level).
+     */
+    @JsonProperty("data_sensitivity")
+    private String dataSensitivity;
+
+    /**
+     * Lifecycle description, e.g. "DRAFT → SUBMITTED → APPROVED".
+     * Persisted to ab_meta_model.lifecycle_description.
+     */
+    @JsonProperty("lifecycle_description")
+    private String lifecycleDescription;
+
     @JsonIgnore
     private Map<String, Object> unknownFields;
 

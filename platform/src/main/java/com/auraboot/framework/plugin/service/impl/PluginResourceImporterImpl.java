@@ -320,7 +320,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             Map<String, Object> wrappedExtension = new HashMap<>();
             wrappedExtension.put("extension", extension);
             String extensionJson = toJson(wrappedExtension);
-            metaModelMapper.updateForPluginImport(extensionJson, pluginPid, effectiveTableName, dto.getModelCategory(), tenantId, dto.getCode());
+            metaModelMapper.updateForPluginImport(extensionJson, pluginPid, effectiveTableName,
+                    dto.getModelCategory(),
+                    dto.getSemanticDescription(), dto.getDomainCategory(),
+                    dto.getDataSensitivity(), dto.getLifecycleDescription(),
+                    tenantId, dto.getCode());
             // Evict ALL tenant caches for this model — plugin import affects all tenants,
             // and per-tenant eviction would leave other tenants with stale tableName/softDelete.
             metaModelService.clearAllCache();
@@ -349,6 +353,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             request.setDescription(dto.getDescription());
             request.setModelType(dto.getModelType() != null ? dto.getModelType() : "entity");
             request.setModelCategory(dto.getModelCategory());
+            request.setSemanticDescription(dto.getSemanticDescription());
+            request.setDomainCategory(dto.getDomainCategory());
+            request.setDataSensitivity(dto.getDataSensitivity());
+            request.setLifecycleDescription(dto.getLifecycleDescription());
             request.setTableName(effectiveTableName);
             request.setExtension(extension);
             request.setTenantId(tenantId);
