@@ -1,0 +1,878 @@
+{
+  "generatedAt": "2026-05-07T19:53:01.654Z",
+  "note": "Snapshot of known permission-code drift. To regenerate after a reconciliation phase, run the SAME command CI uses: `node scripts/validate-permission-codes.mjs --oss-only --write-baseline=scripts/permission-codes-baseline.json`. See docs/standards/meta/permission-code-naming.md.",
+  "mode": "oss-only",
+  "count": 174,
+  "entries": [
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.async_task.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.async_task.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.audit_trail.admin"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.audit_trail.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.automation.admin"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.automation.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.automation.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_config.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_definition.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_form.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_hook.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_monitor.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_monitor.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_report.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_rule.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_signature.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_sla.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_task.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.bpm_task.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.category.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.category.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.cloud_config.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.command.execute"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.command.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.command.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.component.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.component.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.connector.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.dashboard.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.dashboard.team.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.dashboard.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.data_domain.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.datasource.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.datasource.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.decision.execute"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.decision.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.decision.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.designer.admin"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.designer.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.designer.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.dict.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.dict.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.edi.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.edi.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.event_store.admin"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.event_store.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.field_audit.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.field_audit.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.field_mask.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.field.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.field.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.filter.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.invariant.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.invariant.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.menu.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.menu.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.meta_model.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.meta_model.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.meta_permission.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.model.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.model.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.ot_device.data"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.ot_device.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.ot_device.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.page.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.page.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.permission.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.permission.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.permission.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.plugin.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.plugin.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.print.generate"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.process.admin"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.process.execute"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.process.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.process.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.publish.admin"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.publish.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.publish.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.query.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.query.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.rbac_role.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.rbac_role.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.rbac_user_role.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.rbac_user_role.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.reconciliation.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.reconciliation.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.release.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.release.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.repo.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.repo.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.report.generate"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.scheduler.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.sod.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.sod.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.state_graph.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.state_graph.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.template.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.template.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.tenant.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.tenant.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.view_saved_view.read"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.view_saved_view.team.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.view_saved_view.update"
+    },
+    {
+      "file": "auraboot/platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java",
+      "kind": "java.permission.constant",
+      "code": "system.webhook.update"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-admin/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "admin.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ai-colleagues/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "ai.agent.chat"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ai-colleagues/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "ai.agent.create"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ai-colleagues/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "ai.agent.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ai-colleagues/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "ai.agent.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ai-colleagues/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "ai.settings.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.dashboard.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.dashboard.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.knowledge.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.knowledge.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.prompt.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.provider.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.run.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.run.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.run.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.run.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.run.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.run.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.run.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.trace.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-aurabot/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "aurabot.trace.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-automation/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "automation.edit"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-automation/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "automation.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-bpm/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "bpm.process.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-bpm/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "bpm.sla.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-dashboard/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "dashboard.view"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-dashboard/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "dashboard.view"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-dashboard/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "dashboard.view"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-dashboard/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "dashboard.view"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-designer/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "designer.bpmn.use"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-designer/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "designer.flow.use"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-designer/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "designer.page.use"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-designer/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "designer.page.use"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-designer/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "query.builder.use"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.ai-modeling.use"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.dict.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.dict.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.dict.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.dict.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.field.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.field.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.field.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.field.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.field.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.model.edit"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.model.edit"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.model.edit"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.named-query.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.named-query.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-meta/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "meta.named-query.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ops/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "documents.use"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ops/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "notification.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ops/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "notification.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-ops/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "scheduler.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-organization/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "org.member.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-platform/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "platform.cross-tenant-grant.read"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-settings/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "settings.tenant.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-settings/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "settings.tenant.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-settings/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "settings.tenant.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-settings/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "settings.tenant.manage"
+    },
+    {
+      "file": "auraboot/web-admin/app/plugins/core-settings/resources.ts",
+      "kind": "frontend.resources.permission",
+      "code": "settings.tenant.manage"
+    }
+  ]
+}
