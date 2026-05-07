@@ -5,11 +5,45 @@
  * translating, classifying, and extracting content using AI.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
 
 export type AiOperation = 'generate' | 'summarize' | 'translate' | 'classify' | 'extract';
+
+/**
+ * F.3 — vision input on form AiField. Allowed MIME types match what Anthropic
+ * Messages API accepts on image content blocks.
+ */
+const ACCEPTED_IMAGE_MIME_TYPES = 'image/jpeg,image/png,image/gif,image/webp';
+/** Hard cap per image — base64 inflates ~33%, keep request body sane. */
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+export interface AiFieldImageAttachment {
+  /** MIME type, e.g. image/png. */
+  mediaType: string;
+  /** Raw base64 (NO {@code data:} URI prefix). */
+  data: string;
+  /** Original file name — preview only, not sent to backend. */
+  name?: string;
+}
+
+function stripDataUriPrefix(dataUri: string): string {
+  const idx = dataUri.indexOf(',');
+  return idx >= 0 ? dataUri.slice(idx + 1) : dataUri;
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      resolve(stripDataUriPrefix(result));
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+    reader.readAsDataURL(file);
+  });
+}
 
 export interface AiFieldConfig {
   /** Default AI operation */
@@ -55,6 +89,13 @@ export interface AiFieldProps {
   placeholder?: string;
   /** Custom CSS class */
   className?: string;
+  /**
+   * F.3 — when true, render a paperclip button next to the AI button so the
+   * user can attach a screenshot/photo. The selected image is base64-encoded
+   * and sent to the inference endpoint as multimodal content. Defaults to
+   * false to keep existing AiField call sites byte-identical.
+   */
+  imageInput?: boolean;
 }
 
 const OPERATION_LABELS: Record<AiOperation, { label: string; icon: string }> = {
@@ -81,10 +122,53 @@ export const AiField: React.FC<AiFieldProps> = ({
   readOnly = false,
   placeholder = 'AI-generated content will appear here...',
   className,
+  imageInput = false,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showOperations, setShowOperations] = useState(false);
+  // F.3 — staged image attachments. Cleared on successful generation so the
+  // next AI invocation goes back to the text-only path.
+  const [attachments, setAttachments] = useState<AiFieldImageAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAttachClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFilesSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? []);
+      // Reset so picking the same file twice still fires onChange.
+      if (e.target) e.target.value = '';
+      if (files.length === 0) return;
+      setAttachmentError(null);
+      const next: AiFieldImageAttachment[] = [];
+      for (const f of files) {
+        if (f.size > MAX_IMAGE_BYTES) {
+          setAttachmentError(`${f.name} 超过 4MB 限制`);
+          continue;
+        }
+        if (!ACCEPTED_IMAGE_MIME_TYPES.split(',').includes(f.type)) {
+          setAttachmentError(`${f.name} 格式不支持，仅支持 JPEG/PNG/GIF/WEBP`);
+          continue;
+        }
+        try {
+          const data = await readFileAsBase64(f);
+          next.push({ mediaType: f.type, data, name: f.name });
+        } catch {
+          setAttachmentError(`读取 ${f.name} 失败`);
+        }
+      }
+      if (next.length > 0) setAttachments((prev) => [...prev, ...next]);
+    },
+    [],
+  );
+
+  const handleRemoveAttachment = useCallback((idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
 
   const handleGenerate = useCallback(
     async (operation?: AiOperation) => {
@@ -100,6 +184,16 @@ export const AiField: React.FC<AiFieldProps> = ({
           maxTokens: aiConfig?.maxTokens || 500,
           temperature: aiConfig?.temperature || 0.7,
         };
+
+        // F.3 vision: only emit `images` when there's actually an attachment so
+        // the request shape stays identical to the legacy text-only path for
+        // unaffected call sites.
+        if (attachments.length > 0) {
+          requestBody.images = attachments.map((a) => ({
+            mediaType: a.mediaType,
+            data: a.data,
+          }));
+        }
 
         if (op === 'translate' && aiConfig?.targetLanguage) {
           requestBody.targetLanguage = aiConfig.targetLanguage;
@@ -134,6 +228,10 @@ export const AiField: React.FC<AiFieldProps> = ({
         const result = await response.json();
         if (ResultHelper.isSuccess(result) && result.data?.content) {
           onChange?.(result.data.content);
+          // F.3 — successful inference takes ownership of the staged images;
+          // clear them so a follow-up plain-text AI call doesn't re-send the
+          // same screenshot.
+          setAttachments([]);
         } else if (result.data?.error) {
           setError(result.data.error);
         } else {
@@ -146,7 +244,7 @@ export const AiField: React.FC<AiFieldProps> = ({
         setShowOperations(false);
       }
     },
-    [aiConfig, sourceValues, modelCode, recordId, onChange],
+    [aiConfig, sourceValues, modelCode, recordId, onChange, attachments],
   );
 
   if (readOnly) {
@@ -191,6 +289,46 @@ export const AiField: React.FC<AiFieldProps> = ({
         disabled={loading}
       />
 
+      {/* F.3 — staged image preview (rendered only when at least one image attached). */}
+      {imageInput && attachments.length > 0 && (
+        <div
+          className="mt-1.5 flex flex-wrap gap-2"
+          data-testid="aifield-attachments-preview"
+        >
+          {attachments.map((att, idx) => (
+            <div
+              key={`${att.name || 'image'}-${idx}`}
+              className="flex items-center gap-1.5 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs"
+              data-testid={`aifield-attachment-${idx}`}
+            >
+              <img
+                src={`data:${att.mediaType};base64,${att.data}`}
+                alt={att.name || `attachment-${idx}`}
+                className="h-8 w-8 rounded object-cover"
+              />
+              <span className="max-w-[120px] truncate">{att.name || `image-${idx + 1}`}</span>
+              <button
+                type="button"
+                onClick={() => handleRemoveAttachment(idx)}
+                title="Remove image"
+                data-testid={`aifield-attachment-remove-${idx}`}
+                className="text-gray-400 hover:text-red-500"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {imageInput && attachmentError && (
+        <div
+          className="mt-1.5 text-xs text-red-500"
+          data-testid="aifield-attachment-error"
+        >
+          {attachmentError}
+        </div>
+      )}
+
       {/* AI action bar */}
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
@@ -231,6 +369,41 @@ export const AiField: React.FC<AiFieldProps> = ({
               </>
             )}
           </button>
+
+          {/* F.3 — image attachment trigger (opt-in via `imageInput` prop). */}
+          {imageInput && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_IMAGE_MIME_TYPES}
+                multiple
+                className="hidden"
+                data-testid="aifield-image-input"
+                onChange={handleFilesSelected}
+              />
+              <button
+                type="button"
+                onClick={handleAttachClick}
+                disabled={loading}
+                title="Attach image"
+                data-testid="aifield-attach-image"
+                className={cn(
+                  'rounded p-1 text-gray-400 hover:text-gray-600',
+                  'disabled:cursor-not-allowed disabled:opacity-50',
+                )}
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                  />
+                </svg>
+              </button>
+            </>
+          )}
 
           {/* More operations dropdown */}
           <div className="relative">
