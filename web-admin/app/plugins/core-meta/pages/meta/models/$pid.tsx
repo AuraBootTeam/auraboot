@@ -27,7 +27,7 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { CrudTemplateWizard } from '~/ui/meta/CrudTemplateWizard';
 import { RuntimeVerification } from '~/ui/meta/RuntimeVerification';
 import { FieldListManager } from '~/ui/meta/FieldListManager';
-import { FieldConfigDialog, type FieldBindingConfig } from '~/ui/meta/FieldConfigDialog';
+import { FieldConfigDialog } from '~/ui/meta/FieldConfigDialog';
 import { DictConfigDialog } from '~/ui/meta/DictConfigDialog';
 import { SourceTypeBadge } from '~/shared/components/SourceTypeBadge';
 import type { ModelFieldBinding, Permission, ModelVersion } from '~/types/model';
@@ -400,14 +400,14 @@ export default function ModelDetailPage() {
    * 保存字段配置
    */
   const handleFieldConfigSave = useCallback(
-    async (config: FieldBindingConfig) => {
+    async (binding: Partial<ModelFieldBinding>) => {
       if (!configField) return;
 
       try {
-        await modelService.updateFieldBinding(pid!, configField.fieldCode, config);
+        await modelService.updateFieldBinding(pid!, configField.fieldCode, binding);
 
         // 更新本地状态
-        setFields(fields.map((f) => (f.id === configField.id ? { ...f, ...config } : f)));
+        setFields(fields.map((f) => (f.id === configField.id ? { ...f, ...binding } : f)));
 
         showSuccessToast('字段配置已更新');
       } catch (error) {
