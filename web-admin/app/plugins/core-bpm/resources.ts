@@ -14,7 +14,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Task Center', zh: '我的待办' },
     icon: 'inbox',
     menu: { order: 10, group: 'bpm' },
-    permission: 'bpm.task.read',
     file: './plugins/core-bpm/pages/TaskCenter.tsx',
   },
   {
@@ -23,7 +22,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Process Status', zh: '流程状态' },
     icon: 'activity',
     menu: false,
-    permission: 'bpm.process.read',
     file: './plugins/core-bpm/pages/ProcessStatus.tsx',
   },
   {
@@ -32,7 +30,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'SLA Monitor', zh: 'SLA 监控' },
     icon: 'gauge',
     menu: { order: 30, group: 'bpm' },
-    permission: 'bpm.sla.read',
     file: './plugins/core-bpm/pages/SlaMonitor.tsx',
   },
 ]

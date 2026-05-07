@@ -31,14 +31,6 @@ export type {
   ColumnRendererRecord,
 } from './widgets/widget-registry.js'
 
-// Access control
-export { evaluateAccess } from './access/evaluator.js'
-export type {
-  AccessUser,
-  AccessRequirement,
-  AccessDecision,
-} from './access/evaluator.js'
-
 // Data sources
 export { DataSourceRegistry } from './data-source/registry.js'
 export type { DataSourceProviderRecord } from './data-source/registry.js'

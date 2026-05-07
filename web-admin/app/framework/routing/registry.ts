@@ -2,14 +2,12 @@
  * RouteRegistryImpl — concrete implementation of the @auraboot/nav-model
  * RouteRegistry contract.
  *
- * Single source of truth for navigation. Kernel boots, plugins call
+ * Single source of truth for route declarations. Kernel boots, plugins call
  * `register()` during their setup(), then the App shell calls
- * `buildRouteTree()` to feed React Router and `buildMenuTree(user)` to
- * render the sidebar.
- *
- * Ordering: registration order is preserved within a parent. Sort within
- * menu output is by `menu.order` ascending (resources without an explicit
- * order come last in registration order).
+ * `buildRouteTree()` to feed React Router and `buildBreadcrumb(path)` for
+ * the breadcrumb bar. Sidebar menu rendering is owned by the backend
+ * (`/api/menu/user`); permission gating happens server-side via
+ * `@RequirePermission` on Controllers.
  *
  * Conflicts: duplicate `key` or `path` throws. Re-registration after init
  * is allowed in dev (HMR) but emits a warning.
@@ -20,30 +18,9 @@ import type {
   RouteRegistry,
   RouteTree,
   RouteNode,
-  MenuTree,
-  MenuNode,
   BreadcrumbTrail,
   BreadcrumbItem,
-  RegistryUser,
 } from '@auraboot/nav-model'
-import { evaluateAccess, type AccessUser } from '../access/evaluator.js'
-
-function asAccessUser(u: RegistryUser): AccessUser {
-  return {
-    permissions: u.permissions instanceof Set ? u.permissions : new Set(u.permissions),
-    features: u.features instanceof Set ? u.features : new Set(u.features),
-  }
-}
-
-function menuConfig(r: NavigationResource): { enabled: boolean; order: number; group?: string } {
-  if (r.menu === undefined || r.menu === false) return { enabled: false, order: 0 }
-  if (r.menu === true) return { enabled: true, order: Number.POSITIVE_INFINITY }
-  return {
-    enabled: !r.menu.hidden,
-    order: r.menu.order ?? Number.POSITIVE_INFINITY,
-    group: r.menu.group,
-  }
-}
 
 export class RouteRegistryImpl implements RouteRegistry {
   /** Insertion-ordered map keyed by NavigationResource.key. */
@@ -121,52 +98,6 @@ export class RouteRegistryImpl implements RouteRegistry {
     })
 
     return (childrenByParent.get(undefined) ?? []).map(buildNode)
-  }
-
-  buildMenuTree(user: RegistryUser): MenuTree {
-    const access = asAccessUser(user)
-
-    const childrenByParent = new Map<string | undefined, NavigationResource[]>()
-    for (const r of this.resources.values()) {
-      const arr = childrenByParent.get(r.parentKey) ?? []
-      arr.push(r)
-      childrenByParent.set(r.parentKey, arr)
-    }
-
-    const buildMenuNode = (resource: NavigationResource): MenuNode | null => {
-      const cfg = menuConfig(resource)
-      if (!cfg.enabled) return null
-
-      const decision = evaluateAccess(
-        {
-          permission: resource.permission as string | string[] | undefined,
-          featureKey: resource.featureKey as string | string[] | undefined,
-          hidden: resource.hidden,
-        },
-        access,
-      )
-      if (!decision.visible) return null
-
-      const children = (childrenByParent.get(resource.key) ?? [])
-        .map(buildMenuNode)
-        .filter((n): n is MenuNode => n !== null)
-        .sort((a, b) => a.order - b.order)
-
-      return {
-        key: resource.key,
-        path: resource.path,
-        title: resource.title,
-        icon: resource.icon,
-        order: cfg.order,
-        group: cfg.group,
-        children,
-      }
-    }
-
-    return (childrenByParent.get(undefined) ?? [])
-      .map(buildMenuNode)
-      .filter((n): n is MenuNode => n !== null)
-      .sort((a, b) => a.order - b.order)
   }
 
   buildBreadcrumb(path: string): BreadcrumbTrail {

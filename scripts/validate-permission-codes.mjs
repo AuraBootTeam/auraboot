@@ -65,26 +65,37 @@ const JSON_OUT = flag('json')
 const BASELINE_PATH = optValue('baseline')
 const WRITE_BASELINE_PATH = optValue('write-baseline')
 
-function findRepoRoot(start, { ossOnly }) {
-  let cur = path.dirname(start)
-  for (let i = 0; i < 12; i++) {
-    const hasOss = fs.existsSync(path.join(cur, 'auraboot'))
-    const hasEnt = fs.existsSync(path.join(cur, 'auraboot-enterprise'))
-    if (hasOss && (ossOnly || hasEnt)) return cur
+// The script always lives at `<oss-checkout>/scripts/`, so OSS is the
+// grandparent of __filename. This makes the validator scan the CURRENT
+// checkout (whether it's the primary clone or a git worktree) instead of
+// jumping to the primary clone via a sibling search — important because
+// reconciliation work happens in worktrees and needs to be verified
+// without merging first.
+const OSS = path.resolve(path.dirname(__filename), '..')
+
+// Locate enterprise sibling. In a normal workspace layout it's
+// `<workspace>/auraboot-enterprise/` next to `<workspace>/auraboot/`.
+// With --oss-only we skip it (used by OSS CI which has no enterprise
+// checkout).
+function findEnterprise(ossDir) {
+  let cur = path.dirname(ossDir)
+  for (let i = 0; i < 8; i++) {
+    const candidate = path.join(cur, 'auraboot-enterprise')
+    if (fs.existsSync(candidate)) return candidate
     const parent = path.dirname(cur)
     if (parent === cur) break
     cur = parent
   }
-  throw new Error(
-    ossOnly
-      ? 'Could not locate repo root containing auraboot/ sibling'
-      : 'Could not locate repo root containing auraboot + auraboot-enterprise',
-  )
+  return null
 }
 
-const REPO_ROOT = findRepoRoot(__filename, { ossOnly: OSS_ONLY })
-const OSS = path.join(REPO_ROOT, 'auraboot')
-const ENT = path.join(REPO_ROOT, 'auraboot-enterprise')
+const ENT = OSS_ONLY ? null : findEnterprise(OSS)
+if (!OSS_ONLY && !ENT) {
+  throw new Error('Could not locate auraboot-enterprise/ sibling. Pass --oss-only to skip enterprise scanning.')
+}
+
+// Used only for relative-path display in reports/baseline.
+const REPO_ROOT = path.dirname(OSS)
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -119,7 +130,7 @@ function collectRegisteredCodes() {
   }
 
   const roots = [path.join(OSS, 'plugins')]
-  if (!OSS_ONLY) roots.push(path.join(ENT, 'plugins'))
+  if (ENT) roots.push(path.join(ENT, 'plugins'))
   for (const root of roots) {
     const files = walk(root, (f) => f.endsWith('/config/permissions.json'))
     for (const f of files) {
@@ -168,7 +179,7 @@ function collectJavaConstantValues() {
 function collectMenuReferences() {
   const refs = []
   const roots = [path.join(OSS, 'plugins')]
-  if (!OSS_ONLY) roots.push(path.join(ENT, 'plugins'))
+  if (ENT) roots.push(path.join(ENT, 'plugins'))
   for (const root of roots) {
     const files = walk(root, (f) => f.endsWith('/config/menus.json'))
     for (const f of files) {

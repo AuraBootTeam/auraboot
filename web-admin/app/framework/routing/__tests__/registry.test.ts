@@ -57,39 +57,6 @@ describe('RouteRegistryImpl', () => {
     expect(reg.findByKey('sys.users')?.parentKey).toBe('sys')
   })
 
-  it('buildMenuTree filters by permission/feature gates', () => {
-    const reg = new RouteRegistryImpl()
-    reg.register(r({ key: 'free', path: '/free', title: 'Free', menu: true }))
-    reg.register(r({ key: 'priv', path: '/priv', title: 'Priv', menu: true, permission: 'admin.read' }))
-    reg.register(r({ key: 'paid', path: '/paid', title: 'Paid', menu: true, featureKey: 'enterprise' }))
-
-    const free = reg.buildMenuTree({ permissions: [], features: [] })
-    expect(free.map(n => n.key)).toEqual(['free'])
-
-    const admin = reg.buildMenuTree({ permissions: ['admin.read'], features: [] })
-    expect(admin.map(n => n.key).sort()).toEqual(['free', 'priv'])
-
-    const paid = reg.buildMenuTree({ permissions: ['admin.read'], features: ['enterprise'] })
-    expect(paid.map(n => n.key).sort()).toEqual(['free', 'paid', 'priv'])
-  })
-
-  it('buildMenuTree respects menu.order', () => {
-    const reg = new RouteRegistryImpl()
-    reg.register(r({ key: 'b', path: '/b', title: 'B', menu: { order: 20 } }))
-    reg.register(r({ key: 'a', path: '/a', title: 'A', menu: { order: 10 } }))
-    reg.register(r({ key: 'c', path: '/c', title: 'C', menu: true })) // unset order → +Inf
-
-    const tree = reg.buildMenuTree({ permissions: [], features: [] })
-    expect(tree.map(n => n.key)).toEqual(['a', 'b', 'c'])
-  })
-
-  it('buildMenuTree omits menu=false', () => {
-    const reg = new RouteRegistryImpl()
-    reg.register(r({ key: 'shown', path: '/s', title: 'S', menu: true }))
-    reg.register(r({ key: 'hidden-route', path: '/h', title: 'H' })) // no menu
-    expect(reg.buildMenuTree({ permissions: [], features: [] }).map(n => n.key)).toEqual(['shown'])
-  })
-
   it('buildBreadcrumb walks parentKey chain', () => {
     const reg = new RouteRegistryImpl()
     reg.register(r({ key: 'sys', path: '/system', title: 'System' }))
