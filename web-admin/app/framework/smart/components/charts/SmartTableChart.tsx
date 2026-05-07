@@ -18,6 +18,12 @@ import { cn } from '~/utils/cn';
 export interface SmartTableChartProps {
   title?: string;
   dataSource: ChartDataSource;
+  /**
+   * Optional explicit column configuration. When provided, the table renders
+   * exactly these columns in this order with the given header labels.
+   * When omitted, falls back to auto-deriving from `data.meta.dimensions+metrics`.
+   */
+  columns?: Array<{ field: string; label?: string }>;
   /** Page size for pagination */
   pageSize?: number;
   /** Show pagination controls */
@@ -46,6 +52,7 @@ function isDataSourceConfigured(ds: ChartDataSource): boolean {
 export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   title,
   dataSource,
+  columns: columnsConfig,   // explicit config from caller
   pageSize = 10,
   showPagination = true,
   sortable = true,
@@ -72,12 +79,16 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  const columns = useMemo(() => {
+  const columns = useMemo<Array<{ field: string; label: string }>>(() => {
+    // Explicit config wins
+    if (columnsConfig && columnsConfig.length > 0) {
+      return columnsConfig.map((c) => ({ field: c.field, label: c.label || c.field }));
+    }
     if (!data?.rows?.length) return [];
     const allKeys = [...(data.meta?.dimensions || []), ...(data.meta?.metrics || [])];
-    if (allKeys.length > 0) return allKeys;
-    return Object.keys(data.rows[0]);
-  }, [data]);
+    const keys = allKeys.length > 0 ? allKeys : Object.keys(data.rows[0]);
+    return keys.map((k) => ({ field: k, label: k }));
+  }, [columnsConfig, data]);
 
   const sortedRows = useMemo(() => {
     if (!data?.rows) return [];
@@ -201,16 +212,16 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
             <tr>
               {columns.map((col) => (
                 <th
-                  key={col}
-                  onClick={() => handleSort(col)}
+                  key={col.field}
+                  onClick={() => handleSort(col.field)}
                   className={cn(
                     'px-4 py-2.5 text-left text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase',
                     sortable && 'cursor-pointer select-none hover:bg-gray-100',
                   )}
                 >
                   <span className="inline-flex items-center gap-1">
-                    {col}
-                    {sortKey === col && (
+                    {col.label}
+                    {sortKey === col.field && (
                       <span className="text-blue-500">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </span>
@@ -229,8 +240,8 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
                 )}
               >
                 {columns.map((col) => (
-                  <td key={col} className="px-4 py-2.5 whitespace-nowrap text-gray-700">
-                    {formatCellValue(row[col])}
+                  <td key={col.field} className="px-4 py-2.5 whitespace-nowrap text-gray-700">
+                    {formatCellValue(row[col.field])}
                   </td>
                 ))}
               </tr>
