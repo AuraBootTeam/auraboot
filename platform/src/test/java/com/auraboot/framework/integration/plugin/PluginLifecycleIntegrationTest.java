@@ -34,6 +34,9 @@ public class PluginLifecycleIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private PluginManagerService pluginManager;
 
+    @Autowired
+    private com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
+
     /**
      * Create a test plugin manifest with unique namespace.
      */
@@ -127,6 +130,16 @@ public class PluginLifecycleIntegrationTest extends BaseIntegrationTest {
         Optional<PluginInfo> pluginInfo = pluginManager.getPluginByPluginId(manifest.getPluginId());
         assertTrue(pluginInfo.isPresent(), "Plugin should be found");
         assertEquals(PluginStatus.INSTALLED, pluginInfo.get().getStatus());
+
+        // Audit event recorded: plugin.install / success=true / namespace+version in reason.
+        Long tenantId = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+        java.util.List<com.auraboot.framework.audit.entity.AdminEventLog> events =
+                adminEventLogService.byResource(tenantId, "plugin", manifest.getPluginId(), 10);
+        assertFalse(events.isEmpty(), "AdminEventLog row should be written by install");
+        assertEquals("plugin.install", events.get(0).getActionType());
+        assertTrue(events.get(0).getSuccess(), "install event should be success=true");
+        assertTrue(events.get(0).getReason().contains(manifest.getNamespace()),
+                "reason should carry namespace");
 
         log.info("Plugin installed with PID: {}", result.getPluginPid());
     }
