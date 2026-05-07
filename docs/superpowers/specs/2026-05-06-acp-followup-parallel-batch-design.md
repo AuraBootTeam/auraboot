@@ -1,5 +1,8 @@
 # 2026-05-06 ACP Capability Follow-up — Parallel Batch Design
 
+> **文档类型:一次性设计稿(spec)。** 已于 2026-05-07 全部 ship(5 分支 + 7 commits + closure `7dc8e310`)。
+> **本文不再更新。** 长期 followup 跟踪在 → [`docs/backlog/2026-05-06-acp-p0-p1-followups.md`](../../backlog/2026-05-06-acp-p0-p1-followups.md)(§A-G 原始 26 项 + §H 本批次次生 7 项)。
+
 ## Background
 
 2026-04-30 → 2026-05-06 一批 ACP P0/P1 capability(12 commits `164fb5ef → 94b97ad6`)落地后,
