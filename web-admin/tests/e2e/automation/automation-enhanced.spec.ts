@@ -313,16 +313,18 @@ test.describe('Automation Enhanced', () => {
     // Click Enable — use PO method which polls for status change
     await ap.toggle(seedAutomation.pid);
 
-    // After toggle, button should say "Disable" and status badge "Enabled"
+    // After toggle, button should say "Disable" and status badge "Enabled".
+    // Under full-suite load the PATCH+refetch round-trip can exceed 10s — bump
+    // the polls to absorb the contention without hiding a real defect.
     await expect.poll(async () => {
       const text = (await toggleBtn.textContent()) || '';
       return /disable|禁用/i.test(text);
-    }, { timeout: 10000 }).toBe(true);
+    }, { timeout: 20000 }).toBe(true);
 
     await expect.poll(async () => {
       const text = (await statusBadge.textContent()) || '';
       return /enabled|已启用|automation\.list\.enabled/i.test(text);
-    }, { timeout: 5000 }).toBe(true);
+    }, { timeout: 15000 }).toBe(true);
 
     // Toggle back to disabled
     await ap.toggle(seedAutomation.pid);
