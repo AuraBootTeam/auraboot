@@ -27,6 +27,102 @@ publishing {
     }
 }
 
+// Multi-worktree pre-flight guard for publishToMavenLocal.
+// Mirrors scripts/lib/multi-worktree-guard.sh — refuses to publish to the
+// shared ~/.m2 cache when ≥ 2 git worktrees are active, since concurrent
+// publishes silently overwrite each other and downstream consumers (host
+// backend / enterprise / mobile) pick up whichever jar got there last.
+//
+// 2026-05-07 incident: env-layering worktree's reset-db.sh broke 104 page
+// inserts across other worktrees — same class of "shared singleton fights
+// itself" bug as concurrent publishToMavenLocal.
+//
+// Set FORCE_HOST=1 to bypass with audit log to ~/.aura/host-override.log.
+// See docs/plans/2026-05/2026-05-07-docker-per-worktree-isolation-design.md §3.5.
+//
+// Extracted as a Closure so we can attach it to publishToMavenLocal AND
+// expose it via the verifyMultiWorktreeGuard task for safe testing
+// (testing publishToMavenLocal directly would touch ~/.m2 — the very
+// thing the guard exists to prevent).
+//
+// TODO(unify-after-merge): once both PR #48 (scripts/lib/multi-worktree-guard.sh)
+// and this PR are in main, replace this inline block with a `bash` exec call
+// to the shell guard so the logic lives in one place.
+// Capture project ref + use plain ProcessBuilder so this Closure works under
+// any Gradle version (Gradle 9 removed Project.exec; ExecOperations injection
+// would require a typed task class — overkill for a guard check).
+def guardProjectDir = rootProject.projectDir
+def guardLogger = logger
+
+def runGitCommand = { String[] cmd ->
+    def pb = new ProcessBuilder(cmd as List).redirectErrorStream(true)
+    pb.directory(guardProjectDir as File)
+    def proc = pb.start()
+    def out = proc.inputStream.text
+    proc.waitFor()
+    return [exit: proc.exitValue(), output: out]
+}
+
+def multiWorktreeGuardCheck = { String operationName ->
+    def listResult = runGitCommand(['git', 'worktree', 'list'] as String[])
+    if (listResult.exit != 0) {
+        return  // Not a git repo (or git missing); skip guard silently.
+    }
+    def worktreeCount = listResult.output.split('\n').findAll { it.trim() }.size()
+    if (worktreeCount < 2) {
+        return
+    }
+    if (System.getenv('FORCE_HOST') == '1') {
+        def home = System.getProperty('user.home')
+        def auraDir = new File(home, '.aura')
+        auraDir.mkdirs()
+        def logFile = new File(auraDir, 'host-override.log')
+        def ts = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
+        def branchResult = runGitCommand(['git', 'rev-parse', '--abbrev-ref', 'HEAD'] as String[])
+        def branch = branchResult.exit == 0 ? branchResult.output.trim() : 'detached'
+        if (!branch) branch = 'detached'
+        // Use repo top-level for parity with scripts/lib/multi-worktree-guard.sh.
+        def topResult = runGitCommand(['git', 'rev-parse', '--show-toplevel'] as String[])
+        def worktreeRoot = topResult.exit == 0 ? topResult.output.trim() : guardProjectDir.absolutePath
+        logFile.append("${ts}\toperation=${operationName}\tbranch=${branch}\tworktree=${worktreeRoot}\tworktree_count=${worktreeCount}\n")
+        guardLogger.warn("WARN: FORCE_HOST=1 — bypassing multi-worktree guard for '${operationName}'.")
+        guardLogger.warn("      Detected ${worktreeCount} active worktrees; logged to ${logFile.absolutePath}")
+        return
+    }
+    throw new GradleException("""
+
+ERROR: refusing to run '${operationName}' — detected ${worktreeCount} active git worktrees.
+
+Multi-worktree mode requires an isolated Docker stack so shared singletons
+(Postgres / m2 / :6443 / :5174:3501 / Redis) don't collide. Concurrent
+publishes to ~/.m2 silently overwrite each other.
+
+Options:
+  1) Use the isolated stack workflow (P0 #1-4):
+       scripts/dev/start-isolated.sh
+     The stack builds m2 inside the container, fully isolating from host.
+
+  2) Stop other worktrees' host-mode dev stacks first, then re-run.
+
+  3) Override (only if you know other worktrees are dormant):
+       FORCE_HOST=1 ./gradlew ${operationName}
+     This appends one audit line to ~/.aura/host-override.log.
+""")
+}
+
+tasks.named('publishToMavenLocal').configure {
+    doFirst { multiWorktreeGuardCheck('publishToMavenLocal') }
+}
+
+// Helper task — runs the guard check without doing any publish work, so we
+// can verify the guard fires correctly in CI / smoke tests without actually
+// touching ~/.m2.
+tasks.register('verifyMultiWorktreeGuard') {
+    group = 'verification'
+    description = "Run the multi-worktree guard against the simulated 'publishToMavenLocal' operation; useful for testing the guard without touching ~/.m2."
+    doLast { multiWorktreeGuardCheck('publishToMavenLocal') }
+}
+
 repositories {
     mavenLocal()      // Must be first — SmartEngine fork jars only exist here
     maven {
