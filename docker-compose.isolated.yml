@@ -32,6 +32,11 @@ services:
     # base file's "5432:5432" mapping so each stack can claim a unique host port.
     ports: !override
       - "${PG_PORT:-5433}:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: '${PG_CPUS:-0.5}'
+          memory: ${PG_MEM:-512m}
 
   redis:
     # Force redis on (base file gates it behind `cache` profile so it's
@@ -43,6 +48,11 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-redis
     ports: !override
       - "${REDIS_PORT:-6479}:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: '${REDIS_CPUS:-0.25}'
+          memory: ${REDIS_MEM:-256m}
 
   backend:
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-backend
@@ -50,6 +60,14 @@ services:
       - isolated
     build:
       dockerfile: ${ISOLATED_BACKEND_DOCKERFILE:-Dockerfile}
+    # Per-container resource cap so concurrent isolated stacks don't fight
+    # for the Docker Desktop VM's RAM/CPU budget. Tunable via env if a
+    # specific worktree needs more (e.g. heavy plugin import).
+    deploy:
+      resources:
+        limits:
+          cpus: '${BE_CPUS:-2.0}'
+          memory: ${BE_MEM:-2g}
     ports: !override
       - "${BE_PORT:-6444}:6443"
     volumes:
@@ -82,6 +100,11 @@ services:
     user: root
     profiles:
       - isolated
+    deploy:
+      resources:
+        limits:
+          cpus: '${FE_CPUS:-1.0}'
+          memory: ${FE_MEM:-1g}
     working_dir: /repo/web-admin
     ports:
       - "${VITE_PORT:-5174}:5173"
