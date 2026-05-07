@@ -133,9 +133,6 @@
     "stateField": "status",
     "fromStates": ["pending"],
     "toState": "active",
-    "bindingRules": [
-      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
-    ],
     "extension": {
       "confirmMessage:zh-CN": "确认通过该成员申请？",
       "confirmMessage:en": "Approve this member?"
@@ -150,9 +147,6 @@
     "stateField": "status",
     "fromStates": ["pending"],
     "toState": "rejected",
-    "bindingRules": [
-      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
-    ],
     "extension": {
       "confirmMessage:zh-CN": "确认拒绝该成员申请？",
       "confirmMessage:en": "Reject this member?"
@@ -167,9 +161,6 @@
     "stateField": "status",
     "fromStates": ["active"],
     "toState": "suspended",
-    "bindingRules": [
-      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
-    ],
     "extension": {
       "confirmMessage:zh-CN": "确认暂停该成员？",
       "confirmMessage:en": "Suspend this member?"
@@ -184,9 +175,6 @@
     "stateField": "status",
     "fromStates": ["suspended", "rejected"],
     "toState": "active",
-    "bindingRules": [
-      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
-    ],
     "extension": {
       "confirmMessage:zh-CN": "确认恢复该成员？",
       "confirmMessage:en": "Restore this member?"
@@ -201,9 +189,6 @@
     "stateField": "status",
     "fromStates": ["active"],
     "toState": "inactive",
-    "bindingRules": [
-      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
-    ],
     "extension": {
       "confirmMessage:zh-CN": "确认将该成员标记为离职？",
       "confirmMessage:en": "Mark this member as left?"
@@ -215,9 +200,6 @@
     "displayName:en": "Remove Member",
     "type": "delete",
     "modelCode": "tenant_member",
-    "bindingRules": [
-      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
-    ],
     "extension": {
       "confirmMessage:zh-CN": "确认移除该成员？此操作不可恢复。",
       "confirmMessage:en": "Remove this member? This action cannot be undone."
@@ -229,9 +211,6 @@
     "displayName:en": "Reset Password",
     "type": "custom",
     "modelCode": "tenant_member",
-    "bindingRules": [
-      { "ruleType": "handler", "handlerClass": "tenantMemberCommandHandler" }
-    ],
     "extension": {
       "confirmMessage:zh-CN": "确认重置该成员密码并发送重置邮件？",
       "confirmMessage:en": "Reset this member's password and send a reset email?"
