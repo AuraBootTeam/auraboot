@@ -53,8 +53,8 @@ class AllAdminControllersGuardIntegrationTest extends BaseIntegrationTest {
     @ValueSource(strings = {
             // ExchangeRateController
             "/api/admin/exchange-rates",
-            // TimezoneMigrationController — root mapping probe
-            "/api/admin/timezone",
+            // TenantTimezoneController — root mapping probe
+            "/api/admin/tenants/timezone",
             // AdminUserController — /search GET is the only no-arg read endpoint
             "/api/admin/users/search",
             // EnvironmentController
