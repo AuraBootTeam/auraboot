@@ -1,5 +1,5 @@
 // web-admin/app/smart/automation/components/AutomationEditor.tsx
-import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { FlowDesigner, type FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import { useSmartText } from '~/utils/i18n';
@@ -102,6 +102,29 @@ export function AutomationEditor({
     setFlowData(data);
     setIsDirty(true);
   }, []);
+
+  /**
+   * Stable `initialData` reference for FlowDesigner.
+   *
+   * Derived strictly from the `initialData` prop (i.e. the value loaded from
+   * the route loader / DB), NOT from the local `flowData` state that mirrors
+   * the FlowDesigner's onChange output.
+   *
+   * Previously we passed `flowData` (the local state) back as `initialData`,
+   * which meant every onChange → setFlowData → new reference → FlowDesigner
+   * mount-effect → importData() → store reset → `selectedNodeId` cleared.
+   * Symptom: editing a property field unmounts the property panel until the
+   * user re-clicks the node. (See ACP H.1 + the workaround comments removed
+   * from `tests/e2e/automation/llm-call-node.spec.ts`.)
+   *
+   * By memoising on the prop reference, FlowDesigner's mount-effect only
+   * re-runs when the parent genuinely supplies a new schema (e.g. after a
+   * reload from the server), not on every keystroke.
+   */
+  const flowDataInitial = useMemo(
+    () => initialData?.flowData,
+    [initialData],
+  );
 
   const handleDebug = useCallback(() => {
     if (!automationId) return;
@@ -239,7 +262,7 @@ export function AutomationEditor({
       <div className="flex-1">
         <FlowDesigner
           config={config}
-          initialData={flowData}
+          initialData={flowDataInitial}
           title={title}
           onSave={onSave ? handleSave : undefined}
           onChange={handleChange}
