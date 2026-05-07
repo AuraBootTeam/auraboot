@@ -19,6 +19,15 @@ public final class PreActionConstants {
     /** postAction type: start a BPM process via BpmIntegrationService. */
     public static final String POST_TYPE_START_PROCESS = "start_process";
 
+    /**
+     * postAction type: withdraw the running BPM process instance referenced by
+     * the current record (typically used in tandem with a {@code state_transition}
+     * command that flips the business status to {@code cancelled}). Resolves
+     * the active task for the instance and delegates to {@code WithdrawService}
+     * which enforces initiator-only and policy gating.
+     */
+    public static final String POST_TYPE_WITHDRAW_PROCESS = "withdraw_process";
+
     private PreActionConstants() {
         // no instances
     }
