@@ -1,6 +1,6 @@
 package com.auraboot.framework.audit.service;
 
-import com.auraboot.framework.audit.entity.AdminActionLog;
+import com.auraboot.framework.audit.entity.AdminEventLog;
 
 import java.util.List;
 
@@ -8,8 +8,8 @@ import java.util.List;
  * Service for recording cross-cutting administrative-action audit entries.
  *
  * <p>Domain code (e.g. {@code EnvironmentServiceImpl.lock}) calls
- * {@link #record(AdminActionLog)} after a successful (or failed) administrative
- * action; the audit row is persisted to {@code ab_admin_action_log} with
+ * {@link #record(AdminEventLog)} after a successful (or failed) administrative
+ * action; the audit row is persisted to {@code ab_admin_event_log} with
  * tenant scoping derived from {@link com.auraboot.framework.application.tenant.MetaContext}
  * if not already set on the entity.
  *
@@ -22,7 +22,7 @@ import java.util.List;
  *       Callers must not depend on the row being immediately visible.</li>
  * </ul>
  */
-public interface AdminActionLogService {
+public interface AdminEventLogService {
 
     /**
      * Persist an administrative-action audit entry.
@@ -35,7 +35,7 @@ public interface AdminActionLogService {
      *
      * @param log entry to record (mutated to fill defaults; caller may discard the reference)
      */
-    void record(AdminActionLog log);
+    void record(AdminEventLog log);
 
     /**
      * Return the {@code limit} most recent entries for a tenant (newest first).
@@ -43,7 +43,7 @@ public interface AdminActionLogService {
      * @param tenantId tenant to query (must not be null)
      * @param limit    max number of entries to return; clamped to [1, 1000]
      */
-    List<AdminActionLog> recentByTenant(Long tenantId, int limit);
+    List<AdminEventLog> recentByTenant(Long tenantId, int limit);
 
     /**
      * Return entries scoped to a specific resource (newest first).
@@ -53,5 +53,5 @@ public interface AdminActionLogService {
      * @param resourcePid  pid of the resource
      * @param limit        max entries to return; clamped to [1, 1000]
      */
-    List<AdminActionLog> byResource(Long tenantId, String resourceType, String resourcePid, int limit);
+    List<AdminEventLog> byResource(Long tenantId, String resourceType, String resourcePid, int limit);
 }

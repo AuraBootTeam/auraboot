@@ -23,7 +23,7 @@ import java.time.Instant;
  * on the permission hot path) and {@code ab_command_audit_log} (runtime
  * command pipeline events).
  *
- * <p>Writes are fire-and-forget — the {@code AdminActionLogService}
+ * <p>Writes are fire-and-forget — the {@code AdminEventLogService}
  * swallows exceptions and never propagates to the caller, so audit-write
  * failures cannot break the action being audited.
  */
@@ -31,8 +31,8 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@TableName(value = "ab_admin_action_log", autoResultMap = true)
-public class AdminActionLog {
+@TableName(value = "ab_admin_event_log", autoResultMap = true)
+public class AdminEventLog {
 
     @TableId(type = IdType.AUTO)
     private Long id;
