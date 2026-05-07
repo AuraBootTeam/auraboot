@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerIntercept
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.context.annotation.Configuration;
@@ -32,8 +33,11 @@ public class MybatisPlusConfig {
      * Whitelist of tables backing {@code @EnvScoped} entities, discovered via classpath scan
      * (env-layering #18). Adding a new env-scoped resource is now one-step: annotate the
      * entity. The MyBatis-Plus interceptor reads this set on every query.
+     *
+     * <p>Package-visible so {@code EnvWriteLockGuardInnerInterceptor} can reuse the same
+     * lookup (#19 — UPDATE/DELETE lock guard).
      */
-    private static Set<String> envScopedTables() {
+    static Set<String> envScopedTables() {
         Set<String> cached = envScopedTables;
         if (cached != null) return cached;
         synchronized (MybatisPlusConfig.class) {
@@ -62,8 +66,14 @@ public class MybatisPlusConfig {
     }
 
     @Bean
-    public MybatisPlusInterceptor mybatisPlusInterceptor(DatabaseDialect databaseDialect) {
+    public MybatisPlusInterceptor mybatisPlusInterceptor(DatabaseDialect databaseDialect,
+                                                          ApplicationContext applicationContext) {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+
+        // env-layering #19 — UPDATE/DELETE write-side lock guard. Registered FIRST so it sees
+        // the unmodified SQL (no tenant/env WHERE clauses appended yet). beforeUpdate fires
+        // before tenant-line / env-line interceptors mutate boundSql.
+        interceptor.addInnerInterceptor(new EnvWriteLockGuardInnerInterceptor(applicationContext));
 
         TenantLineInnerInterceptor tenantInterceptor = new TenantLineInnerInterceptor();
         tenantInterceptor.setTenantLineHandler(new TenantLineHandler() {

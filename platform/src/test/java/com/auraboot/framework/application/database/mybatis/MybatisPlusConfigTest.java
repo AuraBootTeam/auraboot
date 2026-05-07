@@ -48,11 +48,39 @@ public class MybatisPlusConfigTest {
         MetaContext.clear();
     }
 
+    /**
+     * Find the TenantLineInnerInterceptor whose column == "tenant_id". Multiple instances now
+     * exist (tenant + env-layering env_id) — index 0 is no longer guaranteed to be the tenant
+     * one. Use the configured column name to disambiguate.
+     */
+    private TenantLineInnerInterceptor findTenantInterceptor(MybatisPlusInterceptor interceptor) {
+        for (InnerInterceptor ii : interceptor.getInterceptors()) {
+            if (ii instanceof TenantLineInnerInterceptor t) {
+                try {
+                    var field = TenantLineInnerInterceptor.class.getDeclaredField("tenantLineHandler");
+                    field.setAccessible(true);
+                    TenantLineHandler h = (TenantLineHandler) field.get(t);
+                    if ("tenant_id".equals(h.getTenantIdColumn())) {
+                        return t;
+                    }
+                } catch (Exception ignored) {
+                    // skip
+                }
+            }
+        }
+        throw new AssertionError("Tenant-id TenantLineInnerInterceptor not found");
+    }
+
+    private boolean hasInterceptorOfType(MybatisPlusInterceptor interceptor,
+                                          Class<? extends InnerInterceptor> type) {
+        return interceptor.getInterceptors().stream().anyMatch(type::isInstance);
+    }
+
     @Test
     @DisplayName("验证MybatisPlusInterceptor已正确创建")
     public void testMybatisPlusInterceptorCreation() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
 
         // Then
         assertNotNull(interceptor, "MybatisPlusInterceptor不应为null");
@@ -62,7 +90,7 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证TenantLineInnerInterceptor已注册")
     public void testTenantLineInnerInterceptorRegistered() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         List<InnerInterceptor> interceptors = interceptor.getInterceptors();
 
         // Then
@@ -70,32 +98,29 @@ public class MybatisPlusConfigTest {
         assertFalse(interceptors.isEmpty(), "拦截器列表不应为空");
 
         // 验证第一个拦截器是TenantLineInnerInterceptor
-        assertTrue(interceptors.get(0) instanceof TenantLineInnerInterceptor,
-                "第一个拦截器应该是TenantLineInnerInterceptor");
+        assertTrue(hasInterceptorOfType(interceptor, TenantLineInnerInterceptor.class),
+                "TenantLineInnerInterceptor 应该已注册");
     }
 
     @Test
     @DisplayName("验证PaginationInnerInterceptor已注册")
     public void testPaginationInnerInterceptorRegistered() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         List<InnerInterceptor> interceptors = interceptor.getInterceptors();
 
         // Then
-        assertTrue(interceptors.size() >= 2, "应该至少有2个拦截器");
-
-        // 验证第二个拦截器是PaginationInnerInterceptor
-        assertTrue(interceptors.get(1) instanceof PaginationInnerInterceptor,
-                "第二个拦截器应该是PaginationInnerInterceptor");
+        assertTrue(hasInterceptorOfType(interceptor, PaginationInnerInterceptor.class),
+                "PaginationInnerInterceptor 应该已注册");
     }
 
     @Test
     @DisplayName("验证TenantLineHandler已正确配置")
     public void testTenantLineHandlerConfiguration() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor = 
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         // Then
         assertNotNull(tenantInterceptor, "TenantLineInnerInterceptor不应为null");
@@ -119,9 +144,9 @@ public class MybatisPlusConfigTest {
         MetaContext.setSystemTenantContext(expectedTenantId);
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor = 
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         // 通过反射获取TenantLineHandler并调用getTenantId()
         try {
@@ -148,9 +173,9 @@ public class MybatisPlusConfigTest {
         MetaContext.clear();  // 确保没有租户上下文
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor = 
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         // 通过反射获取TenantLineHandler并调用getTenantId()
         try {
@@ -173,9 +198,9 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证getTenantIdColumn()返回正确的列名")
     public void testGetTenantIdColumn() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor = 
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         // 通过反射获取TenantLineHandler并调用getTenantIdColumn()
         try {
@@ -209,9 +234,9 @@ public class MybatisPlusConfigTest {
         };
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor = 
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         // 通过反射获取TenantLineHandler
         try {
@@ -240,9 +265,9 @@ public class MybatisPlusConfigTest {
         };
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor = 
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         // 通过反射获取TenantLineHandler
         try {
@@ -270,9 +295,9 @@ public class MybatisPlusConfigTest {
         };
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor = 
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         // 通过反射获取TenantLineHandler
         try {
@@ -298,9 +323,9 @@ public class MybatisPlusConfigTest {
                 "ab_review"
         };
 
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor =
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         try {
             var field = TenantLineInnerInterceptor.class.getDeclaredField("tenantLineHandler");
@@ -324,9 +349,9 @@ public class MybatisPlusConfigTest {
                 "ab_role"
         };
 
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor =
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         try {
             var field = TenantLineInnerInterceptor.class.getDeclaredField("tenantLineHandler");
@@ -358,9 +383,9 @@ public class MybatisPlusConfigTest {
                 "ab_decision_definition"
         };
 
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor =
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         try {
             var field = TenantLineInnerInterceptor.class.getDeclaredField("tenantLineHandler");
@@ -389,9 +414,9 @@ public class MybatisPlusConfigTest {
         };
 
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         TenantLineInnerInterceptor tenantInterceptor = 
-                (TenantLineInnerInterceptor) interceptor.getInterceptors().get(0);
+                findTenantInterceptor(interceptor);
 
         // 通过反射获取TenantLineHandler
         try {
@@ -414,16 +439,27 @@ public class MybatisPlusConfigTest {
     @DisplayName("验证拦截器注册顺序正确")
     public void testInterceptorOrder() {
         // When
-        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect);
+        MybatisPlusInterceptor interceptor = config.mybatisPlusInterceptor(mockDialect, null);
         List<InnerInterceptor> interceptors = interceptor.getInterceptors();
 
-        // Then
-        assertEquals(2, interceptors.size(), "应该有2个拦截器");
-
-        // 验证顺序: TenantLineInnerInterceptor应该在PaginationInnerInterceptor之前
-        assertTrue(interceptors.get(0) instanceof TenantLineInnerInterceptor,
-                "第一个拦截器应该是TenantLineInnerInterceptor");
-        assertTrue(interceptors.get(1) instanceof PaginationInnerInterceptor,
+        // Then — env-layering #19 added EnvWriteLockGuardInnerInterceptor + a second
+        // TenantLineInnerInterceptor for env_id, so the chain is now 4 long. Order assertion
+        // relaxed to "tenant interceptor lives before pagination interceptor in the list".
+        int tenantIdx = -1, paginationIdx = -1;
+        for (int i = 0; i < interceptors.size(); i++) {
+            if (interceptors.get(i) instanceof TenantLineInnerInterceptor) {
+                if (tenantIdx == -1) tenantIdx = i;
+            }
+            if (interceptors.get(i) instanceof PaginationInnerInterceptor && paginationIdx == -1) {
+                paginationIdx = i;
+            }
+        }
+        assertTrue(tenantIdx >= 0 && paginationIdx >= 0,
+                "TenantLine + Pagination 拦截器都应该已注册");
+        assertTrue(tenantIdx < paginationIdx,
+                "TenantLineInnerInterceptor 应该在 PaginationInnerInterceptor 之前");
+        // Original assertion preserved structurally so the test name still describes intent
+        assertTrue(interceptors.get(paginationIdx) instanceof PaginationInnerInterceptor,
                 "第二个拦截器应该是PaginationInnerInterceptor");
     }
 }

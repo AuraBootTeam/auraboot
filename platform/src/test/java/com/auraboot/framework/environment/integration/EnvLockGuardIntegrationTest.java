@@ -98,6 +98,63 @@ class EnvLockGuardIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void directUpdate_onPageInLockedEnv_isRejected() {
+        // env-layering #19 — UPDATE on @EnvScoped table while in a locked env throws.
+        Long envId = createEnv("up_lock_" + shortId());
+
+        // Insert a page first (env still unlocked)
+        MetaContext.setEnvironmentId(envId);
+        PageSchema page = newBarePage("p_up_" + shortId());
+        pageSchemaMapper.insert(page);
+
+        // Now lock the env
+        environmentService.lock(envPidById(envId), testTenant.getId(), testUser.getId(), "freeze");
+
+        // Attempt to update via the standard MP path — guard fires
+        page.setName("renamed_after_lock");
+        assertThatThrownBy(() -> pageSchemaMapper.updateById(page))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("locked")
+                .hasMessageContaining("/api/promotions");
+    }
+
+    @Test
+    void directDelete_onPageInLockedEnv_isRejected() {
+        Long envId = createEnv("del_lock_" + shortId());
+
+        MetaContext.setEnvironmentId(envId);
+        PageSchema page = newBarePage("p_del_" + shortId());
+        pageSchemaMapper.insert(page);
+
+        environmentService.lock(envPidById(envId), testTenant.getId(), testUser.getId(), "freeze");
+
+        // Hard delete via deleteById — guard fires (DELETE on env-scoped table while env locked)
+        Long pageId = page.getId();
+        assertThatThrownBy(() -> pageSchemaMapper.deleteById(pageId))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("locked");
+    }
+
+    @Test
+    void runWithoutLockGuard_allowsUpdateOnLockedEnv() {
+        // Promotion / system migration path — bypass closure must let UPDATE through.
+        Long envId = createEnv("up_bypass_" + shortId());
+
+        MetaContext.setEnvironmentId(envId);
+        PageSchema page = newBarePage("p_ub_" + shortId());
+        pageSchemaMapper.insert(page);
+
+        environmentService.lock(envPidById(envId), testTenant.getId(), testUser.getId(), "freeze");
+
+        page.setName("renamed_via_bypass");
+        MetaContext.runWithoutLockGuard(() -> pageSchemaMapper.updateById(page));
+
+        // Sanity: re-read to confirm update went through
+        PageSchema reloaded = pageSchemaMapper.selectByPid(page.getPid());
+        assertThat(reloaded.getName()).isEqualTo("renamed_via_bypass");
+    }
+
+    @Test
     void promotionApply_toLockedTarget_succeedsViaFourEyesBypass() {
         Long sourceEnv = createEnv("src_lk_" + shortId());
         Long targetEnv = createEnv("tgt_lk_" + shortId());
