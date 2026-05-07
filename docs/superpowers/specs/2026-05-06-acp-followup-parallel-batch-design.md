@@ -53,7 +53,7 @@
 **验收命令**
 ```bash
 LOG=/tmp/pw-acp-t1-$(date +%Y%m%d-%H%M%S).log
-./gradlew :platform:test \
+./gradlew :test \
   --tests "com.auraboot.framework.integration.agent.ParentJoinServiceIntegrationTest" \
   --tests "com.auraboot.framework.integration.agent.DelegateTaskToolIntegrationTest" \
   --tests "com.auraboot.framework.integration.agent.SubAgentRunnerExecutionIntegrationTest" \
@@ -144,7 +144,7 @@ bash scripts/oss-test.sh tests/e2e/automation/llm-call-node.spec.ts -- --workers
 **验收**
 ```bash
 LOG=/tmp/pw-acp-t4-$(date +%Y%m%d-%H%M%S).log
-./gradlew :platform:test \
+./gradlew :test \
   --tests "com.auraboot.framework.integration.agent.AgentTemplateSeederIntegrationTest" \
   2>&1 | tee "$LOG"
 ```
@@ -173,7 +173,7 @@ LOG=/tmp/pw-acp-t4-$(date +%Y%m%d-%H%M%S).log
 **验收**
 ```bash
 LOG=/tmp/pw-acp-t5-$(date +%Y%m%d-%H%M%S).log
-./gradlew :platform:test \
+./gradlew :test \
   --tests "com.auraboot.framework.agent.provider.AnthropicLlmProviderCacheMetricIntegrationTest" \
   2>&1 | tee "$LOG"
 # 启动 platform 后:
