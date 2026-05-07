@@ -1,6 +1,6 @@
-# 2026-05-07 C.2 Cross-Tenant Sub-Agent ACL — 设计草案
+# 2026-05-07 C.2 Cross-Tenant Sub-Agent ACL — 设计
 
-> **状态:草稿,等 owner 决策开放问题。**
+> **状态:owner 已 lock 全部默认选项(Q1=A+C kill-switch / Q2=仅 platform_admin / Q3=不需双签 / Q4=租户对粒度 / Q5=每 spawn 一行 audit / Q6=Phase 1 admin 页 / Q7=新拒旧续 / Q8=直接 throw / Q9=SYSTEM_TENANT 也需 grant / Q10=ParentJoinService 同步放开 / Q11=delegate_task 走同 ACL / Q12=C.1 joinChildRun 一并放开)2026-05-07。**
 > **类型:一次性设计稿。** 实施完成后,长期跟踪进 `docs/backlog/2026-05-06-acp-p0-p1-followups.md`。
 
 ## 背景
