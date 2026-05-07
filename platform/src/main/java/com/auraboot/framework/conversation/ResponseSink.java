@@ -66,6 +66,31 @@ public interface ResponseSink {
     }
 
     /**
+     * D.2 (ACP P0/P1 follow-up): non-fatal advisories produced by an LLM
+     * provider during a turn — e.g. Anthropic's
+     * {@code AnthropicLlmProvider.buildAnthropicRequest} auto-extends
+     * {@code max_tokens} when Extended Thinking budget exceeds the caller's
+     * value and records a human-readable explanation in
+     * {@link com.auraboot.framework.agent.dto.LlmChatResponse#getWarnings()}.
+     * Previously these strings only landed in {@code log.warn}; the SSE
+     * adapter now forwards them to the frontend as a {@code warning} event
+     * so users see a yellow toast instead of silently relying on server logs.
+     *
+     * <p>Contract: {@code warnings} is a non-empty list (callers MUST skip
+     * the call when {@link com.auraboot.framework.agent.dto.LlmChatResponse#getWarnings()}
+     * is null/empty so we never emit empty {@code warning} frames). Each
+     * string is one toast on the frontend.
+     *
+     * <p>Default no-op so non-chat sinks (tests, future WS / sync-JSON) need
+     * not implement this — IM channels would clutter the conversation row
+     * with provider-side advisories so the {@link BroadcastResponseSink}
+     * keeps the no-op default.
+     */
+    default void onWarnings(java.util.List<String> warnings) {
+        // default no-op
+    }
+
+    /**
      * Phase C.3b: structured tool-result envelope produced by
      * {@code ResultContractEmitter} after each {@code dsl_query} /
      * {@code dsl_command} execution. SSE adapter serialises as the
