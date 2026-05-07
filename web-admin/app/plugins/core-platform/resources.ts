@@ -34,4 +34,17 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 20, group: 'platform' },
     file: './plugins/core-platform/pages/KernelPluginsPage.tsx',
   },
+  // C.2 cross-tenant sub-agent ACL admin surface — list / grant / revoke /
+  // audit. Backend gates platform_admin role; the menu entry stays visible
+  // for tenant_admin too (the page renders the 403 banner from the API
+  // response when the user lacks platform_admin).
+  {
+    key: 'platform.cross-tenant-grants',
+    path: '/admin/cross-tenant-grants',
+    title: { en: 'Cross-Tenant Grants', zh: '跨租户授权' },
+    icon: 'shield',
+    menu: { order: 30, group: 'platform' },
+    permission: 'platform.cross-tenant-grant.read',
+    file: './plugins/core-platform/pages/CrossTenantGrantsPage.tsx',
+  },
 ]
