@@ -101,6 +101,9 @@ public class CommandFieldMapExecutor {
 
             // Determine operation type - use actual table name for database operations
             if ("update".equalsIgnoreCase(operationType) && StringUtils.hasText(request.getTargetRecordId())) {
+                // F-5 fix: UPDATE must refresh updated_at — DDL DEFAULT CURRENT_TIMESTAMP only
+                // applies to INSERT, so without explicit assignment audit timestamps stale forever.
+                columnData.put("updated_at", Instant.now());
                 Map<String, Object> conditions = new HashMap<>();
                 conditions.put("tenant_id", tenantId);
                 var idEntry = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
@@ -108,6 +111,13 @@ public class CommandFieldMapExecutor {
                 int updated = jsonbCols.isEmpty()
                         ? dynamicDataMapper.update(tableName, columnData, conditions)
                         : dynamicDataMapper.updateWithJsonb(tableName, columnData, conditions, jsonbCols);
+                if (updated == 0) {
+                    // F-5 defense: silent code=0 with affected=0 hides "record not found / wrong tenant"
+                    // bugs from callers. Reject explicitly so the caller sees BadParam, not a fake 200.
+                    throw new BusinessException(ResponseCode.BadParam,
+                            "update affected 0 rows for " + targetModel + " id=" + request.getTargetRecordId()
+                                    + " (record not found or tenant mismatch)");
+                }
                 results.put(targetModel + "_updated", updated);
             } else if ("delete".equalsIgnoreCase(operationType) && StringUtils.hasText(request.getTargetRecordId())) {
                 Map<String, Object> conditions = new HashMap<>();
@@ -245,6 +255,9 @@ public class CommandFieldMapExecutor {
 
         // Execute the database operation
         if (isUpdateLike && StringUtils.hasText(request.getTargetRecordId())) {
+            // F-5 fix: UPDATE must refresh updated_at — DDL DEFAULT CURRENT_TIMESTAMP only
+            // applies to INSERT, so without explicit assignment audit timestamps stale forever.
+            columnData.put("updated_at", Instant.now());
             Map<String, Object> conditions = new HashMap<>();
             conditions.put("tenant_id", tenantId);
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
@@ -252,6 +265,13 @@ public class CommandFieldMapExecutor {
             int updated = jsonbColumns.isEmpty()
                     ? dynamicDataMapper.update(tableName, columnData, conditions)
                     : dynamicDataMapper.updateWithJsonb(tableName, columnData, conditions, jsonbColumns);
+            if (updated == 0) {
+                // F-5 defense: silent code=0 with affected=0 hides "record not found / wrong tenant"
+                // bugs from callers. Reject explicitly so the caller sees BadParam, not a fake 200.
+                throw new BusinessException(ResponseCode.BadParam,
+                        "update affected 0 rows for " + modelCode + " id=" + request.getTargetRecordId()
+                                + " (record not found or tenant mismatch)");
+            }
             results.put(modelCode + "_updated", updated);
             log.info("Implicit FIELD_MAP UPDATE: {} rows in {} (command={})", updated, modelCode, command.getCode());
         } else if ("delete".equalsIgnoreCase(operationType) && StringUtils.hasText(request.getTargetRecordId())) {

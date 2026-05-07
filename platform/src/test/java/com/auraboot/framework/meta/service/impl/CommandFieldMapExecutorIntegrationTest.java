@@ -104,6 +104,14 @@ public class CommandFieldMapExecutorIntegrationTest extends BaseIntegrationTest 
         return rows.isEmpty() ? null : (String) rows.get(0).get("name");
     }
 
+    /** Returns (created_at, updated_at) as raw java.sql.Timestamp / Instant. */
+    private Map<String, Object> getRow(String pid) {
+        List<Map<String, Object>> rows = dynamicDataMapper.queryList(
+                TABLE, List.of("pid", "name", "cron_expression", "created_at", "updated_at"),
+                "pid = '" + pid + "'", null, 1, 0);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
     private List<BindingRule> nameMappingRule() {
         BindingRule rule = new BindingRule();
         rule.setRuleType("FIELD_MAP");
@@ -255,5 +263,155 @@ public class CommandFieldMapExecutorIntegrationTest extends BaseIntegrationTest 
         Long inserted = dynamicDataMapper.countByQueryWithoutTenant(
                 "SELECT COUNT(*) FROM " + TABLE + " WHERE name = #{params.name}", params);
         assertThat(inserted).as("implicit delete-without-id must NOT fall through to INSERT").isEqualTo(0L);
+    }
+
+    // ==================== F-5: update silent-success regressions ====================
+
+    /**
+     * F-5 root-cause regression: UPDATE must refresh updated_at.
+     * Before fix, the UPDATE branch did not set updated_at, leaving the audit
+     * timestamp stale even though SET name=... did persist. This made the row
+     * look "untouched" to any caller comparing created_at vs updated_at.
+     */
+    @Test
+    @DisplayName("F-5: update + targetRecordId refreshes updated_at (audit timestamp not stale)")
+    public void testUpdate_refreshesUpdatedAt() throws InterruptedException {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String pid = seedRow(tenantId, "fmx-f5-ts");
+        Map<String, Object> before = getRow(pid);
+        assertThat(before).isNotNull();
+        Object createdAt = before.get("created_at");
+        Object updatedAtBefore = before.get("updated_at");
+
+        // Sleep so any clock-resolution issue can't accidentally pass the test
+        Thread.sleep(50);
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("update");
+        request.setTargetRecordId(pid);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("name", "fmx-f5-ts-renamed");
+
+        Map<String, Object> result = executor.executeFieldMapPhase(
+                nameMappingRule(), payload, tenantId, request);
+        assertThat(result).containsEntry(TABLE + "_updated", 1);
+
+        Map<String, Object> after = getRow(pid);
+        assertThat(after).isNotNull();
+        assertThat((String) after.get("name")).isEqualTo("fmx-f5-ts-renamed");
+        // updated_at must move forward; created_at must stay put
+        assertThat(after.get("updated_at"))
+                .as("updated_at should be refreshed after UPDATE")
+                .isNotEqualTo(updatedAtBefore);
+        assertThat(after.get("created_at"))
+                .as("created_at must remain stable across UPDATE")
+                .isEqualTo(createdAt);
+    }
+
+    /**
+     * F-5 defense: UPDATE with non-existent targetRecordId must throw BadParam,
+     * not silently return code=0 with affected=0. Hides "wrong tenant / typo'd id" bugs.
+     */
+    @Test
+    @DisplayName("F-5: update against non-existent pid → BusinessException(BadParam), not silent affected=0")
+    public void testUpdate_unknownPid_rejectsLoudly() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String ghostPid = "01GHOST" + UniqueIdGenerator.generate().substring(7); // 32-char fake pid
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("update");
+        request.setTargetRecordId(ghostPid);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("name", "ghost-rename");
+
+        assertThatThrownBy(() ->
+                executor.executeFieldMapPhase(nameMappingRule(), payload, tenantId, request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> {
+                    BusinessException be = (BusinessException) ex;
+                    assertThat(be.getResponseCode()).isEqualTo(ResponseCode.BadParam);
+                    assertThat(be.getMessage()).contains("0 rows").contains(ghostPid);
+                });
+    }
+
+    /**
+     * F-5 implicit-phase regression: same root cause and defense for the implicit
+     * inputFields path used by DSL list-page commands like admin:update_scheduled_task.
+     * Recreates the exact request shape from the original incident.
+     */
+    @Test
+    @DisplayName("F-5: implicit update via inputFields → row mutated AND updated_at refreshed")
+    public void testImplicitUpdate_refreshesUpdatedAtAndMutatesRow() throws InterruptedException {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String pid = seedRow(tenantId, "fmx-f5-impl");
+        Map<String, Object> before = getRow(pid);
+        Object createdAt = before.get("created_at");
+        Object updatedAtBefore = before.get("updated_at");
+        Thread.sleep(50);
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("update");
+        request.setTargetRecordId(pid);
+
+        CommandDefinition command = new CommandDefinition();
+        command.setCode("test-impl-update");
+        command.setModelCode(TABLE); // no ModelDefinition registered → executor uses TABLE as table name
+
+        Map<String, Object> execConfig = new HashMap<>();
+        execConfig.put("type", "update");
+        // Mimic admin:update_scheduled_task inputFields shape
+        execConfig.put("inputFields", List.of("name", "cron_expression"));
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("name", "fmx-f5-impl-renamed");
+        payload.put("cron_expression", "0 45 3 * * ?");
+
+        Map<String, Object> result = executor.executeImplicitFieldMapPhase(
+                execConfig, payload, tenantId, request, command);
+        assertThat(result).containsEntry(TABLE + "_updated", 1);
+
+        Map<String, Object> after = getRow(pid);
+        assertThat((String) after.get("name")).isEqualTo("fmx-f5-impl-renamed");
+        assertThat((String) after.get("cron_expression")).isEqualTo("0 45 3 * * ?");
+        assertThat(after.get("updated_at"))
+                .as("updated_at should be refreshed after implicit UPDATE")
+                .isNotEqualTo(updatedAtBefore);
+        assertThat(after.get("created_at")).isEqualTo(createdAt);
+    }
+
+    /**
+     * F-5 defense: implicit UPDATE against non-existent pid must throw BadParam.
+     */
+    @Test
+    @DisplayName("F-5: implicit update against non-existent pid → BusinessException(BadParam)")
+    public void testImplicitUpdate_unknownPid_rejectsLoudly() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String ghostPid = "01GHOST" + UniqueIdGenerator.generate().substring(7);
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("update");
+        request.setTargetRecordId(ghostPid);
+
+        CommandDefinition command = new CommandDefinition();
+        command.setCode("test-impl-update-ghost");
+        command.setModelCode(TABLE);
+
+        Map<String, Object> execConfig = new HashMap<>();
+        execConfig.put("type", "update");
+        execConfig.put("inputFields", List.of("name"));
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("name", "ghost-impl");
+
+        assertThatThrownBy(() ->
+                executor.executeImplicitFieldMapPhase(execConfig, payload, tenantId, request, command))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> {
+                    BusinessException be = (BusinessException) ex;
+                    assertThat(be.getResponseCode()).isEqualTo(ResponseCode.BadParam);
+                    assertThat(be.getMessage()).contains("0 rows");
+                });
     }
 }
