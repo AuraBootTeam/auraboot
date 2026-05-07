@@ -135,14 +135,26 @@ public class AgentScheduleService {
 
             dynamicDataMapper.insert("ab_agent_task", task);
 
+            // Read run_count fresh from DB — the `schedule` map captured by the
+            // lambda at registerSchedule() time is a snapshot and never refreshes
+            // (would always set run_count = 0 + 1 = 1). Querying current row
+            // ensures monotonic increment + correct max_runs expiry.
+            List<Map<String, Object>> currentRows = dynamicDataMapper.selectByQueryWithoutTenant(
+                    "SELECT run_count FROM ab_agent_schedule WHERE pid = #{pid} AND deleted_flag = false",
+                    Map.of("pid", schedulePid));
+            int currentRunCount = currentRows.isEmpty() || currentRows.get(0).get("run_count") == null
+                    ? 0
+                    : ((Number) currentRows.get(0).get("run_count")).intValue();
+            int nextRunCount = currentRunCount + 1;
+
             Map<String, Object> scheduleUpdate = new HashMap<>();
             scheduleUpdate.put("last_run_at", LocalDateTime.now());
-            scheduleUpdate.put("run_count", ((Number) schedule.getOrDefault("run_count", 0)).intValue() + 1);
+            scheduleUpdate.put("run_count", nextRunCount);
             scheduleUpdate.put("updated_at", LocalDateTime.now());
             dynamicDataMapper.update("ab_agent_schedule", scheduleUpdate, Map.of("pid", schedulePid));
 
             Integer maxRuns = schedule.get("max_runs") != null ? ((Number) schedule.get("max_runs")).intValue() : null;
-            if (maxRuns != null && ((Number) schedule.getOrDefault("run_count", 0)).intValue() + 1 >= maxRuns) {
+            if (maxRuns != null && nextRunCount >= maxRuns) {
                 dynamicDataMapper.update("ab_agent_schedule",
                         Map.of("schedule_status", "expired", "updated_at", LocalDateTime.now()),
                         Map.of("pid", schedulePid));
