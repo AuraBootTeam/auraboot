@@ -87,7 +87,12 @@ public class BiTemporalServiceImpl implements BiTemporalService {
     public BiTemporalRecord correct(String entityType, String entityId,
                                     LocalDateTime validFrom, LocalDateTime validTo,
                                     JsonNode payload, Long userId) {
-        BiTemporalRecord current = mapper.findCurrent(entityType, entityId);
+        // Use FOR UPDATE so two concurrent corrections on the same anchor are
+        // serialized — the second writer blocks until the first commits, then
+        // re-reads the new current row before its own close-and-insert. Without
+        // the lock both could close the same tx_to=INFINITY row and leave two
+        // open versions (REVIEW-BE8-002).
+        BiTemporalRecord current = mapper.findCurrentForUpdate(entityType, entityId);
         if (current == null) {
             throw new IllegalStateException(
                     "No current record found for correction: type=" + entityType + ", id=" + entityId);
@@ -126,7 +131,11 @@ public class BiTemporalServiceImpl implements BiTemporalService {
     @Override
     @Transactional
     public void terminate(String entityType, String entityId, LocalDateTime validTime) {
-        BiTemporalRecord current = mapper.findCurrent(entityType, entityId);
+        // Use FOR UPDATE — see BiTemporalMapper#findCurrentForUpdate Javadoc
+        // and the mirrored note in correct() above. Termination is a
+        // close-and-insert just like correction and is subject to the same
+        // race (REVIEW-BE8-002).
+        BiTemporalRecord current = mapper.findCurrentForUpdate(entityType, entityId);
         if (current == null) {
             throw new IllegalStateException(
                     "No current record found for termination: type=" + entityType + ", id=" + entityId);
