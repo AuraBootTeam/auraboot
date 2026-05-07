@@ -534,6 +534,8 @@ export interface UnifiedSchema {
   schemaVersion?: number;
   id: string;
   title: string | LocalizedText;
+  /** Page name (from PageSchemaDTO.name; effective name fallback when title is missing). */
+  name?: string;
   description?: string | LocalizedText;
 
   /** DSL Profile — "admin" | "storefront" | "portal" (default: "admin") */

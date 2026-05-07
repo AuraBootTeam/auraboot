@@ -1041,7 +1041,24 @@ export function ListPageContent(props: PageContentProps) {
         return getLocalizedText(button.content, locale, t);
       }
       if (button.label) {
-        return getLocalizedText(button.label, locale, t);
+        const localized = getLocalizedText(button.label, locale, t);
+        // If the DSL label is a bare lowercase identifier (e.g. "create",
+        // "edit", "detail", "submit", "cancel"), getLocalizedText returns it
+        // unchanged. Treat it as an i18n key candidate and probe well-known
+        // namespaces before leaking the raw token to the UI.
+        const isBareIdentifier =
+          typeof button.label === 'string' &&
+          /^[a-z][a-z0-9_]*$/.test(button.label) &&
+          localized === button.label;
+        if (isBareIdentifier) {
+          const commonKey = `common.${button.label}`;
+          const commonResolved = t(commonKey);
+          if (commonResolved && commonResolved !== commonKey) return commonResolved;
+          const actionKey = `action.${button.label}`;
+          const actionResolved = t(actionKey);
+          if (actionResolved && actionResolved !== actionKey) return actionResolved;
+        }
+        return localized;
       }
       // Try plugin-namespaced key from commandCode (e.g., "crm:contact_lead" → "crm.action.contact_lead")
       if (button.commandCode && button.commandCode.includes(':')) {
@@ -1642,7 +1659,14 @@ export function ListPageContent(props: PageContentProps) {
       const fieldKey = `field.${column.field}.label`;
       const fieldLabel = t(fieldKey);
       if (fieldLabel !== fieldKey) return fieldLabel;
-      const commonKey = `common.field.${column.field}`;
+      // Probe `common.field.<code>` namespaced under `common.field.*` (legacy slot)
+      const commonFieldKey = `common.field.${column.field}`;
+      const commonFieldLabel = t(commonFieldKey);
+      if (commonFieldLabel !== commonFieldKey) return commonFieldLabel;
+      // Probe top-level `common.<code>` — covers system audit fields like
+      // created_at / updated_at / created_by / updated_by which live directly
+      // under the `common:` namespace in i18n yaml resources.
+      const commonKey = `common.${column.field}`;
       const commonLabel = t(commonKey);
       return commonLabel !== commonKey ? commonLabel : column.field;
     },
@@ -2127,7 +2151,11 @@ export function ListPageContent(props: PageContentProps) {
         <div className="rounded-lg bg-white shadow-sm">
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
-            title={schema.title ? getLocalizedText(schema.title, locale, t) : tableName}
+            title={
+              schema.title
+                ? getLocalizedText(schema.title, locale, t)
+                : (schema.name && schema.name.trim() ? schema.name : tableName)
+            }
             modelCode={modelCode}
             savedViews={savedViews}
             currentView={currentView}
