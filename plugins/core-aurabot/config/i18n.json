@@ -1,0 +1,156 @@
+[
+  {
+    "key": "aurabot.shell.toggle.aria",
+    "source": "import",
+    "zh-CN": "打开 AuraBot 助手",
+    "en-US": "Open AuraBot assistant",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.panel.title",
+    "source": "import",
+    "zh-CN": "AuraBot 助手",
+    "en-US": "AuraBot Assistant",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.panel.close",
+    "source": "import",
+    "zh-CN": "关闭",
+    "en-US": "Close",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.panel.pin",
+    "source": "import",
+    "zh-CN": "停靠到侧边",
+    "en-US": "Pin to side",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.panel.unpin",
+    "source": "import",
+    "zh-CN": "取消停靠",
+    "en-US": "Unpin",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.panel.fullscreen",
+    "source": "import",
+    "zh-CN": "全屏",
+    "en-US": "Full screen",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.panel.minimize",
+    "source": "import",
+    "zh-CN": "最小化",
+    "en-US": "Minimize",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.input.placeholder",
+    "source": "import",
+    "zh-CN": "向 AuraBot 提问,Cmd+Enter 发送",
+    "en-US": "Ask AuraBot, press Cmd+Enter to send",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.input.send",
+    "source": "import",
+    "zh-CN": "发送",
+    "en-US": "Send",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.empty.hint",
+    "source": "import",
+    "zh-CN": "试试输入 echo hello,体验回路",
+    "en-US": "Try typing 'echo hello' to test the round-trip",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.empty.example",
+    "source": "import",
+    "zh-CN": "echo hello",
+    "en-US": "echo hello",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.error.generic",
+    "source": "import",
+    "zh-CN": "出现错误,请重试",
+    "en-US": "Something went wrong. Please retry.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.error.retry",
+    "source": "import",
+    "zh-CN": "重试",
+    "en-US": "Retry",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.confirm.commit",
+    "source": "import",
+    "zh-CN": "确认执行",
+    "en-US": "Confirm",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.confirm.cancel",
+    "source": "import",
+    "zh-CN": "取消",
+    "en-US": "Cancel",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.confirm.requireText",
+    "source": "import",
+    "zh-CN": "请输入 {value} 以确认操作",
+    "en-US": "Type {value} to confirm",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.thinking.label",
+    "source": "import",
+    "zh-CN": "思考中…",
+    "en-US": "Thinking…",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.wizard.progress",
+    "source": "import",
+    "zh-CN": "步骤 {step} / {total}: {label}",
+    "en-US": "Step {step} of {total}: {label}",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.suggestion.title",
+    "source": "import",
+    "zh-CN": "建议",
+    "en-US": "Suggestions",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.preview.title",
+    "source": "import",
+    "zh-CN": "操作预览",
+    "en-US": "Operation preview",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.result.title",
+    "source": "import",
+    "zh-CN": "执行结果",
+    "en-US": "Result",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.shell.code.copy",
+    "source": "import",
+    "zh-CN": "复制",
+    "en-US": "Copy",
+    "refType": "ui"
+  }
+]

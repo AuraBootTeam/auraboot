@@ -13,7 +13,8 @@
   "dependencies": [],
   "resourceDirs": {
     "permissions": "config/permissions.json",
-    "menus": "config/menus.json"
+    "menus": "config/menus.json",
+    "i18n": "config/i18n.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
