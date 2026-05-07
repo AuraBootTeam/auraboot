@@ -21,6 +21,21 @@ public class LlmChatRequest {
     private String model;
     private String providerCode;
     private String systemPrompt;
+
+    /**
+     * Optional structured system prompt — ordered list of segments where each
+     * segment carries a {@code cacheable} flag. Providers that support
+     * multi-segment caching (e.g. Anthropic) can mark stable prefix segments
+     * (tenant-level templates) for the ephemeral cache while leaving volatile
+     * suffix segments (user/session details) uncached, so a session-level
+     * suffix change does not bust the prefix cache.
+     *
+     * <p>When non-empty this field takes precedence over {@link #systemPrompt}.
+     * When null/empty, providers fall back to wrapping {@code systemPrompt} as
+     * a single segment so legacy callers stay byte-identical.
+     */
+    private List<SystemSegment> systemSegments;
+
     private List<Message> messages;
     private List<Tool> tools;
     private int maxTokens;
@@ -147,6 +162,25 @@ public class LlmChatRequest {
         private String description;
         private Map<String, Object> inputSchema;
         private Map<String, Object> nativeToolConfig; // For LLM_NATIVE tools — passed directly to provider
+    }
+
+    /**
+     * Single segment of a structured system prompt. Used by providers that
+     * support multi-segment prompt caching to keep stable prefix (tenant /
+     * agent template) cache entries alive across user/session-level changes.
+     *
+     * <p>{@code cacheable=true} marks the segment as eligible for the
+     * ephemeral prompt cache marker; {@code false} keeps it inline in the
+     * prompt without any cache_control hint. The Anthropic provider further
+     * gates on a 1024-token minimum (Anthropic's documented cache floor) so
+     * tiny "cacheable" segments are silently downgraded to plain text rather
+     * than producing wasted cache_control markers that never hit.
+     */
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class SystemSegment {
+        private String text;
+        @Builder.Default
+        private boolean cacheable = false;
     }
 
     /**
