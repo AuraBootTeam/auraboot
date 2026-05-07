@@ -107,6 +107,30 @@ backend gaps surfaced one after another in the scheduled_task suite:
   endpoint's `deleted_flag` filter.
 - **Re-enable**: drop fixme on ST-009.
 
+## G-10 — Detail-page header toolbar buttons no-op for `action.type=command`
+
+Surfaced by the ACS suite once G-3 was applied (tabs renderable) and the
+cascade unblocked through ACS-007.
+
+- **Symptom**: ACS detail page renders the header toolbar buttons (Submit,
+  Approve, Reject, Edit, Delete) per `acs_demo_request_detail.json`, but
+  clicking Submit fires no `acs:submit_request` POST. Spec
+  `waitForResponse(/api/meta/commands/execute/acs:submit_request)` times out
+  at 20s.
+- **Root cause hypothesis**: the inline toolbar in
+  `web-admin/app/framework/meta/rendering/pages/DetailPageContent.tsx:525-548`
+  uses `handleAction(button, recordData)` from `useActionHandler`. The
+  button JSON declares `action: {type: "command", command: "..."}` (object
+  form), while `useActionHandler.normalizeAction` is reading
+  `button.commandCode` (top-level field) — there is a shape mismatch with
+  no fallback. FormButtonsBlockRenderer / ToolbarBlockRenderer accept both
+  shapes via different code paths.
+- **Fix**: in `useActionHandler` (or its `normalizeAction` helper), accept
+  `action.type === 'command'` → use `action.command` as the command code,
+  in addition to existing `commandCode` top-level fallback. Add a unit test.
+- **Re-enable**: drop fixme on ACS-007. Likely also unblocks ACS-008..014
+  cascade-skipped tests.
+
 ## Dead menus (no React component bound)
 
 These menu entries route to paths that have **no implementation** (frontend

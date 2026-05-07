@@ -576,7 +576,11 @@ export function DetailPageContent(props: PageContentProps) {
           <div>
             {/* Tab headers (hidden in print — only active tab content shows) */}
             <div className="print-hide border-b border-gray-200 px-6" data-print="hide">
-              <nav className="-mb-px flex space-x-8">
+              <nav
+                className="-mb-px flex space-x-8"
+                role="tablist"
+                aria-label="Tabs"
+              >
                 {tabs.map((tab, index) => (
                   <button
                     key={tab.key || index}
