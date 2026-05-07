@@ -13,8 +13,10 @@ import com.auraboot.framework.meta.dto.MetaFieldCreateRequest;
 import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -64,6 +66,8 @@ public class ModelCreateSkill implements AuraBotSkill {
 
     private final MetaModelService metaModelService;
     private final MetaFieldService metaFieldService;
+    private final SchemaManagementService schemaManagementService;
+    private final MetaModelFieldBindingMapper bindingMapper;
     private final DynamicDataMapper dynamicDataMapper;
     private final ObjectMapper objectMapper;
 
@@ -71,10 +75,14 @@ public class ModelCreateSkill implements AuraBotSkill {
 
     public ModelCreateSkill(MetaModelService metaModelService,
                             MetaFieldService metaFieldService,
+                            SchemaManagementService schemaManagementService,
+                            MetaModelFieldBindingMapper bindingMapper,
                             DynamicDataMapper dynamicDataMapper,
                             ObjectMapper objectMapper) {
         this.metaModelService = metaModelService;
         this.metaFieldService = metaFieldService;
+        this.schemaManagementService = schemaManagementService;
+        this.bindingMapper = bindingMapper;
         this.dynamicDataMapper = dynamicDataMapper;
         this.objectMapper = objectMapper;
     }
@@ -333,6 +341,131 @@ public class ModelCreateSkill implements AuraBotSkill {
 
     @Override
     public SkillResult undo(String undoToken) {
-        throw new UnsupportedOperationException("model:create undo not implemented yet (T5)");
+        // Token-based entry is wired in T6 (Controller hand-off): the controller
+        // resolves SkillRunRepository → modelPid/modelCode, then dispatches to
+        // {@link #undoByModel(String, String)}. Direct invocation is not supported.
+        throw new UnsupportedOperationException(
+                "undo(undoToken) routed to undoByModel via Controller hand-off — see T6");
+    }
+
+    /**
+     * Internal undo entry point used by the Controller hand-off (T6) once the
+     * undoToken has been resolved to a concrete (modelPid, modelCode) pair.
+     *
+     * <p>Sequence:
+     * <ol>
+     *     <li>Pre-check: {@code SELECT FROM mt_<code> WHERE deleted_flag=false LIMIT 1}.
+     *         Non-empty rows → {@link SkillErrorCode#SKILL_INTERNAL_ERROR} (data-loss
+     *         guard, see Plan §C-3 §5).</li>
+     *     <li>Hard-delete the model's field bindings so {@code MetaModelService.delete}'s
+     *         {@code validateCanDelete} guard passes (the {@code name_<suffix>} field
+     *         created by {@link #ensureNameFieldBound} would otherwise block deletion).</li>
+     *     <li>Drop the {@code mt_<code>} table via {@link SchemaManagementService#dropTableByModel}.</li>
+     *     <li>Soft-delete the {@code ab_meta_model} row via {@link MetaModelService#delete}.</li>
+     * </ol>
+     *
+     * <p>The pre-check tolerates a missing table (catches {@link RuntimeException}
+     * around {@code SELECT}). This is a P2 graceful-degradation pattern: when the
+     * table is gone (e.g. follow-up undo on a partially-rolled-back run), absence
+     * is equivalent to "no rows" — not an error to surface. We do not swallow
+     * the exception silently elsewhere.
+     */
+    public SkillResult undoByModel(String modelPid, String modelCode) {
+        String tableName = "mt_" + modelCode;
+
+        // 1. Data-loss guard: refuse if any rows exist on the physical table.
+        //
+        //    We MUST test table existence via information_schema first rather
+        //    than try/catching the SELECT — under @Transactional, a SELECT
+        //    against a non-existent relation aborts the PG transaction
+        //    irreversibly (SQLSTATE 25P02), and subsequent statements in the
+        //    same tx all fail with "current transaction is aborted". The Java
+        //    layer catching the exception does not reset PG state.
+        List<Map<String, Object>> existsRows = dynamicDataMapper.selectByQueryWithoutTenant(
+                "SELECT 1 AS x FROM information_schema.tables WHERE table_name = #{params.t}",
+                Map.of("t", tableName));
+        if (!existsRows.isEmpty()) {
+            // Table exists — probe for any row. We don't filter on deleted_flag
+            // because publish() only materialises bound fields onto the table,
+            // and audit columns aren't guaranteed.
+            List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(
+                    "SELECT 1 AS x FROM " + tableName + " LIMIT 1",
+                    Map.of());
+            if (!rows.isEmpty()) {
+                throw new SkillSpiException(
+                        SkillErrorCode.SKILL_INTERNAL_ERROR,
+                        "model " + modelCode + " has data rows; refuse to undo to prevent data loss",
+                        null);
+            }
+        }
+
+        // 2. Existence + idempotency check via raw SELECT (no service-layer
+        //    cache or tenant interceptor wrap-around) so a follow-up undo on a
+        //    pid that's already gone surfaces a clean ValidationException
+        //    rather than a half-aborted Spring tx state.
+        List<Map<String, Object>> modelRows = dynamicDataMapper.selectByQueryWithoutTenant(
+                "SELECT id FROM ab_meta_model WHERE pid = #{params.p}",
+                Map.of("p", modelPid));
+        if (modelRows.isEmpty()) {
+            throw new ValidationException(
+                    com.auraboot.framework.common.constant.ResponseCode.CommonValidationFailed,
+                    "模型不存在: " + modelPid);
+        }
+        Long modelId = ((Number) modelRows.get(0).get("id")).longValue();
+
+        // 3a. Look up the user (non-system) fields bound to this model so we can
+        //     hard-delete them after clearing bindings. We must hard-delete here
+        //     because the field-level unique constraint on (code, version) is
+        //     unconditional — leaving a soft-deleted field row blocks re-creating
+        //     the same skill against a model whose pid prefix collides (ULIDs
+        //     are time-monotonic, so consecutive runs share the first 8 chars).
+        List<Map<String, Object>> userFieldRows = dynamicDataMapper.selectByQueryWithoutTenant(
+                "SELECT b.field_id AS field_id FROM ab_meta_model_field_binding b "
+                        + "WHERE b.model_id = #{params.m} AND b.deleted_flag = false "
+                        + "AND (b.is_system_binding IS NULL OR b.is_system_binding = false)",
+                Map.of("m", modelId));
+
+        // 3b. Hard-delete bindings.
+        bindingMapper.deleteByModelId(modelId);
+
+        // 3c. Hard-delete the user fields whose only binding was just removed.
+        for (Map<String, Object> row : userFieldRows) {
+            Long fieldId = ((Number) row.get("field_id")).longValue();
+            dynamicDataMapper.alterTable(
+                    "DELETE FROM ab_meta_field WHERE id = " + fieldId);
+        }
+
+        // 4. Drop the physical table directly via DynamicDataMapper.alterTable.
+        //    We bypass SchemaManagementService.dropTableByModel because that
+        //    path swallows exceptions into a result object — for an undo path
+        //    we want failures to surface. DROP IF EXISTS makes this idempotent:
+        //    a missing table on a follow-up undo is a no-op.
+        try {
+            dynamicDataMapper.alterTable("DROP TABLE IF EXISTS " + tableName);
+        } catch (RuntimeException e) {
+            log.error("Failed to drop table {} during undoByModel", tableName, e);
+            throw new SkillSpiException(
+                    SkillErrorCode.SKILL_INTERNAL_ERROR,
+                    "failed to drop table " + tableName + ": " + e.getMessage(),
+                    null, e);
+        }
+
+        // 5. Hard-delete the meta model row. We bypass MetaModelService.delete
+        //    (which is a soft-delete) because the unique constraint
+        //    uq_meta_model_code_ver(tenant_id, code, version) is unconditional —
+        //    a soft-deleted row blocks re-creating the same code. Hard-delete
+        //    keeps the code reusable, which is the contract for undo.
+        dynamicDataMapper.alterTable(
+                "DELETE FROM ab_meta_model WHERE pid = '" + modelPid + "'");
+
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("undonePid", modelPid);
+        payload.put("droppedTable", tableName);
+        return SkillResult.builder()
+                .status(SkillResult.Status.SUCCESS)
+                .skillName(name())
+                .payload(payload)
+                .riskLevel(riskLevel())
+                .build();
     }
 }

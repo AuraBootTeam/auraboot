@@ -23,8 +23,10 @@ import org.springframework.test.context.ActiveProfiles;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -129,6 +131,93 @@ class ModelCreateSkillIntegrationTest extends BaseIntegrationTest {
                     assertThat(e.getErrorCode()).isEqualTo(SkillErrorCode.PARAMS_INVALID);
                     assertThat(e.getFieldPath()).isEqualTo("/code");
                 });
+    }
+
+    @Test
+    @DisplayName("undo on empty table: drops mt_<code> and meta row")
+    void undo_emptyTable_succeeds() {
+        SkillResult exec = skill.execute(req(testCode));
+        String modelPid = objectMapper.valueToTree(exec.getPayload()).get("modelPid").asText();
+
+        SkillResult undo = skill.undoByModel(modelPid, testCode);
+
+        assertThat(undo.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+        JsonNode payload = objectMapper.valueToTree(undo.getPayload());
+        assertThat(payload.get("undonePid").asText()).isEqualTo(modelPid);
+        assertThat(payload.get("droppedTable").asText()).isEqualTo("mt_" + testCode);
+
+        // Table is gone from PG.
+        List<Map<String, Object>> tableRows = dynamicDataMapper.selectByQueryWithoutTenant(
+                "SELECT 1 AS x FROM information_schema.tables WHERE table_name = #{params.t}",
+                Map.of("t", "mt_" + testCode));
+        assertThat(tableRows).as("mt_<code> must be dropped after undo").isEmpty();
+
+        // Meta row is soft-deleted (findByCodeOrNull returns null).
+        assertThat(findByCodeOrNull(testCode)).isNull();
+    }
+
+    @Test
+    @DisplayName("undo on non-empty table: refuses with SKILL_INTERNAL_ERROR (data-loss guard)")
+    void undo_nonEmptyTable_refuses() {
+        SkillResult exec = skill.execute(req(testCode));
+        String modelPid = objectMapper.valueToTree(exec.getPayload()).get("modelPid").asText();
+
+        // Insert a row directly via DynamicDataMapper. The undo guard probes for
+        // any row (regardless of soft-delete state) so a single (pid) tuple is enough.
+        String rowPid = "it-mc-row-" + UUID.randomUUID().toString().substring(0, 8);
+        dynamicDataMapper.alterTable(
+                "INSERT INTO mt_" + testCode + " (pid) VALUES ('" + rowPid + "')");
+
+        try {
+            assertThatThrownBy(() -> skill.undoByModel(modelPid, testCode))
+                    .isInstanceOf(SkillSpiException.class)
+                    .satisfies(t -> {
+                        SkillSpiException e = (SkillSpiException) t;
+                        assertThat(e.getErrorCode()).isEqualTo(SkillErrorCode.SKILL_INTERNAL_ERROR);
+                        assertThat(e.getMessage()).contains("data rows");
+                    });
+
+            // Table + meta both still present after refused undo.
+            assertThat(findByCodeOrNull(testCode)).isNotNull();
+        } finally {
+            // Clean the row + finalise undo so tearDown sees a consistent state.
+            dynamicDataMapper.alterTable("DELETE FROM mt_" + testCode + " WHERE pid = '" + rowPid + "'");
+            skill.undoByModel(modelPid, testCode);
+        }
+    }
+
+    @Test
+    @DisplayName("execute → undo → execute again with same code: succeeds (code reusable)")
+    void undo_thenRecreate_works() {
+        SkillResult firstExec = skill.execute(req(testCode));
+        String firstPid = objectMapper.valueToTree(firstExec.getPayload()).get("modelPid").asText();
+
+        skill.undoByModel(firstPid, testCode);
+
+        // Same code is now re-creatable.
+        SkillResult secondExec = skill.execute(req(testCode));
+        assertThat(secondExec.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+        JsonNode payload = objectMapper.valueToTree(secondExec.getPayload());
+        assertThat(payload.get("modelCode").asText()).isEqualTo(testCode);
+        String secondPid = payload.get("modelPid").asText();
+        assertThat(secondPid).isNotEqualTo(firstPid);
+    }
+
+    @Test
+    @DisplayName("undo twice on same model: second call throws ValidationException (canonical 模型不存在)")
+    void undo_alreadyMissing_idempotent() {
+        SkillResult exec = skill.execute(req(testCode));
+        String modelPid = objectMapper.valueToTree(exec.getPayload()).get("modelPid").asText();
+
+        // First undo: SUCCESS.
+        assertThatCode(() -> skill.undoByModel(modelPid, testCode)).doesNotThrowAnyException();
+
+        // Second undo: MetaModelService.delete throws ValidationException("模型不存在").
+        // Wrapping policy: surface raw ValidationException to the caller — Controller
+        // hand-off in T6 will translate. We assert on the canonical message fragment.
+        assertThatThrownBy(() -> skill.undoByModel(modelPid, testCode))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("模型不存在");
     }
 
     private SkillRequest req(String code) {
