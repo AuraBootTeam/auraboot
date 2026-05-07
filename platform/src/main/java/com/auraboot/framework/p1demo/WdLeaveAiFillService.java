@@ -38,7 +38,8 @@ public class WdLeaveAiFillService {
     private final LlmProviderFactory llmProviderFactory;
     private final ObjectMapper objectMapper;
 
-    private static final Pattern JSON_OBJECT = Pattern.compile("\\{[\\s\\S]*\\}");
+    private static final Pattern MARKDOWN_FENCED_JSON =
+            Pattern.compile("```(?:json)?\\s*\\n?(\\{[\\s\\S]*?\\})\\s*\\n?```", Pattern.DOTALL);
 
     private static final String SYSTEM_PROMPT = """
             You extract leave-request fields from a Chinese or English natural-language
@@ -46,12 +47,18 @@ public class WdLeaveAiFillService {
 
             Output schema (omit a key if you cannot determine it):
             {
-              "wd_req_type": one of ["annual","sick","personal","marriage","maternity","compassionate","other"],
+              "wd_req_type": one of ["annual","sick","personal","comp"],
               "wd_req_start_date": "YYYY-MM-DD",
               "wd_req_end_date": "YYYY-MM-DD",
               "wd_req_days": number (calendar days inclusive),
               "wd_req_reason": short reason (<= 200 chars, original language)
             }
+
+            Field-value semantics:
+              annual = 年假 / paid time off
+              sick = 病假 / sick leave
+              personal = 事假 / personal unpaid leave
+              comp = 调休 / compensatory time-off
 
             Resolve relative dates (today / tomorrow / next Monday / 下周三) against the
             "currentDate" hint provided in the user message. If the user gives only a
@@ -113,14 +120,54 @@ public class WdLeaveAiFillService {
     }
 
     private Map<String, Object> parseJson(String raw) {
-        Matcher m = JSON_OBJECT.matcher(raw);
-        String json = m.find() ? m.group() : raw;
+        String json = extractJsonObject(raw);
+        if (json == null) {
+            log.warn("Failed to find JSON object in LLM response. raw={}", raw);
+            return Map.of();
+        }
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            log.warn("Failed to parse LLM response as JSON object. raw={}", raw);
+            log.warn("Failed to parse LLM response as JSON object. extracted={}", json);
             return Map.of();
         }
+    }
+
+    /**
+     * Extract a single JSON object from LLM output. Tries three strategies:
+     *   1) The whole response is already a JSON object
+     *   2) Markdown-fenced ```json ... ``` block
+     *   3) Brace-counting scan to skip any prose / suffix
+     * Returns null if no balanced object is found.
+     */
+    private String extractJsonObject(String raw) {
+        if (raw == null) return null;
+        String text = raw.trim();
+        if (text.startsWith("{") && text.endsWith("}")) {
+            return text;
+        }
+        Matcher fenced = MARKDOWN_FENCED_JSON.matcher(text);
+        if (fenced.find()) {
+            return fenced.group(1);
+        }
+        int start = text.indexOf('{');
+        if (start < 0) return null;
+        int depth = 0;
+        boolean inString = false;
+        boolean escape = false;
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (escape) { escape = false; continue; }
+            if (c == '\\') { escape = true; continue; }
+            if (c == '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) return text.substring(start, i + 1);
+            }
+        }
+        return null;
     }
 
     public record AiFillResult(String turnId, Map<String, Object> fields, long totalTokens,
