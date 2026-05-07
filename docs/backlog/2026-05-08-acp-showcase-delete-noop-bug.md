@@ -1,11 +1,54 @@
 # ACP Showcase — `acs:delete_*` Commands Return Success But Don't Delete
 
 - **Date**: 2026-05-08
-- **Severity**: P1 (data integrity)
+- **Severity**: P1 (data integrity) — **platform-wide**, not acs-specific
 - **Discovered by**: E2E `acp-showcase-lifecycle.spec.ts` — ACS-011 caught it; ACS-007 was hiding it
 - **Owner**: TBD
+- **Status**: **Fixed** in this commit (FieldMapPhase routing asymmetry). Re-enabling
+  ACS-007/011 from `test.fixme` requires backend restart on the host stack to pick up the fix.
 
-## Reproduction
+## Root Cause
+
+`FieldMapPhase.execute()` had an asymmetric routing check (since
+`67f38c8b refactor: extract CommandExecutorImpl into Phase Pipeline architecture`):
+
+```java
+boolean isDeleteOp     = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType());  // OLD
+String cmdType         = (String) ec.get("type");
+boolean isStateTransition = "state_transition".equalsIgnoreCase(cmdType);
+boolean isCreateOrUpdate  = "create".equalsIgnoreCase(cmdType) || "update".equalsIgnoreCase(cmdType);
+```
+
+`isStateTransition` and `isCreateOrUpdate` fall back to `command.type`, but `isDeleteOp`
+only checks `request.operationType`. CLI / API callers using `aura exec <code> --target <pid>`
+(or any frontend that doesn't explicitly send `operationType: "delete"`) hit:
+
+- `request.operationType == null` → `isDeleteOp = false`
+- All five routing flags false → routes to `executeFieldMapPhase` (explicit-binding-rules path)
+- Most plugins have no `field_map` BindingRules with `operationType=delete` → empty for-loop
+- No `dynamicDataMapper.delete(...)` call ever fires
+- Pipeline reaches `CompletionPhase`, returns `phaseReached: completed`
+
+The `executeImplicitFieldMapPhase` path (which DOES call `dynamicDataMapper.delete`) was
+never reached for delete commands missing `operationType`.
+
+## Fix
+
+`FieldMapPhase.java`:
+
+```java
+boolean isDeleteOp = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
+        || "delete".equalsIgnoreCase(cmdType);  // mirror state_transition / create_or_update
+```
+
+## Regression Test
+
+`FieldMapPhaseTest#deleteCommandWithoutOperationTypeStillRoutesToImplicitFieldMap` —
+asserts that a `type: "delete"` command with `request.operationType == null` routes to
+`executeImplicitFieldMapPhase`. Without the fix the test fails (routing falls through
+to `executeFieldMapPhase` and the implicit path is never called).
+
+## Reproduction (pre-fix)
 
 ```bash
 # Pick any inactive safety rule
