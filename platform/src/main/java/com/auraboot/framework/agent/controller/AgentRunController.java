@@ -149,7 +149,9 @@ public class AgentRunController {
         // intent_summary uses MIN(intent) to deduplicate when a run has multiple
         // BIF rows (multi-turn grounding) — first-by-min is stable for display.
         String sql = "SELECT r.pid, r.agent_id, r.run_status, r.parent_run_id, " +
-                "       r.subtask_origin, r.total_cost, r.duration_ms, " +
+                "       r.subtask_origin, r.total_cost, " +
+                "       r.child_aggregate_cost, r.child_aggregate_tokens, " +
+                "       r.duration_ms, " +
                 "       r.created_at, r.completed_at, " +
                 "       (SELECT b.intent FROM ab_agent_bif b " +
                 "         WHERE b.run_id = r.pid AND b.tenant_id = r.tenant_id " +
@@ -218,7 +220,9 @@ public class AgentRunController {
 
     private AgentRunListItem loadRun(Long tenantId, String runId) {
         String sql = "SELECT r.pid, r.agent_id, r.run_status, r.parent_run_id, " +
-                "       r.subtask_origin, r.total_cost, r.duration_ms, " +
+                "       r.subtask_origin, r.total_cost, " +
+                "       r.child_aggregate_cost, r.child_aggregate_tokens, " +
+                "       r.duration_ms, " +
                 "       r.created_at, r.completed_at, " +
                 "       (SELECT b.intent FROM ab_agent_bif b " +
                 "         WHERE b.run_id = r.pid AND b.tenant_id = r.tenant_id " +
@@ -266,7 +270,9 @@ public class AgentRunController {
 
     private List<AgentRunListItem> loadChildRuns(Long tenantId, String runId) {
         String sql = "SELECT r.pid, r.agent_id, r.run_status, r.parent_run_id, " +
-                "       r.subtask_origin, r.total_cost, r.duration_ms, " +
+                "       r.subtask_origin, r.total_cost, " +
+                "       r.child_aggregate_cost, r.child_aggregate_tokens, " +
+                "       r.duration_ms, " +
                 "       r.created_at, r.completed_at, " +
                 "       (SELECT b.intent FROM ab_agent_bif b " +
                 "         WHERE b.run_id = r.pid AND b.tenant_id = r.tenant_id " +
@@ -316,6 +322,9 @@ public class AgentRunController {
                 .parentRunId(rs.getString("parent_run_id"))
                 .subtaskOrigin(rs.getString("subtask_origin"))
                 .costUsd(getBigDecimal(rs, "total_cost"))
+                .childAggregateCostUsd(getBigDecimal(rs, "child_aggregate_cost"))
+                .childAggregateTokens(rs.getObject("child_aggregate_tokens") == null
+                        ? 0L : ((Number) rs.getObject("child_aggregate_tokens")).longValue())
                 .durationMs(durationMs)
                 .createdAt(createdAt == null ? null : createdAt.toInstant())
                 .completedAt(completedAt == null ? null : completedAt.toInstant())
