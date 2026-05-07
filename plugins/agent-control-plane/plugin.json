@@ -24,7 +24,8 @@
     "pages": "config/pages.json",
     "i18n": "config/i18n.json",
     "roles": "config/roles.json",
-    "namedQueries": "config/named-queries.json"
+    "namedQueries": "config/named-queries.json",
+    "defaultBootstrap": "config/default-bootstrap.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
