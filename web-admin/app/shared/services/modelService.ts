@@ -376,12 +376,7 @@ export class ModelService implements IModelService {
   async updateFieldBinding(
     pid: string,
     fieldCode: string,
-    config: {
-      required?: boolean;
-      readonly?: boolean;
-      visible?: boolean;
-      displayOrder?: number;
-    },
+    config: Partial<ModelFieldBinding>,
     request?: Request,
   ): Promise<ModelFieldBinding> {
     // Convert pid to id for API call
