@@ -227,6 +227,10 @@ public class ChatSessionStore {
         private Long conversationId;
         private String agentCode;
         private String sessionId;            // legacy: kept for trace continuity, NOT used as key
+        // GAP-295 resume path: channel session pid captured at suspend so
+        // resumeTurn can re-attach the same ab_agent_channel_session_state row
+        // (rather than leaving TurnContext.channelSessionId null on resume).
+        private String channelSessionPid;
 
         // --- Tool call info ---
         private String toolId;

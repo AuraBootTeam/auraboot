@@ -629,6 +629,7 @@ public class AuraBotChatService {
                                 .conversationId(ctx.conversationId())
                                 .agentCode(pending.getAgentCode())
                                 .sessionId(sessionId)
+                                .channelSessionPid(ctx.channelSessionId())
                                 .toolId(newToolId)
                                 .toolName(toolName)
                                 .toolSpanId(toolSpan != null ? toolSpan.getSpanId() : null)
