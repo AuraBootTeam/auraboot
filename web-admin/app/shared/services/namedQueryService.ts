@@ -248,12 +248,17 @@ function handleResponse<T>(
 }
 
 function normalizePageResult<T>(payload: NamedQueryPagePayload<T>): PageResult<T> {
+  const p = payload as PageResult<T> & {
+    pageSize?: number;
+    page?: number;
+    totalPages?: number;
+  };
   return {
-    records: payload.records ?? [],
-    total: payload.total ?? 0,
-    size: payload.size ?? payload.pageSize ?? 20,
-    current: payload.current ?? payload.page ?? 1,
-    pages: payload.pages ?? payload.totalPages ?? 0,
+    records: p.records ?? [],
+    total: p.total ?? 0,
+    size: p.size ?? p.pageSize ?? 20,
+    current: p.current ?? p.page ?? 1,
+    pages: p.pages ?? p.totalPages ?? 0,
   };
 }
 

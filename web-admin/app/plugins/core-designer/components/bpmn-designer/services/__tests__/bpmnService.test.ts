@@ -59,7 +59,7 @@ describe('bpmnService label normalization', () => {
     });
 
     expect(definition.nodes[0]?.data.label).toBe('主管审批');
-    expect(definition.edges[0]?.data.label).toBe('主管');
+    expect(definition.edges[0]?.data?.label).toBe('主管');
     expect(definition.edges[0]?.label).toBe('主管');
   });
 });

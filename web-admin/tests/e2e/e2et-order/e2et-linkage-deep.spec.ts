@@ -255,7 +255,7 @@ test.describe('Field Linkage Depth', () => {
     });
     try {
       // Verify the order was created successfully by loading the edit form
-      await order.gotoEditForm(pid);
+      const formPage = await order.gotoEditForm(pid);
       // Title should be visible with the value we set
       const titleInput = formPage.fieldContainer('e2et_order_title').locator('input');
       await expect(titleInput).toHaveValue(title);

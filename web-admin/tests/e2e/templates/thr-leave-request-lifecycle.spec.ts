@@ -33,6 +33,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
+import type { Locator } from '@playwright/test';
 import {
   uniqueId,
   todayStr,

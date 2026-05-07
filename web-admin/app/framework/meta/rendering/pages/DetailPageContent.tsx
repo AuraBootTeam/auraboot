@@ -129,7 +129,7 @@ export function DetailPageContent(props: PageContentProps) {
     }
 
     async function loadRecord(): Promise<void> {
-      const endpoint = buildDetailRecordEndpoint(tableName, recordId);
+      const endpoint = buildDetailRecordEndpoint(tableName, recordId!);
       const result = await fetchResult<RecordData>(endpoint, {
         method: 'get',
         token: token || undefined,
@@ -716,7 +716,7 @@ export function DetailPageContent(props: PageContentProps) {
               directMonthlyGridBlocks.length === 0 &&
               directMiscBlocks.length === 0 &&
               tabs.length === 0 && (
-                <FallbackDetailView schema={schema} recordData={recordData} locale={locale} t={t} />
+                <FallbackDetailView schema={schema} recordData={recordData} locale={locale} />
               )}
 
             {/* Inline approval panel — shown when the record has an associated BPM process */}

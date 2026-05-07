@@ -6,11 +6,11 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import type {
-  ViewConfig,
-  ConditionalFormatRule,
-  ConditionalFormatStyle,
+import {
   CONDITIONAL_FORMAT_PRESETS,
+  type ViewConfig,
+  type ConditionalFormatRule,
+  type ConditionalFormatStyle,
 } from '~/framework/smart/types/savedView';
 
 interface FieldOption {

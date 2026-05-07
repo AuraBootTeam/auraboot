@@ -197,7 +197,7 @@ test.describe('Permission Management — Role Members Tab', () => {
     await page.getByTestId('permission-right-tab-members').click();
 
     const memberRows = page.locator('[data-testid^="role-member-row-"]');
-    let memberReady: 'rows' | 'empty' | 'pending' = 'pending';
+    let memberReady: string = 'pending';
     await expect
       .poll(
         async () => {

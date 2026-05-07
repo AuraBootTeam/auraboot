@@ -189,7 +189,8 @@ export default function LlmProvidersPage() {
   } | null>(null);
   const [localTestingPid, setLocalTestingPid] = useState<string | null>(null);
 
-  // Track dynamic custom provider fields
+  // Track dynamic custom provider fields (triggers re-render when new custom providers are registered)
+  const [, setCustomProviderFields] = useState<Record<string, unknown>>({});
   // Combined testing state
   const isTestingPid = testingPid || localTestingPid;
 

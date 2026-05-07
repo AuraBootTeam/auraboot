@@ -1529,21 +1529,21 @@ export function ListPageContent(props: PageContentProps) {
   const SYSTEM_FIELD_DEFS: ColumnConfig[] = [
     {
       field: 'created_at',
-      label: t('common.created_at', undefined, 'Created At'),
+      label: t('common.created_at') || 'Created At',
       valueType: 'datetime' as any,
     },
     {
       field: 'updated_at',
-      label: t('common.updated_at', undefined, 'Updated At'),
+      label: t('common.updated_at') || 'Updated At',
       valueType: 'datetime' as any,
     },
     {
       field: 'created_by',
-      label: t('common.creator', undefined, 'Created By'),
+      label: t('common.creator') || 'Created By',
     },
     {
       field: 'updated_by',
-      label: t('common.modifier', undefined, 'Updated By'),
+      label: t('common.modifier') || 'Updated By',
     },
   ];
 

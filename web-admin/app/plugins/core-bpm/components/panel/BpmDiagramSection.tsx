@@ -88,7 +88,7 @@ function DiagramViewportSync({
   containerRef,
 }: {
   nodeCount: number;
-  containerRef: RefObject<HTMLDivElement>;
+  containerRef: RefObject<HTMLDivElement | null>;
 }) {
   const nodesInitialized = useNodesInitialized();
   const { fitView } = useReactFlow();
