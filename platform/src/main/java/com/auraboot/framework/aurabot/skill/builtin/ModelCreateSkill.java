@@ -4,14 +4,20 @@ import com.auraboot.framework.aurabot.skill.AuraBotSkill;
 import com.auraboot.framework.aurabot.skill.RiskLevel;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
+import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
+import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -113,7 +119,67 @@ public class ModelCreateSkill implements AuraBotSkill {
 
     @Override
     public SkillResult dryRun(SkillRequest req) {
-        throw new UnsupportedOperationException("model:create dryRun not implemented yet (T3)");
+        Map<String, Object> params = parseParams(req);
+        String code = (String) params.get("code");
+
+        MetaModelDTO existing = metaModelService.findByCode(code);
+        if (existing != null) {
+            throw new SkillSpiException(
+                    SkillErrorCode.PARAMS_INVALID,
+                    "modelCode " + code + " already exists",
+                    "/code");
+        }
+
+        ObjectNode preview = buildPreview(params, code);
+        return SkillResult.builder()
+                .status(SkillResult.Status.NEEDS_CONFIRM)
+                .skillName(name())
+                .preview(preview)
+                .riskLevel(riskLevel())
+                .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseParams(SkillRequest req) {
+        if (req.getParams() == null) {
+            throw new SkillSpiException(SkillErrorCode.PARAMS_INVALID, "params is required", "/");
+        }
+        return objectMapper.convertValue(req.getParams(), Map.class);
+    }
+
+    private ObjectNode buildPreview(Map<String, Object> params, String code) {
+        ObjectNode out = objectMapper.createObjectNode();
+        out.put("modelCode", code);
+        out.put("displayName", (String) params.get("displayName"));
+        out.put("modelCategory", asStringOr(params.get("modelCategory"), "ENTITY"));
+        out.put("domainCategory", (String) params.get("domainCategory"));
+        out.put("dataSensitivity", asStringOr(params.get("dataSensitivity"), "INTERNAL"));
+        out.put("willCreateTable", "mt_" + code);
+        ArrayNode fields = out.putArray("defaultFields");
+        addField(fields, "pid", "string", true);
+        addField(fields, "tenant_id", "bigint", false);
+        addField(fields, "created_at", "timestamptz", false);
+        addField(fields, "updated_at", "timestamptz", false);
+        addField(fields, "created_by", "string", false);
+        addField(fields, "updated_by", "string", false);
+        addField(fields, "deleted_flag", "boolean", false);
+        out.put("riskNote",
+                "Creates a real PG table mt_" + code
+                + ". Undo within 30 min drops the table; data inserted before undo blocks the undo.");
+        return out;
+    }
+
+    private void addField(ArrayNode fields, String fieldCode, String type, boolean primary) {
+        ObjectNode f = fields.addObject();
+        f.put("code", fieldCode);
+        f.put("type", type);
+        if (primary) {
+            f.put("primary", true);
+        }
+    }
+
+    private String asStringOr(Object v, String fallback) {
+        return v == null ? fallback : v.toString();
     }
 
     @Override
