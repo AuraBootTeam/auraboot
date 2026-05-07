@@ -22,16 +22,20 @@ export interface MenuConfig {
 /**
  * NavigationResource — single declaration for a navigable page.
  *
- * Combines what was previously split across menus.json / permissions.json /
- * router config / entitlement context. The kernel's RouteRegistry derives:
+ * The kernel's RouteRegistry derives:
  *
  *   - React Router tree     (from path + component + children)
- *   - Sidebar menu tree     (from menu + permission + featureKey + user)
  *   - Breadcrumb trail      (from parentKey chain + breadcrumb flag)
  *   - Tab strip             (from tab flag)
  *
- * Visibility rule:
- *   visible = !hidden && hasPermission(permission) && hasFeature(featureKey)
+ * Sidebar menu rendering is owned by the backend (`/api/menu/user`,
+ * sourced from `ab_menu` populated by plugin `menus.json`); permission
+ * gating happens server-side via `@RequirePermission` on the
+ * Controllers. This interface intentionally does NOT carry `permission`
+ * or `featureKey` fields — front-end client-side menu gating was
+ * removed in favor of the single backend source of truth (see
+ * auraboot-enterprise/docs/standards/meta/permission-code-naming.md
+ * §5 Q3).
  */
 export interface NavigationResource {
   /** Globally unique key (across all plugins). Convention: `<plugin>.<page>`. */
@@ -67,12 +71,6 @@ export interface NavigationResource {
 
   /** Whether this resource is shown in the top tab strip when navigated. Default: true. */
   tab?: boolean
-
-  /** Required permission codes. ALL must be granted. */
-  permission?: string | string[]
-
-  /** Required feature keys (entitlement gate). ALL must be entitled. */
-  featureKey?: string | string[]
 
   /** Hide from menu but keep route accessible. */
   hidden?: boolean

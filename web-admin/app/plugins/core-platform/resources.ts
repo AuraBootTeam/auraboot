@@ -7,7 +7,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Plugins', zh: '插件管理' },
     icon: 'package',
     menu: { order: 10, group: 'platform' },
-    permission: 'plugin_management',
     file: './plugins/core-platform/pages/plugins/index.tsx',
   },
   {
@@ -15,7 +14,6 @@ export const RESOURCES: PluginResource[] = [
     path: '/plugins/solutions/:code',
     title: { en: 'Solution Detail', zh: '解决方案详情' },
     icon: 'package',
-    permission: 'plugin_management',
     file: './plugins/core-platform/pages/plugins/solutions/$code.tsx',
   },
   {
@@ -23,7 +21,6 @@ export const RESOURCES: PluginResource[] = [
     path: '/plugins/:pluginId',
     title: { en: 'Plugin Detail', zh: '插件详情' },
     icon: 'package',
-    permission: 'plugin_management',
     file: './plugins/core-platform/pages/plugins/$pluginId.tsx',
   },
   {
@@ -44,7 +41,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Cross-Tenant Grants', zh: '跨租户授权' },
     icon: 'shield',
     menu: { order: 30, group: 'platform' },
-    permission: 'platform.cross-tenant-grant.read',
     file: './plugins/core-platform/pages/CrossTenantGrantsPage.tsx',
   },
 ]
