@@ -28,6 +28,27 @@ export interface UseKanbanDataOptions {
   linkageFilters?: FilterConfig[];
   /** Whether to enable data fetching (default: true) */
   enabled?: boolean;
+  /**
+   * Page key used as the dynamic API resource segment for persistence.
+   * When provided, moveCard PUTs `/api/dynamic/{pageKey}/{recordId}` to
+   * persist the column change with optimistic-update + rollback semantics.
+   * When omitted, moveCard remains purely optimistic (back-compat).
+   */
+  pageKey?: string;
+  /**
+   * Optional callback invoked when persistence fails (server returned a
+   * non-success Result code or the network call rejected). The optimistic
+   * update is rolled back before this is called.
+   */
+  onMoveError?: (error: { code: string; message: string }) => void;
+}
+
+/**
+ * Move error reported to the onMoveError callback.
+ */
+export interface KanbanMoveError {
+  code: string;
+  message: string;
 }
 
 /**
@@ -42,13 +63,20 @@ export interface UseKanbanDataResult {
   error: Error | null;
   /** Function to manually trigger data refresh */
   refetch: () => Promise<void>;
-  /** Function to optimistically move a card between columns */
+  /**
+   * Move a card between columns with optimistic update.
+   *
+   * When the hook is configured with a `pageKey`, the change is persisted via
+   * PUT `/api/dynamic/{pageKey}/{recordId}` and rolled back on failure. The
+   * returned promise resolves regardless of success/failure; failures are
+   * surfaced through `onMoveError` to keep the call site simple.
+   */
   moveCard: (
     cardId: string,
     sourceColumnId: string,
     targetColumnId: string,
     targetIndex: number,
-  ) => void;
+  ) => Promise<void>;
 }
 
 /**
@@ -112,7 +140,7 @@ function calculateAggregation(cards: KanbanCard[], aggregation: KanbanAggregatio
  * });
  */
 export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResult {
-  const { dataSource, linkageFilters, enabled = true } = options;
+  const { dataSource, linkageFilters, enabled = true, pageKey, onMoveError } = options;
 
   const [rawData, setRawData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
@@ -312,28 +340,75 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
   }, [rawData, groupByField, idField, aggregations]);
 
   /**
-   * Move a card between columns (optimistic update)
+   * Move a card between columns with optimistic update + persistence.
    *
-   * Updates the local rawData to reflect the card movement.
-   * Does not persist the change - external handler should call API.
+   * Behaviour:
+   * 1. Optimistically rewrites the card's groupByField in local rawData so
+   *    the UI updates instantly.
+   * 2. If pageKey is provided, persists the change via
+   *    PUT `/api/dynamic/{pageKey}/{recordId}` with body
+   *    `{ [groupByField]: targetColumnId }`.
+   * 3. On non-success Result code OR network rejection, rolls back the
+   *    optimistic update by restoring the source column value, then invokes
+   *    `onMoveError` so the caller can surface a toast.
+   * 4. When pageKey is omitted, behaves like the legacy optimistic-only
+   *    moveCard (back-compat for callers that don't yet pass pageKey).
    */
   const moveCard = useCallback(
-    (cardId: string, _sourceColumnId: string, targetColumnId: string, _targetIndex: number) => {
-      setRawData((prevData) => {
-        return prevData.map((row) => {
+    async (
+      cardId: string,
+      sourceColumnId: string,
+      targetColumnId: string,
+      _targetIndex: number,
+    ): Promise<void> => {
+      // Step 1: optimistic update
+      setRawData((prevData) =>
+        prevData.map((row) => {
           const rowId = String(row[idField] ?? '');
           if (rowId === cardId) {
-            // Update the groupByField value to move the card to the target column
-            return {
-              ...row,
-              [groupByField]: targetColumnId,
-            };
+            return { ...row, [groupByField]: targetColumnId };
           }
           return row;
+        }),
+      );
+
+      // No pageKey → legacy optimistic-only behaviour
+      if (!pageKey) {
+        return;
+      }
+
+      const rollback = () => {
+        setRawData((prevData) =>
+          prevData.map((row) => {
+            const rowId = String(row[idField] ?? '');
+            if (rowId === cardId) {
+              return { ...row, [groupByField]: sourceColumnId };
+            }
+            return row;
+          }),
+        );
+      };
+
+      try {
+        const result = await fetchResult<unknown>(`/api/dynamic/${pageKey}/${cardId}`, {
+          method: 'put',
+          params: { [groupByField]: targetColumnId },
         });
-      });
+
+        if (!ResultHelper.isSuccess(result)) {
+          rollback();
+          onMoveError?.({
+            code: String(result.code),
+            message: result.message || result.desc || 'Move failed',
+          });
+        }
+      } catch (err) {
+        rollback();
+        const message = err instanceof Error ? err.message : 'Network error';
+        onMoveError?.({ code: 'NETWORK_ERROR', message });
+      }
     },
-    [idField, groupByField],
+    [idField, groupByField, pageKey, onMoveError],
   );
 
   return {
