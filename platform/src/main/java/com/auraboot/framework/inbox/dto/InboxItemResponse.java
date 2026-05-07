@@ -22,16 +22,62 @@ public class InboxItemResponse {
     private Long id;
     private String itemType;
     private String title;
+
+    /**
+     * @deprecated Use {@link #summary} instead. Mobile clients already prefer
+     *     {@code summary} over {@code subtitle} when both are present
+     *     (Android {@code InboxItemDTO.toDomain} and iOS
+     *     {@code InboxItem.summary} fall back to {@code subtitle} only when
+     *     summary is null). Scheduled for removal after release 6.5 — see
+     *     {@code docs/mobile/legacy-field-deprecation.md}.
+     */
+    @Deprecated(since = "6.4")
     private String subtitle;
+
     private String summary;
     private String status;
     private String priority;
     private String sourceType;
     private String sourceId;
+
+    /**
+     * @deprecated Use {@link #sourceModel} instead. Both fields carry the
+     *     same value today (see {@link #from(InboxItem)}); {@code modelCode}
+     *     is the legacy field name that predates the BFF DTO formalisation.
+     *     Scheduled for removal after release 6.5 — see
+     *     {@code docs/mobile/legacy-field-deprecation.md}.
+     */
+    @Deprecated(since = "6.4")
     private String modelCode;
+
     private String sourceModel;
+
+    /**
+     * @deprecated Use {@link #sourceRecordId} (string) instead. The numeric
+     *     {@code recordId} column was a leftover from when {@code ab_inbox_item}
+     *     stored {@code BIGINT}-only record references; production records
+     *     are ULIDs (string) and the BFF only emits a numeric value when the
+     *     legacy column happens to be set. Mobile DTOs already prefer
+     *     {@code sourceRecordId} (Android {@code InboxItemDTO.toDomain} L61,
+     *     iOS {@code InboxItem.sourceRecordId}). Scheduled for removal after
+     *     release 6.5 — see {@code docs/mobile/legacy-field-deprecation.md}.
+     */
+    @Deprecated(since = "6.4")
     private Long recordId;
+
     private String sourceRecordId;
+
+    /**
+     * @deprecated Use {@link #cardData} (parsed Map) instead. {@code cardPayload}
+     *     is the raw JSON string stored in {@code ab_inbox_item.card_payload};
+     *     the BFF parses it once and exposes the parsed map via
+     *     {@link #cardData}. No mobile renderer reads {@code cardPayload}
+     *     directly today (Android {@code InboxItemDTO.cardPayload} only
+     *     fills {@link #cardData} when the parsed map is missing).
+     *     Scheduled for removal after release 6.5 — see
+     *     {@code docs/mobile/legacy-field-deprecation.md}.
+     */
+    @Deprecated(since = "6.4")
     private String cardPayload;
 
     /**
