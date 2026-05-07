@@ -4,9 +4,12 @@
  * Extracted from ListPageContent.tsx (behavior-preserving refactor).
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
+
+const DROPDOWN_MIN_WIDTH = 120;
+const DROPDOWN_ESTIMATED_HEIGHT = 40; // single-item baseline; refined per item
 
 /**
  * DropdownMenu — Portal-rendered dropdown for row actions.
@@ -28,21 +31,48 @@ function DropdownMenu({
   handleAction: (button: ButtonConfig, record?: any) => void;
   setOpen: (v: boolean) => void;
 }) {
-  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  // Compute initial position synchronously from the trigger so the menu
+  // never paints at (0,0) — that flash placed the menu off-screen / off
+  // the trigger and was reported by users as "no dropdown appeared".
+  const computePos = () => {
+    const el = menuRef.current;
+    if (!el || typeof window === 'undefined') return { top: 0, left: 0, ready: false };
+    const rect = el.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const estimatedHeight = Math.max(
+      DROPDOWN_ESTIMATED_HEIGHT,
+      moreButtons.length * 32 + 8,
+    );
+    let top = rect.bottom + 4;
+    if (top + estimatedHeight > viewportHeight) {
+      // Flip above trigger when there is no room below.
+      top = Math.max(4, rect.top - estimatedHeight - 4);
+    }
+    let left = rect.right - DROPDOWN_MIN_WIDTH;
+    left = Math.min(Math.max(0, left), Math.max(0, viewportWidth - DROPDOWN_MIN_WIDTH - 4));
+    return { top, left, ready: true };
+  };
 
-  useEffect(() => {
-    if (!menuRef.current) return;
-    const rect = menuRef.current.getBoundingClientRect();
-    setPos({
-      top: rect.bottom + 4,
-      left: rect.right - 120, // min-w-[120px] aligned to right edge
-    });
-  }, [menuRef]);
+  const [pos, setPos] = useState<{ top: number; left: number; ready: boolean }>(computePos);
+
+  // useLayoutEffect ensures the position is committed before the browser
+  // paints the portal, eliminating the (0,0) flash.
+  useLayoutEffect(() => {
+    setPos(computePos());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
       className="fixed z-[9999] min-w-[120px] rounded-md border border-gray-200 bg-white py-1 shadow-lg"
-      style={{ top: pos.top, left: Math.max(0, pos.left) }}
+      style={{
+        top: pos.top,
+        left: pos.left,
+        // Hide for the very first paint if we somehow could not measure
+        // (e.g. menuRef not yet attached) so the menu never flashes at (0,0).
+        visibility: pos.ready ? 'visible' : 'hidden',
+      }}
       data-testid="row-action-dropdown"
     >
       {moreButtons.map((btn) => (
@@ -152,7 +182,14 @@ export function RowActionButtons({
 
       {/* More actions dropdown — rendered via Portal to avoid overflow clipping */}
       {moreButtons.length > 0 && (
-        <div className="relative" ref={menuRef}>
+        <div
+          className="relative"
+          ref={menuRef}
+          // Keep the trigger visible after the user moves the cursor into the
+          // portaled menu (the row loses :hover and ListTable's wrapper would
+          // otherwise fade us out via opacity-0/group-hover).
+          data-row-actions-open={open ? 'true' : undefined}
+        >
           <button
             type="button"
             data-testid="row-action-more"
