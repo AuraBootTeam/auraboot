@@ -6,8 +6,10 @@ import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.JsonSchema;
@@ -35,6 +37,8 @@ class ModelCreateSkillUnitTest {
 
     @Mock MetaModelService metaModelService;
     @Mock MetaFieldService metaFieldService;
+    @Mock SchemaManagementService schemaManagementService;
+    @Mock MetaModelFieldBindingMapper bindingMapper;
     @Mock DynamicDataMapper dynamicDataMapper;
 
     private ModelCreateSkill skill;
@@ -44,7 +48,8 @@ class ModelCreateSkillUnitTest {
     @BeforeEach
     void setUp() throws Exception {
         objectMapper = new ObjectMapper();
-        skill = new ModelCreateSkill(metaModelService, metaFieldService, dynamicDataMapper, objectMapper);
+        skill = new ModelCreateSkill(metaModelService, metaFieldService,
+                schemaManagementService, bindingMapper, dynamicDataMapper, objectMapper);
         skill.init(); // PostConstruct manual trigger
         compiledSchema = JsonSchemaFactory
                 .getInstance(SpecVersion.VersionFlag.V202012)
