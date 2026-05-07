@@ -5,6 +5,7 @@ import {
   HandThumbUpIcon,
   ChatBubbleLeftIcon,
 } from '@heroicons/react/24/outline';
+import { toast } from 'sonner';
 
 // ---- Types ----------------------------------------------------------------
 
@@ -461,8 +462,12 @@ export default function ReviewSection({ targetType, targetId }: ReviewSectionPro
     });
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
-      throw new Error(json?.message || json?.error || `HTTP ${res.status}`);
+      const errorMessage = json?.message || json?.error || `HTTP ${res.status}`;
+      toast.error(errorMessage);
+      // Re-throw so the form's inner submit handler can surface it inline too.
+      throw new Error(errorMessage);
     }
+    toast.success(data.parentId ? 'Reply posted' : 'Review posted');
     // Refresh both
     await Promise.all([fetchReviews(), fetchSummary()]);
   };
@@ -473,12 +478,18 @@ export default function ReviewSection({ targetType, targetId }: ReviewSectionPro
 
   const handleVote = async (pid: string) => {
     try {
-      await fetch(`/api/reviews/${encodeURIComponent(pid)}/vote?voteType=HELPFUL`, {
+      const res = await fetch(`/api/reviews/${encodeURIComponent(pid)}/vote?voteType=HELPFUL`, {
         method: 'post',
       });
+      if (!res.ok) {
+        toast.error('Vote failed');
+        return;
+      }
+      toast.success('Vote recorded');
       await fetchReviews();
     } catch (err) {
       console.error('[ReviewSection] handleVote failed', err);
+      toast.error('Vote failed');
     }
   };
 

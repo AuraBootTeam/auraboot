@@ -1,6 +1,7 @@
 import React from 'react';
 import { InputField, SelectField, TextareaField } from '~/ui/FormField';
 import { industryOptions, type TenantFormData, type FormErrors } from '~/hooks/useTenantForm';
+import { useI18n } from '~/contexts/I18nContext';
 
 interface TenantFormFieldsProps {
   formData: TenantFormData;
@@ -23,6 +24,8 @@ export default function TenantFormFields({
   showWebsite = true,
   variant = 'edit',
 }: TenantFormFieldsProps) {
+  const { t } = useI18n();
+
   // 根据不同变体调整样式
   const getFieldClassName = () => {
     switch (variant) {
@@ -44,29 +47,71 @@ export default function TenantFormFields({
     }
   };
 
+  // i18n: pass key + Chinese fallback so missing-catalog still renders the
+  // existing UX, while a registered locale (en, etc.) gets translated.
   const getLabelText = (field: string) => {
     const labels = {
-      name: variant === 'selection' ? '租户名称' : '企业名称',
-      displayName: '显示名称',
-      logo: '企业Logo',
-      industry: variant === 'selection' ? '行业' : '所属行业',
-      contactEmail: '联系邮箱',
-      contactPhone: '联系电话',
-      website: '官方网站',
-      description: variant === 'selection' ? '描述' : '企业描述',
+      name: t(
+        variant === 'selection' ? 'tenant.label.name.selection' : 'tenant.label.name.full',
+        undefined,
+        variant === 'selection' ? '租户名称' : '企业名称',
+      ),
+      displayName: t('tenant.label.displayName', undefined, '显示名称'),
+      logo: t('tenant.label.logo', undefined, '企业Logo'),
+      industry: t(
+        variant === 'selection' ? 'tenant.label.industry.short' : 'tenant.label.industry.full',
+        undefined,
+        variant === 'selection' ? '行业' : '所属行业',
+      ),
+      contactEmail: t('tenant.label.contactEmail', undefined, '联系邮箱'),
+      contactPhone: t('tenant.label.contactPhone', undefined, '联系电话'),
+      website: t('tenant.label.website', undefined, '官方网站'),
+      description: t(
+        variant === 'selection' ? 'tenant.label.description.short' : 'tenant.label.description.full',
+        undefined,
+        variant === 'selection' ? '描述' : '企业描述',
+      ),
     };
     return labels[field as keyof typeof labels] || field;
   };
 
   const getPlaceholder = (field: string) => {
     const placeholders = {
-      name: variant === 'selection' ? '输入租户名称' : '请输入企业名称',
-      displayName: variant === 'selection' ? '输入显示名称' : '请输入显示名称',
-      logo: '请输入Logo图片地址',
-      contactEmail: variant === 'selection' ? '输入联系邮箱' : '请输入联系邮箱',
-      contactPhone: variant === 'selection' ? '输入联系电话' : '请输入联系电话',
-      website: '请输入官方网站地址',
-      description: variant === 'selection' ? '输入租户描述' : '请输入企业描述',
+      name: t(
+        variant === 'selection' ? 'tenant.placeholder.name.selection' : 'tenant.placeholder.name.full',
+        undefined,
+        variant === 'selection' ? '输入租户名称' : '请输入企业名称',
+      ),
+      displayName: t(
+        variant === 'selection'
+          ? 'tenant.placeholder.displayName.selection'
+          : 'tenant.placeholder.displayName.full',
+        undefined,
+        variant === 'selection' ? '输入显示名称' : '请输入显示名称',
+      ),
+      logo: t('tenant.placeholder.logo', undefined, '请输入Logo图片地址'),
+      contactEmail: t(
+        variant === 'selection'
+          ? 'tenant.placeholder.contactEmail.selection'
+          : 'tenant.placeholder.contactEmail.full',
+        undefined,
+        variant === 'selection' ? '输入联系邮箱' : '请输入联系邮箱',
+      ),
+      contactPhone: t(
+        variant === 'selection'
+          ? 'tenant.placeholder.contactPhone.selection'
+          : 'tenant.placeholder.contactPhone.full',
+        undefined,
+        variant === 'selection' ? '输入联系电话' : '请输入联系电话',
+      ),
+      website: t('tenant.placeholder.website', undefined, '请输入官方网站地址'),
+      description: t(
+        variant === 'selection'
+          ? 'tenant.placeholder.description.selection'
+          : 'tenant.placeholder.description.full',
+        undefined,
+        variant === 'selection' ? '输入租户描述' : '请输入企业描述',
+      ),
     };
     return placeholders[field as keyof typeof placeholders] || '';
   };
