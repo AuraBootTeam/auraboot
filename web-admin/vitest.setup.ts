@@ -31,8 +31,7 @@ vi.mock('react-router', async () => {
   };
 });
 
-// @testing-library/react v14+ performs cleanup automatically via afterEach
-// in its own setup, so no explicit cleanup() call is needed here.
+// @testing-library/react auto-runs cleanup after each test in React 16+
 
 function createStorageMock() {
   const storage = new Map<string, string>();
