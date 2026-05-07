@@ -6,7 +6,7 @@
  * duplication between DashboardPropertyField and Flow PropertyField.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BaseInput,
   BaseSelect,
@@ -29,6 +29,8 @@ import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
 import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
 import { ArrayItemEditor } from './ArrayItemEditor';
+import { dictService } from '~/shared/services/dictService';
+import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema } from './types';
 
@@ -357,6 +359,17 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
       );
     }
 
+    case 'dict-select':
+      return (
+        <DictSelectField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder}
+          helpText={helpText}
+          dictCodeFilter={schema.dictCodeFilter}
+        />
+      );
+
     default:
       return (
         <BaseInput
@@ -466,6 +479,78 @@ function defaultForType(type: string): unknown {
     default:
       return undefined;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 'dict-select' component
+// ---------------------------------------------------------------------------
+
+/** Async dict selector — fetches all published dicts on mount and renders a <select>. */
+function DictSelectField({
+  adapter,
+  label,
+  placeholder,
+  helpText,
+  dictCodeFilter,
+}: {
+  adapter: FieldAdapter<unknown>;
+  label?: string;
+  placeholder?: string;
+  helpText?: string;
+  dictCodeFilter?: string[];
+}) {
+  const [dicts, setDicts] = useState<{ code: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    dictService
+      .findAll()
+      .then((all) => {
+        if (!alive) return;
+        const filtered = dictCodeFilter
+          ? all.filter((d) => dictCodeFilter.includes(d.code))
+          : all;
+        setDicts(filtered as { code: string; name: string }[]);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        console.error('[dict-select] load failed', err);
+        toast.error('加载字典失败');
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loading) {
+    return <span className="text-sm text-gray-400">加载中…</span>;
+  }
+
+  return (
+    <div>
+      {label && (
+        <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
+      )}
+      <select
+        value={(adapter.value as string) ?? ''}
+        onChange={(e) => adapter.setValue(e.target.value || undefined)}
+        disabled={adapter.disabled}
+        className="block w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+      >
+        <option value="">{placeholder ?? '—'}</option>
+        {dicts.map((d) => (
+          <option key={d.code} value={d.code}>
+            {d.name}
+          </option>
+        ))}
+      </select>
+      {helpText && <p className="mt-1 text-xs text-gray-500">{helpText}</p>}
+    </div>
+  );
 }
 
 export default PropertyFieldRenderer;

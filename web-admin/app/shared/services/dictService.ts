@@ -277,4 +277,16 @@ export const dictService = {
     );
     return handleResponse(result, 'Failed to search dictionaries');
   },
+
+  /**
+   * Load all published dictionaries (convenience wrapper over query).
+   * Used by dict-select property fields in the designer.
+   */
+  async findAll(httpRequest?: Request): Promise<DictDTO[]> {
+    const result = await dictService.query(
+      { pageNum: 1, pageSize: 1000, status: 'published' },
+      httpRequest,
+    );
+    return result.records ?? [];
+  },
 };
