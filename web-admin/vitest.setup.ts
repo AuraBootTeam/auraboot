@@ -1,6 +1,4 @@
 import '@testing-library/jest-dom';
-// Without explicit cleanup, DOM state leaks across tests (e.g., bpm-withdraw-reason
-// found multiple times). Auto-cleanup requires vitest globals which we don't enable.
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
