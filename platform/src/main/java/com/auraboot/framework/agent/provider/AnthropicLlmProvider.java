@@ -4,11 +4,17 @@ import com.auraboot.framework.agent.dto.AnthropicRequest;
 import com.auraboot.framework.agent.dto.AnthropicResponse;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.dto.LlmChunk;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Anthropic Claude Messages API provider.
@@ -195,6 +202,244 @@ public class AnthropicLlmProvider implements LlmProvider {
             out.setWarnings(warnings);
         }
         return out;
+    }
+
+    /**
+     * Real Anthropic streaming via {@code /v1/messages} {@code stream: true}.
+     *
+     * <p>Subscribes to the Anthropic SSE event stream and emits one
+     * {@link LlmChunk} per relevant event. Event mapping (E.1 Phase 1):
+     *
+     * <pre>
+     *   message_start          → ignored (no user-visible delta)
+     *   content_block_start    → ignored (block index tracked internally)
+     *   content_block_delta    → text_delta     → LlmChunk.delta(seq, text)
+     *                          → thinking_delta → LlmChunk.thinking(seq, text)
+     *                          → signature_delta→ accumulated, not emitted as chunk
+     *   content_block_stop     → ignored
+     *   message_delta          → captures stop_reason + output_tokens
+     *   message_stop           → terminal: emit LlmChunk.done(seq, aggregate)
+     *   error                  → Flux.error(...) — NO fallback to sync (Q5)
+     * </pre>
+     *
+     * <p>The aggregate {@link LlmChatResponse} is built from accumulated text
+     * + thinking blocks + final usage so downstream callers (e.g.
+     * {@link com.auraboot.framework.automation.executor.impl.LlmCallExecutor})
+     * can write {@code ${outputVariable}} only after the terminal chunk —
+     * matching spec Q7 (no partial value visible mid-stream).
+     */
+    @Override
+    public Flux<LlmChunk> streamChat(LlmChatRequest request, String apiKey, String baseUrl) {
+        // Vision capability gate mirrors chat() — fail fast before the wire.
+        if (containsImageContent(request.getMessages()) && !supportsVision(request.getModel())) {
+            return Flux.error(new IllegalArgumentException(
+                    "model " + request.getModel() + " does not support vision input; "
+                            + "use a Claude 3.5+ / 4.x / 5.x model "
+                            + "or remove the image attachment."));
+        }
+
+        List<String> warnings = new ArrayList<>();
+        AnthropicRequest anthropicReq = buildAnthropicRequest(request, warnings);
+        // Force stream:true on the wire body. We re-serialise the Anthropic
+        // request as a generic Map so we can add a transport-only field
+        // without polluting AnthropicRequest with a flag that has no
+        // semantic meaning to the rest of the codebase.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = objectMapper.convertValue(anthropicReq, Map.class);
+        body.put("stream", Boolean.TRUE);
+
+        // Streaming aggregator state. Mutable, but confined to the Flux pipeline
+        // — Reactor guarantees serialised emission per subscriber so no extra
+        // synchronisation is needed inside flatMap callbacks.
+        AtomicLong seqCounter = new AtomicLong(0L);
+        StreamingAggregator agg = new StreamingAggregator(warnings);
+
+        String bodyJson;
+        try {
+            bodyJson = objectMapper.writeValueAsString(body);
+        } catch (Exception e) {
+            return Flux.error(e);
+        }
+
+        Flux<ServerSentEvent<String>> sseFlux = webClient.post()
+                .uri(baseUrl + "/v1/messages")
+                .header("x-api-key", apiKey)
+                .header("anthropic-version", "2023-06-01")
+                .header("content-type", "application/json")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(bodyJson)
+                .retrieve()
+                .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {});
+
+        return sseFlux
+                .concatMap(sse -> {
+                    String eventType = sse.event();
+                    String data = sse.data();
+                    if (eventType == null || data == null || data.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    try {
+                        return handleAnthropicSseEvent(eventType, data, seqCounter, agg);
+                    } catch (Exception e) {
+                        return Flux.error(e);
+                    }
+                });
+    }
+
+    /**
+     * Translate one Anthropic SSE event into zero-or-one {@link LlmChunk}.
+     * Visible for tests (package-private) so unit-level event-mapping coverage
+     * does not need to spin up a WebClient.
+     */
+    Flux<LlmChunk> handleAnthropicSseEvent(String eventType,
+                                           String data,
+                                           AtomicLong seqCounter,
+                                           StreamingAggregator agg) throws Exception {
+        switch (eventType) {
+            case "message_start": {
+                JsonNode root = objectMapper.readTree(data);
+                JsonNode usage = root.path("message").path("usage");
+                if (!usage.isMissingNode()) {
+                    agg.inputTokens = usage.path("input_tokens").asInt(agg.inputTokens);
+                    agg.cacheCreationInputTokens = usage.path("cache_creation_input_tokens").asInt(agg.cacheCreationInputTokens);
+                    agg.cacheReadInputTokens = usage.path("cache_read_input_tokens").asInt(agg.cacheReadInputTokens);
+                }
+                return Flux.empty();
+            }
+            case "content_block_start": {
+                JsonNode root = objectMapper.readTree(data);
+                int idx = root.path("index").asInt(0);
+                String type = root.path("content_block").path("type").asText("");
+                agg.startBlock(idx, type);
+                return Flux.empty();
+            }
+            case "content_block_delta": {
+                JsonNode root = objectMapper.readTree(data);
+                int idx = root.path("index").asInt(0);
+                JsonNode delta = root.path("delta");
+                String dtype = delta.path("type").asText("");
+                if ("text_delta".equals(dtype)) {
+                    String text = delta.path("text").asText("");
+                    agg.appendText(idx, text);
+                    long s = seqCounter.getAndIncrement();
+                    return Flux.just(LlmChunk.delta(s, text));
+                } else if ("thinking_delta".equals(dtype)) {
+                    String thinking = delta.path("thinking").asText("");
+                    agg.appendThinking(idx, thinking);
+                    long s = seqCounter.getAndIncrement();
+                    return Flux.just(LlmChunk.thinking(s, thinking));
+                } else if ("signature_delta".equals(dtype)) {
+                    String sig = delta.path("signature").asText("");
+                    agg.appendSignature(idx, sig);
+                    return Flux.empty();
+                }
+                return Flux.empty();
+            }
+            case "content_block_stop": {
+                return Flux.empty();
+            }
+            case "message_delta": {
+                JsonNode root = objectMapper.readTree(data);
+                JsonNode delta = root.path("delta");
+                String stopReason = delta.path("stop_reason").asText(null);
+                if (stopReason != null && !stopReason.isEmpty() && !"null".equals(stopReason)) {
+                    agg.stopReason = stopReason;
+                }
+                JsonNode usage = root.path("usage");
+                if (!usage.isMissingNode()) {
+                    agg.outputTokens = usage.path("output_tokens").asInt(agg.outputTokens);
+                }
+                return Flux.empty();
+            }
+            case "message_stop": {
+                LlmChatResponse aggregate = agg.toResponse();
+                long s = seqCounter.getAndIncrement();
+                return Flux.just(LlmChunk.done(s, aggregate));
+            }
+            case "error": {
+                JsonNode root = objectMapper.readTree(data);
+                String message = root.path("error").path("message").asText("anthropic stream error");
+                return Flux.error(new RuntimeException("Anthropic streaming error: " + message));
+            }
+            case "ping":
+            default:
+                return Flux.empty();
+        }
+    }
+
+    /**
+     * Mutable accumulator for SSE-driven response assembly. Kept package-private
+     * (and as a static nested class) so unit tests can construct one directly.
+     */
+    static final class StreamingAggregator {
+        final Map<Integer, StringBuilder> textBlocks = new LinkedHashMap<>();
+        final Map<Integer, StringBuilder> thinkingBlocks = new LinkedHashMap<>();
+        final Map<Integer, StringBuilder> signatureBlocks = new LinkedHashMap<>();
+        final Map<Integer, String> blockTypes = new LinkedHashMap<>();
+        int inputTokens;
+        int outputTokens;
+        int cacheCreationInputTokens;
+        int cacheReadInputTokens;
+        String stopReason;
+        final List<String> warnings;
+
+        StreamingAggregator(List<String> warnings) {
+            this.warnings = warnings;
+        }
+
+        void startBlock(int idx, String type) {
+            blockTypes.put(idx, type);
+            if ("text".equals(type)) textBlocks.put(idx, new StringBuilder());
+            else if ("thinking".equals(type)) thinkingBlocks.put(idx, new StringBuilder());
+        }
+
+        void appendText(int idx, String text) {
+            textBlocks.computeIfAbsent(idx, k -> new StringBuilder()).append(text);
+            blockTypes.putIfAbsent(idx, "text");
+        }
+
+        void appendThinking(int idx, String text) {
+            thinkingBlocks.computeIfAbsent(idx, k -> new StringBuilder()).append(text);
+            blockTypes.putIfAbsent(idx, "thinking");
+        }
+
+        void appendSignature(int idx, String sig) {
+            signatureBlocks.computeIfAbsent(idx, k -> new StringBuilder()).append(sig);
+        }
+
+        LlmChatResponse toResponse() {
+            List<LlmChatResponse.ContentBlock> blocks = new ArrayList<>();
+            // Preserve insertion order so a thinking-then-text response keeps
+            // the same block ordering callers see from the synchronous path.
+            for (Map.Entry<Integer, String> entry : blockTypes.entrySet()) {
+                int idx = entry.getKey();
+                String type = entry.getValue();
+                LlmChatResponse.ContentBlock.ContentBlockBuilder b =
+                        LlmChatResponse.ContentBlock.builder().type(type);
+                if ("text".equals(type)) {
+                    StringBuilder sb = textBlocks.get(idx);
+                    b.text(sb == null ? "" : sb.toString());
+                } else if ("thinking".equals(type)) {
+                    StringBuilder sb = thinkingBlocks.get(idx);
+                    b.thinking(sb == null ? "" : sb.toString());
+                    StringBuilder sig = signatureBlocks.get(idx);
+                    if (sig != null) b.signature(sig.toString());
+                }
+                blocks.add(b.build());
+            }
+            LlmChatResponse out = LlmChatResponse.builder()
+                    .stopReason(stopReason)
+                    .content(blocks)
+                    .inputTokens(inputTokens)
+                    .outputTokens(outputTokens)
+                    .cacheCreationInputTokens(cacheCreationInputTokens)
+                    .cacheReadInputTokens(cacheReadInputTokens)
+                    .build();
+            if (warnings != null && !warnings.isEmpty()) {
+                out.setWarnings(warnings);
+            }
+            return out;
+        }
     }
 
     @Override
