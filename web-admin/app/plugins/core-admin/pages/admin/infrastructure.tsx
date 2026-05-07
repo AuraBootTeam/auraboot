@@ -109,12 +109,24 @@ export default function InfrastructurePage() {
   }
 
   return (
-    <div className="max-w-4xl p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Infrastructure</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Current provider status and connection testing
-        </p>
+    <div className="mx-auto max-w-6xl p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ServerStackIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Infrastructure</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Current provider status and connection testing
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={fetchStatus}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+        >
+          <ArrowPathIcon className="h-4 w-4" />
+          Refresh
+        </button>
       </div>
 
       <div className="space-y-4">
