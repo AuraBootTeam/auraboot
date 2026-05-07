@@ -17,7 +17,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 import { cn } from '~/utils/cn';
 import { BomTreeToolbar } from './BomTreeToolbar';
-import type { BomNode } from './BomTreeNode';
+import { BomTreeNode, type BomNode } from './BomTreeNode';
 
 // ---------------------------------------------------------------------------
 // Types

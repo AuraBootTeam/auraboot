@@ -48,6 +48,7 @@ export interface AuditEvent {
 export interface TodoTaskRecord {
   instanceId: string;
   taskId: string | null;
+  id?: string | number;
   processInstanceId: string;
   processDefinitionActivityId: string;
   businessKey: string | null;

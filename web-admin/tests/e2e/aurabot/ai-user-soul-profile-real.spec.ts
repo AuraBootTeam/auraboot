@@ -143,7 +143,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
       userId: testUserId,
-      status: 'active',
+      status: 'ACTIVE',
       version: 1,
     });
 
@@ -170,7 +170,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
       userId: testUserId,
-      status: 'active',
+      status: 'ACTIVE',
     });
 
     await navigateToMyProfile(page);
@@ -195,7 +195,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
       userId: testUserId,
-      status: 'active',
+      status: 'ACTIVE',
     });
 
     await navigateToMyProfile(page);
@@ -220,7 +220,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
       userId: testUserId,
-      status: 'active',
+      status: 'ACTIVE',
       editedFields: {
         persona: 'locked',
         'preferences.communication_style': 'hidden',
@@ -251,7 +251,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     seedUserSoulProfile({
       userId: testUserId,
-      status: 'active',
+      status: 'ACTIVE',
       stale: true,
     });
 
@@ -266,12 +266,12 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     seedUserSoulProfile({
       userId: testUserId,
-      status: 'active',
+      status: 'ACTIVE',
       version: 2,
     });
     const oldSeed = seedUserSoulProfile({
       userId: testUserId,
-      status: 'superseded',
+      status: 'SUPERSEDED',
       version: 1,
       confidence: 0.7,
     });
@@ -306,7 +306,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const testUserId = await setupSpoofedIdentity(page, testInfo.workerIndex);
     const seed = seedUserSoulProfile({
       userId: testUserId,
-      status: 'active',
+      status: 'ACTIVE',
     });
 
     await navigateToMyProfile(page);
@@ -443,7 +443,7 @@ test.describe('Mission Control — User Soul Profile (real backend, PR-80)', () 
     const uniquePersona = `UNIQUE-PERSONA-TEXT-${Date.now()}`;
     seedUserSoulProfile({
       userId: uniqueUser,
-      status: 'active',
+      status: 'ACTIVE',
       profileJson: {
         schema_version: '1.0',
         persona: { text: uniquePersona, confidence: 0.82 },

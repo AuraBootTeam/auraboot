@@ -220,7 +220,7 @@ export const PropertyInput: React.FC<PropertyInputProps> = ({
             <IconPicker
               value={typeof value === 'string' ? value : ''}
               onChange={onChange}
-              size="md"
+              iconSize="md"
             />
           </div>
         );

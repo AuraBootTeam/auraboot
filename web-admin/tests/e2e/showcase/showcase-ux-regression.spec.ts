@@ -20,8 +20,8 @@ async function getAccountWithLinkedContact(
 
   const accountBody = await accountResp.json();
   const contactBody = await contactResp.json();
-  const accounts = accountBody?.data?.records || [];
-  const contacts = contactBody?.data?.records || [];
+  const accounts: any[] = accountBody?.data?.records || [];
+  const contacts: any[] = contactBody?.data?.records || [];
 
   const accountByPid = new Map(accounts.map((account: any) => [String(account.pid), account]));
   const linkedContact = contacts.find((contact: any) =>
@@ -29,7 +29,7 @@ async function getAccountWithLinkedContact(
   );
   if (!linkedContact) return null;
 
-  const account = accountByPid.get(String(linkedContact.crm_ct_account_id));
+  const account = accountByPid.get(String(linkedContact.crm_ct_account_id)) as any;
   if (!account?.pid || !linkedContact?.crm_ct_name) return null;
 
   return {
@@ -48,8 +48,8 @@ async function getAccountWithoutLinkedContact(page: Page): Promise<{ accountPid:
 
   const accountBody = await accountResp.json();
   const contactBody = await contactResp.json();
-  const accounts = accountBody?.data?.records || [];
-  const contacts = contactBody?.data?.records || [];
+  const accounts: any[] = accountBody?.data?.records || [];
+  const contacts: any[] = contactBody?.data?.records || [];
 
   const linkedAccountPids = new Set(
     contacts.map((contact: any) => String(contact.crm_ct_account_id)).filter(Boolean),

@@ -85,7 +85,7 @@ export function RecordPreviewDrawer({
   onRecordLoaded,
 }: RecordPreviewDrawerProps) {
   const navigate = useNavigate();
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const drawerRef = useRef<HTMLDivElement>(null);
 
   const [record, setRecord] = useState<RecordData | null>(null);
@@ -211,7 +211,6 @@ export function RecordPreviewDrawer({
                   field={field}
                   value={record[field.field]}
                   modelCode={modelCode}
-                  locale={locale}
                   t={t}
                 />
               ))}

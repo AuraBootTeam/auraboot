@@ -3,8 +3,8 @@ import { useDndMonitor } from '@dnd-kit/core';
 import type { ComponentSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 import {
   DragPreviewSystem,
-  DragPreviewConfig,
-  GhostEffectConfig,
+  type DragPreviewConfig,
+  type GhostEffectConfig,
 } from '~/plugins/core-designer/components/studio/services/layout/drag-preview/DragPreviewSystem';
 
 /**

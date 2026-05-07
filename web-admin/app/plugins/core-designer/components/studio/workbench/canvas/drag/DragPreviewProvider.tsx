@@ -7,8 +7,8 @@ import React, { createContext, useContext, useRef, useEffect, useState } from 'r
 import {
   DragPreview,
   DragPreviewPresets,
-  DragPreviewConfig,
-  DragPreviewState,
+  type DragPreviewConfig,
+  type DragPreviewState,
 } from '~/plugins/core-designer/components/studio/services/layout/drag-preview/DragPreview';
 
 export interface DragPreviewContextValue {

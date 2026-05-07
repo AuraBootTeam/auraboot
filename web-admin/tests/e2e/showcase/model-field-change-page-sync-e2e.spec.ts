@@ -85,7 +85,6 @@ test.describe('Model Field Change Page Sync E2E', () => {
         modelPid,
         createFieldBindingData(seedFieldResp.data!.pid, {
           visible: true,
-          editable: true,
           displayOrder: 1,
         }),
       );

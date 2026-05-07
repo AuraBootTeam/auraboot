@@ -52,7 +52,6 @@ test.describe('Model Fields to Pages Impact E2E', () => {
         modelPid,
         createFieldBindingData(seedFieldResp.data!.pid, {
           visible: true,
-          editable: true,
           displayOrder: 1,
         }),
       );

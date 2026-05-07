@@ -216,6 +216,7 @@ export interface FieldBindingTestData {
   required?: boolean;
   readonly?: boolean;
   visible?: boolean;
+  editable?: boolean;
   displayOrder?: number;
   dictCode?: string;
   defaultValue?: any;

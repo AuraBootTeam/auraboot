@@ -511,7 +511,7 @@ test.describe('Block Renderer — Block Type Tests', () => {
     page,
   }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    await order.gotoList();
+    const listPage = await order.gotoList();
 
     // Open the filter form (hidden by default after list refactor)
     await ensureFilterFormOpen(page);

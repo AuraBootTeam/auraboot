@@ -10,14 +10,14 @@
  */
 
 import type { UnifiedSchema, BlockConfig, ButtonConfig } from '~/framework/meta/schemas/types';
-import type {
-  TemplateModelMeta,
-  TemplateOptions,
-  TemplateFieldMeta,
-  TemplateGenerator,
-  TemplateClassOverrides,
-  TemplateStyleSet,
+import {
   TEMPLATE_STYLES,
+  type TemplateModelMeta,
+  type TemplateOptions,
+  type TemplateFieldMeta,
+  type TemplateGenerator,
+  type TemplateClassOverrides,
+  type TemplateStyleSet,
 } from '../types';
 import { mapFieldToValueType } from '../utils';
 

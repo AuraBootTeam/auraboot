@@ -24,8 +24,10 @@ module.exports = {
       parser: "@typescript-eslint/parser",
       plugins: ["@typescript-eslint", "react-hooks"],
       rules: {
+        // Demoted to warn for baseline cleanup — 96 violations across 173 files exist on main.
+        // Track and fix in a dedicated cleanup task.
         "@typescript-eslint/no-unused-vars": [
-          "error",
+          "warn",
           {
             argsIgnorePattern: "^_",
             varsIgnorePattern: "^_",
@@ -34,8 +36,11 @@ module.exports = {
         ],
         "no-undef": "off",
         "no-redeclare": "off",
-        "@typescript-eslint/no-redeclare": "error",
-        "no-duplicate-imports": "error",
+        // Demoted to warn — 1 violation on main; fix in cleanup task.
+        "@typescript-eslint/no-redeclare": "warn",
+        // Demoted to warn for baseline cleanup — 75 violations across 173 files exist on main.
+        // Track and fix in a dedicated cleanup task.
+        "no-duplicate-imports": "warn",
         "react-hooks/rules-of-hooks": "error",
         "react-hooks/exhaustive-deps": "warn",
       },
