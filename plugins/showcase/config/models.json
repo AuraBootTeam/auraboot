@@ -11,7 +11,11 @@
       "category": "showcase",
       "titleField": "sc_name",
       "subtitleField": "sc_code"
-    }
+    },
+    "semantic_description": "Comprehensive field type showcase demonstrating all supported dataTypes (string, decimal, enum, reference, file, richtext), components (userselect, colorpicker, moneyinput, aifield), workflow status, and time-based tracking. Primary entity for platform capability evaluation and component rendering validation.",
+    "domain_category": "platform",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "DRAFT → ACTIVE (via sc_status enum + workflow)"
   },
   {
     "code": "sc_monthly_metric",
@@ -25,6 +29,10 @@
       "category": "showcase",
       "parentModel": "showcase_all_fields",
       "parentField": "sc_showcase_pid"
-    }
+    },
+    "semantic_description": "Monthly aggregated metrics for a showcase record: revenue, cost, unit volume, and remarks by calendar month (1-12). Child model enabling MonthlyGrid detail block with month-based pivoting.",
+    "domain_category": "platform",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "No independent lifecycle — inherits parent showcase_all_fields status. One-per-month record per parent."
   }
 ]

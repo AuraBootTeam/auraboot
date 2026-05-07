@@ -11,7 +11,11 @@
       "subtitleField": "target_type",
       "tableName": "ab_sla_config",
       "softDelete": true
-    }
+    },
+    "semantic_description": "Service Level Agreement configuration defining deadline and warning rules for BPM process targets. Answers: what SLA milestones apply to which process types, and when should warnings trigger?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — master configuration reference."
   },
   {
     "code": "bpm_domain_config",
@@ -25,7 +29,11 @@
       "subtitleField": "domain_code",
       "tableName": "ab_bpm_domain_config",
       "softDelete": true
-    }
+    },
+    "semantic_description": "BPM domain configuration specifying which process keys belong to a domain, and which fields are visible in list / filter / sort. Answers: which fields should be displayed for which business domain's processes?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — master configuration reference."
   },
   {
     "code": "data_permission",
@@ -39,7 +47,11 @@
       "subtitleField": "model_code",
       "tableName": "ab_data_permission_policy",
       "softDelete": false
-    }
+    },
+    "semantic_description": "Row-level and column-level data permission policy enforcing scope (department / user / custom expression) and masking rules. Answers: who can see which data fields, and how should values be masked if visible?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — policy master data."
   },
   {
     "code": "webhook",
@@ -53,7 +65,11 @@
       "subtitleField": "event_type",
       "tableName": "ab_webhook_subscription",
       "softDelete": false
-    }
+    },
+    "semantic_description": "Webhook subscription configuration specifying target URL, event trigger, authentication secret, and retry policy. Answers: which external systems should be notified of which platform events, and how?",
+    "domain_category": "platform",
+    "data_sensitivity": "restricted",
+    "lifecycle_description": "ACTIVE ↔ INACTIVE (通过 enabled 字段切换;无删除前的 ARCHIVED 转迁)"
   },
   {
     "code": "webhook_delivery_log",
@@ -67,7 +83,11 @@
       "subtitleField": "status",
       "tableName": "ab_webhook_delivery_log",
       "softDelete": false
-    }
+    },
+    "semantic_description": "Delivery attempt log for webhook event notifications: timestamp, status, response code, error message, retry count. Answers: was this webhook invocation successful, and if not, why?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — audit log entry (immutable once written)."
   },
   {
     "code": "api_connector",
@@ -81,7 +101,11 @@
       "subtitleField": "base_url",
       "tableName": "ab_api_connector",
       "softDelete": false
-    }
+    },
+    "semantic_description": "External API connector configuration capturing base URL, authentication type, default headers, timeout and retry policy. Answers: which external APIs can workflows invoke, and under what terms?",
+    "domain_category": "platform",
+    "data_sensitivity": "restricted",
+    "lifecycle_description": "No status lifecycle — integration master data."
   },
   {
     "code": "tenant_member",
@@ -94,7 +118,11 @@
       "titleField": "user_id",
       "tableName": "ab_tenant_member",
       "softDelete": true
-    }
+    },
+    "semantic_description": "Tenant member record tracking user identity, role assignment, and membership status within organization. Answers: who belongs to this tenant, what permissions do they have, and are they currently active?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "PENDING → ACTIVE / REJECTED (approve_member / reject_member) → ACTIVE → SUSPENDED (suspend_member) → SUSPENDED / REJECTED → ACTIVE (restore_member);ACTIVE → INACTIVE (leave_member);DELETE via delete_member command"
   },
   {
     "code": "scheduled_task",
@@ -108,7 +136,11 @@
       "subtitleField": "task_type",
       "tableName": "ab_scheduled_task",
       "softDelete": false
-    }
+    },
+    "semantic_description": "Configurable background task definition specifying trigger (cron / interval), target handler bean/method, retry policy, and execution timeout. Answers: which recurring or delayed operations should execute automatically, with what frequency and constraints?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — task definition reference (enabled/disabled via enabled field, not state transition)."
   },
   {
     "code": "bpm_process_management",
@@ -121,7 +153,11 @@
       "titleField": "process_name",
       "subtitleField": "process_key",
       "skipTableCreation": true
-    }
+    },
+    "semantic_description": "BPM process definition metadata retrieved from dedicated BPM engine API (not persisted to relational table). Answers: which workflow templates exist in the system, with what name and process key?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — read-only metadata from BPM engine (skipTableCreation: true)."
   },
   {
     "code": "dashboard_management",
@@ -134,6 +170,10 @@
       "titleField": "title",
       "subtitleField": "code",
       "skipTableCreation": true
-    }
+    },
+    "semantic_description": "Dashboard definition metadata retrieved from dedicated dashboard API (not persisted to relational table). Manages publication, versioning, and designer state. Answers: which dashboards exist, who can access them, and which are currently published?",
+    "domain_category": "platform",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — read-only metadata from dashboard engine (skipTableCreation: true)."
   }
 ]
