@@ -15,9 +15,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Executor for LLM_CALL action type (P1 — workflow LLM node).
@@ -56,6 +60,41 @@ public class LlmCallExecutor implements ActionExecutor {
 
     /** Default context key the response text is stored under. */
     private static final String DEFAULT_OUTPUT_VARIABLE = "llmOutput";
+
+    /**
+     * Whitelist of image MIME types accepted by Anthropic vision. Mirrors the
+     * provider documentation — sending other types (image/bmp, image/svg+xml,
+     * etc.) would HTTP-400 from Anthropic. We reject upfront so workflow
+     * authors get a clear error instead of an opaque upstream failure.
+     */
+    private static final Set<String> ALLOWED_IMAGE_MIME_TYPES = Set.of(
+            "image/jpeg", "image/png", "image/gif", "image/webp");
+
+    /**
+     * Strict data-URI parser. We chose the data-URI shape (single string
+     * carries both mediaType + base64 payload) over a parallel
+     * {@code imageMimeTypeVariableNames} config because:
+     *   1. Self-describing — one context variable, no risk of mediaType
+     *      drift relative to the bytes.
+     *   2. Matches what the AuraBot chat upload pipeline already produces.
+     *   3. Frontend designer only needs ONE chip-list field.
+     * Format: {@code data:image/<png|jpeg|gif|webp>;base64,<...>}.
+     */
+    private static final Pattern DATA_URI_PATTERN = Pattern.compile(
+            "^data:(image/(?:png|jpeg|gif|webp));base64,(.+)$");
+
+    /**
+     * Provider codes that accept vision input. All other providers will be
+     * rejected at executor level with an explicit error so workflow authors
+     * see "this provider does not support vision" rather than a generic
+     * provider-side HTTP 400 / IllegalArgumentException downstream.
+     *
+     * <p>Anthropic supports vision on Claude 3.5+/4.x/5.x. The OpenAI-compat
+     * fall-through path used by DeepSeek/Qwen/Zhipu/etc. explicitly rejects
+     * image content (see {@code OpenAiCompatibleLlmProvider#chat}), so we
+     * pre-filter here to give a workflow-level error message.
+     */
+    private static final Set<String> VISION_CAPABLE_PROVIDERS = Set.of("anthropic");
 
     /**
      * Anthropic models that accept the {@code thinking} request field. Mirrors
@@ -121,9 +160,22 @@ public class LlmCallExecutor implements ActionExecutor {
         // simple substitution other action executors use (CallApiExecutor,
         // SendWebhookExecutor) — kept inline rather than promoting to a util
         // until the third or fourth executor needs it.
-        String userPrompt = processTemplate(userPromptTemplate, context);
+        // E.2 — Vision: read configured image-variable names. Empty/null means
+        // the existing text-only path runs unchanged (regression safe). We
+        // intentionally read this BEFORE provider resolution so a misconfigured
+        // image var fails fast even on tenants without a vision-capable
+        // provider configured — config errors should not depend on credentials.
+        List<String> imageVariableNames = readStringList(config, "imageVariableNames");
+
+        // Image variables are emitted as IMAGE content blocks, not text — so
+        // when interpolating ${var} placeholders we must skip those keys to
+        // avoid dumping the base64 payload into the user prompt body. Other
+        // context entries interpolate normally.
+        Set<String> imageVarSet = imageVariableNames.isEmpty()
+                ? Set.of() : Set.copyOf(imageVariableNames);
+        String userPrompt = processTemplate(userPromptTemplate, context, imageVarSet);
         String systemPrompt = systemPromptTemplate == null
-                ? null : processTemplate(systemPromptTemplate, context);
+                ? null : processTemplate(systemPromptTemplate, context, imageVarSet);
 
         // Resolve provider from CloudConfig for the current tenant. Falls back
         // to automation row tenantId if no MetaContext is in scope (e.g.
@@ -142,14 +194,41 @@ public class LlmCallExecutor implements ActionExecutor {
         String resolvedModel = (model != null && !model.isBlank())
                 ? model : providerConfig.getDefaultModel();
 
+        // E.2 — Vision provider gate. If image vars are configured, refuse
+        // outright on non-vision providers so the workflow author sees a
+        // clear "Provider X does not support vision" message at the executor
+        // boundary, instead of a confusing IllegalArgumentException raised
+        // deep inside OpenAiCompatibleLlmProvider#chat. Matches the explicit-
+        // refusal pattern used in B.1 (no silent drop of capabilities).
+        if (!imageVariableNames.isEmpty()
+                && !VISION_CAPABLE_PROVIDERS.contains(providerConfig.getProviderCode())) {
+            throw new IllegalArgumentException(
+                    "Provider " + providerConfig.getProviderCode()
+                            + " does not support vision. Configure an Anthropic-backed "
+                            + "model (Claude 3.5+ / 4.x) or remove imageVariableNames.");
+        }
+
+        // Build the user-message content. With no image vars we keep the
+        // legacy String content path so existing wire shape stays byte
+        // identical (regression-tested by LlmCallExecutorTest). With one or
+        // more image vars we switch to the multimodal block list: images
+        // first, then text — Anthropic recommends anchoring the prompt to
+        // the image so the model attends to visual content before reasoning.
+        LlmChatRequest.Message userMessage;
+        if (imageVariableNames.isEmpty()) {
+            userMessage = LlmChatRequest.Message.builder()
+                    .role("user")
+                    .content(userPrompt)
+                    .build();
+        } else {
+            userMessage = buildMultimodalUserMessage(imageVariableNames, context, userPrompt);
+        }
+
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(resolvedModel)
                 .providerCode(providerConfig.getProviderCode())
                 .systemPrompt(systemPrompt)
-                .messages(List.of(LlmChatRequest.Message.builder()
-                        .role("user")
-                        .content(userPrompt)
-                        .build()))
+                .messages(List.of(userMessage))
                 .maxTokens(maxTokens)
                 .thinking(thinkingEnabled
                         ? LlmChatRequest.ThinkingConfig.builder()
@@ -315,9 +394,23 @@ public class LlmCallExecutor implements ActionExecutor {
      * errors visually instead of silently producing empty strings.
      */
     private String processTemplate(String template, Map<String, Object> context) {
+        return processTemplate(template, context, Set.of());
+    }
+
+    /**
+     * Same as {@link #processTemplate(String, Map)} but skips a set of keys —
+     * used by E.2 vision so {@code ${screenshot}} in the prompt body is NOT
+     * replaced with the raw base64 payload (those keys flow as image blocks
+     * instead). Skipped placeholders are LEFT IN PLACE intentionally so a
+     * misconfigured workflow author sees the literal {@code ${screenshot}}
+     * in their prompt and realises they shouldn't reference image vars in
+     * text — silently stripping would hide the misconfiguration.
+     */
+    private String processTemplate(String template, Map<String, Object> context, Set<String> skipKeys) {
         if (template == null) return null;
         String result = template;
         for (Map.Entry<String, Object> entry : context.entrySet()) {
+            if (skipKeys.contains(entry.getKey())) continue;
             String placeholder = "${" + entry.getKey() + "}";
             if (result.contains(placeholder)) {
                 result = result.replace(placeholder,
@@ -341,6 +434,107 @@ public class LlmCallExecutor implements ActionExecutor {
             try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ignored) {}
         }
         return fallback;
+    }
+
+    /**
+     * Read {@code imageVariableNames} from config as a non-null list of
+     * non-blank Strings. Tolerates the field being absent (returns empty
+     * list) but rejects mistyped values (e.g. a single string, or a list
+     * with non-string entries) with IllegalArgumentException so config
+     * errors surface at executor entry rather than masquerading as
+     * "image var missing in context" later.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<String> readStringList(Map<String, Object> config, String key) {
+        Object raw = config.get(key);
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> list)) {
+            throw new IllegalArgumentException(
+                    "LLM_CALL: " + key + " must be a List<String>, got " + raw.getClass().getSimpleName());
+        }
+        List<String> out = new ArrayList<>(list.size());
+        for (Object o : list) {
+            if (!(o instanceof String s) || s.isBlank()) {
+                throw new IllegalArgumentException(
+                        "LLM_CALL: " + key + " entries must be non-blank strings, got " + o);
+            }
+            out.add(s.trim());
+        }
+        return out;
+    }
+
+    /**
+     * Resolve each configured image variable from the workflow context and
+     * fold them into a single multimodal user message. Image blocks are
+     * emitted in the configured order; the text prompt comes last (matches
+     * Anthropic guidance — image first so the model anchors reasoning to
+     * visual content).
+     *
+     * <p>Strict validation per E.2 spec — every failure throws so workflow
+     * authors see exactly which variable misbehaved:
+     *   - missing in context → IllegalArgumentException("not found in context")
+     *   - non-String value → IllegalArgumentException("must be a String")
+     *   - not data:image/...;base64,... shape → IllegalArgumentException
+     *   - mediaType outside allowlist → IllegalArgumentException
+     * NO silent drop. NO best-effort fallback to text-only. Keeping this
+     * loud is the whole point of E.2: when a workflow author wires up an
+     * image variable, they expect the model to see the image — silently
+     * stripping it would be a correctness bug masquerading as resilience.
+     */
+    private LlmChatRequest.Message buildMultimodalUserMessage(
+            List<String> imageVariableNames,
+            Map<String, Object> context,
+            String userPrompt) {
+        List<LlmChatRequest.MessageContentBlock> blocks =
+                new ArrayList<>(imageVariableNames.size() + 1);
+
+        for (String varName : imageVariableNames) {
+            if (!context.containsKey(varName)) {
+                throw new IllegalArgumentException(
+                        "LLM_CALL: image variable '" + varName + "' not found in trigger context. "
+                                + "Available keys: " + context.keySet());
+            }
+            Object value = context.get(varName);
+            if (!(value instanceof String s) || s.isBlank()) {
+                throw new IllegalArgumentException(
+                        "LLM_CALL: image variable '" + varName + "' must be a non-blank String "
+                                + "in data:image/<type>;base64,<data> form, got "
+                                + (value == null ? "null" : value.getClass().getSimpleName()));
+            }
+            Matcher m = DATA_URI_PATTERN.matcher(s);
+            if (!m.matches()) {
+                throw new IllegalArgumentException(
+                        "LLM_CALL: image variable '" + varName + "' is not a valid data URI. "
+                                + "Expected format: data:image/{png|jpeg|gif|webp};base64,<base64-data>");
+            }
+            String mediaType = m.group(1);
+            String base64Data = m.group(2);
+            if (!ALLOWED_IMAGE_MIME_TYPES.contains(mediaType)) {
+                throw new IllegalArgumentException(
+                        "LLM_CALL: image variable '" + varName + "' has unsupported media type '"
+                                + mediaType + "'. Allowed: " + ALLOWED_IMAGE_MIME_TYPES);
+            }
+            blocks.add(LlmChatRequest.MessageContentBlock.builder()
+                    .type("image")
+                    .source(LlmChatRequest.ImageSource.builder()
+                            .type("base64")
+                            .mediaType(mediaType)
+                            .data(base64Data)
+                            .build())
+                    .build());
+        }
+
+        if (userPrompt != null && !userPrompt.isBlank()) {
+            blocks.add(LlmChatRequest.MessageContentBlock.builder()
+                    .type("text")
+                    .text(userPrompt)
+                    .build());
+        }
+
+        return LlmChatRequest.Message.builder()
+                .role("user")
+                .content(blocks)
+                .build();
     }
 
     private static boolean boolOr(Map<String, Object> config, String key, boolean fallback) {
