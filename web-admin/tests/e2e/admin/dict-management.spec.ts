@@ -49,6 +49,18 @@ test.describe('Dictionary Management @smoke', () => {
     expect(count).toBeGreaterThan(0);
   });
 
+  test('container should span full width matching /meta/models layout', async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto('/meta/dict');
+    const container = page.getByTestId('dictionary-list');
+    await expect(container).toBeVisible({ timeout: 10000 });
+    const box = await container.boundingBox();
+    expect(box).not.toBeNull();
+    // max-w-7xl = 1280px would cap container; full-width layout (matching ListPageContent
+    // used by /meta/models) should follow viewport.
+    expect(box!.width).toBeGreaterThan(1400);
+  });
+
   test('should filter by dict type SIMPLE and return results', async ({ page }) => {
     await page.getByTestId('filter-type').selectOption('simple');
     const rows = await runSearchAndWait(page);
