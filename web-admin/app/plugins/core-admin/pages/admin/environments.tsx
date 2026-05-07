@@ -60,7 +60,7 @@ export default function EnvironmentManagement() {
   const { t } = useI18n();
 
   const [environments, setEnvironments] = useState<EnvironmentData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingEnv, setEditingEnv] = useState<EnvironmentData | null>(null);
   const [showDiff, setShowDiff] = useState(false);
@@ -533,7 +533,7 @@ export default function EnvironmentManagement() {
       {loading ? (
         <div className="py-12 text-center text-gray-500 dark:text-gray-400">Loading...</div>
       ) : environments.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white py-12 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div data-testid="env-empty-state" className="rounded-lg border border-gray-200 bg-white py-12 text-center dark:border-gray-700 dark:bg-gray-800">
           <ServerStackIcon className="mx-auto mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
           <p className="mb-4 text-gray-500 dark:text-gray-400">No environments configured yet</p>
           <button
@@ -545,7 +545,7 @@ export default function EnvironmentManagement() {
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div data-testid="env-list-grid" className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {environments.map((env) => (
             <div
               key={env.pid}

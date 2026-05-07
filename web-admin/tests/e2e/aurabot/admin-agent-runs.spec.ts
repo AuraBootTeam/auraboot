@@ -555,8 +555,11 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     await expect(childRunsSection).toContainText(/Child Runs \(\d+\)/);
     const childBtn = page.locator(`[data-testid="child-run-${RUN_CHILD}"]`);
     await expect(childBtn).toBeVisible();
-    await expect(childBtn).toContainText('aurabot.child.e2e');
-    await expect(childBtn).toContainText('succeeded');
+    // Agent code and run status render in sibling spans within the same node row;
+    // assert at the node-level container, not the button itself.
+    const childNode = page.locator(`[data-testid="child-run-node-${RUN_CHILD}"]`);
+    await expect(childNode).toContainText('aurabot.child.e2e');
+    await expect(childNode).toContainText('succeeded');
 
     // [D7-5] BIF section: seeded grounding intent + skill name visible.
     const bifSection = page.locator('[data-testid="drawer-section-bif"]');

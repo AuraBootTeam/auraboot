@@ -288,8 +288,10 @@ test.describe('ServiceTask Properties', () => {
     const ok = await selectServiceTask(page);
     test.skip(!ok, 'React Flow nodes not rendering');
     await expect(page.locator('label', { hasText: /服务类型/ })).toBeVisible({ timeout: 5000 });
+    // ServiceType options render as i18n display labels (HTTP服务/Java类/脚本/Aura 命令);
+    // match case-insensitively so the assertion stays stable across label tweaks.
     for (const opt of ['http', 'Java', '脚本']) {
-      await expect(page.locator('option', { hasText: new RegExp(opt) }).first()).toBeAttached();
+      await expect(page.locator('option', { hasText: new RegExp(opt, 'i') }).first()).toBeAttached();
     }
   });
 
@@ -354,9 +356,14 @@ test.describe('Edge Properties', () => {
       .catch(() => {});
     test.skip((await edges.count()) === 0, 'No edges rendered');
     await edges.first().click();
-    await expect(page.locator('label', { hasText: /条件表达式/ }).first()).toBeVisible({
-      timeout: 5000,
-    });
+    // ConditionExpressionEditor exposes 简单模式 / 高级模式 toggles. Advanced
+    // mode renders a raw expression textarea — that's the contract this test
+    // guards (the legacy single "条件表达式" label was replaced when the
+    // structured builder shipped).
+    const advancedTab = page.locator('button', { hasText: /高级模式/ }).first();
+    await expect(advancedTab).toBeVisible({ timeout: 5000 });
+    await advancedTab.click();
+    await expect(page.locator('textarea').first()).toBeVisible({ timeout: 5000 });
   });
 });
 

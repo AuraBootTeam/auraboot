@@ -85,8 +85,17 @@ test.describe.serial('GAP-311 — group-chat agent reply WS broadcast', () => {
   let convId: number;
   const wsFramesReceived: string[] = [];
 
-  test.beforeAll(async ({ page }) => {
-    convId = await ensureGroupConversationWithAurabot(page);
+  test.beforeAll(async ({ browser }) => {
+    // Per-test `page`/`context` fixtures are not available in `beforeAll`;
+    // create a transient context with the configured admin storageState so the
+    // seeding API calls go out as the same authenticated user the tests use.
+    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const page = await ctx.newPage();
+    try {
+      convId = await ensureGroupConversationWithAurabot(page);
+    } finally {
+      await ctx.close();
+    }
   });
 
   test('user @ mentions agent in group → agent reply appears without refresh', async ({ page }) => {
