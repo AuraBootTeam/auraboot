@@ -72,16 +72,6 @@
     "module": "system"
   },
   {
-    "code": "audit_log_view",
-    "name": "审计日志",
-    "description": "查看系统审计日志和变更记录",
-    "type": "menu",
-    "module": "system",
-    "resource": "/audit-logs",
-    "action": "view",
-    "resourceType": "menu"
-  },
-  {
     "code": "system_management",
     "name": "系统管理",
     "description": "访问系统管理模块",
