@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.provider;
 
+import com.auraboot.framework.agent.crosstenant.CrossTenantAclDeniedException;
 import com.auraboot.framework.agent.nlmodeling.NlModelingService;
 import com.auraboot.framework.agent.nlmodeling.dto.NlApplyRequest;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingRequest;
@@ -485,13 +486,41 @@ public class PlatformToolProvider implements ToolProvider {
             output.put("message", "Subtask delegated. The child agent run will execute asynchronously; "
                     + "completion is observed via ChildRunCompletedEvent. The parent run does NOT block.");
             return output;
+        } catch (CrossTenantAclDeniedException denied) {
+            // Q11: tool-layer must surface ACL denials as structured errors,
+            // not raw exception strings, so the LLM can reason about the
+            // failure (no_grant vs expired vs revoked) and decide whether
+            // to retry, ask the user, or abort.
+            Map<String, Object> output = new LinkedHashMap<>();
+            output.put("error", "cross_tenant_not_granted");
+            output.put("parent_tenant", denied.parentTenantId());
+            output.put("child_tenant", denied.childTenantId());
+            output.put("reason", mapDecisionToReason(denied.decision().code()));
+            output.put("decision", denied.decision().code());
+            output.put("message", denied.getMessage());
+            return output;
         } catch (IllegalStateException e) {
-            // SubAgentRunner refuses cross-tenant / parent-not-running etc.
+            // SubAgentRunner refuses parent-not-running / parent-missing etc.
             return errorResult("delegate_task refused: " + e.getMessage());
         } catch (Exception e) {
             log.error("platform.delegate_task failed: {}", e.getMessage(), e);
             return errorResult("delegate_task execution failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Map an internal decision code to the public {@code reason} field
+     * surfaced to the LLM. Keeps the tool error contract stable even if the
+     * internal enum gains new codes (the reason set is what callers branch on).
+     */
+    private static String mapDecisionToReason(String decisionCode) {
+        if (decisionCode == null) return "no_grant";
+        return switch (decisionCode) {
+            case "denied_expired" -> "expired";
+            case "denied_revoked" -> "revoked";
+            case "denied_feature_disabled" -> "feature_disabled";
+            default -> "no_grant";
+        };
     }
 
     // ==================== Helpers ====================

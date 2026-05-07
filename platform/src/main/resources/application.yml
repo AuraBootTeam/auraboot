@@ -297,6 +297,13 @@ ai:
 
 # AuraBoot Git 配置
 aura:
+  # C.2 Cross-tenant sub-agent ACL kill switch.
+  # When false, every cross-tenant evaluation returns
+  # denied_feature_disabled — same-tenant spawns are unaffected.
+  # See docs/superpowers/specs/2026-05-07-c2-cross-tenant-acl-design.md
+  security:
+    cross-tenant:
+      enabled: ${AURA_CROSS_TENANT_ENABLED:true}
   git:
     repos-base-path: ${AURA_GIT_REPOS_PATH:./data/git-repos}
     default-repo-id: 1           # 默认仓库ID

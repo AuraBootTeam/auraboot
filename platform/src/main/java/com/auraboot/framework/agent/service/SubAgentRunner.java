@@ -1,5 +1,10 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.crosstenant.CrossTenantAclDeniedException;
+import com.auraboot.framework.agent.crosstenant.CrossTenantAclService;
+import com.auraboot.framework.agent.crosstenant.CrossTenantDecision;
+import com.auraboot.framework.agent.crosstenant.CrossTenantGrantType;
+import com.auraboot.framework.agent.crosstenant.CrossTenantSpawnAuditWriter;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.Builder;
@@ -98,12 +103,18 @@ public class SubAgentRunner {
      * has finished wiring all beans.
      */
     private final ObjectProvider<AgentRunService> agentRunServiceProvider;
+    private final CrossTenantAclService crossTenantAclService;
+    private final CrossTenantSpawnAuditWriter crossTenantAuditWriter;
 
     @Autowired
     public SubAgentRunner(JdbcTemplate jdbcTemplate,
-                          ObjectProvider<AgentRunService> agentRunServiceProvider) {
+                          ObjectProvider<AgentRunService> agentRunServiceProvider,
+                          CrossTenantAclService crossTenantAclService,
+                          CrossTenantSpawnAuditWriter crossTenantAuditWriter) {
         this.jdbcTemplate = jdbcTemplate;
         this.agentRunServiceProvider = agentRunServiceProvider;
+        this.crossTenantAclService = crossTenantAclService;
+        this.crossTenantAuditWriter = crossTenantAuditWriter;
     }
 
     @Data
@@ -175,9 +186,35 @@ public class SubAgentRunner {
         Map<String, Object> parent = parentRows.get(0);
         Long parentTenant = parent.get("tenant_id") == null
                 ? null : ((Number) parent.get("tenant_id")).longValue();
-        if (!tenantId.equals(parentTenant)) {
-            throw new IllegalStateException(
-                    "Parent run tenant " + parentTenant + " does not match caller tenant " + tenantId);
+        // Cross-tenant ACL gate. Same-tenant fast path is unchanged: the
+        // CrossTenantAclService still answers "allowed" for parent==child
+        // but we skip the call entirely to keep the per-spawn JDBC budget
+        // identical to the pre-C.2 baseline.
+        //
+        // Cross-tenant: consult the grant table. Every decision (allowed or
+        // denied) writes one row to ab_cross_tenant_spawn_audit. Denied
+        // decisions throw CrossTenantAclDeniedException carrying the
+        // structured (parent, child, decision) tuple so PlatformToolProvider
+        // can convert into a tool-error per Q11.
+        // Cross-tenant ACL — null when same-tenant (fast path), non-null and
+        // allowed when grant exists. Denied path throws above the local
+        // assignment so we never carry a denied decision past this block.
+        CrossTenantDecision crossTenantAllowedDecision = null;
+        if (!java.util.Objects.equals(tenantId, parentTenant)) {
+            CrossTenantDecision decision = crossTenantAclService.evaluate(
+                    parentTenant, tenantId, CrossTenantGrantType.SPAWN_SUB_AGENT);
+            if (!decision.isAllowed()) {
+                crossTenantAuditWriter.write(
+                        /* grantId */ null,
+                        parentTenant,
+                        tenantId,
+                        parentRunPid,
+                        /* childRunPid */ null,
+                        decision.code(),
+                        decision.reason());
+                throw new CrossTenantAclDeniedException(parentTenant, tenantId, decision);
+            }
+            crossTenantAllowedDecision = decision;
         }
 
         String parentStatus = (String) parent.get("run_status");
@@ -249,6 +286,20 @@ public class SubAgentRunner {
 
         log.info("SubAgentRunner.spawn: parent={} → child={} (task={}, agent={}, origin={})",
                 parentRunPid, childRunPid, childTaskPid, agentCode, origin);
+
+        // Cross-tenant audit: write the "allowed" row only after the child
+        // run has been seeded so child_run_pid is populated. The writer uses
+        // REQUIRES_NEW so the audit row is independent of the surrounding TX.
+        if (crossTenantAllowedDecision != null) {
+            crossTenantAuditWriter.write(
+                    crossTenantAllowedDecision.grantId(),
+                    parentTenant,
+                    tenantId,
+                    parentRunPid,
+                    childRunPid,
+                    CrossTenantDecision.ALLOWED,
+                    /* errorMessage */ null);
+        }
 
         // P1: After the spawn transaction commits, fire-and-forget the LLM
         // execution loop on the freshly-seeded child run. We register a

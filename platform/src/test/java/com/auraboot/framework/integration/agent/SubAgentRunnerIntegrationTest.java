@@ -321,7 +321,11 @@ class SubAgentRunnerIntegrationTest extends BaseIntegrationTest {
                 tenantId, parentRunPid, sessionId, "another tenant subtask",
                 "interrupt_subtask"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("does not match caller tenant");
+                // C.2: cross-tenant without grant is now denied via ACL,
+                // surfacing CrossTenantAclDeniedException (subclass of
+                // IllegalStateException) with structured message.
+                .hasMessageContaining("cross-tenant spawn requires explicit grant")
+                .hasMessageContaining("denied_no_grant");
 
         // No child run rows in either tenant.
         Integer countCallerTenant = jdbc.queryForObject(
