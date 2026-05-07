@@ -499,6 +499,51 @@ SELECT
     fi
     echo -e "${GREEN}   Bootstrap verification passed${NC}"
 
+    # Step 7.4: Grant platform_admin to default admin user
+    #
+    # /api/bootstrap/setup grants tenant_admin automatically but NOT platform_admin.
+    # platform_admin gates /api/admin/infrastructure/** and /api/admin/cloud-config/**.
+    # We JOIN via ab_tenant_member so the grant is scoped to each tenant the admin belongs to.
+    #
+    # ID generation:  floor(epoch_µs + random_µs) — no sequence on ab_user_role.id (plain BIGINT PK).
+    # PID generation: left(md5('pa_ur_' || member_id), 26) — deterministic, exactly 26 chars,
+    #                 safe to re-run (NOT EXISTS guard prevents duplicate).
+    echo -e "${YELLOW}Step 7.4: Granting platform_admin role to default admin user...${NC}"
+    psql -h localhost -U ghj -d aura_boot -v ON_ERROR_STOP=1 -P pager=off <<'GRANT_SQL'
+INSERT INTO ab_user_role (
+    id, pid, member_id, tenant_id, role_id,
+    status, assign_type, deleted_flag,
+    created_at, updated_at
+)
+SELECT
+    -- id: epoch microseconds + random offset → unique BIGINT (no sequence on this table)
+    floor(extract(epoch from clock_timestamp()) * 1000000 + random() * 999999)::bigint,
+    -- pid: deterministic 26-char md5 prefix keyed on member_id (safe for re-runs)
+    left(md5('pa_ur_' || tm.id::text), 26),
+    tm.id,
+    r.tenant_id,
+    r.id,
+    'active', 'direct', FALSE,
+    NOW(), NOW()
+FROM ab_user u
+JOIN ab_tenant_member tm
+    ON tm.user_id = u.id
+    AND (tm.deleted_flag = FALSE OR tm.deleted_flag IS NULL)
+JOIN ab_role r
+    ON r.code = 'platform_admin'
+    AND r.tenant_id = tm.tenant_id
+    AND (r.deleted_flag = FALSE OR r.deleted_flag IS NULL)
+WHERE u.email = 'admin@example.com'
+  AND (u.deleted_flag = FALSE OR u.deleted_flag IS NULL)
+  AND NOT EXISTS (
+      SELECT 1 FROM ab_user_role ur2
+      WHERE ur2.member_id = tm.id
+        AND ur2.role_id = r.id
+        AND (ur2.deleted_flag = FALSE OR ur2.deleted_flag IS NULL)
+  );
+GRANT_SQL
+    echo -e "${GREEN}   platform_admin granted to admin user${NC}"
+
     # Step 7.5: Import required plugins for seed data
     echo -e "${YELLOW}Step 7.5: Importing plugins...${NC}"
     cd "$PROJECT_ROOT"
