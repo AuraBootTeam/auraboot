@@ -1,5 +1,9 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.crosstenant.CrossTenantAclDeniedException;
+import com.auraboot.framework.agent.crosstenant.CrossTenantAclService;
+import com.auraboot.framework.agent.crosstenant.CrossTenantDecision;
+import com.auraboot.framework.agent.crosstenant.CrossTenantGrantType;
 import com.auraboot.framework.agent.memory.SessionEndedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +64,7 @@ public class ParentJoinService {
 
     private final ApplicationEventPublisher eventPublisher;
     private final JdbcTemplate jdbcTemplate;
+    private final CrossTenantAclService crossTenantAclService;
 
     /**
      * Active join slots keyed by (parentRunId, childRunId). A slot exists only
@@ -104,6 +109,23 @@ public class ParentJoinService {
         if (tenantId == null) {
             log.warn("ParentJoinService: run {} missing tenant_id, skipping ChildRunCompletedEvent", childRunId);
             return;
+        }
+
+        // Cross-tenant gate: if parent and child live in different tenants
+        // an explicit grant is required. Without one, silently drop the
+        // event (DEBUG log only) — same behaviour as pre-C.2 cross-tenant
+        // events that were dropped unconditionally; C.2 only opens the
+        // gate when ACL approves.
+        Long parentTenantId = readTenantId(parentRunId);
+        if (parentTenantId != null && !Objects.equals(parentTenantId, tenantId)) {
+            CrossTenantDecision decision = crossTenantAclService.evaluate(
+                    parentTenantId, tenantId, CrossTenantGrantType.SPAWN_SUB_AGENT);
+            if (!decision.isAllowed()) {
+                log.debug("ParentJoinService: dropping cross-tenant ChildRunCompletedEvent "
+                                + "(parent={}, child={}, parent_tenant={}, child_tenant={}, decision={})",
+                        parentRunId, childRunId, parentTenantId, tenantId, decision.code());
+                return;
+            }
         }
 
         String outcome = event.getOutcome() == null
@@ -184,9 +206,15 @@ public class ParentJoinService {
             throw new IllegalStateException("child run not found: " + childRunId);
         }
         if (!Objects.equals(parentTenant, childTenant)) {
-            throw new IllegalStateException(
-                    "parent run tenant " + parentTenant
-                            + " does not match child run tenant " + childTenant);
+            // Cross-tenant join: consult ACL. Allowed → fall through and
+            // proceed with the normal latch/DB-readback path. Denied →
+            // throw CrossTenantAclDeniedException (still IllegalStateException
+            // by inheritance for callers that catch the parent type).
+            CrossTenantDecision decision = crossTenantAclService.evaluate(
+                    parentTenant, childTenant, CrossTenantGrantType.SPAWN_SUB_AGENT);
+            if (!decision.isAllowed()) {
+                throw new CrossTenantAclDeniedException(parentTenant, childTenant, decision);
+            }
         }
 
         JoinKey key = new JoinKey(parentRunId, childRunId);
@@ -247,6 +275,21 @@ public class ParentJoinService {
             // share one slot; the second `remove` is a no-op which is fine.
             slots.remove(key, slot);
         }
+    }
+
+    /**
+     * Single-row tenant lookup used by {@link #onSessionEnded} to read the
+     * parent's tenant in order to gate cross-tenant event delivery.
+     * Returns {@code null} when the row does not exist or has a null tenant.
+     */
+    private Long readTenantId(String runPid) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT tenant_id FROM ab_agent_run WHERE pid = ?", runPid);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        Object t = rows.get(0).get("tenant_id");
+        return t == null ? null : ((Number) t).longValue();
     }
 
     /**
