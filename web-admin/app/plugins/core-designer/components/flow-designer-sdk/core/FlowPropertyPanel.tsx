@@ -110,7 +110,7 @@ function GroupedFields({ schema, nodeId }: { schema: PropertySchema[]; nodeId: s
   const groupOrder: string[] = [];
   const groupMap = new Map<string, PropertySchema[]>();
   for (const field of schema) {
-    const g = field.group || '_default';
+    const g = (field.group as string | undefined) || '_default';
     if (!groupMap.has(g)) {
       groupOrder.push(g);
       groupMap.set(g, []);
