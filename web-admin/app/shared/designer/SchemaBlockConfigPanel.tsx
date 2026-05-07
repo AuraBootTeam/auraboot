@@ -22,8 +22,10 @@ import { useI18n } from '~/contexts/I18nContext';
 
 /** Extended PropertySchema supporting `dependsOn.anyOf` for multi-value matching. */
 export interface ExtendedPropertySchema<TLabel = string>
-  extends Omit<PropertySchema<TLabel>, 'dependsOn'> {
+  extends Omit<PropertySchema<TLabel>, 'dependsOn' | 'itemSchema'> {
   dependsOn?: { field: string; value?: unknown; anyOf?: unknown[] };
+  /** Override: itemSchema items are also ExtendedPropertySchema to support anyOf. */
+  itemSchema?: ExtendedPropertySchema<TLabel>[];
 }
 
 export interface SchemaBlockConfigPanelProps<T extends Record<string, unknown>> {
