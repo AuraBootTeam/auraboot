@@ -14,7 +14,7 @@
  * page owns navigation history (URL stays in sync with the open runId).
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getAgentRunDetail,
   type AgentRunDetail,
@@ -23,6 +23,19 @@ import {
   type AgentRunListItem,
   type AgentBifSummary,
 } from '../services/agentRunsApi';
+import LiveStreamSection from './LiveStreamSection';
+
+/**
+ * Heuristic mirror of {@code LiveStreamSection.isLlmAction}. Determines
+ * whether to render the "Live Stream" tab — hidden for runs that contain no
+ * llm_call actions so the surface stays clean for non-AI workflows.
+ */
+function automationContainsLlmNode(actions: AgentActionItem[]): boolean {
+  return actions.some((a) => {
+    const probe = `${a.actionType ?? ''} ${a.actionCode ?? ''}`.toLowerCase();
+    return probe.includes('llm');
+  });
+}
 
 interface Props {
   runId: string | null;
@@ -299,10 +312,18 @@ function BifSection({ bif }: { bif: AgentBifSummary | null }) {
 // Drawer shell
 // ---------------------------------------------------------------------------
 
+type DrawerTab = 'overview' | 'live-stream';
+
 export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Props) {
   const [detail, setDetail] = useState<AgentRunDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DrawerTab>('overview');
+
+  const showLiveStreamTab = useMemo(
+    () => (detail ? automationContainsLlmNode(detail.actions) : false),
+    [detail],
+  );
 
   useEffect(() => {
     if (!runId) {
@@ -368,11 +389,49 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
         )}
         {detail && !loading && (
           <>
-            <MetadataSection run={detail.run} />
-            <ActionsSection actions={detail.actions} />
-            <InterruptsSection rows={detail.interruptLog} />
-            <ChildRunsSection rows={detail.childRuns} onSelectRun={onSelectRun} />
-            <BifSection bif={detail.bif} />
+            <nav
+              className="flex items-center gap-2 border-b border-gray-200 px-4 py-2 bg-gray-50"
+              data-testid="drawer-tab-bar"
+            >
+              <button
+                type="button"
+                onClick={() => setActiveTab('overview')}
+                data-testid="drawer-tab-overview"
+                className={`px-2 py-1 text-xs rounded ${
+                  activeTab === 'overview'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                Overview
+              </button>
+              {showLiveStreamTab && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('live-stream')}
+                  data-testid="drawer-tab-live-stream"
+                  className={`px-2 py-1 text-xs rounded ${
+                    activeTab === 'live-stream'
+                      ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                      : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  Live Stream
+                </button>
+              )}
+            </nav>
+            {activeTab === 'overview' && (
+              <>
+                <MetadataSection run={detail.run} />
+                <ActionsSection actions={detail.actions} />
+                <InterruptsSection rows={detail.interruptLog} />
+                <ChildRunsSection rows={detail.childRuns} onSelectRun={onSelectRun} />
+                <BifSection bif={detail.bif} />
+              </>
+            )}
+            {activeTab === 'live-stream' && showLiveStreamTab && (
+              <LiveStreamSection runId={runId} actions={detail.actions} />
+            )}
           </>
         )}
       </aside>

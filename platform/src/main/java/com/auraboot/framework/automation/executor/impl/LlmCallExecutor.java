@@ -2,14 +2,17 @@ package com.auraboot.framework.automation.executor.impl;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.dto.LlmChunk;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationAction;
+import com.auraboot.framework.automation.event.AutomationLlmChunkEvent;
+import com.auraboot.framework.automation.event.AutomationRunStreamPublisher;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.exception.BusinessException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -40,7 +43,6 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class LlmCallExecutor implements ActionExecutor {
 
     /** Action type code matched against {@link AutomationAction#getType()}. */
@@ -67,6 +69,22 @@ public class LlmCallExecutor implements ActionExecutor {
             "sonnet-4-6", "sonnet-4-7", "opus-4", "haiku-4");
 
     private final LlmProviderFactory llmProviderFactory;
+
+    /**
+     * Optional fan-out for live LLM chunk observability (E.1 Phase 1). Wired
+     * by the Spring container; left null in mock-driven unit tests where
+     * {@link com.auraboot.framework.automation.executor.impl.LlmCallExecutorTest}
+     * uses {@code @InjectMocks} without configuring a publisher. Null-safe
+     * call sites below.
+     */
+    private final AutomationRunStreamPublisher streamPublisher;
+
+    @Autowired
+    public LlmCallExecutor(LlmProviderFactory llmProviderFactory,
+                           @Autowired(required = false) AutomationRunStreamPublisher streamPublisher) {
+        this.llmProviderFactory = llmProviderFactory;
+        this.streamPublisher = streamPublisher;
+    }
 
     @Override
     public Object execute(AutomationAction action, Map<String, Object> context) {
@@ -151,7 +169,9 @@ public class LlmCallExecutor implements ActionExecutor {
         try {
             log.info("LLM_CALL invoking provider={} model={} maxTokens={} thinking={}",
                     providerConfig.getProviderCode(), resolvedModel, maxTokens, thinkingEnabled);
-            response = provider.chat(request, providerConfig.getApiKey(), providerConfig.getBaseUrl());
+            response = aggregateStream(provider, request,
+                    providerConfig.getApiKey(), providerConfig.getBaseUrl(),
+                    context, action);
         } catch (Exception e) {
             // CATCH: non-transactional LLM HTTP call failure. Re-wrap as
             // BusinessException so the trigger service records FAILED status
@@ -206,6 +226,72 @@ public class LlmCallExecutor implements ActionExecutor {
             if (model.contains(pattern)) return true;
         }
         return false;
+    }
+
+    /**
+     * Subscribe to {@link LlmProvider#streamChat} and synchronously aggregate
+     * all chunks into a single {@link LlmChatResponse}. While accumulating,
+     * fire one {@link AutomationLlmChunkEvent} per chunk on the bounded
+     * fan-out executor so the admin live-stream tab can observe progress.
+     *
+     * <p>Per spec Q5 the failure mode is hard-error: a {@code Flux.error}
+     * from the provider propagates as a {@link RuntimeException}, never as a
+     * silent fallback to {@link LlmProvider#chat}. Per spec Q7 the caller
+     * (this executor) writes {@code ${outputVariable}} only AFTER this
+     * method returns, so partial values are never visible mid-stream.
+     */
+    private LlmChatResponse aggregateStream(LlmProvider provider,
+                                            LlmChatRequest request,
+                                            String apiKey,
+                                            String baseUrl,
+                                            Map<String, Object> context,
+                                            AutomationAction action) {
+        String runPid = context.get("runPid") instanceof String s ? s : null;
+        String nodeId = resolveNodeId(action);
+
+        LlmChatResponse[] aggregateHolder = new LlmChatResponse[1];
+
+        // collectList().block() — Reactor's canonical sync bridge. We DO NOT
+        // use Thread.sleep / latches per the no-Thread.sleep red line.
+        provider.streamChat(request, apiKey, baseUrl)
+                .doOnNext(chunk -> {
+                    if (streamPublisher != null && runPid != null) {
+                        streamPublisher.publish(new AutomationLlmChunkEvent(
+                                runPid, nodeId, chunk, chunk.seq()));
+                    }
+                    if (chunk.done() && chunk.aggregateResponse() != null) {
+                        aggregateHolder[0] = chunk.aggregateResponse();
+                    }
+                })
+                .blockLast();
+
+        LlmChatResponse aggregated = aggregateHolder[0];
+        if (aggregated == null) {
+            // No terminal chunk observed — provider violated the
+            // streamChat contract. Fail loudly rather than write empty
+            // ${outputVariable}; matches Q5 (no silent fallback).
+            throw new BusinessException(
+                    "LLM_CALL: provider streamChat returned no terminal chunk for model="
+                            + request.getModel() + " (provider="
+                            + provider.getProviderCode() + ")");
+        }
+        return aggregated;
+    }
+
+    /**
+     * Pick a stable node identifier for chunk events. {@link AutomationAction}
+     * has no public {@code id}; we use the user-set {@code label} when
+     * available so SSE consumers and DSL designers see the same string they
+     * configured. Falls back to {@code action_<sequence>} so the value is
+     * never null — null nodeIds would collapse all parallel LLM calls in a
+     * single workflow onto the same SSE channel.
+     */
+    private String resolveNodeId(AutomationAction action) {
+        if (action == null) return null;
+        if (action.getLabel() != null && !action.getLabel().isBlank()) {
+            return action.getLabel();
+        }
+        return "action_" + (action.getSequence() == null ? 0 : action.getSequence());
     }
 
     /**
