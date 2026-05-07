@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.ai;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.ai.AiFieldProcessor.AiGenerationRequest;
 import com.auraboot.framework.meta.ai.AiFieldProcessor.AiGenerationResult;
+import com.auraboot.framework.meta.ai.AiFieldProcessor.ImageInput;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -60,6 +61,7 @@ public class AiFieldController {
                 .extractFields(request.getExtractFields())
                 .maxTokens(request.getMaxTokens())
                 .temperature(request.getTemperature())
+                .images(request.getImages())
                 .build();
 
         AiGenerationResult result = aiFieldProcessor.process(genRequest);
@@ -124,6 +126,8 @@ public class AiFieldController {
         private List<String> extractFields;
         private Integer maxTokens;
         private Double temperature;
+        /** F.3 vision: optional inline base64 image attachments. */
+        private List<ImageInput> images;
     }
 
     /**
