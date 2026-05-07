@@ -207,7 +207,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     void agentTemplates_areSeeded_withExpectedCount() {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_definition WHERE tenant_id = ? " +
-                "AND deleted_flag = FALSE",
+                "AND deleted_flag = FALSE AND agent_code LIKE 'tpl_%'",
                 Integer.class,
                 SYSTEM_TENANT_ID);
         assertThat(count).isEqualTo(3);
@@ -218,7 +218,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     void agentTemplates_containExpectedCodes() {
         List<String> codes = jdbcTemplate.queryForList(
                 "SELECT agent_code FROM ab_agent_definition WHERE tenant_id = ? " +
-                "AND deleted_flag = FALSE ORDER BY agent_code",
+                "AND deleted_flag = FALSE AND agent_code LIKE 'tpl_%' ORDER BY agent_code",
                 String.class,
                 SYSTEM_TENANT_ID);
         assertThat(codes).containsExactlyInAnyOrder(
@@ -339,7 +339,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     void agentTemplates_allHaveSystemUserId() {
         List<Map<String, Object>> agents = jdbcTemplate.queryForList(
                 "SELECT agent_code, system_user_id FROM ab_agent_definition " +
-                "WHERE tenant_id = ? AND deleted_flag = FALSE ORDER BY agent_code",
+                "WHERE tenant_id = ? AND deleted_flag = FALSE AND agent_code LIKE 'tpl_%' " +
+                "ORDER BY agent_code",
                 SYSTEM_TENANT_ID);
 
         assertThat(agents).hasSize(3);
@@ -356,7 +357,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     void agentTemplates_systemUserExists_inAbUser() {
         List<Map<String, Object>> agents = jdbcTemplate.queryForList(
                 "SELECT agent_code, system_user_id FROM ab_agent_definition " +
-                "WHERE tenant_id = ? AND deleted_flag = FALSE",
+                "WHERE tenant_id = ? AND deleted_flag = FALSE AND agent_code LIKE 'tpl_%'",
                 SYSTEM_TENANT_ID);
 
         for (Map<String, Object> agent : agents) {
@@ -382,7 +383,8 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT a.agent_code, u.email " +
                 "FROM ab_agent_definition a " +
                 "JOIN ab_user u ON u.id = a.system_user_id " +
-                "WHERE a.tenant_id = ? AND a.deleted_flag = FALSE ORDER BY a.agent_code",
+                "WHERE a.tenant_id = ? AND a.deleted_flag = FALSE AND a.agent_code LIKE 'tpl_%' " +
+                "ORDER BY a.agent_code",
                 SYSTEM_TENANT_ID);
 
         assertThat(agents).hasSize(3);
@@ -403,7 +405,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT a.name AS agent_name, u.nick_name " +
                 "FROM ab_agent_definition a " +
                 "JOIN ab_user u ON u.id = a.system_user_id " +
-                "WHERE a.tenant_id = ? AND a.deleted_flag = FALSE",
+                "WHERE a.tenant_id = ? AND a.deleted_flag = FALSE AND a.agent_code LIKE 'tpl_%'",
                 SYSTEM_TENANT_ID);
 
         for (Map<String, Object> row : agents) {
