@@ -59,6 +59,7 @@ tests/storage/admin.json
 # NOT gitignored — Tailwind v4 needs to scan these files for class extraction
 # app/plugins/website/
 
-# Auto-generated plugin public routes
-app/plugins/_public-routes.ts
+# Auto-generated plugin public routes — committed as empty stub so CI typecheck
+# can resolve the import; pnpm sync-plugins regenerates locally per dev's plugin set.
+# (was previously gitignored, breaking CI typecheck on app/middleware/sessionMiddlewareFactory.ts)
 vite.config.ts.timestamp-*.mjs
