@@ -7,7 +7,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Teams', zh: '团队' },
     icon: 'users',
     menu: { order: 10, group: 'organization' },
-    permission: 'org.team.read',
     file: './plugins/core-organization/pages/organization/teams.tsx',
   },
   {
@@ -16,7 +15,6 @@ export const RESOURCES: PluginResource[] = [
     title: { en: 'Team Detail', zh: '团队详情' },
     menu: false,
     parentKey: 'org.teams',
-    permission: 'org.team.read',
     file: './plugins/core-organization/pages/organization/team-detail.tsx',
   },
   {
@@ -24,7 +22,6 @@ export const RESOURCES: PluginResource[] = [
     path: '/organization/members/:memberPid',
     title: { en: 'Member Detail', zh: '成员详情' },
     menu: false,
-    permission: 'org.member.read',
     file: './plugins/core-organization/pages/organization/member-detail.tsx',
   },
 ]
