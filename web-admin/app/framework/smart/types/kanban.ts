@@ -33,6 +33,10 @@ export interface KanbanColumn {
   count: number;
   /** Aggregation results for this column */
   aggregations?: Record<string, number>;
+  /** Column accent color (resolved from dict extras or view config) */
+  color?: string;
+  /** Terminal stage marker for visual treatment (won/lost) */
+  terminal?: 'won' | 'lost';
 }
 
 /**
@@ -56,9 +60,13 @@ export interface KanbanCardField {
   /** Display label */
   label?: string;
   /** Display type for formatting */
-  type?: 'text' | 'number' | 'date' | 'tag' | 'avatar';
+  type?: 'text' | 'number' | 'tag' | 'date' | 'currency' | 'avatar' | 'progress' | 'date-relative';
   /** Format string (e.g., date format) */
   format?: string;
+  /** ISO 4217 currency code (only used when type='currency') */
+  currencyCode?: string;
+  /** Maximum value for progress rendering (only used when type='progress', defaults to 100) */
+  max?: number;
 }
 
 /**
