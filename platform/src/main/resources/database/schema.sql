@@ -7627,13 +7627,38 @@ CREATE TABLE IF NOT EXISTS ab_mobile_config (
     description     VARCHAR(255),
     platform        VARCHAR(20),
     min_version     VARCHAR(20),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by      BIGINT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mobile_config_key_platform
     ON ab_mobile_config (config_key, COALESCE(tenant_id, 0), COALESCE(platform, '__all__'));
 CREATE INDEX IF NOT EXISTS idx_mobile_config_tenant
     ON ab_mobile_config (tenant_id, config_key);
+
+-- ───────────────────────────────────────────────────────────
+-- Mobile Config Audit Log (M-090 CFG-003)
+-- Append-only history of every upsert / delete on ab_mobile_config.
+-- Read by ops dashboards to answer "who changed mobile config X and when".
+-- ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS ab_mobile_config_audit (
+    id              BIGSERIAL PRIMARY KEY,
+    config_key      VARCHAR(100) NOT NULL,
+    tenant_id       BIGINT,
+    platform        VARCHAR(20),
+    operation       VARCHAR(20) NOT NULL,    -- create | update | delete
+    old_value       TEXT,
+    new_value       TEXT,
+    changed_by      BIGINT,
+    changed_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mobile_config_audit_key
+    ON ab_mobile_config_audit (config_key, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mobile_config_audit_tenant
+    ON ab_mobile_config_audit (tenant_id, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mobile_config_audit_changed_by
+    ON ab_mobile_config_audit (changed_by, changed_at DESC);
 
 -- ───────────────────────────────────────────────────────────
 -- Mobile Client Logs — structured log ingestion from iOS/Android
