@@ -25,7 +25,8 @@
       "config": {
         "title": "$i18n:acs.dashboard.kpi.total_requests",
         "icon": "Rocket",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "total_requests" }
+        "metricField": "total_requests",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi" }
       }
     },
     {
@@ -35,8 +36,9 @@
       "config": {
         "title": "$i18n:acs.dashboard.kpi.success_rate",
         "icon": "TrendingUp",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "success_rate" },
-        "visualization": { "suffix": "%" }
+        "metricField": "success_rate",
+        "suffix": "%",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi" }
       }
     },
     {
@@ -46,8 +48,9 @@
       "config": {
         "title": "$i18n:acs.dashboard.kpi.avg_duration",
         "icon": "Clock",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "avg_duration_ms" },
-        "visualization": { "suffix": " ms" }
+        "metricField": "avg_duration_ms",
+        "suffix": " ms",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi" }
       }
     },
     {
@@ -57,7 +60,8 @@
       "config": {
         "title": "$i18n:acs.dashboard.kpi.safety_triggers",
         "icon": "ShieldCheck",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "safety_triggers" }
+        "metricField": "safety_triggers",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi" }
       }
     },
     {
@@ -109,7 +113,11 @@
       "config": {
         "title": "$i18n:acs.dashboard.chart.category_title",
         "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_category_stats" },
-        "visualization": { "xField": "category", "series": [ {"field": "success", "type": "bar"}, {"field": "failed", "type": "bar"} ] }
+        "visualization": { "xField": "category" },
+        "seriesConfig": [
+          { "metricIndex": 0, "chartType": "bar" },
+          { "metricIndex": 1, "chartType": "bar" }
+        ]
       }
     },
     {
@@ -129,7 +137,8 @@
       "config": {
         "title": "$i18n:acs.dashboard.kpi.pending_approvals",
         "icon": "Inbox",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "pending_approvals" }
+        "metricField": "pending_approvals",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi" }
       }
     },
     {
@@ -139,8 +148,9 @@
       "config": {
         "title": "$i18n:acs.dashboard.kpi.total_cost",
         "icon": "DollarSign",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi", "metricField": "total_cost" },
-        "visualization": { "prefix": "$" }
+        "metricField": "total_cost",
+        "prefix": "$",
+        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_kpi" }
       }
     },
     {
