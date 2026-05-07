@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-test('debug wp edit URL', async ({ page, request }) => {
+// This file is an investigative scratchpad — pure console.log with no expect()
+// calls — kept for reference but excluded from CI to avoid masquerading as a
+// real E2E (AGENTS.md "禁止 tests/e2e/ 中纯 API 测试冒充 E2E"). Re-enable
+// locally by running `npx playwright test debug-wp-edit --grep-invert= ''`.
+test.skip('debug wp edit URL', async ({ page, request }) => {
   // login
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
 
