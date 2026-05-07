@@ -232,4 +232,46 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
                     .contains("boom inside executeAuraBotTurn");
         });
     }
+
+    @Test
+    @Order(7)
+    @DisplayName("GAP-295: TurnContext.channelSessionId resolved on aurabot dispatch")
+    void channelSessionId_resolvedOnAurabotDispatch() {
+        withTestIdentity(() -> {
+            org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
+                    org.mockito.ArgumentCaptor.forClass(TurnContext.class);
+            when(chatService.executeAuraBotTurn(ctxCaptor.capture(), any(), any()))
+                    .thenReturn(new TurnOutcome.Success("ok", java.util.Map.of()));
+
+            turnService.runTurn(buildTurnRequest("aurabot", "hi gap-295"), sink);
+
+            TurnContext ctx = ctxCaptor.getValue();
+            assertThat(ctx.channelSessionId())
+                    .as("ChannelSessionResolver should populate channelSessionId for channel=web")
+                    .isNotNull();
+        });
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("GAP-295: TurnContext.channelSessionId resolved on named-agent dispatch")
+    void channelSessionId_resolvedOnNamedAgentDispatch() {
+        withTestIdentity(() -> {
+            Long tenantId = getTestTenant().getId();
+            String agentCode = "test_agent";
+            when(agentChatPort.agentExists(eq(tenantId), eq(agentCode))).thenReturn(true);
+            org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
+                    org.mockito.ArgumentCaptor.forClass(TurnContext.class);
+            when(agentChatPort.runAgentTurn(ctxCaptor.capture(), any(), any(),
+                    org.mockito.ArgumentMatchers.<com.auraboot.framework.agent.port.AgentTurnOverrides>any()))
+                    .thenReturn(new TurnOutcome.Success("ok", java.util.Map.of()));
+
+            turnService.runTurn(buildTurnRequest(agentCode, "hi agent gap-295"), sink);
+
+            TurnContext ctx = ctxCaptor.getValue();
+            assertThat(ctx.channelSessionId())
+                    .as("ChannelSessionResolver should populate channelSessionId for named-agent path")
+                    .isNotNull();
+        });
+    }
 }

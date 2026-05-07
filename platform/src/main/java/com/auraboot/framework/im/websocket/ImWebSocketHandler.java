@@ -1,9 +1,11 @@
 package com.auraboot.framework.im.websocket;
 
+import com.auraboot.framework.agentchat.event.ImMessageSentEvent;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.im.dto.*;
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;
 import com.auraboot.framework.im.model.ImConstants;
+import com.auraboot.framework.im.model.ImConversation;
 import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 import com.auraboot.framework.im.service.ImChatPushService;
@@ -12,6 +14,7 @@ import com.auraboot.framework.im.service.ImMessageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -35,6 +38,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
     private final ImMessageBroadcaster broadcaster;
     private final ObjectMapper objectMapper;
     private final org.springframework.context.ApplicationContext applicationContext;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ImWebSocketHandler(ImSessionRegistry sessionRegistry,
                                ImMessageService messageService,
@@ -42,7 +46,8 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
                                ImConversationMemberMapper memberMapper,
                                ImMessageBroadcaster broadcaster,
                                ObjectMapper objectMapper,
-                               org.springframework.context.ApplicationContext applicationContext) {
+                               org.springframework.context.ApplicationContext applicationContext,
+                               ApplicationEventPublisher eventPublisher) {
         this.sessionRegistry = sessionRegistry;
         this.messageService = messageService;
         this.conversationService = conversationService;
@@ -50,6 +55,7 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
         this.broadcaster = broadcaster;
         this.objectMapper = objectMapper;
         this.applicationContext = applicationContext;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -163,6 +169,24 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
         } catch (Exception e) {
             log.debug("InboxImListener not available, skipping mention inbox", e);
         }
+
+        // Publish ImMessageSentEvent so GroupChatAgentRouter can route to
+        // group-chat agents (P0 explicit @mentions / P1 ALWAYS-reply / P2
+        // conductor). Carries the persisted seq so AgentReplyTask can look up
+        // the agent's reply row post-runTurn for MESSAGE broadcast (GAP-311).
+        ImConversation conv = conversationService.getById(saved.getConversationId(), tenantId);
+        String conversationType = conv != null ? conv.getType() : null;
+        eventPublisher.publishEvent(new ImMessageSentEvent(
+                this,
+                saved.getConversationId(),
+                tenantId,
+                saved.getSenderId(),
+                saved.getSenderType(),
+                saved.getContent(),
+                request.getMentions(),
+                saved.getId(),
+                conversationType,
+                saved.getSeq()));
     }
 
     @SuppressWarnings("unchecked")

@@ -1,5 +1,6 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.identity.ChannelSessionResolver;
 import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.agent.service.ActiveMemoryService;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
@@ -95,6 +96,16 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
      */
     @Autowired(required = false)
     private AgentApprovalGateService agentApprovalGateService;
+
+    /**
+     * GAP-295: 4-tuple session resolution. Optional bean — when absent, every
+     * turn keeps {@code channelSessionId=null} (Phase A behavior preserved).
+     * The default {@link com.auraboot.framework.agent.identity.ChannelSessionResolverImpl}
+     * is always wired in OSS; required=false keeps unit tests that build the
+     * impl without identity infrastructure functional.
+     */
+    @Autowired(required = false)
+    private ChannelSessionResolver channelSessionResolver;
 
     public ConversationTurnServiceImpl(AuraBotChatService chatService,
                                         @Qualifier("turnSideEffects") TurnSideEffects sideEffects,
@@ -757,6 +768,11 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         // TurnContext is not yet built (its inboundMessageId field is exactly
         // what we are about to populate from the persistence return).
         Long inboundMessageId = sideEffects.persistence().persistInbound(request, verdict);
+        // GAP-295: resolve the (tenantId, channel, channelUserId, profileId)
+        // session row so EffectLifetime.PER_SESSION (and downstream session-
+        // scoped state) has a stable scope key. {@code profileId=null} means
+        // "tenant default profile" per the SPI contract — not "no profile".
+        String channelSessionId = resolveChannelSessionId(request);
         return new TurnContext(
                 com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
                 request.tenantId(),
@@ -764,13 +780,47 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 request.humanMemberId(),
                 null,                                // agentId — Phase B's AuraBotAgentResolver
                 request.agentCode(),                 // DC.3c Fix 2: drives outbound sender_id resolution
-                null,                                // channelSessionId — Phase B's ChannelSessionResolver
+                channelSessionId,                    // GAP-295: resolved above
                 request.conversationId(),
                 inboundMessageId,
                 effectiveBucket,
                 null,                                // traceId — set inside chat impl (kept null on TurnContext for Phase A)
                 null,                                // taskPid — chokepoint dispatch later fills via withTaskPid (DC.3c)
                 java.time.Instant.now());
+    }
+
+    /**
+     * GAP-295: resolve or create the channel session for this turn's
+     * 4-tuple identity. Returns null when the resolver bean is absent (test
+     * contexts) or the request lacks the minimum tuple inputs (channel +
+     * userId) — leaves {@code TurnContext.channelSessionId=null} which matches
+     * pre-GAP-295 Phase B behavior. Failures are logged but never propagated:
+     * a turn that can otherwise execute should not be aborted because session
+     * accounting was unavailable.
+     */
+    private String resolveChannelSessionId(TurnRequest request) {
+        if (channelSessionResolver == null) {
+            return null;
+        }
+        if (request.channel() == null || request.channel().isBlank()) {
+            log.debug("GAP-295: skipping channel session resolution — channel is blank");
+            return null;
+        }
+        try {
+            ChannelSessionResolver.ChannelSession session = channelSessionResolver.resolve(
+                    new ChannelSessionResolver.ResolveRequest(
+                            request.tenantId(),
+                            request.channel(),
+                            String.valueOf(request.userId()),
+                            /*profileId=*/ null,           // tenant default
+                            request.userId(),              // acpUserId
+                            /*createIfAbsent=*/ true));
+            return session != null ? session.pid() : null;
+        } catch (Exception e) {
+            log.warn("GAP-295: channel session resolve failed for channel={} userId={}: {}",
+                    request.channel(), request.userId(), e.getMessage());
+            return null;
+        }
     }
 
     /**

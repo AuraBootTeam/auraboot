@@ -17,7 +17,9 @@ import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.conversation.TurnRequest;
 import com.auraboot.framework.im.dto.WsFrame;
+import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
+import com.auraboot.framework.im.service.ImMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Async;
@@ -80,38 +82,53 @@ public class AgentReplyTask {
     private final ImMessageBroadcaster broadcaster;
     private final HandoffToolProvider handoffToolProvider;
     private final ConversationTurnService turnService;
+    private final ImMessageService messageService;
 
     public AgentReplyTask(AgentDefinitionMapper agentDefinitionMapper,
                           ObjectProvider<GroupChatMessagePort> messagePortProvider,
                           GroupChatTurnContextAssembler contextAssembler,
                           ImMessageBroadcaster broadcaster,
                           HandoffToolProvider handoffToolProvider,
-                          ConversationTurnService turnService) {
+                          ConversationTurnService turnService,
+                          ImMessageService messageService) {
         this.agentDefinitionMapper = agentDefinitionMapper;
         this.messagePort = messagePortProvider.getIfAvailable(NoOpGroupChatMessagePort::new);
         this.contextAssembler = contextAssembler;
         this.broadcaster = broadcaster;
         this.handoffToolProvider = handoffToolProvider;
         this.turnService = turnService;
+        this.messageService = messageService;
     }
 
     /**
      * Async entry from {@code GroupChatAgentRouter.onMessageSent}. The chokepoint
      * runs synchronously inside this @Async worker (Q-D.1=α "sync core, async
      * at adapter"); recursion on handoff stays within the same worker.
+     *
+     * @param triggeringSeq seq of the inbound human message that triggered the
+     *                      reply. Used post-runTurn to look up the persisted
+     *                      agent reply row and broadcast a MESSAGE frame so
+     *                      group-chat clients render the answer without a
+     *                      manual refresh (GAP-311).
      */
     @Async
-    public void executeReply(Long conversationId, Long tenantId, Long agentId, String triggerContent) {
-        executeReplyWithDepth(conversationId, tenantId, agentId, triggerContent, 0, /*parentTaskPid=*/ null);
+    public void executeReply(Long conversationId, Long tenantId, Long agentId,
+                              String triggerContent, Long triggeringSeq) {
+        executeReplyWithDepth(conversationId, tenantId, agentId, triggerContent, 0,
+                /*parentTaskPid=*/ null, triggeringSeq);
     }
 
     /**
      * Recursion-aware reply driver. Each invocation produces one chokepoint
      * turn; on handoff signal we re-enter with the upstream turn's taskPid as
-     * the next hop's parentTaskPid (so {@code ab_agent_task.parent_id} chains).
+     * the next hop's parentTaskPid (so {@code ab_agent_task.parent_id} chains)
+     * and the upstream turn's persisted agent row seq as the next hop's
+     * triggeringSeq (so the child's broadcast lookup starts after the parent's
+     * row).
      */
     private void executeReplyWithDepth(Long conversationId, Long tenantId, Long agentId,
-                                        String triggerContent, int depth, String parentTaskPid) {
+                                        String triggerContent, int depth, String parentTaskPid,
+                                        Long triggeringSeq) {
         if (depth >= MAX_HANDOFF_DEPTH) {
             log.warn("Max handoff depth {} reached for conversation {}, agent {}",
                     MAX_HANDOFF_DEPTH, conversationId, agentId);
@@ -194,7 +211,66 @@ public class AgentReplyTask {
         ResponseSink sink = new BroadcastResponseSink(broadcaster, humanMemberIds, conversationId);
         TurnOutcome outcome = turnService.runTurn(req, sink);
 
-        handleOutcome(outcome, conversationId, tenantId, agent, humanMemberIds, depth);
+        // GAP-311: post-runTurn MESSAGE broadcast. After the chokepoint
+        // persists the agent (or system-error) reply row via finalizeTurn ->
+        // Persistence.persistOutbound, push a single MESSAGE frame carrying
+        // full row metadata so connected group-chat clients render the answer
+        // without a manual refresh. Mirrors ImAiService.broadcastPersistedAgentResponse.
+        Long persistedSeq = broadcastPersistedAgentReply(conversationId, tenantId,
+                humanMemberIds, triggeringSeq, outcome);
+
+        handleOutcome(outcome, conversationId, tenantId, agent, humanMemberIds, depth, persistedSeq, triggeringSeq);
+    }
+
+    /**
+     * Look up the agent/system row that the chokepoint persisted for this turn
+     * and broadcast a MESSAGE frame to all human members. Returns the persisted
+     * row's seq (so handoff recursion can use it as the next hop's
+     * {@code triggeringSeq}), or the original {@code triggeringSeq} if no row
+     * was found (treat as no-op for handoff lookup).
+     *
+     * <p>Race-safe: each {@link #executeReply} invocation is serialized inside
+     * its {@code @Async} worker; concurrent agent replies for the same
+     * conversation cannot interleave because each call has its own
+     * triggeringSeq window. We scan rows with {@code seq > triggeringSeq} and
+     * take the last agent/system row.
+     */
+    private Long broadcastPersistedAgentReply(Long conversationId, Long tenantId,
+                                               List<Long> humanMemberIds,
+                                               Long triggeringSeq,
+                                               TurnOutcome outcome) {
+        if (triggeringSeq == null) {
+            log.debug("AgentReplyTask: triggeringSeq is null for conversation {}, "
+                    + "skipping post-runTurn MESSAGE broadcast", conversationId);
+            return null;
+        }
+        List<ImMessage> recent = messageService.getMessagesAfterSeq(
+                conversationId, triggeringSeq, 50, tenantId);
+        ImMessage persisted = recent.stream()
+                .filter(m -> "agent".equals(m.getSenderType()) || "system".equals(m.getSenderType()))
+                .reduce((first, second) -> second) // last one in seq order
+                .orElse(null);
+        if (persisted == null) {
+            log.debug("AgentReplyTask: no persisted agent/system row found post-turn for "
+                            + "conversationId={} (triggeringSeq={}); skipping broadcast — outcome={}",
+                    conversationId, triggeringSeq,
+                    outcome != null ? outcome.getClass().getSimpleName() : "null");
+            return triggeringSeq;
+        }
+        WsFrame frame = WsFrame.builder()
+                .type("MESSAGE")
+                .data(Map.of(
+                        "messageId", persisted.getId(),
+                        "conversationId", conversationId,
+                        "senderId", persisted.getSenderId(),
+                        "senderType", persisted.getSenderType() != null ? persisted.getSenderType() : "",
+                        "seq", persisted.getSeq(),
+                        "messageType", persisted.getMessageType() != null ? persisted.getMessageType() : "ai_response",
+                        "content", persisted.getContent() != null ? persisted.getContent() : "",
+                        "createdAt", persisted.getCreatedAt() != null ? persisted.getCreatedAt().toString() : ""))
+                .build();
+        broadcaster.publish(humanMemberIds, frame);
+        return persisted.getSeq();
     }
 
     private List<ToolDefinition> buildHandoffExtraTools(Long conversationId, Long tenantId, Long currentAgentId) {
@@ -245,7 +321,8 @@ public class AgentReplyTask {
      * </ul>
      */
     private void handleOutcome(TurnOutcome outcome, Long conversationId, Long tenantId,
-                                AgentDefinition agent, List<Long> humanMemberIds, int depth) {
+                                AgentDefinition agent, List<Long> humanMemberIds, int depth,
+                                Long persistedSeq, Long triggeringSeq) {
         if (outcome instanceof TurnOutcome.Success success && success.meta() != null) {
             Object handoffTo = success.meta().get("_handoff_to");
             if (handoffTo != null) {
@@ -260,8 +337,12 @@ public class AgentReplyTask {
                 String childTrigger = handoffContext != null ? String.valueOf(handoffContext) : "";
                 Object upstreamTaskPid = success.meta().get("_taskPid");
                 String parentTaskPidForChild = upstreamTaskPid != null ? String.valueOf(upstreamTaskPid) : null;
+                // Child's triggeringSeq is the parent's persisted reply seq if
+                // available, otherwise fall back to the parent's triggeringSeq
+                // (no rows persisted between hops).
+                Long childTriggeringSeq = persistedSeq != null ? persistedSeq : triggeringSeq;
                 executeReplyWithDepth(conversationId, tenantId, targetAgentId, childTrigger,
-                        depth + 1, parentTaskPidForChild);
+                        depth + 1, parentTaskPidForChild, childTriggeringSeq);
                 return;
             }
         }
