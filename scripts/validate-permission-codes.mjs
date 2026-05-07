@@ -39,6 +39,12 @@
  *     Skip auraboot-enterprise/ checkout (used by OSS CI which only has
  *     the OSS repo).
  *
+ *   --oss=<path> --enterprise=<path>
+ *     Override path auto-detection. Useful in cross-repo CI where the
+ *     two repos aren't laid out as siblings (e.g. enterprise CI checks
+ *     out the OSS repo as `_core/`). When --oss is given, --enterprise
+ *     becomes optional and defaults to the parent + sibling search.
+ *
  *   --json
  *     Machine-readable JSON output (works with --baseline too).
  *
@@ -64,19 +70,27 @@ const OSS_ONLY = flag('oss-only')
 const JSON_OUT = flag('json')
 const BASELINE_PATH = optValue('baseline')
 const WRITE_BASELINE_PATH = optValue('write-baseline')
+const EXPLICIT_OSS = optValue('oss')
+const EXPLICIT_ENT = optValue('enterprise')
 
-// The script always lives at `<oss-checkout>/scripts/`, so OSS is the
-// grandparent of __filename. This makes the validator scan the CURRENT
-// checkout (whether it's the primary clone or a git worktree) instead of
-// jumping to the primary clone via a sibling search — important because
-// reconciliation work happens in worktrees and needs to be verified
-// without merging first.
-const OSS = path.resolve(path.dirname(__filename), '..')
+// OSS path resolution:
+// - If --oss=<path> is given, use it (cross-repo CI mode).
+// - Otherwise the script always lives at `<oss-checkout>/scripts/`, so
+//   OSS is the grandparent of __filename. This makes the validator scan
+//   the CURRENT checkout (whether it's the primary clone or a git
+//   worktree) instead of jumping elsewhere via a sibling search.
+const OSS = EXPLICIT_OSS
+  ? path.resolve(EXPLICIT_OSS)
+  : path.resolve(path.dirname(__filename), '..')
 
-// Locate enterprise sibling. In a normal workspace layout it's
-// `<workspace>/auraboot-enterprise/` next to `<workspace>/auraboot/`.
-// With --oss-only we skip it (used by OSS CI which has no enterprise
-// checkout).
+if (!fs.existsSync(path.join(OSS, 'platform'))) {
+  throw new Error(`OSS checkout not found at ${OSS} (no platform/ subdir). Use --oss=<path> to override.`)
+}
+
+// Enterprise path resolution:
+// - --enterprise=<path>: use as given.
+// - --oss-only: skip entirely.
+// - else: search up from OSS for auraboot-enterprise/ sibling.
 function findEnterprise(ossDir) {
   let cur = path.dirname(ossDir)
   for (let i = 0; i < 8; i++) {
@@ -89,13 +103,30 @@ function findEnterprise(ossDir) {
   return null
 }
 
-const ENT = OSS_ONLY ? null : findEnterprise(OSS)
-if (!OSS_ONLY && !ENT) {
-  throw new Error('Could not locate auraboot-enterprise/ sibling. Pass --oss-only to skip enterprise scanning.')
+let ENT
+if (OSS_ONLY) {
+  ENT = null
+} else if (EXPLICIT_ENT) {
+  ENT = path.resolve(EXPLICIT_ENT)
+  if (!fs.existsSync(path.join(ENT, 'plugins'))) {
+    throw new Error(`Enterprise checkout not found at ${ENT} (no plugins/ subdir).`)
+  }
+} else {
+  ENT = findEnterprise(OSS)
+  if (!ENT) {
+    throw new Error('Could not locate auraboot-enterprise/ sibling. Pass --oss-only or --enterprise=<path>.')
+  }
 }
 
-// Used only for relative-path display in reports/baseline.
-const REPO_ROOT = path.dirname(OSS)
+// Used only for relative-path display. When OSS and ENT live under a
+// common parent (typical workspace layout) use that; otherwise fall
+// back to OSS's parent so paths are still readable.
+const REPO_ROOT = (() => {
+  if (!ENT) return path.dirname(OSS)
+  const ossParent = path.dirname(OSS)
+  const entParent = path.dirname(ENT)
+  return ossParent === entParent ? ossParent : path.dirname(OSS)
+})()
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'))
