@@ -333,6 +333,29 @@ export const actionNodes: FlowNodeDefinition[] = [
         placeholder: 'llmOutput',
         group: 'output',
       },
+      {
+        // E.2 — Vision input. Each entry must name a workflow context
+        // variable whose runtime value is a data:image/{png|jpeg|gif|webp};
+        // base64,<...> URI. The backend executor (LlmCallExecutor) reads
+        // these names from config, resolves them from the trigger context,
+        // and emits Anthropic image content blocks. Non-vision providers
+        // (openai-compat / DeepSeek / Qwen) reject outright — no silent
+        // drop. The chip-list captures the names; the data URI itself
+        // typically arrives via an upstream file-upload trigger or an
+        // explicit "Build image data URI" pre-step.
+        key: 'imageVariableNames',
+        label: '$i18n:automation.field.llmImageVariableNames',
+        // JSON array of context variable names — e.g. ["screenshot", "attachment"].
+        // We use 'json' rather than 'multiselect' because the candidate
+        // names depend on the upstream trigger schema and can't be
+        // enumerated at design time. The 'tags' / chip-input field type
+        // is not yet part of the shared PropertyType union; revisit when
+        // it lands so we can give a friendlier UX.
+        type: 'json',
+        description: '$i18n:automation.field.llmImageVariableNames.desc',
+        placeholder: '["screenshot", "attachment"]',
+        group: 'prompt',
+      },
     ],
     defaultConfig: {
       actionType: 'llm_call',
@@ -341,6 +364,7 @@ export const actionNodes: FlowNodeDefinition[] = [
       thinkingEnabled: false,
       thinkingBudgetTokens: 8000,
       outputVariableName: 'llmOutput',
+      imageVariableNames: [],
     },
   },
 ];
