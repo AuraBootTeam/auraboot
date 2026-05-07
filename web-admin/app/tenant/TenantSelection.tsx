@@ -43,7 +43,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (!resp.ok) return { spaces: [] };
     const result = await resp.json();
     return { spaces: (result.data || []) as UserSpace[] };
-  } catch {
+  } catch (err) {
+    console.error('[TenantSelection] my-spaces fetch failed', err);
     return { spaces: [] };
   }
 };
