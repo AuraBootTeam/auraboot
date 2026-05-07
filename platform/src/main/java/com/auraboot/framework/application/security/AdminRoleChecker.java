@@ -1,9 +1,14 @@
 package com.auraboot.framework.application.security;
 
 import com.auraboot.framework.permission.enums.RoleCodes;
-import lombok.RequiredArgsConstructor;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+
+import java.time.Duration;
 
 /**
  * Shared helper that answers "does {@code userId} hold {@code roleCode} in {@code tenantId}?".
@@ -16,24 +21,73 @@ import org.springframework.stereotype.Component;
  * <p>Join path follows the Phase-2 RBAC schema:
  * <pre>ab_tenant_member (user_id → id) → ab_user_role (member_id) → ab_role (code)</pre>
  *
- * <p>No caching: admin endpoints are low-QPS and freshness matters more than
- * latency. Revisit if traffic patterns change.
+ * <p>Caching strategy: per-instance Caffeine cache with 60 s TTL after write and
+ * a maximum of 10 000 entries. This reduces JDBC pressure on the admin role-check
+ * path while bounding staleness to one minute — acceptable given that role
+ * assignments change rarely. Stats are recorded and exposed via Micrometer gauges
+ * ({@code aura.admin.role_check.cache.hit}, {@code .miss}, {@code .size}) for
+ * production observability.
  */
 @Component
-@RequiredArgsConstructor
 public class AdminRoleChecker {
 
     private final JdbcTemplate jdbcTemplate;
+    private final MeterRegistry meterRegistry;
+
+    private final Cache<RoleCacheKey, Boolean> cache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofSeconds(60))
+            .maximumSize(10_000)
+            .recordStats()
+            .build();
+
+    public AdminRoleChecker(JdbcTemplate jdbcTemplate, MeterRegistry meterRegistry) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.meterRegistry = meterRegistry;
+    }
+
+    @PostConstruct
+    void registerCacheMetrics() {
+        meterRegistry.gauge("aura.admin.role_check.cache.hit",
+                cache, c -> c.stats().hitCount());
+        meterRegistry.gauge("aura.admin.role_check.cache.miss",
+                cache, c -> c.stats().missCount());
+        meterRegistry.gauge("aura.admin.role_check.cache.size",
+                cache, Cache::estimatedSize);
+    }
 
     /**
      * @return {@code true} when an active, non-deleted {@code ab_user_role} row
      * binds {@code userId} (via {@code ab_tenant_member}) to an active,
      * non-deleted role with {@code code = roleCode} in {@code tenantId}.
+     * Result is cached for 60 s per {@code (tenantId, userId, roleCode)} triple.
      */
     public boolean hasRole(Long tenantId, Long userId, String roleCode) {
         if (tenantId == null || userId == null || roleCode == null) {
             return false;
         }
+        return cache.get(new RoleCacheKey(tenantId, userId, roleCode),
+                k -> lookupFromDb(k.tenantId(), k.userId(), k.roleCode()));
+    }
+
+    /** Convenience: {@link #hasRole(Long, Long, String)} with {@link RoleCodes#TENANT_ADMIN}. */
+    public boolean isTenantAdmin(Long tenantId, Long userId) {
+        return hasRole(tenantId, userId, RoleCodes.TENANT_ADMIN);
+    }
+
+    // -------------------------------------------------------------------------
+    // Cache management (package-visible for test cleanup)
+    // -------------------------------------------------------------------------
+
+    /** Invalidates all cache entries. Intended for test teardown only. */
+    void invalidateAll() {
+        cache.invalidateAll();
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal
+    // -------------------------------------------------------------------------
+
+    private boolean lookupFromDb(Long tenantId, Long userId, String roleCode) {
         Long count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_user_role ur " +
                         " JOIN ab_tenant_member tm ON ur.member_id = tm.id " +
@@ -49,8 +103,5 @@ public class AdminRoleChecker {
         return count != null && count > 0;
     }
 
-    /** Convenience: {@link #hasRole(Long, Long, String)} with {@link RoleCodes#TENANT_ADMIN}. */
-    public boolean isTenantAdmin(Long tenantId, Long userId) {
-        return hasRole(tenantId, userId, RoleCodes.TENANT_ADMIN);
-    }
+    private record RoleCacheKey(Long tenantId, Long userId, String roleCode) {}
 }
