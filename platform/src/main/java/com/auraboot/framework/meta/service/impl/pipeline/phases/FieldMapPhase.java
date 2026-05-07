@@ -60,8 +60,16 @@ public class FieldMapPhase implements CommandPhase {
             Map<String, Object> ec = ctx.getExecConfig();
             boolean hasInputFields = ec.containsKey("inputFields");
             boolean hasAutoSetFields = ec.containsKey("autoSetFields");
-            boolean isDeleteOp = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType());
             String cmdType = (String) ec.get("type");
+            // isDeleteOp must mirror isStateTransition/isCreateOrUpdate semantics:
+            // fall back to command.type when request.operationType is empty.
+            // Without this fallback, `type: "delete"` commands invoked via
+            // CLI/API without an explicit `--operation delete` skip the
+            // implicit field-map path entirely, hit the empty-binding-rules
+            // branch in executeFieldMapPhase, and silently no-op while
+            // returning phaseReached=completed. Same for `--target` flows.
+            boolean isDeleteOp = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
+                    || "delete".equalsIgnoreCase(cmdType);
             boolean isStateTransition = "state_transition".equalsIgnoreCase(cmdType);
             boolean isCreateOrUpdate = "create".equalsIgnoreCase(cmdType) || "update".equalsIgnoreCase(cmdType);
 
