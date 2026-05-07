@@ -5,6 +5,37 @@
 
 set -e
 
+# ─── Multi-worktree pre-flight guard ────────────────────────────────────
+# Refuse to run when ≥ 2 git worktrees of this repo are active. Triggered
+# by the 2026-05-07 env-layering DB pollution incident: feat/env-layering-poc
+# worktree ran reset-db.sh against the shared `aura_boot` host DB, rebuilt
+# the schema with env_id NOT NULL while the host backend was still running
+# with a stale m2 jar (no envId field) → 104 POST /api/pages failures.
+#
+# Multi-worktree must use the isolated docker stack workflow (each worktree
+# gets its own COMPOSE_PROJECT_NAME=auraboot-<slug> stack with its own
+# postgres / backend / vite / BFF / redis on dedicated ports). The escape
+# hatch FORCE_HOST=1 lets the operator override when other worktrees are
+# known dormant; each override is logged to ~/.aura/host-override.log so
+# the owner can audit which scenarios depend on it.
+#
+# Spec: docs/plans/2026-05/2026-05-07-docker-per-worktree-isolation-design.md
+# §3.5 (P0 #5).
+ACTIVE_WORKTREES=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
+if [ "${ACTIVE_WORKTREES:-0}" -ge 2 ]; then
+    echo "ERROR: detected ${ACTIVE_WORKTREES} active worktrees on this repo." >&2
+    echo "  Multi-worktree mode requires isolated docker stack." >&2
+    echo "  Run: ./scripts/dev/start-isolated.sh && reset uses your isolated DB." >&2
+    echo "  Override (only if other worktrees are dormant): FORCE_HOST=1 ./scripts/reset-db.sh" >&2
+    if [ "${FORCE_HOST:-}" != "1" ]; then
+        exit 1
+    fi
+    # Audit log
+    mkdir -p "$HOME/.aura"
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) reset-db.sh FORCE_HOST=1 in $(pwd) [$(git rev-parse --abbrev-ref HEAD)] worktrees=${ACTIVE_WORKTREES}" >> "$HOME/.aura/host-override.log"
+    echo "WARN: FORCE_HOST=1 used. Logged to ~/.aura/host-override.log" >&2
+fi
+
 DB_NAME="aura_boot"
 DB_USER="ghj"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
