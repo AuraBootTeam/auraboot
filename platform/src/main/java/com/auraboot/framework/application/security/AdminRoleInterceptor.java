@@ -2,23 +2,36 @@ package com.auraboot.framework.application.security;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.enums.RoleCodes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.util.pattern.PathPattern;
+import org.springframework.web.util.pattern.PathPatternParser;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * URL-prefix admin guard for {@code /api/admin/**}.
  *
- * <p>Enforces that the authenticated caller holds the
- * {@link com.auraboot.framework.permission.enums.RoleCodes#TENANT_ADMIN}
- * role in the current tenant. Replaces the per-controller
+ * <p>Enforces that the authenticated caller holds the required role in the
+ * current tenant. The required role is resolved per path:
+ * <ul>
+ *   <li>{@code /api/admin/infrastructure/**} and {@code /api/admin/cloud-config/**}
+ *       require {@link com.auraboot.framework.permission.enums.RoleCodes#PLATFORM_ADMIN}.</li>
+ *   <li>All other {@code /api/admin/**} paths require
+ *       {@link com.auraboot.framework.permission.enums.RoleCodes#TENANT_ADMIN}.</li>
+ * </ul>
+ * Roles are <em>disjoint</em>: holding {@code platform_admin} does NOT grant
+ * access to tenant-admin-only paths and vice versa.
+ * Replaces the per-controller
  * {@code guardTenantAdmin()} pattern (originally introduced as a Round-2
  * temporary fix on {@code UserSoulProfileAdminController}) with a single
  * default-deny choke point. See design doc
@@ -61,6 +74,12 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
     public static final String DENY_MESSAGE = "admin role required";
     public static final int DENY_CODE = 409;
 
+    /** Paths whose required role is {@code platform_admin} (disjoint from tenant_admin). */
+    private static final List<PathPattern> PLATFORM_ADMIN_PATHS = List.of(
+            new PathPatternParser().parse("/api/admin/infrastructure/**"),
+            new PathPatternParser().parse("/api/admin/cloud-config/**")
+    );
+
     private final AdminRoleChecker adminRoleChecker;
     private final ObjectMapper objectMapper;
 
@@ -89,13 +108,29 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
             writeDenied(response);
             return false;
         }
-        if (!adminRoleChecker.isTenantAdmin(tenantId, userId)) {
-            log.warn("AdminRoleInterceptor: rejected non-admin for {} (tenantId={}, userId={})",
-                    request.getRequestURI(), tenantId, userId);
+        String requiredRole = resolveRequiredRole(request.getRequestURI());
+        if (!adminRoleChecker.hasRole(tenantId, userId, requiredRole)) {
+            log.warn("AdminRoleInterceptor: rejected (requires={}) for {} (tenantId={}, userId={})",
+                    requiredRole, request.getRequestURI(), tenantId, userId);
             writeDenied(response);
             return false;
         }
         return true;
+    }
+
+    /**
+     * Returns the role code required to access {@code requestPath}.
+     * Paths matching {@link #PLATFORM_ADMIN_PATHS} require {@code platform_admin};
+     * all other {@code /api/admin/**} paths require {@code tenant_admin}.
+     */
+    private String resolveRequiredRole(String requestPath) {
+        PathContainer container = PathContainer.parsePath(requestPath);
+        for (PathPattern p : PLATFORM_ADMIN_PATHS) {
+            if (p.matches(container)) {
+                return RoleCodes.PLATFORM_ADMIN;
+            }
+        }
+        return RoleCodes.TENANT_ADMIN;
     }
 
     private void writeDenied(HttpServletResponse response) throws Exception {
