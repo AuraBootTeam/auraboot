@@ -26,6 +26,19 @@
           }
         }
       ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "save",
+          "action": {"type": "command", "command": "acs:create_demo_request"}
+        },
+        {"code": "cancel", "label": "cancel"}
+      ]
     }
   ]
 }
