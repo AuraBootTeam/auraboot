@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.skill.builtin.EchoSkill;
 import com.auraboot.framework.aurabot.skill.builtin.ModelQuerySkill;
 import com.auraboot.framework.aurabot.skill.entity.SkillRun;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.permission.entity.Permission;
@@ -18,9 +19,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -62,6 +66,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * and the {@code body.code} string (the wire identifier the FE switches on).
  */
 @ActiveProfiles({"integration-test", "skills-c2-test"})
+@Import(AuraBotSkillControllerIntegrationTest.NoDryRunSkillTestConfig.class)
 @DisplayName("AuraBotSkillController — main IT (real PG + real Redis, mocked permissions)")
 class AuraBotSkillControllerIntegrationTest extends BaseIntegrationTest {
 
@@ -373,5 +378,79 @@ class AuraBotSkillControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(secondData.path("echo").asText())
                 .as("replay payload must match original after-snapshot")
                 .isEqualTo(firstData.path("echo").asText());
+    }
+
+    // ─── Case 9 (B8 follow-up — F-2 clean fix) ───────────────────────────────
+    @Test
+    @DisplayName("Case 9: POST /skill/dry-run on a skill with supportsDryRun=false → 422 DRY_RUN_NOT_SUPPORTED")
+    void case9_dryRunNotSupported_422() throws Exception {
+        // The NoDryRunSkill bean is wired by the nested @TestConfiguration only
+        // when this IT runs; it is invisible to production profiles. Calling
+        // dry-run on it must surface the typed 422 envelope rather than the
+        // skill's UnsupportedOperationException — that is the controller's
+        // dry-run pre-check contract (see SPI Contract §11).
+        ObjectNode req = body(Map.of(
+                "skillName", NoDryRunSkill.NAME,
+                "params", objectMapper.createObjectNode()
+        ));
+
+        mockMvc.perform(post("/api/aurabot/v2/skill/dry-run")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(req.toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("DRY_RUN_NOT_SUPPORTED"))
+                .andExpect(jsonPath("$.message").isNotEmpty());
+    }
+
+    /**
+     * Test-only skill registered into the IT context to exercise the
+     * {@code DRY_RUN_NOT_SUPPORTED} controller pre-check. Lives as a static
+     * nested class so it is not picked up by component scan in production
+     * profiles — only the {@link Import} on this IT pulls it in.
+     */
+    @TestConfiguration
+    static class NoDryRunSkillTestConfig {
+        @Bean
+        NoDryRunSkill noDryRunSkill() {
+            return new NoDryRunSkill();
+        }
+    }
+
+    /** Minimal skill with {@code supportsDryRun()=false}. */
+    static class NoDryRunSkill implements AuraBotSkill {
+        static final String NAME = "test:no-dry-run";
+
+        @Override
+        public String name() {
+            return NAME;
+        }
+
+        @Override
+        public String displayName() {
+            return "test:no-dry-run";
+        }
+
+        @Override
+        public RiskLevel riskLevel() {
+            return RiskLevel.LOW;
+        }
+
+        @Override
+        public JsonNode paramsSchema() {
+            return JsonNodeFactory.instance.objectNode().put("type", "object");
+        }
+
+        @Override
+        public boolean supportsDryRun() {
+            return false;
+        }
+
+        @Override
+        public SkillResult execute(SkillRequest req) {
+            return SkillResult.builder()
+                    .status(SkillResult.Status.SUCCESS)
+                    .skillName(NAME)
+                    .build();
+        }
     }
 }
