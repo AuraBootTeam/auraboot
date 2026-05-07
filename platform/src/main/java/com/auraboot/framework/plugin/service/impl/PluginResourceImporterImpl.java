@@ -117,6 +117,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final PageSchemaService pageSchemaService;
     private final NamedQueryService namedQueryService;
     private final DashboardService dashboardService;
+    // env-layering PoC #16: resolve target env_id for plugin-imported page rows
+    private final com.auraboot.framework.environment.service.EnvironmentService environmentService;
 
     // Infrastructure dependencies
     // LEGITIMATE: JdbcTemplate kept only for resurrectSoftDeleted() which uses dynamic table names
@@ -1506,8 +1508,15 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             String pid = UlidGenerator.generate();
             boolean publish = autoPublish != null && autoPublish;
 
+            // env-layering PoC #16: resolve env_id from MetaContext (HTTP request) or fall back
+            // to tenant default (CLI / startup imports without env hint).
+            Long envId = com.auraboot.framework.application.tenant.MetaContext.getCurrentEnvironmentId();
+            if (envId == null) {
+                envId = environmentService.findOrCreateDefaultId(tenantId);
+            }
+
             pageSchemaMapper.insertForPluginImport(
-                pid, tenantId, publish ? "published" : "draft",
+                pid, tenantId, envId, publish ? "published" : "draft",
                 dto.getPageKey(), dto.getModelCode(),
                 titleDisplay, titleJson, dto.getDescription(), kind, profile,
                 layoutJson, blocksJson, schemaVersion,

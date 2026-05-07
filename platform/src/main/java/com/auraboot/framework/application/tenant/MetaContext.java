@@ -11,6 +11,9 @@ public class MetaContext {
 
     private static final ThreadLocal<MetaContext> HOLDER = new ThreadLocal<>();
     private static final ThreadLocal<Long> MEMBER_ID = new ThreadLocal<>();
+    private static final ThreadLocal<Long> ENV_ID = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
 
     @Getter
     private final Long tenantId;
@@ -58,6 +61,90 @@ public class MetaContext {
     public static void clear() {
         HOLDER.remove();
         MEMBER_ID.remove();
+        ENV_ID.remove();
+        ENV_FILTER_BYPASSED.remove();
+        LOCK_GUARD_BYPASSED.remove();
+    }
+
+    // ---- env-layering extension (PoC) ----
+
+    /**
+     * Get the current environment id. May be null if the request did not specify one and the
+     * tenant has no default env yet.
+     */
+    public static Long getCurrentEnvironmentId() {
+        return ENV_ID.get();
+    }
+
+    /**
+     * Set the current environment id. Typically called by EnvironmentResolverFilter from
+     * {@code ?env=} or {@code X-Environment} header, or by services starting background work.
+     */
+    public static void setEnvironmentId(Long envId) {
+        ENV_ID.set(envId);
+    }
+
+    /**
+     * @return true if env filter is currently bypassed (cross-env queries such as promotion).
+     */
+    public static boolean isEnvFilterBypassed() {
+        return Boolean.TRUE.equals(ENV_FILTER_BYPASSED.get());
+    }
+
+    /**
+     * Run a block with env filtering disabled. Use sparingly — only for legitimate cross-env
+     * reads/writes (promotion source→target). State is restored even on exception.
+     */
+    public static <T> T runWithoutEnvFilter(java.util.function.Supplier<T> action) {
+        Boolean prior = ENV_FILTER_BYPASSED.get();
+        ENV_FILTER_BYPASSED.set(true);
+        try {
+            return action.get();
+        } finally {
+            ENV_FILTER_BYPASSED.set(prior);
+        }
+    }
+
+    /**
+     * Run a block with env filtering disabled (no return value).
+     */
+    public static void runWithoutEnvFilter(Runnable action) {
+        runWithoutEnvFilter(() -> {
+            action.run();
+            return null;
+        });
+    }
+
+    // ---- env lock guard (env-layering #17) ----
+
+    /**
+     * @return true if the lock guard is currently bypassed (legitimate writes such as
+     *         {@code promotion.apply} that target a locked env via four-eyes flow).
+     */
+    public static boolean isLockGuardBypassed() {
+        return Boolean.TRUE.equals(LOCK_GUARD_BYPASSED.get());
+    }
+
+    /**
+     * Run a block with the lock guard disabled. Use sparingly — only for the legitimate
+     * writes-to-locked-env path: promotion apply, plugin import bootstrap, system migrations.
+     * State is restored even on exception.
+     */
+    public static <T> T runWithoutLockGuard(java.util.function.Supplier<T> action) {
+        Boolean prior = LOCK_GUARD_BYPASSED.get();
+        LOCK_GUARD_BYPASSED.set(true);
+        try {
+            return action.get();
+        } finally {
+            LOCK_GUARD_BYPASSED.set(prior);
+        }
+    }
+
+    public static void runWithoutLockGuard(Runnable action) {
+        runWithoutLockGuard(() -> {
+            action.run();
+            return null;
+        });
     }
 
     public static Long getCurrentMemberId() {

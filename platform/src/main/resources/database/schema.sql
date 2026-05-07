@@ -742,7 +742,7 @@ CREATE TABLE ab_page_schema (
     pid VARCHAR(32) NOT NULL,
     tenant_id BIGINT NOT NULL,
     namespace VARCHAR(100) NOT NULL DEFAULT 'default',
-    env VARCHAR(20) NOT NULL DEFAULT 'prod',
+    env_id BIGINT,  -- env-layering PoC: nullable in batch 1 (auto-fill via MetaObjectHandler in batch 2 → SET NOT NULL)
 
     is_current BOOLEAN NOT NULL DEFAULT TRUE,
     status TEXT NOT NULL DEFAULT 'draft',
@@ -798,9 +798,14 @@ CREATE TABLE ab_page_schema (
 );
 
 -- Partial unique index (logical delete friendly)
+-- env-layering PoC: include env_id so same page_key can coexist in dev/staging/prod;
+-- include is_current so version-bump promotion (#9 apply) can keep old not-current
+-- versions for history without clashing with the new is_current row.
+-- NULLS NOT DISTINCT (PG 15+) treats two NULL env_ids as the same key, preserving
+-- "one row per page_key" guarantee for legacy / batch-1 rows.
 CREATE UNIQUE INDEX uk_page_schema_page_key
-ON ab_page_schema (tenant_id, namespace, page_key)
-WHERE deleted_flag = FALSE;
+ON ab_page_schema (tenant_id, namespace, page_key, env_id) NULLS NOT DISTINCT
+WHERE deleted_flag = FALSE AND is_current = TRUE;
 
 -- Indexes
 CREATE INDEX idx_page_schema_tenant
@@ -2213,6 +2218,7 @@ COMMENT ON TABLE ab_api_connector_endpoint IS 'API connector endpoint definition
       id BIGSERIAL PRIMARY KEY,
       tenant_id BIGINT NOT NULL,
       pid VARCHAR(32) NOT NULL,
+      env_id BIGINT,  -- env-layering PoC: history rows belong to the env where the snapshot was taken
       snapshot JSONB,
       op VARCHAR(20) NOT NULL,
       op_by VARCHAR(32),
@@ -2225,6 +2231,7 @@ COMMENT ON TABLE ab_api_connector_endpoint IS 'API connector endpoint definition
   CREATE INDEX IF NOT EXISTS idx_page_schema_history_pid ON ab_page_schema_history(pid);
   CREATE INDEX IF NOT EXISTS idx_page_schema_history_op ON ab_page_schema_history(op);
   CREATE INDEX IF NOT EXISTS idx_page_schema_history_op_at ON ab_page_schema_history(op_at);
+  CREATE INDEX IF NOT EXISTS idx_page_schema_history_env_id ON ab_page_schema_history(env_id) WHERE env_id IS NOT NULL;
 
   -- 复合索引：按页面和时间查询历史
   CREATE INDEX IF NOT EXISTS idx_page_schema_history_page_time ON ab_page_schema_history(pid, op_at DESC);
@@ -2233,6 +2240,7 @@ COMMENT ON TABLE ab_api_connector_endpoint IS 'API connector endpoint definition
   COMMENT ON COLUMN ab_page_schema_history.id IS '主键ID';
   COMMENT ON COLUMN ab_page_schema_history.tenant_id IS '租户ID';
   COMMENT ON COLUMN ab_page_schema_history.pid IS '关联的页面Schema PID';
+  COMMENT ON COLUMN ab_page_schema_history.env_id IS 'env-layering: environment id this history snapshot belongs to (FK ab_environment.id)';
   COMMENT ON COLUMN ab_page_schema_history.snapshot IS '页面Schema全量快照(JSONB)';
   COMMENT ON COLUMN ab_page_schema_history.op IS '操作类型: CREATE/UPDATE/PUBLISH/ARCHIVE/DELETE/RESTORE';
   COMMENT ON COLUMN ab_page_schema_history.op_by IS '操作人PID';
@@ -6027,13 +6035,21 @@ CREATE TABLE IF NOT EXISTS ab_environment (
 
     created_by BIGINT,
     updated_by BIGINT,
-    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- env-layering extension (PoC): promotion chain + lock audit
+    parent_pid VARCHAR(26),
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+    locked_by BIGINT,
+    locked_at TIMESTAMP WITH TIME ZONE,
+    locked_reason TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_environment_pid ON ab_environment(pid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_environment_tenant_code ON ab_environment(tenant_id, code) WHERE deleted_flag = FALSE;
 CREATE INDEX IF NOT EXISTS idx_ab_environment_tenant_id ON ab_environment(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_ab_environment_status ON ab_environment(status);
+CREATE INDEX IF NOT EXISTS idx_ab_environment_parent_pid ON ab_environment(parent_pid) WHERE parent_pid IS NOT NULL;
 
 COMMENT ON TABLE ab_environment IS 'Environment configuration table for multi-environment management';
 COMMENT ON COLUMN ab_environment.pid IS 'Business ID (ULID)';
@@ -6044,6 +6060,139 @@ COMMENT ON COLUMN ab_environment.db_connection_info IS 'Database connection conf
 COMMENT ON COLUMN ab_environment.status IS 'active or inactive';
 COMMENT ON COLUMN ab_environment.is_default IS 'Whether this is the default environment';
 COMMENT ON COLUMN ab_environment.sort_order IS 'Display order';
+COMMENT ON COLUMN ab_environment.parent_pid IS 'Parent environment pid for promotion chain (NULL for root)';
+COMMENT ON COLUMN ab_environment.is_locked IS 'Lock flag preventing direct edits; locked envs require unlock or four-eyes promotion';
+COMMENT ON COLUMN ab_environment.locked_by IS 'User id who locked the environment';
+COMMENT ON COLUMN ab_environment.locked_at IS 'Timestamp when the environment was locked';
+COMMENT ON COLUMN ab_environment.locked_reason IS 'Free-form reason captured at lock time for audit';
+
+
+-- =====================================================================
+-- Table: ab_promotion (env-layering PoC, task #7)
+-- Description: First-class promotion plan moving DSL resources from a source
+--              environment to a target environment. State machine:
+--              DRAFT → VALIDATED → APPLIED / REJECTED / FAILED.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS ab_promotion (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL DEFAULT '',
+    tenant_id BIGINT NOT NULL,
+
+    source_env_id BIGINT NOT NULL,
+    target_env_id BIGINT NOT NULL,
+
+    status VARCHAR(32) NOT NULL DEFAULT 'DRAFT',
+
+    plan_summary JSONB,
+    dry_run_result JSONB,
+    dry_run_at TIMESTAMP WITH TIME ZONE,
+
+    failure_reason TEXT,
+
+    -- terminal-state audit (immutable once written)
+    applied_at TIMESTAMP WITH TIME ZONE,
+    applied_by BIGINT,
+    applied_reason TEXT,
+    rejected_at TIMESTAMP WITH TIME ZONE,
+    rejected_by BIGINT,
+    rejected_reason TEXT,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by BIGINT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,
+
+    CONSTRAINT chk_promotion_status CHECK (status IN ('DRAFT','VALIDATED','APPLIED','REJECTED','FAILED')),
+    CONSTRAINT chk_promotion_envs_distinct CHECK (source_env_id <> target_env_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ab_promotion_tenant_status ON ab_promotion(tenant_id, status) WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ab_promotion_source_env ON ab_promotion(source_env_id);
+CREATE INDEX IF NOT EXISTS idx_ab_promotion_target_env ON ab_promotion(target_env_id);
+
+COMMENT ON TABLE ab_promotion IS 'Promotion plan for moving DSL resources between environments';
+COMMENT ON COLUMN ab_promotion.status IS 'DRAFT | VALIDATED | APPLIED | REJECTED | FAILED — see PromotionStatus.java';
+COMMENT ON COLUMN ab_promotion.plan_summary IS 'JSONB: {unitCount, resourceTypes, ...} aggregate for list views';
+COMMENT ON COLUMN ab_promotion.dry_run_result IS 'JSONB: last DryRunResult {conflicts, missingDeps, impact, validatedAt}';
+COMMENT ON COLUMN ab_promotion.dry_run_at IS 'When dry_run_result was computed; promotions older than 24h must re-validate before apply';
+
+-- =====================================================================
+-- Table: ab_promotion_unit (env-layering PoC, task #7)
+-- Description: Individual resource included in a promotion plan. PoC scope:
+--              only resource_type=PAGE_SCHEMA. Future: MODEL, COMMAND,
+--              NAMED_QUERY, DASHBOARD.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS ab_promotion_unit (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL DEFAULT '',
+    tenant_id BIGINT NOT NULL,
+
+    promotion_id BIGINT NOT NULL,
+
+    resource_type VARCHAR(32) NOT NULL,
+    resource_pid VARCHAR(32) NOT NULL,
+    source_version INTEGER,
+    target_version INTEGER,
+
+    sort_order INT DEFAULT 0,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,
+
+    CONSTRAINT chk_promotion_unit_resource_type CHECK (resource_type IN ('PAGE_SCHEMA'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ab_promotion_unit_promotion ON ab_promotion_unit(promotion_id) WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ab_promotion_unit_resource ON ab_promotion_unit(resource_type, resource_pid);
+
+COMMENT ON TABLE ab_promotion_unit IS 'Resources included in a promotion plan';
+COMMENT ON COLUMN ab_promotion_unit.resource_type IS 'PAGE_SCHEMA in PoC; expand with MODEL/COMMAND/NAMED_QUERY/DASHBOARD later';
+COMMENT ON COLUMN ab_promotion_unit.source_version IS 'PageSchema.version captured when promotion was drafted (snapshot)';
+COMMENT ON COLUMN ab_promotion_unit.target_version IS 'PageSchema.version assigned in target env when applied (NULL until APPLIED)';
+
+
+-- =====================================================================
+-- Table: ab_resource_reference (env-layering PoC, task #8 batch B)
+-- Description: Reverse-index of "what page references what model/field". Powers the
+--              Diff Viewer impact sidebar — answers "which pages would break if I
+--              delete field X" without scanning the whole DSL corpus.
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS ab_resource_reference (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL DEFAULT '',
+    tenant_id BIGINT NOT NULL,
+    env_id BIGINT,
+
+    source_type VARCHAR(32) NOT NULL,
+    source_id VARCHAR(128) NOT NULL,
+
+    target_type VARCHAR(32) NOT NULL,
+    target_code VARCHAR(200) NOT NULL,
+
+    ref_type VARCHAR(64),
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE,
+
+    CONSTRAINT chk_resource_ref_source_type CHECK (source_type IN ('PAGE_SCHEMA')),
+    CONSTRAINT chk_resource_ref_target_type CHECK (target_type IN ('MODEL','FIELD'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ab_resource_ref_target ON ab_resource_reference(target_type, target_code) WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ab_resource_ref_source ON ab_resource_reference(source_type, source_id) WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ab_resource_ref_env ON ab_resource_reference(env_id) WHERE env_id IS NOT NULL AND deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ab_resource_ref_tenant ON ab_resource_reference(tenant_id) WHERE deleted_flag = FALSE;
+
+COMMENT ON TABLE ab_resource_reference IS 'Reverse-index of DSL resource references for impact analysis';
+COMMENT ON COLUMN ab_resource_reference.source_type IS 'PoC: PAGE_SCHEMA only';
+COMMENT ON COLUMN ab_resource_reference.source_id IS 'pid of the source resource (e.g. PageSchema.pid)';
+COMMENT ON COLUMN ab_resource_reference.target_type IS 'MODEL or FIELD';
+COMMENT ON COLUMN ab_resource_reference.target_code IS 'Model code or field code referenced';
+COMMENT ON COLUMN ab_resource_reference.ref_type IS 'Where in the source the reference appears (modelCode / fieldCode / block.code / page.modelCode)';
 
 
 -- ============================================================
@@ -8201,3 +8350,61 @@ CREATE INDEX IF NOT EXISTS idx_bitemporal_history
   WHERE deleted_flag = FALSE;
 COMMENT ON TABLE ab_bitemporal_record IS
   'Generic bi-temporal record store — (validTime × txTime) versioning keyed by (entityType, entityId).';
+
+
+-- =====================================================================
+-- env-layering #4 — env_id backfill + SET NOT NULL
+--
+-- For fresh DBs (reset-and-init flow) this DO block is a no-op (ab_tenant
+-- empty). For dev DBs that accumulated legacy NULL env_id rows before #16
+-- landed, it ensures every tenant has a 'default' env, then UPDATEs all
+-- NULL env_ids on ab_page_schema + ab_page_schema_history. Idempotent.
+-- =====================================================================
+DO $$
+DECLARE
+    t RECORD;
+    default_env_id BIGINT;
+BEGIN
+    FOR t IN SELECT id FROM ab_tenant WHERE deleted_flag = FALSE LOOP
+        SELECT id INTO default_env_id
+            FROM ab_environment
+            WHERE tenant_id = t.id AND code = 'default' AND deleted_flag = FALSE
+            LIMIT 1;
+        IF default_env_id IS NULL THEN
+            INSERT INTO ab_environment (
+                pid, tenant_id, code, name, status, is_default, sort_order,
+                deleted_flag, is_locked
+            )
+            VALUES (
+                SUBSTRING(REPLACE(gen_random_uuid()::text, '-', ''), 1, 26),
+                t.id, 'default', 'Default', 'active', TRUE, 0, FALSE, FALSE
+            )
+            RETURNING id INTO default_env_id;
+        END IF;
+        UPDATE ab_page_schema
+            SET env_id = default_env_id
+            WHERE tenant_id = t.id AND env_id IS NULL;
+        UPDATE ab_page_schema_history
+            SET env_id = default_env_id
+            WHERE tenant_id = t.id AND env_id IS NULL;
+    END LOOP;
+END$$;
+
+-- After backfill, tighten the column. SET NOT NULL is idempotent in PG.
+ALTER TABLE ab_page_schema ALTER COLUMN env_id SET NOT NULL;
+ALTER TABLE ab_page_schema_history ALTER COLUMN env_id SET NOT NULL;
+
+-- FK with idempotent guard (PG doesn't support ADD CONSTRAINT IF NOT EXISTS).
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_page_schema_env_id') THEN
+        ALTER TABLE ab_page_schema
+            ADD CONSTRAINT fk_page_schema_env_id
+            FOREIGN KEY (env_id) REFERENCES ab_environment(id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_page_schema_history_env_id') THEN
+        ALTER TABLE ab_page_schema_history
+            ADD CONSTRAINT fk_page_schema_history_env_id
+            FOREIGN KEY (env_id) REFERENCES ab_environment(id);
+    END IF;
+END$$;

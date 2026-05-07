@@ -237,6 +237,7 @@ public class EnvironmentServiceImpl implements EnvironmentService {
 
     private EnvironmentResponse toResponse(Environment env) {
         EnvironmentResponse resp = new EnvironmentResponse();
+        resp.setId(env.getId());
         resp.setPid(env.getPid());
         resp.setCode(env.getCode());
         resp.setName(env.getName());
@@ -248,7 +249,107 @@ public class EnvironmentServiceImpl implements EnvironmentService {
         resp.setSortOrder(env.getSortOrder());
         resp.setCreatedAt(env.getCreatedAt());
         resp.setUpdatedAt(env.getUpdatedAt());
+        resp.setParentPid(env.getParentPid());
+        resp.setIsLocked(env.getIsLocked() != null && env.getIsLocked());
+        resp.setLockedBy(env.getLockedBy());
+        resp.setLockedAt(env.getLockedAt());
+        resp.setLockedReason(env.getLockedReason());
         return resp;
+    }
+
+    @Override
+    @Transactional
+    public Long findOrCreateDefaultId(Long tenantId) {
+        if (tenantId == null) {
+            throw new IllegalArgumentException("tenantId must not be null");
+        }
+        Environment existing = environmentMapper.findByTenantAndCode(tenantId, "default");
+        if (existing != null) {
+            return existing.getId();
+        }
+        Environment env = new Environment();
+        env.setPid(UniqueIdGenerator.generate());
+        env.setTenantId(tenantId);
+        env.setCode("default");
+        env.setName("Default");
+        env.setStatus(StatusConstants.ACTIVE);
+        env.setIsDefault(true);
+        env.setSortOrder(0);
+        env.setIsLocked(false);
+        env.setDeletedFlag(false);
+        env.setCreatedAt(new Date());
+        env.setUpdatedAt(new Date());
+        try {
+            environmentMapper.insert(env);
+        } catch (org.springframework.dao.DuplicateKeyException raceLost) {
+            // Race lost — another thread created the default first. Re-find returns its row,
+            // which is what the caller wants (idempotent semantics). Pinned by issue #18.
+            Environment winner = environmentMapper.findByTenantAndCode(tenantId, "default");
+            if (winner != null) {
+                log.debug("findOrCreateDefaultId race resolved by re-fetch for tenant {}", tenantId);
+                return winner.getId();
+            }
+            throw raceLost;
+        }
+        log.info("Created default environment for tenant {}: id={}", tenantId, env.getId());
+        return env.getId();
+    }
+
+    @Override
+    @Transactional
+    public EnvironmentResponse lock(String pid, Long tenantId, Long userId, String reason) {
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new IllegalArgumentException("Lock reason must not be blank");
+        }
+        Environment env = findByPidOrThrow(pid, tenantId);
+        if (Boolean.TRUE.equals(env.getIsLocked())) {
+            throw new IllegalStateException("Environment is already locked: " + pid);
+        }
+
+        env.setIsLocked(true);
+        env.setLockedBy(userId);
+        env.setLockedAt(new Date());
+        env.setLockedReason(reason);
+        env.setUpdatedAt(new Date());
+        env.setUpdatedBy(userId);
+        environmentMapper.updateById(env);
+        log.info("Locked environment: pid={}, code={}, reason={}", pid, env.getCode(), reason);
+
+        return toResponse(env);
+    }
+
+    @Override
+    @Transactional
+    public EnvironmentResponse unlock(String pid, Long tenantId, Long userId, String reason) {
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new IllegalArgumentException("Unlock reason must not be blank");
+        }
+        Environment env = findByPidOrThrow(pid, tenantId);
+        if (!Boolean.TRUE.equals(env.getIsLocked())) {
+            throw new IllegalStateException("Environment is not locked: " + pid);
+        }
+
+        // MyBatis-Plus default updateById skips null fields; use UpdateWrapper to explicitly clear lock columns.
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Environment> uw =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<>();
+        uw.eq("id", env.getId())
+                .set("is_locked", false)
+                .set("locked_by", null)
+                .set("locked_at", null)
+                .set("locked_reason", null)
+                .set("updated_at", new Date())
+                .set("updated_by", userId);
+        environmentMapper.update(null, uw);
+
+        env.setIsLocked(false);
+        env.setLockedBy(null);
+        env.setLockedAt(null);
+        env.setLockedReason(null);
+        env.setUpdatedAt(new Date());
+        env.setUpdatedBy(userId);
+        log.info("Unlocked environment: pid={}, code={}, reason={}", pid, env.getCode(), reason);
+
+        return toResponse(env);
     }
 
     private void addDiffIfChanged(List<EnvironmentDiffResponse.DiffEntry> diffs, String key, Object srcVal, Object tgtVal) {

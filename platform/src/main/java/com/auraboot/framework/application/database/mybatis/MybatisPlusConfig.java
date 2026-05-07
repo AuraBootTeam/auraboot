@@ -3,22 +3,77 @@ package com.auraboot.framework.application.database.mybatis;
 import com.auraboot.framework.application.database.dialect.DatabaseDialect;
 import com.auraboot.framework.application.database.dialect.DatabaseType;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.environment.annotation.EnvScoped;
 import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
+import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 
+import java.util.HashSet;
+import java.util.Set;
+
+@Slf4j
 @Configuration
 public class MybatisPlusConfig {
 
+    /** Static cache populated on first access. Drop-in replacement for the prior hardcoded Set. */
+    private static volatile Set<String> envScopedTables;
+
+    /**
+     * Whitelist of tables backing {@code @EnvScoped} entities, discovered via classpath scan
+     * (env-layering #18). Adding a new env-scoped resource is now one-step: annotate the
+     * entity. The MyBatis-Plus interceptor reads this set on every query.
+     *
+     * <p>Package-visible so {@code EnvWriteLockGuardInnerInterceptor} can reuse the same
+     * lookup (#19 — UPDATE/DELETE lock guard).
+     */
+    static Set<String> envScopedTables() {
+        Set<String> cached = envScopedTables;
+        if (cached != null) return cached;
+        synchronized (MybatisPlusConfig.class) {
+            if (envScopedTables != null) return envScopedTables;
+            Set<String> tables = new HashSet<>();
+            ClassPathScanningCandidateComponentProvider scanner =
+                    new ClassPathScanningCandidateComponentProvider(false);
+            scanner.addIncludeFilter(new AnnotationTypeFilter(EnvScoped.class));
+            for (var bd : scanner.findCandidateComponents("com.auraboot")) {
+                String className = bd.getBeanClassName();
+                if (className == null) continue;
+                try {
+                    Class<?> clazz = Class.forName(className);
+                    TableName tn = clazz.getAnnotation(TableName.class);
+                    if (tn != null && !tn.value().isBlank()) {
+                        tables.add(tn.value());
+                    }
+                } catch (ClassNotFoundException e) {
+                    log.warn("Failed to load @EnvScoped candidate {}: {}", className, e.getMessage());
+                }
+            }
+            log.info("Resolved env-scoped tables via classpath scan: {}", tables);
+            envScopedTables = Set.copyOf(tables);
+            return envScopedTables;
+        }
+    }
+
     @Bean
-    public MybatisPlusInterceptor mybatisPlusInterceptor(DatabaseDialect databaseDialect) {
+    public MybatisPlusInterceptor mybatisPlusInterceptor(DatabaseDialect databaseDialect,
+                                                          ApplicationContext applicationContext) {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+
+        // env-layering #19 — UPDATE/DELETE write-side lock guard. Registered FIRST so it sees
+        // the unmodified SQL (no tenant/env WHERE clauses appended yet). beforeUpdate fires
+        // before tenant-line / env-line interceptors mutate boundSql.
+        interceptor.addInnerInterceptor(new EnvWriteLockGuardInnerInterceptor(applicationContext));
 
         TenantLineInnerInterceptor tenantInterceptor = new TenantLineInnerInterceptor();
         tenantInterceptor.setTenantLineHandler(new TenantLineHandler() {
@@ -122,6 +177,40 @@ public class MybatisPlusConfig {
 
         interceptor.addInnerInterceptor(tenantInterceptor);
 
+        // env-layering PoC: second tenant-line interceptor reused with column=env_id, applied
+        // ONLY to whitelisted @EnvScoped tables (whitelist via blacklist inversion). The
+        // TenantLineHandler abstraction has no native whitelist — we invert ignoreTable.
+        TenantLineInnerInterceptor envInterceptor = new TenantLineInnerInterceptor();
+        envInterceptor.setTenantLineHandler(new TenantLineHandler() {
+            @Override
+            public Expression getTenantId() {
+                Long envId = MetaContext.getCurrentEnvironmentId();
+                // ignoreTable below short-circuits when envId == null, so this is only reached
+                // with a real env id.
+                return new LongValue(envId);
+            }
+
+            @Override
+            public String getTenantIdColumn() {
+                return "env_id";
+            }
+
+            @Override
+            public boolean ignoreTable(String tableName) {
+                if (MetaContext.isEnvFilterBypassed()) {
+                    return true;  // promotion cross-env reads bypass intentionally
+                }
+                if (MetaContext.getCurrentEnvironmentId() == null) {
+                    return true;  // no env context → don't filter (background tasks, legacy tests)
+                }
+                if (!envScopedTables().contains(tableName)) {
+                    return true;  // not a DSL resource → don't apply env filter
+                }
+                return false;
+            }
+        });
+        interceptor.addInnerInterceptor(envInterceptor);
+
         // Configure pagination with the correct database type
         DbType dbType = databaseDialect.getType() == DatabaseType.MYSQL
                 ? DbType.MYSQL
@@ -130,4 +219,5 @@ public class MybatisPlusConfig {
 
         return interceptor;
     }
+
 }
