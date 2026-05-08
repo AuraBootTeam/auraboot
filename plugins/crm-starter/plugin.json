@@ -41,7 +41,8 @@
     "menus": "config/menus.json",
     "i18n": "config/i18n.json",
     "roles": "config/roles.json",
-    "savedViews": "config/saved-views.json"
+    "savedViews": "config/saved-views.json",
+    "dashboards": "config/dashboards"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
