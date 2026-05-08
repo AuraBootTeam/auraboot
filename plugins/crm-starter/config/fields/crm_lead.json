@@ -20,7 +20,7 @@
     "displayName:zh-CN": "联系人",
     "displayName:en": "Contact Name",
     "dataType": "string",
-    "constraints": { "required": true, "maxLength": 100 },
+    "constraints": { "required": false, "maxLength": 100 },
     "feature": { "searchable": true }
   },
   {
