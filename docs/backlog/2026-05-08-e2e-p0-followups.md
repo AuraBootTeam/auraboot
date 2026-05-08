@@ -10,6 +10,31 @@ are blocked on product/config gaps, not spec quality.
 This doc tracks what to fix to unblock the cascade and turn the fixme cases
 into real passes.
 
+## Scope change — acp-showcase plugin removed
+
+Commit `59050eed chore(acp-showcase): remove demo plugin per platformization
+design P0'` removed the entire `plugins/acp-showcase/config/` directory.
+The `acs_demo_request` and `acs_safety_rule` models / pages / commands no
+longer exist.
+
+Consequences for this audit:
+- **G-3 (detail-page tabs `role="tablist"`)** ✅ remains valid — the fix
+  was in the platform renderer (`DetailPageContent.tsx` /
+  `TabsBlockRenderer.tsx`), not the plugin. It survives.
+- **G-6 / G-10** become latent — they describe real bugs but the test
+  cases that surfaced them (`ACS-002` / `ACS-007`) targeted removed pages.
+  Keep the entries for record; they will resurface when other plugins
+  exercise the same code paths (form-buttons + detail toolbar with
+  `action: {type: "command", ...}`).
+- The 2 ACS spec files (`acs-demo-request-lifecycle.spec.ts`,
+  `acs-safety-rule-lifecycle.spec.ts`) are deleted in the follow-up
+  cleanup commit. The 4-spec → 2-spec reduction is reflected in
+  `scripts/dev/run-p0-e2e-docker.sh` which now imports acp-showcase as
+  optional.
+
+Fully-docker reproducer (after acp-showcase removal):
+**8 passed / 1 fail (DASH-002 = G-1) / 6 fixme / 4 cascade**.
+
 ## Product config gaps (blocking ~20 cascade-skipped tests)
 
 ### G-1. `e2et_order_dashboard_list` renders as single-list, not multi-block grid
