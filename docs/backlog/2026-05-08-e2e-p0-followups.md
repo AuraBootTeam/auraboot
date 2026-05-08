@@ -229,6 +229,44 @@ After commits in this session (G-1 plumbing + G-13 + G-14 backlog):
 
 Final docker run on G-1 branch: **5 passed / 4 fixme / 0 fail**.
 
+## G-15 — JWT 20002 "Security credentials changed" intermittent on fresh docker stacks
+
+Surfaced when running `scripts/dev/run-p0-e2e-docker.sh` against a freshly
+built isolated stack. First run after `start-isolated.sh` worked
+(slug=p0-g3); later attempts (p0-g13b, p0-g14) all fail at the first
+plugin import with HTTP 401:
+
+  `{"code":"20002","message":"Security credentials changed, please re-login","context":"/api/plugins/import/execute-direct"}`
+
+Even basic `GET /api/tenants/me` with the freshly-minted JWT returns the
+same error. So the JWT is rejected by `JwtAuthenticationFilter` — either
+on the `securityVersion` mismatch path or on the
+`sessionManagementService.isSessionValid` path.
+
+### Trace evidence
+- `LoginCompletionHelper:92-99` calls
+  `sessionManagementService.createSession(user.getId(), jwt, ipAddress, userAgent)`
+  inside `try { ... } catch (Exception e) { log.warn(...) }`. The catch
+  is wide — any insert failure (duplicate key, FK, NOT NULL violation)
+  silently logs and proceeds. Login still returns the JWT.
+- `JwtAuthenticationFilter:113-118` calls
+  `sessionManagementService.isSessionValid(jwt)` — looks up by
+  `token_hash`. If the session row never persisted, returns false →
+  filter rejects with 20002.
+
+### Fix direction
+- Tighten `LoginCompletionHelper:94-99` catch — log the actual exception
+  class + message at WARN, so subsequent runs surface the real failure
+  instead of silently proceeding. Or fail-fast on session creation
+  error rather than swallowing.
+- After tightening, re-run on a fresh stack and capture the WARN to
+  identify the underlying cause.
+
+### Workaround for now
+The host backend works; the docker reproducer is unreliable until G-15
+is fixed. P0 verification can fall back to host stack with the caveat
+of single-worktree concurrency.
+
 ## Dead menus (no React component bound)
 
 These menu entries route to paths that have **no implementation** (frontend
