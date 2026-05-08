@@ -19,7 +19,7 @@ import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
 
 async function getCurrentUserId(page: import('@playwright/test').Page): Promise<string | null> {
   const resp = await page.request.get(`${BASE_URL}/api/auth/me`);
