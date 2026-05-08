@@ -7,6 +7,8 @@ import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.dto.AddFieldRequest;
 import com.auraboot.framework.meta.dto.AddFieldResult;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
+import com.auraboot.framework.meta.dto.RemoveFieldRequest;
+import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.entity.ModelFieldBinding;
@@ -236,6 +238,155 @@ public class MetaFieldServiceAddToModelIntegrationTest extends BaseIntegrationTe
         assertThatThrownBy(() -> metaFieldService.addToModel(req))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("dataType not in whitelist");
+    }
+
+    // ==================== removeFromModel ====================
+
+    @Test
+    @DisplayName("Spec §3.6 — removeFromModel on empty column drops cleanly")
+    public void removeFromModel_emptyColumn_dropsCleanly() {
+        String fieldCode = "it_c4_rm_e_" + UUID.randomUUID().toString().replace("-", "").substring(0, 6).toLowerCase();
+
+        AddFieldRequest addReq = AddFieldRequest.builder()
+                .modelCode(testModelCode)
+                .code(fieldCode)
+                .dataType("string")
+                .displayName("To Remove")
+                .maxLength(32)
+                .build();
+        AddFieldResult addRes = metaFieldService.addToModel(addReq);
+        assertThat(addRes.getColumnName()).isEqualTo(fieldCode);
+
+        // Sanity: column landed
+        Integer before = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                Integer.class, tableName, fieldCode);
+        assertThat(before).as("column must exist after addToModel").isEqualTo(1);
+
+        RemoveFieldRequest rmReq = RemoveFieldRequest.builder()
+                .modelCode(testModelCode)
+                .storageCode(addRes.getStorageCode())
+                .refuseIfDataExists(true)
+                .build();
+        metaFieldService.removeFromModel(rmReq);
+
+        // Verify: column gone from information_schema
+        Integer after = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                Integer.class, tableName, fieldCode);
+        assertThat(after).as("column must be removed by DROP COLUMN").isZero();
+
+        // Verify: ab_meta_field row hard-deleted (so same code can be re-added)
+        Integer rowCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_meta_field WHERE code = ?",
+                Integer.class, fieldCode);
+        assertThat(rowCount).as("ab_meta_field row hard-deleted").isZero();
+    }
+
+    @Test
+    @DisplayName("Spec §3.7 #6 — removeFromModel rejects when column has data and refuseIfDataExists=true")
+    public void removeFromModel_dataPresent_throwsColumnHasDataException() {
+        String fieldCode = "it_c4_rm_d_" + UUID.randomUUID().toString().replace("-", "").substring(0, 6).toLowerCase();
+
+        AddFieldRequest addReq = AddFieldRequest.builder()
+                .modelCode(testModelCode)
+                .code(fieldCode)
+                .dataType("string")
+                .displayName("Has Data")
+                .maxLength(32)
+                .build();
+        AddFieldResult addRes = metaFieldService.addToModel(addReq);
+
+        // Insert one real data row carrying a non-null value in the new column.
+        // We use minimal columns; the table has standard mt_* columns including pid + tenant_id.
+        // Use information_schema to discover required columns? Simpler: rely on default-having.
+        // Post-T3: just UPDATE — but the table is empty. Insert a synthetic row.
+        Long tenantId = getTestTenant().getId();
+        String pid = UniqueIdGenerator.generate();
+        // Dynamic mt_* tables don't carry deleted_flag (no soft-delete) — see AGENTS.md.
+        jdbcTemplate.update(
+                "INSERT INTO " + tableName + " (pid, tenant_id, " + fieldCode + ") VALUES (?, ?, ?)",
+                pid, tenantId, "non-null-value");
+
+        RemoveFieldRequest rmReq = RemoveFieldRequest.builder()
+                .modelCode(testModelCode)
+                .storageCode(addRes.getStorageCode())
+                .refuseIfDataExists(true)
+                .build();
+
+        try {
+            assertThatThrownBy(() -> metaFieldService.removeFromModel(rmReq))
+                    .isInstanceOf(ColumnHasDataException.class)
+                    .hasMessageContaining("non-null rows");
+
+            // Column must still exist; service must NOT have dropped it.
+            Integer stillThere = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.columns "
+                            + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                    Integer.class, tableName, fieldCode);
+            assertThat(stillThere).as("column must NOT be dropped when refused").isEqualTo(1);
+        } finally {
+            // Clean the data row so @AfterEach DROP TABLE does not leak; also
+            // allow the column to be dropped by the cascading table teardown.
+            try {
+                jdbcTemplate.update("DELETE FROM " + tableName + " WHERE pid = ?", pid);
+            } catch (Exception ignore) {
+                // best effort
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Spec §3.7 #7 — F-5 regression: removeFromModel allows same code to be re-added")
+    public void removeFromModel_thenAddSameCode_succeeds() {
+        String fieldCode = "it_c4_rm_r_" + UUID.randomUUID().toString().replace("-", "").substring(0, 6).toLowerCase();
+
+        // Add
+        AddFieldRequest addReq1 = AddFieldRequest.builder()
+                .modelCode(testModelCode)
+                .code(fieldCode)
+                .dataType("string")
+                .displayName("Cycle 1")
+                .maxLength(32)
+                .build();
+        AddFieldResult first = metaFieldService.addToModel(addReq1);
+        assertThat(first.getFieldPid()).isNotBlank();
+
+        // Remove
+        metaFieldService.removeFromModel(RemoveFieldRequest.builder()
+                .modelCode(testModelCode)
+                .storageCode(first.getStorageCode())
+                .refuseIfDataExists(true)
+                .build());
+
+        // Re-add same code → must NOT throw "already exists"
+        AddFieldRequest addReq2 = AddFieldRequest.builder()
+                .modelCode(testModelCode)
+                .code(fieldCode)
+                .dataType("string")
+                .displayName("Cycle 2")
+                .maxLength(64)
+                .build();
+        AddFieldResult second = metaFieldService.addToModel(addReq2);
+
+        assertThat(second.getFieldPid())
+                .as("second add must produce a new fieldPid")
+                .isNotBlank()
+                .isNotEqualTo(first.getFieldPid());
+        assertThat(second.getStorageCode()).isEqualTo(first.getStorageCode());
+        assertThat(second.getColumnName()).isEqualTo(fieldCode);
+        assertThat(second.getPgColumnType())
+                .as("re-added column should respect new maxLength=64")
+                .isEqualTo("varchar(64)");
+
+        // Verify column is on the table again (with new shape).
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                Integer.class, tableName, fieldCode);
+        assertThat(count).isEqualTo(1);
     }
 
     // ==================== fixtures ====================

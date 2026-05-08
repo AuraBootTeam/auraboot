@@ -4,6 +4,8 @@ import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.dto.AddFieldRequest;
 import com.auraboot.framework.meta.dto.AddFieldResult;
+import com.auraboot.framework.meta.dto.RemoveFieldRequest;
+import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import java.util.List;
@@ -37,6 +39,19 @@ public interface MetaFieldService {
      *         boolean|date|datetime|json}).
      */
     AddFieldResult addToModel(AddFieldRequest request);
+
+    /**
+     * Inverse of {@link #addToModel}: drops the column + deletes binding +
+     * hard-deletes the {@code ab_meta_field} row so the same {@code code}
+     * can be re-added later (F-3/F-5 mitigation).
+     *
+     * <p>When {@code refuseIfDataExists=true} and the column has any
+     * non-null, non-deleted row, throws {@link ColumnHasDataException}.
+     *
+     * @throws com.auraboot.framework.exception.ValidationException modelCode/storageCode unknown
+     * @throws ColumnHasDataException column has data and refuse flag set
+     */
+    void removeFromModel(RemoveFieldRequest request);
 
     /**
      * 根据PID查找字段
