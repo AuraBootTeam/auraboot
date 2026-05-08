@@ -154,6 +154,17 @@ export interface WidgetConfig {
   linkage?: LinkageConfig;
   drillDown?: DrillDownConfig;
   refreshInterval?: number;
+  /**
+   * Optional model-table shorthand. When the widget config supplies
+   * `modelCode` (and table-style columns below) instead of an explicit
+   * dataSource, chart components like SmartTableChart fetch the latest rows
+   * from the dynamic-list API.
+   */
+  modelCode?: string;
+  /** Optional widget-level table config (column order, labels, alignment). */
+  table?: Record<string, unknown>;
+  /** Optional default sort applied client-side (e.g. for table widgets). */
+  defaultSort?: { field: string; order: 'asc' | 'desc' };
 }
 
 /**

@@ -20,6 +20,12 @@ export interface KanbanViewProps {
   viewConfig?: ViewConfig;
   /** Model code for data fetching */
   modelCode: string;
+  /**
+   * Page key used as the dynamic API resource segment (e.g. `crm_opportunity`)
+   * for kanban card-move persistence. When omitted, moves stay purely
+   * optimistic — see SmartKanban / useKanbanData for the contract.
+   */
+  pageKey?: string;
   /** Callback when a card is clicked */
   onCardClick?: (card: KanbanCard) => void;
   /** Callback when a card is moved between columns */
@@ -39,6 +45,7 @@ export interface KanbanViewProps {
 export const KanbanView: React.FC<KanbanViewProps> = ({
   viewConfig,
   modelCode,
+  pageKey,
   onCardClick,
   onCardMove,
   linkageFilters,
@@ -106,6 +113,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
       linkageFilters={linkageFilters}
       groupByDictCode={viewConfig?.groupByDictCode}
       terminalStages={viewConfig?.terminalStages}
+      pageKey={pageKey}
       className={className}
     />
   );
