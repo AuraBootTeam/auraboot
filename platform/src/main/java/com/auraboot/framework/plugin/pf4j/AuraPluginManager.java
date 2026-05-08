@@ -289,8 +289,9 @@ public class AuraPluginManager extends SpringPluginManager {
      * @param pluginId the plugin ID
      * @return set of extension classes
      */
+    @Override
     public Set<String> getExtensionClassNames(String pluginId) {
-        return getExtensionClassNames(pluginId);
+        return super.getExtensionClassNames(pluginId);
     }
 
     // ========== Plugin Information ==========
