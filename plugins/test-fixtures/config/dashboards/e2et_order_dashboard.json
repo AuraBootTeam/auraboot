@@ -1,5 +1,6 @@
 {
   "code": "e2et_order_dashboard",
+  "title": "订单统计仪表盘",
   "title:zh-CN": "订单统计仪表盘",
   "title:en": "Order Dashboard",
   "description": "E2E fixture dashboard: recent orders + pending payments + customer overview",
