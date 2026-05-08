@@ -45,10 +45,22 @@ async function dndKitDrag(page: Page, source: Locator, target: Locator): Promise
     throw new Error('dndKitDrag: source/target locator has no bounding box');
   }
 
+  // Empty kanban columns use `overflow-y-auto` and occupy the full remaining
+  // height of the page (boundingBox().height can be ~9000px). Targeting the
+  // geometric center pushes the cursor far below the viewport, where
+  // Playwright's mouse helper still moves but dnd-kit's collision detection
+  // (which queries `document.elementFromPoint`) cannot find the column body.
+  // We instead aim near the *visible top* of the target so the cursor stays
+  // inside the viewport and elementFromPoint resolves to the droppable.
+  const viewport = page.viewportSize() ?? { width: 1280, height: 800 };
   const fromX = sourceBox.x + sourceBox.width / 2;
   const fromY = sourceBox.y + sourceBox.height / 2;
   const toX = targetBox.x + targetBox.width / 2;
-  const toY = targetBox.y + targetBox.height / 2;
+  const visibleTop = Math.max(0, targetBox.y);
+  const visibleBottom = Math.min(viewport.height, targetBox.y + targetBox.height);
+  // Pin Y a few pixels below the visible top edge of the column body to
+  // guarantee elementFromPoint hits the droppable, not the header above it.
+  const toY = Math.min(visibleBottom - 8, visibleTop + 40);
 
   await page.mouse.move(fromX, fromY);
   await page.mouse.down();
@@ -280,8 +292,12 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
       { timeout: 15_000 },
     );
 
-    // D6: drag card from current column onto proposal column body.
-    // Use PointerEvent simulation — @dnd-kit's PointerSensor ignores HTML5 drag events.
+    // D6: drag card from current column onto proposal column body. The
+    // helper clamps the cursor Y to the visible portion of the body so the
+    // gesture stays in-viewport (the body uses `flex-1` and can be ~9000px
+    // tall when the kanban has many cards in other columns).
+    // Use page.mouse.* — @dnd-kit's MouseSensor (active under
+    // __AURA_E2E_MODE__) consumes these directly.
     await dndKitDrag(page, card, proposalBody);
     await persistRespPromise;
 
@@ -501,9 +517,14 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
     const newRow = page.locator('tbody tr').filter({ hasText: formOppName }).first();
     await expect(newRow).toBeVisible({ timeout: 10_000 });
 
-    // D5: open detail by clicking the link in the row
-    const link = newRow.locator('a').first();
-    await link.click();
+    // D5: open detail. The list view exposes a "详情" button in the row's
+    // action cell — click it (the row itself is not an <a> element). Fall
+    // back to any link inside the row if the button is missing.
+    const detailBtn = newRow
+      .getByRole('button', { name: /^(详情|Detail|查看)$/ })
+      .or(newRow.locator('a'))
+      .first();
+    await detailBtn.click();
     await page.waitForURL(/\/p\/crm_opportunity\/view\//, { timeout: 15_000 }).catch(() => null);
     const main = page.locator('main, [role="main"]').first();
     await expect(main).toBeVisible({ timeout: 10_000 });
