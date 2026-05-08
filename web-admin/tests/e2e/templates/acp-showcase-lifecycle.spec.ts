@@ -347,10 +347,7 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
   // =========================================================================
   // [D11 + D14] Delete a draft request → confirm → row disappears
   // =========================================================================
-  // FIXME: blocked by acs:delete_* no-op bug.
-  // See docs/backlog/2026-05-08-acp-showcase-delete-noop-bug.md
-  // Re-enable after platform/plugin delete handler is fixed.
-  test.fixme('ACS-007 @critical — Delete draft AI request via row action → confirm → row gone', async ({ page }) => {
+  test('ACS-007 @critical — Delete draft AI request via row action → confirm → row gone', async ({ page }) => {
     // Seed a fresh draft request via API
     const seed = await executeCommandViaApi(
       page,
@@ -412,8 +409,18 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
     // [data integrity] Verify deletion landed in DB, not just UI optimistic refresh.
     // Without this, an ack-only delete handler (no actual DB mutation) silently passes
     // because the row scrolls off page 1.
+    // Platform convention: missing dynamic record returns HTTP 400 with body code "40000"
+    // ("Record not found: <pid> in model: ..."). Accept both 400-with-not-found and 404.
     const verify = await page.request.get(`/api/dynamic/acs_demo_request/${seed.recordId}`);
-    expect(verify.status(), `record ${seed.recordId} should be 404 after delete`).toBe(404);
+    if (verify.status() === 404) {
+      expect(verify.status()).toBe(404);
+    } else {
+      const body = await verify.json().catch(() => ({}));
+      expect(
+        verify.status() === 400 && /not found/i.test(String((body as any)?.context ?? '')),
+        `record ${seed.recordId} should be gone after delete; got status=${verify.status()} body=${JSON.stringify(body).slice(0, 200)}`,
+      ).toBeTruthy();
+    }
   });
 
   // =========================================================================
@@ -500,10 +507,7 @@ test.describe('ACP Showcase — Full Lifecycle (acs_demo_request + acs_safety_ru
   // =========================================================================
   // [D11] Deactivate then delete → row disappears
   // =========================================================================
-  // FIXME: blocked by acs:delete_* no-op bug.
-  // See docs/backlog/2026-05-08-acp-showcase-delete-noop-bug.md
-  // Re-enable after platform/plugin delete handler is fixed.
-  test.fixme('ACS-011 @critical — Deactivate then delete safety rule → row gone', async ({ page }) => {
+  test('ACS-011 @critical — Deactivate then delete safety rule → row gone', async ({ page }) => {
     expect(safetyRulePid).toBeTruthy();
 
     const deact = await executeCommandViaApi(page, 'acs:deactivate_rule', {}, safetyRulePid);
