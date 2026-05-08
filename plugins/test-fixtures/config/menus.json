@@ -65,14 +65,14 @@
     "parentCode": "e2et_menu",
     "name:zh-CN": "订单仪表盘",
     "name:en": "Order Dashboard",
-    "path": "/p/e2et_order_dashboard",
+    "path": "/dashboards/view/e2et_order_dashboard",
     "component": null,
     "icon": "LayoutDashboard",
     "type": 1,
     "permissionCode": "e2et.order.read",
     "orderNo": 40,
     "visible": true,
-    "pageKey": "e2et_order_dashboard_list"
+    "pageKey": "e2et_order_dashboard"
   },
   {
     "code": "e2et_record_list",

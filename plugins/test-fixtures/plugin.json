@@ -23,7 +23,8 @@
     "pages": "config/pages.json",
     "i18n": "config/i18n.json",
     "processes": "config/processes.json",
-    "roles": "config/roles.json"
+    "roles": "config/roles.json",
+    "dashboards": "config/dashboards"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",

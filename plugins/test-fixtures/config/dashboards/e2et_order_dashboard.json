@@ -1,0 +1,129 @@
+{
+  "code": "e2et_order_dashboard",
+  "title:zh-CN": "订单统计仪表盘",
+  "title:en": "Order Dashboard",
+  "description": "E2E fixture dashboard: recent orders + pending payments + customer overview",
+  "scope": "global",
+  "status": "published",
+  "sortOrder": 40,
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16,
+    "compactType": "vertical"
+  },
+  "widgets": [
+    {
+      "id": "block_dash_recent_orders",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 4,
+      "title:zh-CN": "近期订单",
+      "title:en": "Recent Orders",
+      "config": {
+        "modelCode": "e2et_order",
+        "title": {
+          "zh-CN": "近期订单",
+          "en": "Recent Orders"
+        },
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        },
+        "searchFields": [
+          "e2et_order_no",
+          "e2et_order_title",
+          "e2et_order_status"
+        ],
+        "table": {
+          "columns": [
+            { "field": "e2et_order_no", "width": 180, "label": {"zh-CN": "订单编号", "en": "Order No"} },
+            { "field": "e2et_order_title", "width": 200, "label": {"zh-CN": "订单标题", "en": "Title"} },
+            { "field": "e2et_order_customer", "width": 150, "label": {"zh-CN": "客户", "en": "Customer"} },
+            { "field": "e2et_order_amount", "width": 120, "align": "right", "label": {"zh-CN": "金额", "en": "Amount"} },
+            { "field": "e2et_order_status", "width": 100, "renderType": "tag", "dictCode": "e2et_order_status", "label": {"zh-CN": "状态", "en": "Status"} },
+            { "field": "e2et_order_date", "width": 120, "label": {"zh-CN": "下单日期", "en": "Date"} }
+          ],
+          "rowActions": [
+            {
+              "code": "view",
+              "label": "view",
+              "action": { "type": "navigate", "to": "e2et_order_detail" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "block_dash_pending_payments",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 4,
+      "w": 6,
+      "h": 4,
+      "title:zh-CN": "待审批付款",
+      "title:en": "Pending Payments",
+      "config": {
+        "modelCode": "e2et_payment",
+        "title": {
+          "zh-CN": "待审批付款",
+          "en": "Pending Payments"
+        },
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        },
+        "defaultFilters": [
+          { "fieldName": "e2et_pay_status", "operator": "EQ", "value": "pending" }
+        ],
+        "table": {
+          "columns": [
+            { "field": "e2et_pay_no", "width": 160, "label": {"zh-CN": "付款单号", "en": "Payment No"} },
+            { "field": "e2et_pay_amount", "width": 120, "align": "right", "label": {"zh-CN": "金额", "en": "Amount"} },
+            { "field": "e2et_pay_method", "width": 100, "label": {"zh-CN": "方式", "en": "Method"} },
+            { "field": "e2et_pay_status", "width": 100, "renderType": "tag", "dictCode": "e2et_pay_status", "label": {"zh-CN": "状态", "en": "Status"} }
+          ],
+          "rowActions": [
+            {
+              "code": "view",
+              "label": "view",
+              "action": { "type": "navigate", "to": "e2et_payment_detail" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "block_dash_customers",
+      "type": "smart-table-chart",
+      "x": 6,
+      "y": 4,
+      "w": 6,
+      "h": 4,
+      "title:zh-CN": "客户一览",
+      "title:en": "Customer Overview",
+      "config": {
+        "modelCode": "e2et_customer",
+        "title": {
+          "zh-CN": "客户一览",
+          "en": "Customer Overview"
+        },
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        },
+        "searchFields": ["e2et_cust_name"],
+        "table": {
+          "columns": [
+            { "field": "e2et_cust_code", "width": 120, "label": {"zh-CN": "编码", "en": "Code"} },
+            { "field": "e2et_cust_name", "width": 160, "label": {"zh-CN": "名称", "en": "Name"} },
+            { "field": "e2et_cust_region", "width": 100, "renderType": "tag", "dictCode": "e2et_region", "label": {"zh-CN": "区域", "en": "Region"} },
+            { "field": "e2et_cust_active", "width": 80, "label": {"zh-CN": "状态", "en": "Active"} }
+          ]
+        }
+      }
+    }
+  ]
+}
