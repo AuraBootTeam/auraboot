@@ -2,7 +2,7 @@
   {
     "name": "Pipeline Board",
     "modelCode": "crm_opportunity",
-    "pageKey": "crm_opportunity_list",
+    "pageKey": "crm_opportunity",
     "scope": "global",
     "viewType": "kanban",
     "isDefault": false,
@@ -32,7 +32,7 @@
   {
     "name": "Lead Board",
     "modelCode": "crm_lead",
-    "pageKey": "crm_lead_list",
+    "pageKey": "crm_lead",
     "scope": "global",
     "viewType": "kanban",
     "isDefault": false,
