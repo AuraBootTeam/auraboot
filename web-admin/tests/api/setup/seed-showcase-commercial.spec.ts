@@ -629,7 +629,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
 
       try {
         execSync(
-          `psql -h localhost -U ghj -d aura_boot -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
+          `psql -h ${process.env.PG_HOST??'localhost'} -p ${process.env.PG_PORT??'5432'} -U ${process.env.PG_USER??process.env.USER??'ghj'} -d ${process.env.PG_DB??'aura_boot'} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
           {
             timeout: 5000,
             stdio: 'pipe',
@@ -699,7 +699,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
 
       try {
         execSync(
-          `psql -h localhost -U ghj -d aura_boot -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
+          `psql -h ${process.env.PG_HOST??'localhost'} -p ${process.env.PG_PORT??'5432'} -U ${process.env.PG_USER??process.env.USER??'ghj'} -d ${process.env.PG_DB??'aura_boot'} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
           {
             timeout: 5000,
             stdio: 'pipe',
