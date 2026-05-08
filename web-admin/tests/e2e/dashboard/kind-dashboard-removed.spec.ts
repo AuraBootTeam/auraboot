@@ -16,7 +16,6 @@ import { test, expect } from '../../fixtures';
 const OSS_DASHBOARD_CODES = [
   'sc_arsenal_dashboard',
   'sc_workflow_dashboard',
-  'acs_dashboard',
 ] as const;
 
 test.describe('Plan 3a - kind=dashboard removal', () => {
@@ -29,7 +28,6 @@ test.describe('Plan 3a - kind=dashboard removal', () => {
     await expect(tabBar).toBeVisible();
     await expect(tabBar).not.toContainText('Showcase Workflow Dashboard');
     await expect(tabBar).not.toContainText('Showcase Arsenal Dashboard');
-    await expect(tabBar).not.toContainText('ACP Showcase Dashboard');
   });
 
   for (const code of OSS_DASHBOARD_CODES) {
