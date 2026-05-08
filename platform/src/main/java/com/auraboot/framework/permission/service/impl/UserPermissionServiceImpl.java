@@ -3,7 +3,6 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.cache.MetaCacheKeyGenerator;
 import com.auraboot.framework.permission.service.UserPermissionService;
-import com.auraboot.framework.permission.util.PermissionCodeAliasResolver;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
@@ -259,22 +258,17 @@ public class UserPermissionServiceImpl implements UserPermissionService {
         log.debug("Checking permission by code: userId={}, permissionCode={}",
             userId, permissionCode);
 
-        for (String candidateCode : PermissionCodeAliasResolver.resolveCandidates(permissionCode)) {
-            Long permissionId = resolvePermissionId(candidateCode);
-            if (permissionId == null) {
-                continue;
-            }
-
-            if (hasPermission(userId, permissionId)) {
-                log.debug("Permission check result: userId={}, permissionCode={}, matchedCandidate={}",
-                    userId, permissionCode, candidateCode);
-                return true;
-            }
+        Long permissionId = resolvePermissionId(permissionCode);
+        if (permissionId == null) {
+            log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=false (unregistered code)",
+                userId, permissionCode);
+            return false;
         }
 
-        log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=false",
-            userId, permissionCode);
-        return false;
+        boolean granted = hasPermission(userId, permissionId);
+        log.debug("Permission check result: userId={}, permissionCode={}, hasPermission={}",
+            userId, permissionCode, granted);
+        return granted;
     }
 
     /**
