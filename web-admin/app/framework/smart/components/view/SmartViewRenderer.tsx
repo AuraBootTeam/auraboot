@@ -56,6 +56,14 @@ export interface SmartViewRendererProps {
   onSwitchToTableView?: () => void;
   /** External filter conditions */
   linkageFilters?: FilterConfig[];
+  /**
+   * Optional page key. When provided, the kanban view persists card moves
+   * via PUT `/api/dynamic/{pageKey}/{recordId}` (matching the dynamic list
+   * URL pattern); without it, the kanban stays purely optimistic. See
+   * backlog 2026-05-08 Gap 2 — drag-to-stage persistence requires this
+   * binding to the dynamic page contract.
+   */
+  pageKey?: string;
   /** Custom CSS class */
   className?: string;
 
@@ -99,6 +107,7 @@ export const SmartViewRenderer: React.FC<SmartViewRendererProps> = ({
   onSwitchToTableView,
   onTreeNodeClick,
   linkageFilters,
+  pageKey,
   className,
   // Data tools & bulk operations
   showDataTools,
@@ -137,6 +146,7 @@ export const SmartViewRenderer: React.FC<SmartViewRendererProps> = ({
           <KanbanView
             viewConfig={view.viewConfig}
             modelCode={view.modelCode}
+            pageKey={pageKey}
             onCardClick={onCardClick}
             onCardMove={onCardMove}
             linkageFilters={linkageFilters}

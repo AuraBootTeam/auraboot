@@ -2837,6 +2837,7 @@ export function ListPageContent(props: PageContentProps) {
               onTreeNodeClick={navigateToRecordView}
               onDataRefresh={() => loadData({ page: 0, size: pagination.pageSize })}
               linkageFilters={[]}
+              pageKey={pageKey}
             />
           )}
 

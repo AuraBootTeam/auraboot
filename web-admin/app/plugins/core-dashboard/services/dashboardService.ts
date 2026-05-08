@@ -150,6 +150,21 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
     props: {} as Record<string, unknown>,
   };
 
+  // Preserve fields that are not part of the legacy WidgetConfig whitelist
+  // but that platform widgets may opt in to (e.g. SmartTableChart uses
+  // `modelCode` + `table` as a model-table shorthand when no full
+  // dataSource is authored — see backlog 2026-05-08 Gap 1).
+  const passthrough: Partial<Widget['config']> = {};
+  if (rawConfig.modelCode !== undefined) {
+    passthrough.modelCode = rawConfig.modelCode as string;
+  }
+  if (rawConfig.table !== undefined) {
+    passthrough.table = rawConfig.table as Record<string, unknown>;
+  }
+  if (rawConfig.defaultSort !== undefined) {
+    passthrough.defaultSort = rawConfig.defaultSort as Widget['config']['defaultSort'];
+  }
+
   // If config already has dataSource, treat as normalized format
   if (rawConfig.dataSource) {
     return {
@@ -162,6 +177,7 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
         drillDown: rawConfig.drillDown as Widget['config']['drillDown'],
         style: rawConfig.style as Widget['config']['style'],
         refreshInterval: rawConfig.refreshInterval as number | undefined,
+        ...passthrough,
       },
     };
   }
@@ -175,6 +191,7 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
       title,
       dataSource,
       ...(visualization && Object.keys(visualization).length > 0 ? { visualization } : {}),
+      ...passthrough,
     },
   };
 }
