@@ -37,6 +37,41 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
     private String approvalPid1;
     private String approvalPid2;
     private final String testRunId = String.valueOf(System.currentTimeMillis());
+    private String wildcardPolicyPid;
+
+    /**
+     * Seed a wildcard active approval policy for the test tenant. The fail-secure
+     * path in {@link AgentApprovalGateService#checkAndRequestApproval} now refuses
+     * to create an approval row when no matching {@code ab_approval_policy} exists,
+     * so without this seed every {@code checkAndRequestApproval(..., true)} call
+     * would return null and almost every test in the class would fail.
+     *
+     * <p>The {@code approver_rules} include a USER rule for the test user so the
+     * "any tenant user is authorized" expectations in test 10 / 15 still hold
+     * (the source is fail-secure on null/empty rules — see
+     * {@link AgentApprovalGateService#isAuthorizedApprover}).
+     */
+    @BeforeAll
+    void seedWildcardPolicy() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        wildcardPolicyPid = UniqueIdGenerator.generate();
+        Map<String, Object> policy = new HashMap<>();
+        policy.put("pid", wildcardPolicyPid);
+        policy.put("tenant_id", tenantId);
+        policy.put("policy_name", "wildcard-test-policy-" + testRunId);
+        policy.put("description", "Wildcard policy seeded by AgentApprovalGateIntegrationTest");
+        policy.put("trigger_rules", "[{\"type\":\"tool_call\",\"pattern\":\".*\"}]");
+        policy.put("approver_rules", "[{\"type\":\"USER\",\"userId\":" + userId + "}]");
+        policy.put("auto_approve", false);
+        policy.put("timeout_hours", 24);
+        policy.put("timeout_action", "reject");
+        policy.put("policy_status", "active");
+        policy.put("deleted_flag", false);
+        policy.put("created_at", LocalDateTime.now());
+        policy.put("updated_at", LocalDateTime.now());
+        dynamicDataMapper.insert("ab_approval_policy", policy);
+    }
 
     // ========== Test 1: checkAndRequestApproval - tool requires approval ==========
 
@@ -370,11 +405,11 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
                 .isFalse();
     }
 
-    // ========== Test 16: isAuthorizedApprover - empty approver_rules array allows any user ==========
+    // ========== Test 16: isAuthorizedApprover - empty approver_rules array fail-secures ==========
 
     @Test
     @Order(16)
-    void isAuthorizedApprover_emptyApproverRules_anyUserAuthorized() {
+    void isAuthorizedApprover_emptyApproverRules_failSecureReject() {
         Long tenantId = getTestTenant().getId();
 
         String policyPid = createApprovalPolicy(tenantId, "[]");
@@ -383,9 +418,13 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
 
         boolean authorized = approvalGateService.isAuthorizedApprover(
                 tenantId, approvalPid, getTestUser().getId());
+        // P0 fail-secure: approver_rules=[] means no one is configured to approve.
+        // The service refuses every caller until tenant admin defines an explicit
+        // USER / ROLE rule. See AgentApprovalGateService.isAuthorizedApprover
+        // (rejects empty arrays with an error log).
         assertThat(authorized)
-                .as("Empty approver_rules array should allow any authenticated user")
-                .isTrue();
+                .as("Empty approver_rules array must be rejected fail-secure")
+                .isFalse();
     }
 
     // ========== Test 17: idempotency - same runId+toolCode returns existing PID ==========
