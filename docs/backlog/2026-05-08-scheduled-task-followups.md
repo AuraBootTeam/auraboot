@@ -12,20 +12,13 @@
 
 ## ⏸ 待办 — `scheduled_task` 域
 
-### F-1 `timeout_ms` 创建/更新校验不一致(P2)
+### ✅ F-1 `timeout_ms` 创建/更新校验不一致(P2) — DONE 2026-05-08 (PR #88)
 
-**症状**:从 detail 页点"编辑"→ 表单预填(timeout_ms 默认 300000)→ 直接提交 update 命令 → 422 `Field 'timeout_ms' exceeds maximum value of 60000`。create 路径 default=300000 通过,update 路径 max=60000 拒绝。任何"原值不动"的更新流程必中招。
+**症状**:从 detail 页点"编辑"→ 表单预填(timeout_ms 默认 300000)→ 直接提交 update 命令 → 422 `Field 'timeout_ms' exceeds maximum value of 60000`。
 
-**定位**:`auraboot/plugins/platform-admin/config/models.json` 中 `scheduled_task.timeout_ms` 的 `default`(300000)与 `validators.max`(60000)互相矛盾;或 default 来自代码 / form schema 别处。
+**实际定位修正**:bug 在 `plugins/platform-admin/config/fields.json`(共享字段定义,被 webhook / api_connector / scheduled_task 三模型复用),不在 models.json。
 
-**修法选项**:
-1. 把 max 提到 600000 或更大(timeout 600s 是合理 cron/job 上限)
-2. 把 default 调到 60000 以内
-3. 区分 cron 任务和 long-running 任务用不同 timeout 上限(过度设计,放弃)
-
-推荐 (1):大多数 LLM/外部调用任务 60s 上限太紧。
-
-**工时**:0.5h(改 model 配置 + 1 条集成测试 + 1 条 E2E 断言更新)
+**Done**:commit `1b060f7e`,选方案 (1):max 60000 → 600000。webhook/api_connector default=10000,无 collateral。docker stack 验证:300000/600000 pass / 600001 reject(`Field 'timeout_ms' exceeds maximum value of 600000`)。
 
 ### F-2 字典 `scheduled_task_type` 在新建/列表往返间被请求 ≥800 次(P1 性能)
 

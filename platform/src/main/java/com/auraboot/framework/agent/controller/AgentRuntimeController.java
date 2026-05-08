@@ -27,6 +27,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -354,7 +355,7 @@ public class AgentRuntimeController {
 
     /** Approve a pending approval request. Auto-resumes the paused agent run. */
     @PostMapping("/approval/{approvalPid}/approve")
-    @RequirePermission(value = "acp_agent_approval", message = "Insufficient permission to approve agent actions")
+    @RequirePermission(value = MetaPermission.ACP_AGENT_APPROVAL, message = "Insufficient permission to approve agent actions")
     public ApiResponse<Map<String, Object>> approveApproval(@PathVariable String approvalPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -385,7 +386,7 @@ public class AgentRuntimeController {
 
     /** Reject a pending approval request. Marks the associated agent run as FAILED. */
     @PostMapping("/approval/{approvalPid}/reject")
-    @RequirePermission(value = "acp_agent_approval", message = "Insufficient permission to reject agent actions")
+    @RequirePermission(value = MetaPermission.ACP_AGENT_APPROVAL, message = "Insufficient permission to reject agent actions")
     public ApiResponse<Map<String, Object>> rejectApproval(@PathVariable String approvalPid,
                                                             @RequestBody(required = false) Map<String, String> body) {
         Long tenantId = MetaContext.getCurrentTenantId();

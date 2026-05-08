@@ -362,10 +362,14 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             request.setTableName(effectiveTableName);
             request.setExtension(extension);
             request.setTenantId(tenantId);
-            request.setAutoPublish(Boolean.TRUE.equals(autoPublish));
             request.setPluginPid(pluginPid);  // Set plugin_pid via request
 
             MetaModelDTO created = metaModelService.create(request);
+
+            // NOTE: descriptor's autoPublish flag is honored by the plugin import
+            // post-processor (publishes after fields + bindings are imported).
+            // Do not publish here — at this point only the draft model exists; field
+            // bindings haven't been imported yet, and publish() requires ≥1 binding.
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL,
                     created.getPid(), null, dto.getCode(), dto.getEffectiveDisplayName(),

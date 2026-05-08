@@ -71,7 +71,6 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
         request.setDescription("Integration test model for data permission coverage");
         request.setModelCategory("entity");
         request.setTableName("mt_dp_perm_" + suffix);
-        request.setAutoPublish(false);
 
         MetaModelDTO created = metaModelService.create(request);
         MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();
