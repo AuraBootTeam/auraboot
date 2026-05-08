@@ -366,11 +366,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
             MetaModelDTO created = metaModelService.create(request);
 
-            // Honor caller's autoPublish: MetaModelService.create() only persists the
-            // draft model + auto-bound system fields. Publication is explicit.
-            if (Boolean.TRUE.equals(autoPublish)) {
-                metaModelService.publish(created.getPid(), null);
-            }
+            // NOTE: descriptor's autoPublish flag is honored by the plugin import
+            // post-processor (publishes after fields + bindings are imported).
+            // Do not publish here — at this point only the draft model exists; field
+            // bindings haven't been imported yet, and publish() requires ≥1 binding.
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL,
                     created.getPid(), null, dto.getCode(), dto.getEffectiveDisplayName(),
