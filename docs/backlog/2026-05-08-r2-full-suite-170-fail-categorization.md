@@ -75,12 +75,26 @@ notification (10) and aurabot (9), not saved-view. New plan:
    `2026-05-08-oss-suite-contention-flakes.md` backlog. Merge entries
    so we don't double-track.
 
+## Saved-view residual 4 — concrete signatures (post-r2 audit)
+
+After C1 was reduced from 40 → 4 by `7b6e94dd` (frontend bump), the
+remaining 4 are concrete product/spec drifts, not environment issues:
+
+| Spec | Signature | Likely root |
+|------|-----------|-------------|
+| `saved-view-gantt.spec.ts:117` SV-040 | `dialog.getByText('E2E Gantt Timeline')` 5s timeout | Required saved-view fixture "E2E Gantt Timeline" not seeded; either add to setup spec or rewrite test to create it inline |
+| `saved-view-gantt.spec.ts:135` SV-041 | (depends on SV-040 → cascade-fail) | Same root as SV-040 |
+| `saved-view-quick-filters.spec.ts:25` QF-002 | `[data-testid=quick-filter-my_records]` lacks "My Records" label | i18n/label drift OR feature partially shipped |
+| `saved-view-row-height.spec.ts:68` RH-002 | row height 57 px exceeds 50 px threshold | CSS/theme drift; spec threshold may be stale (theme bumped padding) |
+
+Disposition: each has a contained fix (~30 min) but no shared root.
+Tackle individually in a follow-up session OR add to oss-scope.json
+test_excludes if classified as feature-not-yet-shipped.
+
 ## Out of scope for "fix in this branch"
 
-- **C1 saved-view product gaps**: if these are real unbuilt features
-  (CF rules etc.), they're roadmap items not regressions. Removing
-  them from OSS scope is a config change; building them is a feature
-  decision.
+- **Saved-view residual 4**: see table above — individual fixes,
+  unrelated to the env/infrastructure work this branch focused on.
 
 - **C5 aurabot LLM-required**: needs ANTHROPIC_API_KEY in `r2-stack`
   env. Optional in dev; tag specs with `@requires-llm` and skip when
