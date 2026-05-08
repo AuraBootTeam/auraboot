@@ -45,6 +45,13 @@ public class CommandAutoSetExecutor {
             Map<String, Object> config = (Map<String, Object>) entry.getValue();
             String strategy = (String) config.get("strategy");
 
+            // default_value only fills when payload omits the field — payload-provided value wins.
+            // Distinct from fixed_value which always overrides (used for audit/system-managed fields).
+            if ("default_value".equals(strategy) && payload.containsKey(fieldCode) && payload.get(fieldCode) != null) {
+                log.debug("AUTO_SET: skipping default_value for {} (payload already provides value)", fieldCode);
+                continue;
+            }
+
             Object value = switch (strategy) {
                 case "auto_generate" -> generateAutoCode(command.getModelCode(), fieldCode, config);
                 case "current_user" -> userId != null ? String.valueOf(userId) : null;
@@ -52,7 +59,7 @@ public class CommandAutoSetExecutor {
                 case "current_username" -> MetaContext.getCurrentUsername();
                 case "current_date" -> tenantClock.businessDate(MetaContext.getCurrentTenantId());
                 case "current_datetime" -> Instant.now();
-                case "fixed_value" -> config.get("value");
+                case "fixed_value", "default_value" -> config.get("value");
                 case "copy_field" -> payload.get(config.get("sourceField"));
                 default -> {
                     log.warn("Unknown autoSet strategy '{}' for field '{}'", strategy, fieldCode);
