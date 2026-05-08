@@ -7689,6 +7689,8 @@ CREATE TABLE IF NOT EXISTS ab_mobile_client_log (
 
 CREATE INDEX IF NOT EXISTS idx_mobile_log_session ON ab_mobile_client_log(session_id);
 CREATE INDEX IF NOT EXISTS idx_mobile_log_tenant_time ON ab_mobile_client_log(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_mobile_log_category_time
+    ON ab_mobile_client_log (category, client_timestamp DESC);
 
 -- ═══════════════════════════════════════════════════════════════
 -- Push Device Token
