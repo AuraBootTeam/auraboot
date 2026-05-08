@@ -7,6 +7,8 @@ import com.auraboot.framework.aurabot.skill.SkillResult;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.AddFieldRequest;
+import com.auraboot.framework.meta.dto.AddFieldResult;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.service.MetaFieldService;
@@ -213,8 +215,81 @@ public class FieldAddSkill implements AuraBotSkill {
 
     @Override
     public SkillResult execute(SkillRequest req) {
-        // T8 lands real impl. Stub fails loud so accidental wiring is caught.
-        throw new UnsupportedOperationException(name() + " execute not implemented yet");
+        Map<String, Object> params = parseParams(req);
+
+        String modelCode = stringParam(params, "modelCode");
+        String code = stringParam(params, "code");
+        String dataType = stringParam(params, "dataType");
+
+        Object displayNameObj = params.get("displayName");
+        String displayName = displayNameObj instanceof String dn && !dn.isBlank() ? dn : null;
+        Boolean required = Boolean.TRUE.equals(params.get("required")) ? Boolean.TRUE : null;
+        Object maxLenObj = params.get("maxLength");
+        Integer maxLength = maxLenObj instanceof Number ml ? ml.intValue() : null;
+
+        AddFieldRequest serviceReq = AddFieldRequest.builder()
+                .modelCode(modelCode)
+                .code(code)
+                .dataType(dataType)
+                .displayName(displayName)
+                .required(required)
+                .maxLength(maxLength)
+                .build();
+
+        AddFieldResult result;
+        try {
+            result = metaFieldService.addToModel(serviceReq);
+        } catch (ValidationException ve) {
+            String msg = ve.getMessage() == null ? "" : ve.getMessage();
+            String fieldPath = inferFieldPath(msg);
+            throw new SkillSpiException(SkillErrorCode.PARAMS_INVALID, msg, fieldPath, ve);
+        } catch (RuntimeException re) {
+            log.error("field:add execute failed for modelCode={} code={}", modelCode, code, re);
+            throw new SkillSpiException(SkillErrorCode.SKILL_INTERNAL_ERROR,
+                    "failed to add field: " + re.getMessage(), null, re);
+        }
+
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("fieldPid", result.getFieldPid());
+        payload.put("modelCode", modelCode);
+        payload.put("fieldCode", code);
+        payload.put("storageCode", result.getStorageCode());
+        payload.put("columnName", result.getColumnName());
+        payload.put("tableName", result.getTableName());
+        payload.put("pgColumnType", result.getPgColumnType());
+        if (result.getAddedAt() != null) {
+            payload.put("addedAt", result.getAddedAt().toString());
+        }
+
+        return SkillResult.builder()
+                .status(SkillResult.Status.SUCCESS)
+                .skillName(name())
+                .payload(payload)
+                .riskLevel(riskLevel())
+                .build();
+    }
+
+    /**
+     * Map a {@link ValidationException} message coming from
+     * {@link MetaFieldService#addToModel} back to a JSON-Pointer fieldPath so
+     * the FE can highlight the offending param. Order matters — {@code
+     * modelCode} is checked first because the impl message
+     * {@code "modelCode not found: ..."} also contains the substring "code".
+     */
+    private static String inferFieldPath(String msg) {
+        if (msg == null) {
+            return "/";
+        }
+        if (msg.contains("modelCode")) {
+            return "/modelCode";
+        }
+        if (msg.contains("dataType")) {
+            return "/dataType";
+        }
+        if (msg.contains("code")) {
+            return "/code";
+        }
+        return "/";
     }
 
     @Override
