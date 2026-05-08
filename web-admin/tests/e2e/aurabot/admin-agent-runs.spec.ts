@@ -111,7 +111,7 @@ const RUN_FAILED_COMPLETED_OFFSET_SEC = 1; // → 1000ms → "1.00s"
 
 function psql(sql: string): string {
   return execSync(
-    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+    `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -v ON_ERROR_STOP=1 -tA`,
     { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
   )
     .toString()
@@ -120,7 +120,7 @@ function psql(sql: string): string {
 
 function psqlQuiet(sql: string): string {
   return execSync(
-    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -qtA`,
+    `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -v ON_ERROR_STOP=1 -qtA`,
     { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
   )
     .toString()

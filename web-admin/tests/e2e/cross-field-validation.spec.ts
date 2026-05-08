@@ -42,7 +42,7 @@ async function executeCommand(
   const body: Record<string, unknown> = { payload };
   if (targetRecordId) body.targetRecordId = targetRecordId;
 
-  const resp = await fetch(`http://localhost:6443/api/meta/commands/execute/${commandCode}`, {
+  const resp = await fetch(`${process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`}/api/meta/commands/execute/${commandCode}`, {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
