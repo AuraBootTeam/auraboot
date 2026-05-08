@@ -147,7 +147,8 @@ public class AssertPhase implements CommandPhase {
             for (Map.Entry<String, Object> entry : autoSetFields.entrySet()) {
                 if (!validationPayload.containsKey(entry.getKey())) {
                     Map<String, Object> config = (Map<String, Object>) entry.getValue();
-                    if ("fixed_value".equals(config.get("strategy"))) {
+                    String strat = (String) config.get("strategy");
+                    if ("fixed_value".equals(strat) || "default_value".equals(strat)) {
                         validationPayload.put(entry.getKey(), config.get("value"));
                     }
                 }
