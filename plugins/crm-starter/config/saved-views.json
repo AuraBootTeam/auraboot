@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Pipeline Board",
+    "modelCode": "crm_opportunity",
+    "pageKey": "crm_opportunity_list",
+    "scope": "global",
+    "viewType": "kanban",
+    "isDefault": false,
+    "sortOrder": 1,
+    "viewConfig": {
+      "groupByField": "crm_opp_stage",
+      "groupByDictCode": "crm_opp_stage",
+      "titleField": "crm_opp_name",
+      "idField": "pid",
+      "cardFields": [
+        { "field": "crm_opp_account_id", "label": "Account", "type": "text" },
+        { "field": "crm_opp_expected_amount", "label": "Amount", "type": "currency", "currencyCode": "CNY" },
+        { "field": "crm_opp_probability", "label": "Probability", "type": "progress" },
+        { "field": "crm_opp_expected_close_date", "label": "Close", "type": "date-relative" },
+        { "field": "crm_opp_owner", "label": "Owner", "type": "avatar" }
+      ],
+      "kanbanAggregations": [
+        { "field": "crm_opp_expected_amount", "function": "sum", "label": "Pipeline Value" },
+        { "field": null, "function": "count", "label": "Count" }
+      ],
+      "draggable": true,
+      "showCount": true,
+      "showAggregations": true,
+      "terminalStages": { "won": ["closed_won"], "lost": ["closed_lost"] }
+    }
+  },
+  {
+    "name": "Lead Board",
+    "modelCode": "crm_lead",
+    "pageKey": "crm_lead_list",
+    "scope": "global",
+    "viewType": "kanban",
+    "isDefault": false,
+    "sortOrder": 1,
+    "viewConfig": {
+      "groupByField": "crm_lead_status",
+      "groupByDictCode": "crm_lead_status",
+      "titleField": "crm_lead_company",
+      "idField": "pid",
+      "cardFields": [
+        { "field": "crm_lead_contact_name", "label": "Contact", "type": "text" },
+        { "field": "crm_lead_source", "label": "Source", "type": "tag" },
+        { "field": "crm_lead_assigned_to", "label": "Owner", "type": "avatar" }
+      ],
+      "kanbanAggregations": [{ "field": null, "function": "count", "label": "Count" }],
+      "draggable": true,
+      "showCount": true,
+      "showAggregations": true
+    }
+  }
+]
