@@ -1,7 +1,13 @@
 package com.auraboot.framework.aurabot.skill.builtin;
 
+import com.auraboot.framework.aurabot.skill.AuraBotSkillRegistry;
+import com.auraboot.framework.aurabot.skill.RiskLevel;
+import com.auraboot.framework.aurabot.skill.SkillMeta;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.SkillRunRepository;
+import com.auraboot.framework.aurabot.skill.SkillRunStatus;
+import com.auraboot.framework.aurabot.skill.entity.SkillRun;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -35,7 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -86,6 +94,12 @@ public class FieldAddSkillIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private SkillRunRepository skillRunRepository;
+
+    @Autowired
+    private AuraBotSkillRegistry skillRegistry;
 
     private String testModelCode;
     private String tableName;
@@ -264,7 +278,194 @@ public class FieldAddSkillIntegrationTest extends BaseIntegrationTest {
                 });
     }
 
+    // ==================== T9: undo + permission filter ====================
+
+    @Test
+    @DisplayName("Spec §6.2 #5 — undo on empty column drops column + payload reports droppedColumn")
+    public void undo_emptyColumn_succeeds() {
+        // 1) Add a real column via the skill so afterSnapshot points at a
+        //    truly existing storage_code; otherwise removeFromModel would
+        //    fail at the binding lookup before exercising the undo path.
+        String fieldCode = "it_fas_undo_e_" + shortHex();
+        SkillRequest add = buildRequest(testModelCode, fieldCode, "string", n -> n.put("displayName", "Undo Empty"));
+        SkillResult addRes = skill.execute(add);
+        assertThat(addRes.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+
+        ObjectNode addPayload = (ObjectNode) addRes.getPayload();
+        String fieldPid = addPayload.get("fieldPid").asText();
+        String storageCode = addPayload.get("storageCode").asText();
+
+        // 2) Synthesize a SkillRun row carrying afterSnapshot — the
+        //    controller normally writes this on the success path of
+        //    /execute; this IT exercises only the undo SPI in isolation.
+        String undoToken = "tok_it_fas_undoe_" + shortHex();
+        SkillRun seeded = persistSkillRun(undoToken, addPayload);
+        assertThat(seeded.getPid()).isNotBlank();
+
+        // 3) Invoke undo and verify column is gone.
+        SkillResult undoRes = skill.undo(undoToken);
+
+        assertThat(undoRes.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+        assertThat(undoRes.getSkillName()).isEqualTo("field:add");
+        ObjectNode undoPayload = (ObjectNode) undoRes.getPayload();
+        assertThat(undoPayload.get("droppedColumn").asText()).isEqualTo(storageCode);
+        assertThat(undoPayload.get("modelCode").asText()).isEqualTo(testModelCode);
+        assertThat(undoPayload.get("undoneFieldPid").asText()).isEqualTo(fieldPid);
+
+        // 4) Independent verification: column is gone from the table.
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                Integer.class, tableName, fieldCode);
+        assertThat(count).as("undo must DROP COLUMN").isZero();
+    }
+
+    @Test
+    @DisplayName("Spec §6.2 #6 — undo refuses when column has data (refuseIfDataExists=true)")
+    public void undo_columnWithData_refuses() {
+        String fieldCode = "it_fas_undo_d_" + shortHex();
+        SkillRequest add = buildRequest(testModelCode, fieldCode, "string",
+                n -> n.put("displayName", "Undo With Data"));
+        SkillResult addRes = skill.execute(add);
+        assertThat(addRes.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+
+        ObjectNode addPayload = (ObjectNode) addRes.getPayload();
+        String storageCode = addPayload.get("storageCode").asText();
+
+        // Insert a real data row so removeFromModel(refuseIfDataExists=true)
+        // throws ColumnHasDataException — undo must rewrap as
+        // SKILL_INTERNAL_ERROR with a "has data" hint.
+        Long tenantId = getTestTenant().getId();
+        String pid = UniqueIdGenerator.generate();
+        jdbcTemplate.update(
+                "INSERT INTO " + tableName + " (pid, tenant_id, " + fieldCode + ") VALUES (?, ?, ?)",
+                pid, tenantId, "non-null-undo");
+
+        String undoToken = "tok_it_fas_undod_" + shortHex();
+        persistSkillRun(undoToken, addPayload);
+
+        try {
+            assertThatThrownBy(() -> skill.undo(undoToken))
+                    .isInstanceOf(SkillSpiException.class)
+                    .satisfies(t -> {
+                        SkillSpiException sse = (SkillSpiException) t;
+                        assertThat(sse.getErrorCode()).isEqualTo(SkillErrorCode.SKILL_INTERNAL_ERROR);
+                        assertThat(sse.getMessage()).contains("has data");
+                        assertThat(sse.getMessage()).contains(storageCode);
+                    });
+
+            // Column must still be present — refuse ≠ drop.
+            Integer stillThere = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.columns "
+                            + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                    Integer.class, tableName, fieldCode);
+            assertThat(stillThere).as("column must remain when undo refused").isEqualTo(1);
+        } finally {
+            // Tear down the synthetic data row so @AfterEach DROP TABLE works
+            // cleanly (and the next test's mt_* CREATE doesn't trip an
+            // unexpected residue).
+            try {
+                jdbcTemplate.update("DELETE FROM " + tableName + " WHERE pid = ?", pid);
+            } catch (Exception ignore) {
+                // best effort
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Spec §6.2 #7 — undo, then re-execute same field code on the model succeeds")
+    public void undo_thenRecreate_works() {
+        String fieldCode = "it_fas_undo_r_" + shortHex();
+
+        // First execute.
+        SkillRequest first = buildRequest(testModelCode, fieldCode, "string",
+                n -> n.put("displayName", "Cycle 1"));
+        SkillResult firstRes = skill.execute(first);
+        assertThat(firstRes.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+        ObjectNode firstPayload = (ObjectNode) firstRes.getPayload();
+
+        // Undo.
+        String undoToken = "tok_it_fas_undor_" + shortHex();
+        persistSkillRun(undoToken, firstPayload);
+        SkillResult undoRes = skill.undo(undoToken);
+        assertThat(undoRes.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+
+        // Re-execute the SAME code on the SAME model — the F-5 fix
+        // (binding hard-deleted on remove) means the bind table no longer
+        // carries a (model, field_code) collision.
+        SkillRequest second = buildRequest(testModelCode, fieldCode, "string",
+                n -> n.put("displayName", "Cycle 2"));
+        SkillResult secondRes = skill.execute(second);
+        assertThat(secondRes.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+
+        ObjectNode secondPayload = (ObjectNode) secondRes.getPayload();
+        assertThat(secondPayload.get("fieldCode").asText()).isEqualTo(fieldCode);
+        // fieldPid must be a fresh row (hard-delete on remove + new insert).
+        assertThat(secondPayload.get("fieldPid").asText())
+                .as("re-executed field gets a fresh fieldPid")
+                .isNotEqualTo(firstPayload.get("fieldPid").asText());
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                Integer.class, tableName, fieldCode);
+        assertThat(count).as("column re-added after undo").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Spec §6.2 #8 — registry.list filters out field:add when caller lacks MODEL.UPDATE+FIELD.CREATE")
+    public void permission_missing_excludesFromDiscovery() {
+        // Caller missing FIELD.CREATE — must NOT see field:add.
+        Set<String> insufficient = Set.of("MODEL.UPDATE");
+        List<SkillMeta> visibleInsufficient = skillRegistry.list(insufficient);
+        assertThat(visibleInsufficient)
+                .as("missing FIELD.CREATE → field:add hidden")
+                .extracting(SkillMeta::getName)
+                .doesNotContain("field:add");
+
+        // Empty perms — must NOT see field:add.
+        List<SkillMeta> visibleEmpty = skillRegistry.list(Set.of());
+        assertThat(visibleEmpty)
+                .as("empty perms → field:add hidden")
+                .extracting(SkillMeta::getName)
+                .doesNotContain("field:add");
+
+        // Both perms present — must see field:add (positive control).
+        Set<String> sufficient = Set.of("MODEL.UPDATE", "FIELD.CREATE");
+        List<SkillMeta> visibleOk = skillRegistry.list(sufficient);
+        assertThat(visibleOk)
+                .as("MODEL.UPDATE + FIELD.CREATE → field:add visible")
+                .extracting(SkillMeta::getName)
+                .contains("field:add");
+    }
+
     // ==================== helpers ====================
+
+    /**
+     * Build + persist a synthetic {@link SkillRun} carrying the supplied
+     * {@code afterSnapshot} so {@link FieldAddSkill#undo(String)} can resolve
+     * the token in isolation (the controller normally does this on /execute
+     * success — but undo IT focuses on the SPI alone).
+     */
+    private SkillRun persistSkillRun(String undoToken, ObjectNode afterSnapshot) {
+        ObjectNode params = objectMapper.createObjectNode();
+        params.put("modelCode", afterSnapshot.get("modelCode").asText());
+        params.put("code", afterSnapshot.get("fieldCode").asText());
+        params.put("dataType", "string");
+
+        SkillRun run = SkillRun.builder()
+                .tenantId(getTestTenant().getId())
+                .skillName("field:add")
+                .paramsJson(params)
+                .afterSnapshot(afterSnapshot)
+                .undoToken(undoToken)
+                .status(SkillRunStatus.SUCCESS.code())
+                .riskLevel(RiskLevel.MEDIUM.code())
+                .createdBy("it_fas")
+                .build();
+        return skillRunRepository.insert(run);
+    }
+
 
     private SkillRequest buildRequest(String modelCode, String code, String dataType,
                                       java.util.function.Consumer<ObjectNode> extras) {
