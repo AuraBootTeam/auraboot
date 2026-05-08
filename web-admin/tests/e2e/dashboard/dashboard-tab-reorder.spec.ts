@@ -15,7 +15,7 @@
 
 import { test, expect } from '../../fixtures';
 
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
 const DASHBOARDS_PATH = '/dashboards';
 const TABS_SEL = 'nav[aria-label="Dashboard tabs"] button.cursor-grab';
 const TS = Date.now();
