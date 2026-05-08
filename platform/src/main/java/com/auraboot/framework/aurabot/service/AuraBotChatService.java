@@ -68,6 +68,17 @@ public class AuraBotChatService {
     @Qualifier("asyncTaskExecutor")
     private final Executor asyncTaskExecutor;
 
+    /**
+     * C-5 T5: AuraBot Skill SPI confirm executor. Resume path detects a
+     * pending skill (extension {@code _aurabot_skill=true}) and dispatches
+     * via {@link com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor#confirm}
+     * with the persisted preview token instead of re-running
+     * {@link ChatToolExecutor#execute} (which would loop back to PREVIEW_PENDING).
+     * Optional so non-skill tests do not need the bean wired.
+     */
+    @Autowired(required = false)
+    private com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor skillToolExecutor;
+
     /** Optional RAG context provider from the shared AI runtime. */
     @Autowired(required = false)
     private RagContextProvider ragContextProvider;
@@ -508,8 +519,13 @@ public class AuraBotChatService {
         aiTraceService.updateSpanStatus(pending.getToolSpanId(), "confirmed");
         sink.onToolStart(toolId, pending.getToolName(), pending.getInput());
 
-        Map<String, Object> result = chatToolExecutor.execute(
-                pending.getToolName(), pending.getInput(), pending.getModelCode());
+        // C-5 T5: AuraBot Skill SPI resume branch. When the suspended tool
+        // carries an {@code _aurabot_skill=true} extension marker, route
+        // through {@link SkillToolExecutor#confirm} so the persisted preview
+        // token is consumed exactly once. Calling {@link ChatToolExecutor#execute}
+        // would loop back through dispatch and re-emit PREVIEW_PENDING because
+        // a MEDIUM+ skill never auto-executes.
+        Map<String, Object> result = executeResumeTool(pending);
         boolean success = Boolean.TRUE.equals(result.get("success"));
 
         sink.onToolResult(toolId, result, success);
@@ -617,10 +633,51 @@ public class AuraBotChatService {
                         sink.onToolStart(newToolId, toolName, input);
                         Map<String, Object> innerResult = chatToolExecutor.execute(
                                 toolName, input, pending.getModelCode());
+
+                        // C-5 T5: an inline-routed aurabot skill may still demand a
+                        // preview when its risk level is MEDIUM+ (executor returns
+                        // a {@code _aurabot_skill_pending} marker). Convert that
+                        // into a fresh suspend so the same chokepoint resume path
+                        // covers the second-stage confirmation.
+                        if (Boolean.TRUE.equals(innerResult.get("_aurabot_skill_pending"))) {
+                            aiTraceService.endSpan(toolSpan, null, "pending");
+                            suspendForAurabotSkill(ctx, pending, sink, messages,
+                                    newToolId, toolName, input, innerResult, round);
+                            needsConfirmation = true;
+                            pendingToolId = newToolId;
+                            break;
+                        }
+
                         boolean innerSuccess = Boolean.TRUE.equals(innerResult.get("success"));
                         aiTraceService.endSpan(toolSpan, innerResult, innerSuccess ? "success" : "error");
                         sink.onToolResult(newToolId, innerResult, innerSuccess);
                         toolResultBlocks.add(buildToolResultBlock(newToolId, innerResult));
+                    } else if (isAurabotSkillTool(toolName)) {
+                        // C-5 T5: MEDIUM+ aurabot skill in the continuation loop.
+                        // Drive the executor to produce the preview body + token,
+                        // then suspend through the same chokepoint as the legacy
+                        // write-tool branch below — only the marker payload differs.
+                        SpanContext toolSpan = aiTraceService.startSpan(trace,
+                                llmSpan != null ? llmSpan.getSpanId() : null, "tool", toolName, input);
+                        Map<String, Object> innerResult = chatToolExecutor.execute(
+                                toolName, input, pending.getModelCode());
+                        if (!Boolean.TRUE.equals(innerResult.get("_aurabot_skill_pending"))) {
+                            // LOW skill that slipped past isReadOnly classification —
+                            // treat as a normal executed result and continue the loop.
+                            boolean innerSuccess = Boolean.TRUE.equals(innerResult.get("success"));
+                            aiTraceService.endSpan(toolSpan, innerResult,
+                                    innerSuccess ? "success" : "error");
+                            sink.onToolStart(newToolId, toolName, input);
+                            sink.onToolResult(newToolId, innerResult, innerSuccess);
+                            toolResultBlocks.add(buildToolResultBlock(newToolId, innerResult));
+                            continue;
+                        }
+                        aiTraceService.endSpan(toolSpan, null, "pending");
+                        suspendForAurabotSkill(ctx, pending, sink, messages,
+                                newToolId, toolName, input, innerResult, round);
+                        needsConfirmation = true;
+                        pendingToolId = newToolId;
+                        break;
                     } else {
                         // Another write tool — need confirmation again
                         SpanContext toolSpan = aiTraceService.startSpan(trace,
@@ -682,6 +739,128 @@ public class AuraBotChatService {
         String exhaustedMsg = "Tool loop exceeded maximum rounds";
         sink.onError(exhaustedMsg, tid);
         return new TurnOutcome.Failed(exhaustedMsg, null);
+    }
+
+    // =========================================================================
+    // C-5 T5: AuraBot Skill SPI suspend / resume helpers
+    // =========================================================================
+
+    /**
+     * Resolve the executor result for the {@link #doResumeApprovedInner} first
+     * tool. When the persisted pending entry carries the AuraBot Skill SPI
+     * extension marker, the resume runs through
+     * {@link com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor#confirm}
+     * with the captured preview token; otherwise it falls back to the legacy
+     * {@link ChatToolExecutor#execute} path.
+     */
+    private Map<String, Object> executeResumeTool(ChatSessionStore.PendingTool pending) {
+        Map<String, Object> ext = pending.getExtension();
+        boolean isSkillResume = ext != null && Boolean.TRUE.equals(ext.get("_aurabot_skill"));
+        if (!isSkillResume) {
+            return chatToolExecutor.execute(
+                    pending.getToolName(), pending.getInput(), pending.getModelCode());
+        }
+        if (skillToolExecutor == null) {
+            log.warn("AuraBot skill resume requested but SkillToolExecutor bean is missing; "
+                    + "falling back to ChatToolExecutor.execute (will likely re-emit PREVIEW_PENDING)");
+            return chatToolExecutor.execute(
+                    pending.getToolName(), pending.getInput(), pending.getModelCode());
+        }
+        String previewToken = ext.get("previewToken") instanceof String s ? s : null;
+        try {
+            com.auraboot.framework.aurabot.skill.SkillRequest req =
+                    com.auraboot.framework.aurabot.skill.SkillRequest.builder()
+                            .skillName(pending.getToolName())
+                            .params(objectMapper.valueToTree(
+                                    pending.getInput() != null ? pending.getInput() : Map.of()))
+                            .build();
+            com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor.DispatchOutcome confirmed =
+                    skillToolExecutor.confirm(pending.getToolName(), req, previewToken);
+            com.auraboot.framework.aurabot.skill.SkillResult result = confirmed.result();
+            Map<String, Object> envelope = new LinkedHashMap<>();
+            envelope.put("success", true);
+            envelope.put("data", result == null ? null : result.getPayload());
+            return envelope;
+        } catch (RuntimeException e) {
+            // Surface skill SPI failures as a typed error envelope so the LLM
+            // can recover (or apologise) instead of swallowing the throw —
+            // matches the ChatToolExecutor contract for skill dispatch.
+            log.warn("AuraBot skill confirm failed for {}: {}",
+                    pending.getToolName(), e.getMessage());
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("success", false);
+            err.put("error", e.getMessage() != null ? e.getMessage() : "Skill confirm failed");
+            return err;
+        }
+    }
+
+    /**
+     * Whether the given LLM-facing tool name belongs to the AuraBot Skill SPI.
+     * Checked at suspend-time so the continuation loop can route MEDIUM+ skills
+     * through the marker-aware suspend path even when the resolver classifies
+     * them on the write side.
+     */
+    private boolean isAurabotSkillTool(String toolName) {
+        if (toolName == null || toolName.isBlank()) return false;
+        if (toolName.startsWith(
+                com.auraboot.framework.aurabot.skill.provider.AuraBotSkillToolProvider.PROVIDER_CODE
+                        + ":")) {
+            return true;
+        }
+        return skillToolExecutor != null
+                && !toolName.contains(":")
+                && skillToolExecutor.handlesBareSkillName(toolName);
+    }
+
+    /**
+     * Persist a fresh {@link ChatSessionStore.PendingTool} for an AuraBot skill
+     * preview and emit the {@code confirm_required} SSE event so the FE renders
+     * the preview card. The {@code extension} map carries the marker map so the
+     * subsequent resume calls {@link com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor#confirm}
+     * with the same preview token.
+     */
+    private void suspendForAurabotSkill(TurnContext ctx,
+                                        ChatSessionStore.PendingTool basis,
+                                        ResponseSink sink,
+                                        List<LlmChatRequest.Message> messages,
+                                        String newToolId,
+                                        String toolName,
+                                        Map<String, Object> input,
+                                        Map<String, Object> markerResult,
+                                        int round) {
+        String description = buildToolDescription(toolName, input);
+        sink.onConfirmRequired(newToolId, toolName, description, input, ctx.turnId());
+
+        Map<String, Object> extension = new LinkedHashMap<>();
+        extension.put("_aurabot_skill", true);
+        extension.put("previewToken", markerResult.get("previewToken"));
+        extension.put("preview", markerResult.get("preview"));
+        extension.put("riskLevel", markerResult.get("riskLevel"));
+
+        chatSessionStore.storePending(ctx.turnId(), ChatSessionStore.PendingTool.builder()
+                .turnId(ctx.turnId())
+                .tenantId(ctx.tenantId())
+                .userId(ctx.userId())
+                .humanMemberId(ctx.humanMemberId())
+                .conversationId(ctx.conversationId())
+                .agentCode(basis.getAgentCode())
+                .sessionId(basis.getSessionId())
+                .channelSessionPid(ctx.channelSessionId())
+                .toolId(newToolId)
+                .toolName(toolName)
+                .input(input)
+                .description(description)
+                .modelCode(basis.getModelCode())
+                .messages(serializeMessages(messages))
+                .providerCode(basis.getProviderCode())
+                .apiKey(basis.getApiKey())
+                .baseUrl(basis.getBaseUrl())
+                .model(basis.getModel())
+                .systemPrompt(basis.getSystemPrompt())
+                .maxTokens(basis.getMaxTokens())
+                .currentLoop(basis.getCurrentLoop() + round + 1)
+                .extension(extension)
+                .build());
     }
 
     // =========================================================================
