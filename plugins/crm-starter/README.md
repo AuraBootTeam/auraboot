@@ -1,82 +1,107 @@
-# CRM Starter Plugin
+# CRM Demo Plugin
 
-A minimal 3-model CRM plugin for teaching AuraBoot plugin development. Extracted and simplified from the full CRM plugin.
+> Customer-facing CRM demonstration package for AuraBoot.
 
-## Models
+A polished 6-model CRM showcase intended for **customer demos and sales conversations** —
+not a teaching template. It is a strict subset of the enterprise `crm` plugin; data captured
+in this package upgrades seamlessly to the enterprise version with no migration.
 
-| Model | Code | Description |
-|-------|------|-------------|
-| Account | `crm_account` | Customer company — the graph root. Has code, name, industry, website, phone, address, rating, owner, status. |
-| Contact | `crm_contact` | Person linked to an Account (1:N via REFERENCE field `crm_ct_account_id`). Has name, title, email, phone, mobile, primary flag. |
-| Lead | `crm_lead` | Unqualified sales prospect. Has a 5-state machine: NEW → CONTACTED → QUALIFIED → CONVERTED / LOST. |
+## Positioning
 
-## Relationships
+| Audience | Goal |
+|---|---|
+| **Sales / Pre-sales** | Show a working CRM (kanban, dashboard, state machines) on the OSS edition |
+| **Prospects evaluating AuraBoot** | Try a real CRM workflow before purchasing the enterprise edition |
+| **Existing OSS customers** | Run a usable CRM until they upgrade |
+
+For a minimal teaching template (3-model CRM walkthrough), see
+[`crm-quick-start`](../crm-quick-start) instead.
+
+## Features
+
+### 6 business models
+| Model | Code | Lifecycle |
+|---|---|---|
+| Account | `crm_account` | master, no status lifecycle |
+| Contact | `crm_contact` | master, no status lifecycle |
+| Lead | `crm_lead` | NEW → CONTACTED → QUALIFIED → CONVERTED / LOST |
+| Opportunity | `crm_opportunity` | DISCOVERY → QUALIFICATION → PROPOSAL → NEGOTIATION → CLOSED_WON / CLOSED_LOST |
+| Activity | `crm_activity` | activity log (call / visit / email / meeting / wechat / other) |
+| Campaign | `crm_campaign` | PLANNED → ACTIVE → COMPLETED / CANCELLED |
+
+### Pipeline & insight
+- **Pipeline Board** — kanban grouped by `crm_opp_stage`, sum/count aggregations,
+  drag-to-advance with terminal markers (won/lost)
+- **Lead Board** — kanban grouped by `crm_lead_status`, drag-to-progress
+- **Overview Dashboard** — recent opportunities + recent leads tables
+
+### State machines
+Opportunity advance commands (`qualify` / `advance_opp_to_proposal` /
+`advance_opp_to_negotiation` / `win_opportunity` / `lose_opportunity`) and
+campaign transitions (`activate_campaign` / `complete_campaign` / `cancel_campaign`).
+
+## Difference from `crm-quick-start`
+
+| Aspect | crm-quick-start | crm-starter (this) |
+|---|---|---|
+| Purpose | Teaching template | Customer demo |
+| Models | 3 (account / contact / lead) | 6 (full CRM) |
+| Kanban / dashboard | None | Pipeline Board + Lead Board + dashboard |
+| State machines | Lead 5-state | Lead + Opportunity + Campaign |
+| Upgrade target | None — pure tutorial | Strict subset of enterprise `crm` (data-compatible) |
+
+## Upgrade to Enterprise CRM
+
+This plugin shares the `crm` namespace and a strict subset of the enterprise
+`crm` plugin schema (models / fields / dicts / commands). When the enterprise
+plugin is installed:
+
+1. Enterprise plugin imports with `conflictStrategy: overwrite` and takes over
+   models, fields, dicts, commands, pages, menus.
+2. **All existing data is retained** — table rows are not touched. New optional
+   columns appear with NULL / default values where the enterprise plugin
+   extended the schema (currency, exchange rate, lost reason, virtual JSONB
+   activity status, etc).
+3. Menu codes already align (`crm_*`); permission codes already lowercase
+   (`crm.<resource>.<action>`).
+4. Saved views and dashboards from this demo remain valid — enterprise package
+   adds extra ones alongside.
+
+No SQL migration is required for the upgrade path.
+
+## Screenshots
+
+> _TODO: Pipeline Board kanban screenshot._
+
+## Resource layout
 
 ```
-Account (1) ──── (N) Contact
-    crm_account          crm_ct_account_id → crm_account
+plugins/crm-starter/
+├── plugin.json
+├── README.md
+├── config/
+│   ├── models.json
+│   ├── fields/<model>.json (6)
+│   ├── bindings/<model>.json (6)
+│   ├── commands/<model>.json (6)
+│   ├── pages/crm_<model>_{list,form,detail}.json
+│   ├── dashboards/crm_overview.json
+│   ├── saved-views.json
+│   ├── dicts.json
+│   ├── menus.json
+│   ├── permissions.json
+│   ├── roles.json
+│   └── i18n.json
 ```
 
-Lead is standalone — it represents a prospect before it becomes an Account.
-
-## Plugin Namespace
-
-`crms` (CRM Starter) — distinct from the full CRM plugin namespace `crm` to allow both plugins to coexist.
-
-## Included Resources
-
-| Resource Type | Count | Details |
-|---------------|-------|---------|
-| Models | 3 | crm_account, crm_contact, crm_lead |
-| Dicts | 5 | account_status, account_rating, lead_status, lead_source, contact_role |
-| Commands | 14 | CRUD + state transitions for all 3 models |
-| Pages | 9 | list / form / detail for each model |
-| Menus | 4 | CRMS_ROOT + Accounts / Contacts / Leads |
-| Permissions | 6 | manage + read for each model |
-| Roles | 2 | CRMS_ADMIN, CRMS_SALES |
-
-## Lead State Machine
-
-```
-NEW ──[contact]──> CONTACTED ──[qualify]──> QUALIFIED ──[convert]──> CONVERTED
- │                     │                       │
- └──────────────────[lose]────────────────────>┘
-                                            LOST
-```
-
-State transition commands: `crm:contact_lead`, `crm:qualify_lead`, `crm:convert_lead`, `crm:lose_lead`
-
-## Installation
-
-Import via the plugin import API or AuraBoot CLI:
+## Install
 
 ```bash
-# CLI
-auraboot plugin import ./plugins/crm-starter
-
-# API
-POST /api/plugins/import/import-directory-sync
-Body: { "pluginDir": "plugins/crm-starter" }
+aura plugin import --path plugins/crm-starter
 ```
 
-After import, the plugin auto-publishes all models, fields, commands, and pages. Permissions are granted to `TENANT_ADMIN` via `default-bootstrap.json`.
+## Compatibility
 
-## Key Concepts Demonstrated
-
-1. **Models** (`config/models.json`) — Define entities with metadata like icon, titleField, subtitleField.
-2. **Fields** (`config/fields/`) — Field definitions with data types, constraints, and searchability.
-3. **Bindings** (`config/bindings/`) — Connect fields to models with visibility and edit rules.
-4. **Commands** (`config/commands/`) — CRUD operations and state transitions with `autoSetFields`, `preconditions`, and `permissions`.
-5. **Pages** (`config/pages/`) — DSL-driven list, form, and detail pages with toolbars, tabs, sub-tables.
-6. **Dicts** (`config/dicts.json`) — Static enum definitions with colors for tag rendering.
-7. **Permissions** (`config/permissions.json`) — Fine-grained read/manage permissions per model.
-8. **Menus** (`config/menus.json`) — Sidebar navigation entries with permission guards.
-9. **i18n** (`config/i18n.json`) — Full zh-CN + en-US translations for all labels.
-10. **Bootstrap** (`config/default-bootstrap.json`) — Grant permissions to platform roles on install.
-
-## Learning Next Steps
-
-- Add a 4th model (e.g., `crm_opportunity`) referencing `crm_account` and see how REFERENCE fields work.
-- Add a sub-table to account detail showing associated leads.
-- Create a NamedQuery for cross-model aggregation.
-- Extend with an L2 industry plugin that adds PCBA-specific fields to the account model.
+- Platform: AuraBoot ≥ 1.0.0
+- Conflicts: namespaced as `crm`; will be cleanly overwritten by the enterprise
+  `crm` plugin when installed.
