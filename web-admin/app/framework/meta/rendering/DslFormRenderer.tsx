@@ -26,6 +26,7 @@ import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { ErrorAlert } from '~/ui/ErrorAlert';
 import type { UseDslFormReturn } from '~/framework/meta/hooks/useDslForm';
 import { useAuraBotSafe } from '~/plugins/core-aurabot/hooks/useAuraBotSafe';
+import { DslFormFillProvider } from './DslFormFillContext';
 
 // Ensure built-in profiles are registered before resolution
 import '~/framework/meta/profiles/admin';
@@ -166,11 +167,13 @@ export function DslFormRenderer({
   // --- 7. Render ---
   return (
     <ProfileProvider value={profile}>
-      <div className={className} data-testid="dsl-form-renderer">
-        <Suspense fallback={suspenseFallback}>
-          <PageContent {...rendererProps} />
-        </Suspense>
-      </div>
+      <DslFormFillProvider setFieldValue={form.setFieldValue}>
+        <div className={className} data-testid="dsl-form-renderer">
+          <Suspense fallback={suspenseFallback}>
+            <PageContent {...rendererProps} />
+          </Suspense>
+        </div>
+      </DslFormFillProvider>
     </ProfileProvider>
   );
 }

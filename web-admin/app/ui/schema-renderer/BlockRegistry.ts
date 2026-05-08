@@ -76,6 +76,12 @@ export function initBlockRegistry(): void {
   BlockRegistry.register('form-wizard', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/FormWizardBlockRenderer'), 'FormWizardBlockRenderer'),
   });
+  // P1' vertical-slice ai-fill banner. To be replaced in P2' by a generic
+  // schema-driven AI fill widget that derives endpoint + field schema from
+  // the surrounding form's modelCode.
+  BlockRegistry.register('ai-fill-banner', {
+    component: lazy(() => import('~/framework/meta/rendering/blocks/AiFillBannerBlockRenderer'), 'AiFillBannerBlockRenderer'),
+  });
 
   // Detail / display blocks
   BlockRegistry.register('description', {
