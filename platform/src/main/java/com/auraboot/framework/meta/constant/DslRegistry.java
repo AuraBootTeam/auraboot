@@ -149,7 +149,8 @@ public final class DslRegistry {
         UUID("uuid", "Generated UUID", "1.0"),
         SEQUENCE("sequence", "Auto-increment sequence", "1.0"),
         EXPRESSION("expression", "SpEL expression", "1.0"),
-        FIXED_VALUE("fixed_value", "Fixed constant", "1.0"),
+        FIXED_VALUE("fixed_value", "Fixed constant (always overrides payload)", "1.0"),
+        DEFAULT_VALUE("default_value", "Default constant (only when payload omits field)", "1.3"),
         AUTO_GENERATE("auto_generate", "Auto-generated value", "1.0"),
         COPY_FIELD("copy_field", "Copy from another field", "1.0"),
         FIELD_MAP("field_map", "Map from source field", "1.0");
