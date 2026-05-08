@@ -17,6 +17,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { ToolResultCard } from './ToolResultCard';
 import { ChatBiResultCard } from './ChatBiResultCard';
 import { ConfirmCard } from './ConfirmCard';
+import { SkillPreviewCard } from '../components-shell/SkillPreviewCard';
 import { ModelSuggestionCard } from './ModelSuggestionCard';
 import { ResultContractView } from './ResultContractView';
 import { ThinkingBlock } from './ThinkingBlock';
@@ -186,6 +187,23 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
         toolName={message.toolName || 'unknown'}
         result={message.toolResult || {}}
         success={true}
+      />
+    );
+  }
+
+  // C-5 T7: skill confirmation — risk-tier card with preview JSON.
+  if (message.type === 'skill_preview_card' && message.toolId) {
+    return (
+      <SkillPreviewCard
+        turnId={message.pendingTurnId || ''}
+        toolId={message.toolId}
+        skillName={message.skillName || message.toolName || 'unknown'}
+        preview={message.skillPreview || {}}
+        previewToken={message.previewToken || ''}
+        riskLevel={message.riskLevel || 'MEDIUM'}
+        onConfirm={onConfirm || (() => {})}
+        onCancel={onCancel || (() => {})}
+        disabled={isLoading}
       />
     );
   }

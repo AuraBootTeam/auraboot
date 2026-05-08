@@ -38,6 +38,13 @@ interface SimpleMessage {
     | 'tool_result'
     | 'result_contract'
     | 'confirm_card'
+    /**
+     * C-5 T7: skill confirmation card. Backend marks the {@code PendingTool}
+     * with {@code extension._aurabot_skill === true} so the chat panel can
+     * render the skill-specific preview UI (risk badge, preview JSON,
+     * critical-tier text gate) instead of the generic {@code ConfirmCard}.
+     */
+    | 'skill_preview_card'
     | 'tool_executed'
     | 'tool_cancelled'
     /**
@@ -61,6 +68,16 @@ interface SimpleMessage {
    * payload and stores it on the corresponding tool message.
    */
   pendingTurnId?: string;
+  /**
+   * C-5 T7: skill confirmation metadata. Populated only when
+   * {@code type === 'skill_preview_card'}. The chat panel surfaces the
+   * preview JSON, risk-tier badge, and (for CRITICAL skills) the
+   * confirm-text gate keyed off {@code skillName}.
+   */
+  skillName?: string;
+  skillPreview?: Record<string, any>;
+  previewToken?: string;
+  riskLevel?: string;
   /**
    * Anthropic thinking-block fields. Populated only when {@code type === 'thinking'}.
    * {@code thinkingTokens} is the precise count from the SSE event; falls back to a
@@ -832,7 +849,42 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               description: string,
               input: Record<string, any>,
               pendingTurnId: string,
+              extension?: Record<string, any>,
             ) => {
+              // C-5 T7: detect skill confirmations and route to
+              // SkillPreviewCard instead of generic ConfirmCard. Backend
+              // sets extension._aurabot_skill=true; we treat a colon in the
+              // toolName as a backup heuristic (skills register as
+              // {plugin}:{skill}).
+              const isSkill =
+                extension?._aurabot_skill === true ||
+                (typeof toolName === 'string' && toolName.includes(':'));
+              if (isSkill) {
+                dispatch({
+                  type: 'add_tool_message',
+                  payload: {
+                    id: `skill-${toolId}`,
+                    type: 'skill_preview_card',
+                    sender: 'system',
+                    timestamp: Date.now(),
+                    content: description,
+                    toolId,
+                    toolName,
+                    toolInput: input,
+                    pendingTurnId,
+                    skillName:
+                      (extension?.skillName as string | undefined) ?? toolName,
+                    skillPreview:
+                      (extension?.preview as Record<string, any> | undefined) ?? {},
+                    previewToken:
+                      (extension?.previewToken as string | undefined) ?? '',
+                    riskLevel:
+                      (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
+                  },
+                });
+                dispatch({ type: 'set_loading', payload: false });
+                return;
+              }
               // Phase B.6: capture pendingTurnId on the confirm card so
               // confirmTool / cancelTool can echo it back to /execute.
               dispatch({
@@ -897,8 +949,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       // Phase B.6: pendingTurnId was stored on the confirm_card message when
       // the SSE confirm_required event arrived. Look it up by toolId so the
       // /execute call can target the correct suspended turn.
+      // C-5 T7: skill_preview_card carries the same pendingTurnId field.
       const confirmCard = state.messages.find(
-        (m) => m.type === 'confirm_card' && m.toolId === toolId,
+        (m) =>
+          (m.type === 'confirm_card' || m.type === 'skill_preview_card') &&
+          m.toolId === toolId,
       );
       const pendingTurnId = confirmCard?.pendingTurnId ?? '';
       if (!pendingTurnId) {
@@ -953,7 +1008,38 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               desc: string,
               input: Record<string, any>,
               pendingTurnId: string,
+              extension?: Record<string, any>,
             ) => {
+              // C-5 T7: route skill confirmations to SkillPreviewCard.
+              const isSkill =
+                extension?._aurabot_skill === true ||
+                (typeof tname === 'string' && tname.includes(':'));
+              if (isSkill) {
+                dispatch({
+                  type: 'add_tool_message',
+                  payload: {
+                    id: `skill-${tid}`,
+                    type: 'skill_preview_card',
+                    sender: 'system',
+                    timestamp: Date.now(),
+                    content: desc,
+                    toolId: tid,
+                    toolName: tname,
+                    toolInput: input,
+                    pendingTurnId,
+                    skillName:
+                      (extension?.skillName as string | undefined) ?? tname,
+                    skillPreview:
+                      (extension?.preview as Record<string, any> | undefined) ?? {},
+                    previewToken:
+                      (extension?.previewToken as string | undefined) ?? '',
+                    riskLevel:
+                      (extension?.riskLevel as string | undefined) ?? 'MEDIUM',
+                  },
+                });
+                dispatch({ type: 'set_loading', payload: false });
+                return;
+              }
               dispatch({
                 type: 'add_tool_message',
                 payload: {
@@ -1015,8 +1101,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
         payload: { toolId, updates: { type: 'tool_cancelled', content: '操作已取消' } },
       });
       // Phase B.6: same pendingTurnId lookup pattern as confirmTool.
+      // C-5 T7: include skill_preview_card so skill cancels echo back too.
       const confirmCard = state.messages.find(
-        (m) => m.type === 'confirm_card' && m.toolId === toolId,
+        (m) =>
+          (m.type === 'confirm_card' || m.type === 'skill_preview_card') &&
+          m.toolId === toolId,
       );
       const pendingTurnId = confirmCard?.pendingTurnId ?? '';
       if (!pendingTurnId) {
