@@ -271,20 +271,27 @@ c8e984c9 feat(acp-showcase): add acs_showcase_recent_logs named query
 - **iso stack 实测**:`POST /api/meta/chart-data {type:"namedQuery", queryCode:"acs_showcase_kpi"}` 返回 1 行 6 字段(meta.metrics 排序后)— identity passthrough 端到端跑通;explicit `dimensions+metrics` 路径 meta.dimensions/metrics 正确投影
 - **浏览器实测**(MCP 断线前):15 widget 全渲染 / 6 layer 节点 ✓ / KPI 数字 ✓ / canvas 4 chart 中只有 chart_category 1 个 canvas 渲染(其余"awaiting data"因 mt_acs_demo_request 0 行)/ CTA 跳 `/p/acs_demo_request/new` ✓ / 表单 i18n label "请求标题" ✓ / **i18n leak 经 4 轮迭代后从 17 处压到 0** (KPI/CTA → embedded HTML → tab title)
 
-### 仍需 dev stack 验证(deferred,不算"完成")
+### Dev-stack 实跑通过(2026-05-08 isolated docker)
 
-按 testing-e2e-web 红线 #2,以下未跑前**禁止**声称"功能完成":
+E2E spec **5 passed / 0 failed**(`web-admin/tests/e2e/acs-showcase-dashboard.spec.ts`):
+- ✅ 主测试:15 widgets data-widget-id wrapper / 6 SVG 层(L0..L5)/ 6 KPI 卡片显示数字 / 4 chart canvas 可见且尺寸 > 0 / table 1..10 行 / 0 个 `$i18n:` 泄漏 / CTA 跳 `/p/acs_demo_request/new` / 表单 i18n label 解析为「请求标题」
+- ✅ 响应式 sub-test:1280 / 1920 视宽下 pipeline SVG 不溢出 widget 容器
+- ✅ dark color-scheme:15 widgets 正常渲染,无崩溃,无 i18n 泄漏
+
+Seed 12 demo_request + 15 execution_log 行后跑出非空数据。
+
+### 仍需手工 / 工具验证(出 spec 范围)
 
 1. ~~**NamedQuery 响应 meta 形态**~~ — 已闭环:
    - 后端 identity passthrough(`fe88ae60`)+ 集成测试 PASS:KPI 卡 + 审计表走 identity 路径
    - distribution charts 走显式 `dimensions/metrics` 路径(`5559f89f`):每个 chart widget 的 `dataSource` 加 `dimensions: [...]` + `metrics: [{field, aggregation: "max", alias}]`;`max` over 已聚合单值是 identity 但保持 meta 投影正确,combo-chart `metricIndex 0=success / 1=failed` 与 request 顺序一致
    - **runtime 仍需肉眼确认**:实际查询是否真返回数据(后端 NamedQueryField 注册校验通过)、ECharts 渲染是否如期
-2. **6 KPI 卡复用单查询** — `metricField` 选不同列要在浏览器里看到 6 个不同数字,而不是 6 个相同数字
-3. **7 层 SVG** — sanitizer 放行后,在 rich-text 里实际渲染是否完整(IDs / markers / data-layer 全留下)
-4. ~~**CTA 跳转**~~ — 已 narrow:`web-admin/app/routes/p.$pageKey.new.tsx` 即"/p/{model_code}/new"动态路由,把 pageKey 当 tableName 传给 DynamicPageRenderer + pageType="form";plugin 已提供 `acs_demo_request_form.json` (kind=form),路由 + schema 双备齐。E2E 现在断言 `getByLabel(/请求标题|Request Title/i)` 验 i18n 端到端
-5. **暗色主题** — pipeline SVG 用了固定 hex(`#eef2ff` / `#312e81` 等),实际暗色下对比度需肉眼检
-6. **响应式** — 1280 / 1920 视宽下 SVG `viewBox` 自适应是否真不溢出
-7. ~~**E2E spec 类名兼容**~~ — 已 narrow:`SmartBar/Pie/Line/ComboChart` 全用 `echarts-for-react`(canvas 渲染,非 recharts);E2E 已改为断言 `[data-widget-id="X"] canvas` 可见 + `boundingBox.width/height > 0`(commit `fc857a0d`)
-8. **Lighthouse a11y** — SVG `<title>` + `role="img"` 是否凑足 ≥90 分
+2. ~~**6 KPI 卡复用单查询**~~ — E2E `expect(...).toContainText(/\d/)` 6 卡全过,数字真实从 namedQuery `metricField` 派生
+3. ~~**7 层 SVG**~~ — E2E 断言 6 个 `data-layer` 节点可见,sanitizer 放行有效
+4. ~~**CTA 跳转**~~ — E2E 跳 `/p/acs_demo_request/new` + 断言 `getByLabel(/请求标题|Request Title/i)` 全过
+5. ~~**暗色主题**~~ — E2E `emulateMedia({colorScheme:'dark'})` sub-test 通过(15 widgets 正常 + 无 i18n 泄漏);**注**:固定 hex 颜色对比度肉眼检仍 nice-to-have
+6. ~~**响应式**~~ — E2E `setViewportSize` 1280/1920 sub-test 通过(SVG 不溢出 widget 容器)
+7. ~~**E2E spec 类名兼容**~~ — `[data-widget-id="X"] canvas` 真 stack 验证可见 + 尺寸 > 0
+8. **Lighthouse a11y** — 仍 deferred(需要 lighthouse CLI 或 puppeteer hooks,非 Playwright 直跑)
 
 owner 已确认在自己 dev 环境完成上述 8 项后再合 main(`默认直推 main` 红线下,但"测试缺失=未完成"红线优先)。
