@@ -75,7 +75,7 @@ async function navigateViaSidebar(page: Page): Promise<void> {
   await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
   await aiCenter.evaluate((el: HTMLElement) => el.click());
 
-  const leaf = nav.getByRole('link', { name: /记忆提案|Memory Promotions?/ });
+  const leaf = nav.getByRole('link', { name: /记忆晋升|Memory Promotions?/ });
   await leaf.waitFor({ state: 'visible', timeout: 5_000 });
   await leaf.evaluate((el: HTMLElement) => el.click());
 
