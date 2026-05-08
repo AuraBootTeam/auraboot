@@ -397,7 +397,7 @@
     "component": null,
     "icon": null,
     "type": 1,
-    "permissionCode": "acp_agent_approval",
+    "permissionCode": "acp.agent.approval",
     "orderNo": 1,
     "visible": false,
     "_deprecated": "PROMOTED — Promoted to AI Center top-level nav as a primary surface. No longer in sidebar group. DSL page still accessible at /p/agent-approval.",
