@@ -5,7 +5,7 @@
  * Displays aggregated data in a clean tabular format with sorting and pagination.
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type {
   ChartDataSource,
@@ -13,11 +13,56 @@ import type {
   LinkageConfig,
   FilterConfig,
 } from '~/framework/smart/types/chart';
+import { fetchResult } from '~/shared/services/http-client';
+import { ResultHelper } from '~/utils/type';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import type { LocalizedText } from '~/framework/meta/schemas/types';
 import { cn } from '~/utils/cn';
+
+/**
+ * Per-column override delivered via `widget.config.table.columns`. Lets the
+ * dashboard JSON name each column in `LocalizedText` form (or via `$i18n:`)
+ * so headers respect the active locale instead of leaking raw field codes.
+ */
+export interface SmartTableChartColumn {
+  /** Field code in the row data. */
+  field: string;
+  /** Optional explicit header label. Falls back to i18n / fieldCode. */
+  label?: string | LocalizedText;
+  /** Reserved for future use (column width). */
+  width?: number;
+  /** Reserved for future use (cell renderer hint). */
+  renderType?: string;
+  /** Reserved for future use (dict-driven tag rendering). */
+  dictCode?: string;
+  /** Optional per-column align: 'left' | 'right' | 'center'. */
+  align?: 'left' | 'right' | 'center';
+}
 
 export interface SmartTableChartProps {
   title?: string;
-  dataSource: ChartDataSource;
+  /**
+   * Optional. Standard chart datasource (aggregate/namedQuery/static). When
+   * omitted, the component falls back to `modelCode` + `table.columns` for the
+   * "list latest N rows of a model" dashboard pattern.
+   */
+  dataSource?: ChartDataSource;
+  /**
+   * Optional shorthand: render the latest rows of a model. When provided
+   * without an explicit dataSource, the component fetches from
+   * `/api/dynamic/{modelCode}/list` so dashboards can show recent records
+   * without authoring a full aggregate query.
+   */
+  modelCode?: string;
+  /**
+   * Optional widget-level table config. `columns[]` controls header labels
+   * and order; when omitted, behaviour falls back to the legacy data-derived
+   * column inference.
+   */
+  table?: {
+    columns?: SmartTableChartColumn[];
+  };
   /** Page size for pagination */
   pageSize?: number;
   /** Show pagination controls */
@@ -36,16 +81,27 @@ export interface SmartTableChartProps {
   style?: React.CSSProperties;
 }
 
-function isDataSourceConfigured(ds: ChartDataSource): boolean {
-  if (!ds) return false;
-  if (ds.type === 'aggregate') return !!(ds.modelCode && ds.metrics?.length);
-  if (ds.type === 'namedQuery') return !!ds.queryCode;
-  return ds.type === 'static';
+function isDataSourceConfigured(
+  ds: ChartDataSource | undefined,
+  modelCode: string | undefined,
+  tableColumns: SmartTableChartColumn[] | undefined,
+): boolean {
+  if (ds) {
+    if (ds.type === 'aggregate') return !!(ds.modelCode && ds.metrics?.length);
+    if (ds.type === 'namedQuery') return !!ds.queryCode;
+    if (ds.type === 'static') return true;
+  }
+  // Model-driven shorthand: modelCode + table.columns is enough to render a
+  // "recent rows" table without an aggregate dataSource being authored.
+  if (modelCode && tableColumns && tableColumns.length > 0) return true;
+  return false;
 }
 
 export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   title,
   dataSource,
+  modelCode,
+  table,
   pageSize = 10,
   showPagination = true,
   sortable = true,
@@ -59,25 +115,111 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   className,
   style,
 }) => {
-  const isConfigured = isDataSourceConfigured(dataSource);
+  const { locale } = useI18n();
+  const tableColumns = table?.columns;
+  const isConfigured = isDataSourceConfigured(dataSource, modelCode, tableColumns);
 
-  const { data, loading, error } = useChartData({
-    dataSource,
+  // Standard chart datasource branch (aggregate / namedQuery / static).
+  const useChartBranch = !!dataSource;
+  const {
+    data: chartData,
+    loading: chartLoading,
+    error: chartError,
+  } = useChartData({
+    dataSource: dataSource ?? ({ type: 'static', staticData: [] } as ChartDataSource),
     linkageFilters: linkage?.receiveFilter ? linkageFilters : undefined,
     refreshInterval,
-    enabled: isConfigured,
+    enabled: useChartBranch && isConfigured,
   });
+
+  // Model-table fallback branch: dashboards that author `modelCode +
+  // table.columns` without a full dataSource. We pull the latest rows from
+  // the dynamic list API and synthesise a chart-data-shaped payload so the
+  // rest of the component can stay agnostic.
+  const [modelRows, setModelRows] = useState<Record<string, unknown>[]>([]);
+  const [modelLoading, setModelLoading] = useState(false);
+  const [modelError, setModelError] = useState<Error | null>(null);
+  const useModelBranch = !useChartBranch && !!modelCode && !!tableColumns?.length;
+
+  useEffect(() => {
+    if (!useModelBranch || !modelCode) return;
+    let cancelled = false;
+    setModelLoading(true);
+    setModelError(null);
+    const params: Record<string, string> = {
+      pageNum: '1',
+      pageSize: String(pageSize * 5), // headroom for sort/pagination on client
+    };
+    fetchResult<{ records?: Record<string, unknown>[] }>(
+      `/api/dynamic/${modelCode}/list`,
+      { method: 'get', params },
+    )
+      .then((result) => {
+        if (cancelled) return;
+        if (ResultHelper.isSuccess(result) && result.data?.records) {
+          setModelRows(result.data.records);
+        } else {
+          setModelRows([]);
+        }
+        setModelLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setModelError(err instanceof Error ? err : new Error(String(err)));
+        setModelRows([]);
+        setModelLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [useModelBranch, modelCode, pageSize]);
+
+  const data = useChartBranch
+    ? chartData
+    : useModelBranch
+      ? {
+          rows: modelRows,
+          summary: {},
+          meta: {
+            dimensions: tableColumns?.map((c) => c.field) ?? [],
+            metrics: [] as string[],
+          },
+        }
+      : null;
+  const loading = useChartBranch ? chartLoading : modelLoading;
+  const error = useChartBranch ? chartError : modelError;
 
   const [currentPage, setCurrentPage] = useState(0);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  const columns = useMemo(() => {
+  /**
+   * Resolved column descriptors. Priority:
+   *   1. `table.columns[]` from widget config (controls order + label + meta)
+   *   2. `data.meta.{dimensions,metrics}` from chart datasource
+   *   3. Keys from the first row (pure fallback)
+   *
+   * Each entry carries the field code plus a pre-resolved header label so the
+   * `<th>` render path can stay declarative.
+   */
+  const columns = useMemo<{ field: string; label: string; align?: 'left' | 'right' | 'center' }[]>(() => {
+    if (tableColumns && tableColumns.length > 0) {
+      return tableColumns.map((col) => {
+        const resolvedLabel = col.label
+          ? getLocalizedText(col.label, locale)
+          : col.field;
+        return {
+          field: col.field,
+          label: resolvedLabel || col.field,
+          align: col.align,
+        };
+      });
+    }
     if (!data?.rows?.length) return [];
     const allKeys = [...(data.meta?.dimensions || []), ...(data.meta?.metrics || [])];
-    if (allKeys.length > 0) return allKeys;
-    return Object.keys(data.rows[0]);
-  }, [data]);
+    const keys = allKeys.length > 0 ? allKeys : Object.keys(data.rows[0]);
+    return keys.map((k) => ({ field: k, label: k }));
+  }, [data, tableColumns, locale]);
 
   const sortedRows = useMemo(() => {
     if (!data?.rows) return [];
@@ -201,16 +343,19 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
             <tr>
               {columns.map((col) => (
                 <th
-                  key={col}
-                  onClick={() => handleSort(col)}
+                  key={col.field}
+                  onClick={() => handleSort(col.field)}
                   className={cn(
-                    'px-4 py-2.5 text-left text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase',
+                    'px-4 py-2.5 text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase',
+                    col.align === 'right' && 'text-right',
+                    col.align === 'center' && 'text-center',
+                    (!col.align || col.align === 'left') && 'text-left',
                     sortable && 'cursor-pointer select-none hover:bg-gray-100',
                   )}
                 >
                   <span className="inline-flex items-center gap-1">
-                    {col}
-                    {sortKey === col && (
+                    {col.label}
+                    {sortKey === col.field && (
                       <span className="text-blue-500">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </span>
@@ -229,8 +374,15 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
                 )}
               >
                 {columns.map((col) => (
-                  <td key={col} className="px-4 py-2.5 whitespace-nowrap text-gray-700">
-                    {formatCellValue(row[col])}
+                  <td
+                    key={col.field}
+                    className={cn(
+                      'px-4 py-2.5 whitespace-nowrap text-gray-700',
+                      col.align === 'right' && 'text-right',
+                      col.align === 'center' && 'text-center',
+                    )}
+                  >
+                    {formatCellValue(row[col.field])}
                   </td>
                 ))}
               </tr>
