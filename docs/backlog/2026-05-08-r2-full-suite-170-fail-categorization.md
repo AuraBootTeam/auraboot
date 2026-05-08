@@ -1,9 +1,14 @@
-# r2 Full Suite — 170 Fail Categorization
+# r2 Full Suite — Fail Categorization (refreshed)
 
-**Date:** 2026-05-08
+**Date:** 2026-05-08 (refreshed after 85b43994 BACKEND_URL auto-derive)
 **Branch:** `fix/oss-suite-r2`
-**Run log:** `/tmp/r2-full3-*.log` (16.4 m, 4 workers, 2c/2g frontend)
-**Tally:** 1664 tests → 1123 passed / 170 failed / 82 skipped / 289 did-not-run
+**Latest run log:** `/tmp/r2-full4-*.log` (15.2 m, 4 workers, 2c/2g frontend)
+**Latest tally:** 1664 tests → **1250 passed / 69 failed** / 82 skipped / 263 did-not-run
+
+**Earlier runs preserved for trend visibility:**
+- `/tmp/r2-full3-*.log` 16.4 m → 1123 passed / 170 failed (post 2c/2g frontend)
+- `/tmp/r2-full2-*.log` 25.3 m → 1005 passed / 221 failed (post psql fix, 1c/1g)
+- `/tmp/r2-full-*.log` 19.8 m → 1154 passed / 128 failed (host-DB false-positives masking)
 
 ## Why this list exists
 
@@ -21,51 +26,54 @@ After both fixes (compose limits → 2c/2g, helpers env-aware via
 - `commit 7b6e94dd`: full-suite drops to 170 fail / 16.4 m
 - The 170 are **honest failures the host runs were hiding**
 
-## Per-cluster table
+## Per-cluster table (current state — 69 fail)
 
-| # | Cluster | Count | Error signature | Likely root | Disposition |
+| # | Cluster | Latest | Earlier | Status | Disposition |
 |---|---|---|---|---|---|
-| C1 | `saved-view/*` | 40 | `expect(received).toBeTruthy()` (assertion, not timeout) | Conditional Format / Form View / Formula functions / Kanban grouping / Lookup field — features the spec asserts on may not be implemented yet (or partially) | product-gap audit |
-| C2 | `showcase/*` | 39 | `page.waitForResponse Timeout 10000ms` | Resource / timing — even at 2c/2g frontend, deep showcase specs (page-creation-dispatch, runtime-rendering, widgets-misc) still sometimes hit waitForResponse 10s walls | timeout audit + maybe single-worker for these specs |
-| C3 | `bpm-designer/*` | 20 | `GET /api/bpm/process-definitions/{pid} → 401` | Auth/tenant scope — JWT is fine for most endpoints but BPM seems to require a tenant scope context that the spec setup doesn't establish | scope: read AdminRoleInterceptor + BPM controller, fix tenant context |
-| C4 | `notification/*` | 10 | `expect(...).toBe(...)` (assertion) | Product gap — notification feature spec expects values not produced | product audit |
-| C5 | `aurabot/*` | 9 | mixed | Some need LLM key (e.g. ai-result-contract), some are state-after-action assertions | classify per spec |
-| C6 | `workflow-demo/*` | 8 | `domain role "wd_manager" not found` | Missing seed — workflow-demo plugin needs `wd_manager` role provisioned, not done by current setup | extend setup spec or workflow-demo plugin to self-seed |
-| C7 | `bpm/*` | 6 | mixed | Likely overlaps C3 (tenant context); some BPMN designer interaction flakes | bundle with C3 |
-| C8 | `organization/*` | 4 | mixed | Team management / employee creation under r2 fresh DB | likely seed gap |
-| C9 | `model/*` | 4 | mixed | Model CRUD on r2 — could be permission or seed | sample needed |
-| C10 | `auth/*` | 4 | mixed | LN-002 / OTP-003 / LO-001 etc. — same as host residual | already in earlier flake backlog |
-| C11 | `admin/*` | 4 | mixed | dict-management / env-layering / etc. — partial overlap with earlier 11-fail residual | dedupe with earlier backlog |
-| C12 | `permission/*` | 3 | mixed | Permission depth tests — likely missing role bindings | sample needed |
-| C13 | `command/*` | 3 | mixed | Command execution tests | sample needed |
-| C14 | `query-builder/*` | 2 | known QB-07/QB-08 from smoke residual | already in flake backlog | dedupe |
-| C15 | `agent-control-plane/*` | 2 | mixed | ACP smoke interaction | sample |
-| C16 | misc | 5 | mixed | plugin-lifecycle / platform / header / dashboard / cross-field-validation — one each | individual triage |
+| C1 | `saved-view/*` | **4** | 40 | 🟢 36 fixed by 2c/2g frontend bump (timeouts) — residual 4 are likely product gap | P1 audit (CF/FV/FF/KG/LF backend endpoints) |
+| C2 | `showcase/*` | **1** | 39 | 🟢 38 fixed by 2c/2g frontend bump | P3 (1 residual is timing flake) |
+| C3 | `bpm-designer/*` | **0** | 20 | ✅ done — `85b43994` BACKEND_URL auto-derive | — |
+| C4 | `notification/*` | **10** | 10 | unchanged — assertion errors, real product gap | **P0-2 next** |
+| C5 | `aurabot/*` | **9** | 9 | unchanged — partial LLM key requirement | **P0-3 next** |
+| C6 | `workflow-demo/*` | **2** | 8 | 🟢 6 fixed by `85b43994` (`wd-fixtures.ts` was in the 11) | P3 (2 residual flakes) |
+| C7 | `bpm/*` | **3** | 6 | 🟢 partial fixed by C3 sibling | P3 |
+| C8 | `organization/*` | **5** | 4 | similar (slight increase due to honest baseline) | P2 audit |
+| C9 | `model/*` | **3** | 4 | 1 fixed | P3 |
+| C10 | `auth/*` | **6** | 4 | similar | dedupe with smoke flake backlog |
+| C11 | `admin/*` | **4** | 4 | unchanged — overlaps with 11-fail smoke residual | dedupe |
+| C12 | `permission/*` | **3** | 3 | unchanged | P3 |
+| C13 | `command/*` | **3** | 3 | unchanged | P3 |
+| C14 | `query-builder/*` | **2** | 2 | unchanged | dedupe |
+| C15 | `agent-control-plane/*` | **1** | 2 | 1 fixed | P3 |
+| C16 | misc | **13** | 5 | (cross-field-validation 6 + dashboard / inbox / search / named-query / platform / automation 2 / workflow-demo 2 fragments) — earlier triage missed some | **P0-? scan** |
 
-## Recommended attack order (next session)
+**Net improvement: 170 → 69 (-101 fails) via 2 fixes (`7b6e94dd` 2c/2g frontend, `85b43994` BACKEND_URL).**
 
-1. **C1 (saved-view, 40)** — biggest cluster, all assertion errors → grep
-   for whether the asserted features (CF rules / FV metadata / FF
-   functions count) actually have backend endpoints. If they don't,
-   these specs document a roadmap, not bugs to fix today; classify as
-   "feature-not-shipped" and exclude from OSS scope OR file P2 issues.
+## Recommended attack order (refreshed)
 
-2. **C3 (bpm-designer 401, 20)** — single error pattern, likely one
-   tenant-context fix unblocks all 20. Read `BpmProcessController` +
-   how spec sets cookie/JWT.
+After 85b43994 the picture changed — biggest residual clusters are now
+notification (10) and aurabot (9), not saved-view. New plan:
 
-3. **C6 (workflow-demo, 8)** — single seed gap (`wd_manager` role).
-   Add to setup spec or workflow-demo plugin's bootstrap. Probably a
-   30-min fix.
+1. **C4 (notification, 10)** — assertion errors, product gap. Sample 1
+   spec, look at backend; classify shipped vs not-shipped.
 
-4. **C2 (showcase 39 timeouts)** — likely just need `--workers=2` for
-   showcase project OR per-spec timeout bump. Cheap fix.
+2. **C5 (aurabot, 9)** — mixed; some likely need ANTHROPIC_API_KEY.
+   Tag `@requires-llm-runtime`, exclude from r2 default scope when key
+   absent.
 
-5. **C4 (notification, 10)** — assertion-style gaps, similar shape to
-   saved-view. Audit endpoints.
+3. **C1 (saved-view residual, 4)** — likely product gap (CF rules / FV
+   metadata / FF functions / KG grouping / LF lookup). grep backend
+   endpoints; add to oss-scope.json#test_excludes if not shipped.
 
-6. **C10/C11/C14 dedupe** — these overlap with the earlier
-   `2026-05-08-oss-suite-contention-flakes.md` backlog. Merge entries.
+4. **C16 misc (13)** — covers cross-field-validation (6 cases),
+   dashboard / inbox / search / named-query / platform / automation (2)
+   / workflow-demo (2 residual). Mostly individual triage.
+
+5. **C8 organization (5)** — likely seed gap or i18n; sample.
+
+6. **C10/C11/C14 dedupe** — overlap with earlier
+   `2026-05-08-oss-suite-contention-flakes.md` backlog. Merge entries
+   so we don't double-track.
 
 ## Out of scope for "fix in this branch"
 
