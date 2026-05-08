@@ -10,8 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
+import { BASE_URL } from '../../helpers/playwright-env';
 
 function uniqueCode(prefix = 'e2e_role') {
   return `${prefix}_${Date.now()}`;

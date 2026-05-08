@@ -16,8 +16,8 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { BASE_URL } from '../../helpers/playwright-env';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
 const BACKEND_URL = 'http://127.0.0.1:6443';
 
 test.describe('Member Invite Flow', () => {
