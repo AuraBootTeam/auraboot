@@ -194,10 +194,11 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                         
                         member.setExtensions(objectMapper.writeValueAsString(extensionsNode));
                     } catch (Exception e) {
-                        // §P2 best-effort: failure to persist the rejection reason
-                        // into the extensions JSON must not block the primary
-                        // rejection workflow — the member is still rejected.
-                        log.warn("存储拒绝原因到extensions字段失败: {}", e.getMessage(), e);
+                        // Fail the whole transaction so member status and rejection
+                        // reason stay consistent. Silent best-effort would leave the
+                        // member as REJECTED while losing the audit-critical reason.
+                        log.error("Failed to persist rejection reason to extensions JSON for memberPid={}", memberPid, e);
+                        throw new BusinessException(ResponseCode.SystemError, "Failed to persist rejection reason");
                     }
                 }
                 
