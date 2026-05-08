@@ -104,42 +104,16 @@ test.describe('ACP Showcase Dashboard', () => {
       ).toBeVisible({ timeout: 10_000 });
     }
 
-    // --- 4. Charts: each has at least one rendered data shape (recharts class names)
-    await expect(
-      page
-        .locator(
-          '[data-widget-id="chart_status"] .recharts-bar-rectangle, [data-widget-id="chart_status"] .recharts-rectangle',
-        )
-        .first(),
-      'chart_status should render at least one bar',
-    ).toBeVisible({ timeout: 15_000 });
-
-    await expect(
-      page
-        .locator(
-          '[data-widget-id="chart_risk"] .recharts-pie-sector, [data-widget-id="chart_risk"] .recharts-sector',
-        )
-        .first(),
-      'chart_risk should render at least one pie sector',
-    ).toBeVisible({ timeout: 15_000 });
-
-    await expect(
-      page
-        .locator(
-          '[data-widget-id="chart_category"] .recharts-bar-rectangle, [data-widget-id="chart_category"] .recharts-rectangle',
-        )
-        .first(),
-      'chart_category should render at least one bar',
-    ).toBeVisible({ timeout: 15_000 });
-
-    await expect(
-      page
-        .locator(
-          '[data-widget-id="chart_safety_trend"] .recharts-line-curve, [data-widget-id="chart_safety_trend"] path.recharts-curve',
-        )
-        .first(),
-      'chart_safety_trend should render at least one line curve',
-    ).toBeVisible({ timeout: 15_000 });
+    // --- 4. Charts: ECharts renders to <canvas>; assert canvas presence + non-zero size.
+    //         (We can't introspect bar/sector internals via DOM with canvas renderer.
+    //          Data-correctness is covered by backend integration tests.)
+    for (const chartId of ['chart_status', 'chart_risk', 'chart_category', 'chart_safety_trend']) {
+      const canvas = page.locator(`[data-widget-id="${chartId}"] canvas`).first();
+      await expect(canvas, `${chartId} should render an ECharts canvas`).toBeVisible({ timeout: 15_000 });
+      const size = await canvas.boundingBox();
+      expect(size?.width ?? 0, `${chartId} canvas width`).toBeGreaterThan(0);
+      expect(size?.height ?? 0, `${chartId} canvas height`).toBeGreaterThan(0);
+    }
 
     // --- 5. Recent logs table: 0..10 rows (empty state is valid when DB has no data)
     const rowCount = await page
