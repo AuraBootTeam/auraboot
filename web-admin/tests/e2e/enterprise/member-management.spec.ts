@@ -26,7 +26,7 @@ import {
 } from '../helpers/index';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
-const BACKEND_URL = 'http://localhost:6443';
+const BACKEND_URL = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
