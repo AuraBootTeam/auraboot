@@ -90,18 +90,43 @@ export default defineConfig({
 
   // Browser projects
   projects: [
-    // Auth project — logs in all test users and saves storageState (runs first)
+    // Setup project — idempotent test-data prep that runs BEFORE auth.
+    // Drives /api/bootstrap/setup, provisions multi-role users, creates
+    // the page-designer fixture pages + system_overview dashboard. All
+    // specs are idempotent so this project is safe to run repeatedly.
+    //
+    // Replaces the bundled `oss-reset-and-init.sh §6/§7.4` bash logic;
+    // tests own test data (cf. fix/oss-suite-r2 commit d2dbab9e).
+    //
+    // 2026-05-08 reinstates the previously-removed setup project (the
+    // "removed" comment below was the artefact of that earlier
+    // decision, now reversed).
+    {
+      name: 'setup',
+      testDir: './tests/api/setup',
+      // Match the new numbered setup specs (00-bootstrap, 01-multi-role-users,
+      // 02-test-pages). Existing seed-showcase-*.spec.ts files run as part
+      // of the showcase seed flow, not in this setup project.
+      testMatch: /\/\d{2}-.*\.spec\.ts$/,
+      timeout: 60_000,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
+    // Auth project — logs in all test users and saves storageState (runs after setup)
     {
       name: 'auth',
       testMatch: /auth\.setup\.ts/,
       timeout: 30000,
+      dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
         actionTimeout: 15000,
         navigationTimeout: 15000,
       },
     },
-    // init-env and setup projects removed — bootstrap handles plugin import + seed data automatically
+    // init-env (legacy bundled spec) is excluded from the setup project's
+    // testMatch — it pre-dates the 00/01/02 split and would re-do steps
     ...(runProfile === 'fast' || runProfile === 'full'
       ? [
           {

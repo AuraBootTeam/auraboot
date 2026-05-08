@@ -29,6 +29,23 @@ test('01-multi-role-users: provision e2e-operator + e2e-viewer', async ({ reques
   const headers = authHeaders(jwt);
 
   for (const user of USERS) {
+    // Idempotency: probe via login first. /api/admin/users returns a
+    // generic "Business error" (HTTP 422) when the email already exists,
+    // and inspecting the message string is brittle. A successful login
+    // proves both that the user exists AND that the credentials match
+    // what auth.setup.ts will use later — strictly stronger guarantee.
+    const probe = await request.post('/api/auth/login', {
+      data: { email: user.email, password: DEFAULT_TEST_ACCOUNT.password },
+    });
+    if (probe.ok()) {
+      const probeBody = await probe.json().catch(() => ({}));
+      if (probeBody?.code === '0' && probeBody?.data?.jwt) {
+        // Already provisioned and password matches — nothing to do.
+        continue;
+      }
+    }
+
+    // Either user doesn't exist, or password mismatched. Try to create.
     const displayName = user.email.split('@')[0];
     const resp = await request.post('/api/admin/users', {
       headers,
@@ -41,35 +58,20 @@ test('01-multi-role-users: provision e2e-operator + e2e-viewer', async ({ reques
       },
     });
     const body = await resp.json().catch(() => ({}));
-    if (body?.data?.email === user.email) {
-      // Created.
-      continue;
-    }
-    // Treat "already exists" as success — re-running this spec must not break.
-    const message = String(body?.message ?? '');
-    if (/already exists/i.test(message)) {
-      continue;
-    }
-    throw new Error(
-      `[setup-01] provisioning ${user.email} failed: HTTP ${resp.status()} — ${
-        message || JSON.stringify(body)
-      }`,
-    );
-  }
+    if (body?.data?.email === user.email) continue; // freshly created
 
-  // Cross-check: log in as each user to confirm credentials were set.
-  for (const user of USERS) {
-    const probe = await request.post('/api/auth/login', {
+    // Re-probe login: maybe the user existed but password was being
+    // reset by a parallel run. If the post-create login works, success.
+    const recheck = await request.post('/api/auth/login', {
       data: { email: user.email, password: DEFAULT_TEST_ACCOUNT.password },
     });
-    expect(
-      probe.ok(),
-      `[setup-01] ${user.email} login probe failed (${probe.status()})`,
-    ).toBeTruthy();
-    const probeBody = await probe.json();
-    expect(
-      probeBody.code,
-      `[setup-01] ${user.email} login returned non-zero code: ${JSON.stringify(probeBody)}`,
-    ).toBe('0');
+    if (recheck.ok()) {
+      const recheckBody = await recheck.json().catch(() => ({}));
+      if (recheckBody?.code === '0') continue;
+    }
+
+    throw new Error(
+      `[setup-01] provisioning ${user.email} failed: create→ HTTP ${resp.status()} ${JSON.stringify(body)}; login probe→ ${recheck.status()}`,
+    );
   }
 });
