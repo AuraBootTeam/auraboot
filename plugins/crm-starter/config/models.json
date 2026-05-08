@@ -95,7 +95,7 @@
     "displayName:en": "Campaign",
     "description": "Marketing campaign for lead generation",
     "modelType": "entity",
-    "modelCategory": "entity",
+    "modelCategory": "master",
     "extension": {
       "icon": "Megaphone",
       "category": "crm",

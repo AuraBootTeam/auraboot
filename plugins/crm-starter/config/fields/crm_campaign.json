@@ -51,7 +51,6 @@
     "displayName:zh-CN": "预算",
     "displayName:en": "Budget",
     "dataType": "decimal",
-    "constraints": { "precision": 14, "scale": 2 },
     "feature": { "sortable": true }
   },
   {

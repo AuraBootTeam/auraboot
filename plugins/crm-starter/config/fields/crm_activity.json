@@ -27,6 +27,7 @@
     "displayName:zh-CN": "活动日期",
     "displayName:en": "Activity Date",
     "dataType": "datetime",
+    "constraints": { "required": true },
     "feature": { "sortable": true }
   },
   {
