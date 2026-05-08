@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.stereotype.Component;
 
@@ -74,19 +75,23 @@ public class SkillRequestValidator {
 
     private final AuraBotSkillRegistry registry;
     private final SkillRunRepository repository;
-    private final SkillIdempotencyStore idempotencyStore;
-    private final PreviewTokenStore previewTokenStore;
+    // Redis-backed stores are conditional on StringRedisTemplate
+    // (RedisOptionalConfig). Single-node deployments without redis still
+    // boot; runtime calls that need these stores fail-open (idempotency)
+    // or fail-closed (preview token) with a clear error.
+    private final ObjectProvider<SkillIdempotencyStore> idempotencyStoreProvider;
+    private final ObjectProvider<PreviewTokenStore> previewTokenStoreProvider;
     private final ObjectMapper objectMapper;
 
     public SkillRequestValidator(AuraBotSkillRegistry registry,
                                  SkillRunRepository repository,
-                                 SkillIdempotencyStore idempotencyStore,
-                                 PreviewTokenStore previewTokenStore,
+                                 ObjectProvider<SkillIdempotencyStore> idempotencyStoreProvider,
+                                 ObjectProvider<PreviewTokenStore> previewTokenStoreProvider,
                                  ObjectMapper objectMapper) {
         this.registry = registry;
         this.repository = repository;
-        this.idempotencyStore = idempotencyStore;
-        this.previewTokenStore = previewTokenStore;
+        this.idempotencyStoreProvider = idempotencyStoreProvider;
+        this.previewTokenStoreProvider = previewTokenStoreProvider;
         this.objectMapper = objectMapper;
     }
 
@@ -170,6 +175,12 @@ public class SkillRequestValidator {
         String idemKey = req.getIdempotencyKey();
         if (idemKey == null || idemKey.isBlank()) {
             // No client-supplied key → no dedup window; proceed normal path.
+            return Optional.empty();
+        }
+        SkillIdempotencyStore idempotencyStore = idempotencyStoreProvider.getIfAvailable();
+        if (idempotencyStore == null) {
+            // Redis not configured — fail-open per plan §R2 (DB unique
+            // index on (tenant, skill, idem) is the ultimate dedup safety net).
             return Optional.empty();
         }
         try {
@@ -263,6 +274,13 @@ public class SkillRequestValidator {
         if (token == null || token.isBlank()) {
             throw new SkillSpiException(SkillErrorCode.CONFIRM_REQUIRED,
                     "preview token required for risk=" + skill.riskLevel().code());
+        }
+        PreviewTokenStore previewTokenStore = previewTokenStoreProvider.getIfAvailable();
+        if (previewTokenStore == null) {
+            // Redis not configured — preview-token handoff requires a shared
+            // store across nodes. Fail-closed (this is risk MEDIUM+).
+            throw new SkillSpiException(SkillErrorCode.PREVIEW_TOKEN_INVALID,
+                    "preview token store unavailable (redis not configured)");
         }
         return previewTokenStore.consume(token, skill.name(), req.getParams())
                 .orElseThrow(() -> new SkillSpiException(
