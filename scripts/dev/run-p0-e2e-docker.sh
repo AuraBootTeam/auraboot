@@ -130,8 +130,30 @@ echo "  authenticated (jwt len=${#JWT})"
 
 # Plugin import order matters: core-bpm provides `bpm_management` parent
 # menu that platform-admin references.
-PLUGINS=(core-bpm platform-admin acp-showcase test-fixtures)
-for p in "${PLUGINS[@]}"; do
+#
+# Each entry encodes "name:required" so this works on macOS bash 3.2 (no
+# associative arrays). Optional plugins skip silently if their plugin.json
+# is absent (e.g. acp-showcase was removed in commit 59050eed per the
+# platformization design P0', so the ACS specs become orphans).
+PLUGIN_SPEC=(
+    "core-bpm:required"
+    "platform-admin:required"
+    "acp-showcase:optional"
+    "test-fixtures:required"
+)
+
+for entry in "${PLUGIN_SPEC[@]}"; do
+    p="${entry%%:*}"
+    req="${entry##*:}"
+    if [[ ! -f "$PROJECT_ROOT/plugins/$p/plugin.json" ]]; then
+        if [[ "$req" == "required" ]]; then
+            echo "ERROR: required plugin $p missing plugin.json at $PROJECT_ROOT/plugins/$p" >&2
+            exit 1
+        else
+            echo "▶ Skipping optional plugin (not in repo): $p"
+            continue
+        fi
+    fi
     echo "▶ Importing plugin: $p"
     if ! AURA_TOKEN="$JWT" aura plugin import "$PROJECT_ROOT/plugins/$p" \
         --target "$BACKEND_URL" --yes 2>&1 | tail -10; then
@@ -148,17 +170,29 @@ AURA_FRONTEND_PORT="$VITE_PORT" node tests/refresh-admin-session.mjs
 
 # ---------- 5. run P0 specs ----------
 
-echo "▶ Running 4 P0 specs against docker (workers=1)..."
+echo "▶ Running P0 specs against docker (workers=1)..."
 LOG="/tmp/pw-p0-docker-${SLUG}-$(date +%Y%m%d-%H%M%S).log"
 echo "  log: $LOG"
 
+# Spec selection adapts to which plugins were imported. ACS specs require
+# acp-showcase, which is no longer in the repo — those specs become
+# orphans and would fail at sidebar nav. Only run them if the plugin was
+# imported (presence of plugin.json gates this same as the import loop).
+SPECS=(
+    tests/e2e/admin/scheduled-task-lifecycle.spec.ts
+    tests/e2e/e2et-order/e2et-order-dashboard-lifecycle.spec.ts
+)
+if [[ -f "$PROJECT_ROOT/plugins/acp-showcase/plugin.json" ]]; then
+    SPECS+=(
+        tests/e2e/agent-control-plane/acs-demo-request-lifecycle.spec.ts
+        tests/e2e/agent-control-plane/acs-safety-rule-lifecycle.spec.ts
+    )
+fi
+echo "  specs: ${#SPECS[@]}"
+
 set +e
 PLAYWRIGHT_BASE_URL="$FRONTEND_URL" PW_SKIP_WEBSERVER=1 NO_PROXY=localhost \
-    npx playwright test --project=chromium \
-        tests/e2e/admin/scheduled-task-lifecycle.spec.ts \
-        tests/e2e/agent-control-plane/acs-demo-request-lifecycle.spec.ts \
-        tests/e2e/agent-control-plane/acs-safety-rule-lifecycle.spec.ts \
-        tests/e2e/e2et-order/e2et-order-dashboard-lifecycle.spec.ts \
+    npx playwright test --project=chromium "${SPECS[@]}" \
     --reporter=line --workers=1 2>&1 | tee "$LOG"
 PW_EXIT=${PIPESTATUS[0]}
 set -e
