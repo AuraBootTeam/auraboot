@@ -110,8 +110,14 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '${FE_CPUS:-1.0}'
-          memory: ${FE_MEM:-1g}
+          # 2026-05-08: bumped from 1 CPU / 1 GB → 2 CPU / 2 GB so vite/BFF
+          # don't choke under playwright's 4-worker default. Triage data:
+          # full-suite r2 run with 1c/1g produced 221 fail, almost all
+          # `page.goto` / `apiRequestContext.post` timeouts — the container
+          # was getting starved while spec workers competed. Bump still
+          # leaves 4 stacks fitting in a 16 GB Docker VM.
+          cpus: '${FE_CPUS:-2.0}'
+          memory: ${FE_MEM:-2g}
     working_dir: /repo/web-admin
     ports:
       - "${VITE_PORT:-5174}:5173"
