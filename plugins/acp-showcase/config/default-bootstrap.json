@@ -1,8 +1,0 @@
-{
-  "rolePermissionBindings": [
-    {
-      "roleCode": "tenant_admin",
-      "permissionCodes": ["*"]
-    }
-  ]
-}
