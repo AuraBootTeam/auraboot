@@ -10,10 +10,9 @@
         "label": "Active",
         "label:zh-CN": "活跃",
         "sortNo": 10,
-        "color": "#52c41a",
         "status": "enabled",
         "extension": {
-          "color": "green"
+          "color": "#10b981"
         }
       },
       {
@@ -21,10 +20,9 @@
         "label": "Inactive",
         "label:zh-CN": "停用",
         "sortNo": 20,
-        "color": "#d9d9d9",
         "status": "enabled",
         "extension": {
-          "color": "gray"
+          "color": "#9ca3af"
         }
       }
     ]
@@ -40,32 +38,40 @@
         "label": "A - Key Account",
         "label:zh-CN": "A - 重点客户",
         "sortNo": 10,
-        "color": "#f5222d",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#ef4444"
+        }
       },
       {
         "value": "B",
         "label": "B - Important",
         "label:zh-CN": "B - 重要客户",
         "sortNo": 20,
-        "color": "#fa8c16",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#f59e0b"
+        }
       },
       {
         "value": "C",
         "label": "C - Normal",
         "label:zh-CN": "C - 一般客户",
         "sortNo": 30,
-        "color": "#1890ff",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#3b82f6"
+        }
       },
       {
         "value": "D",
         "label": "D - Low Priority",
         "label:zh-CN": "D - 低优先级",
         "sortNo": 40,
-        "color": "#d9d9d9",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#9ca3af"
+        }
       }
     ]
   },
@@ -80,10 +86,9 @@
         "label": "New",
         "label:zh-CN": "新建",
         "sortNo": 10,
-        "color": "#1890ff",
         "status": "enabled",
         "extension": {
-          "color": "gray"
+          "color": "#3b82f6"
         }
       },
       {
@@ -91,10 +96,9 @@
         "label": "Contacted",
         "label:zh-CN": "已联系",
         "sortNo": 20,
-        "color": "#13c2c2",
         "status": "enabled",
         "extension": {
-          "color": "blue"
+          "color": "#06b6d4"
         }
       },
       {
@@ -102,10 +106,9 @@
         "label": "Qualified",
         "label:zh-CN": "已合格",
         "sortNo": 30,
-        "color": "#52c41a",
         "status": "enabled",
         "extension": {
-          "color": "blue"
+          "color": "#8b5cf6"
         }
       },
       {
@@ -113,10 +116,10 @@
         "label": "Converted",
         "label:zh-CN": "已转化",
         "sortNo": 40,
-        "color": "#722ed1",
         "status": "enabled",
         "extension": {
-          "color": "blue"
+          "color": "#10b981",
+          "terminal": "won"
         }
       },
       {
@@ -124,10 +127,10 @@
         "label": "Lost",
         "label:zh-CN": "已丢失",
         "sortNo": 50,
-        "color": "#d9d9d9",
         "status": "enabled",
         "extension": {
-          "color": "red"
+          "color": "#9ca3af",
+          "terminal": "lost"
         }
       }
     ]
@@ -236,10 +239,9 @@
         "label": "Discovery",
         "label:zh-CN": "发现",
         "sortNo": 10,
-        "color": "#1890ff",
         "status": "enabled",
         "extension": {
-          "color": "blue"
+          "color": "#3b82f6"
         }
       },
       {
@@ -247,10 +249,9 @@
         "label": "Qualification",
         "label:zh-CN": "资质审查",
         "sortNo": 20,
-        "color": "#13c2c2",
         "status": "enabled",
         "extension": {
-          "color": "blue"
+          "color": "#6366f1"
         }
       },
       {
@@ -258,10 +259,9 @@
         "label": "Proposal",
         "label:zh-CN": "提案",
         "sortNo": 30,
-        "color": "#fa8c16",
         "status": "enabled",
         "extension": {
-          "color": "blue"
+          "color": "#8b5cf6"
         }
       },
       {
@@ -269,10 +269,9 @@
         "label": "Negotiation",
         "label:zh-CN": "谈判",
         "sortNo": 40,
-        "color": "#722ed1",
         "status": "enabled",
         "extension": {
-          "color": "blue"
+          "color": "#f59e0b"
         }
       },
       {
@@ -280,10 +279,10 @@
         "label": "Closed Won",
         "label:zh-CN": "赢单",
         "sortNo": 50,
-        "color": "#52c41a",
         "status": "enabled",
         "extension": {
-          "color": "green"
+          "color": "#10b981",
+          "terminal": "won"
         }
       },
       {
@@ -291,10 +290,10 @@
         "label": "Closed Lost",
         "label:zh-CN": "输单",
         "sortNo": 60,
-        "color": "#d9d9d9",
         "status": "enabled",
         "extension": {
-          "color": "red"
+          "color": "#9ca3af",
+          "terminal": "lost"
         }
       }
     ]
@@ -310,48 +309,60 @@
         "label": "Call",
         "label:zh-CN": "电话",
         "sortNo": 10,
-        "color": "#1890ff",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#3b82f6"
+        }
       },
       {
         "value": "visit",
         "label": "Visit",
         "label:zh-CN": "拜访",
         "sortNo": 20,
-        "color": "#52c41a",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#10b981"
+        }
       },
       {
         "value": "email",
         "label": "Email",
         "label:zh-CN": "邮件",
         "sortNo": 30,
-        "color": "#fa8c16",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#f59e0b"
+        }
       },
       {
         "value": "meeting",
         "label": "Meeting",
         "label:zh-CN": "会议",
         "sortNo": 40,
-        "color": "#722ed1",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#8b5cf6"
+        }
       },
       {
         "value": "wechat",
         "label": "WeChat",
         "label:zh-CN": "微信",
         "sortNo": 50,
-        "color": "#13c2c2",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#06b6d4"
+        }
       },
       {
         "value": "other",
         "label": "Other",
         "label:zh-CN": "其他",
         "sortNo": 60,
-        "color": "#d9d9d9",
-        "status": "enabled"
+        "status": "enabled",
+        "extension": {
+          "color": "#9ca3af"
+        }
       }
     ]
   },
@@ -416,10 +427,9 @@
         "label": "Planned",
         "label:zh-CN": "计划中",
         "sortNo": 10,
-        "color": "#1890ff",
         "status": "enabled",
         "extension": {
-          "color": "blue"
+          "color": "#3b82f6"
         }
       },
       {
@@ -427,10 +437,9 @@
         "label": "Active",
         "label:zh-CN": "进行中",
         "sortNo": 20,
-        "color": "#52c41a",
         "status": "enabled",
         "extension": {
-          "color": "green"
+          "color": "#10b981"
         }
       },
       {
@@ -438,10 +447,10 @@
         "label": "Completed",
         "label:zh-CN": "已完成",
         "sortNo": 30,
-        "color": "#d9d9d9",
         "status": "enabled",
         "extension": {
-          "color": "green"
+          "color": "#9ca3af",
+          "terminal": "won"
         }
       },
       {
@@ -449,10 +458,10 @@
         "label": "Cancelled",
         "label:zh-CN": "已取消",
         "sortNo": 40,
-        "color": "#f5222d",
         "status": "enabled",
         "extension": {
-          "color": "red"
+          "color": "#ef4444",
+          "terminal": "lost"
         }
       }
     ]
