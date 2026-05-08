@@ -23,8 +23,12 @@ import { execSync } from 'node:child_process';
  */
 function resolveAdminTenantId(): string {
   try {
+    // Backend URL — same env-override pattern as scripts/oss-reset-and-init.sh.
+    // Defaults to the host backend on :6443; isolated stack passes BE_PORT
+    // (e.g. 6478) via the test runner environment.
+    const bePort = process.env.BE_PORT ?? '6443';
     const out = execSync(
-      `curl -s -X POST http://localhost:6443/api/auth/login -H 'Content-Type: application/json' ` +
+      `curl -s -X POST http://localhost:${bePort}/api/auth/login -H 'Content-Type: application/json' ` +
         `-d '{"email":"admin@example.com","password":"Test2026x"}'`,
     ).toString();
     const parsed = JSON.parse(out);
@@ -48,13 +52,24 @@ function resolveAdminTenantId(): string {
 
 export const ADMIN_TENANT_ID = resolveAdminTenantId();
 
+// Postgres connection — same env-override pattern as oss-reset-and-init.sh.
+// Defaults preserve host-mode (psql trust auth as $USER on :5432); override
+// for isolated docker stack via PG_HOST=localhost PG_PORT=5467 PG_USER=auraboot
+// PG_DB=aura_boot PGPASSWORD=auraboot_dev. These four env vars travel with the
+// Playwright runner process so every psql subprocess inherits them.
+const PG_HOST = process.env.PG_HOST ?? 'localhost';
+const PG_PORT = process.env.PG_PORT ?? '5432';
+const PG_USER = process.env.PG_USER ?? process.env.USER ?? 'ghj';
+const PG_DB = process.env.PG_DB ?? 'aura_boot';
+const PSQL_BASE = `psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}`;
+
 // Parent menu id of "AI 中心" — resolve from DB at load time (rotates on
 // DB reset like tenant id). Look up via children's parent_id to avoid
 // CJK literal quoting issues in the subprocess.
 function resolveAiCenterMenuId(): string {
   try {
     const sql = `SELECT DISTINCT parent_id FROM ab_menu WHERE tenant_id = ${ADMIN_TENANT_ID} AND path LIKE '/aurabot/%' AND parent_id IS NOT NULL LIMIT 1;`;
-    const id = execSync(`psql -h localhost -U ghj -d aura_boot -tA`, {
+    const id = execSync(`${PSQL_BASE} -tA`, {
       input: sql,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
@@ -77,7 +92,7 @@ function psql(sql: string): string {
   // needs real \n characters) without worrying about shell quoting. -tA keeps
   // the output aligned-free and tuples-only so the caller can parse it.
   return execSync(
-    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+    `${PSQL_BASE} -P pager=off -v ON_ERROR_STOP=1 -tA`,
     { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
   )
     .toString()
@@ -91,7 +106,7 @@ function psql(sql: string): string {
  */
 function psqlQuiet(sql: string): string {
   return execSync(
-    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -qtA`,
+    `${PSQL_BASE} -P pager=off -v ON_ERROR_STOP=1 -qtA`,
     { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
   )
     .toString()
