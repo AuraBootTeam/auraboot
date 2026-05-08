@@ -248,7 +248,7 @@
     "displayName:en": "Timeout (ms)",
     "dataType": "integer",
     "defaultValue": 10000,
-    "constraints": { "min": 1000, "max": 60000 }
+    "constraints": { "min": 1000, "max": 600000 }
   },
 
   {
