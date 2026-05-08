@@ -207,6 +207,56 @@ function collectJavaConstantValues() {
   return refs
 }
 
+function collectBootstrapRoleBindingReferences() {
+  const refs = []
+  const bootstrapFile = path.join(OSS, 'platform/src/main/resources/tenant-templates/default-bootstrap.json')
+  if (!fs.existsSync(bootstrapFile)) return refs
+  const text = fs.readFileSync(bootstrapFile, 'utf8')
+  const lines = text.split('\n')
+  let data
+  try { data = JSON.parse(text) } catch { return refs }
+  for (const binding of data.rolePermissionBindings ?? []) {
+    for (const code of binding.permissionCodes ?? []) {
+      const idx = lines.findIndex((l) => l.includes(`"${code}"`))
+      refs.push({
+        file: bootstrapFile,
+        line: idx >= 0 ? idx + 1 : 0,
+        code,
+        kind: 'bootstrap.rolePermissionBindings',
+      })
+    }
+  }
+  return refs
+}
+
+function collectPluginRolesJsonReferences() {
+  const refs = []
+  const roots = [path.join(OSS, 'plugins')]
+  if (ENT) roots.push(path.join(ENT, 'plugins'))
+  for (const root of roots) {
+    const files = walk(root, (f) => f.endsWith('/config/roles.json'))
+    for (const f of files) {
+      const text = fs.readFileSync(f, 'utf8')
+      let data
+      try { data = JSON.parse(text) } catch { continue }
+      const arr = Array.isArray(data) ? data : data.roles ?? []
+      const lines = text.split('\n')
+      for (const role of arr) {
+        for (const code of role.permissions ?? []) {
+          const idx = lines.findIndex((l) => l.includes(`"${code}"`))
+          refs.push({
+            file: f,
+            line: idx >= 0 ? idx + 1 : 0,
+            code,
+            kind: 'plugin.roles.json.permissions',
+          })
+        }
+      }
+    }
+  }
+  return refs
+}
+
 function collectMenuReferences() {
   const refs = []
   const roots = [path.join(OSS, 'plugins')]
@@ -276,6 +326,8 @@ function main() {
     ...collectFrontendReferences(),
     ...collectJavaConstantValues(),
     ...collectMenuReferences(),
+    ...collectBootstrapRoleBindingReferences(),
+    ...collectPluginRolesJsonReferences(),
   ]
   const missing = refs
     .filter((r) => r.code !== '*' && !registered.has(r.code))
