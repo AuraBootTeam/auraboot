@@ -2,8 +2,8 @@
 
 **Date:** 2026-05-08 (refreshed after 85b43994 BACKEND_URL auto-derive)
 **Branch:** `fix/oss-suite-r2`
-**Latest run log:** `/tmp/r2-full5-*.log` (15.3 m, 4 workers, 2c/2g frontend)
-**Latest tally:** 1664 tests → **1295 passed / 49 failed** / 82 skipped / 238 did-not-run
+**Latest run log:** `/tmp/r2-full7-*.log` (15.4 m, 4 workers, 2c/2g frontend)
+**Latest tally:** 1664 tests → **1312 passed / 40 failed** / 80 skipped / 232 did-not-run
 
 **Trend (full attack chain on fix/oss-suite-r2):**
 | Gate | Run log | pass | fail | duration |
@@ -12,9 +12,14 @@
 | + psql env override | r2-full2-*.log | 1005 | 221 | 25.3 m (1c/1g starved) |
 | + frontend 2c/2g | r2-full3-*.log | 1123 | 170 | 16.4 m |
 | + BACKEND_URL auto-derive | r2-full4-*.log | 1250 |  69 | 15.2 m |
-| + BASE_URL + Spring `test` | r2-full5-*.log | **1295** | **49** | **15.3 m** |
+| + BASE_URL + Spring `test` | r2-full5-*.log | 1295 |  49 | 15.3 m |
+| + cross-field + helpers + wd-fixtures | r2-full6-*.log | 1282 |  45 | 14.7 m |
+| + 12-spec second BASE_URL wave | r2-full7-*.log | **1312** | **40** | **15.4 m** |
 
-Net: −79 fail (170 → 49) via 3 commits (`85b43994`, `462e3f17`, `12b66499`).
+Net: −130 fail (170 → 40) via 6 commits (`85b43994`, `462e3f17`, `12b66499`,
+`8f8b1912`, `969ffa77`, `00caeb17`). All env-drift fixes — no product
+code changed. The honest baseline is now 40 fail; further reduction
+requires per-cluster product/spec audits.
 
 ## Why this list exists
 
