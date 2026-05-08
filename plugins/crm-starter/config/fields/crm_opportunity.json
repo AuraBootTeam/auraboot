@@ -17,14 +17,18 @@
   },
   {
     "code": "crm_opp_account_id",
-    "displayName:zh-CN": "客户",
+    "displayName:zh-CN": "关联客户",
     "displayName:en": "Account",
     "dataType": "reference",
     "constraints": { "required": true },
-    "extension": {
-      "referenceModel": "crm_account",
-      "referenceDisplayField": "crm_acc_name"
-    }
+    "referenceModelCode": "crm_account",
+    "refTarget": {
+      "targetModel": "crm_account",
+      "targetField": "id",
+      "relationship": "many_to_one",
+      "displayField": "crm_acc_name"
+    },
+    "feature": { "searchable": true }
   },
   {
     "code": "crm_opp_stage",
@@ -32,30 +36,29 @@
     "displayName:en": "Stage",
     "dataType": "enum",
     "dictCode": "crm_opp_stage",
-    "defaultValue": "discovery",
+    "defaultValue": "qualification",
     "feature": { "searchable": true }
   },
   {
     "code": "crm_opp_expected_amount",
     "displayName:zh-CN": "预期金额",
     "displayName:en": "Expected Amount",
-    "dataType": "decimal",
-    "constraints": { "precision": 14, "scale": 2 },
+    "dataType": "money",
+    "defaultValue": { "currency": "CNY" },
     "feature": { "sortable": true }
   },
   {
     "code": "crm_opp_expected_close_date",
     "displayName:zh-CN": "预计成交日期",
     "displayName:en": "Expected Close Date",
-    "dataType": "date",
+    "dataType": "datetime",
     "feature": { "sortable": true }
   },
   {
     "code": "crm_opp_probability",
     "displayName:zh-CN": "成交概率(%)",
     "displayName:en": "Probability (%)",
-    "dataType": "integer",
-    "constraints": { "min": 0, "max": 100 }
+    "dataType": "decimal"
   },
   {
     "code": "crm_opp_owner",
