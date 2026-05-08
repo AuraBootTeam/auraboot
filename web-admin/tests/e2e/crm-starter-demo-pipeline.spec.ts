@@ -25,20 +25,19 @@ import { test, expect, type Page } from '../fixtures';
 import { uniqueId, navigateToDynamicPage, waitForDynamicPageLoad } from './helpers/index';
 
 /**
- * Drag helper compatible with @dnd-kit/core PointerSensor.
+ * Drag helper compatible with @dnd-kit/core MouseSensor.
  *
- * Playwright's `Locator.dragTo()` dispatches HTML5 drag events, which @dnd-kit
- * does not listen to (PointerSensor relies on pointerdown/pointermove/pointerup).
- * We instead drive page.mouse.* with a small "activation" nudge to satisfy the
- * default `activationConstraint: { distance: 8 }`, then a multi-step move to
- * the target so dnd-kit detects continuous motion.
+ * The platform's SmartKanban swaps PointerSensor → MouseSensor when
+ * `window.__AURA_E2E_MODE__ === true` (set by the beforeEach init script
+ * below). MouseSensor listens to native `mousedown` / `mousemove` /
+ * `mouseup` on `document`, which Playwright's `page.mouse.*` dispatches
+ * directly — no PointerEvent / setPointerCapture gymnastics needed.
+ *
+ * The first move past 8px satisfies dnd-kit's `activationConstraint`; the
+ * second multi-step move walks the cursor to the drop target so collision
+ * detection registers the over-state continuously.
  */
 async function dndKitDrag(page: Page, source: Locator, target: Locator): Promise<void> {
-  // Resolve both endpoints to ElementHandles so we can dispatch
-  // PointerEvents directly on the DOM nodes, regardless of where they sit
-  // in the viewport. Playwright's page.mouse.* doesn't call
-  // setPointerCapture, which @dnd-kit's PointerSensor relies on to keep
-  // receiving pointermove events after the cursor leaves the source.
   await source.scrollIntoViewIfNeeded();
   const sourceBox = await source.boundingBox();
   const targetBox = await target.boundingBox();
@@ -51,62 +50,14 @@ async function dndKitDrag(page: Page, source: Locator, target: Locator): Promise
   const toX = targetBox.x + targetBox.width / 2;
   const toY = targetBox.y + targetBox.height / 2;
 
-  const sourceHandle = await source.elementHandle();
-  const targetHandle = await target.elementHandle();
-  if (!sourceHandle || !targetHandle) {
-    throw new Error('dndKitDrag: failed to resolve element handles');
-  }
-
-  await page.evaluate(
-    ({ src, dst, fromX, fromY, toX, toY }) => {
-      const dispatch = (
-        el: Element,
-        type: string,
-        x: number,
-        y: number,
-        buttons: number,
-      ): void => {
-        const ev = new PointerEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          composed: true,
-          pointerId: 1,
-          pointerType: 'mouse',
-          isPrimary: true,
-          button: 0,
-          buttons,
-          clientX: x,
-          clientY: y,
-        });
-        el.dispatchEvent(ev);
-      };
-
-      // pointerdown on source — PointerSensor records initial coords here.
-      dispatch(src, 'pointerdown', fromX, fromY, 1);
-      // Cross the 8px activationConstraint distance threshold first so the
-      // sensor commits to a drag rather than treating the gesture as click.
-      dispatch(src, 'pointermove', fromX + 12, fromY + 12, 1);
-
-      // Walk towards the drop target in steps. Dnd-kit attaches its
-      // pointermove listener to document/window once the drag starts, so
-      // dispatching on source still bubbles correctly.
-      const steps = 12;
-      for (let i = 1; i <= steps; i++) {
-        const x = fromX + (toX - fromX) * (i / steps);
-        const y = fromY + (toY - fromY) * (i / steps);
-        dispatch(src, 'pointermove', x, y, 1);
-      }
-
-      // Final pointermove on the destination so collision detection sees
-      // the over-state for that exact element, then pointerup commits.
-      dispatch(dst, 'pointermove', toX, toY, 1);
-      dispatch(dst, 'pointerup', toX, toY, 0);
-    },
-    { src: sourceHandle, dst: targetHandle, fromX, fromY, toX, toY },
-  );
-
-  await sourceHandle.dispose();
-  await targetHandle.dispose();
+  await page.mouse.move(fromX, fromY);
+  await page.mouse.down();
+  // Cross the 8px activationConstraint distance threshold first.
+  await page.mouse.move(fromX + 12, fromY + 12, { steps: 5 });
+  // Walk to the drop target in many steps so dnd-kit's collision detection
+  // sees continuous motion and the over-state resolves to the target column.
+  await page.mouse.move(toX, toY, { steps: 20 });
+  await page.mouse.up();
 }
 
 const UID = uniqueId('OppDemo');
@@ -272,8 +223,14 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
     }
   });
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     test.skip(!demoDataAvailable, 'crm-starter demo data could not be seeded (plugin not imported?)');
+    // Toggle SmartKanban to E2E sensor mode (MouseSensor) BEFORE any navigation.
+    // addInitScript installs the flag on every document the page loads, so
+    // subsequent page.goto() / reload() / link clicks all see it.
+    await page.addInitScript(() => {
+      (window as unknown as { __AURA_E2E_MODE__?: boolean }).__AURA_E2E_MODE__ = true;
+    });
   });
 
   // =========================================================================
