@@ -56,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   } catch (error) {
     console.error('地址数据获取失败:', error);
-    return new Response(JSON.stringify({ action, data: [], error: '获取数据失败' }), {
+    return new Response(JSON.stringify({ action, data: [], error: 'Failed to fetch data' }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }

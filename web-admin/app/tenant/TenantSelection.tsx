@@ -64,7 +64,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!token) {
     return {
       success: false,
-      error: '未找到认证信息，请重新登录',
+      error: 'Authentication required. Please sign in again.',
     };
   }
 
@@ -102,7 +102,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!response.ok) {
       return {
         success: false,
-        error: `请求失败: ${response.status} ${response.statusText}`,
+        error: `Request failed: ${response.status} ${response.statusText}`,
       };
     }
 
@@ -126,19 +126,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } else {
       return {
         success: false,
-        error: result.desc || '操作失败',
+        error: result.desc || 'Operation failed',
       };
     }
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : '网络请求失败',
+      error: error instanceof Error ? error.message : 'Network request failed',
     };
   }
 
   return {
     success: false,
-    error: '操作失败',
+    error: 'Operation failed',
   };
 };
 
