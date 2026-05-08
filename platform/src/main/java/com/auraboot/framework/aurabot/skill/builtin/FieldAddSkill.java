@@ -60,7 +60,7 @@ public class FieldAddSkill implements AuraBotSkill {
             + "\"modelCode\":{\"type\":\"string\",\"pattern\":\"^[a-z][a-z0-9_]{0,62}$\"},"
             + "\"code\":{\"type\":\"string\",\"pattern\":\"^[a-z][a-z0-9_]{0,62}$\"},"
             + "\"dataType\":{\"type\":\"string\",\"enum\":["
-            + "\"string\",\"text\",\"integer\",\"long\",\"decimal\","
+            + "\"string\",\"text\",\"int\",\"long\",\"decimal\","
             + "\"boolean\",\"date\",\"datetime\",\"json\""
             + "]},"
             + "\"displayName\":{\"type\":\"string\",\"maxLength\":128},"
