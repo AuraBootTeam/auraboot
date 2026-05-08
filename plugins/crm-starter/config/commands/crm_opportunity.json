@@ -8,6 +8,7 @@
     "inputFields": [
       "crm_opp_name",
       "crm_opp_account_id",
+      "crm_opp_stage",
       "crm_opp_expected_amount",
       "crm_opp_expected_close_date",
       "crm_opp_probability",
@@ -19,7 +20,7 @@
         "pattern": "OPP-{yyyyMMdd}-{seq}"
       },
       "crm_opp_stage": {
-        "strategy": "fixed_value",
+        "strategy": "default_value",
         "value": "discovery"
       },
       "crm_opp_owner": {
