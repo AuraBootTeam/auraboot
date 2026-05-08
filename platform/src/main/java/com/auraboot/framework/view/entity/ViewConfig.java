@@ -118,6 +118,23 @@ public class ViewConfig {
      */
     private Boolean showAggregations;
 
+    /**
+     * Optional dict code that backs the groupByField. When present, the
+     * kanban renders the full set of dict enum values as columns (in dict
+     * sortOrder), even for stages with zero cards — matching CRM-style
+     * pipeline visibility (Salesforce/HubSpot). Without this, only stages
+     * present in the data render. See backlog 2026-05-08 Gap 2.
+     */
+    private String groupByDictCode;
+
+    /**
+     * Optional terminal-stage hint for kanban views. Maps `won` / `lost`
+     * arrays of dict values that should receive terminal visual treatment
+     * regardless of dict-extension metadata. Stored as a JSON object so
+     * plugin views can express both buckets independently of the dict.
+     */
+    private java.util.Map<String, java.util.List<String>> terminalStages;
+
     // ==================== Calendar Fields ====================
 
     /**
