@@ -86,6 +86,27 @@ notification (10) and aurabot (9), not saved-view. New plan:
    `2026-05-08-oss-suite-contention-flakes.md` backlog. Merge entries
    so we don't double-track.
 
+## Model-list-page residual 3 — concrete signatures
+
+After C3/C4 sweeps, model 4-fail breaks down as: 1 model-crud
+(M-001 unrelated) + 3 model-list-page (ML-01/02/04). All 3
+model-list-page fails are the same root:
+
+| Spec | Signature | Likely root |
+|------|-----------|-------------|
+| `model-list-page.spec.ts:161` ML-01 | `searchModel` helper line 54: `input[placeholder*="Search"], input[placeholder*="搜索"]` not visible 10s | spec drift — `meta_models_admin` page DSL has no global search input |
+| `model-list-page.spec.ts:196` ML-02 | same helper, same root | same |
+| `model-list-page.spec.ts:286` ML-04 | same helper, same root | same |
+
+The page's filter block (verified via `ab_page_schema.blocks` query)
+has only SmartSelect dropdowns + a "查询/Search" button — no global
+search text input. Either the helper needs to switch to the actual
+filter widget pattern (dropdown / button click) or the page DSL should
+add a keyword search field.
+
+Disposition: spec rewrite (~30 min). Out of scope for the env-drift
+branch.
+
 ## Saved-view residual 4 — concrete signatures (post-r2 audit)
 
 After C1 was reduced from 40 → 4 by `7b6e94dd` (frontend bump), the
