@@ -71,7 +71,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return { success: true, data: result };
   } catch (error) {
     console.error('Failed to update model:', error);
-    return { success: false, error: '更新Model失败' };
+    return { success: false, error: 'Failed to update model' };
   }
 };
 

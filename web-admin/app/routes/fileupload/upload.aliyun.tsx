@@ -23,7 +23,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const folder = (formData.get('folder') as string) || uploadConfig.aliyun.defaultFolder;
 
     if (!file) {
-      return Response.json({ error: '没有文件' }, { status: 400 });
+      return Response.json({ error: 'No file provided' }, { status: 400 });
     }
 
     // 从后端获取阿里云配置
@@ -36,7 +36,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     if (!ResultHelper.isSuccess(configResult) || !configResult.data) {
-      return Response.json({ error: '获取阿里云配置失败' }, { status: 500 });
+      return Response.json({ error: 'Failed to load Aliyun OSS configuration' }, { status: 500 });
     }
 
     const aliyunConfig = configResult.data;
@@ -88,6 +88,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   } catch (error) {
     console.error('阿里云上传失败:', error);
-    return Response.json({ error: '文件上传失败' }, { status: 500 });
+    return Response.json({ error: 'File upload failed' }, { status: 500 });
   }
 };
