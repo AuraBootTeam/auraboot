@@ -98,6 +98,14 @@ services:
       # via the compose network.
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      # Test fixtures — the internal `test-fixtures` plugin under
+      # plugins/test-fixtures/ provides the `e2et_*` model/page/command set
+      # that ~100+ OSS specs depend on (action-system, activity, data-tools,
+      # permission, saved-view, model-test-helper-driven specs). It is gated
+      # by IMPORT_TEST_FIXTURES=true (or AURA_ENV=test); without this flag
+      # all e2et:* commands return "Command not found" and any spec that
+      # uses ModelTestHelper(e2et) fails its beforeAll.
+      IMPORT_TEST_FIXTURES: "true"
 
   # Vite + BFF dev server in a browser-capable Node container.
   # We do NOT use web-admin/Dockerfile because it bakes a prod build via
