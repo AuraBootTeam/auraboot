@@ -104,6 +104,15 @@ export interface ChatStreamOptions {
     description: string,
     input: Record<string, any>,
     pendingTurnId: string,
+    /**
+     * C-5 T7: optional extension metadata propagated from the backend
+     * {@code PendingTool.extension} map. Skill confirmations populate this
+     * with {@code _aurabot_skill / previewToken / preview / riskLevel /
+     * skillName}; the chat panel inspects {@code _aurabot_skill === true} to
+     * route to {@code SkillPreviewCard} instead of the generic
+     * {@code ConfirmCard}.
+     */
+    extension?: Record<string, any>,
   ) => void;
   /**
    * P0-2: Anthropic Extended Thinking — chain-of-thought trace emitted before
@@ -685,6 +694,10 @@ async function processSSEStream(
                   data.description || '',
                   data.input || {},
                   data.pendingTurnId || '',
+                  // C-5 T7: forward backend PendingTool.extension so the chat
+                  // panel can detect skill confirmations and render
+                  // SkillPreviewCard instead of generic ConfirmCard.
+                  (data.extension as Record<string, any> | undefined) || undefined,
                 );
                 break;
               case 'done':
