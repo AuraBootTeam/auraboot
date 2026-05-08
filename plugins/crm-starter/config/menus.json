@@ -1,9 +1,9 @@
 [
   {
-    "code": "crms_root",
+    "code": "crm_root",
     "parentCode": null,
-    "name:zh-CN": "CRM 入门",
-    "name:en": "CRM Starter",
+    "name:zh-CN": "CRM 演示",
+    "name:en": "CRM Demo",
     "path": null,
     "component": null,
     "icon": "IconUsers",
@@ -13,11 +13,12 @@
     "visible": true
   },
   {
-    "code": "crms_accounts",
-    "parentCode": "crms_root",
+    "code": "crm_accounts",
+    "parentCode": "crm_root",
     "name:zh-CN": "客户",
     "name:en": "Accounts",
     "path": "/p/crm_account",
+    "pageKey": "crm_account_list",
     "component": null,
     "icon": "IconBuilding",
     "type": 1,
@@ -26,11 +27,12 @@
     "visible": true
   },
   {
-    "code": "crms_contacts",
-    "parentCode": "crms_root",
+    "code": "crm_contacts",
+    "parentCode": "crm_root",
     "name:zh-CN": "联系人",
     "name:en": "Contacts",
     "path": "/p/crm_contact",
+    "pageKey": "crm_contact_list",
     "component": null,
     "icon": "IconUser",
     "type": 1,
@@ -39,11 +41,12 @@
     "visible": true
   },
   {
-    "code": "crms_leads",
-    "parentCode": "crms_root",
+    "code": "crm_leads",
+    "parentCode": "crm_root",
     "name:zh-CN": "线索",
     "name:en": "Leads",
     "path": "/p/crm_lead",
+    "pageKey": "crm_lead_list",
     "component": null,
     "icon": "IconRadar",
     "type": 1,
@@ -52,11 +55,12 @@
     "visible": true
   },
   {
-    "code": "crms_opportunities",
-    "parentCode": "crms_root",
+    "code": "crm_opportunities",
+    "parentCode": "crm_root",
     "name:zh-CN": "商机管理",
     "name:en": "Opportunities",
     "path": "/p/crm_opportunity",
+    "pageKey": "crm_opportunity_list",
     "component": null,
     "icon": "IconTarget",
     "type": 1,
@@ -65,11 +69,12 @@
     "visible": true
   },
   {
-    "code": "crms_activities",
-    "parentCode": "crms_root",
+    "code": "crm_activities",
+    "parentCode": "crm_root",
     "name:zh-CN": "活动记录",
     "name:en": "Activities",
     "path": "/p/crm_activity",
+    "pageKey": "crm_activity_list",
     "component": null,
     "icon": "IconActivity",
     "type": 1,
@@ -78,11 +83,12 @@
     "visible": true
   },
   {
-    "code": "crms_campaigns",
-    "parentCode": "crms_root",
+    "code": "crm_campaigns",
+    "parentCode": "crm_root",
     "name:zh-CN": "营销活动",
     "name:en": "Campaigns",
     "path": "/p/crm_campaign",
+    "pageKey": "crm_campaign_list",
     "component": null,
     "icon": "IconMegaphone",
     "type": 1,
