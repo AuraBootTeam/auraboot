@@ -41,7 +41,9 @@ DEFAULT_PLUGINS=(
   hr-essentials
   simple-inventory
   workflow-demo
-  acp-showcase
+  # acp-showcase removed: plugin directory was deleted on commit 59050eed
+  # (platformization) and now contains only scripts/ — no plugin.json. Bootstrap
+  # would always fail with "Directory does not contain plugin.json".
 )
 PLUGINS=( ${PLUGINS:-${DEFAULT_PLUGINS[@]}} )
 
