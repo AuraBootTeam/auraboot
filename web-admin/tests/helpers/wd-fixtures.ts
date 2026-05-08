@@ -18,8 +18,8 @@
 import { expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 
-const BASE_URL = process.env.BASE_URL ?? 'http://localhost:5173';
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:6443';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173';
+const BACKEND_URL = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
 
 // ---------------------------------------------------------------------------
 // loginAs
