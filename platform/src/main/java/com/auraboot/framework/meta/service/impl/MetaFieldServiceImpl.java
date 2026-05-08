@@ -9,6 +9,7 @@ import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.FieldDictBinding;
+import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaFieldService;
@@ -22,6 +23,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -1034,6 +1036,151 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 .pgColumnType(pgColumnType)
                 .addedAt(Instant.now())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void removeFromModel(RemoveFieldRequest request) {
+        if (request == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "removeFromModel request must not be null");
+        }
+        if (!StringUtils.hasText(request.getModelCode())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "modelCode must not be blank");
+        }
+        if (!StringUtils.hasText(request.getStorageCode())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "storageCode must not be blank");
+        }
+
+        String modelCode = request.getModelCode();
+        String storageCode = request.getStorageCode();
+
+        // Spec §3.6: storageCode = "<modelCode>_<fieldCode>" (mirrors AddFieldResult)
+        String prefix = modelCode + "_";
+        if (!storageCode.startsWith(prefix)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "storageCode does not match modelCode prefix: storageCode=" + storageCode
+                            + ", expected prefix=" + prefix);
+        }
+        String fieldCode = storageCode.substring(prefix.length());
+        if (!StringUtils.hasText(fieldCode)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "fieldCode resolved from storageCode is empty: " + storageCode);
+        }
+
+        // 1) Resolve model
+        MetaModelDTO model;
+        try {
+            model = metaModelService.findByCode(modelCode);
+        } catch (ValidationException ve) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "modelCode not found: " + modelCode);
+        }
+        if (model == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "modelCode not found: " + modelCode);
+        }
+
+        // 2) Resolve field definition (FieldDefinition has columnName but not pid/id, so
+        //    additionally fetch entity row by code for id/pid)
+        FieldDefinition fieldDef;
+        try {
+            fieldDef = metaModelService.getFieldDefinition(modelCode, fieldCode);
+        } catch (RuntimeException re) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "field not found on model: model=" + modelCode + ", code=" + fieldCode
+                            + " (" + re.getMessage() + ")");
+        }
+        if (fieldDef == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "field not found on model: model=" + modelCode + ", code=" + fieldCode);
+        }
+
+        Field fieldEntity = metaFieldMapper.findCurrentByCode(fieldCode);
+        if (fieldEntity == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "ab_meta_field row not found for code=" + fieldCode);
+        }
+
+        String columnName = StringUtils.hasText(fieldDef.getColumnName())
+                ? fieldDef.getColumnName()
+                : fieldCode;
+        String tableName = metaModelService.getTableName(modelCode);
+
+        // 3) Optional data probe (refuseIfDataExists)
+        if (request.isRefuseIfDataExists()) {
+            boolean hasData = false;
+            try {
+                // Note: dynamic mt_* tables don't carry deleted_flag (no soft-delete on
+                // dynamic data) — see AGENTS.md "动态表 mt_* 加 deleted_flag 条件".
+                Integer cnt = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM " + tableName
+                                + " WHERE " + columnName + " IS NOT NULL",
+                        Integer.class);
+                hasData = cnt != null && cnt > 0;
+            } catch (DataAccessException dae) {
+                // F-7 mitigation: if table or column is missing (race / partial state),
+                // treat as empty and continue with cleanup. Log for diagnostics.
+                log.warn("removeFromModel data probe skipped (table/column may not exist): "
+                        + "table={}, column={}, error={}", tableName, columnName, dae.getMessage());
+            }
+            if (hasData) {
+                throw new ColumnHasDataException(
+                        "column has non-null rows; refuseIfDataExists=true: table="
+                                + tableName + ", column=" + columnName);
+            }
+        }
+
+        // 4) Resolve numeric ids for unbind
+        Long modelId = model.getId();
+        if (modelId == null) {
+            // findByCode returns DTO; if id absent, fetch entity directly
+            Field probe = null;
+            try {
+                MetaModelDTO m2 = metaModelService.findByCode(modelCode);
+                modelId = m2 != null ? m2.getId() : null;
+            } catch (RuntimeException ignored) {
+                // fall through
+            }
+            if (modelId == null) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "could not resolve numeric model id for: " + modelCode);
+            }
+        }
+        Long fieldId = fieldEntity.getId();
+        if (fieldId == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "could not resolve numeric field id for: " + fieldCode);
+        }
+
+        // 5) Unbind: this triggers DDL DROP COLUMN inside MetaModelServiceImpl
+        //    when model.isPublished() (verified at MetaModelServiceImpl line ~1604).
+        //    No need to call schemaManagementService.removeFieldFromModel ourselves.
+        try {
+            metaModelService.unbindFieldFromModel(modelId, fieldId);
+        } catch (RuntimeException re) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "unbind failed for " + modelCode + "." + fieldCode + ": " + re.getMessage());
+        }
+
+        // 6) Hard-delete ab_meta_field row (F-3/F-5 mitigation: same code can be re-added).
+        //    BaseMapper.deleteById may be wired to logical-delete via @TableLogic; we need a
+        //    true physical DELETE so the (tenant_id, code, version) unique index is freed.
+        try {
+            int rows = jdbcTemplate.update("DELETE FROM ab_meta_field WHERE id = ?", fieldId);
+            if (rows == 0) {
+                log.warn("hard-delete affected 0 rows for fieldId={}", fieldId);
+            }
+        } catch (RuntimeException re) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "hard-delete of ab_meta_field row failed for fieldId=" + fieldId
+                            + ": " + re.getMessage());
+        }
+
+        log.info("removeFromModel done: model={}, field={}, table={}, column={}",
+                modelCode, fieldCode, tableName, columnName);
     }
 
     /**
