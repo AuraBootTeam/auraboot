@@ -156,6 +156,75 @@ cascade unblocked through ACS-007.
 - **Re-enable**: drop fixme on ACS-007. Likely also unblocks ACS-008..014
   cascade-skipped tests.
 
+## G-13 — Plugin resource importer ignores `dashboards` resource type
+
+Surfaced when running `aura plugin import` against a fresh docker stack
+after adding `plugins/test-fixtures/config/dashboards/e2et_order_dashboard.json`
++ declaring `"dashboards": "config/dashboards"` in `plugin.json.resourceDirs`.
+
+- **Symptom**: `aura plugin import` reports the standard resource counts
+  (FIELD, MODEL, PAGE, COMMAND, MENU, I18N, etc.) but emits **no DASHBOARD**
+  line. After import, `ab_dashboard` is empty.
+- **Root cause**: `PluginResourceImporterImpl` does not declare a
+  `DASHBOARD` import stage. The `PluginManifestLoader` reads the dashboard
+  JSON files into the manifest (counted as `dashboards=N` in startup logs)
+  but the importer pipeline never consumes them.
+- **Workaround used during G-1 verification**: `POST /api/dashboards`
+  directly with the JSON payload (after lower-casing `scope`), then
+  `UPDATE ab_dashboard SET status='published'` (no API endpoint flips
+  status either).
+- **Fix**: add a DASHBOARD import stage to `PluginResourceImporterImpl`
+  that maps each manifest dashboard JSON to a `DashboardCreateRequest`
+  (lower-case scope, default status=draft) and calls
+  `dashboardService.create()`. Add `POST /api/dashboards/{pid}/publish`
+  call (endpoint already exists) for plugins that ship `status: published`.
+
+## G-14 — `smart-table-chart` widget has no flat-list mode
+
+Surfaced when `e2et_order_dashboard` was migrated from `pages.json` (G-1)
+to `config/dashboards/`. The widget JSON adopts the same shape as
+`crm-starter`'s `crm_overview` — `config: { modelCode, defaultSort, table: {columns:[...]} }` —
+but the widget renders **"No data available"** for both fixtures.
+
+- **Root cause**: `SmartTableChart` reads `props.dataSource` (typed
+  `ChartDataSource = aggregate | namedQuery | static`) and
+  `DashboardViewer.tsx:116-118` forwards `widget.config.dataSource`. The
+  flat shape `config.modelCode + config.table.columns` has no consumer.
+  No syntactic-sugar adapter exists in `WidgetRenderer.tsx` either.
+- **Impact**: any "list-style" dashboard widget (recent records, filtered
+  table) shows empty. crm_overview dashboard is likely affected too.
+- **Fix options**:
+  - (a) Add a `smart-list-table` widget type that takes
+    `{ modelCode, table.columns, defaultSort, defaultFilters }` and queries
+    `/api/dynamic/{model}/list` directly.
+  - (b) Add a syntactic-sugar adapter in `DashboardViewer` that wraps
+    `config.modelCode + config.table.columns` into
+    `dataSource: { type: 'aggregate', ...derived }`.
+  - (c) Migrate fixtures to `dataSource: { type: 'namedQuery', queryCode }`
+    and ship 3 namedQuery defs (least flexible, requires DB query
+    coordination).
+- **Re-enable**: drop `test.fixme` on DASH-002, DASH-003, DASH-004,
+  DASH-005 once any of (a)/(b)/(c) lands.
+
+## G-1 status — partial: architecture plumbing done, widget data binding deferred
+
+After commits in this session (G-1 plumbing + G-13 + G-14 backlog):
+
+- ✅ Menu repointed to `/dashboards/view/e2et_order_dashboard`.
+- ✅ pages.json `e2et_order_dashboard_list` removed.
+- ✅ `plugins/test-fixtures/config/dashboards/e2et_order_dashboard.json`
+  written with 3 widgets (recent orders / pending payments / customers).
+- ✅ test-fixtures `plugin.json` declares `dashboards` resource dir.
+- ✅ DASH spec navigation rewritten to use the dashboard URL pattern
+  (matches `crm-starter-demo-dashboard.spec.ts`).
+- ✅ DASH-001 (real test, formerly fixme'd) now passes — sidebar nav +
+  3 widget titles + 3 tables visible.
+- ✅ DASH-006 (no error alert) passes.
+- ⚠️ DASH-002..005 fixme'd to G-14 — widget renders title but inner data is
+  empty until `smart-table-chart` flat-list mode lands.
+
+Final docker run on G-1 branch: **5 passed / 4 fixme / 0 fail**.
+
 ## Dead menus (no React component bound)
 
 These menu entries route to paths that have **no implementation** (frontend
