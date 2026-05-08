@@ -48,6 +48,13 @@ export default defineConfig({
   // Test directory structure
   testDir: './tests',
   testMatch: ['**/*.spec.ts'],
+  // mcp-cursor-demo.spec.ts imports `@modelcontextprotocol/sdk` which is not
+  // a project dep — the file itself documents that it requires extra setup
+  // (CLI build + AURA_TOKEN) and is intentionally NOT part of the default
+  // OSS test grep. Without this ignore, Playwright's spec collection step
+  // imports the file and crashes with ERR_MODULE_NOT_FOUND before any test
+  // runs, blocking auth.setup and the entire suite.
+  testIgnore: ['**/mcp-cursor-demo.spec.ts'],
   outputDir: './test-results/artifacts',
 
   // Global teardown only (login moved to 'auth' setup project)
