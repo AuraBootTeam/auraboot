@@ -2,13 +2,19 @@
 
 **Date:** 2026-05-08 (refreshed after 85b43994 BACKEND_URL auto-derive)
 **Branch:** `fix/oss-suite-r2`
-**Latest run log:** `/tmp/r2-full4-*.log` (15.2 m, 4 workers, 2c/2g frontend)
-**Latest tally:** 1664 tests → **1250 passed / 69 failed** / 82 skipped / 263 did-not-run
+**Latest run log:** `/tmp/r2-full5-*.log` (15.3 m, 4 workers, 2c/2g frontend)
+**Latest tally:** 1664 tests → **1295 passed / 49 failed** / 82 skipped / 238 did-not-run
 
-**Earlier runs preserved for trend visibility:**
-- `/tmp/r2-full3-*.log` 16.4 m → 1123 passed / 170 failed (post 2c/2g frontend)
-- `/tmp/r2-full2-*.log` 25.3 m → 1005 passed / 221 failed (post psql fix, 1c/1g)
-- `/tmp/r2-full-*.log` 19.8 m → 1154 passed / 128 failed (host-DB false-positives masking)
+**Trend (full attack chain on fix/oss-suite-r2):**
+| Gate | Run log | pass | fail | duration |
+|------|---------|------|------|----------|
+| pre-psql-fix (cross-DB false-positives) | r2-full*.log | 1154 | 128 | 19.8 m |
+| + psql env override | r2-full2-*.log | 1005 | 221 | 25.3 m (1c/1g starved) |
+| + frontend 2c/2g | r2-full3-*.log | 1123 | 170 | 16.4 m |
+| + BACKEND_URL auto-derive | r2-full4-*.log | 1250 |  69 | 15.2 m |
+| + BASE_URL + Spring `test` | r2-full5-*.log | **1295** | **49** | **15.3 m** |
+
+Net: −79 fail (170 → 49) via 3 commits (`85b43994`, `462e3f17`, `12b66499`).
 
 ## Why this list exists
 
