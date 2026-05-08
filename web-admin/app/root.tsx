@@ -49,11 +49,6 @@ import { AuthProvider } from '~/contexts/AuthContext';
 import { EntitlementProvider } from '~/contexts/EntitlementContext';
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
-import {
-  AuraBotShellPanel,
-  AuraBotShellProvider,
-  AuraBotShellToggle,
-} from '~/aurabot';
 import { QueryProvider } from '~/providers/QueryProvider';
 import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
@@ -247,21 +242,12 @@ export default function App() {
                   <ToastProvider>
                     <ConfirmDialogProvider>
                       <AuraBotProvider>
-                        <AuraBotShellProvider>
-                          {data.bootstrapStatus && !data.bootstrapStatus.initialized && (
-                            <BootstrapBanner status={data.bootstrapStatus} />
-                          )}
-                          <div className={data.bootstrapStatus && !data.bootstrapStatus.initialized ? 'pt-10' : ''}>
-                            <Outlet />
-                          </div>
-                          {/* AuraBot V3 shell (C-1): renders only for authenticated users. */}
-                          {data.user ? (
-                            <>
-                              <AuraBotShellToggle />
-                              <AuraBotShellPanel />
-                            </>
-                          ) : null}
-                        </AuraBotShellProvider>
+                        {data.bootstrapStatus && !data.bootstrapStatus.initialized && (
+                          <BootstrapBanner status={data.bootstrapStatus} />
+                        )}
+                        <div className={data.bootstrapStatus && !data.bootstrapStatus.initialized ? 'pt-10' : ''}>
+                          <Outlet />
+                        </div>
                       </AuraBotProvider>
                     </ConfirmDialogProvider>
                   </ToastProvider>
