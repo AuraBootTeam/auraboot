@@ -38,7 +38,7 @@ import {
 } from '../../helpers/bpm-assertions';
 import { loginAs } from '../../helpers/wd-fixtures';
 
-const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
+const BACKEND = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
 
 test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => {
   test('configure userTask with formBinding, assert L1/L2/L3', async ({
