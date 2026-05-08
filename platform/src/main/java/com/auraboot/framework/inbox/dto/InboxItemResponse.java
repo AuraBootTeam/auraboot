@@ -65,6 +65,20 @@ public class InboxItemResponse {
     @Deprecated(since = "6.4")
     private Long recordId;
 
+    /**
+     * Canonical identifier of the related business record (M-090 DATA-001).
+     *
+     * <p>String type holds either a numeric {@code Long.toString()}
+     * (legacy BIGINT-keyed records) or a ULID (new ULID-keyed records).
+     * Mobile and web clients MUST read this field; {@link #recordId} is
+     * deprecated and will be removed per
+     * {@code docs/mobile/legacy-field-deprecation.md}.
+     *
+     * <p>Producer guarantee: when both {@link #recordId} and
+     * {@code sourceRecordId} are present on the same row, their values
+     * agree as strings: {@code String.valueOf(recordId).equals(sourceRecordId)}.
+     * The {@link #from(InboxItem)} factory enforces this.
+     */
     private String sourceRecordId;
 
     /**
