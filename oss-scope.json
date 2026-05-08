@@ -77,6 +77,8 @@
     "tests/e2e/platform/**",
     "tests/e2e/integration/**",
     "tests/e2e/cross-field-validation.spec.ts",
+    "tests/e2e/crm-starter-demo-pipeline.spec.ts",
+    "tests/e2e/crm-starter-demo-dashboard.spec.ts",
     "tests/e2e/cross-module/**",
     "tests/e2e/bpm-smoke/**",
     "tests/e2e/bpm-designer/**",
