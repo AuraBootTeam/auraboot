@@ -133,6 +133,12 @@ export interface SmartKanbanProps {
    * pipelines that close on different stages.
    */
   terminalStages?: { won?: string[]; lost?: string[] };
+  /**
+   * Page key used as the dynamic API resource segment for kanban move
+   * persistence (PUT `/api/dynamic/{pageKey}/{recordId}`). When omitted,
+   * card moves stay purely optimistic.
+   */
+  pageKey?: string;
   /** Additional CSS class */
   className?: string;
   /** Inline styles */

@@ -67,6 +67,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
   linkageFilters,
   groupByDictCode,
   terminalStages,
+  pageKey,
   className,
   style,
 }) => {
@@ -84,6 +85,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
     dataSource,
     linkageFilters,
     groupByDictItems: dictItems.length > 0 ? dictItems : undefined,
+    pageKey,
   });
 
   /**
