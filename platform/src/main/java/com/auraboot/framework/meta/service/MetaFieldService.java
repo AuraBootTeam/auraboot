@@ -2,6 +2,8 @@ package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.meta.dto.*;
+import com.auraboot.framework.meta.dto.AddFieldRequest;
+import com.auraboot.framework.meta.dto.AddFieldResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import java.util.List;
@@ -24,6 +26,17 @@ public interface MetaFieldService {
      * @return 创建的字段DTO
      */
     MetaFieldDTO create(MetaFieldCreateRequest request);
+
+    /**
+     * Atomic "add field to existing model". Encapsulates field+binding+publish
+     * handshake. Designed as the single source of truth for AuraBot skills,
+     * CLI commands, and any other automation. See spec §3 for invariants.
+     *
+     * @throws com.auraboot.framework.exception.ValidationException if modelCode unknown / code conflicts /
+     *         dataType invalid (not in {@code string|text|int|long|decimal|
+     *         boolean|date|datetime|json}).
+     */
+    AddFieldResult addToModel(AddFieldRequest request);
 
     /**
      * 根据PID查找字段

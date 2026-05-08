@@ -17,9 +17,12 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,6 +55,17 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     private final com.auraboot.framework.meta.validator.MetaFieldValidator fieldValidator;
     private final com.auraboot.framework.meta.mapper.MetaFieldDictBindingMapper fieldDictBindingMapper;
     private final com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;  // ✅ 新增: 模型-字段绑定服务
+
+    @Autowired
+    @Lazy
+    private com.auraboot.framework.meta.service.MetaModelService metaModelService;
+
+    @Autowired
+    @Lazy
+    private com.auraboot.framework.meta.service.SchemaManagementService schemaManagementService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
 
 
@@ -862,9 +876,214 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             );
             log.info("Field bound to model successfully: modelPid={}, fieldPid={}", modelPid, field.getPid());
         } catch (Exception e) {
-            log.warn("Failed to bind field to model: modelPid={}, fieldPid={}, error={}", 
+            log.warn("Failed to bind field to model: modelPid={}, fieldPid={}, error={}",
                 modelPid, field.getPid(), e.getMessage());
             // 不抛出异常，字段创建成功但绑定失败
         }
+    }
+
+    // ==================== AuraBot Skill SPI: addToModel ====================
+
+    /**
+     * Whitelist of abstract data types accepted by {@link #addToModel}. Maps
+     * onto the dialect's switch arms; {@code int} is normalized to
+     * {@code integer} before {@link MetaFieldCreateRequest} construction.
+     * See spec §3.4 dataType invariants.
+     */
+    private static final Set<String> ACCEPTED_DATA_TYPES = Set.of(
+            "string", "text", "int", "long", "decimal",
+            "boolean", "date", "datetime", "json");
+
+    @Override
+    @Transactional
+    public AddFieldResult addToModel(AddFieldRequest request) {
+        if (request == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "addToModel request must not be null");
+        }
+        if (!StringUtils.hasText(request.getModelCode())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "modelCode must not be blank");
+        }
+        if (!StringUtils.hasText(request.getCode())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "code must not be blank");
+        }
+        if (!StringUtils.hasText(request.getDataType())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "dataType must not be blank");
+        }
+
+        String dataTypeLower = request.getDataType().toLowerCase(Locale.ROOT);
+        if (!ACCEPTED_DATA_TYPES.contains(dataTypeLower)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "dataType not in whitelist (string|text|int|long|decimal|boolean|date|datetime|json): "
+                            + request.getDataType());
+        }
+        // Map abstract `int` -> dialect's `integer`. Other abstract types pass through.
+        String storedDataType = "int".equals(dataTypeLower) ? "integer" : dataTypeLower;
+
+        String modelCode = request.getModelCode();
+        String fieldCode = request.getCode();
+
+        // 1) Resolve model. findByCode throws ValidationException when missing — wrap.
+        MetaModelDTO model;
+        try {
+            model = metaModelService.findByCode(modelCode);
+        } catch (ValidationException ve) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "modelCode not found: " + modelCode);
+        }
+        if (model == null) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "modelCode not found: " + modelCode);
+        }
+
+        // 2) Reject duplicate field on this model.
+        try {
+            List<MetaFieldDTO> bound = modelFieldBindingService.getModelFields(model.getPid());
+            boolean dup = bound != null && bound.stream()
+                    .anyMatch(f -> f != null && fieldCode.equalsIgnoreCase(f.getCode()));
+            if (dup) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "field code already bound to model: model=" + modelCode + ", code=" + fieldCode);
+            }
+        } catch (ValidationException ve) {
+            throw ve;
+        } catch (RuntimeException re) {
+            // P3 boundary: surface as ValidationException so callers see a stable contract.
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "failed to inspect existing fields for model " + modelCode + ": " + re.getMessage());
+        }
+
+        // 3) Build field create request with autoPublish + modelPid for one-shot create+bind.
+        MetaFieldCreateRequest fcr = new MetaFieldCreateRequest();
+        fcr.setCode(fieldCode);
+        fcr.setDataType(storedDataType);
+        fcr.setAutoPublish(Boolean.TRUE);
+        fcr.setModelPid(model.getPid());
+
+        Map<String, Object> extension = new LinkedHashMap<>();
+        if (StringUtils.hasText(request.getDisplayName())) {
+            extension.put("displayName", request.getDisplayName());
+        }
+        if (StringUtils.hasText(request.getComment())) {
+            extension.put("description", request.getComment());
+        }
+        if (request.getMaxLength() != null) {
+            extension.put("maxLength", request.getMaxLength());
+        }
+        if (Boolean.TRUE.equals(request.getRequired())) {
+            extension.put("required", Boolean.TRUE);
+        }
+        if (!extension.isEmpty()) {
+            fcr.setExtension(extension);
+        }
+
+        MetaFieldDTO created;
+        try {
+            created = create(fcr);
+        } catch (ValidationException ve) {
+            throw ve;
+        } catch (RuntimeException re) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "field creation failed for " + fieldCode + ": " + re.getMessage());
+        }
+        if (created == null || !StringUtils.hasText(created.getPid())) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "field creation returned no pid for " + fieldCode);
+        }
+
+        // 4) Trigger DDL ADD COLUMN. The platform's binding helper only fires
+        //    addFieldToModel when model.isPublished() AND when called via
+        //    MetaModelService.bindFieldToModel(modelId,fieldId,...). The
+        //    auto-bind path goes through ModelFieldBindingService instead (no
+        //    DDL trigger), so addToModel must invoke schema management itself.
+        SchemaOperationResult schemaResult;
+        try {
+            schemaResult = schemaManagementService.addFieldToModel(modelCode, fieldCode);
+        } catch (RuntimeException re) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "DDL ADD COLUMN failed for " + modelCode + "." + fieldCode + ": " + re.getMessage());
+        }
+        if (schemaResult == null || !schemaResult.isSuccess()) {
+            String err = schemaResult != null ? schemaResult.getErrorMessage() : "null result";
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "DDL ADD COLUMN reported failure for " + modelCode + "." + fieldCode + ": " + err);
+        }
+
+        String tableName = StringUtils.hasText(schemaResult.getTableName())
+                ? schemaResult.getTableName()
+                : metaModelService.getTableName(modelCode);
+        String columnName = resolveColumnName(tableName, fieldCode);
+        if (columnName == null) {
+            // T1 finding: auto-bind silent-log mode means we cannot trust the
+            // create() return alone — verify the column actually landed.
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "auto-bind verification failed: column not found in information_schema "
+                            + "(table=" + tableName + ", expected code=" + fieldCode
+                            + "); check tenant context & model state");
+        }
+        String pgColumnType = resolvePgColumnType(tableName, columnName);
+
+        return AddFieldResult.builder()
+                .fieldPid(created.getPid())
+                .storageCode(modelCode + "_" + fieldCode)
+                .columnName(columnName)
+                .tableName(tableName)
+                .pgColumnType(pgColumnType)
+                .addedAt(Instant.now())
+                .build();
+    }
+
+    /**
+     * Find the actual column name in {@code information_schema.columns} for the
+     * given field code. The platform's {@code generateColumnName} lowercases +
+     * camel→snake; we try both forms to be tolerant.
+     */
+    private String resolveColumnName(String tableName, String fieldCode) {
+        String snakeLower = fieldCode
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .toLowerCase(Locale.ROOT);
+        List<String> candidates = snakeLower.equals(fieldCode)
+                ? List.of(fieldCode)
+                : List.of(snakeLower, fieldCode);
+        for (String candidate : candidates) {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.columns "
+                            + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                    Integer.class,
+                    tableName, candidate);
+            if (count != null && count > 0) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Read the actual PG type string for a column from
+     * {@code information_schema.columns}. Returns a human-readable shape like
+     * {@code "varchar(255)"}, {@code "integer"}, {@code "timestamptz"}.
+     */
+    private String resolvePgColumnType(String tableName, String columnName) {
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT udt_name, character_maximum_length, numeric_precision, numeric_scale "
+                        + "FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                tableName, columnName);
+        String udt = String.valueOf(row.get("udt_name"));
+        Object cml = row.get("character_maximum_length");
+        Object np = row.get("numeric_precision");
+        Object ns = row.get("numeric_scale");
+        if (cml instanceof Number) {
+            return udt + "(" + ((Number) cml).intValue() + ")";
+        }
+        if ("numeric".equalsIgnoreCase(udt) && np instanceof Number) {
+            int p = ((Number) np).intValue();
+            int s = (ns instanceof Number) ? ((Number) ns).intValue() : 0;
+            return udt + "(" + p + "," + s + ")";
+        }
+        return udt;
     }
 }
