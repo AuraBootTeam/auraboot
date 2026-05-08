@@ -92,8 +92,12 @@
       "x": 0, "y": 10, "w": 4, "h": 4,
       "config": {
         "title": "$i18n:acs.dashboard.chart.status_title",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_status_distribution" },
-        "visualization": { "xField": "label", "yField": "count" }
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "acs_showcase_status_distribution",
+          "dimensions": ["label"],
+          "metrics": [{ "field": "count", "aggregation": "max", "alias": "count" }]
+        }
       }
     },
     {
@@ -102,8 +106,12 @@
       "x": 4, "y": 10, "w": 4, "h": 4,
       "config": {
         "title": "$i18n:acs.dashboard.chart.risk_title",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_risk_distribution" },
-        "visualization": { "labelField": "label", "valueField": "value" }
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "acs_showcase_risk_distribution",
+          "dimensions": ["label"],
+          "metrics": [{ "field": "value", "aggregation": "max", "alias": "value" }]
+        }
       }
     },
     {
@@ -112,8 +120,15 @@
       "x": 8, "y": 10, "w": 4, "h": 4,
       "config": {
         "title": "$i18n:acs.dashboard.chart.category_title",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_category_stats" },
-        "visualization": { "xField": "category" },
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "acs_showcase_category_stats",
+          "dimensions": ["category"],
+          "metrics": [
+            { "field": "success", "aggregation": "max", "alias": "success" },
+            { "field": "failed", "aggregation": "max", "alias": "failed" }
+          ]
+        },
         "seriesConfig": [
           { "metricIndex": 0, "chartType": "bar" },
           { "metricIndex": 1, "chartType": "bar" }
@@ -126,8 +141,12 @@
       "x": 0, "y": 14, "w": 8, "h": 4,
       "config": {
         "title": "$i18n:acs.dashboard.chart.safety_trend_title",
-        "dataSource": { "type": "namedQuery", "queryCode": "acs_showcase_safety_trend" },
-        "visualization": { "xField": "date", "yField": "trigger_count" }
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "acs_showcase_safety_trend",
+          "dimensions": ["date"],
+          "metrics": [{ "field": "trigger_count", "aggregation": "max", "alias": "trigger_count" }]
+        }
       }
     },
     {
