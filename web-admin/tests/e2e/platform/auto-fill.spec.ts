@@ -15,7 +15,7 @@
 
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
 
 /**
  * Authenticate and return a request context with session cookies.

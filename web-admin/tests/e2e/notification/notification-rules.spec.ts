@@ -22,7 +22,7 @@
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers/index';
 
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
 
 async function openCreateRulePanel(page: import('@playwright/test').Page): Promise<void> {
   const createButton = page.locator('button').filter({ hasText: '创建规则' }).first();
