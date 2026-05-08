@@ -20,8 +20,94 @@
  *   - At least one crm_account + crm_opportunity exists; the suite seeds its own data
  */
 
+import type { Locator } from '@playwright/test';
 import { test, expect, type Page } from '../fixtures';
 import { uniqueId, navigateToDynamicPage, waitForDynamicPageLoad } from './helpers/index';
+
+/**
+ * Drag helper compatible with @dnd-kit/core PointerSensor.
+ *
+ * Playwright's `Locator.dragTo()` dispatches HTML5 drag events, which @dnd-kit
+ * does not listen to (PointerSensor relies on pointerdown/pointermove/pointerup).
+ * We instead drive page.mouse.* with a small "activation" nudge to satisfy the
+ * default `activationConstraint: { distance: 8 }`, then a multi-step move to
+ * the target so dnd-kit detects continuous motion.
+ */
+async function dndKitDrag(page: Page, source: Locator, target: Locator): Promise<void> {
+  // Resolve both endpoints to ElementHandles so we can dispatch
+  // PointerEvents directly on the DOM nodes, regardless of where they sit
+  // in the viewport. Playwright's page.mouse.* doesn't call
+  // setPointerCapture, which @dnd-kit's PointerSensor relies on to keep
+  // receiving pointermove events after the cursor leaves the source.
+  await source.scrollIntoViewIfNeeded();
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (!sourceBox || !targetBox) {
+    throw new Error('dndKitDrag: source/target locator has no bounding box');
+  }
+
+  const fromX = sourceBox.x + sourceBox.width / 2;
+  const fromY = sourceBox.y + sourceBox.height / 2;
+  const toX = targetBox.x + targetBox.width / 2;
+  const toY = targetBox.y + targetBox.height / 2;
+
+  const sourceHandle = await source.elementHandle();
+  const targetHandle = await target.elementHandle();
+  if (!sourceHandle || !targetHandle) {
+    throw new Error('dndKitDrag: failed to resolve element handles');
+  }
+
+  await page.evaluate(
+    ({ src, dst, fromX, fromY, toX, toY }) => {
+      const dispatch = (
+        el: Element,
+        type: string,
+        x: number,
+        y: number,
+        buttons: number,
+      ): void => {
+        const ev = new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+          button: 0,
+          buttons,
+          clientX: x,
+          clientY: y,
+        });
+        el.dispatchEvent(ev);
+      };
+
+      // pointerdown on source — PointerSensor records initial coords here.
+      dispatch(src, 'pointerdown', fromX, fromY, 1);
+      // Cross the 8px activationConstraint distance threshold first so the
+      // sensor commits to a drag rather than treating the gesture as click.
+      dispatch(src, 'pointermove', fromX + 12, fromY + 12, 1);
+
+      // Walk towards the drop target in steps. Dnd-kit attaches its
+      // pointermove listener to document/window once the drag starts, so
+      // dispatching on source still bubbles correctly.
+      const steps = 12;
+      for (let i = 1; i <= steps; i++) {
+        const x = fromX + (toX - fromX) * (i / steps);
+        const y = fromY + (toY - fromY) * (i / steps);
+        dispatch(src, 'pointermove', x, y, 1);
+      }
+
+      // Final pointermove on the destination so collision detection sees
+      // the over-state for that exact element, then pointerup commits.
+      dispatch(dst, 'pointermove', toX, toY, 1);
+      dispatch(dst, 'pointerup', toX, toY, 0);
+    },
+    { src: sourceHandle, dst: targetHandle, fromX, fromY, toX, toY },
+  );
+
+  await sourceHandle.dispose();
+  await targetHandle.dispose();
+}
 
 const UID = uniqueId('OppDemo');
 const ACCOUNT_NAME = `DemoAccount_${UID}`;
@@ -108,10 +194,13 @@ async function selectPipelineBoardKanban(page: Page): Promise<void> {
   }
   await panel.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => null);
 
-  // Kanban columns rendered (header testid is the canonical hook per kanban/README.md)
+  // Kanban columns rendered (header testid is the canonical hook per kanban/README.md).
+  // We wait for the *full* set of 6 dict-derived stages (discovery, qualification,
+  // proposal, negotiation, closed_won, closed_lost) so downstream column-id
+  // selectors don't race the async dict fetch that seeds empty columns.
   await expect(
-    page.locator('[data-testid="kanban-column-header"]').first(),
-  ).toBeVisible({ timeout: 15_000 });
+    page.locator('[data-testid="kanban-column-header"]'),
+  ).toHaveCount(6, { timeout: 15_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -215,9 +304,17 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
     );
     await expect(proposalHeader).toBeVisible();
 
+    // The actual droppable is the column *body* (where useDroppable lives).
+    // Targeting the body means handleDragEnd resolves `over.id === column.id`
+    // even when the column is empty (no cards to register as sortable items).
+    const proposalBody = page.locator(
+      `[data-testid="kanban-column-body"][data-column-id="${STAGE_PROPOSAL}"]`,
+    );
+    await expect(proposalBody).toBeVisible();
+
     // The proposal column DOM structure: header sibling-of cards-area inside the
     // same flex column wrapper. We target the "Drop here" zone OR an existing card
-    // within the column. Drag onto the column header reliably hits the column droppable.
+    // within the column. Drag onto the column body hits the column droppable.
     const persistRespPromise = page.waitForResponse(
       (r) =>
         r.url().includes(`/api/dynamic/crm_opportunity/${opportunityPid}`) &&
@@ -226,8 +323,9 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
       { timeout: 15_000 },
     );
 
-    // D6: drag card from current column onto proposal column header.
-    await card.dragTo(proposalHeader);
+    // D6: drag card from current column onto proposal column body.
+    // Use PointerEvent simulation — @dnd-kit's PointerSensor ignores HTML5 drag events.
+    await dndKitDrag(page, card, proposalBody);
     await persistRespPromise;
 
     // D8/D9: card now lives under proposal column. Validate by re-reading data-column-id
