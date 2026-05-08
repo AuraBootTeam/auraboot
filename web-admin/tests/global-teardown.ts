@@ -159,7 +159,7 @@ async function cleanupE2eMenus(): Promise<void> {
   try {
     const { execSync } = await import('node:child_process');
     execSync(
-      `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+      `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -v ON_ERROR_STOP=1 -tA`,
       {
         input: `DELETE FROM ab_menu WHERE pid LIKE 'E2EM\\_%' ESCAPE '\\';`,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -190,7 +190,7 @@ async function cleanupE2eSoulProfiles(): Promise<void> {
   try {
     const { execSync } = await import('node:child_process');
     execSync(
-      `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+      `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -v ON_ERROR_STOP=1 -tA`,
       {
         input: `DELETE FROM ab_agent_user_soul_profile
                  WHERE pid LIKE 'E2EUSP%'
