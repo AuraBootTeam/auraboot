@@ -134,12 +134,12 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
       // Seed account via dynamic API (read parameter naming from CRM commands.json)
       const accResp = await page.request.post('/api/meta/commands/execute/crm:create_account', {
         data: {
-          input: {
+          payload: {
             crm_acc_name: ACCOUNT_NAME,
             crm_acc_industry: 'technology',
             crm_acc_status: 'active',
           },
-          mode: 'create',
+          operationType: 'CREATE',
         },
       });
       if (!accResp.ok()) {
@@ -157,7 +157,7 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
         '/api/meta/commands/execute/crm:create_opportunity',
         {
           data: {
-            input: {
+            payload: {
               crm_opp_name: OPP_NAME,
               crm_opp_account_id: accountPid,
               crm_opp_stage: STAGE_QUALIFICATION,
@@ -167,7 +167,7 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
                 .toISOString()
                 .slice(0, 10),
             },
-            mode: 'create',
+            operationType: 'CREATE',
           },
         },
       );
@@ -277,14 +277,14 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
       '/api/meta/commands/execute/crm:create_opportunity',
       {
         data: {
-          input: {
+          payload: {
             crm_opp_name: `WonOpp_${UID}`,
             crm_opp_account_id: accountPid,
             crm_opp_stage: 'closed_won',
             crm_opp_expected_amount: 90000,
             crm_opp_probability: 100,
           },
-          mode: 'create',
+          operationType: 'CREATE',
         },
       },
     );
@@ -292,14 +292,14 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
       '/api/meta/commands/execute/crm:create_opportunity',
       {
         data: {
-          input: {
+          payload: {
             crm_opp_name: `LostOpp_${UID}`,
             crm_opp_account_id: accountPid,
             crm_opp_stage: 'closed_lost',
             crm_opp_expected_amount: 1000,
             crm_opp_probability: 0,
           },
-          mode: 'create',
+          operationType: 'CREATE',
         },
       },
     );
