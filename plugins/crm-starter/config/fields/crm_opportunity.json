@@ -50,7 +50,7 @@
     "code": "crm_opp_expected_close_date",
     "displayName:zh-CN": "预计成交日期",
     "displayName:en": "Expected Close Date",
-    "dataType": "datetime",
+    "dataType": "date",
     "feature": { "sortable": true }
   },
   {
