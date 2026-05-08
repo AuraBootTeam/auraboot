@@ -44,6 +44,14 @@ DEFAULT_PLUGINS=(
   # acp-showcase removed: plugin directory was deleted on commit 59050eed
   # (platformization) and now contains only scripts/ — no plugin.json. Bootstrap
   # would always fail with "Directory does not contain plugin.json".
+  #
+  # test-fixtures provides the e2et_* model/page/command set that ~100+ specs
+  # depend on (action-system, activity, data-tools, permission, saved-view, …).
+  # Backend gates the plugin loader behind IMPORT_TEST_FIXTURES=true (set in
+  # docker-compose.ga-e2e.override.yml) so this only resolves when run against
+  # a stack that has the env var; on host bootRun without the flag, the import
+  # api call returns "plugin not allowed".
+  test-fixtures
 )
 PLUGINS=( ${PLUGINS:-${DEFAULT_PLUGINS[@]}} )
 
