@@ -99,6 +99,13 @@ public class MetaModelCreateRequest {
      * Field definitions supplied by the virtual-model wizard. Each entry
      * carries at minimum code/dataType/sortable/filterable and is normalized
      * into capabilities.sortableFields/filterableFields at save time.
+     *
+     * <p><b>Note:</b> {@link MetaModelService#create(MetaModelCreateRequest)}
+     * does <b>not</b> persist these field definitions. They are only honored
+     * when routed through {@link MetaModelService#saveDefinition} (e.g. by
+     * the virtual-model wizard in {@code ModelController.createModel}).
+     * Service-direct callers that need custom fields must orchestrate
+     * {@code MetaFieldService.create} + {@code bindFieldToModel} explicitly.
      */
     private List<FieldDefinition> fields;
 
@@ -118,18 +125,10 @@ public class MetaModelCreateRequest {
     private String versionNote;
 
     /**
-     * 是否立即发布
-     */
-    private Boolean autoPublish;
-
-    /**
      * 构造函数
      */
     public MetaModelCreateRequest() {
         this.modelType = "entity";
-          
-        
-        this.autoPublish = false;
     }
 
     /**

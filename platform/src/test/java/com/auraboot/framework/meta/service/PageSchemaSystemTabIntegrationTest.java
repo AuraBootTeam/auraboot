@@ -144,7 +144,6 @@ class PageSchemaSystemTabIntegrationTest extends BaseIntegrationTest {
         modelRequest.setDescription("Integration test model for page schema system tabs");
         modelRequest.setModelCategory(modelCategory);
         modelRequest.setTableName(tableName);
-        modelRequest.setAutoPublish(false);
 
         var model = metaModelService.create(modelRequest);
         MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();

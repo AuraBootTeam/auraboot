@@ -403,11 +403,22 @@ public interface MetaModelService {
     MetaModelDTO rollbackToVersion(String code, Integer version);
 
     /**
-     * 根据编码查询模型
+     * Lookup the current version of a model by code.
+     *
      * @param code 模型编码
-     * @return 模型DTO
+     * @return 模型DTO, or {@code null} if no model with the given code exists
      */
     MetaModelDTO findByCode(String code);
+
+    /**
+     * Lookup the current version of a model by code, throwing when missing.
+     *
+     * @param code 模型编码
+     * @return 模型DTO (never null)
+     * @throws com.auraboot.framework.exception.ValidationException if no
+     *         model with the given code exists or {@code code} is blank
+     */
+    MetaModelDTO findByCodeOrThrow(String code);
 
     /**
      * 分页查询模型列表

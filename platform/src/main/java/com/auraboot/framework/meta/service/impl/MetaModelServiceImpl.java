@@ -444,7 +444,12 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     
     /**
-     * 直接创建模型(开发阶段保留)
+     * Create a model row plus the auto-bound system fields.
+     *
+     * <p>Callers are responsible for orchestrating any custom field creation
+     * (via {@link MetaFieldService#create}) and publishing the model
+     * (via {@link #publish(String, String)}). This method does not honor any
+     * field list or auto-publish flag from the request.
      */
     private MetaModelDTO createDirectly(MetaModelCreateRequest request) {
         log.info("直接创建模型(非Git-First): {}", request.getCode());
@@ -641,18 +646,31 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     }
     
     /**
-     * 根据编码查找模型
+     * Lookup the current version of a model by code.
+     *
+     * @return the DTO, or {@code null} if no model with the given code exists
      */
+    @Override
     public MetaModelDTO findByCode(String code) {
+        if (!StringUtils.hasText(code)) {
+            return null;
+        }
+        Model model = metaModelMapper.findCurrentByCode(code);
+        if (model == null) {
+            return null;
+        }
+        return convertToMetaModelDTO(model);
+    }
+
+    /**
+     * Lookup the current version of a model by code, throwing when missing.
+     */
+    @Override
+    public MetaModelDTO findByCodeOrThrow(String code) {
         if (!StringUtils.hasText(code)) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "模型编码不能为空");
         }
-
-
-
-        // 查找当前版本模型
         Model model = metaModelMapper.findCurrentByCode(code);
-
         if (model == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                 "模型不存在: " + code);
