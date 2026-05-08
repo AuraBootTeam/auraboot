@@ -4,6 +4,8 @@ import com.auraboot.framework.aurabot.skill.AuraBotSkill;
 import com.auraboot.framework.aurabot.skill.RiskLevel;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.SkillRunRepository;
+import com.auraboot.framework.aurabot.skill.entity.SkillRun;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.exception.ValidationException;
@@ -11,6 +13,8 @@ import com.auraboot.framework.meta.dto.AddFieldRequest;
 import com.auraboot.framework.meta.dto.AddFieldResult;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.dto.RemoveFieldRequest;
+import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -74,15 +78,18 @@ public class FieldAddSkill implements AuraBotSkill {
     private final MetaFieldService metaFieldService;
     private final MetaModelService metaModelService;
     private final ObjectMapper objectMapper;
+    private final SkillRunRepository skillRunRepository;
 
     private JsonNode schema;
 
     public FieldAddSkill(MetaFieldService metaFieldService,
                          MetaModelService metaModelService,
-                         ObjectMapper objectMapper) {
+                         ObjectMapper objectMapper,
+                         SkillRunRepository skillRunRepository) {
         this.metaFieldService = metaFieldService;
         this.metaModelService = metaModelService;
         this.objectMapper = objectMapper;
+        this.skillRunRepository = skillRunRepository;
     }
 
     @PostConstruct
@@ -294,8 +301,86 @@ public class FieldAddSkill implements AuraBotSkill {
 
     @Override
     public SkillResult undo(String undoToken) {
-        // T9 lands real impl.
-        throw new UnsupportedOperationException(name() + " undo not implemented yet");
+        // 1) Resolve the originating run from the undo token (Spec §5.5).
+        //    SkillRunRepository looks up by `undo_token` UNIQUE column with a
+        //    soft-delete guard; absent / consumed tokens come back empty.
+        SkillRun run = skillRunRepository.findByUndoToken(undoToken)
+                .orElseThrow(() -> new SkillSpiException(
+                        SkillErrorCode.UNDO_EXPIRED,
+                        "undo token not found or already consumed",
+                        null));
+
+        JsonNode after = run.getAfterSnapshot();
+        if (after == null || after.isNull()) {
+            throw new SkillSpiException(
+                    SkillErrorCode.SKILL_INTERNAL_ERROR,
+                    "skill run " + run.getPid() + " has no afterSnapshot — cannot undo",
+                    null);
+        }
+        JsonNode modelCodeNode = after.get("modelCode");
+        JsonNode storageCodeNode = after.get("storageCode");
+        if (modelCodeNode == null || modelCodeNode.isNull()
+                || storageCodeNode == null || storageCodeNode.isNull()) {
+            throw new SkillSpiException(
+                    SkillErrorCode.SKILL_INTERNAL_ERROR,
+                    "afterSnapshot is missing modelCode/storageCode for run " + run.getPid(),
+                    null);
+        }
+        String modelCode = modelCodeNode.asText();
+        String storageCode = storageCodeNode.asText();
+
+        // 2) Drop the column via removeFromModel(refuseIfDataExists=true).
+        //    ColumnHasDataException is the explicit "row data is at risk"
+        //    signal — we re-wrap as SKILL_INTERNAL_ERROR (P3 boundary;
+        //    re-wrap not swallow) so the controller layer can render the
+        //    user-facing "won't auto-undo, you have data" message. Per spec
+        //    §5.5 the user must manually confirm a destructive flow.
+        RemoveFieldRequest rmReq = RemoveFieldRequest.builder()
+                .modelCode(modelCode)
+                .storageCode(storageCode)
+                .refuseIfDataExists(true)
+                .build();
+        try {
+            metaFieldService.removeFromModel(rmReq);
+        } catch (ColumnHasDataException chd) {
+            throw new SkillSpiException(
+                    SkillErrorCode.SKILL_INTERNAL_ERROR,
+                    "field " + storageCode + " has data; refuse to undo to prevent data loss",
+                    null,
+                    chd);
+        } catch (ValidationException ve) {
+            throw new SkillSpiException(
+                    SkillErrorCode.SKILL_INTERNAL_ERROR,
+                    "undo validation failed: " + ve.getMessage(),
+                    null,
+                    ve);
+        } catch (RuntimeException re) {
+            log.error("field:add undo failed for storageCode={} modelCode={}",
+                    storageCode, modelCode, re);
+            throw new SkillSpiException(
+                    SkillErrorCode.SKILL_INTERNAL_ERROR,
+                    "undo failed: " + re.getMessage(),
+                    null,
+                    re);
+        }
+
+        // 3) Build payload — the controller flips the SkillRun row to UNDONE
+        //    via SkillRunRepository.markUndone; this skill stays focused on
+        //    the SPI contract (return what was undone).
+        ObjectNode payload = objectMapper.createObjectNode();
+        JsonNode fieldPidNode = after.get("fieldPid");
+        if (fieldPidNode != null && !fieldPidNode.isNull()) {
+            payload.put("undoneFieldPid", fieldPidNode.asText());
+        }
+        payload.put("droppedColumn", storageCode);
+        payload.put("modelCode", modelCode);
+
+        return SkillResult.builder()
+                .status(SkillResult.Status.SUCCESS)
+                .skillName(name())
+                .payload(payload)
+                .riskLevel(riskLevel())
+                .build();
     }
 
     /**

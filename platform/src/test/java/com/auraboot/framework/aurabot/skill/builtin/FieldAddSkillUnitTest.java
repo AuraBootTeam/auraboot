@@ -2,6 +2,7 @@ package com.auraboot.framework.aurabot.skill.builtin;
 
 import com.auraboot.framework.aurabot.skill.RiskLevel;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
+import com.auraboot.framework.aurabot.skill.SkillRunRepository;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.exception.ValidationException;
@@ -55,13 +56,15 @@ class FieldAddSkillUnitTest {
 
     private MetaFieldService metaFieldService;
     private MetaModelService metaModelService;
+    private SkillRunRepository skillRunRepository;
     private FieldAddSkill skill;
 
     @BeforeEach
     void setUp() throws Exception {
         metaFieldService = mock(MetaFieldService.class);
         metaModelService = mock(MetaModelService.class);
-        skill = new FieldAddSkill(metaFieldService, metaModelService, MAPPER);
+        skillRunRepository = mock(SkillRunRepository.class);
+        skill = new FieldAddSkill(metaFieldService, metaModelService, MAPPER, skillRunRepository);
         // @PostConstruct is private package-level — invoke directly.
         java.lang.reflect.Method init = FieldAddSkill.class.getDeclaredMethod("init");
         init.setAccessible(true);
