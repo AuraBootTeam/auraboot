@@ -36,11 +36,31 @@ services:
     ports: !override
       - "5433:5432"
 
+  # Redis — required by aurabot skill stores (PreviewTokenStore +
+  # SkillIdempotencyStore wire StringRedisTemplate as a hard constructor dep,
+  # so the backend ApplicationContext fails to start without it). Base
+  # docker-compose.yml has redis under profile [cache] and exposes 6379;
+  # we override here with: (a) joining the ga-e2e-stack profile so it comes
+  # up with the rest of the stack, (b) isolated host port 6380 to avoid
+  # colliding with developers' local redis on 6379, (c) container name
+  # under our COMPOSE_PROJECT_NAME.
+  redis:
+    profiles: !override
+      - ga-e2e-stack
+    container_name: auraboot-ga-e2e-redis
+    ports: !override
+      - "6380:6379"
+
   backend:
     container_name: auraboot-ga-e2e-backend
     # Compose appends profile lists; this gives backend [full, ga-e2e-stack].
     profiles:
       - ga-e2e-stack
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     build:
       dockerfile: ${GA_E2E_BACKEND_DOCKERFILE:-Dockerfile}
     ports:
@@ -70,6 +90,14 @@ services:
       # AuraPluginManager pluginsRoot (overrides the default `plugins/` which
       # we use for JSON resource directories instead).
       AURA_PLUGINS_DIR: /app/plugin-jars
+      # Redis — application.yml says "Redis is optional, set
+      # SPRING_DATA_REDIS_HOST to enable", but the aurabot skill module
+      # (PreviewTokenStore + SkillIdempotencyStore) constructor-injects
+      # StringRedisTemplate as a hard dep. Without these env vars the
+      # backend ApplicationContext fails to start. Hostname `redis` resolves
+      # via the compose network.
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
 
   # Vite + BFF dev server in a browser-capable Node container.
   # We do NOT use web-admin/Dockerfile because it bakes a prod build via

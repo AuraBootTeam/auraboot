@@ -268,6 +268,7 @@ public final class DslRegistry {
         SUB_TABLE("sub-table", "Sub-table block", "1.0"),
         MONTHLY_GRID("monthly-grid", "Monthly grid", "1.0"),
         STAT_CARD("stat-card", "Statistics card", "1.1"),
+        AI_FILL_BANNER("ai-fill-banner", "AI fill banner", "1.1"),
         CUSTOM("custom", "Custom block", "1.0");
 
         private final String code, label, since;
