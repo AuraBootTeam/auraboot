@@ -93,6 +93,15 @@ services:
       # /api/bootstrap/setup → full System+Business tenant + platform_admin
       # grant. Override base docker-compose.yml's "true".
       AURABOOT_BOOTSTRAP_ENABLED: "false"
+      # Activate `test` profile alongside `community` so test-only beans
+      # register on the isolated stack:
+      #   - TestUserSpoofFilter (X-Test-Spoof-User-Id header support)
+      #   - TestFixtureController + TestSeedController test endpoints
+      # This unblocks the user-soul-profile real-backend specs (PR-80)
+      # which spoof per-test user identities to avoid the shared-admin
+      # uq_user_soul_profile_active collision. Host workflow keeps the
+      # default community profile via base docker-compose.yml.
+      SPRING_PROFILES_ACTIVE: community,test
       # CORS allow-list covers the in-container hostnames plus host-mapped
       # variants. Frontend host ports are env-var driven for parity.
       FRONTEND_BASE_URL: http://localhost:${VITE_PORT:-5174}
