@@ -269,10 +269,10 @@ c8e984c9 feat(acp-showcase): add acs_showcase_recent_logs named query
    - **runtime 仍需肉眼确认**:实际查询是否真返回数据(后端 NamedQueryField 注册校验通过)、ECharts 渲染是否如期
 2. **6 KPI 卡复用单查询** — `metricField` 选不同列要在浏览器里看到 6 个不同数字,而不是 6 个相同数字
 3. **7 层 SVG** — sanitizer 放行后,在 rich-text 里实际渲染是否完整(IDs / markers / data-layer 全留下)
-4. **CTA 跳转** — `/p/acs_demo_request/new` 路由真存在(Page Designer 自动生成)且渲染表单有 i18n label
+4. ~~**CTA 跳转**~~ — 已 narrow:`web-admin/app/routes/p.$pageKey.new.tsx` 即"/p/{model_code}/new"动态路由,把 pageKey 当 tableName 传给 DynamicPageRenderer + pageType="form";plugin 已提供 `acs_demo_request_form.json` (kind=form),路由 + schema 双备齐。E2E 现在断言 `getByLabel(/请求标题|Request Title/i)` 验 i18n 端到端
 5. **暗色主题** — pipeline SVG 用了固定 hex(`#eef2ff` / `#312e81` 等),实际暗色下对比度需肉眼检
 6. **响应式** — 1280 / 1920 视宽下 SVG `viewBox` 自适应是否真不溢出
-7. **E2E spec 类名兼容** — recharts DOM 类名(`recharts-bar-rectangle` 等)实际是否如 spec 假设
+7. ~~**E2E spec 类名兼容**~~ — 已 narrow:`SmartBar/Pie/Line/ComboChart` 全用 `echarts-for-react`(canvas 渲染,非 recharts);E2E 已改为断言 `[data-widget-id="X"] canvas` 可见 + `boundingBox.width/height > 0`(commit `fc857a0d`)
 8. **Lighthouse a11y** — SVG `<title>` + `role="img"` 是否凑足 ≥90 分
 
 owner 已确认在自己 dev 环境完成上述 8 项后再合 main(`默认直推 main` 红线下,但"测试缺失=未完成"红线优先)。
