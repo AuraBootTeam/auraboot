@@ -156,28 +156,32 @@ cascade unblocked through ACS-007.
 - **Re-enable**: drop fixme on ACS-007. Likely also unblocks ACS-008..014
   cascade-skipped tests.
 
-## G-13 — Plugin resource importer ignores `dashboards` resource type
+## G-13 — Misdiagnosed (resolved): dashboards ARE imported, my JSON missed `title`
 
-Surfaced when running `aura plugin import` against a fresh docker stack
-after adding `plugins/test-fixtures/config/dashboards/e2et_order_dashboard.json`
-+ declaring `"dashboards": "config/dashboards"` in `plugin.json.resourceDirs`.
+Initially logged as "PluginResourceImporter ignores dashboards resource
+type". Re-investigation while preparing G-13 fix found:
 
-- **Symptom**: `aura plugin import` reports the standard resource counts
-  (FIELD, MODEL, PAGE, COMMAND, MENU, I18N, etc.) but emits **no DASHBOARD**
-  line. After import, `ab_dashboard` is empty.
-- **Root cause**: `PluginResourceImporterImpl` does not declare a
-  `DASHBOARD` import stage. The `PluginManifestLoader` reads the dashboard
-  JSON files into the manifest (counted as `dashboards=N` in startup logs)
-  but the importer pipeline never consumes them.
-- **Workaround used during G-1 verification**: `POST /api/dashboards`
-  directly with the JSON payload (after lower-casing `scope`), then
-  `UPDATE ab_dashboard SET status='published'` (no API endpoint flips
-  status either).
-- **Fix**: add a DASHBOARD import stage to `PluginResourceImporterImpl`
-  that maps each manifest dashboard JSON to a `DashboardCreateRequest`
-  (lower-case scope, default status=draft) and calls
-  `dashboardService.create()`. Add `POST /api/dashboards/{pid}/publish`
-  call (endpoint already exists) for plugins that ship `status: published`.
+- `PluginImportServiceImpl:1298` already calls `importDashboards()`
+  inside the PAGE stage. Resource counts are tracked under PAGE
+  (intentional, see comment "emitted as PAGE resource records").
+- `PluginResourceImporterImpl:1544 importDashboard()` exists end-to-end.
+- The actual silent skip was in `DashboardDefinitionDTO.isValid()` which
+  requires a plain `title` string. My initial JSON had only
+  `title:zh-CN` / `title:en` (which `@JsonAnySetter` captures into
+  `unknownFields`), leaving `title` field null → `isValid() == false` →
+  the import loop logs `Skipping invalid dashboard definition` and
+  moves on.
+
+**Fix landed**: add `"title": "订单统计仪表盘"` (plain string) alongside the
+i18n variants in `plugins/test-fixtures/config/dashboards/e2et_order_dashboard.json`.
+Same shape as `crm_overview` which works.
+
+**Workaround removal**: with the title fix, `aura plugin import` should
+populate `ab_dashboard` automatically — no more manual
+`POST /api/dashboards` + `UPDATE status='published'` needed in
+`scripts/dev/run-p0-e2e-docker.sh`. (Verification on a fresh stack
+blocked by an unrelated JWT 20002 issue on the docker stack instance —
+defer to host-backend re-run.)
 
 ## G-14 — `smart-table-chart` widget has no flat-list mode
 
