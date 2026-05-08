@@ -12,7 +12,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const file = formData.get('file') as File;
 
     if (!file) {
-      return Response.json({ error: '没有文件' }, { status: 400 });
+      return Response.json({ error: 'No file provided' }, { status: 400 });
     }
 
     // 使用服务器端配置
@@ -55,6 +55,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   } catch (error) {
     console.error('本地上传失败:', error);
-    return Response.json({ error: '文件上传失败' }, { status: 500 });
+    return Response.json({ error: 'File upload failed' }, { status: 500 });
   }
 };

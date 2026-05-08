@@ -40,7 +40,7 @@ export async function action({ request }: ActionFunctionArgs) {
       if (!email || !email.includes('@')) {
         return {
           success: false,
-          error: '请输入有效的邮箱地址',
+          error: 'Please enter a valid email address',
           field: 'email',
         };
       }
@@ -68,7 +68,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  return { success: false, error: '无效的操作' };
+  return { success: false, error: 'Invalid action' };
 }
 
 // 头像上传组件
