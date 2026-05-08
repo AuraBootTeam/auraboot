@@ -10,6 +10,7 @@ import {
   DndContext,
   DragOverlay,
   closestCenter,
+  MouseSensor,
   PointerSensor,
   useDroppable,
   useSensor,
@@ -118,14 +119,25 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
     });
   }, [columns, dictItems, terminalStages]);
 
-  // Configure drag sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-  );
+  // Configure drag sensors.
+  //
+  // E2E mode (window.__AURA_E2E_MODE__ === true) swaps PointerSensor for
+  // MouseSensor. Playwright's page.mouse.* API dispatches MouseEvents that
+  // PointerSensor's setPointerCapture path does not always observe reliably
+  // through React portals, leading to pointermove events being lost after the
+  // cursor leaves the source element. MouseSensor listens to mousedown /
+  // mousemove / mouseup directly on document, which Playwright drives natively.
+  // Activation constraint stays at 8px in both modes — user-perceived
+  // semantics are unchanged.
+  const e2eMode =
+    typeof window !== 'undefined' && (window as Window).__AURA_E2E_MODE__ === true;
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: { distance: 8 },
+  });
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 },
+  });
+  const sensors = useSensors(e2eMode ? mouseSensor : pointerSensor);
 
   /**
    * Find a card by ID across all columns
