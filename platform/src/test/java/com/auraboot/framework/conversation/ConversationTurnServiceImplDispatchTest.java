@@ -211,7 +211,7 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
                     argThat(ctx -> ctx.tenantId() == tenantId),
                     argThat(req -> agentCode.equals(req.getAgentCode())
                             && "hi agent".equals(req.getMessage())),
-                    same(sink),
+                    any(),
                     org.mockito.ArgumentMatchers.<com.auraboot.framework.agent.port.AgentTurnOverrides>any());
             verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
         });

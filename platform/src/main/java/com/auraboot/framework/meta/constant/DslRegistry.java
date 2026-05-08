@@ -244,7 +244,9 @@ public final class DslRegistry {
     public enum PageKind implements DslEnum {
         LIST("list", "List page", "1.0"),
         FORM("form", "Form page", "1.0"),
-        DETAIL("detail", "Detail page", "1.0");
+        DETAIL("detail", "Detail page", "1.0"),
+        DASHBOARD("dashboard", "Dashboard page", "1.0"),
+        COMPOSITE("composite", "Composite page", "1.0");
 
         private final String code, label, since;
         PageKind(String code, String label, String since) { this.code = code; this.label = label; this.since = since; }

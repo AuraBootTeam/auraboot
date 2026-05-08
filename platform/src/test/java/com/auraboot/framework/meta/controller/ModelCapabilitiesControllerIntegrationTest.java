@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("ModelCapabilitiesController - Integration Tests (P1 T5)")
 class ModelCapabilitiesControllerIntegrationTest extends BaseIntegrationTest {
 
-    private static final String PERMISSION_CODE = "system.model.read";
+    private static final String PERMISSION_CODE = "meta.model.read";
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -68,7 +68,7 @@ class ModelCapabilitiesControllerIntegrationTest extends BaseIntegrationTest {
     void setupMvc() {
         grantPermissionToTestRole(
                 PERMISSION_CODE,
-                "system",
+                "meta",
                 "model",
                 "read",
                 "Model Read"

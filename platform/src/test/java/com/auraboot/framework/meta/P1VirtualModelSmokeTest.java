@@ -80,8 +80,8 @@ class P1VirtualModelSmokeTest extends BaseIntegrationTest {
         TransactionTemplate tt = new TransactionTemplate(txManager);
         tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
         tt.executeWithoutResult(status -> {
-            grantPermissionToTestRole("system.model.read",
-                    "system", "model", "read", "System Model Read");
+            grantPermissionToTestRole("meta.model.read",
+                    "meta", "model", "read", "Meta Model Read");
             grantPermissionToTestRole("model." + modelCode + ".read",
                     "model", modelCode, "read", "Model " + modelCode + " Read");
             grantPermissionToTestRole("model." + modelCode + ".create",
