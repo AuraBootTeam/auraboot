@@ -54,9 +54,10 @@ export const ADMIN_TENANT_ID = resolveAdminTenantId();
 function resolveAiCenterMenuId(): string {
   try {
     const sql = `SELECT DISTINCT parent_id FROM ab_menu WHERE tenant_id = ${ADMIN_TENANT_ID} AND path LIKE '/aurabot/%' AND parent_id IS NOT NULL LIMIT 1;`;
-    const id = execSync(`psql -h localhost -U ghj -d aura_boot -tA`, {
+    const id = execSync(`psql ${PG_FLAGS} -tA`, {
       input: sql,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: PG_ENV,
     })
       .toString()
       .trim();
@@ -66,20 +67,40 @@ function resolveAiCenterMenuId(): string {
   }
 }
 
-export const AI_CENTER_MENU_ID = resolveAiCenterMenuId();
+// ---------------------------------------------------------------------------
+// psql helpers — must be env-aware. Hardcoded `-h localhost -U ghj -d aura_boot`
+// works for host-mode dev (postgres on :5432) but fails on isolated docker
+// stacks (auraboot-ga-e2e on :5433 user auraboot, auraboot-r2 on :5434, etc.).
+// Read PGHOST/PGPORT/PGUSER/PGDATABASE env (the standard libpq vars) so the
+// same helpers work across stacks. Defaults remain the host-dev shape so
+// historic local runs keep working without env setup.
+// Canonical pattern documented in
+// `auraboot-enterprise/.../feedback_psql_helpers_must_be_env_aware.md`.
+// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// psql helpers
-// ---------------------------------------------------------------------------
+const PG_HOST = process.env.PGHOST || 'localhost';
+const PG_PORT = process.env.PGPORT || '5432';
+const PG_USER = process.env.PGUSER || 'ghj';
+const PG_DB = process.env.PGDATABASE || 'aura_boot';
+const PG_FLAGS = `-h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB} -P pager=off -v ON_ERROR_STOP=1`;
+// PGPASSWORD is the standard libpq env — pass it through if set so docker
+// stacks with non-trust auth can connect. Don't override if the operator
+// has already set it.
+const PG_ENV = process.env.PGPASSWORD
+  ? { ...process.env, PGPASSWORD: process.env.PGPASSWORD }
+  : process.env;
+
+export const AI_CENTER_MENU_ID = resolveAiCenterMenuId();
 
 function psql(sql: string): string {
   // Pipe the SQL via stdin so we can ship multi-line templates (contract_yaml
   // needs real \n characters) without worrying about shell quoting. -tA keeps
   // the output aligned-free and tuples-only so the caller can parse it.
-  return execSync(
-    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
-    { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
-  )
+  return execSync(`psql ${PG_FLAGS} -tA`, {
+    input: sql,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: PG_ENV,
+  })
     .toString()
     .trim();
 }
@@ -90,10 +111,11 @@ function psql(sql: string): string {
  * transactional batches whose only meaningful output is a SELECT tuple.
  */
 function psqlQuiet(sql: string): string {
-  return execSync(
-    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -qtA`,
-    { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
-  )
+  return execSync(`psql ${PG_FLAGS} -qtA`, {
+    input: sql,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: PG_ENV,
+  })
     .toString()
     .trim();
 }
