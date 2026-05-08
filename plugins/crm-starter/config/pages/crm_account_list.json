@@ -13,7 +13,7 @@
         {
           "code": "create",
           "primary": true,
-          "permissionCode": "CRM.account.manage",
+          "permissionCode": "crm.account.manage",
           "label": "create",
           "action": {
             "type": "navigate",
@@ -112,7 +112,7 @@
             },
             {
               "code": "edit",
-              "permissionCode": "CRM.account.manage",
+              "permissionCode": "crm.account.manage",
               "label": "edit",
               "action": {
                 "type": "navigate",
@@ -122,7 +122,7 @@
             {
               "code": "delete",
               "danger": true,
-              "permissionCode": "CRM.account.manage",
+              "permissionCode": "crm.account.manage",
               "label": "delete",
               "confirm": "delete.confirm",
               "action": {

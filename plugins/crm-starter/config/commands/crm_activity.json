@@ -19,7 +19,7 @@
       }
     },
     "permissions": [
-      "CRM.activity.manage"
+      "crm.activity.manage"
     ],
     "agent_hint": "Create a new activity record. Key inputs: type, subject, content. Auto-set: owner, date.",
     "cmd_risk_level": "L1"
@@ -37,7 +37,7 @@
       "crm_act_date"
     ],
     "permissions": [
-      "CRM.activity.manage"
+      "crm.activity.manage"
     ],
     "agent_hint": "Update an existing activity record. Editable fields: type, subject, content, date.",
     "cmd_risk_level": "L1"
@@ -53,7 +53,7 @@
       "confirmMessage:en": "Confirm delete this activity?"
     },
     "permissions": [
-      "CRM.activity.manage"
+      "crm.activity.manage"
     ],
     "agent_hint": "Delete activity record(s). This is irreversible.",
     "cmd_risk_level": "L4"
@@ -65,7 +65,7 @@
     "type": "query",
     "modelCode": "crm_activity",
     "permissions": [
-      "CRM.activity.read"
+      "crm.activity.read"
     ],
     "agent_hint": "Query activity records.",
     "cmd_risk_level": "L0"
@@ -77,7 +77,7 @@
     "type": "query",
     "modelCode": "crm_activity",
     "permissions": [
-      "CRM.activity.read"
+      "crm.activity.read"
     ],
     "agent_hint": "Query activity records.",
     "cmd_risk_level": "L0"

@@ -28,7 +28,7 @@
       }
     },
     "permissions": [
-      "CRM.account.manage"
+      "crm.account.manage"
     ],
     "agent_hint": "Create a new crm account record. Key inputs: name, industry, website, phone, address. Auto-generated: code, owner, status.",
     "cmd_risk_level": "L1"
@@ -50,7 +50,7 @@
       "crm_acc_remark"
     ],
     "permissions": [
-      "CRM.account.manage"
+      "crm.account.manage"
     ],
     "agent_hint": "Update an existing crm account record. Editable fields: name, industry, website, phone, address.",
     "cmd_risk_level": "L1"
@@ -66,7 +66,7 @@
       "confirmMessage:en": "Confirm delete this account?"
     },
     "permissions": [
-      "CRM.account.manage"
+      "crm.account.manage"
     ],
     "agent_hint": "Delete crm account record(s). This is irreversible.",
     "cmd_risk_level": "L4"
@@ -78,7 +78,7 @@
     "type": "query",
     "modelCode": "crm_account",
     "permissions": [
-      "CRM.account.read"
+      "crm.account.read"
     ],
     "agent_hint": "Query crm account records.",
     "cmd_risk_level": "L0"
@@ -90,7 +90,7 @@
     "type": "query",
     "modelCode": "crm_account",
     "permissions": [
-      "CRM.account.read"
+      "crm.account.read"
     ],
     "agent_hint": "Query crm account records.",
     "cmd_risk_level": "L0"

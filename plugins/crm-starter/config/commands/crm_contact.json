@@ -16,7 +16,7 @@
       "crm_ct_remark"
     ],
     "permissions": [
-      "CRM.contact.manage"
+      "crm.contact.manage"
     ],
     "agent_hint": "Create a new crm contact record. Key inputs: account_id, name, title, email, phone.",
     "cmd_risk_level": "L1"
@@ -38,7 +38,7 @@
       "crm_ct_remark"
     ],
     "permissions": [
-      "CRM.contact.manage"
+      "crm.contact.manage"
     ],
     "agent_hint": "Update an existing crm contact record. Editable fields: account_id, name, title, email, phone.",
     "cmd_risk_level": "L1"
@@ -54,7 +54,7 @@
       "confirmMessage:en": "Confirm delete this contact?"
     },
     "permissions": [
-      "CRM.contact.manage"
+      "crm.contact.manage"
     ],
     "agent_hint": "Delete crm contact record(s). This is irreversible.",
     "cmd_risk_level": "L4"
@@ -66,7 +66,7 @@
     "type": "query",
     "modelCode": "crm_contact",
     "permissions": [
-      "CRM.contact.read"
+      "crm.contact.read"
     ],
     "agent_hint": "Query crm contact records.",
     "cmd_risk_level": "L0"
@@ -78,7 +78,7 @@
     "type": "query",
     "modelCode": "crm_contact",
     "permissions": [
-      "CRM.contact.read"
+      "crm.contact.read"
     ],
     "agent_hint": "Query crm contact records.",
     "cmd_risk_level": "L0"

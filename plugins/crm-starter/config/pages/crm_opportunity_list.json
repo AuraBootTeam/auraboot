@@ -13,7 +13,7 @@
         {
           "code": "create",
           "primary": true,
-          "permissionCode": "CRM.opportunity.manage",
+          "permissionCode": "crm.opportunity.manage",
           "label": "create",
           "action": {
             "type": "navigate",
@@ -133,7 +133,7 @@
             },
             {
               "code": "edit",
-              "permissionCode": "CRM.opportunity.manage",
+              "permissionCode": "crm.opportunity.manage",
               "label": "edit",
               "action": {
                 "type": "navigate",
@@ -143,7 +143,7 @@
             {
               "code": "delete",
               "danger": true,
-              "permissionCode": "CRM.opportunity.manage",
+              "permissionCode": "crm.opportunity.manage",
               "label": "delete",
               "confirm": "delete.confirm",
               "action": {
