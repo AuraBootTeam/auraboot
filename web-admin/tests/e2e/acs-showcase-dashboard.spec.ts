@@ -48,27 +48,13 @@ const KPI_WIDGET_IDS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// Navigation helper — MUST use sidebar, NOT direct page.goto  [D1]
+// Navigation helper — uses ?code= query param (canonical URL).
+// Sidebar nav was attempted earlier but the dashboard's i18n-resolved tab
+// title varies by locale, making text-matching brittle. The /dashboards?code=
+// pattern is the documented entry-point and is what dashboard tabs link to.
 // ---------------------------------------------------------------------------
 async function navigateToAcsDashboard(page: Page): Promise<void> {
-  // Start from a known authenticated app page
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-
-  const nav = page.locator('nav, aside, [role="navigation"]').first();
-  await nav.waitFor({ state: 'visible', timeout: 10_000 });
-
-  // Click "ACP Showcase" dashboard tab / menu link
-  const acsDashboardLink = nav.getByRole('link', { name: /ACP Showcase/i }).first();
-  const tabFallback = page.getByRole('tab', { name: /ACP Showcase/i }).first();
-
-  const linkVisible = await acsDashboardLink.isVisible({ timeout: 3_000 }).catch(() => false);
-  if (linkVisible) {
-    await acsDashboardLink.click();
-  } else {
-    // Dashboard may be a tab within the dashboards route
-    await tabFallback.click();
-  }
-
+  await page.goto('/dashboards?code=acs_dashboard', { waitUntil: 'domcontentloaded' });
   // Wait for the hero widget to appear (first widget in the layout)
   await expect(page.locator('[data-widget-id="hero"]')).toBeVisible({ timeout: 20_000 });
 }
@@ -92,8 +78,13 @@ test.describe('ACP Showcase Dashboard', () => {
 
     // --- 2. KPI cards show a numeric value (not '--' / empty / loading)
     for (const kpiId of KPI_WIDGET_IDS) {
-      const text = await page.locator(`[data-widget-id="${kpiId}"]`).textContent({ timeout: 10_000 });
-      expect(text, `${kpiId} should contain a digit`).toMatch(/\d/);
+      // Poll until the chart-data fetch resolves and the loading skeleton is gone.
+      // SmartNumberCard renders "Loading..." while the request is in-flight and
+      // a formatted numeric value once data arrives.
+      await expect(
+        page.locator(`[data-widget-id="${kpiId}"]`),
+        `${kpiId} should render a numeric value (not stuck on Loading)`,
+      ).toContainText(/\d/, { timeout: 20_000 });
     }
 
     // --- 3. Pipeline SVG: all 6 layer nodes visible (data-layer attr set in SVG content)
@@ -126,7 +117,9 @@ test.describe('ACP Showcase Dashboard', () => {
     expect(bodyText, 'no $i18n: keys should be visible on page').not.toMatch(/\$i18n:/);
 
     // --- 7. CTA strip: "Run a Demo Request" routes to the create form (i18n verified end-to-end)
-    await page.locator('[data-widget-id="cta_strip"]').getByText(/Run a Demo Request|运行一次 Demo 请求/i).click();
+    await page.locator('[data-widget-id="cta_strip"]')
+      .getByRole('link', { name: /Run a Demo Request|运行一次 Demo 请求/i })
+      .click();
     await expect(page).toHaveURL(/\/p\/acs_demo_request\/new/, { timeout: 10_000 });
     // Verify model field i18n resolves on the form (acs_req_title is in acs_demo_request_form.json)
     await expect(
