@@ -125,12 +125,13 @@ test.describe('ACP Showcase Dashboard', () => {
     const bodyText = await page.locator('body').textContent();
     expect(bodyText, 'no $i18n: keys should be visible on page').not.toMatch(/\$i18n:/);
 
-    // --- 7. CTA strip: "Run a Demo Request" routes to the create form
+    // --- 7. CTA strip: "Run a Demo Request" routes to the create form (i18n verified end-to-end)
     await page.locator('[data-widget-id="cta_strip"]').getByText(/Run a Demo Request|运行一次 Demo 请求/i).click();
     await expect(page).toHaveURL(/\/p\/acs_demo_request\/new/, { timeout: 10_000 });
-    // Verify the create form actually loaded (not a blank page)
+    // Verify model field i18n resolves on the form (acs_req_title is in acs_demo_request_form.json)
     await expect(
-      page.locator('form, [data-testid="dynamic-form"], [class*="form"]').first(),
+      page.getByLabel(/Request Title|请求标题/i),
+      'create form should render with resolved i18n label for acs_req_title',
     ).toBeVisible({ timeout: 15_000 });
   });
 });
