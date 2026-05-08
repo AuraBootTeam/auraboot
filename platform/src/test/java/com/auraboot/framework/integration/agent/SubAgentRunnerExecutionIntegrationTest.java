@@ -1,5 +1,6 @@
 package com.auraboot.framework.integration.agent;
 
+import com.auraboot.framework.agent.crosstenant.CrossTenantAclDeniedException;
 import com.auraboot.framework.agent.memory.SessionEndedEvent;
 import com.auraboot.framework.agent.service.ChildRunCompletedEvent;
 import com.auraboot.framework.agent.service.SubAgentRunner;
@@ -251,11 +252,15 @@ class SubAgentRunnerExecutionIntegrationTest extends BaseIntegrationTest {
     void e2_cross_tenant_rejected() {
         String parentRunPid = seedParentRun(otherTenantId);
 
+        // Updated: SubAgentRunner now consults CrossTenantAclService and
+        // throws CrossTenantAclDeniedException (a subclass of
+        // IllegalStateException carrying the structured decision tuple). The
+        // message is sourced from the deny-decision audit row format.
         assertThatThrownBy(() -> subAgentRunner.spawn(
                 tenantId, parentRunPid, sessionId, "cross-tenant subtask",
                 "interrupt_subtask"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("does not match caller tenant");
+                .isInstanceOf(CrossTenantAclDeniedException.class)
+                .hasMessageContaining("cross-tenant spawn requires explicit grant");
 
         Integer countCallerTenant = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_run WHERE tenant_id = ? AND parent_run_id = ?",

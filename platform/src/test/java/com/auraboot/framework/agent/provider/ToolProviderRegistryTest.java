@@ -171,13 +171,14 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
                 .build();
         var tools = registry.discoverByProvider("platform", ctx);
 
-        assertThat(tools).hasSize(4);
+        assertThat(tools).hasSize(5);
         assertThat(tools.stream().map(ToolDefinition::getToolCode))
                 .containsExactlyInAnyOrder(
                         "platform.execute_sql",
                         "platform.list_models",
                         "platform.model_suggest",
-                        "platform.create_model");
+                        "platform.create_model",
+                        "platform.delegate_task");
     }
 
     @Test
