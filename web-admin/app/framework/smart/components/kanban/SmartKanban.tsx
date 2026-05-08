@@ -74,14 +74,17 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
 
-  // Fetch Kanban data
+  // Resolve per-stage color / terminal from dict extension (no-op when dictCode absent).
+  const { items: dictItems } = useDictWithExtras(groupByDictCode);
+
+  // Fetch Kanban data. Pass dict items so the hook seeds the full set of
+  // columns in dict order, even for stages with zero cards (full pipeline
+  // visibility — see backlog 2026-05-08 Gap 2).
   const { columns, loading, error, moveCard } = useKanbanData({
     dataSource,
     linkageFilters,
+    groupByDictItems: dictItems.length > 0 ? dictItems : undefined,
   });
-
-  // Resolve per-stage color / terminal from dict extension (no-op when dictCode absent).
-  const { items: dictItems } = useDictWithExtras(groupByDictCode);
 
   /**
    * Enrich columns with color/terminal:
