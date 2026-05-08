@@ -427,30 +427,58 @@
     "refType": "dict_item"
   },
   {
-    "key": "menu.CRMS_ROOT.label",
-    "zh-CN": "CRM 入门",
-    "en-US": "CRM Starter",
+    "key": "menu.crm_root",
+    "zh-CN": "CRM 演示",
+    "en-US": "CRM Demo",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.CRMS_ACCOUNTS.label",
+    "key": "menu.crm_dashboard",
+    "zh-CN": "驾驶舱",
+    "en-US": "Dashboard",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crm_accounts",
     "zh-CN": "客户",
     "en-US": "Accounts",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.CRMS_CONTACTS.label",
+    "key": "menu.crm_contacts",
     "zh-CN": "联系人",
     "en-US": "Contacts",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.CRMS_LEADS.label",
+    "key": "menu.crm_leads",
     "zh-CN": "线索",
     "en-US": "Leads",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crm_opportunities",
+    "zh-CN": "商机管理",
+    "en-US": "Opportunities",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crm_activities",
+    "zh-CN": "活动",
+    "en-US": "Activities",
+    "source": "import",
+    "refType": "menu"
+  },
+  {
+    "key": "menu.crm_campaigns",
+    "zh-CN": "营销活动",
+    "en-US": "Campaigns",
     "source": "import",
     "refType": "menu"
   },
