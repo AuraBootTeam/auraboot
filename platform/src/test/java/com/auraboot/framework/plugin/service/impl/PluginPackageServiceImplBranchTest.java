@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.plugin.dto.packages.PackageHistoryDTO;
 import com.auraboot.framework.plugin.dto.packages.PackageInstallOptions;
 import com.auraboot.framework.plugin.dto.packages.PackageInstallResult;
@@ -18,6 +19,8 @@ import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.service.PluginImportService;
 import com.auraboot.framework.plugin.service.PluginResourceService;
 import com.auraboot.framework.plugin.service.PluginSignatureVerifier;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.io.ByteArrayInputStream;
@@ -63,6 +67,24 @@ class PluginPackageServiceImplBranchTest {
     @Mock private PluginSignatureVerifier signatureVerifier;
 
     @InjectMocks private PluginPackageServiceImpl service;
+
+    @BeforeEach
+    void setUpContext() {
+        if (MetaContext.exists()) {
+            MetaContext.clear();
+        }
+        MetaContext.setContext(100L, 1L, "U-1", "tester");
+        // tempDir is @Value-injected at runtime; populate it for stream parsing tests.
+        ReflectionTestUtils.setField(service, "tempDir",
+                System.getProperty("java.io.tmpdir") + "/aura-plugins-test");
+    }
+
+    @AfterEach
+    void clearContext() {
+        if (MetaContext.exists()) {
+            MetaContext.clear();
+        }
+    }
 
     @Test
     @DisplayName("install returns failure when packageId is unknown to context cache")
