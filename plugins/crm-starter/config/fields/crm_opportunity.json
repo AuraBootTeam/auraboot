@@ -44,7 +44,6 @@
     "displayName:zh-CN": "预期金额",
     "displayName:en": "Expected Amount",
     "dataType": "money",
-    "defaultValue": { "currency": "CNY" },
     "feature": { "sortable": true }
   },
   {
