@@ -299,9 +299,12 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(7)
     void agentTemplates_allHaveSoulProfile() {
+        // Scope to agent_code LIKE 'tpl_%' to exclude legacy SYSTEM_TENANT
+        // fixtures (`aurabot`, `cs_agent`, `test_h3_*`) that pre-date the
+        // tpl_ template convention and are not required to carry a soul_profile.
         List<Map<String, Object>> agents = jdbcTemplate.queryForList(
                 "SELECT agent_code, soul_profile, skills, system_prompt FROM ab_agent_definition " +
-                "WHERE tenant_id = ? AND deleted_flag = FALSE",
+                "WHERE tenant_id = ? AND deleted_flag = FALSE AND agent_code LIKE 'tpl_%'",
                 SYSTEM_TENANT_ID);
 
         for (Map<String, Object> agent : agents) {

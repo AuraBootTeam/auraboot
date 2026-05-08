@@ -264,9 +264,14 @@ class ParentJoinServiceJoinIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("cross-tenant spawn requires explicit grant")
                 .hasMessageContaining("denied_no_grant");
+        // C.2 unifies the cross-tenant deny path: the same exception is thrown
+        // regardless of how many times the call repeats — there is no longer a
+        // separate "does not match" branch (removed when ACL allow was made
+        // fall-through). Both invocations must surface the same denied_no_grant
+        // exception to keep the deny semantics consistent.
         assertThatThrownBy(() -> parentJoinService.joinChildRun(parentRunPid, childRunPid, 5000L))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("does not match");
+                .hasMessageContaining("denied_no_grant");
         long elapsed = System.currentTimeMillis() - before;
         assertThat(elapsed).as("tenant guard must fail fast, not block").isLessThan(500L);
         // No leftover slot from the rejected call.
