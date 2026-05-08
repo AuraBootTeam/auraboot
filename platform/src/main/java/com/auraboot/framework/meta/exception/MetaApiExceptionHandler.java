@@ -88,6 +88,26 @@ public class MetaApiExceptionHandler {
     }
 
     /**
+     * Handle column-has-data refusal (Spec §3.7 #6 / §4) — HTTP 422.
+     *
+     * <p>Surfaced when {@code MetaFieldService.removeFromModel} is invoked with
+     * {@code refuseIfDataExists=true} and the target column still carries
+     * non-null rows. Wire code is the literal string {@code COLUMN_HAS_DATA}
+     * so the FE / CLI can switch on it without depending on numeric codes.
+     */
+    @ExceptionHandler(ColumnHasDataException.class)
+    public ResponseEntity<ApiResponse<Void>> handleColumnHasDataException(ColumnHasDataException e) {
+        log.warn("Column has data — remove refused: {}", e.getMessage());
+
+        ApiResponse<Void> response = ApiResponse.error(
+                HttpStatus.UNPROCESSABLE_ENTITY.value(), e.getMessage());
+        // Override the numeric default (422) with the wire-stable string code.
+        response.setCode("COLUMN_HAS_DATA");
+
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+    }
+
+    /**
      * Handle query timeout.
      */
     @ExceptionHandler(QueryTimeoutException.class)
