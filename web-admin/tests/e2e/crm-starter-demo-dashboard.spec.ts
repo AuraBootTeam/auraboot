@@ -2,8 +2,8 @@
  * CRM Starter Demo — Lightweight Dashboard E2E
  *
  * Validates the crm-starter `crm_overview` dashboard wired through the menu
- * "CRM 演示 → 驾驶舱" / "CRM Demo → Dashboard" (path `/crm/dashboard`,
- * pageKey `crm_overview`).
+ * "CRM 演示 → 驾驶舱" / "CRM Demo → Dashboard" (path
+ * `/dashboards/view/crm_overview`, pageKey `crm_overview`).
  *
  * Real widgets (per `plugins/crm-starter/config/dashboards/crm_overview.json`):
  *   - block_recent_opportunities — type `smart-table-chart`, title "最新商机"
@@ -43,12 +43,12 @@ async function gotoCrmDashboardViaSidebar(page: Page): Promise<void> {
   await rootBtn.scrollIntoViewIfNeeded();
   await rootBtn.evaluate((el: HTMLElement) => el.click());
 
-  // Click leaf "驾驶舱" / "Dashboard" — path is /crm/dashboard
-  const leafLink = nav.locator('a[href="/crm/dashboard"]').first();
+  // Click leaf "驾驶舱" / "Dashboard" — path is /dashboards/view/crm_overview
+  const leafLink = nav.locator('a[href="/dashboards/view/crm_overview"]').first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
   await leafLink.evaluate((el: HTMLElement) => el.click());
 
-  await page.waitForURL(/\/crm\/dashboard/, { timeout: 15_000 });
+  await page.waitForURL(/\/dashboards\/view\/crm_overview/, { timeout: 15_000 });
   await page.waitForLoadState('domcontentloaded');
 }
 
@@ -59,7 +59,7 @@ test.describe('CRM Starter Demo — Lightweight Dashboard', () => {
     page,
   }) => {
     await gotoCrmDashboardViaSidebar(page);
-    await expect(page).toHaveURL(/\/crm\/dashboard/);
+    await expect(page).toHaveURL(/\/dashboards\/view\/crm_overview/);
 
     // The dashboard canvas wraps each widget in a card-style <div>. We pin to the
     // widget title text emitted by SmartTableChart's header (px-4 py-3 border-b).
