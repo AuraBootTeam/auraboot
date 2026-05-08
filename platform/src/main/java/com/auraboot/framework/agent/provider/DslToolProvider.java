@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -331,8 +332,8 @@ public class DslToolProvider implements ToolProvider {
 
     private boolean canDiscoverNamedQueries(Long userId) {
         return userId == null
-                || userPermissionService.hasPermission(userId, "system.query.read")
-                || userPermissionService.hasPermission(userId, "system.datasource.read");
+                || userPermissionService.hasPermission(userId, MetaPermission.QUERY_READ)
+                || userPermissionService.hasPermission(userId, MetaPermission.DATASOURCE_READ);
     }
 
     private List<String> extractPermissions(Object rawPermissions) {
