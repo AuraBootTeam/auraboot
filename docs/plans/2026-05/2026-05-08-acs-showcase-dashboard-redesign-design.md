@@ -259,6 +259,18 @@ c8e984c9 feat(acp-showcase): add acs_showcase_recent_logs named query
 - [x] `$i18n:` 引用 ↔ i18n.json 定义 cross-check 零未匹配
 - [x] `npx tsc --noEmit` 无新增错误(对 5 个改动文件)
 
+### Dev-stack 实跑结果(2026-05-08 isolated docker)
+
+启 isolated stack(`scripts/dev/start-isolated.sh`,slug `feat-acs-dashboard-redes`,vite :5194 / be :6464 / pg :5453)实跑后发现:
+
+- **CLI bug** `plugins/cli/src/commands/plugin-import.ts:290 buildExtendedManifest` 漏 `dashboards` 字段(`publish.ts:263` 有,`plugin-import.ts` 没)→ commit `e3da589e` 补
+- **dataType 校验** named query `outputFields[].dataType` 只接受 `[number, array, boolean, string, date, json]`,`datetime` 非法 → commit `4d9e7033` 改 date
+- **dashboard publish 校验** widget 必须有 `widget.title || widget.config.title` 非空 → commit `e03e2721` 给 hero/cta_strip/footer_guide 加 title
+- **i18n 解析** WidgetRenderer 没有 `$i18n:` 解析层 + 旧实现只 spread `visualization`/`style`(`content`/`shortcuts`/`columns`/`metricField` 都不传给 widget!) → commit `7f77f35e` 加 `resolveI18nDeep` + 整 config spread
+- **Dashboard tab title** `dashboards/index.tsx` 的 `SortableTab` 直接渲染 `dashboard.title`,绕开 widget renderer → commit `784beb73` 单独加 `$i18n:` 前缀解析
+- **iso stack 实测**:`POST /api/meta/chart-data {type:"namedQuery", queryCode:"acs_showcase_kpi"}` 返回 1 行 6 字段(meta.metrics 排序后)— identity passthrough 端到端跑通;explicit `dimensions+metrics` 路径 meta.dimensions/metrics 正确投影
+- **浏览器实测**(MCP 断线前):15 widget 全渲染 / 6 layer 节点 ✓ / KPI 数字 ✓ / canvas 4 chart 中只有 chart_category 1 个 canvas 渲染(其余"awaiting data"因 mt_acs_demo_request 0 行)/ CTA 跳 `/p/acs_demo_request/new` ✓ / 表单 i18n label "请求标题" ✓ / **i18n leak 经 4 轮迭代后从 17 处压到 0** (KPI/CTA → embedded HTML → tab title)
+
 ### 仍需 dev stack 验证(deferred,不算"完成")
 
 按 testing-e2e-web 红线 #2,以下未跑前**禁止**声称"功能完成":
