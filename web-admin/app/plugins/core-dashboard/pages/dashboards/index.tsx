@@ -62,9 +62,13 @@ interface SortableTabProps {
 }
 
 function SortableTab({ dashboard, isActive, onClick }: SortableTabProps) {
+  const { t } = useI18n();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: dashboard.code!,
   });
+  const title = typeof dashboard.title === 'string' && dashboard.title.startsWith('$i18n:')
+    ? t(dashboard.title.slice(6))
+    : dashboard.title;
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -86,7 +90,7 @@ function SortableTab({ dashboard, isActive, onClick }: SortableTabProps) {
       {...attributes}
       {...listeners}
     >
-      {dashboard.title}
+      {title}
     </button>
   );
 }
