@@ -51,6 +51,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired(required = false)
     private TenantMemberService tenantMemberService;
 
+    @Autowired
+    private com.auraboot.framework.rbac.service.UserRoleService userRoleService;
+
     public JwtAuthenticationFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
@@ -139,10 +142,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
                 }
 
-                MetaContext.setContext(tenantId, userDetails.getUserId(), userPid, userDetails.getUsername());
-
-                // Set memberId in MetaContext from JWT claim
                 Long memberId = jwtUtil.extractMemberId(jwt);
+                java.util.Set<Long> roleIds = java.util.Set.of();
+                if (memberId != null && tenantId != null) {
+                    try {
+                        java.util.List<Long> ids = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
+                        if (ids != null && !ids.isEmpty()) {
+                            roleIds = java.util.Set.copyOf(ids);
+                        }
+                    } catch (RuntimeException e) {
+                        // Don't fail the request if RBAC lookup hiccups —
+                        // mobile config role layer falls back to tenant defaults.
+                        log.warn("Failed to load roles for member {} tenant {}: {}",
+                                memberId, tenantId, e.getMessage());
+                    }
+                }
+
+                MetaContext.setContext(tenantId, userDetails.getUserId(), userPid,
+                                       userDetails.getUsername(), roleIds);
                 if (memberId != null) {
                     MetaContext.setMemberId(memberId);
                 }
