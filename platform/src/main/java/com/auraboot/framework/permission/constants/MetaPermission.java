@@ -607,6 +607,13 @@ public final class MetaPermission {
      */
     public static final String CLOUD_CONFIG_MANAGE = "sys.cloud_config.update";
 
+    // ==================== ACP (Agent Control Plane) permissions ====================
+
+    /**
+     * ACP agent approval permission (review and act on agent approval requests).
+     */
+    public static final String ACP_AGENT_APPROVAL = "acp.agent.approval";
+
     // ==================== Private Constructor ====================
 
     /**

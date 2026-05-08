@@ -12,7 +12,7 @@
       "acp_agent_artifact",
       "acp_agent_schedule",
       "acp_approval_policy",
-      "acp_agent_approval",
+      "acp.agent.approval",
       "acp_agent_memory",
       "acp_agent_observation",
       "acp_agent_tool",

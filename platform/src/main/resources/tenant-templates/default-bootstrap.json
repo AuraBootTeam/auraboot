@@ -25,31 +25,31 @@
       "resourceType": "function"
     },
     {
-      "code": "dashboard_management",
+      "code": "dashboard.manage",
       "name": "仪表盘管理",
       "description": "访问和管理仪表盘配置",
       "type": "menu",
-      "module": "meta",
+      "module": "dashboard",
       "resource": "/dashboards",
-      "action": "view",
+      "action": "manage",
       "resourceType": "menu"
     },
     {
-      "code": "acp_agent_approval",
+      "code": "acp.agent.approval",
       "name": "AI 审批",
       "description": "查看和处理 ACP Agent 发起的审批请求",
       "type": "menu",
-      "module": "system",
+      "module": "acp",
       "resource": "/p/agent_approval",
-      "action": "view",
+      "action": "approval",
       "resourceType": "menu"
     },
     {
-      "code": "notification_view",
+      "code": "notification.view",
       "name": "通知中心",
       "description": "查看和管理通知消息",
       "type": "menu",
-      "module": "system",
+      "module": "notification",
       "resource": "/notifications",
       "action": "view",
       "resourceType": "menu"
@@ -1369,7 +1369,7 @@
       "roleCode": "operator",
       "permissionCodes": [
         "dashboards",
-        "dashboard_management",
+        "dashboard.manage",
         "dashboard_mgmt",
         "query_builder",
         "bpm_management",
@@ -1384,7 +1384,7 @@
         "org_teams",
         "org.team.read",
         "org.team.manage",
-        "notification_view",
+        "notification.view",
         "notification_rule_manage",
         "sys.file.upload",
         "meta.changelog.read",
@@ -1400,7 +1400,7 @@
         "bpm.task.read",
         "org_management",
         "org.team.read",
-        "notification_view",
+        "notification.view",
         "meta.changelog.read"
       ]
     }
