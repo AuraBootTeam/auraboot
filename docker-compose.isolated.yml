@@ -86,6 +86,13 @@ services:
       # in the same compose project network).
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      # Disable AdminBootstrapRunner — it creates only a demo tenant and
+      # bypasses BootstrapEngineService.bootstrapSystemTenant, leaving no
+      # System Tenant + no platform_admin role. Tests instead drive
+      # bootstrap via tests/api/setup/00-bootstrap.spec.ts which calls
+      # /api/bootstrap/setup → full System+Business tenant + platform_admin
+      # grant. Override base docker-compose.yml's "true".
+      AURABOOT_BOOTSTRAP_ENABLED: "false"
       # CORS allow-list covers the in-container hostnames plus host-mapped
       # variants. Frontend host ports are env-var driven for parity.
       FRONTEND_BASE_URL: http://localhost:${VITE_PORT:-5174}

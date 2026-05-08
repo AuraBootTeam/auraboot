@@ -4,8 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 PLUGINS_DIR="$PROJECT_ROOT/plugins"
-DB_NAME="aura_boot"
-DB_USER="ghj"
+# Postgres connection — same env-override pattern as oss-reset-and-init.sh.
+# Defaults preserve host-mode; override for isolated docker stack via
+# PG_HOST / PG_PORT / PG_USER / PG_DB (and PGPASSWORD when not trust-auth).
+DB_HOST="${PG_HOST:-localhost}"
+DB_PORT="${PG_PORT:-5432}"
+DB_NAME="${PG_DB:-aura_boot}"
+DB_USER="${PG_USER:-${USER:-ghj}}"
 
 # Category mapping
 category_for_namespace() {
@@ -72,14 +77,14 @@ for plugin_json in "$PLUGINS_DIR"/*/plugin.json; do
   author_escaped="${author//\'/\'\'}"
 
   # Insert marketplace plugin
-  psql -h localhost -U "$DB_USER" -d "$DB_NAME" -P pager=off -q <<SQL
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -P pager=off -q <<SQL
 INSERT INTO ab_marketplace_plugin (pid, plugin_id, namespace, display_name, display_name_zh, display_name_en, summary, description, author, plugin_type, category_code, status, visibility, featured, install_count, latest_version, total_versions, min_platform_version, license_mode, created_at, updated_at, published_at, deleted_flag)
 VALUES ('$plugin_pid', '$plugin_id', '$namespace', '$display_name_escaped', '$display_name_zh_escaped', '$display_name_en_escaped', '$description_escaped', '$description_escaped', '$author_escaped', '$plugin_type', '$category', 'published', 'public', false, 0, '$version', 1, $([ -n "$min_platform" ] && echo "'$min_platform'" || echo "NULL"), 'free', NOW(), NOW(), NOW(), false)
 ON CONFLICT (plugin_id) DO UPDATE SET latest_version = '$version', updated_at = NOW();
 SQL
 
   # Insert marketplace version
-  psql -h localhost -U "$DB_USER" -d "$DB_NAME" -P pager=off -q <<SQL
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -P pager=off -q <<SQL
 INSERT INTO ab_marketplace_version (pid, marketplace_plugin_pid, version, version_major, version_minor, version_patch, manifest_snapshot, status, install_count, created_at, updated_at, published_at)
 VALUES ('$version_pid', '$plugin_pid', '$version', $v_major, $v_minor, $v_patch, '$(echo "$manifest" | sed "s/'/''/g")'::jsonb, 'published', 0, NOW(), NOW(), NOW())
 ON CONFLICT (marketplace_plugin_pid, version) DO NOTHING;
@@ -90,7 +95,7 @@ SQL
   if [[ -f "$readme_file" ]]; then
     readme_content=$(sed "s/'/''/g" "$readme_file")
     screenshots=$(grep -oP '!\[.*?\]\(\K[^)]+' "$readme_file" | grep '^http' | jq -R -s 'split("\n") | map(select(. != ""))' 2>/dev/null || echo '[]')
-    psql -h localhost -U "$DB_USER" -d "$DB_NAME" -P pager=off -q <<EOSQL
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -P pager=off -q <<EOSQL
 UPDATE ab_marketplace_plugin SET readme_markdown = '${readme_content}', screenshots = '${screenshots}'::jsonb WHERE plugin_id = '${plugin_id}';
 EOSQL
     echo "  📖 Loaded README for $plugin_id"
@@ -101,7 +106,7 @@ EOSQL
 done
 
 # Refresh category counts
-psql -h localhost -U "$DB_USER" -d "$DB_NAME" -P pager=off -q <<SQL
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -P pager=off -q <<SQL
 UPDATE ab_marketplace_category SET plugin_count = (
   SELECT COUNT(*) FROM ab_marketplace_plugin
   WHERE category_code = ab_marketplace_category.code
@@ -113,4 +118,4 @@ SQL
 echo ""
 echo "🎉 Seeded $count plugins to marketplace"
 echo ""
-psql -h localhost -U "$DB_USER" -d "$DB_NAME" -P pager=off -c "SELECT code, display_name_en, plugin_count FROM ab_marketplace_category WHERE plugin_count > 0 ORDER BY sort_order"
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -P pager=off -c "SELECT code, display_name_en, plugin_count FROM ab_marketplace_category WHERE plugin_count > 0 ORDER BY sort_order"
