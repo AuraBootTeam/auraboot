@@ -6,6 +6,7 @@ import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.service.PluginImportService;
@@ -34,6 +35,7 @@ import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +89,7 @@ public class TestSeedController {
     private final UserRoleService userRoleService;
     private final RolePermissionService rolePermissionService;
     private final JdbcTemplate jdbcTemplate;
+    private final DynamicDataService dynamicDataService;
 
     /**
      * POST /api/test/seed
@@ -284,9 +287,79 @@ public class TestSeedController {
             }
 
             ensureTestAdminCanUseImportedResources(tenant, user);
+            seedCrmDemoRecords(tenant, user);
         } finally {
             MetaContext.clear();
         }
+    }
+
+    /**
+     * Seed a small set of demo {@code crm_account} records for mobile E2E smoke tests.
+     * <p>
+     * Mobile EndpointRegistry tests assert that {@code /api/dynamic/crm_account/list}
+     * and {@code /api/dynamic/crm_account/{id}} return at least one record. The CRM
+     * plugin import only registers the model definition; without explicit seeding the
+     * table is empty in the freshly-bootstrapped test tenant.
+     * <p>
+     * Idempotent: skips when the model is missing (CRM plugin not present in OSS-only
+     * checkouts) or when records already exist for the tenant. Goes through
+     * {@link DynamicDataService#create} so tenant context, soft-delete, audit and
+     * primary-key generation match production paths (no manual SQL INSERTs).
+     */
+    private void seedCrmDemoRecords(Tenant tenant, User user) {
+        String modelCode = "crm_account";
+
+        Integer modelExists = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM ab_meta_model
+                WHERE tenant_id = ?
+                  AND code = ?
+                  AND deleted_flag = FALSE
+                """, Integer.class, tenant.getId(), modelCode);
+        if (modelExists == null || modelExists == 0) {
+            log.info("Skipping crm_account demo seed; model not imported for tenant {}", tenant.getId());
+            return;
+        }
+
+        Integer existingRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mt_crm_account WHERE tenant_id = ?",
+                Integer.class, tenant.getId());
+        if (existingRows != null && existingRows >= 3) {
+            log.info("Skipping crm_account demo seed; tenant {} already has {} record(s)",
+                    tenant.getId(), existingRows);
+            return;
+        }
+
+        // Minimum payload covers both NOT NULL columns (crm_acc_code, crm_acc_name).
+        // Optional fields populated for realistic list/detail rendering in smoke tests.
+        List<Map<String, Object>> demoRecords = List.of(
+                buildCrmAccountPayload("E2E-ACC-001", "E2E Demo Account Alpha",
+                        "technology", "active", "A"),
+                buildCrmAccountPayload("E2E-ACC-002", "E2E Demo Account Beta",
+                        "manufacturing", "active", "B"),
+                buildCrmAccountPayload("E2E-ACC-003", "E2E Demo Account Gamma",
+                        "automotive", "active", "C")
+        );
+
+        int created = 0;
+        for (Map<String, Object> payload : demoRecords) {
+            Map<String, Object> result = dynamicDataService.create(modelCode, payload);
+            if (result != null) {
+                created++;
+            }
+        }
+        log.info("Seeded {} crm_account demo record(s) for E2E tenant {}", created, tenant.getId());
+    }
+
+    private Map<String, Object> buildCrmAccountPayload(String code, String name,
+            String industry, String status, String rating) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("crm_acc_code", code);
+        payload.put("crm_acc_name", name);
+        payload.put("crm_acc_industry", industry);
+        payload.put("crm_acc_status", status);
+        payload.put("crm_acc_rating", rating);
+        return payload;
     }
 
     private void ensureTestAdminCanUseImportedResources(Tenant tenant, User user) {
