@@ -40,7 +40,8 @@
     "permissions": "config/permissions.json",
     "menus": "config/menus.json",
     "i18n": "config/i18n.json",
-    "roles": "config/roles.json"
+    "roles": "config/roles.json",
+    "savedViews": "config/saved-views.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",
