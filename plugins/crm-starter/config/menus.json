@@ -17,7 +17,7 @@
     "parentCode": "crm_root",
     "name:zh-CN": "驾驶舱",
     "name:en": "Dashboard",
-    "path": "/crm/dashboard",
+    "path": "/dashboards/view/crm_overview",
     "pageKey": "crm_overview",
     "component": null,
     "icon": "IconDashboard",
