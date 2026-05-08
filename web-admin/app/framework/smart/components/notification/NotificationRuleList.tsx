@@ -131,7 +131,7 @@ export default function NotificationRuleList({
     } catch {
       setTestResults((prev) => ({
         ...prev,
-        [rule.id!]: { success: false, matchedCount: 0, summary: '', error: '测试失败' },
+        [rule.id!]: { success: false, matchedCount: 0, summary: '', error: 'Test failed' },
       }));
     } finally {
       setTestingId(null);
