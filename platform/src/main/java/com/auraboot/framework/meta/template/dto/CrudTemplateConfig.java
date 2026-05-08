@@ -37,17 +37,17 @@ public class CrudTemplateConfig {
     /**
      * Whether to create a menu entry
      */
-    private boolean createMenu = false;
+    private boolean createMenu = true;
 
     /**
      * Whether to create permissions
      */
-    private boolean createPermissions = false;
+    private boolean createPermissions = true;
 
     /**
      * Whether to assign permissions to roles
      */
-    private boolean assignRoles = false;
+    private boolean assignRoles = true;
     
     /**
      * Whether to generate list page
