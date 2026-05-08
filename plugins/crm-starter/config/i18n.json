@@ -847,51 +847,51 @@
     "refType": "page"
   },
   {
-    "key": "menu.crms_root.label",
-    "zh-CN": "crms_root",
-    "en-US": "crms_root",
+    "key": "menu.crm_root.label",
+    "zh-CN": "crm_root",
+    "en-US": "crm_root",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.crms_accounts.label",
-    "zh-CN": "crms_accounts",
-    "en-US": "crms_accounts",
+    "key": "menu.crm_accounts.label",
+    "zh-CN": "crm_accounts",
+    "en-US": "crm_accounts",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.crms_contacts.label",
-    "zh-CN": "crms_contacts",
-    "en-US": "crms_contacts",
+    "key": "menu.crm_contacts.label",
+    "zh-CN": "crm_contacts",
+    "en-US": "crm_contacts",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.crms_leads.label",
-    "zh-CN": "crms_leads",
-    "en-US": "crms_leads",
+    "key": "menu.crm_leads.label",
+    "zh-CN": "crm_leads",
+    "en-US": "crm_leads",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.crms_opportunities.label",
-    "zh-CN": "crms_opportunities",
-    "en-US": "crms_opportunities",
+    "key": "menu.crm_opportunities.label",
+    "zh-CN": "crm_opportunities",
+    "en-US": "crm_opportunities",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.crms_activities.label",
-    "zh-CN": "crms_activities",
-    "en-US": "crms_activities",
+    "key": "menu.crm_activities.label",
+    "zh-CN": "crm_activities",
+    "en-US": "crm_activities",
     "source": "import",
     "refType": "menu"
   },
   {
-    "key": "menu.crms_campaigns.label",
-    "zh-CN": "crms_campaigns",
-    "en-US": "crms_campaigns",
+    "key": "menu.crm_campaigns.label",
+    "zh-CN": "crm_campaigns",
+    "en-US": "crm_campaigns",
     "source": "import",
     "refType": "menu"
   }
