@@ -4,8 +4,10 @@
 - **Severity**: P1 (data integrity) — **platform-wide**, not acs-specific
 - **Discovered by**: E2E `acp-showcase-lifecycle.spec.ts` — ACS-011 caught it; ACS-007 was hiding it
 - **Owner**: TBD
-- **Status**: **Fixed** in this commit (FieldMapPhase routing asymmetry). Re-enabling
-  ACS-007/011 from `test.fixme` requires backend restart on the host stack to pick up the fix.
+- **Status**: **Closed** (2026-05-08). Fix shipped in `224eb336`, E2E re-enabled in `c0cf255d`.
+  Verified end-to-end on isolated docker stack (`auraboot-ga-e2e` project): 17/17 pass,
+  ACS-007 + ACS-011 green with API-side DB verification (record returns 400/40000
+  "Record not found" after delete).
 
 ## Root Cause
 
