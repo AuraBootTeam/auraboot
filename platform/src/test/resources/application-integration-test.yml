@@ -1,6 +1,12 @@
 # Device Model Integration Test Configuration
 
 spring:
+  # Redis configuration for test (match host redis at 6379)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 5000ms
   # 数据源配置 - 使用实际数据库
   datasource:
     url: jdbc:postgresql://localhost:5432/aura_boot?charSet=UTF8
