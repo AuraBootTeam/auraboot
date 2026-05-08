@@ -45,7 +45,12 @@ export function renderWidget({
     );
   }
 
+  // Spread the entire widget.config first so chart components can opt in to
+  // any field they understand (e.g. SmartTableChart consumes the `modelCode`
+  // + `table` shorthand). The explicit keys below override / normalise the
+  // most common ones to keep behaviour identical for legacy widgets.
   const props = {
+    ...(widget.config as unknown as Record<string, unknown>),
     title: widget.config.title,
     dataSource: widget.config.dataSource,
     linkage: widget.config.linkage,
