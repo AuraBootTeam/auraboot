@@ -32,7 +32,7 @@ import {
 } from '../../helpers/designer-dsl';
 import { loginAs } from '../../helpers/wd-fixtures';
 
-const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
+const BACKEND = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
 
 interface MatrixCase {
   label: string;
