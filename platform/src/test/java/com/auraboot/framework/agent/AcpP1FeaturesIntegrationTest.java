@@ -154,8 +154,12 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void testCapabilityRouter_noMatch() {
+        // Platform-default capability CAP_GENERIC_QUERY (object_patterns="*")
+        // routes ANY "query" intent to "dsl.query" — including unknown models.
+        // This is the documented behaviour: when no domain-specific capability
+        // matches, the generic DSL query fallback is wired.
         List<String> skills = capabilityRouter.route(tenantId, "query", "nonexistent_model");
-        assertThat(skills).isEmpty();
+        assertThat(skills).containsExactly("dsl.query");
     }
 
     @Test
@@ -166,9 +170,11 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
 
         insertSkill(tenantId, "crm_lead.create", "CRM Lead Create", "atomic");
 
-        // Route with "query" intent — should not match "create" capability
+        // Route with "query" intent — does NOT match the seeded "create" capability,
+        // but DOES match the platform-default CAP_GENERIC_QUERY which routes any
+        // "query" intent to "dsl.query".
         List<String> skills = capabilityRouter.route(tenantId, "query", "crm_lead");
-        assertThat(skills).isEmpty();
+        assertThat(skills).containsExactly("dsl.query");
     }
 
     @Test

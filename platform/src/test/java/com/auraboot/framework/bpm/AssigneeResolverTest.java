@@ -159,11 +159,13 @@ class AssigneeResolverTest extends BaseIntegrationTest {
         // Act
         List<String> assignees = assigneeResolverService.resolve("role", ruleConfig, context);
 
-        // Assert
+        // Assert: AssigneeResolverService.resolveByRole returns user PIDs (ULID),
+        // which is BPM canonical user identity (matches BpmSecurityUtil /
+        // MetaContext.getCurrentUsername). Numeric ab_user.id is internal-only.
         assertNotNull(assignees, "Assignees list should not be null");
         assertTrue(assignees.size() >= 1, "Should resolve at least the test user for the test role");
-        assertTrue(assignees.contains(getTestUser().getId().toString()),
-                "Should contain the test user ID assigned to the test role");
+        assertTrue(assignees.contains(getTestUser().getPid()),
+                "Should contain the test user PID assigned to the test role");
         log.info("D3-04 PASSED: ROLE resolved to {}", assignees);
     }
 
@@ -179,9 +181,9 @@ class AssigneeResolverTest extends BaseIntegrationTest {
         // Act
         List<String> assignees = assigneeResolverService.resolve("role", ruleConfig, context);
 
-        // Assert
+        // Assert: same PID (ULID) contract as D3-04.
         assertNotNull(assignees, "Assignees list should not be null");
-        assertTrue(assignees.contains(getTestUser().getId().toString()),
+        assertTrue(assignees.contains(getTestUser().getPid()),
                 "String-format roleIds should also resolve users correctly");
         log.info("D3-04b PASSED: ROLE (string format) resolved to {}", assignees);
     }
