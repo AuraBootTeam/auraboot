@@ -302,5 +302,6 @@ function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
     i18nResources:       plugin.resourceFiles.get('i18n')          ?? [],
     namedQueries:        plugin.resourceFiles.get('named-queries') ?? [],
     savedViews:          plugin.resourceFiles.get('saved-views')   ?? [],
+    dashboards:          plugin.resourceFiles.get('dashboards')    ?? [],
   };
 }
