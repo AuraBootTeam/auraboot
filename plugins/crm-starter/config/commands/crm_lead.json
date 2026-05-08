@@ -28,7 +28,7 @@
       }
     },
     "permissions": [
-      "CRM.lead.manage"
+      "crm.lead.manage"
     ],
     "agent_hint": "Create a new crm lead record. Key inputs: company, contact_name, contact_phone, contact_email, source. Auto-generated: code, status.",
     "cmd_risk_level": "L1"
@@ -52,7 +52,7 @@
       "crm_lead_requirement"
     ],
     "permissions": [
-      "CRM.lead.manage"
+      "crm.lead.manage"
     ],
     "agent_hint": "Update an existing crm lead record. Editable fields: company, contact_name, contact_phone, contact_email, source.",
     "cmd_risk_level": "L1"
@@ -69,7 +69,7 @@
     ],
     "toState": "contacted",
     "permissions": [
-      "CRM.lead.manage"
+      "crm.lead.manage"
     ],
     "agent_hint": "Transition crm lead status from NEW to CONTACTED.",
     "cmd_risk_level": "L1"
@@ -87,7 +87,7 @@
     ],
     "toState": "qualified",
     "permissions": [
-      "CRM.lead.manage"
+      "crm.lead.manage"
     ],
     "agent_hint": "Transition crm lead status from NEW/CONTACTED to QUALIFIED.",
     "cmd_risk_level": "L1"
@@ -108,7 +108,7 @@
       "confirmMessage:en": "Confirm marking this lead as converted?"
     },
     "permissions": [
-      "CRM.lead.manage"
+      "crm.lead.manage"
     ],
     "agent_hint": "Transition crm lead status from QUALIFIED to CONVERTED.",
     "cmd_risk_level": "L1"
@@ -130,7 +130,7 @@
       "crm_lead_lost_reason"
     ],
     "permissions": [
-      "CRM.lead.manage"
+      "crm.lead.manage"
     ],
     "agent_hint": "Transition crm lead status from NEW/CONTACTED/QUALIFIED to LOST.",
     "cmd_risk_level": "L1"
@@ -156,7 +156,7 @@
       "confirmMessage:en": "Confirm delete this lead?"
     },
     "permissions": [
-      "CRM.lead.manage"
+      "crm.lead.manage"
     ],
     "agent_hint": "Delete crm lead record(s). This is irreversible. Preconditions: status IN [\"NEW\",\"CONTACTED\"].",
     "cmd_risk_level": "L4"
@@ -168,7 +168,7 @@
     "type": "query",
     "modelCode": "crm_lead",
     "permissions": [
-      "CRM.lead.read"
+      "crm.lead.read"
     ],
     "agent_hint": "Query crm lead records.",
     "cmd_risk_level": "L0"
@@ -180,7 +180,7 @@
     "type": "query",
     "modelCode": "crm_lead",
     "permissions": [
-      "CRM.lead.read"
+      "crm.lead.read"
     ],
     "agent_hint": "Query crm lead records.",
     "cmd_risk_level": "L0"

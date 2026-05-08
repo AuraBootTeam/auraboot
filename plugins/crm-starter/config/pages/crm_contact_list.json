@@ -13,7 +13,7 @@
         {
           "code": "create",
           "primary": true,
-          "permissionCode": "CRM.contact.manage",
+          "permissionCode": "crm.contact.manage",
           "label": "create",
           "action": {
             "type": "navigate",
@@ -62,7 +62,7 @@
           "buttons": [
             {
               "code": "view",
-              "permissionCode": "CRM.contact.read",
+              "permissionCode": "crm.contact.read",
               "label": "detail",
               "action": {
                 "type": "navigate",
@@ -71,7 +71,7 @@
             },
             {
               "code": "edit",
-              "permissionCode": "CRM.contact.manage",
+              "permissionCode": "crm.contact.manage",
               "label": "edit",
               "action": {
                 "type": "navigate",
@@ -81,7 +81,7 @@
             {
               "code": "delete",
               "danger": true,
-              "permissionCode": "CRM.contact.manage",
+              "permissionCode": "crm.contact.manage",
               "label": "delete",
               "confirm": "delete.confirm",
               "action": {

@@ -13,7 +13,7 @@
         {
           "code": "edit",
           "icon": "Edit",
-          "permissionCode": "CRM.opportunity.manage",
+          "permissionCode": "crm.opportunity.manage",
           "label": "edit",
           "action": {
             "type": "navigate",
@@ -22,7 +22,7 @@
         },
         {
           "code": "qualify",
-          "permissionCode": "CRM.opportunity.manage",
+          "permissionCode": "crm.opportunity.manage",
           "label": {
             "zh-CN": "资质审查",
             "en-US": "Qualify"
@@ -34,31 +34,31 @@
         },
         {
           "code": "propose",
-          "permissionCode": "CRM.opportunity.manage",
+          "permissionCode": "crm.opportunity.manage",
           "label": {
             "zh-CN": "提交提案",
             "en-US": "Propose"
           },
           "action": {
             "type": "command",
-            "command": "crm:propose_opportunity"
+            "command": "crm:advance_opp_to_proposal"
           }
         },
         {
           "code": "negotiate",
-          "permissionCode": "CRM.opportunity.manage",
+          "permissionCode": "crm.opportunity.manage",
           "label": {
             "zh-CN": "进入谈判",
             "en-US": "Negotiate"
           },
           "action": {
             "type": "command",
-            "command": "crm:negotiate_opportunity"
+            "command": "crm:advance_opp_to_negotiation"
           }
         },
         {
           "code": "win",
-          "permissionCode": "CRM.opportunity.manage",
+          "permissionCode": "crm.opportunity.manage",
           "label": {
             "zh-CN": "赢单",
             "en-US": "Win"
@@ -71,7 +71,7 @@
         {
           "code": "lose",
           "danger": true,
-          "permissionCode": "CRM.opportunity.manage",
+          "permissionCode": "crm.opportunity.manage",
           "label": {
             "zh-CN": "输单",
             "en-US": "Lose"

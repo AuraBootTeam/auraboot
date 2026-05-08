@@ -27,7 +27,7 @@
       }
     },
     "permissions": [
-      "CRM.opportunity.manage"
+      "crm.opportunity.manage"
     ],
     "agent_hint": "Create a new opportunity. Key inputs: name, account_id, expected_amount, expected_close_date, probability. Auto-generated: code, stage, owner.",
     "cmd_risk_level": "L1"
@@ -47,7 +47,7 @@
       "crm_opp_notes"
     ],
     "permissions": [
-      "CRM.opportunity.manage"
+      "crm.opportunity.manage"
     ],
     "agent_hint": "Update an existing opportunity. Editable fields: name, account_id, expected_amount, expected_close_date, probability, notes.",
     "cmd_risk_level": "L1"
@@ -73,7 +73,7 @@
       "confirmMessage:en": "Confirm delete this opportunity?"
     },
     "permissions": [
-      "CRM.opportunity.manage"
+      "crm.opportunity.manage"
     ],
     "agent_hint": "Delete opportunity record(s). Preconditions: stage IN [discovery, qualification].",
     "cmd_risk_level": "L4"
@@ -90,13 +90,13 @@
     ],
     "toState": "qualification",
     "permissions": [
-      "CRM.opportunity.manage"
+      "crm.opportunity.manage"
     ],
     "agent_hint": "Transition opportunity stage from DISCOVERY to QUALIFICATION.",
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crm:propose_opportunity",
+    "code": "crm:advance_opp_to_proposal",
     "displayName:zh-CN": "提交提案",
     "displayName:en": "Submit Proposal",
     "type": "state_transition",
@@ -107,13 +107,13 @@
     ],
     "toState": "proposal",
     "permissions": [
-      "CRM.opportunity.manage"
+      "crm.opportunity.manage"
     ],
     "agent_hint": "Transition opportunity stage from QUALIFICATION to PROPOSAL.",
     "cmd_risk_level": "L1"
   },
   {
-    "code": "crm:negotiate_opportunity",
+    "code": "crm:advance_opp_to_negotiation",
     "displayName:zh-CN": "进入谈判",
     "displayName:en": "Enter Negotiation",
     "type": "state_transition",
@@ -124,7 +124,7 @@
     ],
     "toState": "negotiation",
     "permissions": [
-      "CRM.opportunity.manage"
+      "crm.opportunity.manage"
     ],
     "agent_hint": "Transition opportunity stage from PROPOSAL to NEGOTIATION.",
     "cmd_risk_level": "L1"
@@ -145,7 +145,7 @@
       "confirmMessage:en": "Confirm marking this opportunity as won?"
     },
     "permissions": [
-      "CRM.opportunity.manage"
+      "crm.opportunity.manage"
     ],
     "agent_hint": "Transition opportunity stage from NEGOTIATION to CLOSED_WON.",
     "cmd_risk_level": "L1"
@@ -169,7 +169,7 @@
       "confirmMessage:en": "Confirm marking this opportunity as lost?"
     },
     "permissions": [
-      "CRM.opportunity.manage"
+      "crm.opportunity.manage"
     ],
     "agent_hint": "Transition opportunity stage from DISCOVERY/QUALIFICATION/PROPOSAL/NEGOTIATION to CLOSED_LOST.",
     "cmd_risk_level": "L1"
@@ -181,7 +181,7 @@
     "type": "query",
     "modelCode": "crm_opportunity",
     "permissions": [
-      "CRM.opportunity.read"
+      "crm.opportunity.read"
     ],
     "agent_hint": "Query opportunity records.",
     "cmd_risk_level": "L0"
@@ -193,7 +193,7 @@
     "type": "query",
     "modelCode": "crm_opportunity",
     "permissions": [
-      "CRM.opportunity.read"
+      "crm.opportunity.read"
     ],
     "agent_hint": "Query opportunity records.",
     "cmd_risk_level": "L0"
