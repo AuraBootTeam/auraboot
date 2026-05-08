@@ -217,12 +217,14 @@ class CommandServiceTaskDelegateTest {
             when(commandExecutor.execute(eq("pe:optional_cmd"), any(CommandExecuteRequest.class)))
                     .thenThrow(new RuntimeException("optional command failed"));
 
-            // The original exception is re-thrown (not CommandChainStepException)
-            var ex = assertThrows(RuntimeException.class, () -> delegate.execute(executionContext));
-            assertFalse(ex instanceof CommandChainStepException,
-                    "SKIP_AND_WARN should not throw CommandChainStepException");
+            // skip_and_warn: handleFailure now swallows the exception and
+            // records skip metadata in process variables — the chain
+            // continues. Earlier behaviour rethrew the original exception;
+            // canonical contract is silent step skip with audit log.
+            assertDoesNotThrow(() -> delegate.execute(executionContext),
+                    "SKIP_AND_WARN must not propagate the underlying failure");
 
-            // Should mark as skipped and not successful (set before exception re-throw)
+            // Should mark as skipped and not successful
             assertTrue((Boolean) processVars.get("_step_optional_step_skipped"));
             assertFalse((Boolean) processVars.get("_step_optional_step_success"));
         }

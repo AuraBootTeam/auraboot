@@ -741,14 +741,12 @@ public class AgentChatPortImpl implements AgentChatPort {
 
         java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
         // HandoffToolProvider's tool input schema names the field "agent_code"
-        // (snake_case for LLM-friendliness). We accept "targetAgentCode" as a
-        // synonym so test callers + future tool definitions can use either.
-        // Surface on meta as _handoff_to so the chokepoint contract is stable
-        // regardless of the underlying tool input shape.
+        // (snake_case for LLM-friendliness). The chokepoint reads ONLY the
+        // canonical schema field — legacy "targetAgentCode" was never declared
+        // by the real tool schema and accepting it would mask drift between
+        // schema and reader (DC.3d Fix 4 regression guard).
+        // Surface on meta as _handoff_to so the chokepoint contract is stable.
         Object targetAgentCode = input != null ? input.get("agent_code") : null;
-        if (targetAgentCode == null && input != null) {
-            targetAgentCode = input.get("targetAgentCode");
-        }
         if (targetAgentCode != null) {
             meta.put(META_HANDOFF_TO, String.valueOf(targetAgentCode));
         }
