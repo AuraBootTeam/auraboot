@@ -7634,11 +7634,26 @@ CREATE TABLE IF NOT EXISTS ab_mobile_config (
     platform        VARCHAR(20),
     min_version     VARCHAR(20),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by      BIGINT
+    updated_by      BIGINT,
+    subject_type    VARCHAR(20),
+    subject_id      BIGINT,
+    CONSTRAINT chk_mobile_config_subject_type
+        CHECK (subject_type IS NULL OR subject_type = 'role'),
+    CONSTRAINT chk_mobile_config_subject_pair
+        CHECK ((subject_type IS NULL AND subject_id IS NULL)
+            OR (subject_type IS NOT NULL AND subject_id IS NOT NULL))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_mobile_config_key_platform
-    ON ab_mobile_config (config_key, COALESCE(tenant_id, 0), COALESCE(platform, '__all__'));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mobile_config_key_platform_subject
+    ON ab_mobile_config (
+        config_key,
+        COALESCE(tenant_id, 0),
+        COALESCE(platform, '__all__'),
+        COALESCE(subject_type, '__none__'),
+        COALESCE(subject_id, 0)
+    );
+CREATE INDEX IF NOT EXISTS idx_mobile_config_subject
+    ON ab_mobile_config (subject_type, subject_id);
 CREATE INDEX IF NOT EXISTS idx_mobile_config_tenant
     ON ab_mobile_config (tenant_id, config_key);
 
@@ -7652,6 +7667,8 @@ CREATE TABLE IF NOT EXISTS ab_mobile_config_audit (
     config_key      VARCHAR(100) NOT NULL,
     tenant_id       BIGINT,
     platform        VARCHAR(20),
+    subject_type    VARCHAR(20),
+    subject_id      BIGINT,
     operation       VARCHAR(20) NOT NULL,    -- create | update | delete
     old_value       TEXT,
     new_value       TEXT,
