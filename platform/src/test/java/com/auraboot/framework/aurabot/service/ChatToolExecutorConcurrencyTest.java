@@ -61,7 +61,8 @@ class ChatToolExecutorConcurrencyTest {
             }
         };
 
-        ChatToolExecutor executor = new ChatToolExecutor(port, null);
+        ChatToolExecutor executor = new ChatToolExecutor(port, null, null,
+                new com.fasterxml.jackson.databind.ObjectMapper());
 
         int N = 10;
         ExecutorService pool = Executors.newFixedThreadPool(N);
