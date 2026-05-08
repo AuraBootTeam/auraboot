@@ -299,9 +299,12 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       const groupValue = row[groupByField];
       const { key: groupKey, title: groupTitle } = resolveGroup(groupValue);
 
+      // Note: spread row first, then override `id` last so the configured
+      // idField (e.g. "pid") wins over a row's numeric primary-key `id`.
+      // Reversing this order would let `row.id = 1` clobber `String(row.pid)`.
       const card: KanbanCard = {
-        id: String(row[idField] ?? ''),
         ...row,
+        id: String(row[idField] ?? ''),
       };
 
       if (!groupedData.has(groupKey)) {
