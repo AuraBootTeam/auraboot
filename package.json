@@ -6,8 +6,9 @@
   "scripts": {
     "build:packages": "pnpm -r --filter './packages/*' build",
     "typecheck:packages": "pnpm -r --filter './packages/*' typecheck",
-    "validate:plugins": "node scripts/validate-plugin-i18n.mjs && node scripts/validate-plugin-dashboards.mjs",
-    "validate:dashboards": "node scripts/validate-plugin-dashboards.mjs"
+    "validate:plugins": "node scripts/validate-plugin-i18n.mjs && node scripts/validate-plugin-dashboards.mjs && node scripts/validate-permission-codes.mjs",
+    "validate:dashboards": "node scripts/validate-plugin-dashboards.mjs",
+    "validate:permissions": "node scripts/validate-permission-codes.mjs"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
