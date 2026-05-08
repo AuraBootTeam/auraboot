@@ -1,6 +1,6 @@
 [
   {
-    "code": "crms_admin",
+    "code": "crm_admin",
     "name:zh-CN": "CRM Starter 管理员",
     "name:en": "CRM Starter Administrator",
     "description": "Full access to all CRM Starter modules (Accounts, Contacts, Leads)",
@@ -14,7 +14,7 @@
     ]
   },
   {
-    "code": "crms_sales",
+    "code": "crm_sales",
     "name:zh-CN": "销售代表",
     "name:en": "Sales Representative",
     "description": "Manage accounts, contacts, and leads",
