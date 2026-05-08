@@ -351,9 +351,11 @@ public class MetaApiControllerIntegrationTest extends BaseIntegrationTest {
         assertNull(model, "Should return null for non-existent model");
 
         String nonExistentCode = "non_existent_code_" + System.currentTimeMillis();
+        MetaModelDTO missing = metaModelService.findByCode(nonExistentCode);
+        assertNull(missing, "findByCode should return null for non-existent code");
         assertThrows(com.auraboot.framework.exception.ValidationException.class, () -> {
-            metaModelService.findByCode(nonExistentCode);
-        }, "Should throw exception for non-existent code");
+            metaModelService.findByCodeOrThrow(nonExistentCode);
+        }, "findByCodeOrThrow should throw for non-existent code");
     }
 
     /**

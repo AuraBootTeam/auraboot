@@ -56,7 +56,7 @@
     "module": "acp"
   },
   {
-    "code": "acp_agent_approval",
+    "code": "acp.agent.approval",
     "name:zh-CN": "Agent 审批管理",
     "name:en": "Agent Approval Management",
     "description": "Review and act on agent approval requests",
