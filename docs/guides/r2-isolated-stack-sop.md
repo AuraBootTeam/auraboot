@@ -23,39 +23,34 @@ cd ../auraboot-wt/<topic>
 #    subsequent = ~22 s warm.
 ./scripts/dev/start-isolated.sh --slug=<topic>
 
-# Reads the per-stack ports from .aura-stack/<topic>.env
-# (auto-allocated, persisted across runs):
-source .aura-stack/<topic>.env
-echo "vite=$VITE_PORT  bff=$BFF_PORT  backend=$BE_PORT  postgres=$PG_PORT"
+# 3. One-line env setup — exports the entire env contract
+#    (BE_PORT / VITE_PORT / BFF_PORT / PG_*  + BACKEND_URL /
+#     PLAYWRIGHT_BASE_URL / BFF_URL / PGPASSWORD) for the current shell.
+source scripts/dev/r2-env-export.sh <topic>
 
-# 3. Bootstrap + import plugins via Aura CLI (against the isolated backend).
+# Now every command inherits the right env automatically — no need
+# to repeat them on each playwright/seed invocation.
+
+# 4. Bootstrap + import plugins via Aura CLI.
 for p in core-meta core-bpm core-aurabot page-manager platform-admin \
          org-management crm-starter showcase agent-control-plane \
          acp-showcase workflow-demo test-fixtures; do
   [ -d "plugins/$p" ] && aura plugin publish "plugins/$p" \
-      --target "http://localhost:$BE_PORT" \
+      --target "$BACKEND_URL" \
       --user admin@example.com --password Test2026x --yes
 done
 
-# 4. Run platform-level seeds against the isolated postgres.
-PG_HOST=localhost PG_PORT="$PG_PORT" PG_USER=auraboot \
-  PGPASSWORD=auraboot_dev bash scripts/seed-marketplace.sh
-PG_HOST=localhost PG_PORT="$PG_PORT" PG_USER=auraboot \
-  PGPASSWORD=auraboot_dev psql -f scripts/seed-cs-agent.sql aura_boot
-PG_HOST=localhost PG_PORT="$PG_PORT" PG_USER=auraboot \
-  PGPASSWORD=auraboot_dev psql -f scripts/seed-aurabot-agent.sql aura_boot
-PG_HOST=localhost PG_PORT="$PG_PORT" PG_USER=auraboot \
-  PGPASSWORD=auraboot_dev psql -f scripts/backfill-model-displayname.sql aura_boot
+# 5. Platform-level seeds. Env is already in scope from step 3.
+bash scripts/seed-marketplace.sh
+psql -f scripts/seed-cs-agent.sql
+psql -f scripts/seed-aurabot-agent.sql
+psql -f scripts/backfill-model-displayname.sql
 
-# 5. Run any Playwright suite. The setup project (idempotent) handles
-#    /api/bootstrap/setup + multi-role users + test pages, so step 3-4
-#    above can run in any order before the suite.
+# 6. Run any Playwright suite. The setup project (idempotent) handles
+#    /api/bootstrap/setup + multi-role users + test pages, so step 4-5
+#    can run in any order before the suite.
 cd web-admin
-PG_HOST=localhost PG_PORT="$PG_PORT" PG_USER=auraboot PG_DB=aura_boot \
-  PGPASSWORD=auraboot_dev \
-  BE_PORT="$BE_PORT" \
-  PLAYWRIGHT_BASE_URL="http://localhost:$VITE_PORT" \
-  npx playwright test --config=playwright.oss.config.ts <args>
+npx playwright test --config=playwright.oss.config.ts <args>
 ```
 
 ## Required env vars (single source of truth)
