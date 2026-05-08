@@ -42,7 +42,6 @@ const HINT_STORAGE_KEY = 'dashboard_drag_hint_shown';
 const HIDDEN_DEFAULT_TAB_CODES = new Set([
   'sc_workflow_dashboard',
   'sc_arsenal_dashboard',
-  'acs_dashboard',
 ]);
 
 function getBrowserStorage(): Storage | null {
