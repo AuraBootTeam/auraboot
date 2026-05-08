@@ -6,7 +6,9 @@ package com.auraboot.framework.permission.constants;
  * Defines standard permission codes for Meta platform resources.
  * These constants replace the old MetaPermissions constants.
  *
- * Permission Code Format: system.{resource_code}.{action}
+ * Permission Code Format: {module}.{resource}.{action}
+ *   module ∈ { meta, bpm, org, sys, data, audit, dashboard,
+ *              automation, notification, aurabot, admin }
  *
  * Actions:
  * - read:   Read-only access (query, list, view)
