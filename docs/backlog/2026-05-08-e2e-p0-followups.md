@@ -10,6 +10,29 @@ are blocked on product/config gaps, not spec quality.
 This doc tracks what to fix to unblock the cascade and turn the fixme cases
 into real passes.
 
+## Status snapshot (closing this session)
+
+| Gap | State | Commit / Owner |
+|---|---|---|
+| G-1 dashboard architecture migration | ✅ resolved | `dbaf043d` + `d945f57c` |
+| G-2 scheduled_task detail toolbar | ✅ resolved | `9207ebab` |
+| G-3 detail tabs `role="tablist"` | ✅ resolved | `bcd6a0d5` |
+| G-4 enable/disable/trigger commands | ⏸ open | — |
+| G-5 ACS state machine `block_request` | ⏸ open (low pri) | — |
+| G-6 ACS-002 Radix Select persistence | 🔒 latent (acp-showcase removed) | — |
+| G-7 cron expression validation | ✅ resolved | `d237a975` |
+| G-8 unique scheduled_task.name | ✅ resolved | `d237a975` |
+| G-9 delete-row routing | ✅ resolved | `d237a975` |
+| G-10 detail toolbar action.command | 🔒 latent (acp-showcase removed) | — |
+| G-13 plain `title` in dashboard JSON | ✅ resolved (misdiagnosis) | `d945f57c` |
+| G-14 smart-table-chart shorthand | ✅ resolved | `6e9a85ec` + `d497de10` (owner) |
+| G-15 JWT 20002 docker stack | ⏸ open (blocks docker reproducer) | — |
+| Dead menus (3) | ⏸ open (frontend components missing) | — |
+
+Closing fixme'd specs (DASH-002..005, ST-006/007/009) — owner re-run on
+host backend or post-G-15-fix docker stack should flip them to real
+passes. Fixme entries already cite the resolving commit.
+
 ## Scope change — acp-showcase plugin removed
 
 Commit `59050eed chore(acp-showcase): remove demo plugin per platformization
