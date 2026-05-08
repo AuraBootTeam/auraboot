@@ -65,13 +65,23 @@ WEB_ADMIN_DIR="$PROJECT_ROOT/web-admin"
 #   BE_PORT      backend (default 6443)
 #   VITE_PORT    vite dev server (default 5173)
 #   BFF_PORT     remix BFF (default 3500)
-# Example: BE_PORT=6478 VITE_PORT=5208 BFF_PORT=3535 ./scripts/oss-reset-and-init.sh
+#   PG_HOST      postgres host (default localhost)
+#   PG_PORT      postgres port (default 5432)
+#   PG_USER      postgres user (default $USER for host; auraboot for isolated)
+#   PG_DB        postgres db   (default aura_boot)
+# Example: BE_PORT=6478 VITE_PORT=5208 BFF_PORT=3535 PG_PORT=5467 \
+#          PG_USER=auraboot PGPASSWORD=auraboot_dev ./scripts/oss-reset-and-init.sh
 export BE_PORT="${BE_PORT:-6443}"
 export VITE_PORT="${VITE_PORT:-5173}"
 export BFF_PORT="${BFF_PORT:-3500}"
 export AURA_BE_BASE="http://localhost:${BE_PORT}"
 export AURA_VITE_BASE="http://localhost:${VITE_PORT}"
 export AURA_BFF_BASE="http://localhost:${BFF_PORT}"
+export PG_HOST="${PG_HOST:-localhost}"
+export PG_PORT="${PG_PORT:-5432}"
+export PG_USER="${PG_USER:-${USER:-ghj}}"
+export PG_DB="${PG_DB:-aura_boot}"
+export AURA_PSQL_BASE="psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}"
 
 # shellcheck source=lib/multi-worktree-guard.sh
 source "$SCRIPT_DIR/lib/multi-worktree-guard.sh"
@@ -493,7 +503,7 @@ STORAGEJSON
     DB_NAME="${POSTGRES_DB:-aura_boot}"
     DB_USER="${POSTGRES_USER:-$(whoami)}"
     DB_HOST="${POSTGRES_HOST:-localhost}"
-    BOOTSTRAP_CHECK=$(psql -h localhost -U ghj -d aura_boot -P pager=off -t -A -F',' -c "
+    BOOTSTRAP_CHECK=$($AURA_PSQL_BASE -P pager=off -t -A -F',' -c "
 SELECT
   (SELECT COUNT(*) FROM ab_user WHERE email='admin@example.com' AND (deleted_flag=FALSE OR deleted_flag IS NULL)) AS admin_users,
   (SELECT COUNT(*) FROM ab_tenant WHERE (deleted_flag=FALSE OR deleted_flag IS NULL)) AS tenants,
@@ -522,7 +532,7 @@ SELECT
     # PID generation: left(md5('pa_ur_' || member_id), 26) — deterministic, exactly 26 chars,
     #                 safe to re-run (NOT EXISTS guard prevents duplicate).
     echo -e "${YELLOW}Step 7.4: Granting platform_admin role to default admin user...${NC}"
-    psql -h localhost -U ghj -d aura_boot -v ON_ERROR_STOP=1 -P pager=off <<'GRANT_SQL'
+    $AURA_PSQL_BASE -v ON_ERROR_STOP=1 -P pager=off <<'GRANT_SQL'
 INSERT INTO ab_user_role (
     id, pid, member_id, tenant_id, role_id,
     status, assign_type, deleted_flag,
@@ -585,7 +595,7 @@ GRANT_SQL
 
     # Step 7.6: Backfill model displayName for AuraBot Chinese search
     echo -e "${YELLOW}Step 7.6: Backfilling model displayNames...${NC}"
-    psql -h localhost -U ghj -d aura_boot -f "$SCRIPT_DIR/backfill-model-displayname.sql" -P pager=off 2>&1 | tail -1
+    $AURA_PSQL_BASE -f "$SCRIPT_DIR/backfill-model-displayname.sql" -P pager=off 2>&1 | tail -1
     echo -e "${GREEN}   DisplayName backfill complete${NC}"
 
     # Step 7.7: Seed marketplace registry
@@ -595,14 +605,14 @@ GRANT_SQL
 
     # Step 7.8: Seed CS Agent definition
     echo -e "${YELLOW}Step 7.8: Seeding CS Agent definition...${NC}"
-    psql -h localhost -U ghj -d aura_boot -f "$SCRIPT_DIR/seed-cs-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
+    $AURA_PSQL_BASE -f "$SCRIPT_DIR/seed-cs-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
     echo -e "${GREEN}   CS Agent seed complete${NC}"
 
     # Step 7.9: Seed AuraBot agent definition (GAP-296)
     # Per-tenant aurabot agent_definition row so AuraBotAgentResolver hot-paths
     # never fall back to the inline LAZY_SEED_AURABOT branch.
     echo -e "${YELLOW}Step 7.9: Seeding AuraBot agent definition...${NC}"
-    psql -h localhost -U ghj -d aura_boot -f "$SCRIPT_DIR/seed-aurabot-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
+    $AURA_PSQL_BASE -f "$SCRIPT_DIR/seed-aurabot-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
     echo -e "${GREEN}   AuraBot agent seed complete${NC}"
 
     # Step 8: Seed showcase demo data (optional — skip with SKIP_SEED=1)
