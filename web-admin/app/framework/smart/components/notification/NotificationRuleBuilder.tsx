@@ -225,7 +225,7 @@ export default function NotificationRuleBuilder({ initial, onSaved, onCancel }: 
 
   // Load model options
   useEffect(() => {
-    get<{ records: ModelOption[]; total: number }>('/api/meta/models?pageSize=200&pageNum=1')
+    get<{ records: ModelOption[]; total: number }>('/api/meta/models?size=200&page=1')
       .then((result) => {
         if (result.code === ErrorCodes.SUCCESS && result.data) {
           const raw = result.data as any;
