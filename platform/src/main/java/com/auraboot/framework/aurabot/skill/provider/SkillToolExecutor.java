@@ -86,6 +86,21 @@ public class SkillToolExecutor {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Bare-skill-name routing probe used by the chat tool layer (Task 4
+     * {@code ChatToolExecutor}). The LLM sometimes emits a tool name without
+     * the {@code aurabot:} provider prefix (Anthropic-style tool registry that
+     * de-namespaces during sanitisation, or simple single-provider chats).
+     *
+     * <p>This lets {@code ChatToolExecutor} decide whether an unprefixed name
+     * resolves to a registered skill before routing it to {@link #dispatch} —
+     * if the registry doesn't know it, fall through to the legacy
+     * {@code ToolDiscoveryPort} path.
+     */
+    public boolean handlesBareSkillName(String maybeSkillName) {
+        return maybeSkillName != null && registry.get(maybeSkillName).isPresent();
+    }
+
     // ────────────────────────────────────────────────────────────────────────
     // Dispatch — LOW inline / MEDIUM+ preview-pending
     // ────────────────────────────────────────────────────────────────────────

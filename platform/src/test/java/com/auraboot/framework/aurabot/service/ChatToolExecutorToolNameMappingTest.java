@@ -44,7 +44,8 @@ class ChatToolExecutorToolNameMappingTest {
         } finally {
             MetaContext.clear();
         }
-        ChatToolExecutor executor = new ChatToolExecutor(toolDiscoveryPort, resolver);
+        ChatToolExecutor executor = new ChatToolExecutor(toolDiscoveryPort, resolver, null,
+                new com.fasterxml.jackson.databind.ObjectMapper());
 
         MetaContext.setSystemTenantContext(1L);
         Map<String, Object> result;

@@ -2,6 +2,13 @@ package com.auraboot.framework.aurabot.service;
 
 import com.auraboot.framework.agent.port.ToolDiscoveryPort;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.aurabot.skill.SkillRequest;
+import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.provider.AuraBotSkillToolProvider;
+import com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor;
+import com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor.DispatchOutcome;
+import com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor.OutcomeKind;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +30,12 @@ import java.util.Map;
  *   <li>{@code get_*} → {@code get:*}</li>
  * </ul>
  *
+ * <p>The {@code aurabot:} branch (Plan §C-5 Task 4) intercepts AuraBot Skill SPI
+ * calls before the legacy {@link ToolDiscoveryPort} path: LOW skills run inline
+ * and return a {@code success/data} envelope, MEDIUM+ skills return a
+ * {@code _aurabot_skill_pending} marker the chat layer translates into a
+ * preview confirm card.
+ *
  * @author AuraBoot Team
  * @since 3.1.0
  */
@@ -30,16 +43,25 @@ import java.util.Map;
 @Service
 public class ChatToolExecutor {
 
+    private static final String AURABOT_TOOL_PREFIX = AuraBotSkillToolProvider.PROVIDER_CODE + ":";
+
     private final ToolDiscoveryPort toolDiscoveryPort;
     private final ChatToolResolver chatToolResolver;
+    private final SkillToolExecutor skillToolExecutor;
+    private final ObjectMapper objectMapper;
 
     public ChatToolExecutor(
             @org.springframework.beans.factory.annotation.Autowired(required = false)
             ToolDiscoveryPort toolDiscoveryPort,
             @org.springframework.beans.factory.annotation.Autowired(required = false)
-            ChatToolResolver chatToolResolver) {
+            ChatToolResolver chatToolResolver,
+            @org.springframework.beans.factory.annotation.Autowired(required = false)
+            SkillToolExecutor skillToolExecutor,
+            ObjectMapper objectMapper) {
         this.toolDiscoveryPort = toolDiscoveryPort;
         this.chatToolResolver = chatToolResolver;
+        this.skillToolExecutor = skillToolExecutor;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -60,6 +82,16 @@ public class ChatToolExecutor {
             input = Map.of();
         }
 
+        // ── AuraBot Skill SPI branch (Plan §C-5 Task 4) ─────────────────────
+        // Accept both the canonical "aurabot:<skill>" form and the bare skill
+        // name form (LLM sanitisers occasionally drop the provider prefix).
+        // Bare-name lookup is registry-gated so unrelated tools (e.g. raw
+        // "cmd_crm_create_lead") fall through to the legacy path.
+        String skillName = resolveAuraBotSkillName(toolName);
+        if (skillName != null) {
+            return executeAuraBotSkill(skillName, input);
+        }
+
         if (toolDiscoveryPort == null) {
             return errorResult("ToolDiscoveryPort is not available in the current runtime.");
         }
@@ -76,6 +108,83 @@ public class ChatToolExecutor {
             return toolDiscoveryPort.executeTool(tenantId, providerToolCode, input);
         } catch (Exception e) {
             log.error("Tool execution failed for {}: {}", toolName, e.getMessage(), e);
+            return errorResult(e.getMessage());
+        }
+    }
+
+    /**
+     * Resolve a chat-side tool name to an AuraBot skill name, or {@code null} when
+     * the call should fall through to the legacy ToolDiscoveryPort path.
+     *
+     * <p>Two acceptance forms:
+     * <ol>
+     *   <li>{@code aurabot:<skillName>} — explicit provider prefix.</li>
+     *   <li>{@code <skillName>} (no colon) — bare name registered with the skill
+     *       registry. The registry probe avoids hijacking unrelated unprefixed
+     *       names that legacy resolvers want to handle.</li>
+     * </ol>
+     */
+    private String resolveAuraBotSkillName(String toolName) {
+        if (skillToolExecutor == null) {
+            return null;
+        }
+        if (toolName.startsWith(AURABOT_TOOL_PREFIX)) {
+            String tail = toolName.substring(AURABOT_TOOL_PREFIX.length());
+            return tail.isBlank() ? null : tail;
+        }
+        if (!toolName.contains(":") && skillToolExecutor.handlesBareSkillName(toolName)) {
+            return toolName;
+        }
+        return null;
+    }
+
+    /**
+     * Run an AuraBot skill via {@link SkillToolExecutor#dispatch} and translate the
+     * outcome into the chat tool envelope shape:
+     *
+     * <ul>
+     *   <li>EXECUTED → {@code {success:true, data:<payload>}}</li>
+     *   <li>PREVIEW_PENDING → {@code {_aurabot_skill_pending:true, skillName, preview, previewToken, riskLevel}}</li>
+     *   <li>RuntimeException → {@code errorResult(...)} (logged, not swallowed silently)</li>
+     * </ul>
+     */
+    private Map<String, Object> executeAuraBotSkill(String skillName, Map<String, Object> input) {
+        try {
+            SkillRequest req = SkillRequest.builder()
+                    .skillName(skillName)
+                    .params(objectMapper.valueToTree(input))
+                    .build();
+
+            DispatchOutcome outcome = skillToolExecutor.dispatch(skillName, req);
+
+            if (outcome.kind() == OutcomeKind.EXECUTED) {
+                SkillResult result = outcome.result();
+                Map<String, Object> ok = new LinkedHashMap<>();
+                ok.put("success", true);
+                ok.put("data", result == null ? null : result.getPayload());
+                return ok;
+            }
+
+            // PREVIEW_PENDING — surface a stable marker the chat/FE layer
+            // recognises and renders as a confirm card. Keep the keys flat so
+            // SSE serialisation never collapses nested nulls.
+            SkillResult preview = outcome.preview();
+            Map<String, Object> pending = new LinkedHashMap<>();
+            pending.put("_aurabot_skill_pending", true);
+            pending.put("skillName", skillName);
+            Object previewBody = null;
+            if (preview != null) {
+                previewBody = preview.getPreview() != null ? preview.getPreview() : preview.getPayload();
+            }
+            pending.put("preview", previewBody);
+            pending.put("previewToken", outcome.previewToken());
+            pending.put("riskLevel", outcome.riskLevel());
+            return pending;
+        } catch (RuntimeException e) {
+            // Skill SPI throws SkillSpiException as RuntimeException; permission
+            // / schema / preview-token failures are user-facing and must reach
+            // the LLM as a typed error envelope, not propagate up the stream.
+            log.warn("AuraBot skill dispatch failed for {}: {}", skillName, e.getMessage());
             return errorResult(e.getMessage());
         }
     }
