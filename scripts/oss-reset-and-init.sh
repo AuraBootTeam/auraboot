@@ -5,17 +5,28 @@
 # Responsibility: reset environment (DB + services) and optionally import data.
 #                 NEVER auto-compensate missing data — that masks bootstrap failures.
 #
-# Default flow (all 8 steps):
+# History:
+#   2026-05-09 — §6 trimmed: test pages, system_overview dashboard, and
+#                multi-role users moved into the Playwright setup project
+#                (web-admin/tests/api/setup/0[0-2]-*.spec.ts). The setup
+#                project runs as the first project in playwright.oss.config.ts
+#                so any later Playwright invocation inherits the provisioned
+#                state idempotently. §6d (storageState generation) kept
+#                because some legacy specs read tests/storage/admin.json
+#                directly before the auth project runs.
+#
+# Default flow:
 # 1-2. Stop backend + frontend services
 # 3.   Reset database (drop + recreate)
 # 4.   Start backend + wait for health check
 # 4.5  Bootstrap via /api/bootstrap/setup API (creates admin + System Tenant +
 #      Business Tenant + platform_admin/tenant_admin role assignments)
 # 5.   Start frontend + wait for ready
-# 6.   Seed test pages, dashboard, multi-role users (pure API)
+# 6.   Generate Playwright storageState (test data prep itself moved to setup project)
 # 7.   Verify bootstrap data
+# 7.4  Grant platform_admin to default admin user
 # 7.5  Import plugins via CLI
-# 7.6-7.8. Backfill + marketplace seed + CS Agent seed
+# 7.6-7.9. Backfill + marketplace seed + CS Agent seed + AuraBot seed
 # 8.   (Optional) Seed showcase demo data via Playwright
 #
 # --no-bootstrap flow (steps 1-5 only):
@@ -316,163 +327,16 @@ if [ $WAITED_FE -ge $MAX_WAIT_FE ]; then
 fi
 
 if [ "$NO_BOOTSTRAP" != "1" ]; then
-    # Step 6: Seed test pages, dashboard, and multi-role users (pure API calls, no Playwright)
-    echo -e "${YELLOW}Step 6: Seeding test pages & dashboard...${NC}"
+    # Step 6: Generate Playwright storageState (test pages / dashboard /
+    # multi-role users moved to the Playwright setup project — see
+    # web-admin/tests/api/setup/0[01-2]-*.spec.ts and the documentation
+    # at docs/guides/r2-isolated-stack-sop.md). The setup project runs
+    # as the first project in playwright.oss.config.ts so any test
+    # invocation (including the showcase seed below) inherits the
+    # provisioned data idempotently. Trimmed in commit on 2026-05-09 —
+    # see HISTORY block at the top of this file.
+    echo -e "${YELLOW}Step 6: Generating Playwright storageState (test data prep is now in tests/api/setup/0[0-2]-*.spec.ts)...${NC}"
 
-    AUTH_HEADER="Authorization: Bearer $LOGIN_JWT"
-    API_BASE="${AURA_BE_BASE}"
-
-    # Helper: POST JSON with auth
-    api_post() {
-        NO_PROXY=localhost curl -s -X POST "$API_BASE$1" \
-            -H "$AUTH_HEADER" -H "Content-Type: application/json" \
-            -d "$2" 2>/dev/null
-    }
-
-    # Helper: PUT JSON with auth
-    api_put() {
-        NO_PROXY=localhost curl -s -X PUT "$API_BASE$1" \
-            -H "$AUTH_HEADER" -H "Content-Type: application/json" \
-            -d "$2" 2>/dev/null
-    }
-
-    # Helper: GET with auth
-    api_get() {
-        NO_PROXY=localhost curl -s "$API_BASE$1" -H "$AUTH_HEADER" 2>/dev/null
-    }
-
-    # 6a: Create test pages for Page Designer (idempotent — skip if exists)
-    create_test_page() {
-        local page_key="$1"
-        local payload="$2"
-        local existing
-        existing=$(api_get "/api/pages/key/$page_key" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('pid',''))" 2>/dev/null || echo "")
-        if [ -n "$existing" ] && [ "$existing" != "None" ] && [ "$existing" != "" ]; then
-            echo "   $page_key already exists, skipping"
-            return
-        fi
-        local resp
-        local pid
-        local message
-        resp=$(api_post "/api/pages" "$payload")
-        pid=$(echo "$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('pid',''))" 2>/dev/null || echo "")
-        message=$(echo "$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('errorMessage') or d.get('message') or '')" 2>/dev/null || echo "")
-        if [ -n "$pid" ] && [ "$pid" != "None" ] && [ "$pid" != "" ]; then
-            api_post "/api/pages/$pid/publish" "{}" > /dev/null
-            echo "   Created & published: $page_key"
-        else
-            echo -e "${YELLOW}   Failed to create $page_key: ${message:-$resp}${NC}"
-        fi
-    }
-
-    create_test_page "e2e_test_dashboard" '{
-        "pageKey":"e2e_test_dashboard","name":"E2E Test Dashboard","title":"E2E Test Dashboard","modelCode":"page_schema",
-        "description":"Overview-style list fixture for Page Designer E2E tests",
-        "kind":"list",
-        "layout":{"type":"grid","cols":12},
-        "blocks":[
-            {"id":"block_overview_stats","blockType":"stat-card","layout":{"colSpan":12,"rowSpan":1},"title":"Overview","cards":[{"label":"Total","value":"1234"},{"label":"Today","value":"56"}]},
-            {"id":"block_overview_table","blockType":"table","layout":{"colSpan":12,"rowSpan":1},"columns":[{"field":"name","title":"Name","width":200},{"field":"page_key","title":"Page Key","width":220},{"field":"status","title":"Status","width":120},{"field":"updated_at","title":"Updated At","width":180}]}
-        ]
-    }'
-
-    create_test_page "e2e_test_form" '{
-        "pageKey":"e2e_test_form","name":"E2E Test Form","title":"E2E Test Form","modelCode":"page_schema",
-        "description":"Form fixture for Page Designer E2E tests",
-        "kind":"form",
-        "layout":{"type":"grid","cols":12,"gap":12},
-        "blocks":[
-            {"id":"block_form_main","blockType":"form-section","title":"Basic Information","layout":{"colSpan":12,"rowSpan":1},"columns":2,"fields":[{"field":"name","layout":{"colSpan":6,"rowSpan":1}},{"field":"page_key","layout":{"colSpan":6,"rowSpan":1}},{"field":"kind","layout":{"colSpan":4,"rowSpan":1}},{"field":"profile","layout":{"colSpan":4,"rowSpan":1}},{"field":"model_code","layout":{"colSpan":4,"rowSpan":1}},{"field":"description","layout":{"colSpan":12,"rowSpan":1}}]},
-            {"id":"block_form_actions","blockType":"form-buttons","layout":{"colSpan":12,"rowSpan":1},"buttons":[{"code":"save","primary":true,"label":"save"},{"code":"reset","label":"reset"}]}
-        ]
-    }'
-
-    create_test_page "e2e_test_list" '{
-        "pageKey":"e2e_test_list","name":"E2E Test List","title":"E2E Test List","modelCode":"page_schema",
-        "description":"List fixture for Page Designer E2E tests",
-        "kind":"list",
-        "layout":{"type":"stack"},
-        "blocks":[
-            {"id":"block_list_toolbar","blockType":"toolbar","buttons":[{"code":"create","variant":"primary","label":"create"},{"code":"refresh","label":"refresh"}]},
-            {"id":"block_list_filters","blockType":"filters","fields":[{"field":"name"},{"field":"status"}]},
-            {"id":"block_list_table","blockType":"table","columns":[{"field":"name","title":"Name","width":200},{"field":"page_key","title":"Page Key","width":220},{"field":"status","title":"Status","width":120},{"field":"updated_at","title":"Updated At","width":180}],"rowActions":[{"code":"view","label":"view"},{"code":"edit","label":"edit"},{"code":"delete","label":"delete"}]}
-        ]
-    }'
-
-    echo -e "${GREEN}   Test pages complete${NC}"
-
-    # 6b: Create system_overview dashboard (idempotent)
-    echo "   Creating system_overview dashboard..."
-    DASH_EXISTS=$(api_get "/api/dashboards/code/system_overview" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('pid',''))" 2>/dev/null || echo "")
-    SYSTEM_OVERVIEW_PAYLOAD='{
-        "code":"system_overview",
-        "title":"System Overview",
-        "description":"Live overview dashboard seeded for local development",
-        "scope":"global",
-        "isDefault":true,
-        "layoutConfig":{"columns":12,"rowHeight":100,"gap":16},
-        "widgets":[
-            {"i":"w_accounts","x":0,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Accounts","config":{"title":"Accounts","label":"Accounts","color":"#2563EB","dataSource":{"type":"aggregate","modelCode":"crm_account","metrics":[{"field":"id","aggregation":"count","alias":"count"}]}}},
-            {"i":"w_contacts","x":3,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Contacts","config":{"title":"Contacts","label":"Contacts","color":"#10B981","dataSource":{"type":"aggregate","modelCode":"crm_contact","metrics":[{"field":"id","aggregation":"count","alias":"count"}]}}},
-            {"i":"w_leads","x":6,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Leads","config":{"title":"Leads","label":"Leads","color":"#F59E0B","dataSource":{"type":"aggregate","modelCode":"crm_lead","metrics":[{"field":"id","aggregation":"count","alias":"count"}]}}},
-            {"i":"w_opportunities","x":9,"y":0,"w":3,"h":2,"type":"NumberCard","title":"Opportunities","config":{"title":"Opportunities","label":"Opportunities","color":"#8B5CF6","dataSource":{"type":"aggregate","modelCode":"crm_opportunity","metrics":[{"field":"id","aggregation":"count","alias":"count"}]}}}
-        ]
-    }'
-
-    if [ -n "$DASH_EXISTS" ] && [ "$DASH_EXISTS" != "None" ] && [ "$DASH_EXISTS" != "" ]; then
-        api_put "/api/dashboards/$DASH_EXISTS" "$SYSTEM_OVERVIEW_PAYLOAD" > /dev/null
-        api_post "/api/dashboards/$DASH_EXISTS/publish" "{}" > /dev/null
-        echo "   system_overview updated"
-    else
-        DASH_RESP=$(api_post "/api/dashboards" "$SYSTEM_OVERVIEW_PAYLOAD")
-        DASH_PID=$(echo "$DASH_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('pid',''))" 2>/dev/null || echo "")
-        if [ -n "$DASH_PID" ] && [ "$DASH_PID" != "None" ] && [ "$DASH_PID" != "" ]; then
-            api_post "/api/dashboards/$DASH_PID/publish" "{}" > /dev/null
-            echo -e "${GREEN}   Created & published system_overview${NC}"
-        else
-            echo -e "${YELLOW}   Dashboard creation skipped (may already exist)${NC}"
-        fi
-    fi
-
-    # 6c: Provision multi-role test users via Admin Create User API (idempotent)
-    echo "   Setting up multi-role test users..."
-
-    provision_user() {
-        local email="$1"
-        local password="$2"
-        local role_code="$3"
-        local display_name
-        display_name=$(echo "$email" | cut -d@ -f1)
-
-        local resp
-        resp=$(api_post "/api/admin/users" "{
-            \"email\":\"$email\",
-            \"displayName\":\"$display_name\",
-            \"initialPassword\":\"$password\",
-            \"roleCodes\":[\"$role_code\"],
-            \"sendInviteEmail\":false
-        }")
-        local result_email
-        result_email=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('email',''))" 2>/dev/null || echo "")
-
-        if [ -n "$result_email" ] && [ "$result_email" != "None" ] && [ "$result_email" != "" ]; then
-            echo -e "${GREEN}   $email: provisioned with $role_code role${NC}"
-        else
-            local err_msg
-            err_msg=$(echo "$resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message','unknown'))" 2>/dev/null || echo "unknown")
-            if echo "$err_msg" | grep -qi "already exists"; then
-                echo "   $email already exists, skipping"
-            else
-                echo -e "${YELLOW}   $email: provisioning failed — $err_msg${NC}"
-            fi
-        fi
-    }
-
-    provision_user "e2e-operator@test.com" "Test2026x" "operator"
-    provision_user "e2e-viewer@test.com" "Test2026x" "viewer"
-
-    # 6d: Ensure Playwright storageState exists for E2E tests
-    echo "   Generating Playwright storageState..."
     cd "$WEB_ADMIN_DIR"
     mkdir -p tests/storage
 
