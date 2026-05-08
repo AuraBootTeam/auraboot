@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 角色数据访问层
@@ -168,4 +170,28 @@ public interface RoleMapper extends BaseMapper<Role> {
      */
     @Update("UPDATE ab_role SET deleted_flag = TRUE, updated_at = NOW() WHERE pid = #{pid}")
     int softDeleteByPid(@Param("pid") String pid);
+
+    /**
+     * Batch lookup of role priorities by id (M-090 CFG-001).
+     * Skips soft-deleted rows so the mobile config role layer doesn't
+     * apply overrides from removed roles.
+     *
+     * Returns a list of rows each containing {@code id} and {@code priority}.
+     * Callers convert to {@code Map<Long, Integer>} via stream if needed.
+     *
+     * NOTE: Guard at the call site with {@code if (ids.isEmpty()) return List.of();}
+     * before invoking — MyBatis {@code <foreach>} over an empty collection produces
+     * {@code IN ()} which Postgres rejects.
+     */
+    @Select("""
+        <script>
+        SELECT id AS id, priority AS priority FROM ab_role
+        WHERE id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+          AND (deleted_flag = false OR deleted_flag IS NULL)
+        </script>
+        """)
+    List<Map<String, Object>> findPrioritiesByIds(@Param("ids") Set<Long> ids);
 }
