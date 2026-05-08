@@ -131,7 +131,7 @@ class PluginImportAsyncTaskExecutorTest {
         when(importService.parseDirectory(anyString())).thenReturn(preview);
         when(importService.execute(anyString(), any(ImportRequest.class))).thenReturn(execResult);
 
-        AsyncTaskResult result = executor.execute(params(Map.of()), callback);
+        AsyncTaskResult result = executor.execute(params(Map.of("conflictStrategy", "OVERWRITE")), callback);
 
         assertThat(result.isSuccess()).isTrue();
         JsonNode data = result.getData();
@@ -156,7 +156,7 @@ class PluginImportAsyncTaskExecutorTest {
         when(importService.parseDirectory(anyString())).thenReturn(preview);
         when(importService.execute(anyString(), any(ImportRequest.class))).thenReturn(execResult);
 
-        AsyncTaskResult result = executor.execute(params(Map.of()), callback);
+        AsyncTaskResult result = executor.execute(params(Map.of("conflictStrategy", "OVERWRITE")), callback);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getErrorMessage()).contains("Import failed").contains("conflict");
@@ -172,7 +172,7 @@ class PluginImportAsyncTaskExecutorTest {
         when(importService.parseDirectory(anyString())).thenReturn(preview);
         when(importService.execute(anyString(), any(ImportRequest.class))).thenReturn(exec);
 
-        executor.execute(params(Map.of("conflictStrategy", "skip")), callback);
+        executor.execute(params(Map.of("conflictStrategy", "SKIP")), callback);
 
         ArgumentCaptor<ImportRequest> captor = ArgumentCaptor.forClass(ImportRequest.class);
         verify(importService).execute(anyString(), captor.capture());
