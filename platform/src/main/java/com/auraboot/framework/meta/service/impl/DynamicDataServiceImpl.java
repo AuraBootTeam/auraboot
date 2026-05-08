@@ -718,7 +718,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         Map<String, Object> record = records.get(0);
 
-        // Apply row-level access check for single record
+        // Apply row-level access check for single record — fail-secure: any
+        // non-MetaServiceException must surface as a 5xx, not be swallowed.
+        // Mirrors the list() pattern at lines 173 and 185.
         try {
             Long userId = getCurrentUserId();
             if (!dataPermissionEngine.canAccessRecord(tenantId, modelCode, userId, record)) {
@@ -727,10 +729,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         } catch (MetaServiceException e) {
             throw e;
         } catch (Exception e) {
-            log.warn("Failed to check row-level access for model {} record {}: {}", modelCode, recordId, e.getMessage(), e);
+            log.error("Failed to evaluate row-level access for model {} record {} — failing closed for security",
+                    modelCode, recordId, e);
+            throw new MetaServiceException(
+                    "Data permission evaluation failed for model: " + modelCode, e);
         }
 
-        // Apply column-level field masking (policy-based)
+        // Apply column-level field masking (policy-based) — fail-secure.
+        // Returning the unmasked record on internal error would leak the
+        // very fields the policy is configured to hide.
         try {
             Long userId = getCurrentUserId();
             List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
@@ -741,15 +748,21 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to apply field masking for model {} record {}: {}", modelCode, recordId, e.getMessage(), e);
+            log.error("Failed to apply field masking for model {} record {} — failing closed for security",
+                    modelCode, recordId, e);
+            throw new MetaServiceException(
+                    "Field masking evaluation failed for model: " + modelCode, e);
         }
 
-        // Apply configurable field masking for detail view (A9)
+        // Apply configurable field masking for detail view (A9) — fail-secure.
         try {
             Long userId = getCurrentUserId();
             record = fieldMaskService.applyMaskingForDetail(modelCode, record, userId);
         } catch (Exception e) {
-            log.warn("Failed to apply configurable field masking for model {} record {}: {}", modelCode, recordId, e.getMessage(), e);
+            log.error("Failed to apply configurable field masking for model {} record {} — failing closed for security",
+                    modelCode, recordId, e);
+            throw new MetaServiceException(
+                    "Detail-view field masking failed for model: " + modelCode, e);
         }
 
         // Apply field-level permission filtering — remove hidden fields
