@@ -1,0 +1,65 @@
+# Skills SPI C-2 worktree isolation override.
+#
+# Goals:
+#   - Bring up an isolated Postgres + Redis pair for the
+#     `aurabot-skill-spi-c2` worktree without colliding with the
+#     developer's host services or any other active worktree.
+#   - Keep the override minimal: backend / vite / BFF run on the host
+#     for B1 (Repository IT). They are reserved on shifted ports for
+#     B2+ but not started here.
+#
+# Project: COMPOSE_PROJECT_NAME=auraboot-skills-c4
+# Profile: skills-c4-stack
+#
+# Port shifts (+20 from base):
+#   postgres : 35442 -> 5432   (base 5432)
+#   redis    : 36389 -> 6379   (base 6379)
+#   backend  : 28080 -> 6443   (reserved, not started in B1)
+#   BFF      : 23511 -> 3500   (reserved, not started in B1)
+#   vite     : 25184 -> 5173   (reserved, not started in B1)
+#
+# Usage:
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.skills-c4.override.yml \
+#     -p auraboot-skills-c4 \
+#     --profile skills-c4-stack \
+#     up -d
+#
+# Tear down:
+#   docker compose -p auraboot-skills-c4 down -v
+
+services:
+  postgres:
+    container_name: auraboot-skills-c4-postgres
+    profiles:
+      - skills-c4-stack
+    # Replace the base 5432:5432 mapping; shifted by +20.
+    ports: !override
+      - "35442:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aura_boot}
+      POSTGRES_USER: ${POSTGRES_USER:-auraboot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
+    volumes:
+      - skills_c4_postgres_data:/var/lib/postgresql/data
+      # Mount the worktree's schema.sql (NOT the OSS canonical one) so the
+      # `ab_aurabot_skill_run` table added in this worktree is initialised
+      # on first boot. Operator must run `docker compose down -v` to pick
+      # up subsequent schema.sql edits.
+      - /Users/ghj/work/auraboot-worktrees/aurabot-skill-field-add-c4/platform/src/main/resources/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+
+  redis:
+    container_name: auraboot-skills-c4-redis
+    # Force-on for this stack; in the base file redis is gated by `cache`
+    # profile, but B1 IT depends on Redis being up.
+    profiles:
+      - skills-c4-stack
+    ports: !override
+      - "36389:6379"
+    volumes:
+      - skills_c4_redis_data:/data
+
+volumes:
+  skills_c4_postgres_data:
+  skills_c4_redis_data:
