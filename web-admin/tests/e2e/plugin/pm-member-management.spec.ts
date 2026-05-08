@@ -225,7 +225,7 @@ test.describe('PM Member Management', () => {
 
   test('PM-MEM-05: Remove member via UI', async ({ page }) => {
     // First add a member via API for reliable removal test
-    const BASE = process.env.BASE_URL || 'http://localhost:5173';
+    const BASE = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
 
     // Get current members
     const memberFilter = encodeURIComponent(

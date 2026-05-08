@@ -20,7 +20,7 @@ import { test as baseTest } from '@playwright/test';
 import { navigateToDynamicPage, waitForDynamicPageLoad, extractRecordId } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
 
 test.describe('Permission Depth — Menu Visibility', () => {
   /**

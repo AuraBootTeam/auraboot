@@ -19,7 +19,7 @@
 import { test, expect } from '../../fixtures';
 import { uniqueId, navigateToDynamicPage } from '../helpers';
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
 const MEMBER_PAGE_KEY = 'tenant-member';
 
 // ---------------------------------------------------------------------------

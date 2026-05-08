@@ -19,7 +19,7 @@ import { test, expect } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { LoginPage } from '../../pages';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
 const TEST_EMAIL = DEFAULT_TEST_ACCOUNT.email;
 const TEST_PASSWORD = DEFAULT_TEST_ACCOUNT.password;
 
