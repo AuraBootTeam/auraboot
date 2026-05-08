@@ -18,6 +18,7 @@ import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -67,20 +68,21 @@ public class SkillToolExecutor {
 
     private final AuraBotSkillRegistry registry;
     private final SkillRequestValidator validator;
-    private final PreviewTokenStore previewTokenStore;
+    // Optional: only present when redis is configured (RedisOptionalConfig).
+    private final ObjectProvider<PreviewTokenStore> previewTokenStoreProvider;
     private final UserPermissionService userPermissionService;
     private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
 
     public SkillToolExecutor(AuraBotSkillRegistry registry,
                              SkillRequestValidator validator,
-                             PreviewTokenStore previewTokenStore,
+                             ObjectProvider<PreviewTokenStore> previewTokenStoreProvider,
                              UserPermissionService userPermissionService,
                              PermissionMapper permissionMapper,
                              ObjectMapper objectMapper) {
         this.registry = registry;
         this.validator = validator;
-        this.previewTokenStore = previewTokenStore;
+        this.previewTokenStoreProvider = previewTokenStoreProvider;
         this.userPermissionService = userPermissionService;
         this.permissionMapper = permissionMapper;
         this.objectMapper = objectMapper;
@@ -146,6 +148,13 @@ public class SkillToolExecutor {
         JsonNode previewPayload = preview == null || preview.getPayload() == null
                 ? null
                 : objectMapper.valueToTree(preview.getPayload());
+        // MEDIUM+ requires a shared preview-token store across nodes — fail-closed
+        // when redis is not configured (chat layer gets a typed error).
+        PreviewTokenStore previewTokenStore = previewTokenStoreProvider.getIfAvailable();
+        if (previewTokenStore == null) {
+            throw new SkillSpiException(SkillErrorCode.PREVIEW_TOKEN_INVALID,
+                    "preview token store unavailable (redis not configured); cannot mint MEDIUM+ token");
+        }
         String token = previewTokenStore.save(tenantId, skill.name(), req.getParams(), previewPayload);
 
         log.info("AUDIT skill={} action=chat-dispatch tenantId={} risk={} outcome=PREVIEW_PENDING",
@@ -179,6 +188,11 @@ public class SkillToolExecutor {
                 .orElseThrow(() -> new SkillSpiException(SkillErrorCode.SKILL_NOT_FOUND,
                         "skill not found: " + skillName));
 
+        PreviewTokenStore previewTokenStore = previewTokenStoreProvider.getIfAvailable();
+        if (previewTokenStore == null) {
+            throw new SkillSpiException(SkillErrorCode.PREVIEW_TOKEN_INVALID,
+                    "preview token store unavailable (redis not configured); cannot consume token");
+        }
         previewTokenStore.consume(previewToken, skillName, req.getParams())
                 .orElseThrow(() -> new SkillSpiException(SkillErrorCode.PREVIEW_TOKEN_INVALID,
                         "preview token invalid, expired, or params mismatch"));

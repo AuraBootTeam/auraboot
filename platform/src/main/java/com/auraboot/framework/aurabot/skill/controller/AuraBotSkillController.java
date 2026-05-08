@@ -5,7 +5,6 @@ import com.auraboot.framework.aurabot.skill.AuraBotSkill;
 import com.auraboot.framework.aurabot.skill.AuraBotSkillRegistry;
 import com.auraboot.framework.aurabot.skill.PreviewTokenStore;
 import com.auraboot.framework.aurabot.skill.RiskLevel;
-import com.auraboot.framework.aurabot.skill.SkillIdempotencyStore;
 import com.auraboot.framework.aurabot.skill.SkillMeta;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillRequestValidator;
@@ -26,6 +25,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -87,8 +87,8 @@ public class AuraBotSkillController {
     private final AuraBotSkillRegistry registry;
     private final SkillRequestValidator validator;
     private final SkillRunRepository repository;
-    private final SkillIdempotencyStore idempotencyStore;
-    private final PreviewTokenStore previewTokenStore;
+    // Optional: only present when redis is configured (RedisOptionalConfig).
+    private final ObjectProvider<PreviewTokenStore> previewTokenStoreProvider;
     private final UserPermissionService userPermissionService;
     private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
@@ -96,16 +96,14 @@ public class AuraBotSkillController {
     public AuraBotSkillController(AuraBotSkillRegistry registry,
                                   SkillRequestValidator validator,
                                   SkillRunRepository repository,
-                                  SkillIdempotencyStore idempotencyStore,
-                                  PreviewTokenStore previewTokenStore,
+                                  ObjectProvider<PreviewTokenStore> previewTokenStoreProvider,
                                   UserPermissionService userPermissionService,
                                   PermissionMapper permissionMapper,
                                   ObjectMapper objectMapper) {
         this.registry = registry;
         this.validator = validator;
         this.repository = repository;
-        this.idempotencyStore = idempotencyStore;
-        this.previewTokenStore = previewTokenStore;
+        this.previewTokenStoreProvider = previewTokenStoreProvider;
         this.userPermissionService = userPermissionService;
         this.permissionMapper = permissionMapper;
         this.objectMapper = objectMapper;
@@ -160,8 +158,14 @@ public class AuraBotSkillController {
         // Mint preview token regardless of risk level — execute path will only
         // require it when risk ≥ MEDIUM (validator enforces). LOW skills get a
         // token for free; that's harmless and keeps wire shape uniform.
-        String token = previewTokenStore.save(tenantId, skill.name(), req.getParams(),
-                preview == null ? null : objectMapper.valueToTree(preview.getPayload()));
+        // Token store is optional — single-node deployments without redis
+        // get a null token; downstream execute fails CONFIRM_REQUIRED only
+        // when risk ≥ MEDIUM (which already requires redis in practice).
+        PreviewTokenStore previewTokenStore = previewTokenStoreProvider.getIfAvailable();
+        String token = previewTokenStore == null
+                ? null
+                : previewTokenStore.save(tenantId, skill.name(), req.getParams(),
+                        preview == null ? null : objectMapper.valueToTree(preview.getPayload()));
 
         SkillResult envelope = SkillResult.builder()
                 .status(SkillResult.Status.NEEDS_CONFIRM)
