@@ -374,7 +374,7 @@ async function verifyStorageStateWorks(
 
 // ── Admin login (required) ──────────────────────────────────────────
 setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
-  const baseURL = configURL || 'http://localhost:5173';
+  const baseURL = configURL || (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173');
 
   if (!fs.existsSync(STORAGE_DIR)) {
     fs.mkdirSync(STORAGE_DIR, { recursive: true });
@@ -408,7 +408,7 @@ setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
 // If the user doesn't exist, write empty storage immediately.
 // Use a 5s race timeout to avoid consuming the full 15s test timeout.
 setup('authenticate as operator', async ({ page, baseURL: configURL }) => {
-  const baseURL = configURL || 'http://localhost:5173';
+  const baseURL = configURL || (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173');
   const user = TEST_USERS[1];
   const storagePath = path.join(STORAGE_DIR, user.storageFile);
   if (!ENABLE_ROLE_AUTH) {
@@ -431,7 +431,7 @@ setup('authenticate as operator', async ({ page, baseURL: configURL }) => {
 
 // ── Viewer login (optional) ─────────────────────────────────────────
 setup('authenticate as viewer', async ({ page, baseURL: configURL }) => {
-  const baseURL = configURL || 'http://localhost:5173';
+  const baseURL = configURL || (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173');
   const user = TEST_USERS[2];
   const storagePath = path.join(STORAGE_DIR, user.storageFile);
   if (!ENABLE_ROLE_AUTH) {
