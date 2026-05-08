@@ -13,6 +13,20 @@
     "visible": true
   },
   {
+    "code": "crm_dashboard",
+    "parentCode": "crm_root",
+    "name:zh-CN": "驾驶舱",
+    "name:en": "Dashboard",
+    "path": "/crm/dashboard",
+    "pageKey": "crm_overview",
+    "component": null,
+    "icon": "IconDashboard",
+    "type": 1,
+    "permissionCode": "crm.account.read",
+    "orderNo": 0,
+    "visible": true
+  },
+  {
     "code": "crm_accounts",
     "parentCode": "crm_root",
     "name:zh-CN": "客户",

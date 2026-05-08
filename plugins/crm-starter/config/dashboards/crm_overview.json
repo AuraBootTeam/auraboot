@@ -1,0 +1,157 @@
+{
+  "code": "crm_overview",
+  "title": "CRM 概览",
+  "title:zh-CN": "CRM 概览",
+  "title:en": "CRM Overview",
+  "description": "Lightweight CRM demo dashboard: recent opportunities + recent leads",
+  "scope": "global",
+  "status": "published",
+  "sortOrder": 0,
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16,
+    "compactType": "vertical"
+  },
+  "widgets": [
+    {
+      "id": "block_recent_opportunities",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 0,
+      "w": 8,
+      "h": 4,
+      "title": "最新商机",
+      "config": {
+        "modelCode": "crm_opportunity",
+        "title": {
+          "zh-CN": "最新商机",
+          "en": "Recent Opportunities"
+        },
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "crm_opp_name",
+              "width": 200,
+              "label": {
+                "zh-CN": "商机名称",
+                "en": "Opportunity"
+              }
+            },
+            {
+              "field": "crm_opp_account_id",
+              "width": 160,
+              "label": {
+                "zh-CN": "客户",
+                "en": "Account"
+              }
+            },
+            {
+              "field": "crm_opp_stage",
+              "width": 120,
+              "renderType": "tag",
+              "dictCode": "crm_opp_stage",
+              "label": {
+                "zh-CN": "阶段",
+                "en": "Stage"
+              }
+            },
+            {
+              "field": "crm_opp_expected_amount",
+              "width": 140,
+              "align": "right",
+              "label": {
+                "zh-CN": "预期金额",
+                "en": "Amount"
+              }
+            }
+          ],
+          "rowActions": [
+            {
+              "code": "view",
+              "label": "view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_opportunity_detail"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "block_recent_leads",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 4,
+      "w": 8,
+      "h": 4,
+      "title": "最新线索",
+      "config": {
+        "modelCode": "crm_lead",
+        "title": {
+          "zh-CN": "最新线索",
+          "en": "Recent Leads"
+        },
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "crm_lead_company",
+              "width": 180,
+              "label": {
+                "zh-CN": "公司",
+                "en": "Company"
+              }
+            },
+            {
+              "field": "crm_lead_contact_name",
+              "width": 120,
+              "label": {
+                "zh-CN": "联系人",
+                "en": "Contact"
+              }
+            },
+            {
+              "field": "crm_lead_source",
+              "width": 100,
+              "renderType": "tag",
+              "dictCode": "crm_lead_source",
+              "label": {
+                "zh-CN": "来源",
+                "en": "Source"
+              }
+            },
+            {
+              "field": "crm_lead_status",
+              "width": 100,
+              "renderType": "tag",
+              "dictCode": "crm_lead_status",
+              "label": {
+                "zh-CN": "状态",
+                "en": "Status"
+              }
+            }
+          ],
+          "rowActions": [
+            {
+              "code": "view",
+              "label": "view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_lead_detail"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
