@@ -230,6 +230,7 @@ LIMIT 10
 | `a7130d5b` | `framework/meta/utils/sanitizeHtml.ts` | DOMPurify 允许 SVG 14 个 tag + 30+ presentation attr + `ALLOW_DATA_ATTR: true` | rich-text 可承载内联流程图 / data-* 测试钩子 |
 | `743d05b8` | `framework/smart/components/charts/SmartNumberCard.tsx` | 新 `metricField?: string` + `prefix?: string` | 单 named query 可喂多张 KPI 卡;货币符号支持 |
 | `293d69df` | `framework/smart/components/charts/SmartTableChart.tsx` | 新 `columns?: Array<{field, label}>`,有则覆盖 auto-derive | 表格表头 i18n |
+| `fe88ae60` | `framework/meta/service/impl/AggregateQueryServiceImpl.java` | namedQuery 不带 dim/metric 时走 identity passthrough(`SELECT *` + outputFields 填 meta) + 集成测试已绿 | dashboard JSON 可直接把 named query 当"view"消费,不需套 `aggregation: max`;后续任何复用同模式无后端阻塞 |
 | (无新 commit) | `SmartComboChart` | 复用现有 `seriesConfig: [{metricIndex, chartType, yAxisIndex?}]` | 仅 JSON 调整 |
 
 ### 实际交付清单(commit 序)
@@ -262,7 +263,10 @@ c8e984c9 feat(acp-showcase): add acs_showcase_recent_logs named query
 
 按 testing-e2e-web 红线 #2,以下未跑前**禁止**声称"功能完成":
 
-1. **NamedQuery 响应 meta 形态** — 后端给 namedQuery 类型的响应里 `meta.dimensions` / `meta.metrics` 怎么划分?影响 combo-chart 的 `metricIndex 0` 是否真对应 `success` 字段。可能要前端 normalize 或改后端响应
+1. ~~**NamedQuery 响应 meta 形态**~~ — 已闭环:
+   - 后端 identity passthrough(`fe88ae60`)+ 集成测试 PASS:KPI 卡 + 审计表走 identity 路径
+   - distribution charts 走显式 `dimensions/metrics` 路径(`5559f89f`):每个 chart widget 的 `dataSource` 加 `dimensions: [...]` + `metrics: [{field, aggregation: "max", alias}]`;`max` over 已聚合单值是 identity 但保持 meta 投影正确,combo-chart `metricIndex 0=success / 1=failed` 与 request 顺序一致
+   - **runtime 仍需肉眼确认**:实际查询是否真返回数据(后端 NamedQueryField 注册校验通过)、ECharts 渲染是否如期
 2. **6 KPI 卡复用单查询** — `metricField` 选不同列要在浏览器里看到 6 个不同数字,而不是 6 个相同数字
 3. **7 层 SVG** — sanitizer 放行后,在 rich-text 里实际渲染是否完整(IDs / markers / data-layer 全留下)
 4. **CTA 跳转** — `/p/acs_demo_request/new` 路由真存在(Page Designer 自动生成)且渲染表单有 i18n label
