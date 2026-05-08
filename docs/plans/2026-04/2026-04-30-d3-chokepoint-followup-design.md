@@ -1,6 +1,6 @@
 # D.3-chokepoint Follow-up — HandoffToolProvider × AgentChatPort SPI Integration
 
-> **Status**: v6 closure (2026-05-07) — DC.1–DC.4 + GAP-311 follow-up all landed (OSS commits `131f8890 → d7f9175b → 780fc027 → f4b9dede → c4e3e5a4 → d5093130 → 372b9272 → 89039d0f` + enterprise `e922c3789`). §11 contains the commit-hash table, long-term-evolution actual-vs-claim audit, v5 → v6 deviation log, final test snapshot, and deferred-item routing. **No new decisions in v6**; this version is the design's archival closure.
+> **Status**: v6 closure (2026-05-07; minor hash correction 2026-05-08) — DC.1–DC.4 + GAP-293/295/296/311 follow-up chain all landed (OSS commits `131f8890 → d7f9175b → 780fc027 → f4b9dede → c4e3e5a4 → d5093130 → 372b9272 → 3c53d327` + enterprise `e922c3789`; v6-doc commit `e5adbc90`). §11 contains the commit-hash table, long-term-evolution actual-vs-claim audit, v5 → v6 deviation log, final test snapshot, and deferred-item routing. **No new decisions in v6**; this version is the design's archival closure.
 > **v5 (2026-04-30)** — owner reviewed v4 §10 from long-term-evolution lens; locked **A'**: caller-owned context via **server-only `AgentTurnOverrides`**, NOT public `ChatRequest` fields. v5 §10.7 captures the 5 must-fix issues that v4 missed (security boundary on ChatRequest, named-agent outbound identity drift, task lifecycle protocol, handoff schema field-name bug, DC.4 underestimation). v5 §10.8 refines the PR sequence accordingly.
 > **Predecessor**: [`2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md`](./2026-04-30-conv-turn-svc-phase-d-multi-channel-design.md) v3 §8 row D.3 deferral note.
 
@@ -734,7 +734,7 @@ A' 在长期演进上与 A 完全等价（chokepoint claim 真实 / SRP / 跨模
 | DC.3d | handoff schema bug + caller_overrides_used metric + sunset doc(v5 Fix 4) | `d5093130` | ✅ |
 | DC.4-OSS | OSS 删 SSE transport,统一 ImMessageBroadcaster WS(v5 Fix 5,β 一次性) | `372b9272` | ✅ |
 | DC.4-EE | enterprise ent-im-chat 适配 WS frame | `e922c3789` (enterprise) | ✅ |
-| GAP-311 | post-runTurn MESSAGE broadcast + ImMessageSentEvent publisher 接线 | `89039d0f` (`feat/conv-turn-svc-followup`) | ✅ pending E2E |
+| GAP-293/295/296/311 chain | post-runTurn MESSAGE broadcast + ImMessageSentEvent publisher 接线 + ChannelSessionResolver dispatch + AuraBot bootstrap seed | `3c53d327` (on `origin/main`; 11 files, +665/-20) | ✅ pending E2E |
 
 ### 11.2 长期演进 actual-vs-claim audit
 
@@ -793,6 +793,7 @@ A' 在长期演进上与 A 完全等价（chokepoint claim 真实 / SRP / 跨模
 
 ## CHANGELOG
 
+- 2026-05-08 v6 closure hash audit:发现 §11.1 GAP-311 行 commit hash 写错(`89039d0f` 不存在);实际 land 的是 `3c53d327`(GAP-293/295/296/311 chain bundle,11 files +665/-20,在 `origin/main`)。修正 §11.1 表格 + status header,无内容偏离。doc-only,无 commit。
 - 2026-05-07 v6 closure DC.1–DC.4 + GAP-311 follow-up 全部 land;§11 写交付审计 + 长期演进 actual-vs-claim audit + v5→v6 偏离 + final test snapshot + 推迟项归宿。无新决策。本设计文档自此进入 archival 状态。
 - 2026-04-30 v5 owner reviewed v4 长期方向接受；落地形状 lock 为 **A'**（server-only `AgentTurnOverrides` 替代公开 ChatRequest 字段，安全边界修正）；§10.7 列 5 项 must-fix（含 DC.2 真实 bug：handoff schema 字段名 agent_code vs targetAgentCode）；§10.8 PR 切片调整为 DC.3a-d + DC.4 共 5 PR。
 - 2026-04-30 v4 §10 三个 sub-design 选项详细对比 + 6/12 个月演进预测 + steel-man + v4 倾向 (选项 A) + DC.3a-d 落地切片. **Pending owner review.**
