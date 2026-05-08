@@ -29,6 +29,14 @@ export interface UseKanbanDataOptions {
   /** Whether to enable data fetching (default: true) */
   enabled?: boolean;
   /**
+   * Optional dict-derived enum items used to render the full set of columns
+   * (including stages with no cards yet) in dict-defined order. When provided,
+   * columns are seeded from `groupByDictItems` first; rows whose group value
+   * is not in the dict produce trailing fallback columns. When omitted, the
+   * legacy data-derived behaviour applies — only stages with cards render.
+   */
+  groupByDictItems?: { value: string; label: string }[];
+  /**
    * Page key used as the dynamic API resource segment for persistence.
    * When provided, moveCard PUTs `/api/dynamic/{pageKey}/{recordId}` to
    * persist the column change with optimistic-update + rollback semantics.
@@ -140,7 +148,14 @@ function calculateAggregation(cards: KanbanCard[], aggregation: KanbanAggregatio
  * });
  */
 export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResult {
-  const { dataSource, linkageFilters, enabled = true, pageKey, onMoveError } = options;
+  const {
+    dataSource,
+    linkageFilters,
+    enabled = true,
+    pageKey,
+    onMoveError,
+    groupByDictItems,
+  } = options;
 
   const [rawData, setRawData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
@@ -292,8 +307,15 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       return { key: s, title: s };
     }
 
-    // Group cards by the groupByField value
+    // Group cards by the groupByField value. When dict items are provided,
+    // pre-seed empty columns in dict order so stages without cards still
+    // render — Salesforce/HubSpot-style full pipeline visibility.
     const groupedData = new Map<string, { title: string; cards: KanbanCard[] }>();
+    if (groupByDictItems && groupByDictItems.length > 0) {
+      for (const item of groupByDictItems) {
+        groupedData.set(item.value, { title: item.label, cards: [] });
+      }
+    }
 
     for (const row of rawData) {
       const groupValue = row[groupByField];
@@ -313,7 +335,8 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
       groupedData.get(groupKey)!.cards.push(card);
     }
 
-    // Convert grouped data to columns
+    // Convert grouped data to columns. Map insertion order is preserved, so
+    // dict-seeded keys come first in dict order, followed by any drift keys.
     const result: KanbanColumn[] = [];
 
     for (const [groupKey, { title, cards }] of groupedData) {
@@ -340,7 +363,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
     }
 
     return result;
-  }, [rawData, groupByField, idField, aggregations]);
+  }, [rawData, groupByField, idField, aggregations, groupByDictItems]);
 
   /**
    * Move a card between columns with optimistic update + persistence.
