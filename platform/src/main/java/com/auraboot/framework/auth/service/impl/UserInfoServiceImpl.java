@@ -6,7 +6,6 @@ import com.auraboot.framework.auth.service.UserInfoService;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
-import com.auraboot.framework.permission.util.PermissionCodeAliasResolver;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.tenant.service.TenantMemberService;
@@ -90,8 +89,6 @@ public class UserInfoServiceImpl implements UserInfoService {
             } else {
                 permissionCodes = resolvePermissionsByUserId(userId);
             }
-
-            permissionCodes = new ArrayList<>(PermissionCodeAliasResolver.expandCodes(permissionCodes));
         }
 
         List<UserInfoResponse.RoleDTO> roleDTOs = roles.stream()

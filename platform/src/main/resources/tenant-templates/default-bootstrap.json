@@ -25,16 +25,6 @@
       "resourceType": "function"
     },
     {
-      "code": "consistency_rule_management",
-      "name": "一致性规则管理",
-      "description": "访问和管理跨单据一致性规则",
-      "type": "menu",
-      "module": "meta",
-      "resource": "/meta/consistency-rules",
-      "action": "view",
-      "resourceType": "menu"
-    },
-    {
       "code": "dashboard_management",
       "name": "仪表盘管理",
       "description": "访问和管理仪表盘配置",
@@ -45,72 +35,12 @@
       "resourceType": "menu"
     },
     {
-      "code": "dashboard_designer",
-      "name": "仪表盘设计器",
-      "description": "设计和编辑仪表盘",
-      "type": "menu",
-      "module": "meta",
-      "resource": "/dashboard-designer",
-      "action": "manage",
-      "resourceType": "menu"
-    },
-    {
-      "code": "report_manage",
-      "name": "报表模板管理",
-      "description": "Create, edit, publish report templates",
-      "type": "menu",
-      "module": "meta",
-      "resource": "/report-templates",
-      "action": "manage",
-      "resourceType": "menu"
-    },
-    {
-      "code": "report_read",
-      "name": "报表模板查看",
-      "description": "View report templates",
-      "type": "menu",
-      "module": "meta",
-      "resource": "/report-templates",
-      "action": "view",
-      "resourceType": "menu"
-    },
-    {
-      "code": "report_generate",
-      "name": "报表生成",
-      "description": "Generate reports from templates",
-      "type": "menu",
-      "module": "meta",
-      "resource": "/report-templates/generate",
-      "action": "execute",
-      "resourceType": "menu"
-    },
-    {
-      "code": "print_generate",
-      "name": "打印/PDF生成",
-      "description": "Generate PDF business documents from HTML templates",
-      "type": "menu",
-      "module": "meta",
-      "resource": "/print",
-      "action": "execute",
-      "resourceType": "menu"
-    },
-    {
       "code": "acp_agent_approval",
       "name": "AI 审批",
       "description": "查看和处理 ACP Agent 发起的审批请求",
       "type": "menu",
       "module": "system",
       "resource": "/p/agent_approval",
-      "action": "view",
-      "resourceType": "menu"
-    },
-    {
-      "code": "ai_trace_console",
-      "name": "AI Trace",
-      "description": "查看AI调用链路追踪和性能指标",
-      "type": "menu",
-      "module": "system",
-      "resource": "/aurabot/traces",
       "action": "view",
       "resourceType": "menu"
     },
