@@ -447,6 +447,60 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @org.junit.jupiter.api.DisplayName("Named query: identity passthrough returns all output fields when no dimensions/metrics requested")
+    void testNamedQueryIdentityPassthrough() {
+        // Given: a named query whose fromSql is a deterministic inline SELECT
+        String code = generateQueryCode();
+
+        NamedQueryFieldRequest aField = new NamedQueryFieldRequest();
+        aField.setFieldCode("a");
+        aField.setColumnExpr("a");
+        aField.setDataType("number");
+        aField.setOperators(List.of("eq"));
+        aField.setSortable(false);
+
+        NamedQueryFieldRequest bField = new NamedQueryFieldRequest();
+        bField.setFieldCode("b");
+        bField.setColumnExpr("b");
+        bField.setDataType("string");
+        bField.setOperators(List.of("eq"));
+        bField.setSortable(false);
+
+        NamedQueryCreateRequest createReq = new NamedQueryCreateRequest();
+        createReq.setCode(code);
+        createReq.setTitle("Identity Passthrough Test Query");
+        createReq.setDescription("Returns one row with two pre-aggregated columns for passthrough testing");
+        createReq.setFromSql("SELECT 42 AS a, 'foo' AS b");
+        createReq.setStatus("published");
+        createReq.setFields(List.of(aField, bField));
+
+        namedQueryService.create(createReq);
+
+        // When: execute with NO dimensions and NO metrics
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setType("namedQuery");
+        request.setQueryCode(code);
+        // dimensions = null, metrics = null — identity passthrough
+
+        AggregateQueryResponse response = aggregateQueryService.execute(request);
+
+        // Then: one row returned with the raw columns from the subquery
+        assertThat(response).isNotNull();
+        assertThat(response.getRows()).hasSize(1);
+        assertThat(response.getRows().get(0)).containsKey("a");
+        assertThat(response.getRows().get(0)).containsKey("b");
+        assertThat(((Number) response.getRows().get(0).get("a")).intValue()).isEqualTo(42);
+        assertThat(response.getRows().get(0).get("b")).isEqualTo("foo");
+
+        // And: meta.metrics derived from named query outputFields
+        assertThat(response.getMeta()).isNotNull();
+        assertThat(response.getMeta().getMetrics())
+                .as("meta.metrics should be derived from named query outputFields")
+                .containsExactlyInAnyOrder("a", "b");
+        assertThat(response.getMeta().getDimensions()).isEmpty();
+    }
+
+    @Test
     void shouldExecuteNamedQueryWithMultipleAggregations() {
         // Given: a named query with multiple aggregation metrics
         String queryCode = createTestNamedQuery();
