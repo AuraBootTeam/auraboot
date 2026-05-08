@@ -11,6 +11,7 @@ import {
   DragOverlay,
   closestCenter,
   PointerSensor,
+  useDroppable,
   useSensor,
   useSensors,
   type DragStartEvent,
@@ -279,29 +280,19 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
             )}
           </div>
 
-          {/* Cards area */}
-          <div className="flex-1 space-y-2 overflow-y-auto p-2">
-            <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-              {column.cards.map((card) => (
-                <KanbanCardItem
-                  key={card.id}
-                  card={card}
-                  titleField={dataSource.titleField}
-                  descriptionField={dataSource.descriptionField}
-                  cardFields={dataSource.cardFields}
-                  draggable={draggable}
-                  terminal={column.terminal}
-                  onClick={onCardClick}
-                />
-              ))}
-            </SortableContext>
-            {/* Empty column drop zone */}
-            {column.cards.length === 0 && (
-              <div className="flex h-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-sm text-gray-400">
-                Drop here
-              </div>
-            )}
-          </div>
+          {/* Cards area — wrapped in useDroppable so empty columns still
+              accept drops (SortableContext alone only registers existing
+              cards as drop targets). The column body itself becomes a
+              droppable; handleDragEnd resolves over.id === column.id. */}
+          <KanbanColumnDropZone
+            columnId={column.id}
+            cardIds={cardIds}
+            cards={column.cards}
+            draggable={draggable}
+            dataSource={dataSource}
+            onCardClick={onCardClick}
+            terminal={column.terminal}
+          />
         </div>
       );
     },
@@ -402,3 +393,67 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
 };
 
 export default SmartKanban;
+
+// ---------------------------------------------------------------------------
+// KanbanColumnDropZone — column body wired with `useDroppable`.
+//
+// Without this, empty columns (dict-derived stages with zero cards) cannot
+// accept drops — SortableContext only registers its own items as drop
+// targets. We hoist column-body rendering into a child component so it can
+// call `useDroppable` per-column without violating the rules of hooks (the
+// parent's renderColumn is a useCallback that runs in a loop).
+// ---------------------------------------------------------------------------
+interface KanbanColumnDropZoneProps {
+  columnId: string;
+  cardIds: string[];
+  cards: KanbanCard[];
+  draggable: boolean;
+  dataSource: SmartKanbanProps['dataSource'];
+  onCardClick?: SmartKanbanProps['onCardClick'];
+  terminal?: 'won' | 'lost';
+}
+
+const KanbanColumnDropZone: React.FC<KanbanColumnDropZoneProps> = ({
+  columnId,
+  cardIds,
+  cards,
+  draggable,
+  dataSource,
+  onCardClick,
+  terminal,
+}) => {
+  const { setNodeRef, isOver } = useDroppable({ id: columnId });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'flex-1 space-y-2 overflow-y-auto p-2',
+        isOver && 'bg-blue-50/50',
+      )}
+      data-testid="kanban-column-body"
+      data-column-id={columnId}
+    >
+      <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
+        {cards.map((card) => (
+          <KanbanCardItem
+            key={card.id}
+            card={card}
+            titleField={dataSource.titleField}
+            descriptionField={dataSource.descriptionField}
+            cardFields={dataSource.cardFields}
+            draggable={draggable}
+            terminal={terminal}
+            onClick={onCardClick}
+          />
+        ))}
+      </SortableContext>
+      {/* Empty column hint — the parent div is the actual droppable. */}
+      {cards.length === 0 && (
+        <div className="flex h-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-sm text-gray-400">
+          Drop here
+        </div>
+      )}
+    </div>
+  );
+};
