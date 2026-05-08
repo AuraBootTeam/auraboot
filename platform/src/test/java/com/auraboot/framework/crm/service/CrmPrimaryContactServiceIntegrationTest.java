@@ -2,8 +2,6 @@ package com.auraboot.framework.crm.service;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +9,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * mt_crm_contact is defined by the crm-starter plugin
+ * (plugins/crm-starter/config/fields/crm_contact.json) and materialised
+ * during oss-reset-and-init.sh's plugin-import phase, mirroring the
+ * mt_crm_lead pattern. Per-test row isolation comes from
+ * BaseIntegrationTest's @Transactional + @Rollback(true).
+ */
 class CrmPrimaryContactServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -18,31 +23,6 @@ class CrmPrimaryContactServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @BeforeEach
-    void createContactTable() {
-        jdbcTemplate.execute("DROP TABLE IF EXISTS mt_crm_contact");
-        jdbcTemplate.execute("""
-                CREATE TABLE mt_crm_contact (
-                    id BIGSERIAL PRIMARY KEY,
-                    pid VARCHAR(64) NOT NULL,
-                    tenant_id BIGINT NOT NULL,
-                    crm_ct_account_id VARCHAR(64),
-                    crm_ct_name VARCHAR(255),
-                    crm_ct_email VARCHAR(255),
-                    crm_ct_is_primary BOOLEAN DEFAULT FALSE,
-                    deleted_flag BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP,
-                    updated_at TIMESTAMP
-                )
-                """);
-        jdbcTemplate.execute("TRUNCATE TABLE mt_crm_contact");
-    }
-
-    @AfterEach
-    void dropContactTable() {
-        jdbcTemplate.execute("DROP TABLE IF EXISTS mt_crm_contact");
-    }
 
     @Test
     @DisplayName("CRM primary contact normalization demotes other primaries under the same account")
