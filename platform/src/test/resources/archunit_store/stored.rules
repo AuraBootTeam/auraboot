@@ -1,3 +1,5 @@
 #
-#Thu Apr 02 09:59:18 UTC 2026
+#Fri May 08 09:51:08 UTC 2026
 no\ classes\ that\ reside\ in\ any\ package\ ['..controller..']\ should\ depend\ on\ classes\ that\ reside\ in\ any\ package\ ['..mapper..',\ '..dao..'],\ because\ Controllers\ must\ go\ through\ service\ layer,\ not\ directly\ access\ data\ layer=0ab97cbe-fdac-438b-ada6-6a3345321449
+no\ classes\ that\ reside\ in\ any\ package\ ['..controller..']\ should\ depend\ on\ classes\ that\ reside\ in\ any\ package\ ['..mapper..'],\ because\ Controllers\ must\ go\ through\ service\ layer,\ not\ directly\ access\ mapper\ layer=ad99c78f-40bc-452d-a135-dd19ac56e09f
+no\ classes\ that\ reside\ in\ any\ package\ ['com.auraboot.framework.application..',\ 'com.auraboot.framework.meta..']\ should\ depend\ on\ classes\ that\ reside\ in\ any\ package\ ['com.auraboot.framework.crm..',\ 'com.auraboot.framework.bpm..',\ 'com.auraboot.framework.finance..',\ 'com.auraboot.framework.aps..',\ 'com.auraboot.framework.mrp..'],\ because\ Framework\ core\ must\ remain\ module-agnostic=9a9cb756-5be8-46ae-9f1d-376c0d43e313
