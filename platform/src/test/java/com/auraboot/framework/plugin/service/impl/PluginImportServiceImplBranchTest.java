@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.rule.DroolsRuleService;
 import com.auraboot.framework.bpm.service.SlaConfigService;
 import com.auraboot.framework.i18n.compiler.I18nCompiler;
@@ -29,6 +30,8 @@ import com.auraboot.framework.plugin.validation.PluginValidationPipeline;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -94,6 +97,21 @@ class PluginImportServiceImplBranchTest {
     @Mock private JdbcTemplate jdbcTemplate;
 
     @InjectMocks private PluginImportServiceImpl service;
+
+    @BeforeEach
+    void setUpContext() {
+        if (MetaContext.exists()) {
+            MetaContext.clear();
+        }
+        MetaContext.setContext(100L, 1L, "U-1", "tester");
+    }
+
+    @AfterEach
+    void clearContext() {
+        if (MetaContext.exists()) {
+            MetaContext.clear();
+        }
+    }
 
     @Test
     @DisplayName("parseJson returns invalid result on malformed JSON")
