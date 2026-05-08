@@ -13,7 +13,7 @@
         {
           "code": "create",
           "primary": true,
-          "permissionCode": "CRM.lead.manage",
+          "permissionCode": "crm.lead.manage",
           "label": "create",
           "action": {
             "type": "navigate",
@@ -161,7 +161,7 @@
             },
             {
               "code": "edit",
-              "permissionCode": "CRM.lead.manage",
+              "permissionCode": "crm.lead.manage",
               "label": "edit",
               "action": {
                 "type": "navigate",
@@ -171,7 +171,7 @@
             {
               "code": "delete",
               "danger": true,
-              "permissionCode": "CRM.lead.manage",
+              "permissionCode": "crm.lead.manage",
               "label": "delete",
               "confirm": "delete.confirm",
               "action": {

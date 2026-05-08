@@ -27,7 +27,7 @@
       }
     },
     "permissions": [
-      "CRM.campaign.manage"
+      "crm.campaign.manage"
     ],
     "agent_hint": "Create a new campaign. Key inputs: name, type, start_date, end_date, budget, description. Auto-generated: code, status, owner.",
     "cmd_risk_level": "L1"
@@ -47,7 +47,7 @@
       "crm_cpn_description"
     ],
     "permissions": [
-      "CRM.campaign.manage"
+      "crm.campaign.manage"
     ],
     "agent_hint": "Update an existing campaign. Editable fields: name, type, start_date, end_date, budget, description.",
     "cmd_risk_level": "L1"
@@ -70,7 +70,7 @@
       "confirmMessage:en": "Confirm delete this campaign?"
     },
     "permissions": [
-      "CRM.campaign.manage"
+      "crm.campaign.manage"
     ],
     "agent_hint": "Delete campaign record(s). Preconditions: status = planned.",
     "cmd_risk_level": "L4"
@@ -87,7 +87,7 @@
     ],
     "toState": "active",
     "permissions": [
-      "CRM.campaign.manage"
+      "crm.campaign.manage"
     ],
     "agent_hint": "Transition campaign status from PLANNED to ACTIVE.",
     "cmd_risk_level": "L1"
@@ -104,7 +104,7 @@
     ],
     "toState": "completed",
     "permissions": [
-      "CRM.campaign.manage"
+      "crm.campaign.manage"
     ],
     "agent_hint": "Transition campaign status from ACTIVE to COMPLETED.",
     "cmd_risk_level": "L1"
@@ -126,22 +126,10 @@
       "confirmMessage:en": "Confirm cancelling this campaign?"
     },
     "permissions": [
-      "CRM.campaign.manage"
+      "crm.campaign.manage"
     ],
     "agent_hint": "Transition campaign status from PLANNED/ACTIVE to CANCELLED.",
     "cmd_risk_level": "L1"
-  },
-  {
-    "code": "crm:detail_campaign",
-    "displayName:zh-CN": "查看营销活动",
-    "displayName:en": "View Campaign",
-    "type": "query",
-    "modelCode": "crm_campaign",
-    "permissions": [
-      "CRM.campaign.read"
-    ],
-    "agent_hint": "Query campaign records.",
-    "cmd_risk_level": "L0"
   },
   {
     "code": "crm:list_campaigns",
@@ -150,7 +138,7 @@
     "type": "query",
     "modelCode": "crm_campaign",
     "permissions": [
-      "CRM.campaign.read"
+      "crm.campaign.read"
     ],
     "agent_hint": "Query campaign records.",
     "cmd_risk_level": "L0"

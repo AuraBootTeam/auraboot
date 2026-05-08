@@ -13,7 +13,7 @@
         {
           "code": "edit",
           "icon": "Edit",
-          "permissionCode": "CRM.campaign.manage",
+          "permissionCode": "crm.campaign.manage",
           "label": "edit",
           "action": {
             "type": "navigate",
@@ -22,7 +22,7 @@
         },
         {
           "code": "activate",
-          "permissionCode": "CRM.campaign.manage",
+          "permissionCode": "crm.campaign.manage",
           "label": {
             "zh-CN": "启动",
             "en-US": "Activate"
@@ -34,7 +34,7 @@
         },
         {
           "code": "complete",
-          "permissionCode": "CRM.campaign.manage",
+          "permissionCode": "crm.campaign.manage",
           "label": {
             "zh-CN": "完成",
             "en-US": "Complete"
@@ -47,7 +47,7 @@
         {
           "code": "cancel",
           "danger": true,
-          "permissionCode": "CRM.campaign.manage",
+          "permissionCode": "crm.campaign.manage",
           "label": {
             "zh-CN": "取消",
             "en-US": "Cancel"

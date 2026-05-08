@@ -13,7 +13,7 @@
         {
           "code": "edit",
           "icon": "Edit",
-          "permissionCode": "CRM.lead.manage",
+          "permissionCode": "crm.lead.manage",
           "label": "edit",
           "action": {
             "type": "navigate",
