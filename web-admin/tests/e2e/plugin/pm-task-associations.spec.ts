@@ -16,6 +16,7 @@
 
 import { test, expect } from '@playwright/test';
 import { uniqueId, executeCommandViaApi, dateOffsetStr, ensureFilterFormOpen } from '../helpers/index';
+import { BASE_URL as BASE } from '../../helpers/playwright-env';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -361,7 +362,7 @@ test.describe('PM Task Associations', () => {
   });
 
   test('PM-ASSOC-10: Task dependency data persists via API query', async ({ page }) => {
-    const BASE = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
+
     const filter = encodeURIComponent(
       JSON.stringify([{ fieldName: 'pm_td_task_id', operator: 'EQ', value: task2Pid }]),
     );
@@ -393,7 +394,7 @@ test.describe('PM Task Associations', () => {
   });
 
   test('PM-ASSOC-12: Watcher record persists via dynamic list API', async ({ page }) => {
-    const BASE = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
+
     const filters = encodeURIComponent(
       JSON.stringify([{ fieldName: 'pm_tw_task_id', operator: 'EQ', value: task1Pid }]),
     );

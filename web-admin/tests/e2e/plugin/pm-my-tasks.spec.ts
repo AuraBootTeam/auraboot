@@ -11,6 +11,7 @@
 
 import { test, expect } from '@playwright/test';
 import { uniqueId, executeCommandViaApi, dateOffsetStr } from '../helpers/index';
+import { BASE_URL as BASE } from '../../helpers/playwright-env';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,7 +62,7 @@ test.describe('PM My Tasks', () => {
       await executeCommandViaApi(page, 'pm:activate_project', {}, projectPid, 'update');
 
       // Fetch auto-created member pid
-      const BASE = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
+
       const memberFilter = encodeURIComponent(
         JSON.stringify([{ fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid }]),
       );
