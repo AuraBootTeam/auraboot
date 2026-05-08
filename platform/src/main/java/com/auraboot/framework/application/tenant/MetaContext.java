@@ -3,6 +3,8 @@ package com.auraboot.framework.application.tenant;
 import lombok.Getter;
 import org.springframework.util.StringUtils;
 
+import java.util.Set;
+
 /**
  * 租户上下文管理
  * 使用ThreadLocal存储当前线程的租户信息
@@ -29,19 +31,34 @@ public class MetaContext {
     @Getter
     private final String username;
 
+    private final Set<Long> roleIds;
 
-    private MetaContext(Long tenantId, Long userId,String userPid,String username) {
+
+    private MetaContext(Long tenantId, Long userId, String userPid, String username, Set<Long> roleIds) {
         this.tenantId = tenantId;
-
         this.userId = userId;
-        this.userPid= userPid;
+        this.userPid = userPid;
         this.username = username;
+        this.roleIds = roleIds;
     }
 
     /* ---------- static API ---------- */
 
-    public static void setContext(Long tenantId, Long userId,String userPid,String username) {
-        HOLDER.set(new MetaContext(tenantId,userId,userPid,username));
+    public static void setContext(Long tenantId, Long userId, String userPid, String username) {
+        setContext(tenantId, userId, userPid, username, Set.of());
+    }
+
+    public static void setContext(Long tenantId, Long userId, String userPid, String username,
+                                  Set<Long> roleIds) {
+        Set<Long> snapshot = roleIds == null
+            ? Set.of()
+            : Set.copyOf(roleIds);
+        HOLDER.set(new MetaContext(tenantId, userId, userPid, username, snapshot));
+    }
+
+    public static Set<Long> getCurrentRoleIds() {
+        MetaContext ctx = HOLDER.get();
+        return ctx == null ? Set.of() : ctx.roleIds;
     }
 
     public static MetaContext get() {
@@ -159,7 +176,7 @@ public class MetaContext {
      * Set tenant-scoped context for system/background work with no user identity.
      */
     public static void setSystemTenantContext(Long tenantId) {
-        HOLDER.set(new MetaContext(tenantId, null, null, null));
+        HOLDER.set(new MetaContext(tenantId, null, null, null, Set.of()));
     }
 
 
@@ -195,7 +212,7 @@ public class MetaContext {
     public static void setCurrentTenantId(Long tenantId) {
         MetaContext current = HOLDER.get();
         if (current != null) {
-            HOLDER.set(new MetaContext(tenantId, current.userId, current.userPid, current.username));
+            HOLDER.set(new MetaContext(tenantId, current.userId, current.userPid, current.username, current.roleIds));
             return;
         }
         setSystemTenantContext(tenantId);
@@ -213,9 +230,9 @@ public class MetaContext {
     public static void setCurrentUserId(Long userId) {
         MetaContext current = HOLDER.get();
         if (current != null) {
-            HOLDER.set(new MetaContext(current.tenantId, userId, current.userPid, current.username));
+            HOLDER.set(new MetaContext(current.tenantId, userId, current.userPid, current.username, current.roleIds));
         } else {
-            HOLDER.set(new MetaContext(null, userId, null, null));
+            HOLDER.set(new MetaContext(null, userId, null, null, Set.of()));
         }
     }
 
