@@ -127,4 +127,31 @@ test.describe('ACP Showcase Dashboard', () => {
       'create form should render with resolved i18n label for acs_req_title',
     ).toBeVisible({ timeout: 15_000 });
   });
+
+  // Visual sanity sub-test: 1280 / 1920 viewports + dark color scheme.
+  // We don't pixel-diff the screenshot — just assert that the layout shell
+  // renders without a JS crash and the pipeline SVG fits inside the widget
+  // bounds at both common dashboard widths.
+  test('renders cleanly at 1280px / 1920px and in dark color-scheme', async ({ page }) => {
+    for (const width of [1280, 1920] as const) {
+      await page.setViewportSize({ width, height: 900 });
+      await navigateToAcsDashboard(page);
+      const widgetBox = await page.locator('[data-widget-id="pipeline_diagram"]').boundingBox();
+      const svgBox = await page.locator('[data-widget-id="pipeline_diagram"] svg').boundingBox();
+      expect(widgetBox && svgBox, `${width}px: pipeline SVG should be in DOM`).toBeTruthy();
+      expect(svgBox!.width, `${width}px: SVG width should not exceed widget container`).toBeLessThanOrEqual(widgetBox!.width + 1);
+      expect(svgBox!.height, `${width}px: SVG height > 0`).toBeGreaterThan(0);
+    }
+
+    // Dark color-scheme: just confirm the dashboard re-renders cleanly. Dashboards
+    // use Tailwind's `dark:` variant so a colour-scheme switch should not crash
+    // anything; if any widget throws under prefers-color-scheme: dark, this asserts
+    // we notice.
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await navigateToAcsDashboard(page);
+    const widgetCount = await page.locator('[data-widget-id]').count();
+    expect(widgetCount, 'dark-scheme: 15 widgets should still render').toBe(15);
+    const bodyText = (await page.locator('body').textContent()) ?? '';
+    expect(bodyText, 'dark-scheme: no $i18n leak').not.toMatch(/\$i18n:/);
+  });
 });
