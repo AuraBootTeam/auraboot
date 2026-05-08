@@ -352,7 +352,22 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
   }
 
   return (
-    <div className={cn('rounded-lg border border-gray-200 bg-white', className)} style={style}>
+    <div
+      className={cn(
+        'flex flex-col rounded-lg border border-gray-200 bg-white',
+        className,
+      )}
+      // Cap the board to the viewport so each column's internal
+      // `overflow-y-auto` actually scrolls instead of letting the whole page
+      // grow unboundedly. Without this cap, column bodies render at their
+      // natural content height (often >9000px on a real pipeline) — both bad
+      // UX (the whole page becomes the scroll surface, not the column) and a
+      // problem for dnd-kit's `closestCenter` collision detection because the
+      // body's geometric center sits far below the viewport, so an empty
+      // column body never wins the "nearest droppable" race against cards in
+      // already-populated columns.
+      style={{ maxHeight: 'calc(100vh - 8rem)', ...style }}
+    >
       {/* Title */}
       {title && (
         <div className="border-b border-gray-200 px-4 py-3">
@@ -361,7 +376,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
       )}
 
       {/* Kanban board */}
-      <div className="p-4">
+      <div className="flex min-h-0 flex-1 flex-col p-4">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -369,7 +384,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={columnIds} strategy={verticalListSortingStrategy}>
-            <div className="flex gap-4 overflow-x-auto pb-2">
+            <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2">
               {enrichedColumns.map(renderColumn)}
             </div>
           </SortableContext>
