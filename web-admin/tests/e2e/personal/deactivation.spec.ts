@@ -31,7 +31,7 @@ function ensureUserEnabled(): void {
   const email = DEFAULT_TEST_ACCOUNT.email;
   const db = 'aura_boot';
   const psql = (sql: string) =>
-    execSync(`psql -h localhost -U ghj -d ${db} -P pager=off -t -c "${sql}"`, {
+    execSync(`psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${db} -P pager=off -t -c "${sql}"`, {
       encoding: 'utf-8',
       timeout: 5000,
     }).trim();

@@ -37,15 +37,27 @@ test.describe('Model CRUD Operations', () => {
     await page.goto(`/meta/models/new`);
     await page.waitForLoadState('domcontentloaded');
 
-    // Step 0: choose physical model type to reach the form
-    await page.getByTestId('model-type-physical').click();
+    // Step 0: choose physical model type to reach the form. Hydration can race
+    // with the click — retry if the form does not appear.
+    const physicalCard = page.getByTestId('model-type-physical');
+    await expect(physicalCard).toBeVisible({ timeout: 10000 });
+    const codeInput = page
+      .locator('[data-testid="model-code-input"], input[placeholder*="user_order"]')
+      .first();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await physicalCard.click({ force: attempt > 0 });
+      const appeared = await codeInput
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (appeared) break;
+    }
+    await expect(codeInput).toBeVisible({ timeout: 5000 });
 
-    // Wait for form fields to be visible and interactive
-    const codeInput = page.locator('input[placeholder*="user_order"]');
-    await expect(codeInput).toBeVisible({ timeout: 10000 });
-
-    const nameInput = page.locator('input[placeholder*="用户订单"]');
-    await expect(nameInput).toBeVisible();
+    const nameInput = page
+      .locator('[data-testid="model-display-name-input"], input[placeholder*="用户订单"]')
+      .first();
+    await expect(nameInput).toBeVisible({ timeout: 15000 });
 
     // Click first to ensure focus, then fill
     await fillWithRetry(codeInput, modelData.code);
@@ -61,13 +73,26 @@ test.describe('Model CRUD Operations', () => {
       await descriptionInput.fill(modelData.description || '');
     }
 
-    // Submit the form
+    // Submit the form and wait for the create POST + the detail-page navigation
+    const createResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/meta/models') &&
+        response.request().method() === 'POST' &&
+        response.status() < 500,
+      { timeout: 15_000 },
+    );
     await page
-      .locator('button[type="submit"], button:has-text("创建"), button:has-text("保存")')
+      .locator(
+        '[data-testid="model-create-submit"], button[type="submit"], button:has-text("创建"), button:has-text("保存")',
+      )
       .first()
       .click();
+    await createResponse;
 
-    // Wait for response
+    // PhysicalModelForm navigates to /meta/models/{pid} on success.
+    await page
+      .waitForURL(/\/meta\/models\/[^/]+(?:\?|#|$)/, { timeout: 10_000 })
+      .catch(() => {});
     await page.waitForLoadState('domcontentloaded');
 
     // Verify model was created via API

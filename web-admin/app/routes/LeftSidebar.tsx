@@ -46,14 +46,18 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
     return () => window.removeEventListener('menu:refresh', handler);
   }, [revalidator]);
 
-  // Auto-scroll to active menu item when path changes
+  // Auto-scroll to active menu item when path changes.
+  // Use `block: 'center'` so the active item lands in the middle of the
+  // scroll container — this prevents adjacent submenu chips from overlapping
+  // the click target on initial navigation (which broke Playwright clicks
+  // with intercepted-pointer-events failures, e.g. QB-07/08).
   useEffect(() => {
     if (collapsed) return;
     const timer = setTimeout(() => {
       if (navRef.current) {
         const activeItem = navRef.current.querySelector('.bg-blue-100');
         if (activeItem) {
-          activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
     }, 300);

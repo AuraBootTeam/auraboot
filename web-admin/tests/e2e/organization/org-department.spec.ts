@@ -31,7 +31,7 @@ test.describe('Organization Department', () => {
     const context = await browser.newContext({
       storageState: 'tests/storage/admin.json',
       // Must supply baseURL so page.request relative-path calls resolve correctly
-      baseURL: testInfo.project.use.baseURL ?? BASE_URL,
+      baseURL: testInfo.project.use.baseURL ?? (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173'),
     });
     const page = await context.newPage();
 

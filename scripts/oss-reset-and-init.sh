@@ -81,6 +81,25 @@ unset NO_COLOR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 PLATFORM_DIR="$PROJECT_ROOT/platform"
+
+# Env-aware psql connection params (memory:feedback_psql_helpers_must_be_env_aware).
+# Defaults match the legacy host setup (localhost:5432 / user ghj / db aura_boot).
+# Isolated docker stacks must override PG_HOST/PG_PORT/PG_USER/PG_DB before invoking.
+PG_HOST="${PG_HOST:-${PGHOST:-localhost}}"
+PG_PORT="${PG_PORT:-${PGPORT:-5432}}"
+PG_USER="${PG_USER:-${PGUSER:-ghj}}"
+PG_DB="${PG_DB:-${PGDATABASE:-aura_boot}}"
+PG_PASSWORD_ENV=""
+if [ -n "${PG_PASSWORD:-${PGPASSWORD:-}}" ]; then
+    PG_PASSWORD_ENV="PGPASSWORD=${PG_PASSWORD:-${PGPASSWORD}}"
+fi
+psql_run() {
+    if [ -n "$PG_PASSWORD_ENV" ]; then
+        env "$PG_PASSWORD_ENV" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" "$@"
+    else
+        psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" "$@"
+    fi
+}
 WEB_ADMIN_DIR="$PROJECT_ROOT/web-admin"
 
 # Port overrides — when targeting an isolated docker stack, source the per-stack
@@ -392,7 +411,7 @@ STORAGEJSON
     DB_NAME="${POSTGRES_DB:-aura_boot}"
     DB_USER="${POSTGRES_USER:-$(whoami)}"
     DB_HOST="${POSTGRES_HOST:-localhost}"
-    BOOTSTRAP_CHECK=$($AURA_PSQL_BASE -P pager=off -t -A -F',' -c "
+    BOOTSTRAP_CHECK=$(psql_run -P pager=off -t -A -F',' -c "
 SELECT
   (SELECT COUNT(*) FROM ab_user WHERE email='admin@example.com' AND (deleted_flag=FALSE OR deleted_flag IS NULL)) AS admin_users,
   (SELECT COUNT(*) FROM ab_tenant WHERE (deleted_flag=FALSE OR deleted_flag IS NULL)) AS tenants,
@@ -421,7 +440,7 @@ SELECT
     # PID generation: left(md5('pa_ur_' || member_id), 26) — deterministic, exactly 26 chars,
     #                 safe to re-run (NOT EXISTS guard prevents duplicate).
     echo -e "${YELLOW}Step 7.4: Granting platform_admin role to default admin user...${NC}"
-    $AURA_PSQL_BASE -v ON_ERROR_STOP=1 -P pager=off <<'GRANT_SQL'
+    psql_run -v ON_ERROR_STOP=1 -P pager=off <<'GRANT_SQL'
 INSERT INTO ab_user_role (
     id, pid, member_id, tenant_id, role_id,
     status, assign_type, deleted_flag,
@@ -471,7 +490,7 @@ GRANT_SQL
 
     # Step 7.6: Backfill model displayName for AuraBot Chinese search
     echo -e "${YELLOW}Step 7.6: Backfilling model displayNames...${NC}"
-    $AURA_PSQL_BASE -f "$SCRIPT_DIR/backfill-model-displayname.sql" -P pager=off 2>&1 | tail -1
+    psql_run -f "$SCRIPT_DIR/backfill-model-displayname.sql" -P pager=off 2>&1 | tail -1
     echo -e "${GREEN}   DisplayName backfill complete${NC}"
 
     # Step 7.7: Seed marketplace registry
@@ -481,14 +500,14 @@ GRANT_SQL
 
     # Step 7.8: Seed CS Agent definition
     echo -e "${YELLOW}Step 7.8: Seeding CS Agent definition...${NC}"
-    $AURA_PSQL_BASE -f "$SCRIPT_DIR/seed-cs-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
+    psql_run -f "$SCRIPT_DIR/seed-cs-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
     echo -e "${GREEN}   CS Agent seed complete${NC}"
 
     # Step 7.9: Seed AuraBot agent definition (GAP-296)
     # Per-tenant aurabot agent_definition row so AuraBotAgentResolver hot-paths
     # never fall back to the inline LAZY_SEED_AURABOT branch.
     echo -e "${YELLOW}Step 7.9: Seeding AuraBot agent definition...${NC}"
-    $AURA_PSQL_BASE -f "$SCRIPT_DIR/seed-aurabot-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
+    psql_run -f "$SCRIPT_DIR/seed-aurabot-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
     echo -e "${GREEN}   AuraBot agent seed complete${NC}"
 
     # Step 8: Seed showcase demo data (optional — skip with SKIP_SEED=1)

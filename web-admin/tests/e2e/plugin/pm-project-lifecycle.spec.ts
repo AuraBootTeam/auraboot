@@ -100,7 +100,7 @@ test.describe('PM Full Lifecycle', () => {
       await executeCommandViaApi(page, 'pm:activate_project', {}, projectPid, 'update');
 
       // Fetch auto-created member pid (sideEffect on pm:create_project)
-
+      const BASE = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
       const memberFilter = encodeURIComponent(
         JSON.stringify([{ fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid }]),
       );

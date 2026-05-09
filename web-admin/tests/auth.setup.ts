@@ -132,7 +132,14 @@ async function autoSelectSpace(
     if (!spacesResp.ok()) return false;
     const spacesBody = await spacesResp.json();
     const spaces = spacesBody?.data || [];
-    const bizSpace = spaces.find((s: any) => s.spaceType === 'business');
+    // Prefer the canonical "AuraBoot Demo" tenant — bpm/tenant-isolation-ui
+    // and similar specs add admin to additional p3d_isolation_ui_* tenants
+    // without cleanup, and the backend's "primary" tenant on login can flip
+    // to whichever was created last. Pinning auth.setup to AuraBoot Demo
+    // gives every downstream spec a deterministic admin session.
+    const bizSpace =
+      spaces.find((s: any) => s.spaceType === 'business' && s.tenantName === 'AuraBoot Demo') ||
+      spaces.find((s: any) => s.spaceType === 'business');
     if (!bizSpace?.tenantId) return false;
 
     // Select the business space to get a JWT with tenantId
@@ -253,15 +260,22 @@ async function loginViaApi(
           extractSessionCookieFromHeaders(resp.headers()['set-cookie']) ||
           (await extractSessionCookieFromContext());
         if (await persistSessionCookie(sessionCookie || '')) {
-          // Check if redirected to /tenant-selection (multi-tenant, no default tenant).
-          // If so, auto-select the first business space to get a JWT with tenantId.
-          const location = resp.headers()['location'] || '';
-          if (location.includes('tenant-selection')) {
-            const resolved = await autoSelectSpace(page, baseURL);
-            if (!resolved) {
-              console.log(
-                `   [${user.email}] Warning: redirected to tenant-selection but auto-select failed`,
-              );
+          // Always pin to the canonical "AuraBoot Demo" business space.
+          // We previously only ran autoSelectSpace when the login response
+          // included a /tenant-selection redirect — but on stacks where
+          // bpm/tenant-isolation-ui (or similar) has added admin to extra
+          // p3d_isolation_ui_* tenants, login lands directly with a JWT
+          // for whichever tenant the backend picks as primary, which is
+          // non-deterministic. Calling autoSelectSpace unconditionally
+          // overrides that JWT with one explicitly bound to AuraBoot Demo.
+          // Errors are non-fatal — the original cookie remains usable as
+          // a fallback.
+          if (user.email === 'admin@example.com') {
+            await autoSelectSpace(page, baseURL).catch(() => false);
+          } else {
+            const location = resp.headers()['location'] || '';
+            if (location.includes('tenant-selection')) {
+              await autoSelectSpace(page, baseURL).catch(() => false);
             }
           }
 
@@ -375,7 +389,7 @@ async function verifyStorageStateWorks(
 
 // ── Admin login (required) ──────────────────────────────────────────
 setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
-  const baseURL = configURL || DEFAULT_BASE_URL;
+  const baseURL = configURL || (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173');
 
   if (!fs.existsSync(STORAGE_DIR)) {
     fs.mkdirSync(STORAGE_DIR, { recursive: true });
@@ -409,7 +423,7 @@ setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
 // If the user doesn't exist, write empty storage immediately.
 // Use a 5s race timeout to avoid consuming the full 15s test timeout.
 setup('authenticate as operator', async ({ page, baseURL: configURL }) => {
-  const baseURL = configURL || DEFAULT_BASE_URL;
+  const baseURL = configURL || (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173');
   const user = TEST_USERS[1];
   const storagePath = path.join(STORAGE_DIR, user.storageFile);
   if (!ENABLE_ROLE_AUTH) {
@@ -497,7 +511,7 @@ setup('ensure e2et test pages dsl', async ({ page, baseURL: configURL }) => {
 
 // ── Viewer login (optional) ─────────────────────────────────────────
 setup('authenticate as viewer', async ({ page, baseURL: configURL }) => {
-  const baseURL = configURL || DEFAULT_BASE_URL;
+  const baseURL = configURL || (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173');
   const user = TEST_USERS[2];
   const storagePath = path.join(STORAGE_DIR, user.storageFile);
   if (!ENABLE_ROLE_AUTH) {

@@ -182,6 +182,10 @@ test.describe('Named Query Deep', () => {
 
     const nq = new NamedQueryPage(page);
     await nq.gotoEditTab(queryPid!, 'fields');
+    // The hash fragment alone does not always activate the fields tab on
+    // initial load (especially under chromium-deep cold start). Click the tab
+    // explicitly so the field-management surface is rendered.
+    await nq.clickTab('fields').catch(() => {});
 
     // Verify via API first (field may be rendered by i18n label, not raw code text).
     const fieldsResp = await page.request.get(`/api/meta/named-queries/${queryCode}/fields`);
