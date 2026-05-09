@@ -6,6 +6,18 @@
 #                 NEVER auto-compensate missing data — that masks bootstrap failures.
 #
 # History:
+#   2026-05-09 — §7.5 removed (Phase 3 / bootstrap-unified Op 6+8): plugin
+#                import for both core (org-management, platform-admin) and
+#                demo (core-meta/core-bpm/core-aurabot/page-manager/
+#                crm-starter/showcase/agent-control-plane/acp-showcase/
+#                workflow-demo) profiles is now in-process via
+#                BuiltinPluginImportService, gated by AURABOOT_DEMO_SEED.
+#                test-fixtures is seeded by the Playwright setup project
+#                (web-admin/tests/api/setup/03-import-test-fixtures.spec.ts).
+#                §7.6/§7.7/§7.8/§7.9 are KEPT — they seed marketplace
+#                registry / agent definitions / model displayName, which
+#                are not part of the bootstrap invariants and need direct
+#                SQL/script access.
 #   2026-05-09 — §6 trimmed: test pages, system_overview dashboard, and
 #                multi-role users moved into the Playwright setup project
 #                (web-admin/tests/api/setup/0[0-2]-*.spec.ts). The setup
@@ -25,7 +37,7 @@
 # 6.   Generate Playwright storageState (test data prep itself moved to setup project)
 # 7.   Verify bootstrap data
 # 7.4  Grant platform_admin to default admin user
-# 7.5  Import plugins via CLI
+# 7.5  (removed — plugin import is now in-process; see History above)
 # 7.6-7.9. Backfill + marketplace seed + CS Agent seed + AuraBot seed
 # 8.   (Optional) Seed showcase demo data via Playwright
 #
@@ -161,6 +173,13 @@ cd "$PLATFORM_DIR"
 if [ "$NO_BOOTSTRAP" = "1" ]; then
     export AURABOOT_BOOTSTRAP_ENABLED=false
     echo "   AURABOOT_BOOTSTRAP_ENABLED=false (--no-bootstrap escape hatch)"
+else
+    # Phase 3: opt the in-process BootstrapStartupRunner into the demo plugin
+    # profile (core-meta, core-bpm, core-aurabot, page-manager, crm-starter,
+    # showcase, agent-control-plane, acp-showcase, workflow-demo) so the
+    # platform owns plugin import end-to-end. Replaces former §7.5 CLI loop.
+    export AURABOOT_DEMO_SEED="${AURABOOT_DEMO_SEED:-true}"
+    echo "   AURABOOT_DEMO_SEED=${AURABOOT_DEMO_SEED} (Phase 3: demo profile via platform)"
 fi
 
 # Start backend in background as a single long-running process
@@ -218,7 +237,7 @@ else
                 "adminPassword": "Test2026x",
                 "adminDisplayName": "Admin User",
                 "systemMode": "single",
-                "seedDemoData": false
+                "seedDemoData": true
             }' 2>/dev/null)
 
         BOOTSTRAP_BODY=$(echo "$BOOTSTRAP_RESP" | sed '$d')
@@ -437,31 +456,18 @@ WHERE u.email = 'admin@example.com'
 GRANT_SQL
     echo -e "${GREEN}   platform_admin granted to admin user${NC}"
 
-    # Step 7.5: Import required plugins for seed data
-    echo -e "${YELLOW}Step 7.5: Importing plugins...${NC}"
-    cd "$PROJECT_ROOT"
-
-    # Use LOGIN_JWT for CLI authentication (DB was reset, cached token is stale)
-    export AURA_TOKEN="$LOGIN_JWT"
-
-    # Import in dependency order: base plugins first, then dependent ones
-    PLUGINS_TO_IMPORT=(core-meta core-bpm core-aurabot page-manager platform-admin org-management crm-starter showcase agent-control-plane acp-showcase workflow-demo)
-
-    # test-fixtures is an internal-only plugin that provides e2et_order/e2et_customer/
-    # e2et_payment schemas for the E2E test suite. It is excluded from demo flows and
-    # public distribution; import it only when explicitly running tests.
-    if [ "${AURA_ENV:-demo}" = "test" ] || [ "${IMPORT_TEST_FIXTURES:-false}" = "true" ]; then
-        echo "   Including test-fixtures (AURA_ENV=test or IMPORT_TEST_FIXTURES=true)"
-        PLUGINS_TO_IMPORT+=(test-fixtures)
-    fi
-
-    for plugin in "${PLUGINS_TO_IMPORT[@]}"; do
-        if [ -d "plugins/$plugin" ]; then
-            echo -n "   Importing $plugin... "
-            NO_PROXY=localhost aura plugin publish "plugins/$plugin" --yes 2>&1 | tail -1
-        fi
-    done
-    echo -e "${GREEN}   Plugin import complete${NC}"
+    # Step 7.5: (REMOVED 2026-05-09 — Phase 3 of bootstrap-unified)
+    #
+    # Plugin import for the core+demo profiles is now done in-process by
+    # BuiltinPluginImportService during BootstrapStartupRunner (org-management,
+    # platform-admin, core-meta, core-bpm, core-aurabot, page-manager,
+    # crm-starter, showcase, agent-control-plane, acp-showcase, workflow-demo).
+    # Demo profile is gated by AURABOOT_DEMO_SEED (exported above; defaults
+    # true here, false in production application.yml).
+    #
+    # The internal-only `test-fixtures` plugin is NOT imported via the platform.
+    # It is seeded by the Playwright setup project (web-admin/tests/api/setup/
+    # 03-import-test-fixtures.spec.ts), gated by AURA_ENV=test.
 
     # Step 7.6: Backfill model displayName for AuraBot Chinese search
     echo -e "${YELLOW}Step 7.6: Backfilling model displayNames...${NC}"
