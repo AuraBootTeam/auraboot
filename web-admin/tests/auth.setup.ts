@@ -429,6 +429,71 @@ setup('authenticate as operator', async ({ page, baseURL: configURL }) => {
   }
 });
 
+// ── Ensure e2et test pages have full DSL (saved-view E2E suite depends on this) ──
+// Background: when a model is published, MetaModelServiceImpl.autoCreateDefaultPages
+// inserts a stub page schema with `[{toolbar},{filters},{table}]`. Plugin imports
+// can fail to overwrite it (e.g. when schema-sync rolls back the import). This
+// leaves `e2et_order_list` (and similar) without column/button defs, breaking
+// every saved-view spec that navigates to /p/e2et_order. We re-PUT the canonical
+// DSL from the test-fixtures plugin sources so the suite is robust to drift.
+setup('ensure e2et test pages dsl', async ({ page, baseURL: configURL }) => {
+  const baseURL = configURL || 'http://localhost:5173';
+  // Use admin storage state for API access
+  const adminStoragePath = path.join(STORAGE_DIR, 'admin.json');
+  if (!fs.existsSync(adminStoragePath)) return;
+
+  // Resolve fixture pages.json relative to repo root
+  const fixturesPagesPath = path.resolve(
+    __dirname,
+    '../../plugins/test-fixtures/config/pages.json',
+  );
+  if (!fs.existsSync(fixturesPagesPath)) {
+    console.warn('[e2et-pages] fixtures pages.json missing, skipping');
+    return;
+  }
+  const fixtures: any[] = JSON.parse(fs.readFileSync(fixturesPagesPath, 'utf-8'));
+  // Load admin token via stored cookie + a header request through the BFF
+  const ctx = await page.context();
+  await ctx.addCookies(
+    JSON.parse(fs.readFileSync(adminStoragePath, 'utf-8')).cookies || [],
+  );
+
+  for (const fx of fixtures) {
+    const pageKey = fx.pageKey;
+    if (!pageKey) continue;
+    // Look up current page by key
+    const lookup = await page.request.get(`${baseURL}/api/pages/key/${pageKey}`);
+    if (!lookup.ok()) continue;
+    const cur = (await lookup.json())?.data;
+    if (!cur?.pid) continue;
+    const blocks = Array.isArray(cur.blocks) ? cur.blocks : [];
+    // Heuristic: stub blocks have no `id` and no `columns`/`buttons`/`fields`.
+    const isStub = blocks.length === 0 || blocks.every(
+      (b: any) => !b?.id && !b?.columns && !b?.buttons && !b?.fields && !b?.tabs,
+    );
+    if (!isStub) continue;
+
+    const payload = {
+      pageKey,
+      modelCode: fx.modelCode,
+      kind: fx.kind || 'list',
+      blocks: fx.blocks,
+      layout: fx.layout || { type: 'stack' },
+      name: fx.name || pageKey,
+    };
+    const resp = await page.request.put(`${baseURL}/api/pages/${cur.pid}`, {
+      data: payload,
+    });
+    if (resp.ok()) {
+      console.log(`[e2et-pages] restored DSL for ${pageKey}`);
+    } else {
+      console.warn(
+        `[e2et-pages] PUT ${pageKey} failed: ${resp.status()} ${await resp.text()}`,
+      );
+    }
+  }
+});
+
 // ── Viewer login (optional) ─────────────────────────────────────────
 setup('authenticate as viewer', async ({ page, baseURL: configURL }) => {
   const baseURL = configURL || 'http://localhost:5173';
