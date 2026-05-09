@@ -398,6 +398,53 @@ test.describe('BPM tenant isolation — UI path @bpm-regression', () => {
     expect(tenantADefPid).not.toBe('');
   });
 
+  // Cleanup — without this, every run leaks a `p3d_isolation_ui_*` tenant +
+  // an admin membership in it. Subsequent /api/auth/login for admin then
+  // returns a JWT scoped to whichever tenant the backend picks as primary
+  // (which is non-deterministic across runs and frequently the leaked one),
+  // breaking ~30 specs in bpm-designer / aurabot / workflow-demo with
+  // "Process definition not found" / wrong-tenant data.
+  test.afterAll(async () => {
+    if (!tenantBId) return;
+    const client = new PgClient(PG_CONN);
+    try {
+      await client.connect();
+      // Soft-delete in dependency order: user_role → role_permission →
+      // permission → role → tenant_member → tenant. Use deleted_flag rather
+      // than DELETE to keep the audit trail intact (matches the platform's
+      // soft-delete contract).
+      await client.query(
+        `UPDATE ab_user_role SET deleted_flag = true WHERE tenant_id = $1::bigint`,
+        [tenantBId],
+      );
+      await client.query(
+        `UPDATE ab_role_permission SET deleted_flag = true WHERE tenant_id = $1::bigint`,
+        [tenantBId],
+      );
+      await client.query(
+        `UPDATE ab_permission SET deleted_flag = true WHERE tenant_id = $1::bigint`,
+        [tenantBId],
+      );
+      await client.query(
+        `UPDATE ab_role SET deleted_flag = true WHERE tenant_id = $1::bigint`,
+        [tenantBId],
+      );
+      await client.query(
+        `UPDATE ab_tenant_member SET deleted_flag = true WHERE tenant_id = $1::bigint`,
+        [tenantBId],
+      );
+      await client.query(
+        `UPDATE ab_tenant SET deleted_flag = true WHERE id = $1::bigint`,
+        [tenantBId],
+      );
+    } catch {
+      // Best-effort cleanup — never fail the suite on cleanup errors,
+      // but the leak will resurface in the next run if this throws.
+    } finally {
+      await client.end().catch(() => {});
+    }
+  });
+
   test('UI-1: tenant A sees its own process definition in the list', async ({ page }) => {
     // The cached storageState (admin.json) already logs admin in — but it may
     // be scoped to tenant A or unscoped. Force a known tenant-A session by
