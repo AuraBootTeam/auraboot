@@ -151,7 +151,7 @@
     "jspdf": "^4.1.0",
     "jsqr": "^1.4.0",
     "lodash": "^4.17.21",
-    "lucide-react": "^0.542.0",
+    "lucide-react": "^0.577.0",
     "match-sorter": "^6.3.1",
     "mysql2": "^3.14.3",
     "papaparse": "^5.5.3",
