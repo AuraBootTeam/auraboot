@@ -24,8 +24,9 @@ import {
 } from '../../helpers/designer-dsl';
 import { startInstanceAndAdvance } from '../../helpers/bpm-assertions';
 import { loginAs } from '../../helpers/wd-fixtures';
+import { BACKEND_URL } from '../../helpers/environments';
 
-const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
+const BACKEND = BACKEND_URL;
 
 test.describe('BPM designer — notification-task', { tag: ['@bpm-regression'] }, () => {
   test('configure notification-task with eventCode + templateParamsVars — L1/L2/L3', async ({ page, request }) => {

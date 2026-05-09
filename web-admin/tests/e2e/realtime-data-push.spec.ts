@@ -12,11 +12,12 @@
 
 import { test, expect } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../helpers/test-accounts';
+import { BACKEND_URL, BASE_URL } from '../helpers/environments';
 
 const uniqueId = () => `rtp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 async function getToken(): Promise<string> {
-  const resp = await fetch('http://localhost:6443/api/auth/login', {
+  const resp = await fetch(`${BACKEND_URL}/api/auth/login`, {
     method: 'post',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -33,7 +34,7 @@ async function createRecordViaApi(
   commandCode: string,
   payload: Record<string, unknown>,
 ) {
-  const resp = await fetch(`http://localhost:6443/api/meta/commands/execute/${commandCode}`, {
+  const resp = await fetch(`${BACKEND_URL}/api/meta/commands/execute/${commandCode}`, {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
@@ -56,7 +57,7 @@ test.describe('Real-Time Data Push', () => {
       {
         name: 'auth_token',
         value: token,
-        url: 'http://localhost:5173',
+        url: BASE_URL,
       },
     ]);
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });

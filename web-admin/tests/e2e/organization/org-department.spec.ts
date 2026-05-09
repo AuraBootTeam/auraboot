@@ -17,6 +17,7 @@
 import { test, expect } from '../../fixtures';
 import { navigateToDynamicPage, uniqueId, acceptConfirmDialog, executeCommandViaApi, findRowInPaginatedList, extractRecordId, clickRowActionByLocator } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 const DEPT_PAGE_KEY = 'org-department';
 
@@ -30,7 +31,7 @@ test.describe('Organization Department', () => {
     const context = await browser.newContext({
       storageState: 'tests/storage/admin.json',
       // Must supply baseURL so page.request relative-path calls resolve correctly
-      baseURL: testInfo.project.use.baseURL ?? 'http://localhost:5173',
+      baseURL: testInfo.project.use.baseURL ?? BASE_URL,
     });
     const page = await context.newPage();
 

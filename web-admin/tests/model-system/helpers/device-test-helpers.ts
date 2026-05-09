@@ -12,6 +12,7 @@
 
 import type { Page } from '@playwright/test';
 import { ApiClient } from './api-client';
+import { BASE_URL } from '../../helpers/environments';
 
 // ============================================================================
 // Types
@@ -122,7 +123,7 @@ export function createDeviceForEachStatus(): DeviceData[] {
  */
 export class DeviceApiClient {
   private api: ApiClient;
-  private baseUrl = 'http://localhost:5173';
+  private baseUrl = BASE_URL;
 
   constructor(pageOrApi: Page | ApiClient) {
     if (pageOrApi instanceof ApiClient) {
@@ -315,7 +316,7 @@ export class DeviceListPage {
   constructor(private page: Page) {}
 
   async goto(): Promise<void> {
-    await this.page.goto('http://localhost:5173/enterprise/devices');
+    await this.page.goto(`${BASE_URL}/enterprise/devices`);
     await this.page.waitForLoadState('domcontentloaded');
   }
 
@@ -354,7 +355,7 @@ export class DeviceDetailPage {
   constructor(private page: Page) {}
 
   async goto(pid: string): Promise<void> {
-    await this.page.goto(`http://localhost:5173/enterprise/devices/${pid}`);
+    await this.page.goto(`${BASE_URL}/enterprise/devices/${pid}`);
     await this.page.waitForLoadState('domcontentloaded');
   }
 

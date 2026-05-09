@@ -32,6 +32,11 @@ services:
     # base file's "5432:5432" mapping so each stack can claim a unique host port.
     ports: !override
       - "${PG_PORT:-5433}:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: '${PG_CPUS:-0.5}'
+          memory: ${PG_MEM:-512m}
 
   redis:
     # Force redis on (base file gates it behind `cache` profile so it's
@@ -43,6 +48,11 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-redis
     ports: !override
       - "${REDIS_PORT:-6479}:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: '${REDIS_CPUS:-0.25}'
+          memory: ${REDIS_MEM:-256m}
 
   backend:
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-backend
@@ -50,6 +60,14 @@ services:
       - isolated
     build:
       dockerfile: ${ISOLATED_BACKEND_DOCKERFILE:-Dockerfile}
+    # Per-container resource cap so concurrent isolated stacks don't fight
+    # for the Docker Desktop VM's RAM/CPU budget. Tunable via env if a
+    # specific worktree needs more (e.g. heavy plugin import).
+    deploy:
+      resources:
+        limits:
+          cpus: '${BE_CPUS:-2.0}'
+          memory: ${BE_MEM:-2g}
     ports: !override
       - "${BE_PORT:-6444}:6443"
     volumes:
@@ -58,11 +76,32 @@ services:
       - ./plugins:/app/plugins:ro
       # Optional sibling enterprise plugins (no-op if absent).
       - ../auraboot-enterprise/plugins:/app/plugins-enterprise:ro
+      # Cross-stack shared caches — first stack populates, all others reuse.
+      # See Dockerfile.dev (GRADLE_USER_HOME=/gradle-cache, MAVEN_HOME=/m2-cache)
+      # and docs/plans/2026-05/2026-05-08-docker-warm-stack-and-suite-r2.md §1A/§1B.
+      - aura_gradle_cache:/gradle-cache
+      - aura_m2_cache:/m2-cache
     environment:
       # Talk to the redis container by service name (works because both are
       # in the same compose project network).
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      # Disable AdminBootstrapRunner — it creates only a demo tenant and
+      # bypasses BootstrapEngineService.bootstrapSystemTenant, leaving no
+      # System Tenant + no platform_admin role. Tests instead drive
+      # bootstrap via tests/api/setup/00-bootstrap.spec.ts which calls
+      # /api/bootstrap/setup → full System+Business tenant + platform_admin
+      # grant. Override base docker-compose.yml's "true".
+      AURABOOT_BOOTSTRAP_ENABLED: "false"
+      # Activate `test` profile alongside `community` so test-only beans
+      # register on the isolated stack:
+      #   - TestUserSpoofFilter (X-Test-Spoof-User-Id header support)
+      #   - TestFixtureController + TestSeedController test endpoints
+      # This unblocks the user-soul-profile real-backend specs (PR-80)
+      # which spoof per-test user identities to avoid the shared-admin
+      # uq_user_soul_profile_active collision. Host workflow keeps the
+      # default community profile via base docker-compose.yml.
+      SPRING_PROFILES_ACTIVE: community,test
       # CORS allow-list covers the in-container hostnames plus host-mapped
       # variants. Frontend host ports are env-var driven for parity.
       FRONTEND_BASE_URL: http://localhost:${VITE_PORT:-5174}
@@ -77,6 +116,17 @@ services:
     user: root
     profiles:
       - isolated
+    deploy:
+      resources:
+        limits:
+          # 2026-05-08: bumped from 1 CPU / 1 GB → 2 CPU / 2 GB so vite/BFF
+          # don't choke under playwright's 4-worker default. Triage data:
+          # full-suite r2 run with 1c/1g produced 221 fail, almost all
+          # `page.goto` / `apiRequestContext.post` timeouts — the container
+          # was getting starved while spec workers competed. Bump still
+          # leaves 4 stacks fitting in a 16 GB Docker VM.
+          cpus: '${FE_CPUS:-2.0}'
+          memory: ${FE_MEM:-2g}
     working_dir: /repo/web-admin
     ports:
       - "${VITE_PORT:-5174}:5173"
@@ -130,3 +180,12 @@ volumes:
   # (docker prefixes volumes with project name), so no manual suffixing here.
   isolated_node_modules:
   isolated_web_admin_node_modules:
+  # Shared volumes across all isolated stacks (NOT per-project) — gradle
+  # and m2 are content-addressed, so concurrent reads are safe and
+  # cross-worktree reuse cuts cold backend builds 5-10 min → 30-90 s.
+  aura_gradle_cache:
+    name: aura_gradle_cache
+    external: false
+  aura_m2_cache:
+    name: aura_m2_cache
+    external: false

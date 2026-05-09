@@ -17,6 +17,7 @@
     "check": "pnpm typecheck && pnpm verify:plugin-routes",
     "verify:plugin-routes": "node scripts/verify-plugin-routes.mjs",
     "lint": "eslint \"app/**/*.{ts,tsx,js,jsx}\"",
+    "test:env-lint": "node scripts/test-env-lint.mjs",
     "format": "prettier --write \"app/**/*.{ts,tsx,js,jsx,css,json}\"",
     "format:check": "prettier --check \"app/**/*.{ts,tsx,js,jsx,css,json}\"",
     "test": "PW_PROFILE=full PW_ROLE_PROJECTS=1 playwright test",

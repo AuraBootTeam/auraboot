@@ -15,6 +15,7 @@
 
 import { test, expect } from '@playwright/test';
 import { uniqueId, executeCommandViaApi, ensureFilterFormOpen } from '../helpers/index';
+import { BASE_URL as BASE } from '../../helpers/playwright-env';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -225,7 +226,6 @@ test.describe('PM Member Management', () => {
 
   test('PM-MEM-05: Remove member via UI', async ({ page }) => {
     // First add a member via API for reliable removal test
-    const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
     // Get current members
     const memberFilter = encodeURIComponent(

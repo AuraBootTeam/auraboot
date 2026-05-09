@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const BASE_URL = 'http://localhost:5173';
+import { BASE_URL } from './helpers/environments';
 
 /**
  * E2E tests for GAP-047 BI & Reporting features.

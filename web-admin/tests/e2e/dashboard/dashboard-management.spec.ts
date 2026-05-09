@@ -48,7 +48,7 @@ async function checkActionInDropdown(page: Page, row: Locator, actionCode: strin
   await dropdown.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 }
 
-const BASE_URL = 'http://localhost:5173';
+import { BASE_URL } from '../../helpers/environments';
 const MGMT_PATH = '/p/dashboard_management';
 
 /**

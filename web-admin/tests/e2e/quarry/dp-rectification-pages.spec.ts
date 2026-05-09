@@ -33,6 +33,7 @@ import {
   clickRowActionByLocator,
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -121,7 +122,7 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     try {
@@ -139,7 +140,7 @@ test.describe('DP Rectification — Form & Detail Page Blocks', () => {
     if (!projectId) throw new Error('Project not available');
 
     // Navigate directly to the form page using the underscore model code in the URL.
-    await page.goto('http://localhost:5173/p/dp_rectification/new', {
+    await page.goto(`${BASE_URL}/p/dp_rectification/new`, {
       waitUntil: 'domcontentloaded',
     });
 
