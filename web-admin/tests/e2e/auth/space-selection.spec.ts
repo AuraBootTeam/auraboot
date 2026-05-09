@@ -72,7 +72,7 @@ test.describe('Space Selection API', () => {
     expect(businessSpace).toBeTruthy();
 
     // Select the business space — call backend directly to avoid BFF precision issues
-    const backendUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
+    const backendUrl = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
     const selectRes = await page.request.fetch(`${backendUrl}/api/tenant-selection/process`, {
       method: 'POST',
       headers: {
@@ -109,7 +109,7 @@ test.describe('Space Selection API', () => {
     expect(platformSpace).toBeTruthy();
 
     // Select the platform space — call backend directly to avoid BFF precision issues
-    const backendUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
+    const backendUrl = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
     const selectRes = await page.request.fetch(`${backendUrl}/api/tenant-selection/process`, {
       method: 'POST',
       headers: {

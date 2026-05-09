@@ -24,7 +24,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/auth/verify-code/dev")
-@Profile({"dev", "local"})
+@Profile({"dev", "local", "test"})
 public class DevVerifyCodeController {
 
     private static final Logger log = LoggerFactory.getLogger(DevVerifyCodeController.class);
