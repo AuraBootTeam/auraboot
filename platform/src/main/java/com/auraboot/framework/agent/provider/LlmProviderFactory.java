@@ -5,6 +5,7 @@ import com.auraboot.framework.cloudconfig.entity.CloudConfig;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -33,6 +34,15 @@ public class LlmProviderFactory {
     private final AgentProperties agentProperties;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Global kill-switch for the stub LLM provider. When true, every
+     * {@link #resolveConfig} call returns a stub-key config regardless of
+     * CloudConfig / yml content, and {@link #getProvider} routes to the stub
+     * bean. Defaults to false so production is unaffected.
+     */
+    @Value("${agent.llm.stub-mode:false}")
+    private boolean stubMode;
+
     public LlmProviderFactory(List<LlmProvider> providers, CloudConfigService cloudConfigService,
                                AgentProperties agentProperties, ObjectMapper objectMapper) {
         this.cloudConfigService = cloudConfigService;
@@ -59,6 +69,19 @@ public class LlmProviderFactory {
             providerCode = "anthropic";
         }
 
+        // Stub-mode short-circuit: when the operator opts into stub-mode, every
+        // provider lookup resolves to the stub bean so AuraBot E2E suites can
+        // exercise the chat pipeline without real provider credentials.
+        if (stubMode) {
+            LlmProvider stub = providerMap.get(StubLlmProvider.PROVIDER_CODE);
+            if (stub != null) return stub;
+        }
+        // Explicit stub provider code from config.
+        if (StubLlmProvider.PROVIDER_CODE.equals(providerCode)) {
+            LlmProvider stub = providerMap.get(StubLlmProvider.PROVIDER_CODE);
+            if (stub != null) return stub;
+        }
+
         // Check for a dedicated bean first (anthropic, openai)
         LlmProvider dedicated = providerMap.get(providerCode);
         if (dedicated != null) return dedicated;
@@ -82,15 +105,36 @@ public class LlmProviderFactory {
      */
     @SuppressWarnings("unchecked")
     public ProviderConfig resolveConfig(Long tenantId, String providerCode) {
+        // Stub-mode short-circuit: bypass CloudConfig / yml entirely. The
+        // returned config carries the sentinel key so downstream code that
+        // re-routes by API-key (e.g. {@link #getProvider}) also lands on the
+        // stub bean.
+        if (stubMode) {
+            return stubProviderConfig();
+        }
+
         // No provider specified — find the first enabled provider with an API key
         if (providerCode == null || providerCode.isBlank()) {
             List<ProviderInfo> configured = listConfiguredProviders(tenantId);
             if (configured.isEmpty()) {
+                // Fallback chain when nothing real is configured:
+                //   1. application.yml agent.anthropic.api-key (set to the
+                //      stub sentinel by default in dev/E2E) → stub config.
+                //   2. Otherwise null, matching legacy behaviour.
+                ProviderConfig ymlFallback = ymlAnthropicFallback();
+                if (ymlFallback != null) {
+                    return ymlFallback;
+                }
                 log.warn("No LLM provider configured for tenant {}", tenantId);
                 return null;
             }
             providerCode = configured.get(0).getProviderCode();
             log.debug("Auto-resolved LLM provider: {}", providerCode);
+        }
+
+        // Explicit stub provider code requested.
+        if (StubLlmProvider.PROVIDER_CODE.equals(providerCode)) {
+            return stubProviderConfig();
         }
 
         // Look up the specific provider in CloudConfig
@@ -113,8 +157,57 @@ public class LlmProviderFactory {
             log.debug("CloudConfig lookup failed for LLM/{}: {}", providerCode, e.getMessage());
         }
 
+        // application.yml fallback (anthropic only). When the yml key is the
+        // stub sentinel, the returned config will route to the stub provider
+        // via {@link #getProvider}'s API-key recognition.
+        if ("anthropic".equals(providerCode)) {
+            ProviderConfig ymlFallback = ymlAnthropicFallback();
+            if (ymlFallback != null) {
+                return ymlFallback;
+            }
+        }
+
         log.warn("LLM provider '{}' not configured or missing API key for tenant {}", providerCode, tenantId);
         return null;
+    }
+
+    /**
+     * Build a {@link ProviderConfig} pointing at the stub provider. Used both
+     * when {@code agent.llm.stub-mode=true} and when the resolved Anthropic key
+     * happens to equal {@link StubLlmProvider#STUB_API_KEY_SENTINEL}.
+     */
+    private ProviderConfig stubProviderConfig() {
+        return ProviderConfig.builder()
+                .providerCode(StubLlmProvider.PROVIDER_CODE)
+                .apiKey(StubLlmProvider.STUB_API_KEY_SENTINEL)
+                .baseUrl("stub://local")
+                .defaultModel("stub-model")
+                .maxTokens(4096)
+                .build();
+    }
+
+    /**
+     * Resolve the {@code agent.anthropic.*} block from {@code application.yml}
+     * into a {@link ProviderConfig}. Returns null when the yml key is blank.
+     * When the key equals {@link StubLlmProvider#STUB_API_KEY_SENTINEL}, a
+     * stub-routed config is returned instead so the request falls into the
+     * stub bean rather than the real Anthropic provider.
+     */
+    private ProviderConfig ymlAnthropicFallback() {
+        AgentProperties.Anthropic anthropic = agentProperties.getAnthropic();
+        if (anthropic == null) return null;
+        String key = anthropic.getApiKey();
+        if (key == null || key.isBlank()) return null;
+        if (StubLlmProvider.STUB_API_KEY_SENTINEL.equals(key)) {
+            return stubProviderConfig();
+        }
+        return ProviderConfig.builder()
+                .providerCode("anthropic")
+                .apiKey(key)
+                .baseUrl(anthropic.getBaseUrl())
+                .defaultModel(anthropic.getDefaultModel())
+                .maxTokens(anthropic.getMaxTokens())
+                .build();
     }
 
     /**
