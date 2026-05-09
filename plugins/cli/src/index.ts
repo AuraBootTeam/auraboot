@@ -650,8 +650,24 @@ plugin
 plugin
   .command('init [name]')
   .description('Create a new plugin from template')
-  .action(async (name?: string) => {
-    await initCommand(name);
+  .option('-d, --dir <path>', 'Output directory for the new plugin (defaults to <cwd>/<name>)')
+  .option('--non-interactive', 'Skip all prompts; require values via flags or fail with missing-flag error')
+  .option('--plugin-id <id>', 'Plugin ID in reverse-domain form (e.g. com.acme.foo)')
+  .option('--namespace <ns>', 'Lowercase alphanumeric namespace')
+  .option('--display-name <name>', 'Human-readable display name')
+  .option('--plugin-type <type>', "Plugin type: 'config' or 'hybrid'")
+  .option('--no-sample-model', 'Do not include sample model scaffold (non-interactive mode)')
+  .action(async (name: string | undefined, cmdOpts: any) => {
+    await initCommand(name, {
+      dir: cmdOpts.dir,
+      nonInteractive: cmdOpts.nonInteractive,
+      pluginId: cmdOpts.pluginId,
+      namespace: cmdOpts.namespace,
+      displayName: cmdOpts.displayName,
+      pluginType: cmdOpts.pluginType,
+      // commander auto-derives `--no-sample-model` → `sampleModel === false`
+      noSampleModel: cmdOpts.sampleModel === false,
+    });
   });
 
 plugin
