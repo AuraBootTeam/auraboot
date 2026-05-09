@@ -70,6 +70,28 @@ services:
       # AuraPluginManager pluginsRoot (overrides the default `plugins/` which
       # we use for JSON resource directories instead).
       AURA_PLUGINS_DIR: /app/plugin-jars
+      # Force the stub LLM provider for the entire E2E stack so AuraBot /
+      # agent / chat / automation specs can exercise the full chat pipeline
+      # without real provider credentials. The knob is the global kill-switch
+      # documented in platform/src/main/resources/application.yml; setting it
+      # here means LlmProviderFactory.getProvider() returns StubLlmProvider for
+      # every provider lookup, regardless of what CloudConfigSeeder may have
+      # written into ab_cloud_config (which seeds a real-looking minimax key,
+      # the root cause behind the 62 AuraBot specs failing on default E2E
+      # before this change — see backlog item B-7 in
+      # docs/backlog/2026-05-09-enterprise-test-suite-failures.md).
+      #
+      # Stub semantics (see StubLlmProvider#STUB_RESPONSE_TEXT):
+      #   - chat()      → single text block "[stub response]" + stop_reason "end_turn"
+      #   - streamChat()→ one delta chunk + one terminal done chunk
+      #   - never emits tool_use, so the turn loop terminates deterministically
+      # Specs that rely on real LLM behaviour (token counts, content shape,
+      # tool_use cascades) intercept the chat layer via Playwright route
+      # mocks and bypass this provider entirely.
+      #
+      # NOT for production: this env only exists in the E2E compose override.
+      # Production application.yml leaves agent.llm.stub-mode at false.
+      AGENT_LLM_STUB_MODE: "true"
 
   # Vite + BFF dev server in a browser-capable Node container.
   # We do NOT use web-admin/Dockerfile because it bakes a prod build via
