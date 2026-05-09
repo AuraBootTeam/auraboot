@@ -302,6 +302,15 @@ ai:
 
 # AuraBoot Git 配置
 aura:
+  # Public-demo guardrails. When enabled, the DemoModeGuard filter rejects
+  # destructive endpoints (license, plugin upload, admin, password reset, etc.)
+  # with HTTP 403 regardless of caller authentication. Used by the public
+  # demo.auraboot.com deployment; must remain false in production.
+  # See docs/operations/demo-mode.md
+  demo:
+    enabled: ${AURA_DEMO_MODE:false}
+    banner: ${AURA_DEMO_BANNER:This is a public demo — data is wiped every 30 minutes. Don't enter sensitive info.}
+    reset-interval-min: ${AURA_DEMO_RESET_INTERVAL_MIN:30}
   # C.2 Cross-tenant sub-agent ACL kill switch.
   # When false, every cross-tenant evaluation returns
   # denied_feature_disabled — same-tenant spawns are unaffected.
