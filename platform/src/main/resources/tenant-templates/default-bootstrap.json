@@ -335,6 +335,16 @@
       "resourceType": "function"
     },
     {
+      "code": "sys.bootstrap.repair",
+      "name": "Bootstrap Repair",
+      "description": "Run bootstrap repair (re-align the 9 system invariants). Admin-only.",
+      "type": "function",
+      "module": "sys",
+      "resource": "sys:bootstrap",
+      "action": "repair",
+      "resourceType": "function"
+    },
+    {
       "code": "org.team.read",
       "name": "Team Read",
       "description": "View teams and team members",
