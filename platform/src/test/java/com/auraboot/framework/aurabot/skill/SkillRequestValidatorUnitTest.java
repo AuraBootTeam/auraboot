@@ -12,6 +12,7 @@ import com.networknt.schema.SpecVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.RedisConnectionFailureException;
 
 import java.time.Duration;
@@ -60,8 +61,14 @@ class SkillRequestValidatorUnitTest {
         repository = mock(SkillRunRepository.class);
         idempotencyStore = mock(SkillIdempotencyStore.class);
         previewStore = mock(PreviewTokenStore.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<SkillIdempotencyStore> idempotencyProvider = mock(ObjectProvider.class);
+        when(idempotencyProvider.getIfAvailable()).thenReturn(idempotencyStore);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<PreviewTokenStore> previewProvider = mock(ObjectProvider.class);
+        when(previewProvider.getIfAvailable()).thenReturn(previewStore);
         validator = new SkillRequestValidator(
-                registry, repository, idempotencyStore, previewStore, MAPPER);
+                registry, repository, idempotencyProvider, previewProvider, MAPPER);
     }
 
     /** Build an AuraBotSkill mock with the given name / risk / perms. */
