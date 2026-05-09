@@ -15,14 +15,22 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Imports built-in plugins during tenant bootstrap.
  *
- * Built-in plugins are located in the project's plugins/ directory.
- * The base directory is auto-detected (platform/../plugins when running
- * via gradlew bootRun) or configured via aura.builtin-plugins.dir property.
+ * <p>Built-in plugins are located in the project's {@code plugins/} directory.
+ * The base directory is auto-detected ({@code platform/../plugins} when running
+ * via {@code gradlew bootRun}) or configured via {@code aura.builtin-plugins.dir}.
+ *
+ * <p>Phase 3 introduces a 2-profile split (see
+ * {@link BuiltinPluginImportService} javadoc): {@link Profile#CORE} (always
+ * imported, 2 plugins) vs {@link Profile#DEMO} (opt-in, 9 plugins). The
+ * {@code includeDemoPlugins} flag flows from
+ * {@code BootstrapRepairService.RepairOptions} → wizard payload
+ * ({@code BootstrapRequest.seedDemoData}) or startup env ({@code AURABOOT_DEMO_SEED}).
  */
 @Slf4j
 @Service
@@ -35,17 +43,42 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
     @Value("${aura.builtin-plugins.dir:}")
     private String builtinPluginsDir;
 
+    /** Profile classifier for built-in plugins. */
+    enum Profile {
+        /** Always imported — required by every deployment. */
+        CORE,
+        /** Opt-in showcase / demo plugins — gated by {@code AURABOOT_DEMO_SEED}. */
+        DEMO
+    }
+
     /**
-     * List of built-in plugin directory names to import.
-     * Each entry corresponds to a subdirectory under the plugins base directory.
+     * Catalogue of built-in plugins. Each entry corresponds to a subdirectory
+     * under the plugins base directory. Plugins missing on disk are warned and
+     * skipped at import time.
      */
     private static final List<BuiltinPlugin> BUILTIN_PLUGINS = List.of(
-            new BuiltinPlugin("org-management", "com.auraboot.org-management"),
-            new BuiltinPlugin("platform-admin", "com.auraboot.platform-admin")
+            // ── Core profile (always imported) ──────────────────────────
+            new BuiltinPlugin("org-management",        "com.auraboot.org-management",      Profile.CORE),
+            new BuiltinPlugin("platform-admin",        "com.auraboot.platform-admin",      Profile.CORE),
+            // ── Demo profile (only when includeDemoPlugins=true) ────────
+            new BuiltinPlugin("core-meta",             "com.auraboot.core-meta",           Profile.DEMO),
+            new BuiltinPlugin("core-bpm",              "com.auraboot.core-bpm",            Profile.DEMO),
+            new BuiltinPlugin("core-aurabot",          "com.auraboot.core-aurabot",        Profile.DEMO),
+            new BuiltinPlugin("page-manager",          "com.auraboot.page-manager",        Profile.DEMO),
+            new BuiltinPlugin("crm-starter",           "com.auraboot.crm-starter",         Profile.DEMO),
+            new BuiltinPlugin("showcase",              "com.auraboot.showcase",            Profile.DEMO),
+            new BuiltinPlugin("agent-control-plane",   "com.auraboot.agent-control-plane", Profile.DEMO),
+            new BuiltinPlugin("acp-showcase",          "com.auraboot.acp-showcase",        Profile.DEMO),
+            new BuiltinPlugin("workflow-demo",         "com.auraboot.workflow-demo",       Profile.DEMO)
     );
 
     @Override
     public void importForTenant(Long tenantId, Long userId) {
+        importForTenant(tenantId, userId, false);
+    }
+
+    @Override
+    public void importForTenant(Long tenantId, Long userId, boolean includeDemoPlugins) {
         String baseDir = resolveBaseDir();
         if (baseDir == null) {
             log.warn("Cannot resolve built-in plugins directory, skipping import. "
@@ -53,14 +86,16 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
             return;
         }
 
-        log.info("Importing built-in plugins for tenant {}: baseDir={}", tenantId, baseDir);
+        List<BuiltinPlugin> selected = selectPlugins(includeDemoPlugins);
+        log.info("Importing built-in plugins for tenant {}: baseDir={}, includeDemo={}, plugins={}",
+                tenantId, baseDir, includeDemoPlugins, selected.size());
 
         // Setup MetaContext for the import
         MetaContext previousContext = MetaContext.exists() ? MetaContext.get() : null;
         MetaContext.setContext(tenantId, userId, null, null);
 
         try {
-            for (BuiltinPlugin plugin : BUILTIN_PLUGINS) {
+            for (BuiltinPlugin plugin : selected) {
                 importPlugin(baseDir, plugin, tenantId);
             }
         } finally {
@@ -76,11 +111,22 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
         }
     }
 
+    private List<BuiltinPlugin> selectPlugins(boolean includeDemoPlugins) {
+        List<BuiltinPlugin> out = new ArrayList<>(BUILTIN_PLUGINS.size());
+        for (BuiltinPlugin p : BUILTIN_PLUGINS) {
+            if (p.profile == Profile.CORE || includeDemoPlugins) {
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
     private void importPlugin(String baseDir, BuiltinPlugin plugin, Long tenantId) {
         String pluginPath = baseDir + "/" + plugin.dirName;
 
         if (!Files.isDirectory(Path.of(pluginPath))) {
-            log.warn("Built-in plugin directory not found: {}", pluginPath);
+            log.warn("Built-in plugin directory not found ({}), skipping: {}",
+                    plugin.profile, pluginPath);
             return;
         }
 
@@ -146,5 +192,5 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
         return null;
     }
 
-    private record BuiltinPlugin(String dirName, String pluginId) {}
+    private record BuiltinPlugin(String dirName, String pluginId, Profile profile) {}
 }
