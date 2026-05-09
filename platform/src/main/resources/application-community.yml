@@ -10,6 +10,9 @@ auraboot:
     enabled: false
   agent:
     enabled: true   # AI Core (AuraBot, Tool Gen, ChatBI) is available in community
+  # Phase 2.3: community profile defaults bootstrap ON (env override available).
+  bootstrap:
+    enabled: ${AURABOOT_BOOTSTRAP_ENABLED:true}
 
 logging:
   level:
