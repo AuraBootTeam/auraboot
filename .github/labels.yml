@@ -1,0 +1,112 @@
+# Repository label catalog. Sync with `gh label create -f` or a tool like
+# `github-label-sync`. Keep names short, descriptions concrete.
+
+# --- Type ---
+- name: bug
+  color: "d73a4a"
+  description: Something isn't working
+- name: enhancement
+  color: "a2eeef"
+  description: New feature or improvement request
+- name: question
+  color: "d876e3"
+  description: User question / how-to
+- name: documentation
+  color: "0075ca"
+  description: Improvements or additions to docs
+- name: discussion
+  color: "cfd3d7"
+  description: Open-ended discussion, no concrete action yet
+
+# --- Triage state ---
+- name: needs-triage
+  color: "ededed"
+  description: Awaiting maintainer review
+- name: needs-info
+  color: "fbca04"
+  description: Waiting on reporter for more details
+- name: confirmed
+  color: "0e8a16"
+  description: Reproduced and accepted
+- name: wont-fix
+  color: "ffffff"
+  description: Out of scope or by design
+- name: duplicate
+  color: "cfd3d7"
+  description: Duplicate of another issue/PR
+
+# --- Priority ---
+- name: P0
+  color: "b60205"
+  description: Blocker — drop everything
+- name: P1
+  color: "d93f0b"
+  description: High priority — current iteration
+- name: P2
+  color: "fbca04"
+  description: Normal priority
+- name: P3
+  color: "c2e0c6"
+  description: Nice to have
+
+# --- Contributor on-ramp ---
+- name: good-first-issue
+  color: "7057ff"
+  description: Good for newcomers
+- name: help-wanted
+  color: "008672"
+  description: Maintainers welcome external help
+- name: hacktoberfest
+  color: "ff8c00"
+  description: Eligible for Hacktoberfest contributions
+
+# --- Area ---
+- name: "area: dsl"
+  color: "1d76db"
+  description: DSL engine, models, fields, commands
+- name: "area: page-designer"
+  color: "1d76db"
+  description: Page Designer / blocks
+- name: "area: bpm"
+  color: "1d76db"
+  description: BPMN / workflow engine
+- name: "area: automation"
+  color: "1d76db"
+  description: Event-driven automation
+- name: "area: ai"
+  color: "1d76db"
+  description: AuraBot / ACP / ChatBI / RAG
+- name: "area: plugin"
+  color: "1d76db"
+  description: PF4J plugin system
+- name: "area: permissions"
+  color: "1d76db"
+  description: RBAC / tenant / data scope
+- name: "area: frontend"
+  color: "1d76db"
+  description: React / web-admin
+- name: "area: backend"
+  color: "1d76db"
+  description: Spring Boot / API
+- name: "area: devops"
+  color: "1d76db"
+  description: Docker / deploy / CI
+
+# --- Lifecycle ---
+- name: breaking-change
+  color: "e99695"
+  description: Backward-incompatible change
+- name: regression
+  color: "b60205"
+  description: Worked in a previous release
+- name: stale
+  color: "cccccc"
+  description: No activity for a while
+
+# --- Security / license ---
+- name: security
+  color: "ee0701"
+  description: Security-related (use SECURITY.md for vulnerabilities)
+- name: licensing
+  color: "5319e7"
+  description: License interpretation / FAQ updates
