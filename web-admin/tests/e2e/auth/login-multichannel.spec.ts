@@ -14,6 +14,7 @@
 import { test, expect } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Config

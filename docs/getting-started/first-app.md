@@ -1125,4 +1125,4 @@ The platform handles everything else: database schema, REST APIs, form validatio
 - Build a second model (e.g., `tt_project`) and link it to tasks
 - Explore the [CRM Starter plugin](../../plugins/crm-starter/) for a more complex example with 6 models
 
-For the full DSL reference, see the [DSL Capability Map](../../docs/system-reference/core/09-DSL能力边界完整参考.md).
+For the full DSL reference, see the architecture [overview](../architecture/overview.md) and the [core-concepts](../core-concepts/) directory.

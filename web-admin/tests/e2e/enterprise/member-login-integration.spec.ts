@@ -17,6 +17,7 @@
 
 import { test, expect } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { BASE_URL } from '../../helpers/playwright-env';
 import { LoginPage } from '../../pages';
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';

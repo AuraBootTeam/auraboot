@@ -82,6 +82,11 @@ auraboot:
     version: 1.0.0
   bootstrap:
     enabled: ${AURABOOT_BOOTSTRAP_ENABLED:false}
+    # Phase 3: when true, the demo profile of built-in plugins (core-meta,
+    # core-bpm, core-aurabot, page-manager, crm-starter, showcase,
+    # agent-control-plane, acp-showcase, workflow-demo) is imported in addition
+    # to the always-on core profile. Default false — prod-safe.
+    demo-seed: ${AURABOOT_DEMO_SEED:false}
   entitlement:
     enabled: false
     grace-period-days: 7
@@ -297,6 +302,15 @@ ai:
 
 # AuraBoot Git 配置
 aura:
+  # Public-demo guardrails. When enabled, the DemoModeGuard filter rejects
+  # destructive endpoints (license, plugin upload, admin, password reset, etc.)
+  # with HTTP 403 regardless of caller authentication. Used by the public
+  # demo.auraboot.com deployment; must remain false in production.
+  # See docs/operations/demo-mode.md
+  demo:
+    enabled: ${AURA_DEMO_MODE:false}
+    banner: ${AURA_DEMO_BANNER:This is a public demo — data is wiped every 30 minutes. Don't enter sensitive info.}
+    reset-interval-min: ${AURA_DEMO_RESET_INTERVAL_MIN:30}
   # C.2 Cross-tenant sub-agent ACL kill switch.
   # When false, every cross-tenant evaluation returns
   # denied_feature_disabled — same-tenant spawns are unaffected.
@@ -468,8 +482,16 @@ agent:
   enabled: true
   max-concurrent-runs: 5
   default-cost-limit: 1.0
+  # When no real provider key is configured the platform routes chat traffic
+  # to the StubLlmProvider so AuraBot E2E suites can run without provider
+  # credentials. The "stub_key_for_no_llm_paths" sentinel is recognised by
+  # LlmProviderFactory and swapped to the stub bean. Override
+  # ANTHROPIC_API_KEY to use a real Anthropic key, or set
+  # AGENT_LLM_STUB_MODE=true to force stub-mode globally.
+  llm:
+    stub-mode: ${AGENT_LLM_STUB_MODE:false}
   anthropic:
-    api-key: ${ANTHROPIC_API_KEY:}
+    api-key: ${ANTHROPIC_API_KEY:stub_key_for_no_llm_paths}
     base-url: https://api.anthropic.com
     default-model: claude-sonnet-4-6
     max-tokens: 4096

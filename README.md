@@ -1,13 +1,10 @@
-<!-- TODO: Add banner image -->
-
 <p align="center">
-  <img src="docs/assets/logo.png" alt="AuraBoot Logo" width="120" />
   <h1 align="center">AuraBoot</h1>
-  <p align="center"><strong>Open-source AI-native low-code business platform</strong></p>
+  <p align="center"><strong>AI-native low-code business platform — source-available, self-hosted</strong></p>
 </p>
 
 <p align="center">
-  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.0-blue.svg" alt="License"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.1-blue.svg" alt="License"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/actions/workflows/backend.yml"><img src="https://github.com/AuraBootTeam/auraboot/actions/workflows/backend.yml/badge.svg?branch=main" alt="Backend CI"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/actions/workflows/frontend.yml"><img src="https://github.com/AuraBootTeam/auraboot/actions/workflows/frontend.yml/badge.svg?branch=main" alt="Frontend CI"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
@@ -30,12 +27,10 @@
 
 ## What is AuraBoot?
 
-AuraBoot is an open-source platform for building business applications using a declarative DSL (Domain-Specific Language) instead of writing boilerplate code. Define your data models, pages, commands, and workflows in JSON — the platform generates the database schema, REST APIs, and UI automatically. AI capabilities are built into the core: an in-app copilot, agent orchestration, ChatBI, and a RAG knowledge base that work with multiple LLM providers.
+AuraBoot is a source-available, self-hosted platform for building business applications using a declarative DSL (Domain-Specific Language) instead of writing boilerplate code. Define your data models, pages, commands, and workflows in JSON — the platform generates the database schema, REST APIs, and UI automatically. AI capabilities are built into the core: an in-app copilot, agent orchestration, ChatBI, and a RAG knowledge base that work with multiple LLM providers.
 
-<!-- TODO: Add screenshot — main dashboard -->
-<!-- TODO: Add screenshot — page designer -->
-<!-- TODO: Add screenshot — command pipeline -->
-<!-- TODO: Add screenshot — AI copilot -->
+<!-- Screenshots (dashboard, page designer, command pipeline, AI copilot) land
+     with v0.1.0-beta.1; capture spec at docs/community/readme-screenshots-spec.md -->
 
 ## Key Features
 
@@ -61,7 +56,7 @@ Every data operation flows through a unified pipeline: schema validation → per
 SmartEngine-based BPMN 2.0 engine with visual process design, human task assignment, approval inbox, escalation rules, and SLA tracking.
 
 ### Plugin System
-PF4J-based plugin architecture with 27+ modules. Plugins are declarative JSON packages that add models, fields, commands, pages, and menus. Install from a marketplace or build your own with the CLI.
+PF4J-based plugin architecture. The OSS repo ships 16 first-party plugins (CRM, HR, BPM, asset management, AI / agent control plane, dashboards, etc.). Plugins are declarative JSON packages that add models, fields, commands, pages, and menus. Install from a marketplace or build your own with the CLI.
 
 ### Multi-Tenant RBAC
 Row-level tenant isolation, role-based access control at resource/operation/data levels, and a complete permission system with menus, routes, and API-level enforcement.
@@ -84,11 +79,11 @@ Open [http://localhost:5173](http://localhost:5173) and log in:
 | | |
 |---|---|
 | **Email** | `admin@example.com` |
-| **Password** | `ChangeMeOnFirstLogin!` |
+| **Password** | `Test2026x` (change immediately on first login) |
 
 ### Manual Setup
 
-**Prerequisites:** Java 21+, Node.js 20+, PostgreSQL 15+, Redis 7+
+**Prerequisites:** Java 21+, Node.js 20+, PostgreSQL 15+ (Docker stack ships 16), Redis 7+, pnpm 9+
 
 ```bash
 # 1. Clone the repository
@@ -192,7 +187,7 @@ auraboot/
 ├── web-admin/                # React frontend + BFF
 │   ├── app/                  #   Application source
 │   └── tests/                #   E2E and API tests
-├── plugins/                  # Plugin packages (27+ modules)
+├── plugins/                  # Plugin packages (16 first-party in OSS repo)
 │   ├── crm/                  #   CRM plugin
 │   ├── sales/                #   Sales management
 │   ├── procurement/          #   Procurement
@@ -281,13 +276,16 @@ To report a security vulnerability, please email [security@auraboot.com](mailto:
 
 ## License
 
-AuraBoot is released under the [AuraBoot License v1.0](LICENSE.txt), a source-available license based on Apache 2.0 with additional terms:
+AuraBoot is released under the [AuraBoot License v1.1](LICENSE.txt), a source-available license based on Apache 2.0 with supplementary terms.:
 
-- **Free for internal use** — Use, modify, and deploy for your own business applications
-- **Attribution required** — Retain copyright notices and "Powered by AuraBoot" branding
-- **Platform restriction** — You may not offer AuraBoot as a hosted low-code/no-code platform service without a commercial license
+- **Free for internal use** — Use, modify, and deploy for your own business applications. No obligation to open-source your modifications.
+- **Free for ISV / project delivery** — Build and deliver business applications (ERP, CRM, vertical SaaS) to customers, with your changes kept private.
+- **Attribution required** — Retain copyright notices and "Powered by AuraBoot" branding (the upper-left main logo may be replaced).
+- **Platform restriction** — You may not offer AuraBoot itself as a hosted low-code / no-code / AI platform service without a commercial license.
 
-For commercial licensing (SaaS hosting, white-labeling, or removing branding), contact [license@auraboot.com](mailto:license@auraboot.com).
+📖 **See the [License FAQ (中文)](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md)** for common questions about commercial use, modification, redistribution, and SaaS boundaries.
+
+For commercial licensing (multi-tenant low-code SaaS, white-labeling, or removing branding), contact [license@auraboot.com](mailto:license@auraboot.com).
 
 ---
 

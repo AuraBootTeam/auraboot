@@ -1,0 +1,56 @@
+# Gitleaks configuration for AuraBoot OSS repo.
+# Extends the default ruleset; adds repo-specific allowlists for known
+# false positives (test fixtures, i18n keys, default-dev placeholders).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for known-safe placeholders and test fixtures."
+
+paths = [
+  # Binary / lock / build artifacts (low risk, scan noise)
+  '''(.*?)(jpg|jpeg|gif|png|webp|svg|ico|pdf|woff2?|ttf|eot)$''',
+  '''node_modules/''',
+  '''build/''',
+  '''dist/''',
+  '''target/''',
+  '''\.gradle/''',
+  '''\.idea/''',
+  '''\.worktrees/''',
+  '''pnpm-lock\.yaml$''',
+  '''package-lock\.json$''',
+  '''gradle\.lockfile$''',
+  '''test-results/''',
+  '''playwright-report/''',
+
+  # Known-FP fixture FILES — specifically scoped so a real secret accidentally
+  # committed elsewhere still gets flagged. The Playwright storage-state and
+  # i18n-fixture directories ARE allowed broadly because by their nature
+  # (test-only auth state / generated translation keys) they accumulate
+  # JWT-shaped tokens that are signed with a documented dev-only secret.
+  '''^web-admin/tests/storage/.*\.json$''',
+  '''^scripts/perf-ci/baseline/.*\.json$''',
+  '''^plugins/test-fixtures/config/i18n\.json$''',
+  '''^plugins/e2e-test-order/config/i18n\.json$''',
+  '''^web-admin/app/plugins/core-bpm/components/__tests__/TaskCenter\.test\.tsx$''',
+  '''^plugins/cli/tests/client/api-client\.test\.ts$''',
+  '''^web-admin/tests/e2e/setup/setup-wizard\.spec\.ts$''',
+  '''^platform/src/test/resources/application-integration-test\.yml$''',
+]
+
+regexes = [
+  # Documented default credentials (intentionally weak, for local dev only)
+  '''ChangeMeOnFirstLogin!''',
+  '''admin@example\.com''',
+  '''dev-only-secret-key-replace-in-production-min-32-chars''',
+  '''change-me-in-production''',
+
+  # Placeholder API keys in samples / docs
+  '''sk-(your|placeholder|example|xxx).*''',
+  '''YOUR_[A-Z_]+_KEY''',
+  '''<your-[a-z-]+>''',
+
+  # JWT example / test tokens (literal "test" suffix)
+  '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.test''',
+]

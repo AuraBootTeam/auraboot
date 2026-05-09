@@ -10,6 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -36,6 +38,7 @@ public class ActionRecorder {
      * Model code and operation type are resolved from ab_command_definition (authoritative source),
      * NOT parsed from tool name (which uses namespace:operation_model format, not model_operation).
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public String recordAction(Long tenantId, String runPid, String commandCode,
                                 AgentToolDefinition toolDef, Map<String, Object> input,
                                 CommandExecuteResult cmdResult,
@@ -150,6 +153,7 @@ public class ActionRecorder {
      * No before/after snapshots needed.
      * queryCode is the NamedQuery code (e.g., crm_lead_list), which maps to model via ab_meta_named_query.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public String recordReadAction(Long tenantId, String runPid, String queryCode,
                                     AgentToolDefinition toolDef, Map<String, Object> input,
                                     int resultCount, String error) {

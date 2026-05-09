@@ -8,6 +8,7 @@ import { test, expect } from '@playwright/test';
 import { navigateToDynamicPage, uniqueId, executeCommandViaApi } from '../helpers/index';
 import { PAGE_KEYS, getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 /** Generate a unique future date to avoid uniqueness constraint conflicts. */
 function randomFutureDate(): string {
@@ -28,7 +29,7 @@ test.describe('QO Daily Report', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     try {

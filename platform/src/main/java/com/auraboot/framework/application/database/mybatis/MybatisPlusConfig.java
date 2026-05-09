@@ -110,6 +110,7 @@ public class MybatisPlusConfig {
                     || "ab_platform_account".equals(tableName)      // G1: no tenant_id
                     || "ab_platform_license".equals(tableName)      // G1: no tenant_id
                     || "ab_api_connector_endpoint".equals(tableName)  // No tenant_id
+                    || "ab_jdbc_connector_endpoint".equals(tableName)  // No tenant_id (parented by connector_pid)
                     || "ab_mkt_publisher_payout".equals(tableName)    // No tenant_id, publisher-scoped (not tenant-scoped)
 
                     // ── Currency (has tenant_id, but all queries pass it explicitly as @Param) ──

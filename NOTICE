@@ -1,0 +1,151 @@
+AuraBoot
+Copyright (c) 2026 The AuraBoot Project and its contributors.
+
+This product is licensed under the AuraBoot License (see LICENSE.txt),
+a source-available license based on the Apache License, Version 2.0,
+with supplementary terms.
+
+================================================================================
+Third-Party Software
+================================================================================
+
+This product includes software developed by third parties under various open
+source licenses. Each third-party component remains subject to its own license
+terms. The list below is informational; for the authoritative license text of
+each dependency, refer to the dependency's own LICENSE file or its package
+manifest.
+
+--------------------------------------------------------------------------------
+Backend (Java) — major dependencies
+--------------------------------------------------------------------------------
+
+Spring Boot, Spring Framework
+  Copyright VMware, Inc.
+  Licensed under Apache License 2.0
+  https://github.com/spring-projects/spring-boot
+
+MyBatis-Plus
+  Copyright baomidou
+  Licensed under Apache License 2.0
+  https://github.com/baomidou/mybatis-plus
+
+PF4J (Plugin Framework for Java)
+  Copyright Decebal Suiu
+  Licensed under Apache License 2.0
+  https://github.com/pf4j/pf4j
+
+SmartEngine (BPMN engine)
+  Copyright Alibaba Group
+  Licensed under Apache License 2.0
+  https://github.com/alibaba/SmartEngine
+
+Jackson
+  Copyright FasterXML, LLC
+  Licensed under Apache License 2.0
+  https://github.com/FasterXML/jackson
+
+PostgreSQL JDBC Driver
+  Copyright PostgreSQL Global Development Group and contributors
+  Licensed under BSD-2-Clause
+  https://github.com/pgjdbc/pgjdbc
+
+Lettuce (Redis client, via Spring Boot Data Redis)
+  Copyright Mark Paluch and contributors
+  Licensed under Apache License 2.0 / MIT for some sub-modules
+  https://github.com/lettuce-io/lettuce-core
+
+JJWT (JSON Web Token for Java)
+  Copyright JJWT contributors
+  Licensed under Apache License 2.0
+  https://github.com/jwtk/jjwt
+
+Caffeine (in-process cache)
+  Copyright Ben Manes and contributors
+  Licensed under Apache License 2.0
+  https://github.com/ben-manes/caffeine
+
+Micrometer (metrics + tracing facade)
+  Copyright VMware, Inc. and contributors
+  Licensed under Apache License 2.0
+  https://github.com/micrometer-metrics/micrometer
+
+OpenTelemetry Java
+  Copyright The OpenTelemetry Authors
+  Licensed under Apache License 2.0
+  https://github.com/open-telemetry/opentelemetry-java
+
+Sentry SDK for Spring Boot Jakarta
+  Copyright Sentry
+  Licensed under MIT
+  https://github.com/getsentry/sentry-java
+
+NetworkNT JSON Schema Validator
+  Copyright NetworkNT
+  Licensed under Apache License 2.0
+  https://github.com/networknt/json-schema-validator
+
+Apache PDFBox + Apache POI
+  Copyright The Apache Software Foundation
+  Licensed under Apache License 2.0
+  https://pdfbox.apache.org / https://poi.apache.org
+
+JUnit 5
+  Copyright The JUnit Team
+  Licensed under Eclipse Public License 2.0
+  https://github.com/junit-team/junit5
+
+--------------------------------------------------------------------------------
+Frontend (TypeScript / JavaScript) — major dependencies
+--------------------------------------------------------------------------------
+
+React
+  Copyright Meta Platforms, Inc. and affiliates
+  Licensed under MIT
+  https://github.com/facebook/react
+
+React Router
+  Copyright Remix Software Inc.
+  Licensed under MIT
+  https://github.com/remix-run/react-router
+
+Vite
+  Copyright VoidZero Inc. and Vite contributors
+  Licensed under MIT
+  https://github.com/vitejs/vite
+
+Tailwind CSS
+  Copyright Tailwind Labs Inc.
+  Licensed under MIT
+  https://github.com/tailwindlabs/tailwindcss
+
+Playwright
+  Copyright Microsoft Corporation
+  Licensed under Apache License 2.0
+  https://github.com/microsoft/playwright
+
+Express
+  Copyright OpenJS Foundation and contributors
+  Licensed under MIT
+  https://github.com/expressjs/express
+
+--------------------------------------------------------------------------------
+AI / LLM SDKs (optional, runtime-loaded)
+--------------------------------------------------------------------------------
+
+When AI features are enabled, AuraBoot integrates with third-party LLM
+providers via their official SDKs or REST APIs. The provider SDKs and
+their respective licenses apply only when the corresponding feature is
+enabled and configured by the operator. AuraBoot does not redistribute
+provider-specific credentials, model weights, or proprietary content.
+
+================================================================================
+Generating a Complete Bill of Materials
+================================================================================
+
+For a complete and authoritative dependency list, run:
+
+  Backend:   cd platform && ./gradlew dependencyReport
+  Frontend:  cd web-admin && pnpm licenses list
+
+Or use a dedicated tool such as `licensee`, `FOSSA`, `Snyk`, or `cyclonedx`
+to produce an SBOM for a given build artifact.

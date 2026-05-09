@@ -30,6 +30,7 @@ import {
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Test Describe: Contract CRUD & Lifecycle
@@ -338,7 +339,7 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     // contractPid is closed, can't delete; contractPid2 was cleaned in CC-007
@@ -362,7 +363,7 @@ test.describe('CC Contract Change — Approval & SideEffect', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
 
@@ -447,7 +448,7 @@ test.describe('CC Contract Change — Approval & SideEffect', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     if (changePid) {
@@ -476,7 +477,7 @@ test.describe('CC Payment & Receipt — SideEffect on Contract', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
 
@@ -566,7 +567,7 @@ test.describe('CC Payment & Receipt — SideEffect on Contract', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     if (paymentPid) {
@@ -594,7 +595,7 @@ test.describe('CC Cost Budget & Budget Lines', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     projectId = await getTestProjectId(p);
@@ -684,7 +685,7 @@ test.describe('CC Cost Budget & Budget Lines', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     if (budgetLinePid) {
@@ -714,7 +715,7 @@ test.describe('CC Actual Cost', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     projectId = await getTestProjectId(p);
@@ -753,7 +754,7 @@ test.describe('CC Actual Cost', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     if (actualCostPid) {

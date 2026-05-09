@@ -1,0 +1,33 @@
+name: ❓ Question
+description: Ask a usage / configuration / "how do I" question
+title: "[Question] "
+labels: ["question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For broader discussion, also consider [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) or our [Discord](https://discord.gg/auraboot).
+
+        Before asking:
+        - Search [existing issues](https://github.com/AuraBootTeam/auraboot/issues?q=)
+        - Check the [docs](https://docs.auraboot.com)
+        - For licensing questions, see the [License FAQ](https://github.com/AuraBootTeam/auraboot/blob/main/LICENSE-FAQ-en.md)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      placeholder: How do I ...?
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you already tried?
+      placeholder: I read X, I tried Y, I expected Z but saw ...
+
+  - type: input
+    id: version
+    attributes:
+      label: AuraBoot version (if relevant)

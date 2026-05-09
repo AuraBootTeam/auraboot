@@ -54,8 +54,16 @@ export interface SmartNumberCardProps {
   precision?: number;
   /** Currency code for currency format (default: CNY) */
   currency?: string;
+  /** Optional prefix prepended before the formatted value (e.g. "$") */
+  prefix?: string;
   /** Optional suffix appended to the formatted value */
   suffix?: string;
+  /**
+   * Pick a specific column from the response when the data source returns multiple
+   * (e.g. a single named query feeding multiple KPI cards). When set, the card reads
+   * `data.rows[0][metricField]` instead of `data.rows[0][data.meta.metrics[0]]`.
+   */
+  metricField?: string;
   /** Accent color used by the card chrome */
   color?: string;
   /** Trend comparison configuration */
@@ -135,7 +143,9 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   format = 'number',
   precision = 0,
   currency = 'cny',
+  prefix,
   suffix,
+  metricField,
   color = '#2563EB',
   trend,
   linkage,
@@ -165,7 +175,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   const getValue = (): number => {
     if (!data?.rows?.length) return 0;
     const firstRow = data.rows[0];
-    const metricKey = data.meta?.metrics?.[0];
+    const metricKey = metricField || data.meta?.metrics?.[0];
     if (!metricKey) return 0;
     return Number(firstRow[metricKey]) || 0;
   };
@@ -192,7 +202,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
     }
   };
 
-  const formattedValue = `${formatValue(getValue())}${suffix || ''}`;
+  const formattedValue = `${prefix || ''}${formatValue(getValue())}${suffix || ''}`;
 
   /**
    * Handle click event for linkage
@@ -291,7 +301,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           ) : isEmpty ? (
             <div className="space-y-3">
               <div className="text-4xl font-semibold tracking-tight text-slate-950 tabular-nums md:text-[2.65rem]">
-                0{suffix || ''}
+                {prefix || ''}0{suffix || ''}
               </div>
               <div className="inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
                 Waiting for first record

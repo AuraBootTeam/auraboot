@@ -17,6 +17,7 @@ import {
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 test.describe('Cross-Module Integration', () => {
   test.describe.configure({ mode: 'serial', timeout: 90000 });
@@ -159,7 +160,7 @@ test.describe('Cross-Module Integration', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     try {
@@ -174,7 +175,7 @@ test.describe('Cross-Module Integration', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     for (const pid of createdIssuePids) {

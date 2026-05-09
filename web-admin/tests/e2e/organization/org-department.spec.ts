@@ -17,6 +17,7 @@
 import { test, expect } from '../../fixtures';
 import { navigateToDynamicPage, uniqueId, acceptConfirmDialog, executeCommandViaApi, findRowInPaginatedList, extractRecordId, clickRowActionByLocator } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 const DEPT_PAGE_KEY = 'org-department';
 

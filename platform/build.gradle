@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.6'
+    id 'org.springframework.boot' version '3.5.14'
     id 'io.spring.dependency-management' version '1.1.6'
     id 'maven-publish'
     id 'jacoco'
@@ -177,16 +177,16 @@ compileTestJava {
 
 // 版本管理
 ext {
-    jacksonVersion = '2.19.2'
+    jacksonVersion = '2.21.3'
     sentryVersion = '6.28.0'
-    jwtVersion = '0.12.6'
+    jwtVersion = '0.13.0'
     mybatisPlusVersion = '3.5.14'
     lombokVersion = '1.18.40'
     aspectjVersion = '1.9.22'
     reflectasmVersion = '1.11.3'
     validationApiVersion = '2.0.1.Final'
     // PF4J Plugin Framework
-    pf4jVersion = '3.13.0'
+    pf4jVersion = '3.15.0'
     pf4jSpringVersion = '0.10.0'
     // Drools Rule Engine
     droolsVersion = '8.44.2.Final'
@@ -290,12 +290,12 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     // Apache POI for Excel export
-    implementation 'org.apache.poi:poi:5.3.0'
-    implementation 'org.apache.poi:poi-ooxml:5.3.0'
+    implementation 'org.apache.poi:poi:5.5.1'
+    implementation 'org.apache.poi:poi-ooxml:5.5.1'
     implementation 'org.apache.pdfbox:pdfbox:2.0.32'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
-    implementation('com.google.firebase:firebase-admin:9.3.0') {
+    implementation('com.google.firebase:firebase-admin:9.8.0') {
         exclude group: 'com.google.guava', module: 'listenablefuture'
     }
 
@@ -342,6 +342,13 @@ dependencies {
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.8'
 
+    // TestContainers — ephemeral MySQL for connector SDK tests
+    testImplementation platform('org.testcontainers:testcontainers-bom:1.20.4')
+    testImplementation 'org.testcontainers:testcontainers'
+    testImplementation 'org.testcontainers:mysql'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:junit-jupiter'
+
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.2.0'
 
@@ -360,7 +367,7 @@ dependencies {
     implementation 'io.github.java-diff-utils:java-diff-utils:4.12'
 
     // JSON Schema Validator (Draft-07) for DSL page validation
-    implementation 'com.networknt:json-schema-validator:1.5.6'
+    implementation 'com.networknt:json-schema-validator:1.5.9'
 
     // PF4J Plugin Framework for hot-loading
     implementation "org.pf4j:pf4j:${pf4jVersion}"
@@ -422,6 +429,13 @@ test {
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
     jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+
+    // TestContainers: Docker Desktop 29+ requires API v1.44+. The api.version
+    // property in src/test/resources/docker-java.properties pins docker-java
+    // to 1.47 so the shaded HTTP client does not send v1.32 requests that
+    // Docker Desktop now rejects with HTTP 400.
+    // Callers should also set DOCKER_HOST to the real daemon socket, e.g.
+    // DOCKER_HOST=unix:///Users/me/.docker/run/docker.sock
 
     // ─── Parallel execution ───
     // Integration tests share a real PostgreSQL connection pool.
@@ -703,4 +717,70 @@ tasks.register('codeQuality') {
     group = 'verification'
     description = 'Run all static analysis: Checkstyle + PMD + ArchUnit tests'
     dependsOn 'checkstyleMain', 'pmdMain', 'test'
+}
+
+// ========== Integration Test source set (Phase 2.1 IT scaffolding) ==========
+//
+// Separate from the default `test` task so:
+//   • unit tests stay fast and run on every commit
+//   • IT (real Postgres, full Spring context) run on demand or in a dedicated CI job
+//
+// Layout:
+//   platform/src/integrationTest/java       — *IT.java sources
+//   platform/src/integrationTest/resources  — IT-only application-*.yml etc.
+//
+// Existing IT under src/test/java continue to run via the default `test` task —
+// this source set is purely additive. New ITs (BootstrapEngineServiceIT,
+// future BootstrapRepairServiceIT, etc.) belong here.
+sourceSets {
+    integrationTest {
+        java {
+            srcDir 'src/integrationTest/java'
+        }
+        resources {
+            srcDir 'src/integrationTest/resources'
+        }
+        compileClasspath += sourceSets.main.output + sourceSets.test.output
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+    }
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+    integrationTestCompileOnly.extendsFrom testCompileOnly
+    integrationTestAnnotationProcessor.extendsFrom testAnnotationProcessor
+}
+
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    description = 'Run integration tests (real Postgres, full Spring context).'
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    shouldRunAfter test
+
+    // Mirror `test` task JVM args so behavior matches.
+    jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
+    jvmArgs '-Duser.timezone=UTC'
+    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+
+    // Single fork — Postgres connection pool is shared across tests.
+    maxParallelForks = 1
+
+    def integrationTmpDir = file("${buildDir}/tmp/integrationTest")
+    integrationTmpDir.mkdirs()
+    systemProperty 'java.io.tmpdir', integrationTmpDir.absolutePath
+
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = false
+    }
+}
+
+// Ensure IT compile errors surface during `./gradlew check`.
+tasks.named('check').configure {
+    dependsOn 'compileIntegrationTestJava'
 }

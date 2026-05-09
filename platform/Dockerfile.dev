@@ -1,9 +1,30 @@
-# AuraBoot Backend — Development Dockerfile
-# Uses Gradle bootRun with devtools for hot reload
+# AuraBoot Backend — Development Dockerfile (BuildKit required).
+# Uses Gradle bootRun with devtools for hot reload.
+#
+# 2026-05-08: gradle/m2 caches survive both image builds (BuildKit cache
+# mounts at build time) AND container runs (named volumes at runtime).
+# Both point at the same paths — `/gradle-cache` and `/m2-cache` — so the
+# `./gradlew dependencies` step at image-build populates the same dir the
+# container later mounts a volume over.
+#
+# Without the `--mount=type=cache` directives, the `RUN ./gradlew deps` step
+# writes to an image layer that is then HIDDEN at runtime by the named
+# volume mount → image-layer cache wasted. With BuildKit cache mounts the
+# downloads land outside the image layer and survive across builds; named
+# volumes pick up the same content lazily on first container run.
+#
+# See docs/plans/2026-05/2026-05-08-docker-warm-stack-and-suite-r2.md §1A/§1B.
 
-FROM eclipse-temurin:21-jdk
+# syntax=docker/dockerfile:1.4
+
+FROM eclipse-temurin:25-jdk
 
 WORKDIR /app
+
+# Cache locations — BuildKit cache mounts (build time) AND named volume
+# mounts (runtime) target these paths.
+ENV GRADLE_USER_HOME=/gradle-cache
+ENV MAVEN_HOME=/m2-cache
 
 # Copy Gradle wrapper and config
 COPY gradlew gradlew
@@ -19,8 +40,13 @@ COPY platform-mq-rabbitmq/build.gradle platform-mq-rabbitmq/build.gradle
 
 RUN chmod +x gradlew
 
-# Download dependencies
-RUN ./gradlew dependencies --no-daemon || true
+# Download dependencies — BuildKit cache mounts persist /gradle-cache and
+# /m2-cache outside the image layer, so subsequent builds (this Dockerfile
+# OR any other) read from the same cache. id= scopes the cache so it's not
+# accidentally shared with unrelated images.
+RUN --mount=type=cache,target=/gradle-cache,id=aura-gradle,sharing=locked \
+    --mount=type=cache,target=/m2-cache,id=aura-m2,sharing=locked \
+    ./gradlew dependencies --no-daemon || true
 
 # Copy source (will be overridden by volume mount in dev)
 COPY src ./src

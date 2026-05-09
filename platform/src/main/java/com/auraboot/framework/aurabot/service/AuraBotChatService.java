@@ -1204,6 +1204,89 @@ public class AuraBotChatService {
         return cleaned.isBlank() ? raw.trim() : cleaned;
     }
 
+    /**
+     * Stateful filter that strips inline {@code <think>...</think>} blocks from
+     * a streaming text source where the open / close tags may be split across
+     * multiple deltas. Buffers any prefix that could plausibly start an open
+     * tag, drops everything between {@code <think>} and {@code </think>}
+     * (inclusive), and returns the visible text to forward to the sink.
+     */
+    static final class ThinkTagFilter {
+        private static final String OPEN = "<think>";
+        private static final String CLOSE = "</think>";
+        private final StringBuilder buffer = new StringBuilder();
+        private boolean inside = false;
+
+        /** Feed a delta. Returns visible text safe to forward (may be empty). */
+        String accept(String delta) {
+            if (delta == null || delta.isEmpty()) return "";
+            buffer.append(delta);
+            StringBuilder out = new StringBuilder();
+            while (buffer.length() > 0) {
+                if (inside) {
+                    int closeIdx = buffer.indexOf(CLOSE);
+                    if (closeIdx < 0) {
+                        // Keep last (CLOSE.length()-1) chars in case close tag is split
+                        if (buffer.length() > CLOSE.length() - 1) {
+                            buffer.delete(0, buffer.length() - (CLOSE.length() - 1));
+                        }
+                        return out.toString();
+                    }
+                    buffer.delete(0, closeIdx + CLOSE.length());
+                    inside = false;
+                } else {
+                    int openIdx = buffer.indexOf(OPEN);
+                    if (openIdx < 0) {
+                        // No complete open tag. Hold back only the longest suffix that could
+                        // be a partial open tag (e.g. "<", "<t", "<th", "<thi", "<thin", "<think").
+                        // Flush everything before that suffix as visible text.
+                        int holdFrom = buffer.length();
+                        int maxPrefix = Math.min(buffer.length(), OPEN.length() - 1);
+                        for (int p = maxPrefix; p > 0; p--) {
+                            int start = buffer.length() - p;
+                            if (OPEN.startsWith(buffer.substring(start, buffer.length()))) {
+                                holdFrom = start;
+                                break;
+                            }
+                        }
+                        if (holdFrom > 0) {
+                            out.append(buffer, 0, holdFrom);
+                            buffer.delete(0, holdFrom);
+                        }
+                        return out.toString();
+                    }
+                    if (openIdx > 0) {
+                        out.append(buffer, 0, openIdx);
+                    }
+                    buffer.delete(0, openIdx + OPEN.length());
+                    inside = true;
+                }
+            }
+            return out.toString();
+        }
+
+        /** Flush any buffered visible text (call after stream ends). */
+        String flush() {
+            if (inside) {
+                buffer.setLength(0);
+                return "";
+            }
+            String tail = buffer.toString();
+            buffer.setLength(0);
+            // If the tail is a partial open tag prefix, drop it (best-effort).
+            return couldBeOpenPrefix(new StringBuilder(tail)) ? "" : tail;
+        }
+
+        private static boolean couldBeOpenPrefix(StringBuilder sb) {
+            for (int i = 1; i <= Math.min(sb.length(), OPEN.length() - 1); i++) {
+                if (OPEN.startsWith(sb.substring(0, i))) {
+                    if (sb.length() == i) return true;
+                }
+            }
+            return false;
+        }
+    }
+
     // =========================================================================
     // Anthropic Messages API streaming
     // =========================================================================
@@ -1449,6 +1532,7 @@ public class AuraBotChatService {
         }
 
         StringBuilder accumulated = new StringBuilder();
+        ThinkTagFilter thinkFilter = new ThinkTagFilter();
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
             String line;
@@ -1458,6 +1542,11 @@ public class AuraBotChatService {
 
                 String data = line.substring(6).trim();
                 if ("[DONE]".equals(data)) {
+                    String tail = thinkFilter.flush();
+                    if (!tail.isEmpty()) {
+                        accumulated.append(tail);
+                        sink.onTextChunk(tail);
+                    }
                     String full = accumulated.toString();
                     sink.onDone(full, null);
                     return new TurnOutcome.Success(full, java.util.Map.of());
@@ -1471,8 +1560,11 @@ public class AuraBotChatService {
                         if (delta != null) {
                             String content = (String) delta.get("content");
                             if (content != null) {
-                                accumulated.append(content);
-                                sink.onTextChunk(content);
+                                String visible = thinkFilter.accept(content);
+                                if (!visible.isEmpty()) {
+                                    accumulated.append(visible);
+                                    sink.onTextChunk(visible);
+                                }
                             }
                         }
                     }
@@ -1483,6 +1575,11 @@ public class AuraBotChatService {
         }
 
         // Stream ended without [DONE] — send done with what we have
+        String tail = thinkFilter.flush();
+        if (!tail.isEmpty()) {
+            accumulated.append(tail);
+            sink.onTextChunk(tail);
+        }
         if (!accumulated.isEmpty()) {
             String full = accumulated.toString();
             sink.onDone(full, null);

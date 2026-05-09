@@ -1,0 +1,100 @@
+# Changelog
+
+All notable changes to AuraBoot will be documented in this file.
+
+The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
+and the project version follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+During the **0.x beta** period, minor versions may include backward-incompatible
+changes. They are tagged as **BREAKING** below; consult the migration notes for
+each before upgrading.
+
+---
+
+## [Unreleased]
+
+### Added
+- (entries here are folded into the next release)
+
+### Changed
+
+### Fixed
+
+### Removed
+
+### Security
+
+---
+
+<!--
+Template — copy this block when cutting a release.
+
+## [0.1.0-beta.1] - 2026-05-XX
+
+Beta release notes lead with the headline so readers can decide whether
+to upgrade in 5 seconds. Then a short paragraph framing what this
+release is about. Then the structured sections.
+
+### Highlights
+- One-sentence headline per major item, linked to issue/PR.
+
+### Added
+- ✨ <feature>: <one-line description> (#PR)
+
+### Changed
+- ♻️ <change>: <one-line description> (#PR)
+
+### Deprecated
+- ⚠️ <thing>: deprecated, will be removed in 0.x.0. Migrate by ... (#PR)
+
+### Removed
+- 🗑 <thing>: removed (was deprecated since 0.x.0). (#PR)
+
+### Fixed
+- 🐛 <bug>: <one-line description> (#PR)
+
+### Security
+- 🔒 <CVE / advisory>: <one-line description>. Severity: <High|Medium|Low>. (#PR)
+
+### Breaking changes
+- 💥 <thing>: <description>. **Migration**: <one-line how to migrate>. (#PR)
+
+### Known issues
+- <issue>: workaround <how>. Tracked in #<issue>.
+
+### Contributors
+First-time contributors this release: @user1, @user2. Thanks!
+
+[0.1.0-beta.1]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.1
+-->
+
+---
+
+## Conventions for maintainers
+
+- Entries land in `[Unreleased]` as part of the PR that ships them.
+- On release-cut, the section is renamed `[X.Y.Z] - YYYY-MM-DD` and a
+  fresh `[Unreleased]` skeleton is added on top.
+- Each release also gets a GitHub Release with the same body — automated
+  via `.github/workflows/release-notes.yml` (TODO).
+- Use the icons (✨ ♻️ ⚠️ 🗑 🐛 🔒 💥) consistently — they make the
+  changelog scannable.
+- Link each entry to the PR or issue (`(#PR)`) so readers can audit
+  changes without digging through git log.
+- Always include `### Migration` notes for breaking changes — never
+  ship a breaking change without telling users how to migrate.
+
+## Release version policy
+
+- **0.x.y-beta.N** — beta-tier; minor versions may include breaking
+  changes (called out as `### Breaking changes`); patch versions never
+  break compatibility.
+- **0.x.y** — stable-tier in the 0.x series; patch versions never break
+  compatibility, minor versions may break with deprecation notice.
+- **1.0.0** — first stable; from then on, strict semver applies.
+
+## Release cadence
+
+The team commits to **at least one release per month** during beta. Two
+months without a release is the signal community treats as project death;
+we don't go there.

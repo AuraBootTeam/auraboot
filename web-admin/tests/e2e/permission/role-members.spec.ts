@@ -19,6 +19,7 @@
 
 import { test, expect, type Page } from '../../fixtures';
 import { uniqueId } from '../helpers/index';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Serial mode

@@ -57,7 +57,9 @@ const ossTestIgnore = toScopedMatch(scope.test_excludes ?? []);
 export default defineConfig({
   ...baseConfig,
   projects: (baseConfig.projects ?? []).map((project) => {
-    if (project.name === 'auth') {
+    // setup + auth projects keep their own testMatch — they're not
+    // limited to the OSS test_paths scope.
+    if (project.name === 'auth' || project.name === 'setup') {
       return project;
     }
     return {

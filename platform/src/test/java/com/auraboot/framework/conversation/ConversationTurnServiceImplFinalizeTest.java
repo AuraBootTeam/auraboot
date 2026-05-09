@@ -151,7 +151,7 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
             verify(persistence, times(1)).persistInbound(
                     argThat(req -> "hi".equals(req.userMessage())),
                     nullable(com.auraboot.framework.agent.triage.TriageVerdict.class));
-            verify(persistence, times(1)).persistOutbound(any(), same(success));
+            verify(persistence, times(1)).persistOutbound(any(), same(success), any());
             verify(eventEmitter, times(1)).emit(isA(TurnCompletedEvent.class));
             verify(auditWriter, never()).writeFailure(any(), any());
             verify(metricsRecorder, times(1)).recordTurnEnd(any(), same(success));
@@ -169,7 +169,7 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
             TurnOutcome outcome = turnService.runTurn(auraBotTurn("hi"), sink);
 
             assertThat(outcome).isSameAs(interrupted);
-            verify(persistence, times(1)).persistOutbound(any(), same(interrupted));
+            verify(persistence, times(1)).persistOutbound(any(), same(interrupted), any());
             verify(eventEmitter, times(1)).emit(isA(TurnCompletedEvent.class));
             verify(eventEmitter, never()).emit(isA(TurnSuspendedEvent.class));
             verify(auditWriter, never()).writeFailure(any(), any());
@@ -191,7 +191,7 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
             verify(auditWriter, times(1)).writeFailure(any(), same(failed));
             verify(eventEmitter, times(1)).emit(isA(TurnCompletedEvent.class));
             verify(eventEmitter, never()).emit(isA(TurnSuspendedEvent.class));
-            verify(persistence, never()).persistOutbound(any(), any());
+            verify(persistence, never()).persistOutbound(any(), any(), any());
             verify(metricsRecorder, times(1)).recordTurnEnd(any(), same(failed));
         });
     }
@@ -208,7 +208,7 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
             TurnOutcome outcome = turnService.runTurn(auraBotTurn("hi"), sink);
 
             assertThat(outcome).isSameAs(pc);
-            verify(persistence, never()).persistOutbound(any(), any());
+            verify(persistence, never()).persistOutbound(any(), any(), any());
             verify(eventEmitter, times(1)).emit(isA(TurnSuspendedEvent.class));
             verify(eventEmitter, never()).emit(isA(TurnCompletedEvent.class));
             verify(auditWriter, never()).writeFailure(any(), any());
@@ -229,7 +229,7 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
             TurnOutcome outcome = turnService.runTurn(auraBotTurn("hi"), sink);
 
             assertThat(outcome).isSameAs(pc);
-            verify(persistence, times(1)).persistOutbound(any(), same(pc));
+            verify(persistence, times(1)).persistOutbound(any(), same(pc), any());
             verify(eventEmitter, times(1)).emit(isA(TurnSuspendedEvent.class));
             verify(eventEmitter, never()).emit(isA(TurnCompletedEvent.class));
             verify(metricsRecorder, times(1)).recordTurnEnd(any(), same(pc));

@@ -9,7 +9,7 @@
  * - Enabled flag presence
  * - Feature check API
  *
- * All API calls go through BFF (localhost:5173).
+ * All API calls go through BFF (BASE_URL helper).
  * No waitForTimeout — uses waitForResponse / waitFor / expect().toBeVisible().
  *
  * @since 5.0.0

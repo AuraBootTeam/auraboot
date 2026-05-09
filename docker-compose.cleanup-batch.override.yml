@@ -1,0 +1,90 @@
+# Cleanup-batch isolated stack — fork of docker-compose.ga-e2e.override.yml.
+# Project: auraboot-cleanup-batch. Host ports shifted to avoid 5 active stacks
+# (ga-e2e / r2 / skills-c2 / skills-c4 / e2e). Container names disambiguated.
+#
+# Host ports:
+#   postgres : 6533 -> 5432
+#   backend  : 7544 -> 6443
+#   vite     : 6274 -> 5173
+#   BFF      : 4601 -> 3500
+#
+# Usage from this worktree root:
+#   ./scripts/docker-cleanup-batch-up.sh
+#   ./scripts/docker-cleanup-batch-down.sh
+
+services:
+  postgres:
+    container_name: auraboot-cleanup-batch-postgres
+    ports: !override
+      - "6533:5432"
+
+  backend:
+    container_name: auraboot-cleanup-batch-backend
+    profiles:
+      - cleanup-batch-stack
+    build:
+      dockerfile: ${CLEANUP_BATCH_BACKEND_DOCKERFILE:-Dockerfile}
+    ports:
+      - "7544:6443"
+    volumes:
+      - ./plugins:/app/plugins:ro
+      - ../auraboot-enterprise/plugins:/app/plugins-enterprise:ro
+      - ../auraboot-enterprise/build/plugin-jars:/app/plugin-jars:ro
+    environment:
+      FRONTEND_BASE_URL: http://localhost:6274
+      CORS_ALLOWED_ORIGINS: "http://cleanup-batch-frontend:5173,http://cleanup-batch-frontend:3500,http://localhost:6274,http://127.0.0.1:6274,http://localhost:4601,http://127.0.0.1:4601,http://localhost:5173,http://localhost:3500"
+      AURA_PLUGINS_DIR: /app/plugin-jars
+
+  cleanup-batch-frontend:
+    image: ${CLEANUP_BATCH_FRONTEND_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-noble}
+    container_name: auraboot-cleanup-batch-frontend
+    user: root
+    profiles:
+      - cleanup-batch-stack
+    working_dir: /repo/web-admin
+    ports:
+      - "6274:5173"
+      - "4601:3500"
+    environment:
+      SPRING_BOOT_URL: http://backend:6443
+      BFF_PORT: "3500"
+      VITE_PORT: "5173"
+      VITE_ALLOWED_HOSTS: "cleanup-batch-frontend,localhost,127.0.0.1"
+      HOST: "0.0.0.0"
+      CI: "true"
+      NODE_ENV: development
+      BFF_INTERNAL_URL: http://127.0.0.1:3500
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+    volumes:
+      - ./:/repo:cached
+      - cleanup_batch_node_modules:/repo/node_modules
+      - cleanup_batch_web_admin_node_modules:/repo/web-admin/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: >-
+      sh -c "
+      set -e;
+      if command -v pnpm >/dev/null 2>&1; then
+        pnpm --version;
+      else
+        corepack enable;
+        corepack prepare pnpm@9 --activate;
+      fi;
+      cd /repo;
+      pnpm install --no-frozen-lockfile --prefer-offline;
+      cd web-admin;
+      sh ../scripts/sync-platform-plugins.sh;
+      node ../scripts/generate-plugin-routes.mjs;
+      pnpm exec concurrently --names 'web,bff' --prefix-colors 'cyan,green' --restart-tries 5 --restart-after 2000 'pnpm dev:web' 'pnpm dev:bff'
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5173 >/dev/null 2>&1 && wget -q -O- http://127.0.0.1:3500/health >/dev/null 2>&1 || wget -q -O- http://127.0.0.1:3500 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 5m
+
+volumes:
+  cleanup_batch_node_modules:
+  cleanup_batch_web_admin_node_modules:

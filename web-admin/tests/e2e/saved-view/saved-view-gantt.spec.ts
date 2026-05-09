@@ -12,6 +12,7 @@
 
 import { test, expect } from '@playwright/test';
 import { navigateToDynamicPage, dateOffsetStr } from '../helpers';
+import { BASE_URL } from '../../helpers/environments';
 
 const VIEW_NAME = 'E2E Gantt Timeline';
 const MODEL_CODE = 'e2et_order';

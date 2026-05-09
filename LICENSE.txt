@@ -1,6 +1,6 @@
 AuraBoot License Agreement
 
-Version 1.0, March 15, 2026
+Version 1.2, May 9, 2026
 
 https://www.auraboot.com/
 
@@ -66,19 +66,28 @@ AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT.
 
 4. LICENSE TYPE
 
-4.1 This Software is dual-licensed. You may choose either the Open Source
-    License (Section 5) or the Commercial License (Section 7), subject to
-    their respective terms and conditions.
+4.1 This Software is dual-licensed. You may choose either the Community
+    License (Section 5, source-available with field-of-use restrictions)
+    or the Commercial License (Section 7), subject to their respective
+    terms and conditions.
 
-4.2 The Open Source License is based on the Apache License, Version 2.0
+4.2 The Community License is based on the Apache License, Version 2.0
     (https://www.apache.org/licenses/LICENSE-2.0), with the supplementary
-    terms and restrictions set forth in this Agreement. In the event of any
-    conflict between the Apache License 2.0 and this Agreement, the terms of
-    this Agreement shall prevail.
+    terms and restrictions set forth in this Agreement. Because of those
+    supplementary restrictions (Sections 5.2–5.4), the Community License
+    is "source-available" rather than OSI-conforming "open source." In
+    the event of any conflict between the Apache License 2.0 and this
+    Agreement, the terms of this Agreement shall prevail.
 
 ------------------------------------------------------------------------
 
-5. OPEN SOURCE LICENSE — RIGHTS AND OBLIGATIONS
+5. COMMUNITY LICENSE — RIGHTS AND OBLIGATIONS
+
+(This license is "source-available" — the source is published under the
+terms below, but the additional restrictions in §5.2–§5.4 mean it does
+NOT meet the Open Source Initiative's Open Source Definition. Where
+this Agreement uses the phrase "open source," it is descriptive of
+"source-available with attribution" and not a claim of OSI conformity.)
 
 Subject to the terms and conditions of this Agreement, the Licensor hereby
 grants You a worldwide, royalty-free, non-exclusive, perpetual license to
@@ -86,9 +95,7 @@ use, reproduce, modify, and distribute the Software, subject to the
 following conditions:
 
 5.1 ATTRIBUTION. You must retain all copyright notices, license notices, and
-    attribution statements in the Software and any Derivative Works. You must
-    include a prominent notice in any Derivative Work stating that You have
-    modified the Software, along with the date of any changes.
+    attribution statements in the Software and any Derivative Works.
 
 5.2 BRAND INFORMATION PRESERVATION. You may not remove or alter any Brand
     Information displayed in the user interface of the Software, except for
@@ -103,11 +110,16 @@ following conditions:
     or attribution comments embedded in the source code, configuration files,
     or documentation of the Software.
 
-5.4 PLATFORM SERVICE RESTRICTION. You may NOT use the Software, in whole or
-    in part, to provide any Low-Code/No-Code/AI Platform as a service
+5.4 PLATFORM SERVICE RESTRICTION. You may NOT use the Software, in whole
+    or in part, to provide any Low-Code/No-Code/AI Platform as a service
     (whether SaaS, PaaS, or any other "as a Service" model) to third
-    parties without obtaining a Commercial License. This restriction includes
-    but is not limited to:
+    parties WITHOUT (a) obtaining a Commercial License under Section 7
+    AND (b) receiving the Licensor's express written grant of SaaS / OEM
+    distribution rights for the specific deployment in question. A
+    Commercial License alone does not by itself authorize platform-as-a-
+    service distribution; an explicit SaaS / OEM rider or addendum is
+    required (see Section 7.3 and 7.4). This restriction includes but is
+    not limited to:
 
     (a) Hosting the Software or any Derivative Work as a multi-tenant
         platform service;
@@ -118,17 +130,13 @@ following conditions:
     (d) Reselling, redistributing, or white-labeling the Software as part of
         a platform service offering.
 
-5.5 OPEN SOURCE DISTRIBUTION. If You distribute the Software or any
-    Derivative Work, You must do so under the terms of this License and make
-    the source code available under the same terms.
-
-5.6 CONTRIBUTION BACK. Contributions to the Software (via pull requests or
+5.5 CONTRIBUTION BACK. Contributions to the Software (via pull requests or
     other means) are subject to the Contributor License Agreement and shall
     be licensed under the same terms as this License.
 
 ------------------------------------------------------------------------
 
-6. TERMINATION OF OPEN SOURCE LICENSE
+6. TERMINATION OF COMMUNITY LICENSE
 
 6.1 This License and the rights granted hereunder will terminate
     automatically if You fail to comply with the terms herein and fail to

@@ -72,7 +72,10 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
             if (cache != null) cache.clear();
         });
 
-        grantPermission("system.view_saved_view.update", "system", "view_saved_view", "update", "Saved View Update");
+        // SavedViewController requires MetaPermission.VIEW_MANAGE which is the
+        // canonical "dashboard.saved_view.update" code. The legacy
+        // "system.view_saved_view.update" code is no longer registered.
+        grantPermission("dashboard.saved_view.update", "dashboard", "saved_view", "update", "Saved View Update");
         userPermissionService.evictUserPermissions(getTestUser().getId());
 
         ensureUserInSingleTeam(getTestUser().getId(), TEAM_ALPHA);

@@ -71,11 +71,18 @@ public class AdminRoleChecker {
     }
 
     // -------------------------------------------------------------------------
-    // Cache management (package-visible for test cleanup)
+    // Cache management
     // -------------------------------------------------------------------------
 
-    /** Invalidates all cache entries. Intended for test teardown only. */
-    void invalidateAll() {
+    /**
+     * Invalidates all cache entries.
+     *
+     * <p>Public so cross-package integration tests can drop stale entries between
+     * cases (the 60 s TTL would otherwise hold a {@code false} from caseA over
+     * into caseB when a role is granted between cases — see
+     * {@code CrossTenantGrantControllerIntegrationTest}).
+     */
+    public void invalidateAll() {
         cache.invalidateAll();
     }
 

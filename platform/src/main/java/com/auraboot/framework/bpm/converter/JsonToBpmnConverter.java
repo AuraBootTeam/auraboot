@@ -715,7 +715,13 @@ public class JsonToBpmnConverter {
      */
     private void writeUserTaskAssigneeAttributes(XMLStreamWriter writer, JsonNode config,
                                                   JsonNode data) throws XMLStreamException {
-        // Format 1: nested assignee object inside data.config (Page Designer format)
+        // Format 1: nested assignee object inside data.config (Page Designer format).
+        // candidateUsers / candidateGroups are emitted independently of the
+        // primary `assignee` block so a config that ONLY declares candidates
+        // (no assignee) still produces the smart:candidateUsers /
+        // smart:candidateGroups attributes — required by the BPMN runtime to
+        // surface the task in candidate-user inboxes.
+        boolean nestedHandled = false;
         if (config != null && !config.isMissingNode()) {
             JsonNode assignee = config.path("assignee");
             if (!assignee.isMissingNode() && !assignee.isNull()) {
@@ -749,21 +755,26 @@ public class JsonToBpmnConverter {
                         }
                     }
                 }
+                nestedHandled = true;
+            }
 
-                // Candidate users
-                JsonNode candidateUsers = config.path("candidateUsers");
-                if (candidateUsers.isArray() && !candidateUsers.isEmpty()) {
-                    String candidateUsersStr = joinArrayNode(candidateUsers);
-                    writer.writeAttribute(SMART_NAMESPACE, "candidateUsers", candidateUsersStr);
-                }
+            // Candidate users — emitted whether or not a primary assignee is set.
+            JsonNode candidateUsers = config.path("candidateUsers");
+            if (candidateUsers.isArray() && !candidateUsers.isEmpty()) {
+                String candidateUsersStr = joinArrayNode(candidateUsers);
+                writer.writeAttribute(SMART_NAMESPACE, "candidateUsers", candidateUsersStr);
+                nestedHandled = true;
+            }
 
-                // Candidate groups
-                JsonNode candidateGroups = config.path("candidateGroups");
-                if (candidateGroups.isArray() && !candidateGroups.isEmpty()) {
-                    String candidateGroupsStr = joinArrayNode(candidateGroups);
-                    writer.writeAttribute(SMART_NAMESPACE, "candidateGroups", candidateGroupsStr);
-                }
-                return; // nested format handled, done
+            // Candidate groups — same independent emission.
+            JsonNode candidateGroups = config.path("candidateGroups");
+            if (candidateGroups.isArray() && !candidateGroups.isEmpty()) {
+                String candidateGroupsStr = joinArrayNode(candidateGroups);
+                writer.writeAttribute(SMART_NAMESPACE, "candidateGroups", candidateGroupsStr);
+                nestedHandled = true;
+            }
+            if (nestedHandled) {
+                return; // nested format handled, skip flat-format fallback
             }
         }
 

@@ -12,6 +12,7 @@
 
 import { test, expect } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../helpers/test-accounts';
+import { BACKEND_URL, BASE_URL } from '../helpers/environments';
 
 const uniqueId = () => `rtp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -56,7 +57,7 @@ test.describe('Real-Time Data Push', () => {
       {
         name: 'auth_token',
         value: token,
-        url: 'http://localhost:5173',
+        url: BASE_URL,
       },
     ]);
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });

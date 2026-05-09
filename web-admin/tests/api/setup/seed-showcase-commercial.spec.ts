@@ -18,6 +18,7 @@
 
 import { test, expect } from '@playwright/test';
 import { executeCommandViaApi } from '../../e2e/helpers';
+import { PSQL_BASE } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Time helpers (same as other seed scripts)

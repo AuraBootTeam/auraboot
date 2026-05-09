@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discord (community chat)
+    url: https://discord.gg/auraboot
+    about: Quick questions, community discussion
+  - name: 📚 Documentation
+    url: https://docs.auraboot.com
+    about: User guides and API reference
+  - name: 🔒 Security vulnerability
+    url: https://github.com/AuraBootTeam/auraboot/blob/main/SECURITY.md
+    about: Do NOT open a public issue — please follow responsible disclosure
+  - name: ⚖️ Licensing / commercial inquiries
+    url: mailto:license@auraboot.com
+    about: SaaS hosting, white-labeling, OEM, enterprise editions

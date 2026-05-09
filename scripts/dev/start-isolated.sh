@@ -20,7 +20,8 @@
 #   scripts/dev/start-isolated.sh                     # auto from current branch
 #   scripts/dev/start-isolated.sh --slug=my-poc       # explicit slug
 #   scripts/dev/start-isolated.sh --offset=5          # explicit offset (skips probe)
-#   scripts/dev/start-isolated.sh --no-build          # reuse existing built backend image
+#   scripts/dev/start-isolated.sh --rebuild           # force rebuild of backend image
+#   scripts/dev/start-isolated.sh --no-build          # (deprecated alias for default; kept for back-compat)
 #   scripts/dev/start-isolated.sh --dry-run           # print plan, don't start
 #
 # Exit codes:
@@ -41,19 +42,28 @@ STACK_DIR="$PROJECT_ROOT/.aura-stack"
 
 SLUG=""
 EXPLICIT_OFFSET=""
-COMPOSE_BUILD_FLAG="--build"
+# 2026-05-08 §1C: default is now --no-build (faster). Pass --rebuild to opt
+# in to a rebuild when you've changed Dockerfile.dev / build.gradle / source.
+COMPOSE_BUILD_FLAG=""
 DRY_RUN=0
 
 usage() {
     cat <<USAGE
-Usage: $0 [--slug=<name>] [--offset=<N>] [--no-build] [--dry-run] [--help]
+Usage: $0 [--slug=<name>] [--offset=<N>] [--rebuild] [--dry-run] [--help]
 
 Options:
   --slug=<name>    Override auto-derived slug (lowercase / dash separated, ≤ 24 chars)
   --offset=<N>     Skip auto-probing; force port offset N (1-89)
-  --no-build       Don't rebuild backend image (faster restart)
+  --rebuild        Force backend image rebuild (slow; opt in only when Dockerfile.dev /
+                   build.gradle / src changed since last image)
+  --no-build       (deprecated; kept for back-compat — same as default)
   --dry-run        Print resolved plan and exit without starting docker
   --help           Show this message
+
+Default behaviour (since 2026-05-08): --no-build. The first stack of a worktree
+populates the shared aura_gradle_cache + aura_m2_cache named volumes; later
+stacks reuse them and avoid 5-10 min gradle dep download. Pass --rebuild to
+force a fresh image when Dockerfile.dev or backend code changed.
 USAGE
 }
 
@@ -61,7 +71,8 @@ for arg in "$@"; do
     case "$arg" in
         --slug=*) SLUG="${arg#--slug=}" ;;
         --offset=*) EXPLICIT_OFFSET="${arg#--offset=}" ;;
-        --no-build) COMPOSE_BUILD_FLAG="" ;;
+        --rebuild) COMPOSE_BUILD_FLAG="--build" ;;
+        --no-build) COMPOSE_BUILD_FLAG="" ;;  # deprecated alias for default
         --dry-run) DRY_RUN=1 ;;
         --help|-h) usage; exit 0 ;;
         *) echo "ERROR: unknown argument: $arg" >&2; usage; exit 2 ;;
@@ -213,7 +224,11 @@ export AURABOOT_BFF_ALLOWED_PORTS="$BFF_PORT,$VITE_PORT"
 
 cd "$PROJECT_ROOT"
 
-echo "Bringing stack up …"
+if [ -z "$COMPOSE_BUILD_FLAG" ]; then
+    echo "Bringing stack up (reusing cached image; pass --rebuild if Dockerfile.dev / build.gradle / src changed) …"
+else
+    echo "Bringing stack up (--rebuild → forcing backend image rebuild) …"
+fi
 # `--profile cache` includes redis (in base file); `--profile isolated`
 # includes the backend + isolated-frontend services from the override.
 # shellcheck disable=SC2086

@@ -7,6 +7,7 @@ import {
   setLeaveBalance,
   submitLeaveRequest,
 } from '../../helpers/wd-fixtures';
+import { BACKEND_URL } from '../../helpers/environments';
 
 const BACKEND = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
 

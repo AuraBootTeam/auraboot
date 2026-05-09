@@ -58,20 +58,28 @@ public class ToolLoopService implements ToolExecutionPort {
      * Execute a tool call within an agent run.
      * This is the main entry point — dispatches to the appropriate executor based on tool type.
      *
-     * <p>ACP P0-5: marked {@code REQUIRES_NEW} for parallel-tool failure isolation.
-     * When the StepLoop fans out N tool calls onto async workers, each tool must
-     * commit / roll back independently — one tool's RuntimeException must not
-     * mark a sibling's transaction rollback-only. This is NOT being used to
-     * bypass an outer rollback-only state (which the project's red lines forbid);
-     * the parent agent loop has no enclosing @Transactional. Tool stats / Action
-     * audit writes are independently committed so partial-success batches still
-     * leave a complete audit trail.
+     * <p>Transaction: {@code NOT_SUPPORTED}. The outer agent-loop / approval-gate
+     * pipeline does not own a transaction — tool execution is composed of many
+     * independent SQL operations (CommandExecutor, NamedQuery, ActionRecorder,
+     * tool stats, hallucination counters) each of which manages its own boundary.
+     * Wrapping the whole dispatch in {@code REQUIRES_NEW} previously caused
+     * {@code UnexpectedRollbackException} when an inner write threw and the
+     * tool-loop's top-level {@code catch (Exception)} swallowed the error to
+     * surface a structured "Error: ..." string back to the LLM — the swallowed
+     * RuntimeException had already marked the {@code REQUIRES_NEW} tx
+     * rollback-only, so the surrounding commit attempt failed.
+     *
+     * <p>Per AGENTS.md red line #8 ("禁自愈 / Retry / Fallback / catch(Exception)"),
+     * the canonical resolution is to drop the enclosing transaction rather than
+     * swallow inside one — auxiliary operations stay {@code NOT_SUPPORTED} and
+     * commit independently, while a real DB error from CommandExecutor surfaces
+     * via that nested service's own transaction (which rolls back as expected).
      *
      * <p>Stateless contract: callable from concurrent threads. Verified by
      * code inspection — no static mutable state, no instance-level mutation;
      * all per-call state lives on the stack or in tenant-scoped DB rows.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 60)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public String executeToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
                                    String toolName, Map<String, Object> input,
                                    List<AgentToolDefinition> tools, TraceContext traceCtx) {

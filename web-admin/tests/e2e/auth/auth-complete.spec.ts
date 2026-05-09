@@ -40,6 +40,7 @@ import {
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { uniqueId } from '../helpers';
 import { HeaderPage } from '../../pages/HeaderPage';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Constants

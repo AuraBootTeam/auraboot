@@ -15,6 +15,7 @@
 
 import { test, expect } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../helpers/test-accounts';
+import { BACKEND_URL } from '../helpers/environments';
 
 const uniqueId = () => `cfv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 

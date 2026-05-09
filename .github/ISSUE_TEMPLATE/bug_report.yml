@@ -1,0 +1,90 @@
+name: 🐛 Bug Report
+description: Report something that doesn't work as expected
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill in the details below so we can reproduce and fix it quickly.
+
+        Before submitting, please:
+        - Search [existing issues](https://github.com/AuraBootTeam/auraboot/issues) to avoid duplicates
+        - Check the [License FAQ](https://github.com/AuraBootTeam/auraboot/blob/main/LICENSE-FAQ-en.md) if your question is about licensing
+        - For security vulnerabilities, do **not** open a public issue — see [SECURITY.md](https://github.com/AuraBootTeam/auraboot/blob/main/SECURITY.md)
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: When I do X, I see Y, but I expected Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: I expected ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: AuraBoot version
+      placeholder: e.g. 0.1.0-beta.1, commit sha, or "main as of <date>"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment method
+      options:
+        - Docker Compose
+        - Manual / from source
+        - Kubernetes
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Java/Node/Postgres versions, browser (for frontend bugs)
+      placeholder: |
+        - OS: macOS 14.5 / Ubuntu 22.04
+        - Java: 21.0.2
+        - Node: 20.10.0
+        - PostgreSQL: 16.2
+        - Browser: Chrome 130
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stack trace
+      description: Paste relevant logs. Please redact secrets/tokens.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Screenshots, related issues, anything else helpful.

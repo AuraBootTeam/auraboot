@@ -22,6 +22,7 @@ import { test, expect } from '@playwright/test';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { BACKEND_URL } from '../../helpers/environments';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const PLUGINS_DIR = path.resolve(

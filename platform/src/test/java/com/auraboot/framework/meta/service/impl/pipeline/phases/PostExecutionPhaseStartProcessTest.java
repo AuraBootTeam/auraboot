@@ -102,7 +102,7 @@ class PostExecutionPhaseStartProcessTest {
         verify(bpmIntegrationService).startBusinessProcess(
                 eq("wd_leave_approval"), eq("rec-7"), varsCaptor.capture(), eq("WDLR-20260415-001"));
         Map<String, Object> sent = varsCaptor.getValue();
-        assertThat(sent).containsEntry("days", "3");
+        assertThat(sent).containsEntry("days", 3);
         assertThat(sent).containsEntry("recordId", "rec-7");
 
         // storeInstanceIdIn triggers an update on the record.

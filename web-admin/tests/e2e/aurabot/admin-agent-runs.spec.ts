@@ -61,6 +61,7 @@
 
 import { test, expect, type Page } from '../../fixtures';
 import { execSync } from 'node:child_process';
+import { PSQL_BASE } from '../../helpers/environments';
 import {
   ADMIN_TENANT_ID,
   AI_CENTER_MENU_ID,

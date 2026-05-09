@@ -108,16 +108,27 @@ public class AgentControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Test 4: POST /api/agent/tools/sync → 200, body has created/updated/deactivated keys.
+     * Test 4: GET /api/agent/tools/registry → 200, body surfaces in-process ToolProviderRegistry.
+     *
+     * <p>Asserts the registry surface includes {@code PlatformToolProvider}'s tools (always
+     * present at boot — no DB seeding required). This replaces the legacy
+     * {@code POST /tools/sync} test, which exercised a no-op endpoint that is now removed
+     * (see F-6 in {@code docs/backlog/2026-05-08-acp-p1-findings.md}).
      */
     @Test
     @Order(4)
-    @DisplayName("POST /api/agent/tools/sync returns sync result with created/updated/deactivated")
-    void syncTools_returnsSyncResult() throws Exception {
-        mockMvc.perform(post("/api/agent/tools/sync")
-                        .contentType(MediaType.APPLICATION_JSON))
+    @DisplayName("GET /api/agent/tools/registry surfaces in-process ToolProviderRegistry tools")
+    void listToolRegistry_surfacesPlatformTools() throws Exception {
+        mockMvc.perform(get("/api/agent/tools/registry"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.tools").isArray())
+                .andExpect(jsonPath("$.data.providers").isArray())
+                .andExpect(jsonPath("$.data.total").exists())
+                // PlatformToolProvider is auto-registered as a Spring bean and exposes
+                // a fixed set of tools at boot — at least one must be present.
+                .andExpect(jsonPath("$.data.providers[?(@ == 'platform')]").exists())
+                .andExpect(jsonPath("$.data.tools[?(@.providerCode == 'platform')]").exists());
     }
 
     // ==================== AgentRuntimeController ====================

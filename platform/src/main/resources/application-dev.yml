@@ -18,6 +18,17 @@
 ##
 ##    # ===== 你自己的代码（非常关键）=====
 ##    com.auraboot.framework: DEBUG
+# Phase 2.3: dev profile turns the unified BootstrapStartupRunner ON by default.
+# Override with AURABOOT_BOOTSTRAP_ENABLED=false to opt out (e.g. oss-reset-and-init.sh
+# pre-Phase-2.4 still does this so the script's wizard call is sole authority).
+auraboot:
+  bootstrap:
+    enabled: ${AURABOOT_BOOTSTRAP_ENABLED:true}
+    # Phase 3: dev profile defaults demo-seed to true so `gradlew bootRun` gets
+    # the full demo plugin set (showcase / acp-showcase / crm-starter / etc.).
+    # Override with AURABOOT_DEMO_SEED=false to opt out.
+    demo-seed: ${AURABOOT_DEMO_SEED:true}
+
 logging:
   level:
     root: info

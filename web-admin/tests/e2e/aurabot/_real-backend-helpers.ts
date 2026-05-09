@@ -12,6 +12,8 @@
  */
 
 import { execSync } from 'node:child_process';
+import { PSQL_BASE } from '../../helpers/pg-env';
+import { BACKEND_URL } from '../../helpers/playwright-env';
 
 // Admin primary tenant — matches the JWT issued by
 // `admin@example.com / Test2026x`. Keep in sync with

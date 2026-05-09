@@ -15,10 +15,10 @@ All participants are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 | Tool       | Version | Notes                          |
 |------------|---------|--------------------------------|
 | Java (JDK) | 21+     | GraalVM or Temurin recommended |
-| Node.js    | 18+     | LTS version preferred          |
-| PostgreSQL | 14+     | Running on default port 5432   |
-| Redis      | 7+      | Running on default port 6379   |
-| pnpm       | 9+      | Install via `npm install -g pnpm` |
+| Node.js    | 20+     | Active LTS; matches README + CI |
+| PostgreSQL | 15+     | Default port 5432; Docker stack ships PG 16; pgvector required for AI features |
+| Redis      | 7+      | Default port 6379              |
+| pnpm       | 9+      | `npm install -g pnpm`          |
 | Git        | 2.30+   |                                |
 
 ### Getting Started
@@ -180,14 +180,41 @@ See the [Plugin Development Guide](docs/system-reference/plugins/02-插件开发
 
 ## Contributor License Agreement
 
-By submitting a pull request, you agree that your contributions are licensed under the [AuraBoot License](LICENSE.txt), the same license as the project. You confirm that you have the right to grant this license for your contributions.
+AuraBoot is dual-licensed (the [source-available AuraBoot License](LICENSE.txt) for the community edition + a separate commercial license for enterprise customers). To distribute your contribution under both licenses, we need a signed [Contributor License Agreement (CLA)](CLA.md).
+
+**On your first pull request**, the CLA Assistant bot will comment with a one-click sign-off instruction. You sign by replying:
+
+> I have read the CLA Document and I hereby sign the CLA
+
+The signature is recorded against your GitHub username and applies to all your future PRs.
+
+**The CLA does not transfer your copyright** — you retain ownership of your work. You grant the project the rights needed to redistribute and sublicense it.
+
+**Trivial contributions are exempt** (typo fixes, formatting). See [CLA.md § Trivial Contributions](CLA.md#trivial-contributions) for the full list.
+
+For organizations, a Corporate CLA may be required if your employer holds rights to your work. Contact license@auraboot.com.
 
 ---
 
 ## Getting Help
 
-- [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — Questions and ideas
-- [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — Bug reports and feature requests
-- [Discord](https://discord.gg/auraboot) — Community chat
+- [Usage FAQ](USAGE-FAQ.md) — common questions about getting started, data, plugins, AI, and ops (check here first)
+- [License FAQ](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md) — questions about commercial use, modifications, SaaS boundaries
+- [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — open-ended questions and ideas
+- [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — bug reports and feature requests
+- [Discord](https://discord.gg/auraboot) — real-time community chat
+- [Security](SECURITY.md) — vulnerability disclosure (don't open a public issue)
+- [Telemetry](TELEMETRY.md) — what AuraBoot does and doesn't send across the network
+
+## Architecture & deep references
+
+- [Architecture overview](docs/architecture/overview.md) — system layering, request flow
+- [Data model](docs/architecture/data-model.md) — schema conventions
+- [Tech stack](docs/architecture/tech-stack.md) — Java / TypeScript / DB choices
+- [Plugin development](docs/plugin-development/) — building your own plugins
+
+## Documentation contributions
+
+Docs PRs are especially welcome and have a faster review lane (we aim to first-respond within 24h on docs PRs during beta). The docs source of truth lives in `auraboot/docs/`; the public site at docs.auraboot.com is auto-synced via `scripts/sync-docs-to-website.sh`. If you're adding screenshots, see [docs/community/readme-screenshots-spec.md](docs/community/readme-screenshots-spec.md) for visual conventions.
 
 Thank you for helping make AuraBoot better!

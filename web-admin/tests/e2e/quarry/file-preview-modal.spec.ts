@@ -16,6 +16,7 @@ import { navigateToDynamicPage, executeCommandViaApi, waitForFormReady } from '.
 import { getTestProjectId } from '../quarry-management.setup';
 import path from 'node:path';
 import fs from 'node:fs';
+import { BASE_URL } from '../../helpers/environments';
 
 const ISSUE_MODEL = 'dp_issue';
 
@@ -114,7 +115,7 @@ test.describe('File Preview Modal', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     try {
@@ -130,7 +131,7 @@ test.describe('File Preview Modal', () => {
     // Cleanup created issues
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     for (const pid of createdPids) {

@@ -77,7 +77,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
   `;
 
   return (
-    <div className={`${sidebarClasses} print-hide`} data-print="hide">
+    <div className={`${sidebarClasses} print-hide`} data-print="hide" data-testid="sidebar">
       {/* Top bar: toggle + mobile close */}
       <div
         className={`flex items-center ${collapsed ? 'justify-center' : 'justify-end'} h-8 flex-shrink-0 px-2`}

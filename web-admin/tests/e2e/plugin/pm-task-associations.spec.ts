@@ -16,6 +16,7 @@
 
 import { test, expect } from '@playwright/test';
 import { uniqueId, executeCommandViaApi, dateOffsetStr, ensureFilterFormOpen } from '../helpers/index';
+import { BASE_URL as BASE } from '../../helpers/playwright-env';
 
 // ---------------------------------------------------------------------------
 // Helpers

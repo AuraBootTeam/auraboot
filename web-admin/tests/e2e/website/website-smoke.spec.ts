@@ -10,7 +10,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-01: homepage loads for anonymous visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/', { waitUntil: 'load' });
+    await page.goto(`/`, { waitUntil: 'load' });
 
     // Should see hero section, not login page
     await expect(page.locator('h1')).toContainText('Build Enterprise Apps');
@@ -25,7 +25,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-02: pricing page loads for anonymous visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/pricing', { waitUntil: 'load' });
+    await page.goto(`/pricing`, { waitUntil: 'load' });
 
     await expect(page.locator('h1')).toBeVisible();
     // Should see pricing tiers
@@ -39,7 +39,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-03: docs page loads for anonymous visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/docs', { waitUntil: 'load' });
+    await page.goto(`/docs`, { waitUntil: 'load' });
 
     await expect(page.locator('h1')).toBeVisible();
     expect(page.url()).not.toContain('/login');
@@ -49,7 +49,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-04: blog page loads for anonymous visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/blog', { waitUntil: 'load' });
+    await page.goto(`/blog`, { waitUntil: 'load' });
 
     await expect(page.locator('h1')).toBeVisible();
     expect(page.url()).not.toContain('/login');
@@ -59,7 +59,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-05: plugins page loads for anonymous visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/plugins', { waitUntil: 'load' });
+    await page.goto(`/plugins`, { waitUntil: 'load' });
 
     await expect(page.locator('h1')).toBeVisible();
     expect(page.url()).not.toContain('/login');
@@ -69,7 +69,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-06: about page loads for anonymous visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/about', { waitUntil: 'load' });
+    await page.goto(`/about`, { waitUntil: 'load' });
 
     await expect(page.locator('h1')).toBeVisible();
     expect(page.url()).not.toContain('/login');
@@ -79,7 +79,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-07: community page loads for anonymous visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/community', { waitUntil: 'load' });
+    await page.goto(`/community`, { waitUntil: 'load' });
 
     await expect(page.locator('h1')).toBeVisible();
     expect(page.url()).not.toContain('/login');
@@ -89,7 +89,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-08: demo page loads for anonymous visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/demo', { waitUntil: 'load' });
+    await page.goto(`/demo`, { waitUntil: 'load' });
 
     await expect(page.locator('h1')).toBeVisible();
     expect(page.url()).not.toContain('/login');
@@ -99,7 +99,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-09: marketing routes NOT caught by DSL catch-all', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/pricing', { waitUntil: 'load' });
+    await page.goto(`/pricing`, { waitUntil: 'load' });
 
     // These texts come from $.tsx catch-all when unauthenticated
     await expect(page.locator('text=Please login first')).not.toBeVisible();
@@ -112,7 +112,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-10: header shows navigation for visitor', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/', { waitUntil: 'load' });
+    await page.goto(`/`, { waitUntil: 'load' });
 
     // Header should have nav links (Login/Get Started for anon, or Go to App for logged-in)
     const header = page.locator('header');
@@ -134,7 +134,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
   test('WS-11: footer links are present', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
-    await page.goto('http://localhost:5173/', { waitUntil: 'load' });
+    await page.goto(`/`, { waitUntil: 'load' });
 
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
@@ -146,7 +146,7 @@ test.describe('Website Platform Plugin - Smoke Tests', () => {
 
   test('WS-12: app routes still work for logged-in users', async ({ page }) => {
     // Uses default authenticated context (admin user via storageState)
-    await page.goto('http://localhost:5173/meta/models', { waitUntil: 'load' });
+    await page.goto(`/meta/models`, { waitUntil: 'load' });
     // Should NOT be redirected to marketing homepage
     expect(page.url()).toContain('/meta/models');
   });

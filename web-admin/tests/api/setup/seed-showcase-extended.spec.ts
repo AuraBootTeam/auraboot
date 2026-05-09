@@ -556,21 +556,21 @@ test.describe.serial('Showcase Seed — Extended', () => {
     const transitionMap: Record<string, string[]> = {
       discovery: [],
       qualification: ['crm:qualify_opportunity'],
-      proposal: ['crm:qualify_opportunity', 'crm:propose_opportunity'],
+      proposal: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal'],
       negotiation: [
         'crm:qualify_opportunity',
-        'crm:propose_opportunity',
-        'crm:negotiate_opportunity',
+        'crm:advance_opp_to_proposal',
+        'crm:advance_opp_to_negotiation',
       ],
       closed_won: [
         'crm:qualify_opportunity',
-        'crm:propose_opportunity',
-        'crm:negotiate_opportunity',
+        'crm:advance_opp_to_proposal',
+        'crm:advance_opp_to_negotiation',
         'crm:win_opportunity',
       ],
       closed_lost: [
         'crm:qualify_opportunity',
-        'crm:propose_opportunity',
+        'crm:advance_opp_to_proposal',
         'crm:lose_opportunity',
       ],
     };
@@ -825,11 +825,11 @@ test.describe.serial('Showcase Seed — Extended', () => {
     const transitionMap: Record<string, string[]> = {
       discovery: [],
       qualification: ['crm:qualify_opportunity'],
-      proposal: ['crm:qualify_opportunity', 'crm:propose_opportunity'],
+      proposal: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal'],
       closed_won: [
         'crm:qualify_opportunity',
-        'crm:propose_opportunity',
-        'crm:negotiate_opportunity',
+        'crm:advance_opp_to_proposal',
+        'crm:advance_opp_to_negotiation',
         'crm:win_opportunity',
       ],
       closed_lost: ['crm:qualify_opportunity', 'crm:lose_opportunity'],

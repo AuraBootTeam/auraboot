@@ -4,7 +4,7 @@
 # jar on the host with the already-warmed Gradle cache, then package it here
 # without any network-dependent build step.
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 

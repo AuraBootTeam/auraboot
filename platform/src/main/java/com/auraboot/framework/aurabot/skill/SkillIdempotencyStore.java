@@ -1,6 +1,7 @@
 package com.auraboot.framework.aurabot.skill;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -42,6 +43,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
+@ConditionalOnBean(StringRedisTemplate.class)
 public class SkillIdempotencyStore {
 
     /**

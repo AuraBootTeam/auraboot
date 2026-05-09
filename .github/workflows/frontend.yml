@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -63,6 +63,10 @@ jobs:
       - name: Lint web-admin
         working-directory: web-admin
         run: pnpm lint
+
+      - name: Env-drift gate (tests/)
+        working-directory: web-admin
+        run: pnpm test:env-lint
 
       - name: Type-check web-admin
         working-directory: web-admin
