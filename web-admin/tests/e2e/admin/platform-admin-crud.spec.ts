@@ -34,12 +34,12 @@ import { ADMIN_DATA_PERMISSION_CONFIG } from '../../helpers/configs/admin-data-p
 import { ADMIN_WEBHOOK_CONFIG } from '../../helpers/configs/admin-webhook.config';
 import { ADMIN_API_CONNECTOR_CONFIG } from '../../helpers/configs/admin-api-connector.config';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const CREATE_COMMAND_BY_PAGE_KEY: Record<string, string> = {
   'sla-config': 'admin:create_sla_config',
   'bpm-domain-config': 'admin:create_bpm_domain_config',
