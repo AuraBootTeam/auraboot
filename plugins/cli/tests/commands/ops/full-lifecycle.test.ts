@@ -119,36 +119,38 @@ describe('CLI full lifecycle: scaffold → publish → sync → dispatch', () =>
     });
   });
 
-  // ─── Phase 3: sync (agent tools sync) ───────────────────────────────────────
+  // ─── Phase 3: tool registry (in-process ToolProviderRegistry surface) ───────
+  // The legacy /api/agent/tools/sync no-op endpoint was removed in F-6;
+  // /api/agent/tools/registry is the canonical read-only surface.
 
-  describe('sync tools API contract', () => {
-    it('sync tools API returns created/updated/deactivated counts', () => {
-      const expectedResponse = { created: 5, updated: 0, deactivated: 0 };
-      expect(expectedResponse).toHaveProperty('created');
-      expect(expectedResponse).toHaveProperty('updated');
-      expect(expectedResponse).toHaveProperty('deactivated');
+  describe('tool registry API contract', () => {
+    it('registry API returns tools[] + providers[] + total', () => {
+      const expectedResponse = {
+        tools: [{ toolCode: 'platform.list_models', providerCode: 'platform' }],
+        providers: ['platform', 'dsl'],
+        total: 1,
+      };
+      expect(expectedResponse).toHaveProperty('tools');
+      expect(expectedResponse).toHaveProperty('providers');
+      expect(expectedResponse).toHaveProperty('total');
+      expect(Array.isArray(expectedResponse.tools)).toBe(true);
+      expect(Array.isArray(expectedResponse.providers)).toBe(true);
     });
 
-    it('sync counts must be non-negative integers', () => {
-      const syncResult = { created: 5, updated: 2, deactivated: 1 };
-      Object.values(syncResult).forEach(count => {
-        expect(count).toBeGreaterThanOrEqual(0);
-        expect(Number.isInteger(count)).toBe(true);
+    it('registry endpoint path matches CLI implementation', () => {
+      const registryPath = '/api/agent/tools/registry';
+      expect(registryPath).toMatch(/^\/api\/agent\/tools\/registry$/);
+    });
+
+    it('every tool in registry must declare a providerCode', () => {
+      const tools = [
+        { toolCode: 'platform.list_models', providerCode: 'platform' },
+        { toolCode: 'cmd_demo_create', providerCode: 'dsl' },
+      ];
+      tools.forEach((t) => {
+        expect(t.providerCode).toBeTruthy();
+        expect(typeof t.providerCode).toBe('string');
       });
-    });
-
-    it('sync endpoint path matches CLI implementation', () => {
-      const syncPath = '/api/agent/tools/sync';
-      expect(syncPath).toMatch(/^\/api\/agent\/tools\/sync$/);
-    });
-
-    it('sync should be idempotent — re-running returns updated=N, created=0', () => {
-      // After initial sync (created=N), a second sync on the same data
-      // should produce created=0, updated=N (or 0 if nothing changed)
-      const firstSync = { created: 5, updated: 0, deactivated: 0 };
-      const secondSync = { created: 0, updated: 5, deactivated: 0 };
-      expect(firstSync.created).toBeGreaterThan(0);
-      expect(secondSync.created).toBe(0);
     });
   });
 
