@@ -1362,15 +1362,18 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
     test('FAC-071: Create fiscal period via API @critical', async ({ page }) => {
       const periodName = `E2E FP ${uniqueId()}`;
+      // fin_fp_period is constrained to 1-12; use a random future year to avoid (year, period) collisions
+      const fpYear = 3000 + Math.floor(Math.random() * 6000);
+      const fpPeriod = Math.floor(Math.random() * 12) + 1;
       const result = await executeCommandViaApi(
         page,
         'fin:create_fiscal_period',
         {
-          fin_fp_year: 2026,
-          fin_fp_period: Math.floor(Math.random() * 100) + 100, // unique period number
+          fin_fp_year: fpYear,
+          fin_fp_period: fpPeriod,
           fin_fp_name: periodName,
-          fin_fp_start_date: '2026-07-01',
-          fin_fp_end_date: '2026-07-31',
+          fin_fp_start_date: `${fpYear}-07-01`,
+          fin_fp_end_date: `${fpYear}-07-31`,
         },
         undefined,
         'create',
@@ -1386,7 +1389,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
       // Verify default status is open
       const record = await fetchRecord(page, PAGE_KEYS.fiscalPeriod, result.recordId);
       expect(record.fin_fp_status).toBe('open');
-      expect(record.fin_fp_year).toBe(2026);
+      expect(record.fin_fp_year).toBe(fpYear);
 
       // Verify in list
       await navigateToDynamicPage(page, PAGE_KEYS.fiscalPeriod);
@@ -1396,15 +1399,17 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
     test('FAC-072: Close period (open -> SOFT_CLOSED) via UI @critical', async ({ page }) => {
       const periodName = `E2E FPClose ${uniqueId()}`;
+      const fpYear = 3000 + Math.floor(Math.random() * 6000);
+      const fpPeriod = Math.floor(Math.random() * 12) + 1;
       const result = await executeCommandViaApi(
         page,
         'fin:create_fiscal_period',
         {
-          fin_fp_year: 2026,
-          fin_fp_period: Math.floor(Math.random() * 100) + 200,
+          fin_fp_year: fpYear,
+          fin_fp_period: fpPeriod,
           fin_fp_name: periodName,
-          fin_fp_start_date: '2026-08-01',
-          fin_fp_end_date: '2026-08-31',
+          fin_fp_start_date: `${fpYear}-08-01`,
+          fin_fp_end_date: `${fpYear}-08-31`,
         },
         undefined,
         'create',
@@ -1470,15 +1475,17 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
     test('FAC-073: Reopen period (SOFT_CLOSED -> open) via UI @critical', async ({ page }) => {
       const periodName = `E2E FPReopen ${uniqueId()}`;
+      const fpYear = 3000 + Math.floor(Math.random() * 6000);
+      const fpPeriod = Math.floor(Math.random() * 12) + 1;
       const result = await executeCommandViaApi(
         page,
         'fin:create_fiscal_period',
         {
-          fin_fp_year: 2026,
-          fin_fp_period: Math.floor(Math.random() * 100) + 300,
+          fin_fp_year: fpYear,
+          fin_fp_period: fpPeriod,
           fin_fp_name: periodName,
-          fin_fp_start_date: '2026-09-01',
-          fin_fp_end_date: '2026-09-30',
+          fin_fp_start_date: `${fpYear}-09-01`,
+          fin_fp_end_date: `${fpYear}-09-30`,
         },
         undefined,
         'create',
@@ -1555,15 +1562,17 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
     test('FAC-074: Cannot delete closed period', async ({ page }) => {
       const periodName = `E2E FPNoDel ${uniqueId()}`;
+      const fpYear = 3000 + Math.floor(Math.random() * 6000);
+      const fpPeriod = Math.floor(Math.random() * 12) + 1;
       const result = await executeCommandViaApi(
         page,
         'fin:create_fiscal_period',
         {
-          fin_fp_year: 2026,
-          fin_fp_period: Math.floor(Math.random() * 100) + 400,
+          fin_fp_year: fpYear,
+          fin_fp_period: fpPeriod,
           fin_fp_name: periodName,
-          fin_fp_start_date: '2026-10-01',
-          fin_fp_end_date: '2026-10-31',
+          fin_fp_start_date: `${fpYear}-10-01`,
+          fin_fp_end_date: `${fpYear}-10-31`,
         },
         undefined,
         'create',
@@ -1625,15 +1634,17 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
     test('FAC-075: Period date range validation (start > end rejected)', async ({ page }) => {
       // Attempt to create a period where start_date > end_date
+      const fpYear = 3000 + Math.floor(Math.random() * 6000);
+      const fpPeriod = Math.floor(Math.random() * 12) + 1;
       const result = await executeCommandViaApi(
         page,
         'fin:create_fiscal_period',
         {
-          fin_fp_year: 2026,
-          fin_fp_period: Math.floor(Math.random() * 100) + 500,
+          fin_fp_year: fpYear,
+          fin_fp_period: fpPeriod,
           fin_fp_name: `E2E FPInvalid ${uniqueId()}`,
-          fin_fp_start_date: '2026-12-31',
-          fin_fp_end_date: '2026-12-01', // end before start
+          fin_fp_start_date: `${fpYear}-12-31`,
+          fin_fp_end_date: `${fpYear}-12-01`, // end before start
         },
         undefined,
         'create',
