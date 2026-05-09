@@ -93,7 +93,8 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
     /** Paths whose required role is {@code platform_admin} (disjoint from tenant_admin). */
     private static final List<PathPattern> PLATFORM_ADMIN_PATHS = List.of(
             new PathPatternParser().parse("/api/admin/infrastructure/**"),
-            new PathPatternParser().parse("/api/admin/cloud-config/**")
+            new PathPatternParser().parse("/api/admin/cloud-config/**"),
+            new PathPatternParser().parse("/api/admin/bootstrap/**")
     );
 
     private final AdminRoleChecker adminRoleChecker;
