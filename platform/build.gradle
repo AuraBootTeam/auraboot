@@ -186,7 +186,7 @@ ext {
     reflectasmVersion = '1.11.3'
     validationApiVersion = '2.0.1.Final'
     // PF4J Plugin Framework
-    pf4jVersion = '3.13.0'
+    pf4jVersion = '3.15.0'
     pf4jSpringVersion = '0.10.0'
     // Drools Rule Engine
     droolsVersion = '8.44.2.Final'
