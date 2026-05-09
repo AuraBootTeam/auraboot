@@ -31,8 +31,10 @@ async function navigateToOrderList(page: Page): Promise<void> {
   const nav = page.locator('nav');
   await nav.first().waitFor({ state: 'visible', timeout: 10_000 });
 
-  // Click parent menu "E2E测试"
-  const rootBtn = nav.getByRole('button', { name: /E2E测试/i }).first();
+  // Click parent menu "E2E测试" (fixture canonical) or "移动端测试" (auto-imported variant)
+  const rootBtn = nav
+    .getByRole('button', { name: /E2E测试|E2E Test|移动端测试/i })
+    .first();
   await rootBtn.scrollIntoViewIfNeeded();
   await rootBtn.evaluate((el: HTMLElement) => el.click());
 
