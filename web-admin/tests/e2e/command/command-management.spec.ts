@@ -30,7 +30,11 @@ test.describe('Command List', () => {
       page.locator('button:has-text("新建模型"), button:has-text("Create")').first(),
     ).toBeVisible();
     await expect(
-      page.locator('input[placeholder*="搜索模型"], input[placeholder*="Search"]').first(),
+      page
+        .locator(
+          '[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+        )
+        .first(),
     ).toBeVisible();
   });
 
@@ -44,7 +48,9 @@ test.describe('Command List', () => {
 
     // Look for search input
     const searchInput = page
-      .locator('input[placeholder*="搜索模型"], input[placeholder*="Search"]')
+      .locator(
+        '[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+      )
       .first();
 
     await expect(searchInput).toBeVisible();
@@ -128,7 +134,9 @@ test.describe('Command Execution', () => {
     await expect(page).toHaveURL(/\/meta\/models/);
 
     const searchInput = page
-      .locator('input[placeholder*="搜索模型"], input[placeholder*="Search"]')
+      .locator(
+        '[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+      )
       .first();
     await expect(searchInput).toBeVisible();
     await searchInput.fill('e2et');
