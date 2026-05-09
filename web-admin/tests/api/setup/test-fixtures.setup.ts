@@ -22,6 +22,7 @@ import { test, expect } from '@playwright/test';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { BACKEND_URL } from '../../helpers/environments';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const PLUGINS_DIR = path.resolve(
@@ -414,7 +415,7 @@ const TEST_DATA_ROWS = [
 // Persists across serial test steps so we only login once.
 // ---------------------------------------------------------------------------
 let sharedBackendJwt: string | null = null;
-const DIRECT_BACKEND_URL = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
+const DIRECT_BACKEND_URL = BACKEND_URL;
 
 async function obtainBackendJwt(page: import('@playwright/test').Page): Promise<string | null> {
   if (sharedBackendJwt) return sharedBackendJwt;

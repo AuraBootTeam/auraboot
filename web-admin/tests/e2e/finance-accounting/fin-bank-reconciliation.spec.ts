@@ -24,6 +24,7 @@ import {
   todayStr,
   dateOffsetStr,
 } from '../helpers/index';
+import { BASE_URL } from '../../helpers/environments';
 
 /** Navigate to a Finance list page via correct menu URL, setting up waitForResponse BEFORE goto. */
 async function gotoFinancePage(page: Page, menuPath: string, modelCode: string): Promise<void> {
@@ -31,7 +32,7 @@ async function gotoFinancePage(page: Page, menuPath: string, modelCode: string):
     (r) => r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
     { timeout: 15_000 },
   );
-  await page.goto(`http://localhost:5173${menuPath}`);
+  await page.goto(`${BASE_URL}${menuPath}`);
   await listResponse;
   await expect(page.locator('table, [class*="ant-table"]')).toBeVisible({ timeout: 10_000 });
 }

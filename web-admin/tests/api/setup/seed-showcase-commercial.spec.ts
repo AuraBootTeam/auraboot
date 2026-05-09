@@ -18,6 +18,7 @@
 
 import { test, expect } from '@playwright/test';
 import { executeCommandViaApi } from '../../e2e/helpers';
+import { PSQL_BASE } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Time helpers (same as other seed scripts)
@@ -629,7 +630,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
 
       try {
         execSync(
-          `psql -h ${process.env.PG_HOST??'localhost'} -p ${process.env.PG_PORT??'5432'} -U ${process.env.PG_USER??process.env.USER??'ghj'} -d ${process.env.PG_DB??'aura_boot'} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
+          `${PSQL_BASE} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
           {
             timeout: 5000,
             stdio: 'pipe',
@@ -699,7 +700,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
 
       try {
         execSync(
-          `psql -h ${process.env.PG_HOST??'localhost'} -p ${process.env.PG_PORT??'5432'} -U ${process.env.PG_USER??process.env.USER??'ghj'} -d ${process.env.PG_DB??'aura_boot'} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
+          `${PSQL_BASE} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
           {
             timeout: 5000,
             stdio: 'pipe',

@@ -469,7 +469,7 @@ test.describe('Asset Management Plugin @smoke', () => {
   // =========================================================================
 
   test('AMT-080: asset_kpi_summary NQ returns total_count > 0', async ({ page }) => {
-    // Use relative path — BFF at localhost:5173 proxies to backend
+    // Use relative path — vite/BFF dev server proxies to backend
     const resp = await page.request.get(
       '/api/datasource/list?datasourceId=nq:asset_kpi_summary&format=records&maxItems=1',
     );

@@ -13,6 +13,7 @@
 
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import path from 'path';
+import { BASE_URL } from '../../helpers/environments';
 import { fileURLToPath } from 'url';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
@@ -895,7 +896,7 @@ test.describe('Environment Initialization', () => {
         args: ['--no-proxy-server'],
       });
       const regContext = await regBrowser.newContext({
-        baseURL: (page.context() as any)._options?.baseURL || 'http://localhost:5173',
+        baseURL: (page.context() as any)._options?.baseURL || BASE_URL,
       });
 
       try {

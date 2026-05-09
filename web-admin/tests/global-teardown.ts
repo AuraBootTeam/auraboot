@@ -16,12 +16,13 @@
 
 import type { FullConfig } from '@playwright/test';
 import { PSQL_BASE } from './helpers/pg-env';
+import { BASE_URL } from './helpers/environments';
 
 const ADMIN_STORAGE = process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json';
 
 async function globalTeardown(config: FullConfig): Promise<void> {
   // Resolve baseURL from Playwright config (native fetch requires absolute URLs)
-  const baseURL = config.projects[0]?.use?.baseURL ?? 'http://localhost:5173';
+  const baseURL = config.projects[0]?.use?.baseURL ?? BASE_URL;
   console.log('🧹 Running global teardown...');
 
   try {

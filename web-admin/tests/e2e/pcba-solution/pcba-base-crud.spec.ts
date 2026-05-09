@@ -29,12 +29,11 @@ import {
   clickRowActionByLocator,
   ensureFilterFormOpen,
 } from '../helpers';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
 
 /**
  * Navigate to a dynamic page and search for a specific record by name.

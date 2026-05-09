@@ -17,6 +17,7 @@ import {
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 const RECT_MODEL = 'dp_rectification';
 
@@ -75,7 +76,7 @@ test.describe('DP Rectification — UI Tests', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     try {
@@ -90,7 +91,7 @@ test.describe('DP Rectification — UI Tests', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     for (const pid of createdPids) {
