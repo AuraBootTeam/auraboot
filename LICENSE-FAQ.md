@@ -11,7 +11,7 @@
 ### Q1. AuraBoot 是开源软件吗?
 **是,但更准确的说法是 "source-available with commercial restrictions"**。AuraBoot 协议以 Apache License 2.0 为基底,叠加了若干商业用途限制(主要是禁止把 AuraBoot 本身作为低代码/AI 平台 SaaS 转售,详见 §5.4)。它**不是 OSI 认证的开源协议**,因为 OSI 定义不允许"限制特定使用领域"。
 
-社区里类似定位的项目:NocoBase、Sentry、PostHog、Cal.com、n8n。
+社区里类似定位的项目:Sentry、PostHog、Cal.com、n8n、Cockroach、HashiCorp。
 
 ### Q2. 为什么不直接用 Apache-2.0 / MIT / AGPL?
 - **纯 Apache/MIT** 防不住云厂商把 AuraBoot 包装成托管服务卖钱,同时不回馈
@@ -137,12 +137,11 @@ CLA 不要求你放弃版权,只是授予项目长期、不可撤销的使用许
 
 ## 八、和其他项目对比
 
-### Q22. AuraBoot 协议和 NocoBase / Appsmith / ToolJet 比有什么区别?
+### Q22. AuraBoot 协议和 Appsmith / ToolJet / Budibase 比有什么区别?
 
 | 项目 | 协议 | 多租户 SaaS 限制 | 品牌可改 |
 |---|---|---|---|
 | **AuraBoot** | Apache-2.0 + 补充条款 | 禁止低代码/AI 平台 SaaS 转售 | 仅左上 LOGO |
-| NocoBase | Apache-2.0 + 补充条款(参考蓝本) | 禁止低代码/AI 平台 SaaS 转售 | 仅左上 LOGO |
 | Appsmith | Apache-2.0 | 无限制 | 完全可改 |
 | ToolJet | AGPLv3 | 必须开源全部改动 | 完全可改 |
 | Budibase | GPL v3 + Commercial | 必须开源全部改动(GPL) | 商业版可改 |

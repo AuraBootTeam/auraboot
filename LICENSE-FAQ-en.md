@@ -11,7 +11,7 @@
 ### Q1. Is AuraBoot open source?
 **Technically, it is "source-available with commercial restrictions."** AuraBoot's license is built on Apache License 2.0 with supplementary terms — primarily restrictions on reselling AuraBoot itself as a low-code / no-code / AI platform SaaS (see §5.4).
 
-It is **not OSI-approved**, because OSI's definition disallows field-of-use restrictions. Comparable projects in this category: NocoBase, Sentry, PostHog, Cal.com, n8n.
+It is **not OSI-approved**, because OSI's definition disallows field-of-use restrictions. Comparable projects in this category: Sentry, PostHog, Cal.com, n8n, CockroachDB, HashiCorp.
 
 ### Q2. Why not pure Apache-2.0 / MIT / AGPL?
 - **Pure Apache/MIT** doesn't prevent cloud vendors from packaging AuraBoot as a managed service without contributing back.
@@ -137,12 +137,11 @@ For cross-border commercial customers, an alternative jurisdiction (e.g., Singap
 
 ## 8. Comparison with Other Projects
 
-### Q22. How does AuraBoot's license compare to NocoBase / Appsmith / ToolJet?
+### Q22. How does AuraBoot's license compare to Appsmith / ToolJet / Budibase?
 
 | Project | License | Multi-tenant SaaS Restriction | Branding Removable? |
 |---|---|---|---|
 | **AuraBoot** | Apache-2.0 + supplementary terms | Prohibits low-code / AI platform SaaS resale | Upper-left logo only |
-| NocoBase | Apache-2.0 + supplementary terms (reference template) | Prohibits low-code / AI platform SaaS resale | Upper-left logo only |
 | Appsmith | Apache-2.0 | None | Fully removable |
 | ToolJet | AGPLv3 | Must open-source all modifications | Fully removable |
 | Budibase | GPL v3 + Commercial | Must open-source all modifications (GPL) | Commercial version only |
