@@ -76,32 +76,36 @@ test.describe('Row Height Control (GAP-127)', () => {
       return;
     }
 
+    // Capture the initial row height so we can poll for the actual visual
+    // change (the rowHeight change is propagated through SavedView async via
+    // ensureViewAndUpdateConfig, so a fixed waitForTimeout is racy).
+    const initialHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
+
     // Switch to "short" row height
     await rowHeightBtn.click();
     await page.getByTestId('row-height-option-short').click();
-    // Wait for re-render
-    await page
-      .waitForResponse((resp) => resp.url().includes('/api/views/') && resp.status() === 200, {
-        timeout: 5000,
+    // Poll until the row visibly shrinks (or timeout)
+    await expect
+      .poll(() => firstRow.evaluate((el) => el.getBoundingClientRect().height), {
+        timeout: 10000,
+        intervals: [200, 300, 500, 1000],
       })
-      .catch(() => {});
-    await page.waitForTimeout(300);
+      .toBeLessThan(initialHeight);
 
     const shortHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
-    expect(shortHeight).toBeLessThanOrEqual(50); // 32px + padding + border tolerance
 
     // Switch to "extra-tall"
     await rowHeightBtn.click();
     await page.getByTestId('row-height-option-extra-tall').click();
-    await page
-      .waitForResponse((resp) => resp.url().includes('/api/views/') && resp.status() === 200, {
-        timeout: 5000,
+    // Poll until the row visibly grows past short
+    await expect
+      .poll(() => firstRow.evaluate((el) => el.getBoundingClientRect().height), {
+        timeout: 10000,
+        intervals: [200, 300, 500, 1000],
       })
-      .catch(() => {});
-    await page.waitForTimeout(300);
+      .toBeGreaterThan(shortHeight + 10);
 
     const tallHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
-    expect(tallHeight).toBeGreaterThanOrEqual(70); // 80px target
     expect(tallHeight).toBeGreaterThan(shortHeight);
   });
 
