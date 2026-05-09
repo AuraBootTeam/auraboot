@@ -15,15 +15,20 @@ HTTP 403, regardless of caller authentication state.
 
 **Default deny patterns** (configurable via `aura.demo.deny-paths`):
 
-| Category | Patterns |
-|---|---|
-| License | `/api/license/**`, `/api/admin/license/**` |
-| Plugins | `/api/plugins/upload`, `/api/plugins/*/install`, `/api/plugins/*/uninstall`, `/api/marketplace/install/**`, `/api/marketplace/*/install` |
-| Admin | `/api/admin/**` |
-| System danger zone | `/api/system/migrate`, `/api/system/reset`, `/api/system/danger/**` |
-| Tenant lifecycle | `/api/tenants/*/destroy`, `/api/tenants/*/transfer-ownership` |
-| Auth-sensitive | `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/users/*/password` |
-| Test / internal | `/api/test/**`, `/api/_internal/**` |
+> Patterns marked _verified_ correspond to a controller that exists in the
+> OSS repo today; _preventive_ patterns block future endpoints under those
+> prefixes so a new feature added later doesn't accidentally become a
+> demo-write loophole.
+
+| Category | Patterns | Status |
+|---|---|---|
+| Plugin packages | `/api/plugins/packages/**`, `/api/plugins/*/install`, `/api/plugins/*/uninstall`, `/api/marketplace/install/**`, `/api/marketplace/*/install` | _verified_ — package upload via `PluginPackageController` |
+| Admin | `/api/admin/**` | _verified_ — 18+ controllers under this prefix |
+| Auth-sensitive | `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/users/*/password` | _verified_ — `AuthController` |
+| Test / internal | `/api/test/**`, `/api/_internal/**` | _verified_ — `TestSeedController` |
+| License | `/api/license/**`, `/api/admin/license/**` | _preventive_ — license issuance is enterprise-only today |
+| System danger zone | `/api/system/migrate`, `/api/system/reset`, `/api/system/danger/**` | _preventive_ |
+| Tenant lifecycle | `/api/tenants/*/destroy`, `/api/tenants/*/transfer-ownership` | _preventive_ |
 
 **Allowlist** (`aura.demo.allow-paths`) overrides the denylist.
 

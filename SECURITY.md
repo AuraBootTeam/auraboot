@@ -11,12 +11,28 @@
 
 During the 0.x beta, "best-effort" means we triage and fix verifiable
 security issues, but cannot commit to formal SLA windows or backports
-to older betas. Severity-driven targets:
+to older betas. Severity-driven aspirations (NOT contractual SLAs):
 
-- **Critical** (RCE, auth bypass, mass data exposure): aim to patch in the
-  next release within 7 days; advisory issued.
-- **High**: aim to patch in the next minor (target 30 days).
+- **Critical** (RCE, auth bypass, mass data exposure): we will work on a
+  fix immediately, coordinate disclosure, and aim to ship a patched
+  release as fast as the engineering investigation allows. We don't
+  promise a fixed number of days because the right fix shipped slowly
+  beats the wrong fix shipped quickly. A GitHub Security Advisory is
+  issued when a fix is available.
+- **High**: aim to address in the next regular minor release.
 - **Medium / Low**: tracked publicly, scheduled by roadmap priority.
+
+Automation backing these processes:
+- Dependabot security updates are enabled (`.github/dependabot.yml`).
+- GitHub-native secret-scanning + push-protection are active (configured
+  per `auraboot-website/docs/github-repo-settings.md`).
+- CodeQL static analysis runs on `main` (`.github/workflows/codeql.yml`).
+- Private vulnerability reporting is enabled — file a draft advisory at
+  https://github.com/AuraBootTeam/auraboot/security/advisories/new.
+
+Post-1.0 we'll publish a contractual SLA aligned with what we can
+sustain. Until then this document is "what we'll genuinely try to do,"
+not a binding commitment.
 
 ## Reporting a Vulnerability
 
