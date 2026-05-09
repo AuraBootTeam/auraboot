@@ -86,7 +86,7 @@ After logging in, you can:
 - **Browse the sidebar menu** -- Navigate through the default modules
 - **Open the Page Designer** -- Create and edit pages with drag-and-drop blocks
 - **Try AuraBot** -- Click the AI assistant icon to ask questions in natural language
-- **Check the API docs** -- Visit [http://localhost:6443/swagger-ui.html](http://localhost:6443/swagger-ui.html) for the interactive API reference
+- **Check the API docs** -- The backend runs on `http://backend:6443` inside the Docker network only (port 6443 is not exposed to the host in the default `full` profile). To open Swagger UI from your laptop, add a `docker-compose.override.yml` that maps `backend` port `6443:6443`, then visit [http://localhost:6443/swagger-ui.html](http://localhost:6443/swagger-ui.html). Otherwise, fetch the OpenAPI spec from inside the container: `docker compose exec backend curl -s localhost:6443/v3/api-docs`
 
 ## What's Next
 
