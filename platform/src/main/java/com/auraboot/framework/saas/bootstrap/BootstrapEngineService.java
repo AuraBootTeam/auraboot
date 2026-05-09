@@ -2,24 +2,16 @@ package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
-import com.auraboot.framework.menu.entity.Menu;
-import com.auraboot.framework.menu.mapper.MenuMapper;
-import static com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID;
-import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapProgressResponse;
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
 import com.auraboot.framework.saas.config.entity.BootstrapEntity;
 import com.auraboot.framework.saas.config.mapper.BootstrapMapper;
-import com.auraboot.framework.saas.config.mapper.SystemConfigMapper;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
 import com.auraboot.framework.saas.constant.BootstrapStatus;
 import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.auraboot.framework.saas.constant.SystemMode;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.service.TenantBootstrapService;
-import com.auraboot.framework.rbac.entity.Role;
-import com.auraboot.framework.rbac.service.RoleService;
-import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
@@ -35,10 +27,22 @@ import java.time.Instant;
 /**
  * Bootstrap Engine — orchestrates the 15-step system initialization pipeline.
  *
- * <p>Layer A (Steps 1-8): Core bootstrap within a single transaction.
- * <p>Layer B (Steps 9-12): Runtime setup, each step independent (non-transactional).
- * <p>Layer C (Steps 13-14): Optional setup (demo data, AuraBot).
- * <p>Step 15: Finalize — mark system as initialized.
+ * <p>As of Phase 2.2 (bootstrap-unified plan §7), the actual repair work for the
+ * 9 invariants lives in {@link BootstrapRepairService}. This service retains the
+ * existing public contract:
+ * <ul>
+ *   <li>Guards "already initialized" + "another in progress"</li>
+ *   <li>Creates / updates the {@code ab_bootstrap} progress row</li>
+ *   <li>Calls {@link BootstrapRepairService} step-by-step inside a single
+ *       Layer-A transaction (matches pre-2.2 behavior)</li>
+ *   <li>Runs {@code TenantBootstrapService.bootstrapTenant} for the business
+ *       tenant (heavy roles/permissions/menus seeding — kept here, not extracted)</li>
+ *   <li>Finalizes by writing {@code system.initialized=true}</li>
+ * </ul>
+ *
+ * <p>The public {@link #execute(BootstrapRequest)} contract — including the
+ * "fail-if-already-initialized" guard relied on by the wizard UI — is unchanged
+ * from pre-2.2. Inverting that contract is Phase 2.3.
  */
 @Slf4j
 @Service
@@ -48,16 +52,12 @@ public class BootstrapEngineService {
     private static final int TOTAL_STEPS = 15;
 
     private final SystemConfigService systemConfigService;
-    private final SystemConfigMapper systemConfigMapper;
     private final BootstrapMapper bootstrapMapper;
     private final UserService userService;
     private final TenantService tenantService;
-    private final TenantMemberService tenantMemberService;
     private final TenantBootstrapService tenantBootstrapService;
-    private final BuiltinPluginImportService builtinPluginImportService;
-    private final RoleService roleService;
+    private final BootstrapRepairService bootstrapRepairService;
     private final ObjectMapper objectMapper;
-    private final MenuMapper menuMapper;
 
     // ── Public API ──────────────────────────────────────────────────────
 
@@ -67,33 +67,22 @@ public class BootstrapEngineService {
      * @return result containing success flag, JWT placeholder, tenant ID, or error
      */
     public BootstrapResult execute(BootstrapRequest request) {
-        // Guard: already initialized
         if (systemConfigService.isInitialized()) {
             return BootstrapResult.failure("System is already initialized");
         }
 
-        // Guard: another bootstrap in progress
         BootstrapEntity active = bootstrapMapper.findActiveBootstrap();
         if (active != null) {
             return BootstrapResult.failure("Another bootstrap is already in progress (id=" + active.getId() + ")");
         }
 
-        // Create bootstrap record
         BootstrapEntity bootstrap = createBootstrapRecord(request);
 
         try {
-            // Layer A: Core (transactional)
             CoreBootstrapResult coreResult = executeCoreBootstrap(bootstrap, request);
-
-            // Layer B: Runtime (non-transactional, each step independent)
-            executeRuntimeSetup(bootstrap, coreResult);
-
-            // Layer C: Optional (non-transactional)
+            executeRuntimeSetup(bootstrap, coreResult, request);
             executeOptionalSetup(bootstrap, request, coreResult);
-
-            // Step 15: Finalize
             finalizeBootstrap(bootstrap, coreResult);
-
             return BootstrapResult.success(null, coreResult.defaultTenantId);
         } catch (Exception e) {
             log.error("Bootstrap failed at step: {}", bootstrap.getCurrentStep(), e);
@@ -128,6 +117,8 @@ public class BootstrapEngineService {
     @Transactional(rollbackFor = Exception.class)
     public CoreBootstrapResult executeCoreBootstrap(BootstrapEntity bootstrap, BootstrapRequest request) {
         CoreBootstrapResult result = new CoreBootstrapResult();
+        BootstrapRepairService.RepairOptions opts =
+                BootstrapRepairService.RepairOptions.fromBootstrapRequest(request);
 
         // Step 1: Validate input
         updateProgress(bootstrap, 1, "validate_input");
@@ -135,11 +126,15 @@ public class BootstrapEngineService {
 
         // Step 2: Write system config
         updateProgress(bootstrap, 2, "write_system_config");
-        writeSystemConfig(request);
+        throwIfError(bootstrapRepairService.repairSystemConfig(opts));
 
         // Step 3: Create system tenant
         updateProgress(bootstrap, 3, "create_system_tenant");
-        Tenant systemTenant = createSystemTenant();
+        throwIfError(bootstrapRepairService.repairSystemTenant(opts));
+        Tenant systemTenant = tenantService.findByName("System");
+        if (systemTenant == null) {
+            throw new IllegalStateException("System Tenant not found after repair");
+        }
         result.systemTenantId = systemTenant.getId();
         bootstrap.setSystemTenantId(systemTenant.getId());
 
@@ -149,27 +144,31 @@ public class BootstrapEngineService {
 
         // Step 5: Create admin user
         updateProgress(bootstrap, 5, "create_admin_user");
-        User adminUser = userService.signUp(
-                request.getAdminEmail(),
-                request.getAdminPassword(),
-                request.getAdminDisplayName()
-        );
+        throwIfError(bootstrapRepairService.repairAdminUser(opts));
+        User adminUser = userService.findByEmail(request.getAdminEmail());
+        if (adminUser == null) {
+            throw new IllegalStateException("admin user not found after repair");
+        }
         result.adminUserId = adminUser.getId();
         result.adminUserPid = adminUser.getPid();
         bootstrap.setAdminUserId(adminUser.getId());
 
-        // Step 6: Create default tenant
+        // Step 6: Create default (business) tenant
         updateProgress(bootstrap, 6, "create_default_tenant");
-        Tenant defaultTenant = createDefaultTenant(request);
+        throwIfError(bootstrapRepairService.repairBusinessTenant(opts));
+        Tenant defaultTenant = tenantService.findByName(request.getCompanyName());
+        if (defaultTenant == null) {
+            throw new IllegalStateException("Business Tenant not found after repair");
+        }
         result.defaultTenantId = defaultTenant.getId();
         bootstrap.setDefaultTenantId(defaultTenant.getId());
 
         // Step 7: Add admin to both tenants
         updateProgress(bootstrap, 7, "add_admin_to_tenants");
-        tenantMemberService.addMember(adminUser.getId(), defaultTenant.getId(), "active");
-        tenantMemberService.addMember(adminUser.getId(), systemTenant.getId(), "active");
+        throwIfError(bootstrapRepairService.repairAdminMembership(opts));
 
-        // Step 8: Bootstrap default tenant (roles/permissions/menus)
+        // Step 8: Bootstrap default tenant (roles/permissions/menus). Heavy seed —
+        // owned by TenantBootstrapService, NOT one of the 9 invariants.
         updateProgress(bootstrap, 8, "bootstrap_default_tenant");
         MetaContext.setContext(defaultTenant.getId(), adminUser.getId(), adminUser.getPid(), adminUser.getEmail());
         try {
@@ -185,11 +184,12 @@ public class BootstrapEngineService {
             MetaContext.clear();
         }
 
-        // Step 8.5: Bootstrap System Tenant — create platform_admin role + assign to admin
+        // Step 8.5: Bootstrap System Tenant — platform_admin role + grant + menus
         updateProgress(bootstrap, 8, "bootstrap_system_tenant");
         MetaContext.setContext(systemTenant.getId(), adminUser.getId(), adminUser.getPid(), adminUser.getEmail());
         try {
-            bootstrapSystemTenant(systemTenant.getId(), adminUser.getId());
+            throwIfError(bootstrapRepairService.repairPlatformAdminRole(opts));
+            throwIfError(bootstrapRepairService.repairAdminRoleGrant(opts));
             log.info("Step 8.5: System tenant bootstrap complete — platform_admin role created");
         } finally {
             MetaContext.clear();
@@ -198,113 +198,26 @@ public class BootstrapEngineService {
         return result;
     }
 
-    /**
-     * Bootstrap the System Tenant with platform_admin role.
-     * Platform Admin manages: tenant lifecycle, license, marketplace, system config.
-     * Separate from tenant_admin which manages business within a single tenant.
-     */
-    private void bootstrapSystemTenant(Long systemTenantId, Long adminUserId) {
-        // Create platform_admin role in System Tenant
-        Role platformAdmin = new Role();
-        platformAdmin.setTenantId(systemTenantId);
-        platformAdmin.setCode("platform_admin");
-        platformAdmin.setName("Platform Admin");
-        platformAdmin.setDescription("Platform administrator — manages tenants, licenses, marketplace, and system configuration");
-        platformAdmin.setType("system");
-        platformAdmin.setScopeType("global");
-        platformAdmin.setPriority(0);
-        platformAdmin.setIsDefault(true);
-        platformAdmin.setIsSystem(true);
-        platformAdmin.setStatus("active");
-        platformAdmin.setCreatedBy(adminUserId);
-        platformAdmin.setUpdatedBy(adminUserId);
-
-        Role created = roleService.createRole(platformAdmin);
-
-        // Assign platform_admin role to admin member in System Tenant
-        com.auraboot.framework.tenant.dao.entity.TenantMember adminMember =
-                tenantMemberService.findByTenantIdAndUserId(systemTenantId, adminUserId);
-        if (adminMember != null) {
-            roleService.assignRoleToMember(adminMember.getId(), created.getId(), systemTenantId);
-        }
-
-        // Create Platform Console menus for System Tenant
-        createPlatformMenus(systemTenantId, adminUserId);
-        log.info("Platform Console menus created for System Tenant");
-
-        log.info("platform_admin role created (id={}) and assigned to admin user (id={}) in System Tenant (id={})",
-                created.getId(), adminUserId, systemTenantId);
-    }
-
-    /**
-     * Create Platform Console menus for the System Tenant.
-     * These are fixed menus (not plugin-driven) for the L1 Control Plane.
-     */
-    private void createPlatformMenus(Long tenantId, Long adminUserId) {
-        // Top-level menus
-        createMenu(tenantId, null, "platform_overview", "Overview", "/platform/overview", 1, 10, "ChartBarIcon", adminUserId);
-        createMenu(tenantId, null, "platform_tenants", "Tenants", "/platform/tenants", 1, 20, "BuildingOfficeIcon", adminUserId);
-
-        // Commerce directory
-        Menu commerce = createMenu(tenantId, null, "platform_commerce", "Commerce", null, 0, 30, null, adminUserId);
-        createMenu(tenantId, commerce.getId(), "platform_marketplace", "Marketplace", "/platform/marketplace", 1, 31, "ShoppingBagIcon", adminUserId);
-        createMenu(tenantId, commerce.getId(), "platform_licenses", "Licenses", "/platform/licenses", 1, 32, "KeyIcon", adminUserId);
-
-        // Platform directory
-        Menu infra = createMenu(tenantId, null, "platform_infra", "Platform", null, 0, 40, null, adminUserId);
-        createMenu(tenantId, infra.getId(), "platform_cloud_config", "Cloud Config", "/platform/cloud-config", 1, 41, "CloudIcon", adminUserId);
-        createMenu(tenantId, infra.getId(), "platform_templates", "Templates", "/platform/templates", 1, 42, "DocumentDuplicateIcon", adminUserId);
-        createMenu(tenantId, infra.getId(), "platform_plugins", "Plugins", "/platform/plugins", 1, 43, "PuzzlePieceIcon", adminUserId);
-
-        // System directory
-        Menu system = createMenu(tenantId, null, "platform_system", "System", null, 0, 50, null, adminUserId);
-        createMenu(tenantId, system.getId(), "platform_audit_logs", "Audit Log", "/platform/audit-logs", 1, 51, "ClipboardDocumentListIcon", adminUserId);
-        createMenu(tenantId, system.getId(), "platform_settings", "Settings", "/platform/system-preferences", 1, 52, "Cog6ToothIcon", adminUserId);
-    }
-
-    private Menu createMenu(Long tenantId, Long parentId, String code, String name, String path, int type, int orderNo, String icon, Long adminUserId) {
-        Menu menu = new Menu();
-        menu.setTenantId(tenantId);
-        menu.setParentId(parentId);
-        menu.setPid(UniqueIdGenerator.generate());
-        menu.setCode(code);
-        menu.setName(name);
-        menu.setPath(path);
-        menu.setType(type);
-        menu.setOrderNo(orderNo);
-        menu.setIcon(icon);
-        menu.setVisible(true);
-        menu.setCreatedBy(adminUserId);
-        menu.setUpdatedBy(adminUserId);
-        menuMapper.insert(menu);
-        return menu;
-    }
-
     // ── Layer B: Runtime Setup (Non-Transactional) ──────────────────────
 
-    private void executeRuntimeSetup(BootstrapEntity bootstrap, CoreBootstrapResult coreResult) {
-        // Step 9: Import builtin plugins
+    private void executeRuntimeSetup(BootstrapEntity bootstrap, CoreBootstrapResult coreResult,
+                                     BootstrapRequest request) {
+        // Step 9: Import builtin plugins (non-fatal on failure — matches pre-2.2 behavior)
         updateProgress(bootstrap, 9, "import_builtin_plugins");
-        try {
-            MetaContext.setContext(coreResult.defaultTenantId, coreResult.adminUserId,
-                    coreResult.adminUserPid, "system");
-            builtinPluginImportService.importForTenant(coreResult.defaultTenantId, coreResult.adminUserId);
-            log.info("Step 9: Built-in plugins imported");
-        } catch (Exception e) {
-            log.warn("Step 9: Built-in plugin import failed (non-fatal): {}", e.getMessage());
-        } finally {
-            MetaContext.clear();
+        BootstrapRepairService.RepairOptions opts =
+                BootstrapRepairService.RepairOptions.fromBootstrapRequest(request);
+        RepairStepResult plugins = bootstrapRepairService.repairBuiltinPlugins(opts);
+        if (plugins.status() == RepairStepResult.Status.ERROR) {
+            log.warn("Step 9: Built-in plugin import failed (non-fatal): {}", plugins.detail());
+        } else {
+            log.info("Step 9: Built-in plugins imported — {}", plugins.detail());
         }
 
-        // Step 10: Marketplace categories (stub)
+        // Steps 10-12: stubs (kept here for progress reporting parity)
         updateProgress(bootstrap, 10, "marketplace_categories");
         log.info("Step 10: Marketplace categories — stub");
-
-        // Step 11: i18n sync (stub)
         updateProgress(bootstrap, 11, "i18n_sync");
         log.info("Step 11: i18n sync — stub");
-
-        // Step 12: License initialization (stub)
         updateProgress(bootstrap, 12, "license_init");
         log.info("Step 12: License initialization — stub");
     }
@@ -313,15 +226,12 @@ public class BootstrapEngineService {
 
     private void executeOptionalSetup(BootstrapEntity bootstrap, BootstrapRequest request,
                                       CoreBootstrapResult coreResult) {
-        // Step 13: Seed demo data (stub)
         updateProgress(bootstrap, 13, "seed_demo_data");
         if (Boolean.TRUE.equals(request.getSeedDemoData())) {
             log.info("Step 13: Demo data seeding — stub");
         } else {
             log.info("Step 13: Demo data seeding — skipped (not requested)");
         }
-
-        // Step 14: AuraBot setup (stub)
         updateProgress(bootstrap, 14, "aurabot_setup");
         log.info("Step 14: AuraBot setup — stub");
     }
@@ -331,7 +241,6 @@ public class BootstrapEngineService {
     private void finalizeBootstrap(BootstrapEntity bootstrap, CoreBootstrapResult coreResult) {
         updateProgress(bootstrap, 15, "finalize");
 
-        // Use initialize() (create-or-update) since these rows may not exist yet on a fresh DB
         systemConfigService.initialize(SystemConfigKeys.SYSTEM_INITIALIZED, "true",
                 "system", "boolean", "Whether the system has been bootstrapped", true);
         systemConfigService.initialize(SystemConfigKeys.SYSTEM_DEFAULT_TENANT_ID,
@@ -352,6 +261,13 @@ public class BootstrapEngineService {
 
     // ── Internal Helpers ────────────────────────────────────────────────
 
+    private static void throwIfError(RepairStepResult result) {
+        if (result.status() == RepairStepResult.Status.ERROR) {
+            throw new RuntimeException(
+                    "Repair step '" + result.stepName() + "' failed: " + result.detail());
+        }
+    }
+
     private void validateInput(BootstrapRequest request) {
         if (!StringUtils.hasText(request.getAdminEmail())) {
             throw new IllegalArgumentException("adminEmail is required");
@@ -362,66 +278,9 @@ public class BootstrapEngineService {
         if (!StringUtils.hasText(request.getCompanyName())) {
             throw new IllegalArgumentException("companyName is required");
         }
-
-        // Validate systemMode if provided
         if (StringUtils.hasText(request.getSystemMode())) {
-            SystemMode.fromCode(request.getSystemMode()); // throws if invalid
+            SystemMode.fromCode(request.getSystemMode());
         }
-    }
-
-    private void writeSystemConfig(BootstrapRequest request) {
-        String mode = StringUtils.hasText(request.getSystemMode())
-                ? request.getSystemMode() : SystemMode.SINGLE.getCode();
-
-        // Use initialize() (create-or-update) since these rows may not exist yet on a fresh DB
-        systemConfigService.initialize(SystemConfigKeys.SYSTEM_MODE, mode,
-                "system", "string", "System mode (single/multi/hybrid)", true);
-        systemConfigService.initialize(SystemConfigKeys.SYSTEM_PLATFORM_NAME, request.getCompanyName(),
-                "system", "string", "Platform display name", false);
-        systemConfigService.initialize(SystemConfigKeys.SYSTEM_ALLOW_SELF_REGISTRATION, "false",
-                "system", "boolean", "Allow self-registration", false);
-
-        // Instance identity: generate db_uuid via PostgreSQL gen_random_uuid() (immutable, created once)
-        String existingDbUuid = systemConfigService.get(SystemConfigKeys.SYSTEM_DB_UUID).orElse(null);
-        if (existingDbUuid == null || existingDbUuid.isBlank()) {
-            String dbUuid = systemConfigMapper.generateDbUuid();
-            systemConfigService.initialize(SystemConfigKeys.SYSTEM_DB_UUID, dbUuid,
-                    "system", "string", "Database instance unique identifier (immutable)", true);
-            log.info("Generated db_uuid via gen_random_uuid(): {}", dbUuid);
-        }
-
-        // Instance URL (user-provided or default, mutable)
-        String instanceUrl = StringUtils.hasText(request.getInstanceUrl())
-                ? request.getInstanceUrl() : "http://localhost:6443";
-        systemConfigService.initialize(SystemConfigKeys.SYSTEM_INSTANCE_URL, instanceUrl,
-                "system", "string", "Instance base URL for fingerprint binding", false);
-    }
-
-    private Tenant createSystemTenant() {
-        // Idempotent: check if system tenant already exists
-        Tenant existing = tenantService.findByName("System");
-        if (existing != null) {
-            log.info("Step 3: System tenant already exists (id={}), reusing", existing.getId());
-            return existing;
-        }
-
-        Tenant systemTenant = new Tenant();
-        systemTenant.setId(SYSTEM_TENANT_ID);
-        systemTenant.setPid(UniqueIdGenerator.generate());
-        systemTenant.setName("System");
-        systemTenant.setDisplayName("System");
-        systemTenant.setStatus("active");
-        return tenantService.createTenant(systemTenant);
-    }
-
-    private Tenant createDefaultTenant(BootstrapRequest request) {
-        Tenant tenant = new Tenant();
-        tenant.setPid(UniqueIdGenerator.generate());
-        tenant.setName(request.getCompanyName());
-        tenant.setDisplayName(request.getCompanyName());
-        tenant.setStatus("active");
-        tenant.setContactEmail(request.getAdminEmail());
-        return tenantService.createTenant(tenant);
     }
 
     private BootstrapEntity createBootstrapRecord(BootstrapRequest request) {
@@ -462,9 +321,7 @@ public class BootstrapEngineService {
 
     // ── Result Types ────────────────────────────────────────────────────
 
-    /**
-     * Internal result from Layer A core bootstrap.
-     */
+    /** Internal result from Layer A core bootstrap. */
     static class CoreBootstrapResult {
         Long systemTenantId;
         Long defaultTenantId;
@@ -472,9 +329,7 @@ public class BootstrapEngineService {
         String adminUserPid;
     }
 
-    /**
-     * Public result from the bootstrap engine.
-     */
+    /** Public result from the bootstrap engine. */
     public record BootstrapResult(boolean success, String jwt, Long tenantId, String error) {
         public static BootstrapResult success(String jwt, Long tenantId) {
             return new BootstrapResult(true, jwt, tenantId, null);
