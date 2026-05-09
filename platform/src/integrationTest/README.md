@@ -96,6 +96,7 @@ across the canonical bootstrap tables:
 - `ab_tenant_member`
 - `ab_role`
 - `ab_user`
+- `ab_menu`
 - `ab_tenant`
 - `ab_plugin`
 
@@ -104,13 +105,19 @@ truncate is rolled back at the end of the test, so the host DB is untouched at
 commit time. Tables that don't exist on the connected stack are skipped with a
 warning (forward-compat with smaller schemas).
 
-### Known limitations
+### Cache eviction (Phase 2.2)
 
-- `SystemConfigServiceImpl` keeps an in-memory cache that survives `freshDb()`.
-  ITs that depend on `isInitialized()` returning `false` after `freshDb()` will
-  hit a stale cache hit. Phase 2.2 will add `SystemConfigService#evictCache()`
-  to fix this. See `BootstrapEngineServiceIT` for the current workaround
-  (asserting on the guard's error message).
+`SystemConfigServiceImpl` keeps an in-memory cache that survives `freshDb()`.
+After `freshDb()`, ITs that read `system.*` config (or call `isInitialized()`)
+must call:
+
+```java
+systemConfigService.evictCache();
+```
+
+See `BootstrapRepairServiceIT#resetDb()` for the canonical pattern. Phase 2.1
+shipped without this and worked around the issue by asserting on the guard's
+error message — Phase 2.2 added `evictCache()` to the public interface.
 
 ## Multi-worktree hygiene
 
