@@ -86,13 +86,14 @@ services:
       # in the same compose project network).
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      # Disable AdminBootstrapRunner — it creates only a demo tenant and
-      # bypasses BootstrapEngineService.bootstrapSystemTenant, leaving no
-      # System Tenant + no platform_admin role. Tests instead drive
-      # bootstrap via tests/api/setup/00-bootstrap.spec.ts which calls
-      # /api/bootstrap/setup → full System+Business tenant + platform_admin
-      # grant. Override base docker-compose.yml's "true".
-      AURABOOT_BOOTSTRAP_ENABLED: "false"
+      # Phase 2.4 of bootstrap-unified: removed the
+      # AURABOOT_BOOTSTRAP_ENABLED=false override. The Phase 2.3
+      # BootstrapStartupRunner is idempotent and produces the same
+      # 9-invariant state as /api/bootstrap/setup (System + Business
+      # tenant + platform_admin role + grant), so isolated stacks can
+      # auto-bootstrap on first start just like the host stack. The
+      # tests/api/setup/00-bootstrap.spec.ts contract test still runs as
+      # an idempotent verification of the 9 invariants.
       # Activate `test` profile alongside `community` so test-only beans
       # register on the isolated stack:
       #   - TestUserSpoofFilter (X-Test-Spoof-User-Id header support)
