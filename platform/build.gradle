@@ -295,7 +295,7 @@ dependencies {
     implementation 'org.apache.pdfbox:pdfbox:2.0.32'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
-    implementation('com.google.firebase:firebase-admin:9.3.0') {
+    implementation('com.google.firebase:firebase-admin:9.8.0') {
         exclude group: 'com.google.guava', module: 'listenablefuture'
     }
 
