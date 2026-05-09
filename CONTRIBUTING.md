@@ -180,7 +180,19 @@ See the [Plugin Development Guide](docs/system-reference/plugins/02-插件开发
 
 ## Contributor License Agreement
 
-By submitting a pull request, you agree that your contributions are licensed under the [AuraBoot License](LICENSE.txt), the same license as the project. You confirm that you have the right to grant this license for your contributions.
+AuraBoot is dual-licensed (the [source-available AuraBoot License](LICENSE.txt) for the community edition + a separate commercial license for enterprise customers). To distribute your contribution under both licenses, we need a signed [Contributor License Agreement (CLA)](CLA.md).
+
+**On your first pull request**, the CLA Assistant bot will comment with a one-click sign-off instruction. You sign by replying:
+
+> I have read the CLA Document and I hereby sign the CLA
+
+The signature is recorded against your GitHub username and applies to all your future PRs.
+
+**The CLA does not transfer your copyright** — you retain ownership of your work. You grant the project the rights needed to redistribute and sublicense it.
+
+**Trivial contributions are exempt** (typo fixes, formatting). See [CLA.md § Trivial Contributions](CLA.md#trivial-contributions) for the full list.
+
+For organizations, a Corporate CLA may be required if your employer holds rights to your work. Contact license@auraboot.com.
 
 ---
 
