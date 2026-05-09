@@ -23,8 +23,15 @@ import { execSync } from 'node:child_process';
  */
 function resolveAdminTenantId(): string {
   try {
+    // Honor BACKEND_URL / BE_PORT so isolated docker stacks (auraboot-ga-e2e
+    // on :6444, auraboot-r2 on :6445, etc.) resolve the correct tenant.
+    // Hardcoding :6443 made every docker-stack run silently fall back to
+    // the host-DB tenant id, which then propagated into every menu /
+    // seeded row insert and tripped FK violations on docker DB.
+    const backendUrl =
+      process.env.BACKEND_URL || `http://localhost:${process.env.BE_PORT ?? '6443'}`;
     const out = execSync(
-      `curl -s -X POST http://localhost:6443/api/auth/login -H 'Content-Type: application/json' ` +
+      `curl -s -X POST ${backendUrl}/api/auth/login -H 'Content-Type: application/json' ` +
         `-d '{"email":"admin@example.com","password":"Test2026x"}'`,
     ).toString();
     const parsed = JSON.parse(out);
@@ -652,7 +659,11 @@ export function seedMemoryPromotionsMenu(): SeededPromotionMenu {
   const r = upsertMenu({
     pid,
     code: 'aurabot.memory-promotions',
-    name: '记忆提案',
+    // Match the canonical zh title registered in
+    // web-admin/app/plugins/core-aurabot/resources.ts (`记忆晋升`). Specs
+    // assert against `/记忆晋升|Memory Promotions?/` so the seeded label
+    // must agree.
+    name: '记忆晋升',
     path: '/aurabot/memory-promotions',
     order: 37,
   });
