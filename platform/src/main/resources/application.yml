@@ -468,8 +468,16 @@ agent:
   enabled: true
   max-concurrent-runs: 5
   default-cost-limit: 1.0
+  # When no real provider key is configured the platform routes chat traffic
+  # to the StubLlmProvider so AuraBot E2E suites can run without provider
+  # credentials. The "stub_key_for_no_llm_paths" sentinel is recognised by
+  # LlmProviderFactory and swapped to the stub bean. Override
+  # ANTHROPIC_API_KEY to use a real Anthropic key, or set
+  # AGENT_LLM_STUB_MODE=true to force stub-mode globally.
+  llm:
+    stub-mode: ${AGENT_LLM_STUB_MODE:false}
   anthropic:
-    api-key: ${ANTHROPIC_API_KEY:}
+    api-key: ${ANTHROPIC_API_KEY:stub_key_for_no_llm_paths}
     base-url: https://api.anthropic.com
     default-model: claude-sonnet-4-6
     max-tokens: 4096
