@@ -82,7 +82,7 @@
 如果你的产品同时提供"租户自己用低代码改业务流程"的能力,边界开始模糊 — 建议联系 license@auraboot.com 确认。
 
 ### Q12. 商业 License 能解锁多租户低代码 SaaS 吗?
-**部分可以**,但 §7.3 明确即使买了商业 License,**也不能在未经书面同意下把 AuraBoot 改造成竞品低代码平台对外销售**。这是防止商业客户绕道做同业竞争。如果你有这种需求,需要单独谈 OEM 协议。
+**仅靠 Commercial License 不够**。按 §5.4(并经 §7.3 强化)要求,把 AuraBoot 作为平台 SaaS 对外提供,**必须同时**(a)持有 Commercial License,(b)取得我方就该具体部署的**书面 SaaS / OEM 分发权利**。普通 Commercial License(用于 white-label / 去品牌)本身不授权多租户低代码平台 SaaS 转售。如果你的商业模式是平台 SaaS,需要在 Commercial License 之上单独签订 SaaS / OEM rider。联系 license@auraboot.com 协商。
 
 ---
 
@@ -106,11 +106,11 @@ CLA 不要求你放弃版权,只是授予项目长期、不可撤销的使用许
 ## 六、商业 License
 
 ### Q16. 什么情况下我必须买商业 License?
-- ✅ 想去除全部品牌信息(white-label)
-- ✅ 想做多租户低代码 / AI 平台 SaaS 转售
-- ✅ 公司法务不接受非 OSI 认证的协议(罕见但存在)
-- ✅ 想要官方技术支持 / SLA / 优先 bug 修复
-- ✅ 需要定制开发 / 私有功能 / proprietary plugin
+- ✅ 想去除全部品牌信息(white-label)— Commercial License 即可
+- ✅ 公司法务不接受非 OSI 认证的协议(罕见但存在)— Commercial License 即可
+- ✅ 想要官方技术支持 / SLA / 优先 bug 修复 — Commercial License 即可
+- ✅ 需要定制开发 / 私有功能 / proprietary plugin — Commercial License 即可
+- ⚠️ 做多租户低代码 / AI 平台 SaaS 转售 — **Commercial License + 书面 SaaS / OEM rider 都需要**(见 Q12)
 
 仅自部署、仅做项目交付、仅做垂直业务 SaaS — **都不需要商业 License**。
 

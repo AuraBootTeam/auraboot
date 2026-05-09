@@ -27,7 +27,7 @@
 
 ## What is AuraBoot?
 
-AuraBoot is an open-source platform for building business applications using a declarative DSL (Domain-Specific Language) instead of writing boilerplate code. Define your data models, pages, commands, and workflows in JSON — the platform generates the database schema, REST APIs, and UI automatically. AI capabilities are built into the core: an in-app copilot, agent orchestration, ChatBI, and a RAG knowledge base that work with multiple LLM providers.
+AuraBoot is a source-available, self-hosted platform for building business applications using a declarative DSL (Domain-Specific Language) instead of writing boilerplate code. Define your data models, pages, commands, and workflows in JSON — the platform generates the database schema, REST APIs, and UI automatically. AI capabilities are built into the core: an in-app copilot, agent orchestration, ChatBI, and a RAG knowledge base that work with multiple LLM providers.
 
 <!-- Screenshots (dashboard, page designer, command pipeline, AI copilot) land
      with v0.1.0-beta.1; capture spec at docs/community/readme-screenshots-spec.md -->

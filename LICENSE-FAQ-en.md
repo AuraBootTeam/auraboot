@@ -82,7 +82,7 @@ If you only use AuraBoot to configure business applications (ERP / CRM / interna
 If your product also exposes "tenants can use low-code to modify their own business workflows," the boundary becomes ambiguous — please contact license@auraboot.com to confirm.
 
 ### Q12. Does a commercial license unlock multi-tenant low-code SaaS?
-**Partially.** §7.3 explicitly states that **even with a commercial license, you may not — without prior written consent — turn AuraBoot into a competing low-code platform for resale**. This protects against competitors using a paid license to circumvent the restriction. If you have such needs, a separate OEM agreement is required.
+**No, not by itself.** Per §5.4 (and reinforced by §7.3), platform-as-a-service distribution requires **both** a Commercial License AND an explicit written grant of SaaS / OEM distribution rights for the specific deployment. A standard Commercial License (e.g., for white-labeling or removing branding) does not by itself authorize you to host AuraBoot itself as a multi-tenant low-code platform service. If that's your business model, a separate SaaS / OEM rider or addendum to your Commercial License is required. Contact license@auraboot.com to negotiate the rider.
 
 ---
 
@@ -106,11 +106,11 @@ If your plugin **directly copies AuraBoot core code**, that copied portion remai
 ## 6. Commercial License
 
 ### Q16. When do I need a commercial license?
-- ✅ You want to remove all branding (white-label)
-- ✅ You want to operate a multi-tenant low-code / AI platform SaaS resale business
-- ✅ Your legal team won't accept non-OSI-approved licenses (rare but real)
-- ✅ You need official technical support / SLA / priority bug fixes
-- ✅ You require custom development / private features / proprietary plugins
+- ✅ You want to remove all branding (white-label) — Commercial License sufficient
+- ✅ Your legal team won't accept non-OSI-approved licenses (rare but real) — Commercial License sufficient
+- ✅ You need official technical support / SLA / priority bug fixes — Commercial License sufficient
+- ✅ You require custom development / private features / proprietary plugins — Commercial License sufficient
+- ⚠️ You want to operate a multi-tenant low-code / AI platform SaaS resale business — **Commercial License + written SaaS / OEM rider required** (see Q12)
 
 Self-hosting only, ISV project delivery only, vertical business SaaS only — **none of these require a commercial license.**
 
