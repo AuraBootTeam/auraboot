@@ -26,9 +26,14 @@ test.describe('Quick Filters (GAP-130)', () => {
     await page.goto('/p/e2et_order');
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
 
-    await expect(quickFilter(page, 'my_records')).toContainText('My Records');
-    await expect(quickFilter(page, 'created_today')).toContainText('Created Today');
-    await expect(quickFilter(page, 'modified_this_week')).toContainText('Modified This Week');
+    // Runtime locale is zh-CN with translations loaded for these keys; assert
+    // the actual rendered i18n strings (English fallback only surfaces when
+    // translations are missing — see ListToolbar.i18n.test.tsx).
+    await expect(quickFilter(page, 'my_records')).toContainText(/My Records|我的记录/);
+    await expect(quickFilter(page, 'created_today')).toContainText(/Created Today|今日新建/);
+    await expect(quickFilter(page, 'modified_this_week')).toContainText(
+      /Modified This Week|本周修改/,
+    );
   });
 
   test('QF-003: clicking a quick filter toggles active state', async ({ page }) => {
