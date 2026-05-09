@@ -182,3 +182,28 @@ host+r2 smoke gate.
 1. Build IT scaffolding first or rely on Playwright contract test? (§6.1)
 2. Confirm the back-compat behavior of `/api/bootstrap/setup` (still reject when initialized)? (§6.2)
 3. Approve splitting Phase 2 into 4 sub-PRs (§7)?
+
+## 9. Status (2026-05-09)
+
+- **Phase 2.1** — IT scaffolding (`IntegrationTestBase` + `freshDb()`): SHIPPED (`57757c2b`).
+- **Phase 2.2** — `BootstrapRepairService` extracted with 9 idempotent steps + 11 ITs: SHIPPED (`81ee31be`).
+- **Phase 2.3** — Unified `BootstrapStartupRunner` replaces legacy admin/seed runners: SHIPPED (`03e910c5`).
+- **Phase 2.4** — `/api/admin/bootstrap/repair` admin endpoint + 9-invariant contract spec
+  (`00-bootstrap.spec.ts`): SHIPPED (`816cf153`).
+- **Phase 3 — Op 6 + Op 8** — `BuiltinPluginImportService` 2-profile (CORE / DEMO) +
+  `oss-reset-and-init.sh` §7.5 trim: SHIPPED on `feat/phase3-demo-profile-and-script-trim`.
+  - Demo profile gated by `AURABOOT_DEMO_SEED` (default `false` in prod
+    `application.yml`; default `true` in `application-dev.yml` /
+    `application-community.yml`).
+  - `BootstrapRequest.seedDemoData` now threaded into `RepairOptions.includeDemoPlugins`
+    so wizard callers also get demo-profile control.
+  - `oss-reset-and-init.sh` §7.5 (CLI plugin import loop) deleted; backend startup
+    handles 11 plugins (2 core + 9 demo) in-process. §7.6/§7.7/§7.8/§7.9 KEPT —
+    these are non-bootstrap SQL seeds (model displayName backfill, marketplace
+    registry, CS Agent, AuraBot agent definition) that are not part of the
+    9 invariants. The internal-only `test-fixtures` plugin remains seeded by
+    Playwright setup project `03-import-test-fixtures.spec.ts` (Op 7).
+  - New IT `BuiltinPluginProfileIT` (5 tests) covers core-only/demo flag-threading/
+    idempotency/legacy-arity-default/`fromBootstrapRequest` mapping.
+- **Phase 3 — Op 9 / Op 10** (stack timings + CI matrix recommendation) — out of
+  scope for this branch; tracked as planning-only deliverable (`a3d71188`).
