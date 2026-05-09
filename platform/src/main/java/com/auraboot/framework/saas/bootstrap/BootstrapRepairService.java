@@ -361,12 +361,14 @@ public class BootstrapRepairService {
             }
             MetaContext.setContext(businessTenant.getId(), admin.getId(), admin.getPid(), "system");
             try {
-                builtinPluginImportService.importForTenant(businessTenant.getId(), admin.getId());
+                builtinPluginImportService.importForTenant(
+                        businessTenant.getId(), admin.getId(), opts.includeDemoPlugins());
             } finally {
                 MetaContext.clear();
             }
             return RepairStepResult.repaired(STEP_BUILTIN_PLUGINS,
-                    "BuiltinPluginImportService.importForTenant invoked (skips up-to-date plugins internally)");
+                    "BuiltinPluginImportService.importForTenant invoked (includeDemo="
+                            + opts.includeDemoPlugins() + "; skips up-to-date plugins internally)");
         } catch (Exception e) {
             log.warn("repairBuiltinPlugins failed (non-fatal)", e);
             return RepairStepResult.error(STEP_BUILTIN_PLUGINS, e.getMessage());
@@ -504,13 +506,24 @@ public class BootstrapRepairService {
             String adminDisplayName,
             String companyName,
             String systemMode,
-            String instanceUrl) {
+            String instanceUrl,
+            boolean includeDemoPlugins) {
 
+        /** 6-arg variant — defaults {@code includeDemoPlugins=false} (prod-safe). */
         public static RepairOptions of(String adminEmail, String adminPassword,
                                        String adminDisplayName, String companyName,
                                        String systemMode, String instanceUrl) {
             return new RepairOptions(adminEmail, adminPassword, adminDisplayName,
-                    companyName, systemMode, instanceUrl);
+                    companyName, systemMode, instanceUrl, false);
+        }
+
+        /** 7-arg variant — explicit {@code includeDemoPlugins} (Phase 3 demo profile). */
+        public static RepairOptions of(String adminEmail, String adminPassword,
+                                       String adminDisplayName, String companyName,
+                                       String systemMode, String instanceUrl,
+                                       boolean includeDemoPlugins) {
+            return new RepairOptions(adminEmail, adminPassword, adminDisplayName,
+                    companyName, systemMode, instanceUrl, includeDemoPlugins);
         }
 
         public static RepairOptions fromBootstrapRequest(
@@ -521,7 +534,8 @@ public class BootstrapRepairService {
                     req.getAdminDisplayName(),
                     req.getCompanyName(),
                     req.getSystemMode(),
-                    req.getInstanceUrl());
+                    req.getInstanceUrl(),
+                    Boolean.TRUE.equals(req.getSeedDemoData()));
         }
     }
 }
