@@ -31,7 +31,16 @@ function isPathInSubmenu(items: SubmenuItem[], pathname: string): boolean {
 export default function SidebarSubmenu({ submenu, name, icon, depth = 0 }: SidebarSubmenuProps) {
   const location = useLocation();
   const { t } = useI18n();
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Default expanded so child nav links are always visible & clickable.
+  // Previously collapsed-by-default created two failure modes:
+  //   1. Clicking a sidebar link from a fresh page (e.g. test goes
+  //      `/home` → click "Query Builder") raced with the submenu auto-
+  //      expand transition, intercepting clicks (QB-07/08).
+  //   2. With `display:none` on collapsed children, the link wasn't
+  //      findable at all from `/home`.
+  // Expanded-by-default sidesteps both: links are always reachable and
+  // there's no animation race. Users can still collapse via the chevron.
+  const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
     if (isPathInSubmenu(submenu, location.pathname)) {
@@ -60,10 +69,17 @@ export default function SidebarSubmenu({ submenu, name, icon, depth = 0 }: Sideb
         />
       </button>
 
-      {/* Child menu items */}
+      {/* Child menu items.
+          Previously animated `max-h` + opacity over 200ms which caused
+          layout shift on initial page-load when the active path's
+          submenu auto-expanded. That layout shift raced with Playwright
+          clicks on sibling nav links and produced "intercepted by
+          parent submenu button" failures (e.g. QB-07/08). Snapping the
+          expand/collapse to instant removes the race window without
+          changing the visible end-states. */}
       <div
-        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-          isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+        className={`overflow-hidden ${
+          isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         <div className={`${paddingLeft} space-y-1`}>
