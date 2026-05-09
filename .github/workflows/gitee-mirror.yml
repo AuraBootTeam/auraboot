@@ -1,0 +1,47 @@
+name: Mirror to Gitee
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  schedule:
+    # Hourly safety net in case a push event was missed
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: Sync GitHub → Gitee
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Configure Gitee remote
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_USER:  ${{ secrets.GITEE_USER }}
+          GITEE_REPO:  ${{ secrets.GITEE_REPO }}    # e.g. "auraboot/auraboot"
+        run: |
+          if [ -z "$GITEE_TOKEN" ] || [ -z "$GITEE_USER" ] || [ -z "$GITEE_REPO" ]; then
+            echo "ERROR: missing GITEE_TOKEN / GITEE_USER / GITEE_REPO secret"
+            exit 1
+          fi
+          git remote add gitee \
+            "https://${GITEE_USER}:${GITEE_TOKEN}@gitee.com/${GITEE_REPO}.git"
+
+      - name: Push branches + tags to Gitee
+        run: |
+          # Push only the main branch + tags. Don't blast all branches —
+          # those are dev branches with internal context.
+          git push --force-with-lease gitee main
+          git push --force-with-lease gitee --tags
+
+      - name: Status
+        if: success()
+        run: echo "✅ Mirrored to Gitee at $(date -u)"
