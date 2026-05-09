@@ -13,8 +13,10 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -205,6 +207,58 @@ class GlobalExceptionHandlerTest {
         RootUnCheckedException ex = new RootUnCheckedException(ResponseCode.BadParam, "specific dev msg");
         ResponseEntity<ApiResponse<Object>> resp = handler.handleRootUncheckedException(ex);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void handleHttpMessageNotReadable_returns400_withRootCauseMessageInProd() {
+        // Simulate Jackson failing to deserialize a nested object into Map<String,String>.
+        Throwable jacksonRoot = new IllegalArgumentException(
+                "Cannot deserialize value of type java.lang.String from Object value");
+        HttpInputMessage input = mock(HttpInputMessage.class);
+        HttpMessageNotReadableException ex =
+                new HttpMessageNotReadableException("JSON parse error", jacksonRoot, input);
+
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleHttpMessageNotReadable(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody()).isNotNull();
+        // Prod profile: detail is the most-specific-cause message string.
+        assertThat(resp.getBody().getContext())
+                .isEqualTo("Cannot deserialize value of type java.lang.String from Object value");
+    }
+
+    @Test
+    void handleHttpMessageNotReadable_returns400_withDevDetailMap() {
+        asDev();
+        Throwable jacksonRoot = new IllegalArgumentException("type mismatch detail");
+        HttpInputMessage input = mock(HttpInputMessage.class);
+        HttpMessageNotReadableException ex =
+                new HttpMessageNotReadableException("JSON parse error", jacksonRoot, input);
+
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleHttpMessageNotReadable(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody()).isNotNull();
+        // Dev profile: detail is a structured map with exception/detail/cause keys.
+        assertThat(resp.getBody().getContext()).isInstanceOf(Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, String> ctx = (Map<String, String>) resp.getBody().getContext();
+        assertThat(ctx).containsEntry("exception", "HttpMessageNotReadableException");
+        assertThat(ctx.get("detail")).contains("type mismatch detail");
+        assertThat(ctx.get("cause")).contains("IllegalArgumentException");
+    }
+
+    @Test
+    void handleHttpMessageNotReadable_handlesNullRootCauseMessage() {
+        // Defensive: ensure no NPE when root cause has null message.
+        HttpInputMessage input = mock(HttpInputMessage.class);
+        HttpMessageNotReadableException ex =
+                new HttpMessageNotReadableException("outer message", input);
+
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleHttpMessageNotReadable(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody()).isNotNull();
     }
 
     @Test

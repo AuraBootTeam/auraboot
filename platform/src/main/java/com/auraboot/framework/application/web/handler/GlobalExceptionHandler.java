@@ -21,6 +21,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -283,6 +284,48 @@ public class GlobalExceptionHandler {
 
         ApiResponse<Object> response = ApiResponse.error(responseCode, message, detail);
         return ResponseEntity.status(status).body(response);
+    }
+
+    /**
+     * Handle malformed request bodies — JSON parse failures, type mismatches
+     * (e.g. nested object posted into a {@code Map<String,String>} field).
+     *
+     * <p>Without this handler such errors fall through to the generic
+     * {@link Exception} handler and surface as HTTP 500 "An unexpected error
+     * occurred", which hides client-side contract drift behind a server error.
+     * Returns HTTP 400 with the parse error message and (in dev profiles)
+     * the underlying root cause class+message for faster diagnosis.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex) {
+        log.warn("Malformed request body: {}", ex.getMessage());
+
+        // Prefer the most specific message available. Spring wraps Jackson
+        // errors so the root cause carries the useful "Cannot deserialize
+        // value of type X from Object value" detail.
+        Throwable rootCause = ex.getMostSpecificCause();
+        String message = rootCause != null && rootCause.getMessage() != null
+                ? rootCause.getMessage()
+                : (ex.getMessage() != null ? ex.getMessage() : "Malformed request body");
+
+        Object detail;
+        if (isDevEnvironment()) {
+            Map<String, String> devDetail = new HashMap<>();
+            devDetail.put("exception", ex.getClass().getSimpleName());
+            devDetail.put("detail", message);
+            if (rootCause != null && rootCause != ex) {
+                devDetail.put("cause", rootCause.getClass().getSimpleName()
+                        + ": " + rootCause.getMessage());
+            }
+            detail = devDetail;
+        } else {
+            detail = message;
+        }
+
+        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, detail);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     /**
