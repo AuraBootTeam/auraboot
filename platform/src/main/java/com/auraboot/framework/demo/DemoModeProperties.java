@@ -46,30 +46,37 @@ public class DemoModeProperties {
 
     private static List<String> defaultDenyPaths() {
         List<String> paths = new ArrayList<>();
-        // License issuance / management
-        paths.add("/api/license/**");
-        paths.add("/api/admin/license/**");
-        // Plugin upload / install (could land arbitrary code)
-        paths.add("/api/plugins/upload");
+
+        // --- Verified-real OSS endpoints (controller exists in code) ---
+        // Plugin package upload — real path is /api/plugins/packages/**, NOT
+        // /api/plugins/upload (PluginPackageController @RequestMapping
+        // "/api/plugins/packages"). Blocking the whole packages tree covers
+        // upload + remove + activate.
+        paths.add("/api/plugins/packages/**");
         paths.add("/api/plugins/*/install");
         paths.add("/api/plugins/*/uninstall");
         paths.add("/api/marketplace/install/**");
         paths.add("/api/marketplace/*/install");
-        // Admin / danger-zone surfaces
+        // Admin surfaces (verified — 18+ controllers under /api/admin/**)
         paths.add("/api/admin/**");
-        paths.add("/api/system/migrate");
-        paths.add("/api/system/reset");
-        paths.add("/api/system/danger/**");
-        // Tenant lifecycle
-        paths.add("/api/tenants/*/destroy");
-        paths.add("/api/tenants/*/transfer-ownership");
-        // Password / auth-sensitive
+        // Auth-sensitive (verified — AuthController.forgotPassword + resetPassword)
         paths.add("/api/auth/forgot-password");
         paths.add("/api/auth/reset-password");
         paths.add("/api/users/*/password");
-        // Test / fixture seeders that bypass normal flows
+        // Test / fixture seeders (verified — TestSeedController etc.)
         paths.add("/api/test/**");
         paths.add("/api/_internal/**");
+
+        // --- Preventive (no current controller maps these, but kept so a
+        // future endpoint added under these paths is denied by default) ---
+        paths.add("/api/license/**");          // license issuance is enterprise-only today
+        paths.add("/api/admin/license/**");
+        paths.add("/api/system/migrate");
+        paths.add("/api/system/reset");
+        paths.add("/api/system/danger/**");
+        paths.add("/api/tenants/*/destroy");
+        paths.add("/api/tenants/*/transfer-ownership");
+
         return paths;
     }
 

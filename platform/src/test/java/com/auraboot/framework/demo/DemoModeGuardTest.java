@@ -60,15 +60,21 @@ class DemoModeGuardTest {
     }
 
     @Test
-    void enabled_blocksPluginUpload() throws Exception {
+    void enabled_blocksPluginPackageUpload() throws Exception {
+        // The real plugin package upload endpoint is at /api/plugins/packages/upload
+        // (PluginPackageController @RequestMapping "/api/plugins/packages").
+        // The whole packages/** tree is covered by the default deny list.
         props.setEnabled(true);
-        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/plugins/upload");
-        MockHttpServletResponse resp = new MockHttpServletResponse();
-
-        guard.doFilter(req, resp, chain);
-
-        assertEquals(403, resp.getStatus());
-        verify(chain, never()).doFilter(req, resp);
+        for (String path : List.of(
+                "/api/plugins/packages/upload",
+                "/api/plugins/packages/some-id/activate",
+                "/api/plugins/some-id/install")) {
+            MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
+            MockHttpServletResponse resp = new MockHttpServletResponse();
+            guard.doFilter(req, resp, chain);
+            assertEquals(403, resp.getStatus(), "expected 403 for " + path);
+            verify(chain, never()).doFilter(req, resp);
+        }
     }
 
     @Test
