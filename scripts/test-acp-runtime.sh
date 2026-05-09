@@ -43,7 +43,7 @@ check "Providers" "/api/agent/providers" "["
 check "Configured providers" "/api/agent/providers/configured" "["
 
 echo "[2] Tool Operations"
-check "Sync tools" "/api/agent/tools/sync" "created" "POST"
+check "Tool registry" "/api/agent/tools/registry" "providers"
 check "Derive contracts" "/api/agent/tools/derive-contracts" "derived" "POST"
 check "Dry-run missing toolCode" "/api/agent/tools/dry-run" "toolCode" "POST" '{"input":{}}'
 check "Dry-run-plan empty steps" "/api/agent/tools/dry-run-plan" "steps" "POST" '{"steps":[]}'

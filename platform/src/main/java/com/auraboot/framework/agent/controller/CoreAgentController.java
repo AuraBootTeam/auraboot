@@ -3,6 +3,9 @@ package com.auraboot.framework.agent.controller;
 import com.auraboot.framework.agent.config.AgentProperties;
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.provider.ToolDefinition;
+import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
+import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.service.AgentDefinitionService;
 import com.auraboot.framework.agent.service.AgentEventDispatchService;
 import com.auraboot.framework.agent.service.AgentOrganizationService;
@@ -30,6 +33,7 @@ public class CoreAgentController {
     private final AgentEventDispatchService agentEventDispatchService;
     private final AgentOrganizationService agentOrganizationService;
     private final AgentDefinitionService agentDefinitionService;
+    private final ToolProviderRegistry toolProviderRegistry;
 
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getStatus() {
@@ -59,11 +63,52 @@ public class CoreAgentController {
         return ResponseEntity.ok(providerFactory.listConfiguredProviders(null));
     }
 
-    @PostMapping("/tools/sync")
-    public ResponseEntity<?> syncTools() {
-        // Tool auto-generation into ab_agent_tool is no longer needed.
-        // Tools are now discovered dynamically via ToolProviderRegistry.
-        return ResponseEntity.ok(Map.of("message", "Tool sync is no longer needed. Tools are discovered dynamically."));
+    /**
+     * List all tools currently registered in the in-process {@link ToolProviderRegistry}.
+     *
+     * <p>This is the canonical, read-only surface for "what tools can the agent runtime invoke
+     * right now". It supersedes the legacy {@code POST /tools/sync} endpoint, which was a no-op
+     * after the runtime migrated from the DB-backed {@code ab_agent_tool} registry to the
+     * Spring-managed {@code ToolProviderRegistry}. Validation scripts (and any future
+     * agent-introspection UI) should query this endpoint instead of {@code ab_agent_tool}.
+     *
+     * <p>Response shape:
+     * <pre>
+     * {
+     *   "tools": [
+     *     {
+     *       "toolCode": "platform.list_models",
+     *       "toolName": "List Models",
+     *       "description": "...",
+     *       "providerCode": "platform",
+     *       "toolType": "platform",
+     *       "sourceCode": "...",
+     *       "riskLevel": "L0",
+     *       "requiresApproval": false,
+     *       "requiresConfirmation": false,
+     *       "parameterSchema": { ... }
+     *     },
+     *     ...
+     *   ],
+     *   "providers": ["platform", "dsl", "custom", "mcp"],
+     *   "total": 42
+     * }
+     * </pre>
+     */
+    @GetMapping("/tools/registry")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> listToolRegistry() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
+                .tenantId(tenantId)
+                .maxResults(Integer.MAX_VALUE)
+                .build();
+        List<ToolDefinition> tools = toolProviderRegistry.discoverAll(ctx);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tools", tools);
+        result.put("providers", toolProviderRegistry.getProviderCodes());
+        result.put("total", tools.size());
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     // ──────────────────────────────────────────────────────────────
