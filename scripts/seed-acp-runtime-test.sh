@@ -20,10 +20,10 @@ echo "  Token: ${TOKEN:0:20}..."
 
 AUTH="Authorization: Bearer $TOKEN"
 
-# 2. Sync agent tools
-echo "[2/4] Syncing agent tools..."
-SYNC=$(NO_PROXY=localhost curl -s -X POST "$BASE_URL/api/agent/tools/sync" -H "$AUTH" -H "Content-Type: application/json")
-echo "  $SYNC"
+# 2. List runtime tool registry (canonical source — replaces legacy /tools/sync no-op)
+echo "[2/4] Listing agent tool registry..."
+REGISTRY=$(NO_PROXY=localhost curl -s "$BASE_URL/api/agent/tools/registry" -H "$AUTH")
+echo "  $REGISTRY"
 
 # 3. Derive contracts
 echo "[3/4] Deriving contracts..."
