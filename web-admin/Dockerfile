@@ -26,7 +26,7 @@
 # root and commit the regenerated pnpm-lock.yaml.
 
 # ── Stage 1: Build ──────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 
 # Optional registry override — useful in environments where
 # https://registry.npmjs.org is firewalled or rate-limited. Pass at build
@@ -84,7 +84,7 @@ RUN pnpm sync-plugins && pnpm exec react-router build
 WORKDIR /app
 
 # ── Stage 2: Runtime ────────────────────────────────────────
-FROM node:20-alpine
+FROM node:26-alpine
 
 ARG NPM_REGISTRY=https://registry.npmjs.org
 
