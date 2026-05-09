@@ -1,0 +1,75 @@
+# Dependabot configuration for AuraBoot OSS
+# Reduces time-to-patch on third-party CVEs without flooding the team.
+# Tune after launch — first month we may want fewer auto-PRs.
+
+version: 2
+
+updates:
+  # GitHub Actions workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(deps-ci)"
+
+  # Backend (Gradle)
+  - package-ecosystem: "gradle"
+    directory: "/platform"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 8
+    labels:
+      - "dependencies"
+      - "area: backend"
+    commit-message:
+      prefix: "chore(deps-backend)"
+    # Don't auto-bump major versions — those usually need code changes.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Frontend (pnpm)
+  - package-ecosystem: "npm"
+    directory: "/web-admin"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 8
+    labels:
+      - "dependencies"
+      - "area: frontend"
+    commit-message:
+      prefix: "chore(deps-frontend)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Docker base images
+  - package-ecosystem: "docker"
+    directory: "/platform"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    labels:
+      - "dependencies"
+      - "area: devops"
+    commit-message:
+      prefix: "chore(deps-docker)"
+
+  - package-ecosystem: "docker"
+    directory: "/web-admin"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    labels:
+      - "dependencies"
+      - "area: devops"
+    commit-message:
+      prefix: "chore(deps-docker)"

@@ -198,8 +198,23 @@ For organizations, a Corporate CLA may be required if your employer holds rights
 
 ## Getting Help
 
-- [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — Questions and ideas
-- [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — Bug reports and feature requests
-- [Discord](https://discord.gg/auraboot) — Community chat
+- [Usage FAQ](USAGE-FAQ.md) — common questions about getting started, data, plugins, AI, and ops (check here first)
+- [License FAQ](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md) — questions about commercial use, modifications, SaaS boundaries
+- [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — open-ended questions and ideas
+- [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — bug reports and feature requests
+- [Discord](https://discord.gg/auraboot) — real-time community chat
+- [Security](SECURITY.md) — vulnerability disclosure (don't open a public issue)
+- [Telemetry](TELEMETRY.md) — what AuraBoot does and doesn't send across the network
+
+## Architecture & deep references
+
+- [Architecture overview](docs/architecture/overview.md) — system layering, request flow
+- [Data model](docs/architecture/data-model.md) — schema conventions
+- [Tech stack](docs/architecture/tech-stack.md) — Java / TypeScript / DB choices
+- [Plugin development](docs/plugin-development/) — building your own plugins
+
+## Documentation contributions
+
+Docs PRs are especially welcome and have a faster review lane (24h target). The docs source of truth lives in `auraboot/docs/`; the public site at docs.auraboot.com is auto-synced via `scripts/sync-docs-to-website.sh`. If you're adding screenshots, see [docs/community/readme-screenshots-spec.md](docs/community/readme-screenshots-spec.md) for visual conventions.
 
 Thank you for helping make AuraBoot better!
