@@ -74,13 +74,21 @@ This CLA is accepted electronically by You signing your GitHub username via the 
 
 ## Trivial Contributions
 
-The following are exempt from CLA signature requirements:
+The following narrow categories are exempt from CLA signature requirements:
 
-- Typo fixes in documentation, comments, or strings (1–3 character corrections)
-- Translation contributions (translations are subject to a separate translator note)
-- Trivial formatting changes that do not alter logic or content
+- Typo fixes in documentation, comments, or strings (≤ 5 character corrections)
+- Whitespace / formatting changes that do not alter logic or content
+- Minor corrections to **existing** translations (single-string fixes, ≤ 10 changed strings)
 
-For any contribution larger than the above (including documentation rewrites, new translations, and any code changes), the CLA must be signed.
+**Everything else requires a signed CLA**, including but not limited to:
+- Any code change, regardless of size
+- New translations (full-locale additions, new `.po` / `i18n.json` files)
+- Bulk translation updates (> 10 changed strings in one PR)
+- Documentation rewrites or new pages
+- Configuration / DSL resource additions
+
+The trivial-fix exemption exists so docs/typo PRs aren't blocked on
+paperwork. It does NOT cover substantive contributions of any kind.
 
 ---
 

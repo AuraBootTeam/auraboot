@@ -85,6 +85,11 @@ echo ""
 # ---------- 4. Dead-link check ----------
 
 echo "--- Dead Link Check (internal refs) ---"
+# Internal-only directories that are NOT published to docs.auraboot.com and
+# whose dead-link state is not a launch-quality gate. (Their content is
+# session notes, archived plans, and Claude scaffolding — they reference
+# personal-machine paths and superseded files by design.)
+DEADLINK_EXCLUDE='docs/backlog|docs/superpowers|docs/plans|docs/handover|docs/archive'
 DEAD_LINKS=0
 while IFS= read -r file; do
     # Extract markdown links to local .md files (excluding http(s)://, mailto:, anchor-only)
@@ -94,13 +99,23 @@ while IFS= read -r file; do
         path_only="${ref%%#*}"
         [ -z "$path_only" ] && continue
         dir=$(dirname "$file")
-        target=$(cd "$dir" 2>/dev/null && realpath -q "$path_only" 2>/dev/null || echo "")
-        if [ -n "$target" ] && [ ! -f "$target" ]; then
+        # Resolve relative path WITHOUT requiring existence — the previous
+        # `realpath -q` form returned empty when the target was missing,
+        # which the `[ -n "$target" ]` guard then silently swallowed,
+        # causing real dead links to be reported "OK". Use bash path
+        # joining + python normpath so we can flag truly missing files.
+        case "$path_only" in
+            /*) target="$path_only" ;;
+            *)  target="$dir/$path_only" ;;
+        esac
+        target=$(python3 -c "import os,sys; print(os.path.normpath(sys.argv[1]))" "$target" 2>/dev/null \
+                 || echo "$target")
+        if [ ! -f "$target" ]; then
             echo "  BROKEN: $file → $ref"
             DEAD_LINKS=$((DEAD_LINKS + 1))
         fi
     done
-done < <(find "$DEADLINK_ROOT" -name "*.md" -type f 2>/dev/null)
+done < <(find "$DEADLINK_ROOT" -name "*.md" -type f 2>/dev/null | grep -vE "$DEADLINK_EXCLUDE")
 
 if [ "$DEAD_LINKS" -gt 0 ]; then
     echo "WARNING: $DEAD_LINKS dead links found"

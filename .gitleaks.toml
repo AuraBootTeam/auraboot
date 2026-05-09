@@ -9,7 +9,7 @@ useDefault = true
 description = "Global allowlist for known-safe placeholders and test fixtures."
 
 paths = [
-  # Binary / lock / build artifacts
+  # Binary / lock / build artifacts (low risk, scan noise)
   '''(.*?)(jpg|jpeg|gif|png|webp|svg|ico|pdf|woff2?|ttf|eot)$''',
   '''node_modules/''',
   '''build/''',
@@ -24,14 +24,19 @@ paths = [
   '''test-results/''',
   '''playwright-report/''',
 
-  # Test storage / fixtures (Playwright login state, perf baselines, BPM business keys)
-  '''web-admin/tests/storage/.*\.json$''',
-  '''scripts/perf-ci/baseline/.*\.json$''',
-  '''plugins/(test-fixtures|e2e-test-order)/config/i18n\.json$''',
-  '''web-admin/app/plugins/.*/__tests__/.*\.tsx?$''',
-  '''plugins/cli/tests/.*\.test\.ts$''',
-  '''web-admin/tests/e2e/.*\.spec\.ts$''',
-  '''platform/src/test/.*\.(yml|yaml|properties|json)$''',
+  # Known-FP fixture FILES — specifically scoped so a real secret accidentally
+  # committed elsewhere still gets flagged. The Playwright storage-state and
+  # i18n-fixture directories ARE allowed broadly because by their nature
+  # (test-only auth state / generated translation keys) they accumulate
+  # JWT-shaped tokens that are signed with a documented dev-only secret.
+  '''^web-admin/tests/storage/.*\.json$''',
+  '''^scripts/perf-ci/baseline/.*\.json$''',
+  '''^plugins/test-fixtures/config/i18n\.json$''',
+  '''^plugins/e2e-test-order/config/i18n\.json$''',
+  '''^web-admin/app/plugins/core-bpm/components/__tests__/TaskCenter\.test\.tsx$''',
+  '''^plugins/cli/tests/client/api-client\.test\.ts$''',
+  '''^web-admin/tests/e2e/setup/setup-wizard\.spec\.ts$''',
+  '''^platform/src/test/resources/application-integration-test\.yml$''',
 ]
 
 regexes = [

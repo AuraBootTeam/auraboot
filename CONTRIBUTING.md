@@ -215,6 +215,6 @@ For organizations, a Corporate CLA may be required if your employer holds rights
 
 ## Documentation contributions
 
-Docs PRs are especially welcome and have a faster review lane (24h target). The docs source of truth lives in `auraboot/docs/`; the public site at docs.auraboot.com is auto-synced via `scripts/sync-docs-to-website.sh`. If you're adding screenshots, see [docs/community/readme-screenshots-spec.md](docs/community/readme-screenshots-spec.md) for visual conventions.
+Docs PRs are especially welcome and have a faster review lane (we aim to first-respond within 24h on docs PRs during beta). The docs source of truth lives in `auraboot/docs/`; the public site at docs.auraboot.com is auto-synced via `scripts/sync-docs-to-website.sh`. If you're adding screenshots, see [docs/community/readme-screenshots-spec.md](docs/community/readme-screenshots-spec.md) for visual conventions.
 
 Thank you for helping make AuraBoot better!

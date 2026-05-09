@@ -88,10 +88,12 @@ fi
 step "6/8 Login API contract"
 LOGIN_RESPONSE=$(curl -fsS -m 5 -X POST http://localhost:6443/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"ChangeMeOnFirstLogin!"}' 2>/dev/null || echo "FAIL")
-if echo "$LOGIN_RESPONSE" | grep -q '"token"'; then
-  ok "login returns JWT"
-  TOKEN=$(echo "$LOGIN_RESPONSE" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+  -d '{"email":"admin@example.com","password":"Test2026x"}' 2>/dev/null || echo "FAIL")
+# AuraBoot wraps responses as ApiResponse<AuthenticationResponse> →
+# the JWT is at $.data.jwt, not $.token.
+if echo "$LOGIN_RESPONSE" | grep -q '"jwt"'; then
+  ok "login returns JWT (data.jwt)"
+  TOKEN=$(echo "$LOGIN_RESPONSE" | sed -n 's/.*"jwt":"\([^"]*\)".*/\1/p')
 else
   fail "login failed; response: $(echo "$LOGIN_RESPONSE" | head -c 200)"
   TOKEN=""
