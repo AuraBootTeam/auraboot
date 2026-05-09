@@ -217,7 +217,7 @@
     "lint-staged": "^16.4.0",
     "nyc": "^18.0.0",
     "prettier": "^3.8.1",
-    "prettier-plugin-tailwindcss": "^0.7.2",
+    "prettier-plugin-tailwindcss": "^0.8.0",
     "react-router-devtools": "^1.1.0",
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.0.13",
