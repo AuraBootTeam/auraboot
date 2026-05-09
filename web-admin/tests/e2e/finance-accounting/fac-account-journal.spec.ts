@@ -149,15 +149,18 @@ async function createJournalEntryViaApi(
   overrides: Record<string, unknown> = {},
 ): Promise<{ recordId: string; code: string }> {
   const periodName = `E2E FP ${uniqueId()}`;
+  // fin_fp_period is constrained to 1-12; use a random year to avoid (year, period) collisions across tests
+  const fpYear = 3000 + Math.floor(Math.random() * 6000);
+  const fpPeriod = Math.floor(Math.random() * 12) + 1;
   const fiscalPeriod = await executeCommandViaApi(
     page,
     'fin:create_fiscal_period',
     {
-      fin_fp_year: 2026,
-      fin_fp_period: Math.floor(Math.random() * 9000) + 1000,
+      fin_fp_year: fpYear,
+      fin_fp_period: fpPeriod,
       fin_fp_name: periodName,
-      fin_fp_start_date: '2026-01-01',
-      fin_fp_end_date: '2026-12-31',
+      fin_fp_start_date: `${fpYear}-01-01`,
+      fin_fp_end_date: `${fpYear}-12-31`,
     },
     undefined,
     'create',
