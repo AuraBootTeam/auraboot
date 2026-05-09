@@ -678,10 +678,11 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
     test.skip(missingProcessUpdatePermission, 'Missing permission: system.process.update');
     await navigateToProcessDefinitionList(page);
 
-    // Find search input
+    // Find search input — ListToolbar renders [data-testid="list-search-input"];
+    // legacy fallbacks kept for plugins that have not migrated yet.
     const searchInput = page
       .locator(
-        'input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"], [data-testid="search-input"]',
+        '[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"], [data-testid="search-input"]',
       )
       .first();
 
