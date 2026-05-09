@@ -25,8 +25,7 @@ import {
   findRowInPaginatedList,
 } from '../helpers/index';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
-
-const BACKEND_URL = 'http://localhost:6443';
+import { BACKEND_URL } from '../../helpers/environments';
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

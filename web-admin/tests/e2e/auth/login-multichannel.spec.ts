@@ -14,6 +14,7 @@
 import { test, expect } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -56,7 +57,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     await page.request.put('/api/admin/login-channels', {
@@ -74,7 +75,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     await page.request.put('/api/admin/login-channels', {

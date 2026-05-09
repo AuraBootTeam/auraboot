@@ -27,6 +27,7 @@ import {
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Test Describe: Construction Log — CRUD
@@ -44,7 +45,7 @@ test.describe('CP Construction Log — CRUD', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     projectId = await getTestProjectId(p);
@@ -213,7 +214,7 @@ test.describe('CP Construction Log — CRUD', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     // Attempt cleanup in case delete test didn't run
@@ -241,7 +242,7 @@ test.describe('CP Weekly Report — Lifecycle', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     projectId = await getTestProjectId(p);
@@ -447,7 +448,7 @@ test.describe('CP Weekly Report — Lifecycle', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     if (reportPid) {
@@ -474,7 +475,7 @@ test.describe('CP Material Inspection — Lifecycle', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     projectId = await getTestProjectId(p);
@@ -606,7 +607,7 @@ test.describe('CP Material Inspection — Lifecycle', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     // PASSED/failed inspections cannot be deleted (fromStates: [pending] for delete)
@@ -641,7 +642,7 @@ test.describe('CP Site Issue — Lifecycle', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     projectId = await getTestProjectId(p);
@@ -737,7 +738,7 @@ test.describe('CP Site Issue — Lifecycle', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     // closed issues cannot be deleted (fromStates: [open] for delete)
@@ -765,7 +766,7 @@ test.describe('CP Issue Follow-Up', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     projectId = await getTestProjectId(p);
@@ -822,7 +823,7 @@ test.describe('CP Issue Follow-Up', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     if (followUpPid) {

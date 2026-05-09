@@ -25,6 +25,7 @@ import {
   clickRowActionByLocator,
 } from '../helpers/index';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Page keys (hyphenated for URL / API compatibility)
@@ -510,7 +511,7 @@ test.describe('DK Document Version', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const setupPage = await ctx.newPage();
 
@@ -567,7 +568,7 @@ test.describe('DK Document Version', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const cleanupPage = await ctx.newPage();
 
@@ -605,7 +606,7 @@ test.describe('DK Project-Document Link', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const setupPage = await ctx.newPage();
 
@@ -670,7 +671,7 @@ test.describe('DK Project-Document Link', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const cleanupPage = await ctx.newPage();
 

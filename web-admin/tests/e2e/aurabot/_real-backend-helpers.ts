@@ -12,6 +12,8 @@
  */
 
 import { execSync } from 'node:child_process';
+import { PSQL_BASE } from '../../helpers/pg-env';
+import { BACKEND_URL } from '../../helpers/playwright-env';
 
 // Admin primary tenant — matches the JWT issued by
 // `admin@example.com / Test2026x`. Keep in sync with
@@ -24,7 +26,7 @@ import { execSync } from 'node:child_process';
 function resolveAdminTenantId(): string {
   try {
     const out = execSync(
-      `curl -s -X POST http://localhost:6443/api/auth/login -H 'Content-Type: application/json' ` +
+      `curl -s -X POST ${BACKEND_URL}/api/auth/login -H 'Content-Type: application/json' ` +
         `-d '{"email":"admin@example.com","password":"Test2026x"}'`,
     ).toString();
     const parsed = JSON.parse(out);
@@ -54,7 +56,7 @@ export const ADMIN_TENANT_ID = resolveAdminTenantId();
 function resolveAiCenterMenuId(): string {
   try {
     const sql = `SELECT DISTINCT parent_id FROM ab_menu WHERE tenant_id = ${ADMIN_TENANT_ID} AND path LIKE '/aurabot/%' AND parent_id IS NOT NULL LIMIT 1;`;
-    const id = execSync(`psql -h localhost -U ghj -d aura_boot -tA`, {
+    const id = execSync(`${PSQL_BASE} -tA`, {
       input: sql,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
@@ -77,7 +79,7 @@ function psql(sql: string): string {
   // needs real \n characters) without worrying about shell quoting. -tA keeps
   // the output aligned-free and tuples-only so the caller can parse it.
   return execSync(
-    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+    `${PSQL_BASE} -P pager=off -v ON_ERROR_STOP=1 -tA`,
     { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
   )
     .toString()
@@ -91,7 +93,7 @@ function psql(sql: string): string {
  */
 function psqlQuiet(sql: string): string {
   return execSync(
-    `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -qtA`,
+    `${PSQL_BASE} -P pager=off -v ON_ERROR_STOP=1 -qtA`,
     { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
   )
     .toString()

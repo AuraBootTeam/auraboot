@@ -19,6 +19,7 @@
 
 import { test, expect, type Page } from '../../fixtures';
 import { uniqueId } from '../helpers/index';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Serial mode
@@ -112,7 +113,7 @@ test.describe('Permission Management — Role Members Tab', () => {
       storageState: 'tests/storage/admin.json',
     });
     const page = await context.newPage();
-    const baseURL = 'http://localhost:5173';
+    const baseURL = BASE_URL;
 
     // Create test role via API
     const resp = await page.request.post(`${baseURL}/api/roles`, {

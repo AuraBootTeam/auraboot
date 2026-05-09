@@ -23,7 +23,8 @@ import {
 } from '../../helpers/designer-dsl';
 import { loginAs } from '../../helpers/wd-fixtures';
 
-const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:6443';
+import { BACKEND_URL } from '../../helpers/environments';
+const BACKEND = BACKEND_URL;
 
 test.describe('BPM designer — receiveTask', { tag: ['@bpm-regression'] }, () => {
   test('flow with receiveTask — L1 designerJson + L2 BPMN XML', async ({ page, request }) => {

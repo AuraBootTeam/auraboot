@@ -21,6 +21,7 @@ import {
   queryFilteredList,
   findRowInPaginatedList,
 } from '../helpers/index';
+import { BASE_URL } from '../../helpers/environments';
 
 /** Navigate to the supplier invoice list page, setting up waitForResponse BEFORE goto. */
 async function gotoInvoiceList(page: Page): Promise<void> {
@@ -28,7 +29,7 @@ async function gotoInvoiceList(page: Page): Promise<void> {
     (r) => r.url().includes('/api/dynamic/fin_supplier_invoice/list') && r.status() === 200,
     { timeout: 15_000 },
   );
-  await page.goto('http://localhost:5173/finance/supplier-invoices');
+  await page.goto(`${BASE_URL}/finance/supplier-invoices`);
   await listResponse;
   await expect(page.locator('table, [class*="ant-table"]')).toBeVisible({ timeout: 10_000 });
 }

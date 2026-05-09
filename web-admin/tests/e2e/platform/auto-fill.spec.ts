@@ -15,7 +15,7 @@
 
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5173';
+import { BASE_URL } from '../../helpers/environments';
 
 /**
  * Authenticate and return a request context with session cookies.

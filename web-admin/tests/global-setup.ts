@@ -15,6 +15,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { DEFAULT_TEST_ACCOUNT } from './helpers/test-accounts';
+import { BASE_URL as DEFAULT_BASE_URL } from './helpers/playwright-env';
 
 // ES module compatibility for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -188,7 +189,7 @@ async function globalSetup(config: FullConfig): Promise<void> {
 
   // Get baseURL from config
   const project = config.projects.find((p) => p.name === 'chromium') || config.projects[0];
-  const baseURL = project?.use?.baseURL || 'http://localhost:5173';
+  const baseURL = project?.use?.baseURL || DEFAULT_BASE_URL;
   console.log(`   Base URL: ${baseURL}`);
 
   // Login admin (required)

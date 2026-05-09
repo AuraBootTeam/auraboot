@@ -20,6 +20,7 @@ import {
   todayStr,
 } from '../helpers/index';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 const PAGE_KEY = 'dk-document';
 
@@ -131,7 +132,7 @@ test.describe('DK Access Control @smoke', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const cleanupPage = await ctx.newPage();
 
