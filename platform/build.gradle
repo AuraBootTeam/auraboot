@@ -367,7 +367,7 @@ dependencies {
     implementation 'io.github.java-diff-utils:java-diff-utils:4.12'
 
     // JSON Schema Validator (Draft-07) for DSL page validation
-    implementation 'com.networknt:json-schema-validator:1.5.6'
+    implementation 'com.networknt:json-schema-validator:1.5.9'
 
     // PF4J Plugin Framework for hot-loading
     implementation "org.pf4j:pf4j:${pf4jVersion}"
