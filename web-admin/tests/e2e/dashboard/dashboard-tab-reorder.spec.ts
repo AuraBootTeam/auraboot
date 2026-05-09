@@ -15,7 +15,10 @@
 
 import { test, expect } from '../../fixtures';
 
-const BASE_URL = 'http://localhost:5173';
+// Derive from PLAYWRIGHT_BASE_URL so isolated docker stacks (e.g. GA-E2E on
+// :5174) work without a hardcoded port. Falls back to the default 5173 used
+// by the host-mode dev stack.
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
 const DASHBOARDS_PATH = '/dashboards';
 const TABS_SEL = 'nav[aria-label="Dashboard tabs"] button.cursor-grab';
 const TS = Date.now();
