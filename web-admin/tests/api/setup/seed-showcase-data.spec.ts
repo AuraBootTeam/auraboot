@@ -1338,8 +1338,8 @@ test.describe.serial('Showcase Seed Data', () => {
         notes: '首批500片，含PCB+SMT+测试',
         transitions: [
           'crm:qualify_opportunity',
-          'crm:propose_opportunity',
-          'crm:negotiate_opportunity',
+          'crm:advance_opp_to_proposal',
+          'crm:advance_opp_to_negotiation',
           'crm:win_opportunity',
         ],
       },
@@ -1352,8 +1352,8 @@ test.describe.serial('Showcase Seed Data', () => {
         notes: 'Q4追加800片',
         transitions: [
           'crm:qualify_opportunity',
-          'crm:propose_opportunity',
-          'crm:negotiate_opportunity',
+          'crm:advance_opp_to_proposal',
+          'crm:advance_opp_to_negotiation',
           'crm:win_opportunity',
         ],
       },
@@ -1366,8 +1366,8 @@ test.describe.serial('Showcase Seed Data', () => {
         notes: '年度框架，分季度交付',
         transitions: [
           'crm:qualify_opportunity',
-          'crm:propose_opportunity',
-          'crm:negotiate_opportunity',
+          'crm:advance_opp_to_proposal',
+          'crm:advance_opp_to_negotiation',
           'crm:win_opportunity',
         ],
       },
@@ -1381,8 +1381,8 @@ test.describe.serial('Showcase Seed Data', () => {
         notes: '年度协议，6款产品，原始报价480万，谈判至460万',
         transitions: [
           'crm:qualify_opportunity',
-          'crm:propose_opportunity',
-          'crm:negotiate_opportunity',
+          'crm:advance_opp_to_proposal',
+          'crm:advance_opp_to_negotiation',
           'crm:win_opportunity',
         ],
       },
@@ -1394,7 +1394,7 @@ test.describe.serial('Showcase Seed Data', () => {
         amount: 580000,
         closeDate: dateAt(18, 15),
         notes: '定制伺服驱动器方案',
-        transitions: ['crm:qualify_opportunity', 'crm:propose_opportunity'],
+        transitions: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal'],
       },
       {
         name: '新能源充电模块',
@@ -1405,8 +1405,8 @@ test.describe.serial('Showcase Seed Data', () => {
         notes: '7kW充电模块，质量要求极严',
         transitions: [
           'crm:qualify_opportunity',
-          'crm:propose_opportunity',
-          'crm:negotiate_opportunity',
+          'crm:advance_opp_to_proposal',
+          'crm:advance_opp_to_negotiation',
         ],
       },
       {
@@ -1434,7 +1434,7 @@ test.describe.serial('Showcase Seed Data', () => {
         amount: 280000,
         closeDate: dateAt(18, 20),
         notes: '5G小基站配套',
-        transitions: ['crm:qualify_opportunity', 'crm:propose_opportunity'],
+        transitions: ['crm:qualify_opportunity', 'crm:advance_opp_to_proposal'],
       },
       {
         name: '工业网关方案',
@@ -1463,8 +1463,8 @@ test.describe.serial('Showcase Seed Data', () => {
         notes: '自动化产线控制',
         transitions: [
           'crm:qualify_opportunity',
-          'crm:propose_opportunity',
-          'crm:negotiate_opportunity',
+          'crm:advance_opp_to_proposal',
+          'crm:advance_opp_to_negotiation',
         ],
       },
       // Lost opportunities
@@ -1477,7 +1477,7 @@ test.describe.serial('Showcase Seed Data', () => {
         notes: '客户选择了更便宜的供应商（竞品低15%）',
         transitions: [
           'crm:qualify_opportunity',
-          'crm:propose_opportunity',
+          'crm:advance_opp_to_proposal',
           'crm:lose_opportunity',
         ],
       },
@@ -1500,8 +1500,8 @@ test.describe.serial('Showcase Seed Data', () => {
         notes: '大批量车载充电器',
         transitions: [
           'crm:qualify_opportunity',
-          'crm:propose_opportunity',
-          'crm:negotiate_opportunity',
+          'crm:advance_opp_to_proposal',
+          'crm:advance_opp_to_negotiation',
           'crm:win_opportunity',
         ],
       },
@@ -1769,6 +1769,33 @@ test.describe.serial('Showcase Seed Data', () => {
         status: 'active',
         description: '全年SEO优化，目标关键词：PCBA加工、电子元器件供应、BMS控制板。',
       },
+      {
+        name: '2025华南区线下沙龙',
+        type: 'event',
+        startDate: dateAt(15, 1),
+        endDate: dateAt(15, 3),
+        budget: 28000,
+        status: 'planned',
+        description: '深圳/广州/东莞三地线下技术沙龙，邀请重点客户技术负责人。',
+      },
+      {
+        name: '2025汽车电子行业垂直邮件营销',
+        type: 'email',
+        startDate: dateAt(13, 5),
+        endDate: dateAt(15, 30),
+        budget: 18000,
+        status: 'active',
+        description: '针对汽车电子目标客户分批发送行业解决方案邮件，季度复盘。',
+      },
+      {
+        name: '2024线上线下一体化推广(已取消)',
+        type: 'digital',
+        startDate: dateAt(7, 1),
+        endDate: dateAt(9, 30),
+        budget: 50000,
+        status: 'cancelled',
+        description: '原计划线上线下一体化推广，因预算调整取消。',
+      },
     ];
 
     for (const cpn of campaigns) {
@@ -1787,6 +1814,8 @@ test.describe.serial('Showcase Seed Data', () => {
       } else if (cpn.status === 'completed') {
         await cmd(page, 'crm:activate_campaign', {}, id, 'update').catch(() => {});
         await cmd(page, 'crm:complete_campaign', {}, id, 'update').catch(() => {});
+      } else if (cpn.status === 'cancelled') {
+        await cmd(page, 'crm:cancel_campaign', {}, id, 'update').catch(() => {});
       }
 
       ids.campaigns[cpn.name] = id;
