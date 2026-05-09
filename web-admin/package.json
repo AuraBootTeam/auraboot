@@ -77,7 +77,7 @@
     ]
   },
   "dependencies": {
-    "@atlaskit/pragmatic-drag-and-drop": "^1.7.0",
+    "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
     "@auraboot/core": "workspace:*",
     "@auraboot/dsl-types": "workspace:*",
     "@auraboot/nav-model": "workspace:*",
