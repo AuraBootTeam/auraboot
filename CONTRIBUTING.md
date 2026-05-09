@@ -15,10 +15,10 @@ All participants are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 | Tool       | Version | Notes                          |
 |------------|---------|--------------------------------|
 | Java (JDK) | 21+     | GraalVM or Temurin recommended |
-| Node.js    | 18+     | LTS version preferred          |
-| PostgreSQL | 14+     | Running on default port 5432   |
-| Redis      | 7+      | Running on default port 6379   |
-| pnpm       | 9+      | Install via `npm install -g pnpm` |
+| Node.js    | 20+     | Active LTS; matches README + CI |
+| PostgreSQL | 15+     | Default port 5432; Docker stack ships PG 16; pgvector required for AI features |
+| Redis      | 7+      | Default port 6379              |
+| pnpm       | 9+      | `npm install -g pnpm`          |
 | Git        | 2.30+   |                                |
 
 ### Getting Started
