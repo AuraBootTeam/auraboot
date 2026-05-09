@@ -171,7 +171,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
         AggregateQueryResponse response = new AggregateQueryResponse();
         response.setRows(rows);
-        response.setMeta(buildMeta(request));
+        response.setMeta(buildMetaForNamedQuery(request, query, fieldMap));
         response.setSummary(calculateSummary(rows, request.getMetrics()));
 
         return response;
@@ -237,10 +237,11 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         }
 
         if (selectClauses.isEmpty()) {
-            throw new MetaServiceException("At least one metric or dimension is required");
+            // Identity passthrough — return the named query's full output as-is
+            sql.append("*");
+        } else {
+            sql.append(String.join(", ", selectClauses));
         }
-
-        sql.append(String.join(", ", selectClauses));
 
         // FROM clause: use Named Query's fromSql as subquery
         // Tenant isolation is handled by MyBatis tenant interceptor or fromSql definition
@@ -656,6 +657,32 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         }
 
         return value;
+    }
+
+    /**
+     * Build query metadata for a named query request.
+     * When the request has no explicit dimensions or metrics (identity passthrough),
+     * meta.metrics is derived from the named query's outputFields whitelist.
+     */
+    private AggregateQueryResponse.QueryMeta buildMetaForNamedQuery(
+            AggregateQueryRequest request,
+            NamedQuery query,
+            Map<String, NamedQueryField> fieldMap) {
+        boolean hasExplicitProjection =
+                (request.getDimensions() != null && !request.getDimensions().isEmpty())
+                || (request.getMetrics() != null && !request.getMetrics().isEmpty());
+        if (hasExplicitProjection) {
+            return buildMeta(request);
+        }
+        // Identity passthrough — meta.metrics derives from named query whitelist
+        AggregateQueryResponse.QueryMeta meta = new AggregateQueryResponse.QueryMeta();
+        meta.setDimensions(java.util.Collections.emptyList());
+        List<String> fieldCodes = fieldMap.values().stream()
+                .map(NamedQueryField::getFieldCode)
+                .sorted()
+                .collect(Collectors.toList());
+        meta.setMetrics(fieldCodes);
+        return meta;
     }
 
     /**
