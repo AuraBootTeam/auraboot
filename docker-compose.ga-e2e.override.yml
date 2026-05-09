@@ -83,6 +83,14 @@ services:
       # Design: auraboot-enterprise/docs/plans/2026-05/2026-05-08-pf4j-plugin-backend-loading-design.md
       - ../auraboot-enterprise/build/plugin-jars:/app/plugin-jars:ro
     environment:
+      # Activate `test` profile alongside `community` so the
+      # TestUserSpoofFilter (and any other @Profile("test") beans the OSS
+      # E2E suite expects) gets registered. Specs like aurabot
+      # ai-user-soul-profile-real.spec.ts use `X-Test-Spoof-User-Id` to
+      # impersonate a synthetic user whose seeded rows must be visible to
+      # the admin session; without `test` profile the filter is absent
+      # and the header is silently ignored.
+      SPRING_PROFILES_ACTIVE: community,test
       # CORS allow-list covers the in-container vite/BFF host plus the
       # host-mapped variants (5174/3501) that Playwright targets.
       FRONTEND_BASE_URL: http://localhost:5174
