@@ -53,6 +53,13 @@ jobs:
         working-directory: platform
         run: ./gradlew --no-daemon compileJava compileTestJava
 
+      # Phase 2.1 IT scaffolding: compile-only gate ensures IT sources stay
+      # green even though we don't run the suite in CI yet (running requires
+      # a seeded Postgres — schema init script is Phase 2.2 backlog).
+      - name: Compile (integrationTest sources)
+        working-directory: platform
+        run: ./gradlew --no-daemon compileIntegrationTestJava
+
       - name: Checkstyle (main)
         working-directory: platform
         run: ./gradlew --no-daemon checkstyleMain

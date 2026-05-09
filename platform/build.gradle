@@ -718,3 +718,69 @@ tasks.register('codeQuality') {
     description = 'Run all static analysis: Checkstyle + PMD + ArchUnit tests'
     dependsOn 'checkstyleMain', 'pmdMain', 'test'
 }
+
+// ========== Integration Test source set (Phase 2.1 IT scaffolding) ==========
+//
+// Separate from the default `test` task so:
+//   • unit tests stay fast and run on every commit
+//   • IT (real Postgres, full Spring context) run on demand or in a dedicated CI job
+//
+// Layout:
+//   platform/src/integrationTest/java       — *IT.java sources
+//   platform/src/integrationTest/resources  — IT-only application-*.yml etc.
+//
+// Existing IT under src/test/java continue to run via the default `test` task —
+// this source set is purely additive. New ITs (BootstrapEngineServiceIT,
+// future BootstrapRepairServiceIT, etc.) belong here.
+sourceSets {
+    integrationTest {
+        java {
+            srcDir 'src/integrationTest/java'
+        }
+        resources {
+            srcDir 'src/integrationTest/resources'
+        }
+        compileClasspath += sourceSets.main.output + sourceSets.test.output
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+    }
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+    integrationTestCompileOnly.extendsFrom testCompileOnly
+    integrationTestAnnotationProcessor.extendsFrom testAnnotationProcessor
+}
+
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    description = 'Run integration tests (real Postgres, full Spring context).'
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    shouldRunAfter test
+
+    // Mirror `test` task JVM args so behavior matches.
+    jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
+    jvmArgs '-Duser.timezone=UTC'
+    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+
+    // Single fork — Postgres connection pool is shared across tests.
+    maxParallelForks = 1
+
+    def integrationTmpDir = file("${buildDir}/tmp/integrationTest")
+    integrationTmpDir.mkdirs()
+    systemProperty 'java.io.tmpdir', integrationTmpDir.absolutePath
+
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = false
+    }
+}
+
+// Ensure IT compile errors surface during `./gradlew check`.
+tasks.named('check').configure {
+    dependsOn 'compileIntegrationTestJava'
+}
