@@ -177,7 +177,7 @@ compileTestJava {
 
 // 版本管理
 ext {
-    jacksonVersion = '2.19.2'
+    jacksonVersion = '2.21.3'
     sentryVersion = '6.28.0'
     jwtVersion = '0.12.6'
     mybatisPlusVersion = '3.5.14'
