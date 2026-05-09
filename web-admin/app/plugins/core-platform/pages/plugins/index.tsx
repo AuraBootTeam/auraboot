@@ -111,7 +111,12 @@ export default function PluginsPage() {
 
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200">
-        <nav className="-mb-px flex" data-testid="plugins-tabs">
+        <nav
+          className="-mb-px flex"
+          data-testid="plugins-tabs"
+          role="tablist"
+          aria-label={t('plugin.title')}
+        >
           {availableTabs.map((key) => {
             const meta = tabMeta[key];
             const Icon = meta.icon;
@@ -121,6 +126,11 @@ export default function PluginsPage() {
                 key={key}
                 onClick={() => setTab(key)}
                 data-testid={`plugins-tab-${key}`}
+                role="tab"
+                aria-selected={active}
+                aria-controls={`plugins-tabpanel-${key}`}
+                id={`plugins-tab-${key}`}
+                type="button"
                 className={`border-b-2 px-6 py-3 text-sm font-medium ${
                   active
                     ? 'border-indigo-500 text-indigo-600'
