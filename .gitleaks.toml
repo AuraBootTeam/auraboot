@@ -1,0 +1,51 @@
+# Gitleaks configuration for AuraBoot OSS repo.
+# Extends the default ruleset; adds repo-specific allowlists for known
+# false positives (test fixtures, i18n keys, default-dev placeholders).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for known-safe placeholders and test fixtures."
+
+paths = [
+  # Binary / lock / build artifacts
+  '''(.*?)(jpg|jpeg|gif|png|webp|svg|ico|pdf|woff2?|ttf|eot)$''',
+  '''node_modules/''',
+  '''build/''',
+  '''dist/''',
+  '''target/''',
+  '''\.gradle/''',
+  '''\.idea/''',
+  '''\.worktrees/''',
+  '''pnpm-lock\.yaml$''',
+  '''package-lock\.json$''',
+  '''gradle\.lockfile$''',
+  '''test-results/''',
+  '''playwright-report/''',
+
+  # Test storage / fixtures (Playwright login state, perf baselines, BPM business keys)
+  '''web-admin/tests/storage/.*\.json$''',
+  '''scripts/perf-ci/baseline/.*\.json$''',
+  '''plugins/(test-fixtures|e2e-test-order)/config/i18n\.json$''',
+  '''web-admin/app/plugins/.*/__tests__/.*\.tsx?$''',
+  '''plugins/cli/tests/.*\.test\.ts$''',
+  '''web-admin/tests/e2e/.*\.spec\.ts$''',
+  '''platform/src/test/.*\.(yml|yaml|properties|json)$''',
+]
+
+regexes = [
+  # Documented default credentials (intentionally weak, for local dev only)
+  '''ChangeMeOnFirstLogin!''',
+  '''admin@example\.com''',
+  '''dev-only-secret-key-replace-in-production-min-32-chars''',
+  '''change-me-in-production''',
+
+  # Placeholder API keys in samples / docs
+  '''sk-(your|placeholder|example|xxx).*''',
+  '''YOUR_[A-Z_]+_KEY''',
+  '''<your-[a-z-]+>''',
+
+  # JWT example / test tokens (literal "test" suffix)
+  '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.test''',
+]
