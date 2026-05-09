@@ -4,12 +4,12 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.trace.AiTraceService;
+import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -167,10 +167,10 @@ class AuraBotChatServiceTracePayloadTest {
                     String.class,
                     int.class,
                     double.class,
-                    SseEmitter.class);
+                    ResponseSink.class);
             method.setAccessible(true);
 
-            CapturingEmitter emitter = new CapturingEmitter();
+            CapturingResponseSink sink = new CapturingResponseSink();
             method.invoke(
                     service,
                     "http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
@@ -181,9 +181,9 @@ class AuraBotChatServiceTracePayloadTest {
                     "hello",
                     128,
                     0.2,
-                    emitter);
+                    sink);
 
-            List<CapturedEvent> visibleEvents = emitter.events.stream()
+            List<CapturedEvent> visibleEvents = sink.events.stream()
                     .filter(event -> "chunk".equals(event.name) || "done".equals(event.name))
                     .toList();
             assertThat(visibleEvents)
@@ -197,30 +197,32 @@ class AuraBotChatServiceTracePayloadTest {
         }
     }
 
-    private static class CapturingEmitter extends SseEmitter {
+    private static class CapturingResponseSink implements ResponseSink {
         final List<CapturedEvent> events = new ArrayList<>();
 
         @Override
-        public void send(SseEventBuilder builder) {
-            String name = "message";
-            Object payload = null;
-            for (var entry : builder.build()) {
-                Object data = entry.getData();
-                if (data instanceof String text) {
-                    int eventIndex = text.indexOf("event:");
-                    if (eventIndex >= 0) {
-                        String tail = text.substring(eventIndex + 6);
-                        int newline = tail.indexOf('\n');
-                        name = (newline >= 0 ? tail.substring(0, newline) : tail).trim();
-                    } else if (!text.startsWith("data:") && !text.isBlank()
-                            && !"\n".equals(text) && !"\n\n".equals(text) && !":".equals(text)) {
-                        payload = text;
-                    }
-                } else if (data != null) {
-                    payload = data;
-                }
-            }
-            events.add(new CapturedEvent(name, payload == null ? "" : payload.toString()));
+        public void onTextChunk(String text) {
+            events.add(new CapturedEvent("chunk", text == null ? "" : text));
+        }
+
+        @Override
+        public void onToolStart(String toolId, String toolName, Map<String, Object> input) {}
+
+        @Override
+        public void onToolResult(String toolId, Map<String, Object> result, boolean success) {}
+
+        @Override
+        public void onConfirmRequired(String toolId, String toolName, String description,
+                                       Map<String, Object> input, String sessionId) {}
+
+        @Override
+        public void onError(String message, String traceId) {
+            events.add(new CapturedEvent("error", message == null ? "" : message));
+        }
+
+        @Override
+        public void onDone(String finalResponse, String traceId) {
+            events.add(new CapturedEvent("done", finalResponse == null ? "" : finalResponse));
         }
     }
 

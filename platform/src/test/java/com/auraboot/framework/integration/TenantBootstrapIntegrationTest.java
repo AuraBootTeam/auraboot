@@ -65,13 +65,15 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
         // 预期: 10种资源类型 * 2种操作(manage, read) = 20个Permission被创建
         
         // 验证具体的Permission存在
-        // System permissions follow format: system.{resourceCode}.{action}
-        Permission modelManage = permissionMapper.findByCode("system.model.create");
-        assertNotNull(modelManage, "system.model.create permission should exist");
-        assertEquals("system", modelManage.getSource(), "Should be system-level permission");
+        // Permission code format (red-line #13): <resourceType>.<resourceCode>.<action>
+        // Legacy "system.*" prefix retired — SystemPermissionInitializer emits
+        // codes via PermissionCodeValidator.build, e.g. "model.model.read".
+        Permission modelCreate = permissionMapper.findByCode("model.model.create");
+        assertNotNull(modelCreate, "model.model.create permission should exist");
+        assertEquals("system", modelCreate.getSource(), "Should be system-level permission");
 
-        Permission modelRead = permissionMapper.findByCode("system.model.read");
-        assertNotNull(modelRead, "system.model.read permission should exist");
+        Permission modelRead = permissionMapper.findByCode("model.model.read");
+        assertNotNull(modelRead, "model.model.read permission should exist");
         assertEquals("system", modelRead.getSource(), "Should be system-level permission");
     }
     
@@ -180,17 +182,21 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
         assertTrue(result.getPermissionsAssigned() >= 0, 
             "Permissions assigned should be non-negative");
         
-        // 验证核心资源类型的Permission都被创建
-        // System permissions follow format: system.{resourceCode}.{action}
-        // For resources where resourceType == resourceCode, code is system.{code}.{action}
-        // For sub-resources (e.g., rbac/role), code is system.{type}_{subCode}.{action}
-        String[] basicResourceCodes = {"model", "component", "dict", "field",
-                                        "query", "form", "menu"};
+        // Permission code format (red-line #13): <resourceType>.<resourceCode>.<action>
+        // For resources where resourceType==resourceCode (e.g. model/model) the
+        // code reads "model.model.read"; for sub-resources (rbac/role) it reads
+        // "rbac.role.read". We only spot-check the canonical resources that
+        // SystemPermissionInitializer registers under the platform module.
+        String[][] sampleCodes = {
+                {"model", "model"},
+                {"field", "field"},
+                {"menu", "menu"}
+        };
         String[] actions = {"create", "read"};
 
-        for (String resourceCode : basicResourceCodes) {
+        for (String[] pair : sampleCodes) {
             for (String action : actions) {
-                String code = "system." + resourceCode + "." + action;
+                String code = pair[0] + "." + pair[1] + "." + action;
                 Permission permission = permissionMapper.findByCode(code);
                 assertNotNull(permission,
                     "Permission should exist: " + code);
@@ -199,12 +205,12 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
             }
         }
 
-        // 验证 RBAC 子资源的 Permission (rbac_role, rbac_user_role)
-        Permission roleCreate = permissionMapper.findByCode("system.rbac_role.create");
-        assertNotNull(roleCreate, "Permission should exist: system.rbac_role.create");
+        // Verify RBAC sub-resource permissions (resourceType=rbac, resourceCode=role)
+        Permission roleCreate = permissionMapper.findByCode("rbac.role.create");
+        assertNotNull(roleCreate, "Permission should exist: rbac.role.create");
 
-        // 验证 PAGE 子资源的 Permission (page, page_designer, page_publish)
-        Permission pageCreate = permissionMapper.findByCode("system.page.create");
-        assertNotNull(pageCreate, "Permission should exist: system.page.create");
+        // Verify PAGE sub-resource permissions
+        Permission pageCreate = permissionMapper.findByCode("page.page.create");
+        assertNotNull(pageCreate, "Permission should exist: page.page.create");
     }
 }

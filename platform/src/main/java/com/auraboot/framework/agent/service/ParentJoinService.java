@@ -297,9 +297,8 @@ public class ParentJoinService {
             if (!decision.isAllowed()) {
                 throw new CrossTenantAclDeniedException(parentTenant, childTenant, decision);
             }
-            throw new IllegalStateException(
-                    "parent run tenant " + parentTenant
-                            + " does not match child run tenant " + childTenant);
+            // ACL approved cross-tenant join — fall through into the regular
+            // latch / DB-readback path below.
         }
 
         JoinKey key = new JoinKey(parentRunId, childRunId);
