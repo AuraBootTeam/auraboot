@@ -7,8 +7,9 @@ import {
   setLeaveBalance,
   submitLeaveRequest,
 } from '../../helpers/wd-fixtures';
+import { BACKEND_URL } from '../../helpers/environments';
 
-const BACKEND = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
+const BACKEND = BACKEND_URL;
 
 /**
  * R3 — SLA escalation end-to-end.

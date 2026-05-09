@@ -17,6 +17,7 @@ import {
   queryFilteredList,
   clickRowActionByLocator,
 } from '../helpers/index';
+import { BASE_URL } from '../../helpers/environments';
 
 const HS_MODEL = 'dp_hazard_source';
 
@@ -300,7 +301,7 @@ test.describe('DP Issue — Hazard Source REFERENCE field', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
 
@@ -332,7 +333,7 @@ test.describe('DP Issue — Hazard Source REFERENCE field', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     // Cleanup

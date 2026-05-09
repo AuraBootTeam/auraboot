@@ -31,7 +31,8 @@ import {
 } from '../../helpers/designer-dsl';
 import { loginAs } from '../../helpers/wd-fixtures';
 
-const BACKEND = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
+import { BACKEND_URL } from '../../helpers/environments';
+const BACKEND = BACKEND_URL;
 
 async function setupFlow(
   page: any,

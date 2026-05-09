@@ -6,9 +6,10 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { BASE_URL } from '../../helpers/environments';
 
 export const TEST_CONFIG = {
-  baseURL: 'http://localhost:5173',
+  baseURL: BASE_URL,
   credentials: {
     email: DEFAULT_TEST_ACCOUNT.email,
     password: DEFAULT_TEST_ACCOUNT.password,

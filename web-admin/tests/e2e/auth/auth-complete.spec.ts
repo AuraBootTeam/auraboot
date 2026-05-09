@@ -40,6 +40,7 @@ import {
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { uniqueId } from '../helpers';
 import { HeaderPage } from '../../pages/HeaderPage';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -438,7 +439,7 @@ test.describe('Login — Email OTP', () => {
 
   test.beforeAll(async () => {
     const adminRequest = await playwrightRequest.newContext({
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
       storageState: 'tests/storage/admin.json',
     });
     try {
