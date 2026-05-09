@@ -13,8 +13,7 @@
 ### Q. The 5-minute quickstart didn't work for me. What now?
 
 1. Run `scripts/dev/verify-quickstart.sh` — it scripts the whole quickstart and prints what failed.
-2. Check the [Troubleshooting](docs/getting-started/troubleshooting.md) page (TODO before launch).
-3. Open a `[Question]` issue with the verifier output. We aim for first-response within 24h during beta.
+2. Open a `[Question]` issue with the verifier output. We aim to first-respond within 24h during beta. (A dedicated Troubleshooting page lands with v0.2.x — until then, verifier output + an issue is the path.)
 
 ### Q. Do I need Java 21? I'm on Java 17.
 

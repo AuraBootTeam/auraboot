@@ -2,9 +2,21 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | Yes                |
+| Version          | Supported       | Notes |
+| ---------------- | --------------- | ----- |
+| 0.1.x-beta       | ✅ best-effort | First public beta. Security fixes ship in the next minor (no separate patch line during beta). |
+| 0.x.y (post-beta)| ✅ patch line  | Latest 0.x minor receives patch fixes. |
+| 1.0.x and later  | ✅              | Patch + supported-minor policy. Strict semver from 1.0.0. |
+| pre-0.1.0        | ❌              | Not supported; use a tagged release. |
+
+During the 0.x beta, "best-effort" means we triage and fix verifiable
+security issues, but cannot commit to formal SLA windows or backports
+to older betas. Severity-driven targets:
+
+- **Critical** (RCE, auth bypass, mass data exposure): aim to patch in the
+  next release within 7 days; advisory issued.
+- **High**: aim to patch in the next minor (target 30 days).
+- **Medium / Low**: tracked publicly, scheduled by roadmap priority.
 
 ## Reporting a Vulnerability
 

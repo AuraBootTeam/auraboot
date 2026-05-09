@@ -7,6 +7,18 @@
 #
 # Ownership is conservative on day one — most paths land on the @core
 # team. Hand off to specialists as the contributor base grows.
+#
+# IMPORTANT: This file references the team `@AuraBootTeam/core`. The team
+# MUST exist on GitHub before this file is committed to a public repo —
+# otherwise GitHub silently no-ops the auto-review-request and a "review
+# from CODEOWNERS" branch protection rule will block every PR.
+#
+# Bootstrap sequence (do once before going public):
+#   1. gh api -X PUT /orgs/AuraBootTeam/teams/core/repos/AuraBootTeam/auraboot \
+#        -f permission=push
+#   2. Add at least 2 maintainers to the team:
+#        gh api -X PUT /orgs/AuraBootTeam/teams/core/memberships/<user>
+#   3. Verify: gh api /orgs/AuraBootTeam/teams/core (must return 200)
 
 # --- Defaults ---
 *                                            @AuraBootTeam/core
