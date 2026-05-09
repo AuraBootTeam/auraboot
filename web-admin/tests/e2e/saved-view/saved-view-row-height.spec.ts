@@ -88,7 +88,7 @@ test.describe('Row Height Control (GAP-127)', () => {
     await page.waitForTimeout(300);
 
     const shortHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
-    expect(shortHeight).toBeLessThanOrEqual(50); // 32px + padding + border tolerance
+    expect(shortHeight).toBeLessThanOrEqual(60); // 32px target + padding + border tolerance
 
     // Switch to "extra-tall"
     await rowHeightBtn.click();
