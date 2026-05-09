@@ -448,21 +448,42 @@ test.describe('Plugin System Deep', () => {
    */
   test('PL-008: Preview import (two-step)', async ({ page }) => {
     // Two-step preview in current backend is directory-based parse.
-    const pluginDir = path.resolve(process.cwd(), '../plugins/project-management');
-    const previewResp = await page.request.post('/api/plugins/import/parse-directory', {
-      data: { path: pluginDir },
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // The backend resolves the path on its own filesystem, so a host path will
+    // not exist when the backend runs in docker. Try host path first, fall
+    // back to the canonical container path used by the docker E2E stack.
+    const hostPluginDir = path.resolve(process.cwd(), '../plugins/project-management');
+    const candidatePaths = [
+      process.env.E2E_BACKEND_PLUGIN_DIR,
+      hostPluginDir,
+      '/app/plugins/project-management',
+    ].filter((p): p is string => Boolean(p));
 
-    if (!previewResp.ok()) {
-      throw new Error(String(`Preview parse-directory API returned HTTP ${previewResp.status()}`));
-      return;
+    let previewResult: any = null;
+    let lastError = '';
+    for (const candidate of candidatePaths) {
+      const resp = await page.request.post('/api/plugins/import/parse-directory', {
+        data: { path: candidate },
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!resp.ok()) {
+        lastError = `HTTP ${resp.status()} for ${candidate}`;
+        continue;
+      }
+      const body = await resp.json();
+      const data = body.data || body;
+      if (data?.valid !== false) {
+        previewResult = data;
+        break;
+      }
+      lastError = `valid=false for ${candidate}: ${JSON.stringify(data?.errors ?? [])}`;
     }
 
-    const previewResult = await previewResp.json();
-    const result = previewResult.data || previewResult;
-    const importId = result?.importId || result?.historyId || result?.id;
-    const isValid = Boolean(result?.valid ?? true);
+    if (!previewResult) {
+      throw new Error(`Preview parse-directory failed for all candidates. Last error: ${lastError}`);
+    }
+
+    const importId = previewResult?.importId || previewResult?.historyId || previewResult?.id;
+    const isValid = Boolean(previewResult?.valid ?? true);
     expect(isValid).toBe(true);
     expect(importId).toBeTruthy();
   });
