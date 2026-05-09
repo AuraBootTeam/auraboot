@@ -1,8 +1,11 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { execSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * MCP × Cursor end-to-end demonstrator.
