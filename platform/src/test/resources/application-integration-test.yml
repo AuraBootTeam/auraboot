@@ -92,6 +92,10 @@ security:
   password:
     require-uppercase: false
     require-special: false
+  field-encryption:
+    # Test-only AES-256 key (32 bytes base64). Enables encrypt/decrypt
+    # roundtrip in integration tests so encryption-at-rest assertions hold.
+    key: OfyNVseJd/jTpoQx1K15q9Gs/zByXkfqSz12dH+hw0Y=
 
 # 雪花ID配置
 snowflake:
