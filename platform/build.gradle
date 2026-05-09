@@ -342,6 +342,13 @@ dependencies {
     // PostgreSQL 数据库用于测试
     testImplementation 'org.postgresql:postgresql:42.7.8'
 
+    // TestContainers — ephemeral MySQL for connector SDK tests
+    testImplementation platform('org.testcontainers:testcontainers-bom:1.20.4')
+    testImplementation 'org.testcontainers:testcontainers'
+    testImplementation 'org.testcontainers:mysql'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:junit-jupiter'
+
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
     testImplementation 'org.awaitility:awaitility:4.2.0'
 
@@ -422,6 +429,13 @@ test {
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
     jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+
+    // TestContainers: Docker Desktop 29+ requires API v1.44+. The api.version
+    // property in src/test/resources/docker-java.properties pins docker-java
+    // to 1.47 so the shaded HTTP client does not send v1.32 requests that
+    // Docker Desktop now rejects with HTTP 400.
+    // Callers should also set DOCKER_HOST to the real daemon socket, e.g.
+    // DOCKER_HOST=unix:///Users/me/.docker/run/docker.sock
 
     // ─── Parallel execution ───
     // Integration tests share a real PostgreSQL connection pool.
