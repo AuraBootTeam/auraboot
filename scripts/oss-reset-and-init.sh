@@ -149,13 +149,19 @@ echo -e "${GREEN}   Database reset complete${NC}"
 echo -e "${YELLOW}Step 4: Starting backend service...${NC}"
 cd "$PLATFORM_DIR"
 
-# Disable AdminBootstrapRunner so this script is the sole authority for
-# bootstrap. Otherwise it races the explicit /api/bootstrap/setup call below
-# (auto-creates admin → BootstrapEngineService then fails to recreate it).
-# AdminBootstrapRunner exists for Docker first-run convenience (no script);
-# here the script drives, so disable it in BOTH modes.
-export AURABOOT_BOOTSTRAP_ENABLED=false
-echo "   AURABOOT_BOOTSTRAP_ENABLED=false (script-driven bootstrap, no auto-runner)"
+# Phase 2.4 of bootstrap-unified: the in-process BootstrapStartupRunner is
+# now idempotent (Phase 2.2 + 2.3) so we no longer have to suppress it to
+# avoid a race with the explicit /api/bootstrap/setup call. The script's
+# own /api/bootstrap/setup call still runs (back-compat for the wizard
+# semantics) and now lands on a backend that already has invariants 1-9
+# in place — the wizard call short-circuits via "already initialized".
+#
+# Escape hatch: --no-bootstrap mode disables the runner explicitly so the
+# wizard UI can drive a manual setup against an uninitialized backend.
+if [ "$NO_BOOTSTRAP" = "1" ]; then
+    export AURABOOT_BOOTSTRAP_ENABLED=false
+    echo "   AURABOOT_BOOTSTRAP_ENABLED=false (--no-bootstrap escape hatch)"
+fi
 
 # Start backend in background as a single long-running process
 nohup ./gradlew bootRun > /tmp/aura-backend.log 2>&1 &
