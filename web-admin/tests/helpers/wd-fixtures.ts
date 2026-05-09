@@ -18,15 +18,7 @@
 import { expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 
-// Resolve BASE_URL via the unified env contract: prefer PLAYWRIGHT_BASE_URL
-// (the Playwright runner's primary handle on the vite host port), fall
-// back to the legacy BASE_URL var, then auto-derive from VITE_PORT (set
-// by start-isolated.sh per worktree). Defaults preserve host-mode.
-const BASE_URL =
-  process.env.PLAYWRIGHT_BASE_URL ??
-  process.env.BASE_URL ??
-  `http://localhost:${process.env.VITE_PORT ?? '5173'}`;
-const BACKEND_URL = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
+import { BASE_URL, BACKEND_URL } from './playwright-env';
 
 // ---------------------------------------------------------------------------
 // loginAs

@@ -64,6 +64,10 @@ jobs:
         working-directory: web-admin
         run: pnpm lint
 
+      - name: Env-drift gate (tests/)
+        working-directory: web-admin
+        run: pnpm test:env-lint
+
       - name: Type-check web-admin
         working-directory: web-admin
         run: pnpm typecheck
