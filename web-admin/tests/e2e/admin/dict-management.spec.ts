@@ -57,8 +57,10 @@ test.describe('Dictionary Management @smoke', () => {
     const box = await container.boundingBox();
     expect(box).not.toBeNull();
     // max-w-7xl = 1280px would cap container; full-width layout (matching ListPageContent
-    // used by /meta/models) should follow viewport.
-    expect(box!.width).toBeGreaterThan(1400);
+    // used by /meta/models) should follow viewport (modulo the ~256px sidebar).
+    // At 1600px viewport, content area is ~1344px when sidebar is present — anything
+    // greater than 1280 proves the page is NOT capped at max-w-7xl.
+    expect(box!.width).toBeGreaterThan(1280);
   });
 
   test('should filter by dict type SIMPLE and return results', async ({ page }) => {
