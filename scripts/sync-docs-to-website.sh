@@ -60,6 +60,7 @@ SECTIONS=(
   "docs/deployment:deployment"
   "docs/plugin-development:plugin-development"
   "docs/use-cases:use-cases"
+  "docs/operations:operations"
 )
 
 # Patterns we never publish (internal-only)
