@@ -183,6 +183,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@originjs/vite-plugin-federation": "^1.4.1",
     "@playwright/test": "^1.53.2",
     "@react-router/dev": "7.5.0",
