@@ -26,9 +26,12 @@ test.describe('Quick Filters (GAP-130)', () => {
     await page.goto('/p/e2et_order');
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
 
-    await expect(quickFilter(page, 'my_records')).toContainText('My Records');
-    await expect(quickFilter(page, 'created_today')).toContainText('Created Today');
-    await expect(quickFilter(page, 'modified_this_week')).toContainText('Modified This Week');
+    // Locale-agnostic: backend may render zh-CN by default
+    await expect(quickFilter(page, 'my_records')).toHaveText(/My Records|我的记录/);
+    await expect(quickFilter(page, 'created_today')).toHaveText(/Created Today|今日新建/);
+    await expect(quickFilter(page, 'modified_this_week')).toHaveText(
+      /Modified This Week|本周修改/,
+    );
   });
 
   test('QF-003: clicking a quick filter toggles active state', async ({ page }) => {
