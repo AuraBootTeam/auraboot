@@ -40,11 +40,15 @@ import { uniqueId } from '../helpers/index';
 const ADMIN_EMAIL = 'admin@example.com';
 const ADMIN_PASSWORD = 'Test2026x';
 const PG_CONN = {
-  host: 'localhost',
-  port: 5432,
-  database: 'aura_boot',
+  host: process.env.PGHOST ?? 'localhost',
+  port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
+  database: process.env.PGDATABASE ?? 'aura_boot',
   user: process.env.PGUSER ?? 'ghj',
+  password: process.env.PGPASSWORD,
 };
+
+const BACKEND_URL =
+  process.env.BACKEND_URL ?? `http://127.0.0.1:${process.env.BE_PORT ?? '6443'}`;
 
 const UID = uniqueId('TENUI');
 const PROCESS_KEY_A = `tenui_a_${UID}`;
@@ -74,7 +78,7 @@ function buildBpmn(processKey: string, processName: string): string {
 async function loginAsAdminUntenanted(
   request: APIRequestContext,
 ): Promise<{ jwt: string; userId: string }> {
-  const resp = await request.post('http://127.0.0.1:6443/api/auth/login', {
+  const resp = await request.post(`${BACKEND_URL}/api/auth/login`, {
     data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     headers: { 'Content-Type': 'application/json' },
   });
@@ -89,7 +93,7 @@ async function selectTenantApi(
   baseJwt: string,
   tenantId: string,
 ): Promise<string> {
-  const resp = await request.post('http://127.0.0.1:6443/api/tenant-selection/process', {
+  const resp = await request.post(`${BACKEND_URL}/api/tenant-selection/process`, {
     headers: authHeaders(baseJwt),
     data: { action: 'select', tenantId },
   });
@@ -103,7 +107,7 @@ async function discoverTenantA(
   request: APIRequestContext,
   baseJwt: string,
 ): Promise<string> {
-  const resp = await request.get('http://127.0.0.1:6443/api/tenant-selection/my-spaces', {
+  const resp = await request.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
     headers: authHeaders(baseJwt),
   });
   expect(resp.ok()).toBe(true);
@@ -233,7 +237,7 @@ async function createAndDeploy(
   args: { processKey: string; processName: string },
 ): Promise<string> {
   const createResp = await request.post(
-    'http://127.0.0.1:6443/api/bpm/process-definitions',
+    `${BACKEND_URL}/api/bpm/process-definitions`,
     {
       headers: authHeaders(jwt),
       data: {
@@ -253,7 +257,7 @@ async function createAndDeploy(
   expect(typeof pid).toBe('string');
 
   const deployResp = await request.post(
-    `http://127.0.0.1:6443/api/bpm/process-definitions/${pid}/deploy`,
+    `${BACKEND_URL}/api/bpm/process-definitions/${pid}/deploy`,
     { headers: authHeaders(jwt) },
   );
   expect(deployResp.ok(), `deploy ${deployResp.status()}`).toBe(true);
