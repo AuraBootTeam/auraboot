@@ -13,6 +13,8 @@ auraboot:
   # Phase 2.3: community profile defaults bootstrap ON (env override available).
   bootstrap:
     enabled: ${AURABOOT_BOOTSTRAP_ENABLED:true}
+    # Phase 3: community profile defaults demo-seed ON for showcase parity.
+    demo-seed: ${AURABOOT_DEMO_SEED:true}
 
 logging:
   level:
