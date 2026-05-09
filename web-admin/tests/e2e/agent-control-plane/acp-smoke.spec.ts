@@ -804,28 +804,19 @@ test.describe('Agent Control Plane @smoke', () => {
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15000 });
   });
 
-  test('ACP-27: Tool auto-sync generates tools from published DSL commands', async ({ page }) => {
-    // Call the sync endpoint
-    const syncResp = await page.request.post('/api/agent/tools/sync');
-    expect(syncResp.ok(), 'Tool sync should succeed').toBeTruthy();
-    const syncData = await syncResp.json();
-    const syncResult = syncData?.data ?? syncData;
-    const result = syncResult;
-    expect(result).toBeTruthy();
-    const totalActions = (result.created || 0) + (result.updated || 0);
-
-    // Verify auto-generated tools exist in the database
-    const toolListResp = await page.request.get('/api/dynamic/agent-tool/list?pageSize=200');
-    expect(toolListResp.ok()).toBeTruthy();
-    const toolListData = await toolListResp.json();
-    const tools = toolListData.data?.records || [];
-
-    // Should have auto-generated tools (prefixed with cmd_ or nq_)
-    const autoTools = tools.filter((t: any) =>
-      (t.tool_code?.startsWith('cmd_') || t.tool_code?.startsWith('nq_')) && t.auto_generated === true
-    );
-    expect(Array.isArray(autoTools)).toBe(true);
-    expect(totalActions, 'Sync may legitimately be a no-op when tools are already up to date').toBeGreaterThanOrEqual(0);
+  test('ACP-27: Tool registry surfaces in-process ToolProviderRegistry tools', async ({ page }) => {
+    // Tools are discovered live from the in-process ToolProviderRegistry.
+    // The legacy /api/agent/tools/sync no-op endpoint was removed in F-6;
+    // /api/agent/tools/registry is the canonical read-only surface.
+    const registryResp = await page.request.get('/api/agent/tools/registry');
+    expect(registryResp.ok(), 'Tool registry GET should succeed').toBeTruthy();
+    const registryJson = await registryResp.json();
+    const registryData = registryJson?.data ?? registryJson;
+    expect(Array.isArray(registryData.tools)).toBe(true);
+    expect(Array.isArray(registryData.providers)).toBe(true);
+    expect(typeof registryData.total).toBe('number');
+    // PlatformToolProvider is always registered at boot.
+    expect(registryData.providers).toContain('platform');
   });
 
   test('ACP-28: Observation analytics NQs return data', async ({ page }) => {
