@@ -29,8 +29,15 @@ public class SystemTabRegistry {
             "blocks", List.of(Map.of("blockType", "field-history", "id", "__field_history_block__"))
     );
 
+    private static final Map<String, Object> APPROVAL_COMMENTS_TAB = Map.of(
+            "key", "__approval_comments__",
+            "system", true,
+            "label", Map.of("zh-CN", "审批意见", "en-US", "Approval Comments"),
+            "blocks", List.of(Map.of("blockType", "approval-comments", "id", "__approval_comments_block__"))
+    );
+
     private static final Map<String, List<Map<String, Object>>> RULES = Map.of(
-            "document", List.of(COMMENT_TAB, ACTIVITY_TAB, FIELD_HISTORY_TAB),
+            "document", List.of(COMMENT_TAB, ACTIVITY_TAB, APPROVAL_COMMENTS_TAB, FIELD_HISTORY_TAB),
             "master", List.of(COMMENT_TAB, ACTIVITY_TAB, FIELD_HISTORY_TAB),
             "transaction", List.of(FIELD_HISTORY_TAB),
             "entity", List.of(FIELD_HISTORY_TAB),

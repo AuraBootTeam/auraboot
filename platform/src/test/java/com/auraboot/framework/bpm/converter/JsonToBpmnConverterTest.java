@@ -464,7 +464,7 @@ class JsonToBpmnConverterTest {
                   "nodes": [
                     {"id": "start", "type": "startEvent", "position": {"x": 100, "y": 200}, "data": {"type": "startEvent", "label": "Start"}},
                     {"id": "svc1", "type": "serviceTask", "position": {"x": 300, "y": 200}, "data": {"type": "serviceTask", "label": "Empty", "config": {
-                      "serviceType": "http"
+                      "serviceType": "java"
                     }}},
                     {"id": "end", "type": "endEvent", "position": {"x": 500, "y": 200}, "data": {"type": "endEvent", "label": "End"}}
                   ],

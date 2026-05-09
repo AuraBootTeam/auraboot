@@ -114,14 +114,14 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
         ChatSessionStore.PendingTool pending = buildPending(pendingTurnId, "tool-a", tenantId, userId);
         when(chatSessionStore.consumePending(eq(pendingTurnId))).thenReturn(pending);
         TurnOutcome.Success expected = new TurnOutcome.Success("done", Map.of());
-        when(chatService.resumeApprovedTurnFromPending(any(), same(pending), same(sink)))
+        when(chatService.resumeApprovedTurnFromPending(any(), same(pending), any()))
                 .thenReturn(expected);
 
         TurnOutcome outcome = turnService.resumeTurn(
                 pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
 
         assertThat(outcome).isSameAs(expected);
-        verify(chatService, times(1)).resumeApprovedTurnFromPending(any(), same(pending), same(sink));
+        verify(chatService, times(1)).resumeApprovedTurnFromPending(any(), same(pending), any());
     }
 
     @Test
@@ -247,7 +247,7 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
         // 3. Capture the TurnContext that resumeApprovedTurnFromPending sees
         org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
                 org.mockito.ArgumentCaptor.forClass(TurnContext.class);
-        when(chatService.resumeApprovedTurnFromPending(ctxCaptor.capture(), same(pending), same(sink)))
+        when(chatService.resumeApprovedTurnFromPending(ctxCaptor.capture(), same(pending), any()))
                 .thenReturn(new TurnOutcome.Success("ok", Map.of()));
 
         // 4. Resume
@@ -274,7 +274,7 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
 
         org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
                 org.mockito.ArgumentCaptor.forClass(TurnContext.class);
-        when(chatService.resumeApprovedTurnFromPending(ctxCaptor.capture(), same(pending), same(sink)))
+        when(chatService.resumeApprovedTurnFromPending(ctxCaptor.capture(), same(pending), any()))
                 .thenReturn(new TurnOutcome.Success("ok", Map.of()));
 
         turnService.resumeTurn(

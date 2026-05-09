@@ -107,10 +107,16 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(10)
     void resolve_fuzzyMatch_partialDisplayName() {
-        // "销售" should fuzzy-match models with "销售" in display name
-        // e.g., sl_sales_order (销售订单), sl_sales_return (销售退货单)
+        // Derive a 2-char probe from a real sampleDisplayName harvested in
+        // @BeforeEach so this test is robust against seed-data churn.
+        // Hardcoded probes (e.g. "销售") were brittle: no guarantee any model
+        // with that displayName exists in the published seed.
+        Assumptions.assumeTrue(sampleDisplayName != null && sampleDisplayName.length() >= 2,
+                "No published model with displayName ≥ 2 chars found");
+        String probe = sampleDisplayName.substring(0, 2);
+
         ObjectResolver.ObjectResult result = objectResolver.resolve(
-                getTestTenant().getId(), "帮我看看销售相关的数据");
+                getTestTenant().getId(), "帮我看看" + probe + "相关的数据");
 
         assertThat(result).isNotNull();
         assertThat(result.getModelCode()).isNotNull();

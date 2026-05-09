@@ -2,8 +2,10 @@ package com.auraboot.framework.integration.automation;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.dto.LlmChunk;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import reactor.core.publisher.Flux;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.impl.LlmCallExecutor;
 import com.auraboot.framework.integration.BaseIntegrationTest;
@@ -22,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -80,6 +83,25 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
         when(llmProviderFactory.getProvider(providerCode)).thenReturn(provider);
     }
 
+    /**
+     * Stub both legacy {@code chat()} and current {@code streamChat()} on the
+     * mock provider so the executor's {@code aggregateStream(...)} path
+     * (which calls {@code streamChat}) returns the canned response. The
+     * default {@code streamChat} on {@link LlmProvider} delegates to
+     * {@code chat}, but Mockito mocks do not honour default methods unless
+     * {@link Mockito#CALLS_REAL_METHODS} is wired — so we stub explicitly.
+     */
+    private void stubChatResponse(LlmProvider provider, LlmChatResponse response) throws Exception {
+        // lenient — only one of chat/streamChat is actually invoked depending
+        // on executor branch; the other stub is held for forward compatibility.
+        // chat() declares `throws Exception` — propagate it on this helper so
+        // each @Test (which already declares `throws Exception`) compiles.
+        lenient().when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
+                .thenReturn(response);
+        lenient().when(provider.streamChat(any(LlmChatRequest.class), anyString(), anyString()))
+                .thenReturn(Flux.just(LlmChunk.fromFinal(response)));
+    }
+
     private LlmChatResponse textResponse(String text) {
         return LlmChatResponse.builder()
                 .stopReason("end_turn")
@@ -106,8 +128,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
     void caseA_singleImageVar_buildsMultimodalRequest() throws Exception {
         LlmProvider provider = stubProvider();
         wireFactory("anthropic", provider);
-        when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
-                .thenReturn(textResponse("a cat"));
+        stubChatResponse(provider, textResponse("a cat"));
 
         AutomationAction action = llmAction(Map.of(
                 "model", "claude-sonnet-4-6",
@@ -120,7 +141,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
         Object result = executor.execute(action, ctx);
 
         ArgumentCaptor<LlmChatRequest> captor = ArgumentCaptor.forClass(LlmChatRequest.class);
-        verify(provider).chat(captor.capture(), anyString(), anyString());
+        verify(provider).streamChat(captor.capture(), anyString(), anyString());
         LlmChatRequest sent = captor.getValue();
 
         assertThat(sent.getMessages()).hasSize(1);
@@ -155,8 +176,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
     void caseB_multipleImageVars_orderPreserved() throws Exception {
         LlmProvider provider = stubProvider();
         wireFactory("anthropic", provider);
-        when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
-                .thenReturn(textResponse("ok"));
+        stubChatResponse(provider, textResponse("ok"));
 
         AutomationAction action = llmAction(Map.of(
                 "model", "claude-sonnet-4-6",
@@ -173,7 +193,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
         executor.execute(action, ctx);
 
         ArgumentCaptor<LlmChatRequest> captor = ArgumentCaptor.forClass(LlmChatRequest.class);
-        verify(provider).chat(captor.capture(), anyString(), anyString());
+        verify(provider).streamChat(captor.capture(), anyString(), anyString());
         @SuppressWarnings("unchecked")
         List<LlmChatRequest.MessageContentBlock> blocks =
                 (List<LlmChatRequest.MessageContentBlock>) captor.getValue().getMessages().get(0).getContent();
@@ -211,7 +231,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
                 .hasMessageContaining("missingScreenshot")
                 .hasMessageContaining("not found in trigger context");
 
-        verify(provider, never()).chat(any(), anyString(), anyString());
+        verify(provider, never()).streamChat(any(), anyString(), anyString());
     }
 
     // =========================================================================
@@ -237,7 +257,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
                 .hasMessageContaining("openai-compatible")
                 .hasMessageContaining("does not support vision");
 
-        verify(provider, never()).chat(any(), anyString(), anyString());
+        verify(provider, never()).streamChat(any(), anyString(), anyString());
     }
 
     // =========================================================================
@@ -263,7 +283,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not a valid data URI");
 
-        verify(provider, never()).chat(any(), anyString(), anyString());
+        verify(provider, never()).streamChat(any(), anyString(), anyString());
     }
 
     @Test
@@ -287,7 +307,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(() -> executor.execute(action, ctx))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(provider, never()).chat(any(), anyString(), anyString());
+        verify(provider, never()).streamChat(any(), anyString(), anyString());
     }
 
     @Test
@@ -308,7 +328,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must be a non-blank String");
 
-        verify(provider, never()).chat(any(), anyString(), anyString());
+        verify(provider, never()).streamChat(any(), anyString(), anyString());
     }
 
     // =========================================================================
@@ -320,8 +340,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
     void regression_textOnlyPathUnchanged() throws Exception {
         LlmProvider provider = stubProvider();
         wireFactory("anthropic", provider);
-        when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
-                .thenReturn(textResponse("done"));
+        stubChatResponse(provider, textResponse("done"));
 
         AutomationAction action = llmAction(Map.of(
                 "model", "claude-sonnet-4-6",
@@ -333,7 +352,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
         executor.execute(action, ctx);
 
         ArgumentCaptor<LlmChatRequest> captor = ArgumentCaptor.forClass(LlmChatRequest.class);
-        verify(provider).chat(captor.capture(), anyString(), anyString());
+        verify(provider).streamChat(captor.capture(), anyString(), anyString());
         LlmChatRequest.Message msg = captor.getValue().getMessages().get(0);
 
         // Legacy contract: content is a String, not a list of blocks.
@@ -350,8 +369,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
     void imageVarKeyNotInterpolatedIntoPromptText() throws Exception {
         LlmProvider provider = stubProvider();
         wireFactory("anthropic", provider);
-        when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
-                .thenReturn(textResponse("ok"));
+        stubChatResponse(provider, textResponse("ok"));
 
         AutomationAction action = llmAction(Map.of(
                 "model", "claude-sonnet-4-6",
@@ -368,7 +386,7 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
         executor.execute(action, ctx);
 
         ArgumentCaptor<LlmChatRequest> captor = ArgumentCaptor.forClass(LlmChatRequest.class);
-        verify(provider).chat(captor.capture(), anyString(), anyString());
+        verify(provider).streamChat(captor.capture(), anyString(), anyString());
         @SuppressWarnings("unchecked")
         List<LlmChatRequest.MessageContentBlock> blocks =
                 (List<LlmChatRequest.MessageContentBlock>) captor.getValue().getMessages().get(0).getContent();
