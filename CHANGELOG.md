@@ -93,6 +93,13 @@ First-time contributors this release: @user1, @user2. Thanks!
   compatibility, minor versions may break with deprecation notice.
 - **1.0.0** — first stable; from then on, strict semver applies.
 
+**No fixed 1.0 date during beta.** The 1.0 cut depends on the API surface
+stabilizing (no `### Breaking changes` for ≥ 2 consecutive releases) and
+the first commercial customer cohort validating production fitness. We
+expect this around month 5–6 post-launch but won't promise it; "1.0
+shipped because the calendar said so" is how you ship a bad 1.0. We'll
+publish a target date once the conditions look met, then live with it.
+
 ## Release cadence
 
 The team commits to **at least one release per month** during beta. Two

@@ -69,6 +69,15 @@ EXCLUDE_GLOBS=(
   'INTERNAL-*'
   '*-INTERNAL.md'
   'TODO*.md'
+  # Security incident audits / historical CVE writeups stay internal by
+  # default. They detail past attack surface + fix commits, which is
+  # uncommon to publish proactively. Operators who want security
+  # transparency can opt back in by removing these patterns or by
+  # publishing curated GitHub Security Advisories instead (the
+  # canonical channel).
+  'ssrf-*-audit*.md'
+  '*-historical-audit.md'
+  'security-incident-*.md'
 )
 
 # NOTE: deliberately omit --delete. The website has its own hand-written
@@ -78,13 +87,17 @@ EXCLUDE_GLOBS=(
 RSYNC_OPTS=(-a --prune-empty-dirs)
 [ $APPLY -eq 0 ] && RSYNC_OPTS+=(--dry-run --itemize-changes)
 
+# rsync rule order: FIRST match wins. Excludes MUST come before broad
+# includes — otherwise `--include='*.md'` matches first and the later
+# `--exclude='ssrf-*-audit*.md'` never fires.
+for pat in "${EXCLUDE_GLOBS[@]}"; do
+  RSYNC_OPTS+=(--exclude="$pat")
+done
+
 # Sync only .md (not .mdx — those are website-authored marketing pages
 # that may share filenames; we don't want to overwrite them with raw OSS
 # docs that aren't formatted for the site).
 RSYNC_OPTS+=(--include='*/' --include='*.md' --include='*.png' --include='*.jpg' --include='*.svg')
-for pat in "${EXCLUDE_GLOBS[@]}"; do
-  RSYNC_OPTS+=(--exclude="$pat")
-done
 RSYNC_OPTS+=(--exclude='*')
 
 mkdir -p "$TARGET_DIR"

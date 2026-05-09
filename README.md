@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.1-blue.svg" alt="License"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.2-blue.svg" alt="License"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/actions/workflows/backend.yml"><img src="https://github.com/AuraBootTeam/auraboot/actions/workflows/backend.yml/badge.svg?branch=main" alt="Backend CI"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/actions/workflows/frontend.yml"><img src="https://github.com/AuraBootTeam/auraboot/actions/workflows/frontend.yml/badge.svg?branch=main" alt="Frontend CI"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
@@ -71,10 +71,10 @@ Multi-channel notifications (email, in-app, webhook), event bus for cross-module
 ```bash
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
-docker compose up -d
+docker compose --profile full up --build -d
 ```
 
-Open [http://localhost:5173](http://localhost:5173) and log in:
+The `full` profile builds and starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Cold start takes 2–4 minutes (the backend health check has a 120s start period). Open [http://localhost:3000](http://localhost:3000) and log in:
 
 | | |
 |---|---|
@@ -212,7 +212,7 @@ auraboot/
 
 ### Getting Started
 - [Introduction](docs/getting-started/introduction.md) — What is AuraBoot, who it's for
-- [OSS Onboarding](docs/community/getting-started.md) — Clone, bootstrap, and smoke-test the open-source core
+- [OSS Onboarding](docs/community/getting-started.md) — Clone, bootstrap, and smoke-test the community edition
 - [Open-Source Scope](docs/community/oss-scope.md) — What is and isn't OSS, how to verify, how to adjust scope
 - [Quick Start](docs/getting-started/quick-start.md) — Docker Compose setup in 5 minutes
 - [Installation](docs/getting-started/installation.md) — Detailed installation guide
