@@ -160,6 +160,37 @@ echo "[ga-e2e-bootstrap] provisioning test users..."
 provision_user "e2e-operator@test.com" "Test2026x" "operator"
 provision_user "e2e-viewer@test.com"   "Test2026x" "viewer"
 
+# 3b. Ensure admin@example.com is a member of a "System" (platform) tenant.
+# The auraboot bootstrap only seeds a single business tenant ("AuraBoot Demo"),
+# but the space-selection E2E suite (and any UI flow that surfaces a Platform
+# Console toggle) requires admin to belong to BOTH a platform tenant (named
+# "System" — see TenantSelectionController.getMySpaces logic) and a business
+# tenant. Idempotently create + bind via /api/tenant-selection/process action=create.
+echo "[ga-e2e-bootstrap] ensuring admin is bound to a 'System' platform tenant..."
+sys_resp=$(api_post "/api/tenant-selection/process" \
+  '{"action":"create","tenantName":"System","displayName":"System Tenant","industry":"technology"}')
+sys_status=$(printf '%s' "$sys_resp" | python3 -c "
+import sys, json
+try:
+    d = json.loads(sys.stdin.read())
+except Exception:
+    print('parse-error'); sys.exit(0)
+if isinstance(d, dict):
+    data = d.get('data') if isinstance(d.get('data'), dict) else {}
+    if data.get('status') == 'success':
+        print('created')
+    else:
+        msg = (d.get('message') or '') + ' ' + str(d.get('context') or '')
+        print('exists' if 'already exists' in msg.lower() else 'fail:' + msg[:120])
+else:
+    print('fail:unexpected-shape')
+")
+case "$sys_status" in
+  created) echo "  System tenant: created and bound to admin" ;;
+  exists)  echo "  System tenant: already provisioned" ;;
+  *)       echo "  System tenant: provision failed ($sys_status)" >&2 ;;
+esac
+
 # 4. Seed showcase records via the OSS playwright seed config.
 # Skip with SKIP_SEED=1 if the operator has already seeded (e.g. during a
 # tight rerun loop). The seed run uses tests/storage/admin.json from a
