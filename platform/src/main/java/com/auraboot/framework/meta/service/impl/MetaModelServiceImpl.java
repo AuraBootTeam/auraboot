@@ -2141,7 +2141,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 null,                            // templateCategory
                 now,                             // publishedAt
                 0,                               // sortWeight
-                "{}",                            // extension
+                // Mark this row as an auto-generated stub so a subsequent
+                // plugin import (importPage) can overwrite it unconditionally,
+                // independent of the OVERWRITE_SAFE user-modified guard.
+                "{\"auto_created\":true}",      // extension
                 null                             // pluginPid
             );
 
