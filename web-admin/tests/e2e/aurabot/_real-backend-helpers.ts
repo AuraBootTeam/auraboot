@@ -12,6 +12,8 @@
  */
 
 import { execSync } from 'node:child_process';
+import { PSQL_BASE } from '../../helpers/pg-env';
+import { BACKEND_URL } from '../../helpers/playwright-env';
 
 // Admin primary tenant — matches the JWT issued by
 // `admin@example.com / Test2026x`. Keep in sync with
@@ -23,12 +25,8 @@ import { execSync } from 'node:child_process';
  */
 function resolveAdminTenantId(): string {
   try {
-    // Backend URL — same env-override pattern as scripts/oss-reset-and-init.sh.
-    // Defaults to the host backend on :6443; isolated stack passes BE_PORT
-    // (e.g. 6478) via the test runner environment.
-    const bePort = process.env.BE_PORT ?? '6443';
     const out = execSync(
-      `curl -s -X POST http://localhost:${bePort}/api/auth/login -H 'Content-Type: application/json' ` +
+      `curl -s -X POST ${BACKEND_URL}/api/auth/login -H 'Content-Type: application/json' ` +
         `-d '{"email":"admin@example.com","password":"Test2026x"}'`,
     ).toString();
     const parsed = JSON.parse(out);
@@ -51,17 +49,6 @@ function resolveAdminTenantId(): string {
 }
 
 export const ADMIN_TENANT_ID = resolveAdminTenantId();
-
-// Postgres connection — same env-override pattern as oss-reset-and-init.sh.
-// Defaults preserve host-mode (psql trust auth as $USER on :5432); override
-// for isolated docker stack via PG_HOST=localhost PG_PORT=5467 PG_USER=auraboot
-// PG_DB=aura_boot PGPASSWORD=auraboot_dev. These four env vars travel with the
-// Playwright runner process so every psql subprocess inherits them.
-const PG_HOST = process.env.PG_HOST ?? 'localhost';
-const PG_PORT = process.env.PG_PORT ?? '5432';
-const PG_USER = process.env.PG_USER ?? process.env.USER ?? 'ghj';
-const PG_DB = process.env.PG_DB ?? 'aura_boot';
-const PSQL_BASE = `psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}`;
 
 // Parent menu id of "AI 中心" — resolve from DB at load time (rotates on
 // DB reset like tenant id). Look up via children's parent_id to avoid
