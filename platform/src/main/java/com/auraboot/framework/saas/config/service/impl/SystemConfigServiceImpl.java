@@ -112,6 +112,12 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         return getBoolean(SystemConfigKeys.SYSTEM_INITIALIZED, false);
     }
 
+    @Override
+    public void evictCache() {
+        cache.clear();
+        cacheExpiry = 0;
+    }
+
     private String getCached(String key) {
         if (System.currentTimeMillis() > cacheExpiry) {
             cache.clear();

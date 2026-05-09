@@ -59,6 +59,7 @@ public abstract class IntegrationTestBase {
             "ab_tenant_member",
             "ab_role",
             "ab_user",
+            "ab_menu",
             "ab_tenant",
             "ab_plugin"
     };
