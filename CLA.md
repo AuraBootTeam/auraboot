@@ -76,9 +76,11 @@ This CLA is accepted electronically by You signing your GitHub username via the 
 
 The following narrow categories are exempt from CLA signature requirements:
 
-- Typo fixes in documentation, comments, or strings (≤ 5 character corrections)
-- Whitespace / formatting changes that do not alter logic or content
-- Minor corrections to **existing** translations (single-string fixes, ≤ 10 changed strings)
+- Typo / spelling fixes in documentation, comments, or string literals — single
+  PR scoped to such fixes, regardless of total character count
+- Whitespace / formatting / lint-only changes that do not alter logic or content
+- Minor corrections to **existing** translations (single-string-at-a-time fixes,
+  not full-locale additions)
 
 **Everything else requires a signed CLA**, including but not limited to:
 - Any code change, regardless of size
