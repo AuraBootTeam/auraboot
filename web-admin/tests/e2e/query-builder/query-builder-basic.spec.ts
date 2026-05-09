@@ -11,6 +11,43 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { Client as PgClient } from 'pg';
+
+// Seed at least one e2et_record row with status='failed' so QB-07 (which
+// asserts data-rows >= 1 after filtering by status=failed) and QB-08 (which
+// fires Cmd+Enter after model select) have data to return.
+//
+// Why DB-direct: POST /api/dynamic/e2et_record requires permission
+// `model.e2et_record.create` which the default admin role doesn't grant in
+// the OSS smoke stack (see test-fixtures plugin permissions). Bypass the API
+// and write the row through the same data path the QB-execute SELECT reads.
+const PG_CONN = {
+  host: process.env.PGHOST ?? 'localhost',
+  port: Number(process.env.PGPORT ?? 5432),
+  database: process.env.PGDATABASE ?? 'aura_boot',
+  user: process.env.PGUSER ?? 'auraboot',
+  password: process.env.PGPASSWORD ?? 'auraboot_dev',
+};
+
+async function seedE2etRecord(): Promise<void> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const tenantRow = await client.query<{ tenant_id: string }>(
+      "SELECT tenant_id FROM ab_meta_model WHERE code = 'e2et_record' LIMIT 1",
+    );
+    if (tenantRow.rows.length === 0) return; // model missing — let test fail loudly elsewhere
+    const tenantId = tenantRow.rows[0]!.tenant_id;
+    await client.query(
+      `INSERT INTO mt_e2et_record (pid, tenant_id, e2et_name, e2et_status, e2et_count, created_at, updated_at)
+       VALUES ($1, $2, $3, 'failed', 1, NOW(), NOW())
+       ON CONFLICT (pid) DO NOTHING`,
+      ['qbseed_failed_01', tenantId, 'qb-seed-failed-01'],
+    );
+  } finally {
+    await client.end();
+  }
+}
 
 // TODO(2026-05-08): QB-02..05 are API-only and should move to tests/api/
 // per docs/standards/core/testing-e2e-web.md. Kept in this file to maintain
@@ -18,6 +55,10 @@ import { test, expect } from '../../fixtures';
 
 test.describe('Query Builder @smoke', () => {
   test.setTimeout(60000);
+
+  test.beforeAll(async () => {
+    await seedE2etRecord();
+  });
 
   test('QB-01: Query Builder page loads', async ({ page }) => {
     await page.goto('/query-builder', { waitUntil: 'domcontentloaded' });
@@ -86,17 +127,24 @@ test.describe('Query Builder @smoke', () => {
 
     await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeVisible();
 
+    // The QB models endpoint caps results at 20; in stacks with many seeded
+    // models, e2et_record may not appear in the default list. Use the search
+    // input (which re-fetches with keyword) to surface it deterministically.
+    await page.locator('[data-testid="qb-model-search"]').fill('e2et_record');
+    await expect(page.locator('[data-testid="qb-model-e2et_record"]')).toBeVisible({ timeout: 10000 });
     await page.locator('[data-testid="qb-model-e2et_record"]').click();
     await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeHidden();
     await expect(page.locator('[data-testid="qb-step-fields"]')).toBeVisible();
 
+    // e2et_record fields are namespaced (e2et_*); the spec selects three
+    // representative columns to satisfy the "3 fields" summary assertion.
     await page.locator('[data-testid="qb-field-pid"]').click();
-    await page.locator('[data-testid="qb-field-scenario"]').click();
-    await page.locator('[data-testid="qb-field-status"]').click();
+    await page.locator('[data-testid="qb-field-e2et_name"]').click();
+    await page.locator('[data-testid="qb-field-e2et_status"]').click();
 
     await page.locator('[data-testid="qb-add-filter"]').click();
     const row = page.locator('[data-testid="qb-filter-row-0"]');
-    await row.locator('[data-role="field"]').selectOption('status');
+    await row.locator('[data-role="field"]').selectOption('e2et_status');
     await row.locator('[data-role="op"]').selectOption('EQ');
     await row.locator('[data-role="value"]').fill('failed');
 
@@ -120,6 +168,8 @@ test.describe('Query Builder @smoke', () => {
     await page.getByRole('link', { name: /query builder|查询构建/i }).first().click();
     await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeVisible({ timeout: 10000 });
 
+    await page.locator('[data-testid="qb-model-search"]').fill('e2et_record');
+    await expect(page.locator('[data-testid="qb-model-e2et_record"]')).toBeVisible({ timeout: 10000 });
     await page.locator('[data-testid="qb-model-e2et_record"]').click();
     await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeHidden();
 
@@ -127,8 +177,10 @@ test.describe('Query Builder @smoke', () => {
 
     const status = page.locator('[data-testid="qb-result-status"]');
     await expect(status).toBeVisible({ timeout: 15000 });
+    // qb-result-status is rendered with data-latency-ms="" before any run; poll
+    // until handleRun's finally{} populates it with a positive integer.
+    await expect(status).toHaveAttribute('data-latency-ms', /^[1-9][0-9]*$/, { timeout: 15000 });
     const latency = await status.getAttribute('data-latency-ms');
-    expect(latency).toBeTruthy();
     expect(Number(latency)).toBeGreaterThan(0);
   });
 });

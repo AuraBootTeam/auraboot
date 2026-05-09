@@ -9,7 +9,7 @@ import {
 } from '../../helpers/wd-fixtures';
 import { BACKEND_URL } from '../../helpers/environments';
 
-const BACKEND = BACKEND_URL;
+const BACKEND = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
 
 /**
  * R3 — SLA escalation end-to-end.

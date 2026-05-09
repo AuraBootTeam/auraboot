@@ -1,6 +1,7 @@
 import { test, expect } from '../../fixtures';
 import { ErrorCodes } from '~/shared/services/http-client/types';
-import { BASE_URL } from '../../helpers/playwright-env';
+
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
 
 /**
  * Team Management E2E Tests

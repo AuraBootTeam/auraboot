@@ -20,6 +20,7 @@ import { test, expect } from '../../fixtures';
 import { uniqueId, navigateToDynamicPage } from '../helpers';
 import { BASE_URL } from '../../helpers/playwright-env';
 
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
 const MEMBER_PAGE_KEY = 'tenant-member';
 
 // ---------------------------------------------------------------------------

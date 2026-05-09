@@ -48,8 +48,17 @@ async function navigateToModelListViaMenu(page: Page) {
 }
 
 async function searchModel(page: Page, keyword: string) {
+  // Prefer the stable data-testid; fall back to placeholder substrings
+  // (the actual i18n placeholder may render as "查询..." or "Search...").
   const searchInput = page
-    .locator('input[placeholder*="Search"], input[placeholder*="搜索"]')
+    .locator(
+      [
+        '[data-testid="list-search-input"]',
+        'input[placeholder*="Search"]',
+        'input[placeholder*="搜索"]',
+        'input[placeholder*="查询"]',
+      ].join(', '),
+    )
     .first();
   await expect(searchInput).toBeVisible({ timeout: 10_000 });
   await searchInput.click();

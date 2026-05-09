@@ -415,7 +415,7 @@ const TEST_DATA_ROWS = [
 // Persists across serial test steps so we only login once.
 // ---------------------------------------------------------------------------
 let sharedBackendJwt: string | null = null;
-const DIRECT_BACKEND_URL = BACKEND_URL;
+const DIRECT_BACKEND_URL = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
 
 async function obtainBackendJwt(page: import('@playwright/test').Page): Promise<string | null> {
   if (sharedBackendJwt) return sharedBackendJwt;

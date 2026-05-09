@@ -161,6 +161,9 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
   // ---- D4+D6: Create a new role ----
   test('D4+D6: create a new custom role', async ({ page }) => {
+    // navigateToPermissions waits up to 15s for permission-page testid; the
+    // default 15s test timeout leaves no room for the rest of the assertions.
+    test.setTimeout(30_000);
     await navigateToPermissions(page);
 
     // Click create button

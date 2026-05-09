@@ -41,7 +41,17 @@ DEFAULT_PLUGINS=(
   hr-essentials
   simple-inventory
   workflow-demo
-  acp-showcase
+  # acp-showcase removed: plugin directory was deleted on commit 59050eed
+  # (platformization) and now contains only scripts/ — no plugin.json. Bootstrap
+  # would always fail with "Directory does not contain plugin.json".
+  #
+  # test-fixtures provides the e2et_* model/page/command set that ~100+ specs
+  # depend on (action-system, activity, data-tools, permission, saved-view, …).
+  # Backend gates the plugin loader behind IMPORT_TEST_FIXTURES=true (set in
+  # docker-compose.ga-e2e.override.yml) so this only resolves when run against
+  # a stack that has the env var; on host bootRun without the flag, the import
+  # api call returns "plugin not allowed".
+  test-fixtures
 )
 PLUGINS=( ${PLUGINS:-${DEFAULT_PLUGINS[@]}} )
 
@@ -149,6 +159,156 @@ else:
 echo "[ga-e2e-bootstrap] provisioning test users..."
 provision_user "e2e-operator@test.com" "Test2026x" "operator"
 provision_user "e2e-viewer@test.com"   "Test2026x" "viewer"
+
+# 3b. Ensure admin@example.com is a member of a "System" (platform) tenant.
+# The auraboot bootstrap only seeds a single business tenant ("AuraBoot Demo"),
+# but the space-selection E2E suite (and any UI flow that surfaces a Platform
+# Console toggle) requires admin to belong to BOTH a platform tenant (named
+# "System" — see TenantSelectionController.getMySpaces logic) and a business
+# tenant. Idempotently create + bind via /api/tenant-selection/process action=create.
+echo "[ga-e2e-bootstrap] ensuring admin is bound to a 'System' platform tenant..."
+sys_resp=$(api_post "/api/tenant-selection/process" \
+  '{"action":"create","tenantName":"System","displayName":"System Tenant","industry":"technology"}')
+sys_status=$(printf '%s' "$sys_resp" | python3 -c "
+import sys, json
+try:
+    d = json.loads(sys.stdin.read())
+except Exception:
+    print('parse-error'); sys.exit(0)
+if isinstance(d, dict):
+    data = d.get('data') if isinstance(d.get('data'), dict) else {}
+    if data.get('status') == 'success':
+        print('created')
+    else:
+        msg = (d.get('message') or '') + ' ' + str(d.get('context') or '')
+        print('exists' if 'already exists' in msg.lower() else 'fail:' + msg[:120])
+else:
+    print('fail:unexpected-shape')
+")
+case "$sys_status" in
+  created) echo "  System tenant: created and bound to admin" ;;
+  exists)  echo "  System tenant: already provisioned" ;;
+  *)       echo "  System tenant: provision failed ($sys_status)" >&2 ;;
+esac
+
+# 3c. Provision platform_admin role in System tenant + assign to admin@example.com.
+#
+# Why this is needed: BootstrapEngineService.bootstrapSystemTenant() (step 8.5)
+# creates platform_admin only when /api/bootstrap/setup runs the full system-
+# tenant provisioning path. The lighter auto-bootstrap that the GA-E2E stack
+# uses (AURABOOT_BOOTSTRAP_ENABLED=true) creates the System tenant via
+# /api/tenant-selection/process action=create above (3b), which does NOT trigger
+# bootstrapSystemTenant. As a result admin@example.com is only tenant_admin
+# in System and lacks platform_admin, causing 4 admin specs to fail with 409:
+#   - admin-guard-v2 AG-001 (GET /api/admin/infrastructure/status)
+#   - admin-guard-v2 AG-002 (path-scope check)
+#   - cloud-config CC-004     (POST /api/admin/cloud-config/...)
+#   - cross-tenant-grants CTG-002
+#
+# Idempotent flow (admin API only — no raw SQL):
+#   a) GET  /api/tenant-selection/my-spaces  → find System tenant id
+#   b) POST /api/tenant-selection/process action=select → JWT scoped to System
+#   c) GET  /api/roles/all                   → check if platform_admin exists
+#   d) POST /api/roles                       → create if missing
+#                                              (scopeType=global is required by
+#                                              RoleServiceImpl guard for
+#                                              platform-only role codes)
+#   e) Decode JWT_SYS → memberId (admin's membership in System tenant)
+#   f) POST /api/user-roles/assign?memberId=X body=[roleId]  → grant
+#      (assignRolesToMember is idempotent — safe to re-run)
+echo "[ga-e2e-bootstrap] ensuring admin holds platform_admin in System tenant..."
+SYS_TID=$(NO_PROXY=localhost curl -fsS -H "Authorization: Bearer $JWT" \
+  "$API_BASE/api/tenant-selection/my-spaces" \
+  | python3 -c "
+import sys, json
+try:
+    spaces = json.load(sys.stdin).get('data') or []
+except Exception:
+    spaces = []
+plat = [s for s in spaces if s.get('spaceType') == 'platform']
+print(plat[0]['tenantId'] if plat else '')
+")
+if [ -z "$SYS_TID" ]; then
+  echo "  WARN: could not locate System tenant — skipping platform_admin grant" >&2
+else
+  JWT_SYS=$(NO_PROXY=localhost curl -fsS -X POST "$API_BASE/api/tenant-selection/process" \
+    -H "Authorization: Bearer $JWT" -H 'Content-Type: application/json' \
+    -d "{\"action\":\"select\",\"tenantId\":\"$SYS_TID\"}" \
+    | python3 -c "import sys,json; print((json.load(sys.stdin).get('data') or {}).get('jwt',''))")
+  if [ -z "$JWT_SYS" ]; then
+    echo "  WARN: could not select System tenant — skipping platform_admin grant" >&2
+  else
+    # Find or create platform_admin role in System tenant
+    ROLE_ID=$(NO_PROXY=localhost curl -fsS -H "Authorization: Bearer $JWT_SYS" \
+      "$API_BASE/api/roles/all" \
+      | python3 -c "
+import sys, json
+try:
+    roles = json.load(sys.stdin).get('data') or []
+except Exception:
+    roles = []
+hit = [r for r in roles if r.get('code') == 'platform_admin']
+print(hit[0]['id'] if hit else '')
+")
+    if [ -z "$ROLE_ID" ]; then
+      ROLE_ID=$(NO_PROXY=localhost curl -fsS -X POST "$API_BASE/api/roles" \
+        -H "Authorization: Bearer $JWT_SYS" -H 'Content-Type: application/json' \
+        -d '{"code":"platform_admin","name":"Platform Admin","description":"Platform administrator — manages tenants, licenses, marketplace, and system configuration","type":"system","scopeType":"global","priority":0,"status":"active","isDefault":true}' \
+        | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    d = {}
+data = d.get('data') if isinstance(d, dict) else None
+print((data or {}).get('id', ''))
+")
+      if [ -n "$ROLE_ID" ]; then
+        echo "  platform_admin role: created (id=$ROLE_ID)"
+      else
+        echo "  WARN: failed to create platform_admin role" >&2
+      fi
+    else
+      echo "  platform_admin role: already exists (id=$ROLE_ID)"
+    fi
+
+    # Decode admin's memberId from the System-scoped JWT (jwt.payload.memberId)
+    MEMBER_ID=$(printf '%s' "$JWT_SYS" | python3 -c "
+import sys, base64, json
+tok = sys.stdin.read().strip()
+parts = tok.split('.')
+if len(parts) < 2:
+    print('')
+else:
+    p = parts[1]
+    p += '=' * (-len(p) % 4)
+    try:
+        print(json.loads(base64.urlsafe_b64decode(p)).get('memberId', ''))
+    except Exception:
+        print('')
+")
+    if [ -n "$ROLE_ID" ] && [ -n "$MEMBER_ID" ]; then
+      assign_resp=$(NO_PROXY=localhost curl -fsS -X POST \
+        "$API_BASE/api/user-roles/assign?memberId=$MEMBER_ID" \
+        -H "Authorization: Bearer $JWT_SYS" -H 'Content-Type: application/json' \
+        -d "[$ROLE_ID]")
+      assign_ok=$(printf '%s' "$assign_resp" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    print('ok' if d.get('code') == '0' else 'fail:' + str(d.get('message', ''))[:120])
+except Exception:
+    print('parse-error')
+")
+      case "$assign_ok" in
+        ok) echo "  platform_admin: granted to admin@example.com (memberId=$MEMBER_ID)" ;;
+        *)  echo "  WARN: platform_admin grant failed: $assign_ok" >&2 ;;
+      esac
+    else
+      echo "  WARN: missing roleId or memberId — cannot grant platform_admin" >&2
+    fi
+  fi
+fi
 
 # 4. Seed showcase records via the OSS playwright seed config.
 # Skip with SKIP_SEED=1 if the operator has already seeded (e.g. during a

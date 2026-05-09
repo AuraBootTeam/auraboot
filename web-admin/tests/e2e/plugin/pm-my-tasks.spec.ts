@@ -62,7 +62,7 @@ test.describe('PM My Tasks', () => {
       await executeCommandViaApi(page, 'pm:activate_project', {}, projectPid, 'update');
 
       // Fetch auto-created member pid
-
+      const BASE = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
       const memberFilter = encodeURIComponent(
         JSON.stringify([{ fieldName: 'pm_member_project_id', operator: 'EQ', value: projectPid }]),
       );

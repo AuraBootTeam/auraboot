@@ -81,7 +81,18 @@ export class AutomationListPage extends BasePage {
 
   /** Toggle automation enable/disable and wait for the API response. */
   async toggle(pid: string): Promise<void> {
+    // Wait for the POST /api/automations/{pid}/toggle round-trip so callers
+    // don't have to poll on stale text. Under full-suite load the click → PATCH
+    // → refetch chain can exceed 10s; explicitly anchoring on the response
+    // avoids 20s flake bounds (see automation-enhanced AUTO-04).
+    const togglePromise = this.page
+      .waitForResponse(
+        (r) => r.url().includes(`/api/automations/${pid}/toggle`) && r.status() < 500,
+        { timeout: 20000 },
+      )
+      .catch(() => null);
     await this.toggleButton(pid).click();
+    await togglePromise;
   }
 
   /** Open execution logs dialog for an automation. */

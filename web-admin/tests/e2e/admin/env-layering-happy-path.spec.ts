@@ -55,9 +55,28 @@ function envCard(page: Page, code: string) {
 }
 
 async function fillCreateForm(page: Page, code: string, name: string) {
-  // Form is a centered modal with required fields Code + Name
-  await page.locator('input[placeholder*="dev, staging, prod"]').fill(code);
+  // Form is a centered modal with required fields Code + Name. Wait for the
+  // modal to mount before fill — under parallel workers the click → setState
+  // handler can be delayed by other React work, so the input may not yet exist
+  // at the moment fill() begins.
+  const codeInput = page.locator('input[placeholder*="dev, staging, prod"]');
+  await codeInput.waitFor({ state: 'visible', timeout: 10_000 });
+  await codeInput.fill(code);
   await page.locator('input[placeholder*="Development"]').fill(name);
+}
+
+async function openCreateModal(page: Page) {
+  // Click the New-Environment header button and wait for the modal to render.
+  // Under parallel workers the modal click can race with React re-renders
+  // triggered by concurrent network activity, so retry once if the initial
+  // click is absorbed before showForm flips to true.
+  const btn = page.locator('button', { hasText: 'New Environment' }).first();
+  const codeInput = page.locator('input[placeholder*="dev, staging, prod"]');
+  await btn.click();
+  if (!(await codeInput.isVisible({ timeout: 3_000 }).catch(() => false))) {
+    await btn.click();
+  }
+  await codeInput.waitFor({ state: 'visible', timeout: 5_000 });
 }
 
 async function dismissError(page: Page) {
@@ -78,6 +97,12 @@ test.describe('Env-layering happy path', () => {
     // is verified by the menu-presence smoke at the bottom of this file.
     await page.goto(ENV_PAGE);
     await expect(page.locator('h1', { hasText: 'Environment Management' })).toBeVisible();
+    // Wait for the env list fetch to complete — either grid or empty state
+    // becomes visible. Without this, downstream test bodies race against the
+    // first /api/admin/environments call and may not see freshly-created cards.
+    const grid = page.getByTestId('env-list-grid');
+    const empty = page.getByTestId('env-empty-state');
+    await expect(grid.or(empty)).toBeVisible({ timeout: 15_000 });
   });
 
   test('EL-001 list renders with at least the auto-seeded default env', async ({ page }) => {
@@ -95,24 +120,24 @@ test.describe('Env-layering happy path', () => {
   test('EL-002 create dev + staging envs (D4 + D6)', async ({ page }) => {
     // Create dev — modal "Create" button is exact-text "Create" (the empty-state
     // CTA is "Create your first environment" so we must use exact match).
-    await page.locator('button', { hasText: 'New Environment' }).click();
+    await openCreateModal(page);
     await fillCreateForm(page, DEV_CODE, DEV_NAME);
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     // Modal closes, card appears with our code
-    await expect(envCard(page, DEV_CODE)).toBeVisible();
+    await expect(envCard(page, DEV_CODE)).toBeVisible({ timeout: 10_000 });
     await expect(envCard(page, DEV_CODE).locator('h3')).toHaveText(DEV_NAME);
 
     // Create staging
-    await page.locator('button', { hasText: 'New Environment' }).click();
+    await openCreateModal(page);
     await fillCreateForm(page, STAGING_CODE, STAGING_NAME);
     await page.getByRole('button', { name: 'Create', exact: true }).click();
-    await expect(envCard(page, STAGING_CODE)).toBeVisible();
+    await expect(envCard(page, STAGING_CODE)).toBeVisible({ timeout: 10_000 });
     await expect(envCard(page, STAGING_CODE).locator('h3')).toHaveText(STAGING_NAME);
   });
 
   test('EL-003 lock + unlock toggles Locked badge (D9 + D14)', async ({ page }) => {
     const card = envCard(page, DEV_CODE);
-    await expect(card).toBeVisible();
+    await expect(card).toBeVisible({ timeout: 15_000 });
 
     // Initially unlocked — no Locked badge
     await expect(card.locator('text=Locked')).toHaveCount(0);

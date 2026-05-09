@@ -131,8 +131,9 @@ async function isDevVerifyCodeAvailable(request: APIRequestContext): Promise<boo
     const res = await request.get(`/api/auth/verify-code/dev/latest`, {
       params: { target: 'probe@test.local' },
     });
-    // 200 or 404 (no code) both mean the endpoint exists
-    return res.status() !== 403 && res.status() !== 405;
+    // 200 (found) or 404 (no code yet) mean the endpoint exists.
+    // 403/405 = endpoint blocked, 500 = NoResourceFoundException (controller not loaded for active profile).
+    return res.status() === 200 || res.status() === 404;
   } catch {
     return false;
   }
@@ -439,7 +440,7 @@ test.describe('Login — Email OTP', () => {
 
   test.beforeAll(async () => {
     const adminRequest = await playwrightRequest.newContext({
-      baseURL: BASE_URL,
+      baseURL: (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173'),
       storageState: 'tests/storage/admin.json',
     });
     try {

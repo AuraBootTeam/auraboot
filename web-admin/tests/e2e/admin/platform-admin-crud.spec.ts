@@ -741,7 +741,14 @@ test.describe('PA: Webhook Subscription CRUD', () => {
     const nameInput = page
       .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
       .first();
+    // Wait for the form's React state to hydrate with the existing record's
+    // name before filling — otherwise an early fill() can be overwritten by
+    // the async record-load that completes after waitForFormReady().
+    await expect(nameInput).toHaveValue(originalName, { timeout: 10_000 });
     await nameInput.fill(updatedName);
+    await nameInput.blur();
+    // Confirm the controlled input picked up the new value before clicking save.
+    await expect(nameInput).toHaveValue(updatedName);
     await clickSaveAndWait(page);
 
     await expect

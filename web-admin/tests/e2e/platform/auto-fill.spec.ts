@@ -15,7 +15,7 @@
 
 import { test, expect } from '@playwright/test';
 
-import { BASE_URL } from '../../helpers/environments';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173';
 
 /**
  * Authenticate and return a request context with session cookies.

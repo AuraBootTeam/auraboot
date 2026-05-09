@@ -362,7 +362,7 @@ test.describe('PM Task Associations', () => {
   });
 
   test('PM-ASSOC-10: Task dependency data persists via API query', async ({ page }) => {
-
+    const BASE = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
     const filter = encodeURIComponent(
       JSON.stringify([{ fieldName: 'pm_td_task_id', operator: 'EQ', value: task2Pid }]),
     );
@@ -394,7 +394,7 @@ test.describe('PM Task Associations', () => {
   });
 
   test('PM-ASSOC-12: Watcher record persists via dynamic list API', async ({ page }) => {
-
+    const BASE = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
     const filters = encodeURIComponent(
       JSON.stringify([{ fieldName: 'pm_tw_task_id', operator: 'EQ', value: task1Pid }]),
     );

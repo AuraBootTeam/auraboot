@@ -87,31 +87,86 @@ async function findRow(page: Page, text: string): Promise<Locator> {
 }
 
 /**
+ * Open the row's overflow dropdown if a "..." trigger is present. Secondary
+ * row actions (pause/resume/complete/archive/delete) are portaled into a
+ * floating dropdown that is only mounted while the trigger is open. Tests
+ * that target those actions must open the dropdown first.
+ *
+ * Returns true if the dropdown was opened (or already open), false if no
+ * "..." trigger exists for this row (i.e. all actions render inline).
+ */
+async function ensureRowDropdownOpen(page: Page, row: Locator): Promise<boolean> {
+  // If the dropdown is already mounted somewhere on the page, treat as open.
+  const existing = page.locator('[data-testid="row-action-dropdown"]');
+  if (await existing.first().isVisible({ timeout: 250 }).catch(() => false)) {
+    return true;
+  }
+  const moreBtn = row.locator('[data-testid="row-action-more"]').first();
+  if (!(await moreBtn.isVisible({ timeout: 1_000 }).catch(() => false))) {
+    return false;
+  }
+  // Hover the row first to defeat the opacity-0/group-hover gate on the
+  // sticky action column.
+  await row.hover().catch(() => {});
+  await moreBtn.click();
+  await existing.first().waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+  return true;
+}
+
+/**
  * Click a row action button by code.
- * Strategy 1: data-testid="row-action-{code}" directly on row
- * Strategy 2: same selector on entire page (when row doesn't have its own data-testid container)
+ * Strategy 1: data-testid="row-action-{code}" directly on row (primary action)
+ * Strategy 2: open the row's overflow dropdown and click inside the portal
  */
 async function clickRowActionBtn(page: Page, row: Locator, btnCode: string): Promise<void> {
-  // Prefer scoped to row
+  // Prefer scoped to row (primary action / inline single button case).
   const btn = row.locator(`[data-testid="row-action-${btnCode}"]`);
   if (await btn.isVisible({ timeout: 2_000 }).catch(() => false)) {
     await btn.click();
     return;
   }
-  // Fallback: action button in same <tr> context
-  // Wait for it to become visible with a bit more time
+  // Open dropdown and click the action there.
+  const opened = await ensureRowDropdownOpen(page, row);
+  if (opened) {
+    const dropdownBtn = page
+      .locator('[data-testid="row-action-dropdown"]')
+      .locator(`[data-testid="row-action-${btnCode}"]`)
+      .first();
+    await dropdownBtn.waitFor({ state: 'visible', timeout: 5_000 });
+    await dropdownBtn.click();
+    return;
+  }
+  // Final fallback: wait on row-scoped locator (legacy inline render).
   await btn.waitFor({ state: 'visible', timeout: 5_000 });
   await btn.click();
 }
 
 /**
  * Assert a row action button IS visible (state allows the action).
+ *
+ * For mission/task tables the primary button (typically `edit`) renders
+ * inline; the rest live inside a portaled dropdown that is only mounted
+ * once the row's "..." trigger is clicked. To keep call-sites simple we
+ * open the dropdown when the button is not inline.
  */
 async function assertBtnVisible(row: Locator, btnCode: string): Promise<void> {
   const btn = row.locator(`[data-testid="row-action-${btnCode}"]`);
-  // Mid-suite the row's action column may render after a list refetch lands;
-  // 8s is too tight under chromium-deep contention. Bump to 20s to match the
-  // observed wall-clock on a hot BFF.
+  // Inline case (primary action, or pages with only one row action).
+  if (await btn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    return;
+  }
+  // Try the portaled dropdown.
+  const page = row.page();
+  const opened = await ensureRowDropdownOpen(page, row);
+  if (opened) {
+    const dropdownBtn = page
+      .locator('[data-testid="row-action-dropdown"]')
+      .locator(`[data-testid="row-action-${btnCode}"]`)
+      .first();
+    await expect(dropdownBtn).toBeVisible({ timeout: 10_000 });
+    return;
+  }
+  // Inline-only fallback with extended timeout for hot BFF contention.
   await expect(btn).toBeVisible({ timeout: 20_000 });
 }
 
@@ -119,8 +174,27 @@ async function assertBtnVisible(row: Locator, btnCode: string): Promise<void> {
  * Assert a row action button is NOT present/visible (state prohibits the action).
  */
 async function assertBtnHidden(row: Locator, btnCode: string): Promise<void> {
-  const btn = row.locator(`[data-testid="row-action-${btnCode}"]`);
-  await expect(btn).not.toBeVisible({ timeout: 5_000 });
+  const page = row.page();
+  // Check inline first.
+  const inline = row.locator(`[data-testid="row-action-${btnCode}"]`);
+  await expect(inline).not.toBeVisible({ timeout: 2_000 });
+  // If a dropdown is already open, also assert the action is not there.
+  const dropdown = page.locator('[data-testid="row-action-dropdown"]').first();
+  if (await dropdown.isVisible({ timeout: 250 }).catch(() => false)) {
+    await expect(
+      dropdown.locator(`[data-testid="row-action-${btnCode}"]`),
+    ).not.toBeVisible({ timeout: 2_000 });
+    return;
+  }
+  // Otherwise open the dropdown (if any) and assert absence inside.
+  const opened = await ensureRowDropdownOpen(page, row);
+  if (opened) {
+    await expect(
+      page
+        .locator('[data-testid="row-action-dropdown"]')
+        .locator(`[data-testid="row-action-${btnCode}"]`),
+    ).not.toBeVisible({ timeout: 5_000 });
+  }
 }
 
 /**
