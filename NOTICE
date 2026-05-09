@@ -49,15 +49,45 @@ PostgreSQL JDBC Driver
   Licensed under BSD-2-Clause
   https://github.com/pgjdbc/pgjdbc
 
-Redisson
-  Copyright Nikita Koksharov
+Lettuce (Redis client, via Spring Boot Data Redis)
+  Copyright Mark Paluch and contributors
+  Licensed under Apache License 2.0 / MIT for some sub-modules
+  https://github.com/lettuce-io/lettuce-core
+
+JJWT (JSON Web Token for Java)
+  Copyright JJWT contributors
   Licensed under Apache License 2.0
-  https://github.com/redisson/redisson
+  https://github.com/jwtk/jjwt
+
+Caffeine (in-process cache)
+  Copyright Ben Manes and contributors
+  Licensed under Apache License 2.0
+  https://github.com/ben-manes/caffeine
+
+Micrometer (metrics + tracing facade)
+  Copyright VMware, Inc. and contributors
+  Licensed under Apache License 2.0
+  https://github.com/micrometer-metrics/micrometer
 
 OpenTelemetry Java
   Copyright The OpenTelemetry Authors
   Licensed under Apache License 2.0
   https://github.com/open-telemetry/opentelemetry-java
+
+Sentry SDK for Spring Boot Jakarta
+  Copyright Sentry
+  Licensed under MIT
+  https://github.com/getsentry/sentry-java
+
+NetworkNT JSON Schema Validator
+  Copyright NetworkNT
+  Licensed under Apache License 2.0
+  https://github.com/networknt/json-schema-validator
+
+Apache PDFBox + Apache POI
+  Copyright The Apache Software Foundation
+  Licensed under Apache License 2.0
+  https://pdfbox.apache.org / https://poi.apache.org
 
 JUnit 5
   Copyright The JUnit Team

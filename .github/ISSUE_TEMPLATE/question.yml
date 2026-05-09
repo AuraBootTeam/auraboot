@@ -11,7 +11,7 @@ body:
         Before asking:
         - Search [existing issues](https://github.com/AuraBootTeam/auraboot/issues?q=)
         - Check the [docs](https://docs.auraboot.com)
-        - For licensing questions, see the [License FAQ](../blob/main/LICENSE-FAQ-en.md)
+        - For licensing questions, see the [License FAQ](https://github.com/AuraBootTeam/auraboot/blob/main/LICENSE-FAQ-en.md)
 
   - type: textarea
     id: question

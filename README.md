@@ -83,7 +83,7 @@ Open [http://localhost:5173](http://localhost:5173) and log in:
 
 ### Manual Setup
 
-**Prerequisites:** Java 21+, Node.js 20+, PostgreSQL 15+, Redis 7+
+**Prerequisites:** Java 21+, Node.js 20+, PostgreSQL 15+ (Docker stack ships 16), Redis 7+, pnpm 9+
 
 ```bash
 # 1. Clone the repository
