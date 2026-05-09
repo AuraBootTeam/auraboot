@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
@@ -70,9 +71,24 @@ public class BootstrapStartupRunner implements ApplicationRunner {
     private final BootstrapRepairService bootstrapRepairService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Phase 3: when {@code true}, the demo profile of built-in plugins
+     * (core-meta, core-bpm, core-aurabot, page-manager, crm-starter, showcase,
+     * agent-control-plane, acp-showcase, workflow-demo) is imported in addition
+     * to the always-on core profile (org-management, platform-admin).
+     *
+     * <p>Default {@code false} — prod-safe. Override via env
+     * {@code AURABOOT_DEMO_SEED=true} or property
+     * {@code auraboot.bootstrap.demo-seed=true}. The {@code dev} / {@code community}
+     * profiles default this to {@code true} (see {@code application-dev.yml}).
+     */
+    @Value("${auraboot.bootstrap.demo-seed:false}")
+    private boolean demoSeed;
+
     @Override
     public void run(ApplicationArguments args) {
-        log.info("BootstrapStartupRunner: auraboot.bootstrap.enabled=true → running repairAll() for the 9 invariants");
+        log.info("BootstrapStartupRunner: auraboot.bootstrap.enabled=true, demo-seed={} → running repairAll() for the 9 invariants",
+                demoSeed);
 
         BootstrapRepairService.RepairOptions opts = loadOptions();
         RepairReport report;
@@ -127,7 +143,14 @@ public class BootstrapStartupRunner implements ApplicationRunner {
                     BootstrapRequest req = objectMapper.readValue(is, BootstrapRequest.class);
                     log.info("BootstrapStartupRunner: loaded options from {} (companyName={}, adminEmail={}, mode={})",
                             SEED_CONFIG_RESOURCE, req.getCompanyName(), req.getAdminEmail(), req.getSystemMode());
-                    return BootstrapRepairService.RepairOptions.fromBootstrapRequest(req);
+                    BootstrapRepairService.RepairOptions base =
+                            BootstrapRepairService.RepairOptions.fromBootstrapRequest(req);
+                    // Startup-time demo-seed flag overrides whatever the seed-config JSON says
+                    // (env var takes precedence over checked-in defaults).
+                    return BootstrapRepairService.RepairOptions.of(
+                            base.adminEmail(), base.adminPassword(), base.adminDisplayName(),
+                            base.companyName(), base.systemMode(), base.instanceUrl(),
+                            demoSeed);
                 }
             }
         } catch (Exception e) {
@@ -140,6 +163,7 @@ public class BootstrapStartupRunner implements ApplicationRunner {
                 "Admin",
                 "AuraBoot Dev",
                 "single",
-                "http://localhost:6443");
+                "http://localhost:6443",
+                demoSeed);
     }
 }
