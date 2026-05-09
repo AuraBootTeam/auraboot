@@ -71,11 +71,17 @@ EXCLUDE_GLOBS=(
   'TODO*.md'
 )
 
-RSYNC_OPTS=(-a --delete --prune-empty-dirs)
+# NOTE: deliberately omit --delete. The website has its own hand-written
+# .mdx content (intro pages, marketing-toned overviews) that does not live
+# in the OSS docs/ tree. --delete would clobber them. Sync is overlay-only;
+# orphan removal is a manual decision.
+RSYNC_OPTS=(-a --prune-empty-dirs)
 [ $APPLY -eq 0 ] && RSYNC_OPTS+=(--dry-run --itemize-changes)
 
-# Honor includes (only .md and .mdx) and excludes
-RSYNC_OPTS+=(--include='*/' --include='*.md' --include='*.mdx' --include='*.png' --include='*.jpg' --include='*.svg')
+# Sync only .md (not .mdx — those are website-authored marketing pages
+# that may share filenames; we don't want to overwrite them with raw OSS
+# docs that aren't formatted for the site).
+RSYNC_OPTS+=(--include='*/' --include='*.md' --include='*.png' --include='*.jpg' --include='*.svg')
 for pat in "${EXCLUDE_GLOBS[@]}"; do
   RSYNC_OPTS+=(--exclude="$pat")
 done

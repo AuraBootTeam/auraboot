@@ -1,0 +1,16 @@
+# GitHub funding link surfaced on the repo landing page.
+# Activate AT LEAST ONE of these before going public; otherwise GitHub renders
+# a "Sponsor" button that 404s, which looks broken.
+#
+# Recommended: set up GitHub Sponsors (free for the project) AND list the
+# commercial license URL so visitors interested in supporting the project
+# financially have a clear path. Sponsors and commercial license are
+# orthogonal — sponsors fund development, commercial license unlocks SaaS
+# resale rights.
+
+# github: AuraBootTeam              # Uncomment after enabling Sponsors
+# open_collective: auraboot         # Optional, if Open Collective is also set up
+
+custom:
+  - https://www.auraboot.com/pricing
+  - mailto:license@auraboot.com

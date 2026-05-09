@@ -1,0 +1,31 @@
+# AuraBoot CODEOWNERS
+#
+# These owners are auto-requested as reviewers when a PR touches files
+# matching the pattern. They're NOT a permission gate — anyone can still
+# merge — but the auto-request means the right people see the review
+# request without the contributor having to know who to tag.
+#
+# Ownership is conservative on day one — most paths land on the @core
+# team. Hand off to specialists as the contributor base grows.
+
+# --- Defaults ---
+*                                            @AuraBootTeam/core
+
+# --- Licensing & legal (high-stakes; always need maintainer eyes) ---
+LICENSE.txt                                  @AuraBootTeam/core
+LICENSE-FAQ*.md                              @AuraBootTeam/core
+CLA.md                                       @AuraBootTeam/core
+NOTICE                                       @AuraBootTeam/core
+TELEMETRY.md                                 @AuraBootTeam/core
+SECURITY.md                                  @AuraBootTeam/core
+CHANGELOG.md                                 @AuraBootTeam/core
+
+# --- CI / release infrastructure (don't accidentally break the build) ---
+/.github/                                    @AuraBootTeam/core
+/scripts/                                    @AuraBootTeam/core
+
+# --- License signing key (any change here is a security event) ---
+/platform/src/main/resources/license/        @AuraBootTeam/core
+
+# --- Demo / launch guardrails ---
+/platform/src/main/java/com/auraboot/framework/demo/  @AuraBootTeam/core
