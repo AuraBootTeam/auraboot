@@ -25,6 +25,7 @@ import {
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Page keys (hyphenated for URL / API compatibility)
@@ -219,7 +220,7 @@ test.describe('DP Quality Standard -- CRUD', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     await ctx.close();
@@ -259,7 +260,7 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     try {
@@ -496,7 +497,7 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     await navigateToDynamicPage(p, PAGE.CHECKPOINT).catch(() => {});
@@ -516,7 +517,7 @@ test.describe('DP Quality Checkpoint -- Project Reference', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     try {
@@ -572,7 +573,7 @@ test.describe('DP Quality Checkpoint -- Project Reference', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     await ctx.close();
   });

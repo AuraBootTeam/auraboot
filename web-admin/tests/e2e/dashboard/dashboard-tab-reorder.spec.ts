@@ -15,7 +15,7 @@
 
 import { test, expect } from '../../fixtures';
 
-const BASE_URL = 'http://localhost:5173';
+import { BASE_URL } from '../../helpers/environments';
 const DASHBOARDS_PATH = '/dashboards';
 const TABS_SEL = 'nav[aria-label="Dashboard tabs"] button.cursor-grab';
 const TS = Date.now();

@@ -29,12 +29,11 @@ import {
   queryFilteredList,
   clickRowActionByLocator,
 } from '../helpers';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
 
 /** Wait for form page to be ready after navigation (create or edit). */
 async function waitForFormReady(page: import('@playwright/test').Page) {

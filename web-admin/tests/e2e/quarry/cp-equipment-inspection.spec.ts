@@ -22,6 +22,7 @@ import {
 } from '../helpers/index';
 import { getTestProjectId } from '../quarry-management.setup';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Test Describe: Equipment Inspection — CRUD & Status
@@ -41,7 +42,7 @@ test.describe('CP Equipment Inspection — CRUD & Status', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     projectId = await getTestProjectId(p);
@@ -215,7 +216,7 @@ test.describe('CP Equipment Inspection — CRUD & Status', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
     // Cleanup any remaining test records

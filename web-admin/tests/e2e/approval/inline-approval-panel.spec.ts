@@ -7,8 +7,8 @@
  *            associated approval process — InlineApprovalPanel renders null gracefully)
  *
  * Prerequisites:
- *   - Backend running at localhost:6443
- *   - Frontend dev server running at localhost:5173
+ *   - Backend running at the BACKEND_URL (default :6443)
+ *   - Frontend dev server running at the BASE_URL (default :5173)
  *   - Any DSL model with at least one record (uses e2et_record from the test-order plugin,
  *     falling back to any available dynamic model)
  *

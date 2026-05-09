@@ -15,12 +15,14 @@
  */
 
 import type { FullConfig } from '@playwright/test';
+import { PSQL_BASE } from './helpers/pg-env';
+import { BASE_URL } from './helpers/environments';
 
 const ADMIN_STORAGE = process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json';
 
 async function globalTeardown(config: FullConfig): Promise<void> {
   // Resolve baseURL from Playwright config (native fetch requires absolute URLs)
-  const baseURL = config.projects[0]?.use?.baseURL ?? 'http://localhost:5173';
+  const baseURL = config.projects[0]?.use?.baseURL ?? BASE_URL;
   console.log('🧹 Running global teardown...');
 
   try {
@@ -159,7 +161,7 @@ async function cleanupE2eMenus(): Promise<void> {
   try {
     const { execSync } = await import('node:child_process');
     execSync(
-      `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+      `${PSQL_BASE} -P pager=off -v ON_ERROR_STOP=1 -tA`,
       {
         input: `DELETE FROM ab_menu WHERE pid LIKE 'E2EM\\_%' ESCAPE '\\';`,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -190,7 +192,7 @@ async function cleanupE2eSoulProfiles(): Promise<void> {
   try {
     const { execSync } = await import('node:child_process');
     execSync(
-      `psql -h localhost -U ghj -d aura_boot -P pager=off -v ON_ERROR_STOP=1 -tA`,
+      `${PSQL_BASE} -P pager=off -v ON_ERROR_STOP=1 -tA`,
       {
         input: `DELETE FROM ab_agent_user_soul_profile
                  WHERE pid LIKE 'E2EUSP%'

@@ -106,5 +106,36 @@ module.exports = {
         "react-hooks/exhaustive-deps": "warn",
       },
     },
+
+    // ─── Test env-drift gate (Phase 3 — env-scripts-testing v3) ─────────
+    // Forbid direct reads of env-contract vars (BE_PORT / VITE_PORT / BFF_PORT
+    // / PG_HOST / PG_PORT / PG_USER / PG_DB / PGPASSWORD / BACKEND_URL /
+    // PLAYWRIGHT_BASE_URL / BFF_URL) inside tests/. Specs and helpers must
+    // import the resolved constants from `tests/helpers/environments` (or call
+    // `loadEnv()`) so a single config change reroutes every caller.
+    //
+    // The canonical loader (`tests/helpers/environments.ts`) and Playwright
+    // configs are exempted — they are the only places the raw env values are
+    // legitimately read.
+    {
+      files: ["tests/**/*.{ts,tsx,js,jsx,mjs,cjs}"],
+      excludedFiles: [
+        "tests/helpers/environments.ts",
+        "tests/helpers/playwright-env.ts",
+        "tests/helpers/pg-env.ts",
+        "tests/**/playwright*.config.ts",
+      ],
+      rules: {
+        "no-restricted-syntax": [
+          "error",
+          {
+            selector:
+              "MemberExpression[object.object.name='process'][object.property.name='env'][property.name=/^(BE_PORT|VITE_PORT|BFF_PORT|PG_HOST|PG_PORT|PG_USER|PG_DB|PGPASSWORD|BACKEND_URL|PLAYWRIGHT_BASE_URL|BFF_URL)$/]",
+            message:
+              "Do not read env-contract vars directly in tests. Import BACKEND_URL / BASE_URL / BFF_URL / PSQL_BASE from 'tests/helpers/environments' (or call loadEnv()).",
+          },
+        ],
+      },
+    },
   ],
 };

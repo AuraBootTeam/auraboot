@@ -12,6 +12,7 @@
 
 import { test, expect } from '@playwright/test';
 import { navigateToDynamicPage, dateOffsetStr } from '../helpers';
+import { BASE_URL } from '../../helpers/environments';
 
 const VIEW_NAME = 'E2E Gantt Timeline';
 const MODEL_CODE = 'e2et_order';
@@ -46,7 +47,7 @@ test.describe('SavedView — GANTT View', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
 
@@ -91,7 +92,7 @@ test.describe('SavedView — GANTT View', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: 'http://localhost:5173',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
 

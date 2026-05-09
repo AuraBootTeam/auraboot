@@ -23,6 +23,7 @@ import { test, expect } from '../../fixtures';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { uniqueId } from '../helpers';
+import { BACKEND_URL } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -305,7 +306,7 @@ test.describe('Document Flow — Expression Formats', () => {
   test('DF-006: backend should be healthy and accept DOCUMENT_FLOW requests', async ({
     request,
   }) => {
-    const healthResp = await request.get('http://localhost:6443/actuator/health');
+    const healthResp = await request.get(`${BACKEND_URL}/actuator/health`);
     expect(healthResp.ok()).toBeTruthy();
     const body = await healthResp.json();
     expect(body.status).toBe('UP');
