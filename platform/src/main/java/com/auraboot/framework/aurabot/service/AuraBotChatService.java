@@ -1237,16 +1237,21 @@ public class AuraBotChatService {
                 } else {
                     int openIdx = buffer.indexOf(OPEN);
                     if (openIdx < 0) {
-                        // Possibly a partial open tag at the tail — buffer up to OPEN.length()-1 chars
-                        int safe = buffer.length() - (OPEN.length() - 1);
-                        if (safe > 0) {
-                            out.append(buffer, 0, safe);
-                            buffer.delete(0, safe);
+                        // No complete open tag. Hold back only the longest suffix that could
+                        // be a partial open tag (e.g. "<", "<t", "<th", "<thi", "<thin", "<think").
+                        // Flush everything before that suffix as visible text.
+                        int holdFrom = buffer.length();
+                        int maxPrefix = Math.min(buffer.length(), OPEN.length() - 1);
+                        for (int p = maxPrefix; p > 0; p--) {
+                            int start = buffer.length() - p;
+                            if (OPEN.startsWith(buffer.substring(start, buffer.length()))) {
+                                holdFrom = start;
+                                break;
+                            }
                         }
-                        // Check if remainder could start an open tag; if not, flush it
-                        if (!couldBeOpenPrefix(buffer)) {
-                            out.append(buffer);
-                            buffer.setLength(0);
+                        if (holdFrom > 0) {
+                            out.append(buffer, 0, holdFrom);
+                            buffer.delete(0, holdFrom);
                         }
                         return out.toString();
                     }
