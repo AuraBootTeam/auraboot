@@ -1,11 +1,13 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.rag.config.SynonymConfig;
 import com.auraboot.framework.rag.dto.RetrievalResult;
 import com.auraboot.framework.rag.service.QueryRewriteService.QueryRewriteResult;
 import org.junit.jupiter.api.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -14,7 +16,26 @@ import static org.assertj.core.api.Assertions.*;
  */
 class QueryRewriteServiceTest {
 
-    private final QueryRewriteService service = new QueryRewriteService(new com.auraboot.framework.rag.config.SynonymConfig());
+    private final QueryRewriteService service = new QueryRewriteService(buildSynonymConfig());
+
+    /**
+     * Mirrors the defaults declared in {@code aurabot/synonyms.yml}. Spring's
+     * {@code @ConfigurationProperties} binding is bypassed in this unit test
+     * since we instantiate {@link SynonymConfig} directly — populate the same
+     * expansions here so the test exercises the canonical mapping.
+     */
+    private static SynonymConfig buildSynonymConfig() {
+        SynonymConfig cfg = new SynonymConfig();
+        cfg.setExpansions(Map.of(
+                "bpm", List.of("workflow", "process", "approval", "task"),
+                "auth", List.of("login", "token", "jwt", "session", "password"),
+                "plugin", List.of("module", "extension", "package"),
+                "crm", List.of("lead", "opportunity", "account", "contact", "sales"),
+                "permission", List.of("rbac", "role", "access", "menu"),
+                "rag", List.of("knowledge", "embedding", "vector", "retrieval", "chunk")
+        ));
+        return cfg;
+    }
 
     // =========================================================================
     // Query expansion

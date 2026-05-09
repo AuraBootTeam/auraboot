@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.crosstenant.CrossTenantAclService;
 import com.auraboot.framework.agent.crosstenant.CrossTenantDecision;
 import com.auraboot.framework.agent.crosstenant.CrossTenantGrantController;
 import com.auraboot.framework.agent.crosstenant.CrossTenantGrantType;
+import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.enums.RoleCodes;
@@ -48,6 +49,7 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private CrossTenantGrantController controller;
     @Autowired private CrossTenantAclService aclService;
+    @Autowired private AdminRoleChecker adminRoleChecker;
     @Autowired private JdbcTemplate jdbc;
 
     private Long parentTenant;
@@ -84,6 +86,11 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("DELETE FROM ab_cross_tenant_grant WHERE parent_tenant_id IN (?, ?)",
                 parentTenant, childTenant);
         aclService.invalidate(parentTenant, childTenant, CrossTenantGrantType.SPAWN_SUB_AGENT);
+        // The caseA "non platform admin" path consults AdminRoleChecker, which
+        // memoises the role lookup for 60 s. Without this invalidation the
+        // cached `false` from caseA leaks into caseB-E when those cases grant
+        // platform_admin and then expect the controller to recognise the role.
+        adminRoleChecker.invalidateAll();
         MetaContext.clear();
     }
 
@@ -137,6 +144,10 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
                     platformAdminRoleId,
                     testTenant.getId());
         }
+        // Drop any cached "user does NOT have platform_admin" entry from a prior
+        // caseA invocation in the same JVM — the 60 s TTL on AdminRoleChecker
+        // would otherwise mask the freshly-inserted ab_user_role binding.
+        adminRoleChecker.invalidateAll();
     }
 
     private CrossTenantGrantController.CreateGrantRequest makeRequest() {
