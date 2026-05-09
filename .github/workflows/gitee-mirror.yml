@@ -39,8 +39,14 @@ jobs:
         run: |
           # Push only the main branch + tags. Don't blast all branches —
           # those are dev branches with internal context.
-          git push --force-with-lease gitee main
-          git push --force-with-lease gitee --tags
+          #
+          # Use plain --force, NOT --force-with-lease. The mirror is one-way
+          # (GitHub → Gitee); Gitee should never have local-only commits we
+          # don't have on GitHub. --force-with-lease requires a known remote
+          # ref to compare against, which fails on a fresh empty Gitee repo.
+          # For a unidirectional mirror, --force is the correct semantic.
+          git push --force gitee main
+          git push --force gitee --tags
 
       - name: Status
         if: success()

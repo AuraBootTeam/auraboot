@@ -28,14 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-          # Use security-extended pack for stricter coverage; can drop back to
-          # default if false-positive volume becomes painful in beta.
-          queries: security-extended
-
       - name: Set up JDK 21 (for Java analysis)
         if: matrix.language == 'java-kotlin'
         uses: actions/setup-java@v4
@@ -43,8 +35,25 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # build-mode: manual lets us provide the build command explicitly.
+          # autobuild fails on multi-module Gradle layouts where the root is
+          # in platform/ rather than the repo root.
+          build-mode: ${{ matrix.language == 'java-kotlin' && 'manual' || 'none' }}
+          # security-extended pack for stricter coverage; drop back to
+          # default if false-positive volume becomes painful in beta.
+          queries: security-extended
+
+      - name: Build (Java only — CodeQL build-mode=manual)
+        if: matrix.language == 'java-kotlin'
+        working-directory: ./platform
+        run: |
+          chmod +x gradlew
+          # Skip tests during CodeQL build — analysis only needs compiled classes.
+          ./gradlew clean assemble -x test --no-daemon
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
