@@ -274,6 +274,30 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 && isResourceUserModified(tenantId, type, resourceCode);
     }
 
+    /**
+     * Detect a page row created by {@code MetaModelServiceImpl.autoCreateDefaultPages}. Such rows
+     * carry no user content and are tagged with {@code extension.auto_created=true}. Plugin imports
+     * must overwrite them unconditionally so that the canonical DSL from {@code config/pages/*.json}
+     * lands in place of the stub.
+     *
+     * <p>Returns {@code false} on any lookup error or if the flag is absent — the caller will then
+     * fall back to the normal OVERWRITE_SAFE skip behavior.
+     */
+    private boolean isAutoCreatedStubPage(String pageKey) {
+        try {
+            com.auraboot.framework.meta.dto.PageSchemaDTO existing = pageSchemaService.findAnyByPageKey(pageKey);
+            if (existing == null || existing.getExtension() == null) {
+                return false;
+            }
+            Object flag = existing.getExtension().get("auto_created");
+            return Boolean.TRUE.equals(flag) || "true".equals(String.valueOf(flag));
+        } catch (Exception e) {
+            // Defensive: on lookup failure, do not bypass the user-modified guard.
+            log.debug("isAutoCreatedStubPage lookup failed for pageKey={}: {}", pageKey, e.getMessage());
+            return false;
+        }
+    }
+
     // ==================== Import Operations ====================
 
     @Override
@@ -1472,9 +1496,17 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.PAGE, dto.getPageKey())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.PAGE, dto.getPageKey());
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
-                    null, null, dto.getPageKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
+            // Stub pages emitted by MetaModelServiceImpl.autoCreateDefaultPages are tagged with
+            // extension.auto_created=true. Such rows carry no user content (zero columns / buttons /
+            // fields) and exist solely so that /api/pages/key/{pageKey} resolves between model
+            // publish and plugin import. They must never block plugin DSL overwrite, even if the
+            // resource was somehow flagged user-modified earlier. Bypass the skip in that case.
+            if (!isAutoCreatedStubPage(dto.getPageKey())) {
+                log.info("Skipping user-modified resource: {} {}", ResourceType.PAGE, dto.getPageKey());
+                return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+                        null, null, dto.getPageKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
+            }
+            log.info("Forcing overwrite of auto-created stub page: {}", dto.getPageKey());
         }
 
         // V2 flat format: kind/profile/title/layout/blocks directly on DTO
