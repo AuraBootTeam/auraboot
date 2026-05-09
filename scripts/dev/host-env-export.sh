@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # host-env-export.sh — symmetric counterpart to r2-env-export.sh.
-# Exports the canonical host-mode env contract so every shell that
-# runs Playwright / psql / curl picks up identical defaults.
+# Delegates to lib/env-loader.sh::aura_env_load host so all five
+# profile scripts share one canonical default table.
 #
 # Usage:
 #
@@ -18,8 +18,6 @@
 #
 # Existing values are preserved — pre-export to override (e.g. for a
 # per-developer custom port).
-#
-# Source-only: see r2-env-export.sh for the same source-vs-exec guard.
 
 # ---------- detect source vs exec ----------
 
@@ -42,19 +40,13 @@ fi
 
 unset __host_sourced
 
-# ---------- export host defaults ----------
+# ---------- load via env-loader ----------
 
-export BE_PORT="${BE_PORT:-6443}"
-export VITE_PORT="${VITE_PORT:-5173}"
-export BFF_PORT="${BFF_PORT:-3500}"
-export PG_HOST="${PG_HOST:-localhost}"
-export PG_PORT="${PG_PORT:-5432}"
-export PG_USER="${PG_USER:-auraboot}"
-export PG_DB="${PG_DB:-aura_boot}"
-export PGPASSWORD="${PGPASSWORD:-auraboot_dev}"
-export BACKEND_URL="${BACKEND_URL:-http://localhost:$BE_PORT}"
-export PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://localhost:$VITE_PORT}"
-export BFF_URL="${BFF_URL:-http://localhost:$BFF_PORT}"
+__host_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"
+# shellcheck disable=SC1091
+. "$__host_script_dir/lib/env-loader.sh"
+aura_env_load host || return $?
+unset __host_script_dir
 
 # ---------- summary ----------
 
