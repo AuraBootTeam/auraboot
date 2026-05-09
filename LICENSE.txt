@@ -1,6 +1,6 @@
 AuraBoot License Agreement
 
-Version 1.0, March 15, 2026
+Version 1.1, May 9, 2026
 
 https://www.auraboot.com/
 
@@ -86,9 +86,7 @@ use, reproduce, modify, and distribute the Software, subject to the
 following conditions:
 
 5.1 ATTRIBUTION. You must retain all copyright notices, license notices, and
-    attribution statements in the Software and any Derivative Works. You must
-    include a prominent notice in any Derivative Work stating that You have
-    modified the Software, along with the date of any changes.
+    attribution statements in the Software and any Derivative Works.
 
 5.2 BRAND INFORMATION PRESERVATION. You may not remove or alter any Brand
     Information displayed in the user interface of the Software, except for
@@ -118,11 +116,7 @@ following conditions:
     (d) Reselling, redistributing, or white-labeling the Software as part of
         a platform service offering.
 
-5.5 OPEN SOURCE DISTRIBUTION. If You distribute the Software or any
-    Derivative Work, You must do so under the terms of this License and make
-    the source code available under the same terms.
-
-5.6 CONTRIBUTION BACK. Contributions to the Software (via pull requests or
+5.5 CONTRIBUTION BACK. Contributions to the Software (via pull requests or
     other means) are subject to the Contributor License Agreement and shall
     be licensed under the same terms as this License.
 
