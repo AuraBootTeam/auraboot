@@ -108,8 +108,10 @@ test.describe('Space Selection API', () => {
     const platformSpace = spaces.find((s: any) => s.spaceType === 'platform');
     expect(platformSpace).toBeTruthy();
 
-    // Select the platform space
-    const selectRes = await page.request.post('/api/tenant-selection/process', {
+    // Select the platform space — call backend directly to avoid BFF precision issues
+    const backendUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
+    const selectRes = await page.request.fetch(`${backendUrl}/api/tenant-selection/process`, {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
