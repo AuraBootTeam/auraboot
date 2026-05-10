@@ -7,6 +7,7 @@ import {
   type Automation,
 } from '~/framework/smart/automation/services/automationService';
 import { getTokenFromRequest } from '~/shared/services/session';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 interface LoaderData {
   automations: Automation[];
@@ -30,8 +31,8 @@ export default function AutomationsPage() {
   const { automations, token, error } = useLoaderData<LoaderData>();
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="mx-auto max-w-6xl px-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className={workspacePageClassName('contentCompact')}>
         <h1 className="mb-6 text-2xl font-bold text-gray-900">
           {st('$i18n:automation.page.title') || 'Automation Management'}
         </h1>

@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 type MetaArgs = Record<string, unknown>;
 
@@ -446,7 +447,7 @@ export default function I18nWorkflowPage() {
   const pendingCount = resources.filter((r) => r.status === 'review').length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
+    <div className={workspacePageClassName('contentPadded', 'space-y-6')}>
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

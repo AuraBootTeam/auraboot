@@ -18,6 +18,7 @@ import {
 import { useToastContext } from '~/contexts/ToastContext';
 import { get, put } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -258,7 +259,7 @@ export default function LoginChannelsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <div className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="mx-auto max-w-3xl px-6 py-5">
+        <div className={workspacePageClassName('header')}>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">登录渠道管理</h1>
@@ -287,7 +288,7 @@ export default function LoginChannelsPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-3xl px-6 py-6">
+      <div className={workspacePageClassName('content')}>
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />

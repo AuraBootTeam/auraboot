@@ -23,6 +23,7 @@ import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -420,7 +421,7 @@ export default function AIColleaguesPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl p-6">
+    <div className={workspacePageClassName('contentPadded')}>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
