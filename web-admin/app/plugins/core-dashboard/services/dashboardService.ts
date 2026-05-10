@@ -165,6 +165,14 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
     passthrough.defaultSort = rawConfig.defaultSort as Widget['config']['defaultSort'];
   }
 
+  const isModelTableShorthand =
+    type === 'smart-table-chart' &&
+    rawConfig.modelCode !== undefined &&
+    rawConfig.table !== undefined &&
+    rawConfig.dataSource === undefined &&
+    rawConfig.data === undefined &&
+    rawConfig.columns === undefined;
+
   // If config already has dataSource, treat as normalized format
   if (rawConfig.dataSource) {
     return {
@@ -177,6 +185,16 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
         drillDown: rawConfig.drillDown as Widget['config']['drillDown'],
         style: rawConfig.style as Widget['config']['style'],
         refreshInterval: rawConfig.refreshInterval as number | undefined,
+        ...passthrough,
+      },
+    };
+  }
+
+  if (isModelTableShorthand) {
+    return {
+      ...base,
+      config: {
+        title,
         ...passthrough,
       },
     };
@@ -520,7 +538,7 @@ function buildStaticDataSource(type: WidgetType, config: Record<string, unknown>
  * Normalize a dashboard response from the backend.
  * Ensures all widgets conform to the frontend Widget type.
  */
-function normalizeDashboard(raw: Dashboard): Dashboard {
+export function normalizeDashboard(raw: Dashboard): Dashboard {
   return {
     ...raw,
     title: normalizeLocalizedText(raw.title),

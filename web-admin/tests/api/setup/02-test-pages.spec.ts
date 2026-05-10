@@ -11,7 +11,7 @@
  * Replaces oss-reset-and-init.sh §6a + §6b. Idempotent: skip-if-exists.
  */
 
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { authHeaders, loginAdmin } from './_helpers';
 
 const TEST_PAGES = [
@@ -132,77 +132,77 @@ const SYSTEM_OVERVIEW = {
   layoutConfig: { columns: 12, rowHeight: 100, gap: 16 },
   widgets: [
     {
-      i: 'w_accounts',
+      i: 'w_pages',
       x: 0,
       y: 0,
       w: 3,
       h: 2,
       type: 'NumberCard',
-      title: 'Accounts',
+      title: 'Pages',
       config: {
-        title: 'Accounts',
-        label: 'Accounts',
+        title: 'Pages',
+        label: 'Pages',
         color: '#2563EB',
         dataSource: {
           type: 'aggregate',
-          modelCode: 'crm_account',
+          modelCode: 'page_schema',
           metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
         },
       },
     },
     {
-      i: 'w_contacts',
+      i: 'w_agents',
       x: 3,
       y: 0,
       w: 3,
       h: 2,
       type: 'NumberCard',
-      title: 'Contacts',
+      title: 'Agents',
       config: {
-        title: 'Contacts',
-        label: 'Contacts',
+        title: 'Agents',
+        label: 'Agents',
         color: '#10B981',
         dataSource: {
           type: 'aggregate',
-          modelCode: 'crm_contact',
+          modelCode: 'agent_definition',
           metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
         },
       },
     },
     {
-      i: 'w_leads',
+      i: 'w_members',
       x: 6,
       y: 0,
       w: 3,
       h: 2,
       type: 'NumberCard',
-      title: 'Leads',
+      title: 'Members',
       config: {
-        title: 'Leads',
-        label: 'Leads',
+        title: 'Members',
+        label: 'Members',
         color: '#F59E0B',
         dataSource: {
           type: 'aggregate',
-          modelCode: 'crm_lead',
+          modelCode: 'tenant_member',
           metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
         },
       },
     },
     {
-      i: 'w_opportunities',
+      i: 'w_missions',
       x: 9,
       y: 0,
       w: 3,
       h: 2,
       type: 'NumberCard',
-      title: 'Opportunities',
+      title: 'Missions',
       config: {
-        title: 'Opportunities',
-        label: 'Opportunities',
+        title: 'Missions',
+        label: 'Missions',
         color: '#8B5CF6',
         dataSource: {
           type: 'aggregate',
-          modelCode: 'crm_opportunity',
+          modelCode: 'mission',
           metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
         },
       },
@@ -211,6 +211,26 @@ const SYSTEM_OVERVIEW = {
 };
 
 test.describe.configure({ mode: 'serial' });
+
+test('02-test-pages: system_overview widget data sources are queryable', async ({
+  request,
+}) => {
+  const jwt = await loginAdmin(request);
+  const headers = authHeaders(jwt);
+
+  for (const widget of SYSTEM_OVERVIEW.widgets) {
+    const dataSource = widget.config.dataSource;
+    const response = await request.post('/api/meta/chart-data', {
+      headers,
+      data: dataSource,
+    });
+    const body = await response.json().catch(() => null);
+    const failure = `${widget.title} chart-data failed: ${response.status()} ${JSON.stringify(body)}`;
+
+    expect(response.ok(), failure).toBeTruthy();
+    expect(body?.code, failure).toBe('0');
+  }
+});
 
 test('02-test-pages: create + publish 3 fixture pages', async ({ request }) => {
   const jwt = await loginAdmin(request);

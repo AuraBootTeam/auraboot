@@ -8,6 +8,8 @@ import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.plugin.service.PluginImportService;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +41,7 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
 
     private final PluginImportService pluginImportService;
     private final PluginRecordMapper pluginRecordMapper;
+    private final UserService userService;
 
     @Value("${aura.builtin-plugins.dir:}")
     private String builtinPluginsDir;
@@ -94,9 +97,15 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
         log.info("Importing built-in plugins for tenant {}: baseDir={}, includeDemo={}, plugins={}",
                 tenantId, baseDir, includeDemoPlugins, selected.size());
 
+        User importUser = userService.findByUserId(userId);
+        if (importUser == null || importUser.getPid() == null || importUser.getPid().isBlank()) {
+            throw new IllegalStateException(
+                    "Built-in plugin import user is missing or has no pid: userId=" + userId);
+        }
+
         // Setup MetaContext for the import
         MetaContext previousContext = MetaContext.exists() ? MetaContext.get() : null;
-        MetaContext.setContext(tenantId, userId, null, null);
+        MetaContext.setContext(tenantId, userId, importUser.getPid(), importUser.getEmail());
 
         try {
             for (BuiltinPlugin plugin : selected) {

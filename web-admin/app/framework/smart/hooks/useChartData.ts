@@ -108,18 +108,29 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
    * Fetch data from the API
    */
   const fetchData = useCallback(async () => {
-    // Skip fetch for static data sources or when disabled
-    if (!enabled || dataSource.type === 'static') {
-      if (dataSource.type === 'static' && dataSource.staticData) {
-        setData({
-          rows: dataSource.staticData,
-          summary: {},
-          meta: {
-            dimensions: dataSource.dimensions || [],
-            metrics: dataSource.metrics?.map((m) => m.alias || m.field) || [],
-          },
-        });
-      }
+    if (!enabled) {
+      return;
+    }
+
+    if (dataSource.type === 'static') {
+      const nextData = {
+        rows: dataSource.staticData || [],
+        summary: {},
+        meta: {
+          dimensions: dataSource.dimensions || [],
+          metrics: dataSource.metrics?.map((m) => m.alias || m.field) || [],
+        },
+      };
+      setData((currentData) => {
+        if (
+          currentData &&
+          JSON.stringify(currentData.rows) === JSON.stringify(nextData.rows) &&
+          JSON.stringify(currentData.meta) === JSON.stringify(nextData.meta)
+        ) {
+          return currentData;
+        }
+        return nextData;
+      });
       return;
     }
 

@@ -25,6 +25,28 @@
 
 import { test, expect, type Page } from '../fixtures';
 
+function extractTotal(body: any): number {
+  const raw =
+    body?.data?.total ??
+    body?.data?.totalCount ??
+    body?.data?.records?.length ??
+    0;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function captureDashboardConsoleErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() !== 'error') return;
+    errors.push(message.text());
+  });
+  page.on('pageerror', (error) => {
+    errors.push(error.message);
+  });
+  return errors;
+}
+
 // ---------------------------------------------------------------------------
 // Sidebar navigation — clicks "CRM 演示 → 驾驶舱" / "CRM Demo → Dashboard"
 // ---------------------------------------------------------------------------
@@ -54,6 +76,7 @@ async function gotoCrmDashboardViaSidebar(page: Page): Promise<void> {
 
 test.describe('CRM Starter Demo — Lightweight Dashboard', () => {
   test.setTimeout(60_000);
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
   test('DASH-001 @smoke — sidebar → dashboard renders both smart-table-chart widgets', async ({
     page,
@@ -97,5 +120,75 @@ test.describe('CRM Starter Demo — Lightweight Dashboard', () => {
     // Recent leads widget exposes its own headers (公司 / 联系人 / 来源 / 状态).
     const leadHeader = page.getByText(/公司|Company/).first();
     await expect(leadHeader).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('DASH-002 @smoke — /dashboards resolves default CRM dashboard with seeded rows', async ({
+    page,
+  }) => {
+    const consoleErrors = captureDashboardConsoleErrors(page);
+    const dashboardList = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/dashboards?status=published') && response.status() === 200,
+      { timeout: 15_000 },
+    );
+    const defaultDashboard = page.waitForResponse(
+      (response) => response.url().includes('/api/dashboards/default') && response.status() === 200,
+      { timeout: 15_000 },
+    );
+    const leadList = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/dynamic/crm_lead/list') && response.status() === 200,
+      { timeout: 15_000 },
+    );
+    const opportunityList = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/dynamic/crm_opportunity/list') && response.status() === 200,
+      { timeout: 15_000 },
+    );
+
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+
+    const [dashboardListResponse, defaultResponse, leadResponse, opportunityResponse] =
+      await Promise.all([dashboardList, defaultDashboard, leadList, opportunityList]);
+    const [dashboardListBody, defaultBody, leadBody, opportunityBody] = await Promise.all([
+      dashboardListResponse.json(),
+      defaultResponse.json(),
+      leadResponse.json(),
+      opportunityResponse.json(),
+    ]);
+
+    expect(dashboardListBody?.code).toBe('0');
+    expect(defaultBody?.code).toBe('0');
+    expect(defaultBody?.data?.code).toBe('crm_overview');
+    expect(leadBody?.code).toBe('0');
+    expect(opportunityBody?.code).toBe('0');
+    expect(extractTotal(leadBody)).toBeGreaterThan(0);
+    expect(extractTotal(opportunityBody)).toBeGreaterThan(0);
+
+    await expect(page.getByText(/CRM 概览|CRM Overview/).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText(/最新商机|Recent Opportunities/).first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText(/最新线索|Recent Leads/).first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText(/Application Error|Internal system error/i)).toHaveCount(0);
+    await expect(page.getByText(/Please configure data source|Failed to load data/i)).toHaveCount(
+      0,
+    );
+    await expect(page.getByText('No data available')).toHaveCount(0);
+
+    const tableRows = page.locator('main table tbody tr');
+    await expect(tableRows.first()).toBeVisible({ timeout: 10_000 });
+    expect(await tableRows.count()).toBeGreaterThan(1);
+
+    const relevantConsoleErrors = consoleErrors.filter((message) =>
+      /Invalid hook call|Maximum update depth|Internal system error|Application Error/i.test(
+        message,
+      ),
+    );
+    expect(relevantConsoleErrors).toEqual([]);
   });
 });
