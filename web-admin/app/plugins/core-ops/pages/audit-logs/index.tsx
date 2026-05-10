@@ -257,7 +257,7 @@ export default function AuditLogsPage() {
   const totalPages = Math.ceil(total / queryParams.pageSize);
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
+    <div className="mx-auto w-full max-w-5xl p-6">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">

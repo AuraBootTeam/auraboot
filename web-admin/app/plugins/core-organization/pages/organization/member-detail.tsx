@@ -225,7 +225,7 @@ export default function MemberDetailPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
+    <div className="mx-auto w-full max-w-4xl p-6">
       {/* Header */}
       <div className="mb-6 flex items-start gap-4">
         <button

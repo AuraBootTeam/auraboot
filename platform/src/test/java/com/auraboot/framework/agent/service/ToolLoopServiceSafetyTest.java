@@ -3,8 +3,13 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.dto.ConfidenceScore;
+import com.auraboot.framework.agent.provider.ProviderExecutionResult;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.trace.AiTraceService;
+import com.auraboot.framework.aurabot.skill.RiskLevel;
+import com.auraboot.framework.aurabot.skill.SkillRequest;
+import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -18,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -39,6 +45,7 @@ class ToolLoopServiceSafetyTest {
     @Mock private NamedQueryService namedQueryService;
     @Mock private ToolProviderRegistry toolProviderRegistry;
     @Mock private ResultContractEmitter resultContractEmitter;
+    @Mock private SkillToolExecutor skillToolExecutor;
 
     private ToolLoopService service;
 
@@ -140,6 +147,86 @@ class ToolLoopServiceSafetyTest {
 
         assertThat(result).contains("approval policy").contains("No data was changed");
         verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
+    @DisplayName("platform provider tools route through ToolProviderRegistry")
+    void platformProviderToolsRouteThroughRegistry() {
+        Map<String, Object> input = Map.of("keyword", "customer");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("platform.list_models")
+                .description("List models")
+                .toolType("platform")
+                .sourceCode("platform.list_models")
+                .riskLevel("L0")
+                .build();
+        when(toolProviderRegistry.execute(eq(1L), eq("platform.list_models"), eq(input)))
+                .thenReturn(ProviderExecutionResult.builder()
+                        .success(true)
+                        .data(Map.of("models", List.of(Map.of("code", "crm_customer"))))
+                        .durationMs(7)
+                        .build());
+
+        String result = service.executeToolCall(1L, "run-platform", "task-platform", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).contains("\"success\":true").contains("crm_customer");
+        verify(toolProviderRegistry).execute(1L, "platform.list_models", input);
+        verifyNoInteractions(commandExecutor, namedQueryService);
+    }
+
+    @Test
+    @DisplayName("low-risk AuraBot skill tools route through SkillToolExecutor")
+    void lowRiskAurabotSkillToolsRouteThroughSkillExecutor() {
+        ReflectionTestUtils.setField(service, "skillToolExecutor", skillToolExecutor);
+        Map<String, Object> input = Map.of("text", "hello");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("aurabot:echo")
+                .description("Echo")
+                .toolType("AURABOT_SKILL")
+                .sourceCode("echo")
+                .riskLevel("LOW")
+                .build();
+        when(skillToolExecutor.dispatch(eq("echo"), any(SkillRequest.class)))
+                .thenReturn(SkillToolExecutor.DispatchOutcome.executed(
+                        SkillResult.builder()
+                                .status(SkillResult.Status.SUCCESS)
+                                .payload(Map.of("text", "hello"))
+                                .build(),
+                        RiskLevel.LOW));
+
+        String result = service.executeToolCall(1L, "run-skill", "task-skill", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).contains("\"success\":true").contains("\"text\":\"hello\"");
+        verify(skillToolExecutor).dispatch(eq("echo"), argThat(req ->
+                req.getParams() != null && "hello".equals(req.getParams().get("text").asText())));
+        verifyNoInteractions(toolProviderRegistry, commandExecutor, namedQueryService);
+    }
+
+    @Test
+    @DisplayName("custom provider api_call tools route through ToolProviderRegistry")
+    void customProviderApiCallToolsRouteThroughRegistry() {
+        Map<String, Object> input = Map.of("value", "ping");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("custom:api_test_tool")
+                .description("Custom API tool")
+                .toolType("api_call")
+                .riskLevel("L1")
+                .build();
+        when(toolProviderRegistry.execute(eq(1L), eq("custom:api_test_tool"), eq(input)))
+                .thenReturn(ProviderExecutionResult.builder()
+                        .success(true)
+                        .data(Map.of("body", "{\"ok\":true}"))
+                        .durationMs(11)
+                        .build());
+
+        String result = service.executeToolCall(1L, "run-custom", "task-custom", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).contains("\"success\":true").contains("\"body\":\"{\\\"ok\\\":true}\"");
+        verify(toolProviderRegistry).execute(1L, "custom:api_test_tool", input);
+        verifyNoInteractions(commandExecutor, namedQueryService);
     }
 
     @Test

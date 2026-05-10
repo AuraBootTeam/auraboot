@@ -205,25 +205,15 @@ echo -e "${GREEN}   Database reset complete${NC}"
 echo -e "${YELLOW}Step 4: Starting backend service...${NC}"
 cd "$PLATFORM_DIR"
 
-# Phase 2.4 of bootstrap-unified: the in-process BootstrapStartupRunner is
-# now idempotent (Phase 2.2 + 2.3) so we no longer have to suppress it to
-# avoid a race with the explicit /api/bootstrap/setup call. The script's
-# own /api/bootstrap/setup call still runs (back-compat for the wizard
-# semantics) and now lands on a backend that already has invariants 1-9
-# in place — the wizard call short-circuits via "already initialized".
-#
-# Escape hatch: --no-bootstrap mode disables the runner explicitly so the
-# wizard UI can drive a manual setup against an uninitialized backend.
+# This script still drives the canonical /api/bootstrap/setup flow below.
+# Keep the in-process BootstrapStartupRunner disabled here so there is only one
+# bootstrap authority in this process. Otherwise the runner can import plugins
+# while /api/bootstrap/setup is still creating the default tenant roles.
+export AURABOOT_BOOTSTRAP_ENABLED=false
 if [ "$NO_BOOTSTRAP" = "1" ]; then
-    export AURABOOT_BOOTSTRAP_ENABLED=false
     echo "   AURABOOT_BOOTSTRAP_ENABLED=false (--no-bootstrap escape hatch)"
 else
-    # Phase 3: opt the in-process BootstrapStartupRunner into the demo plugin
-    # profile (core-meta, core-bpm, core-aurabot, page-manager, crm-starter,
-    # showcase, agent-control-plane, acp-showcase, workflow-demo) so the
-    # platform owns plugin import end-to-end. Replaces former §7.5 CLI loop.
-    export AURABOOT_DEMO_SEED="${AURABOOT_DEMO_SEED:-true}"
-    echo "   AURABOOT_DEMO_SEED=${AURABOOT_DEMO_SEED} (Phase 3: demo profile via platform)"
+    echo "   AURABOOT_BOOTSTRAP_ENABLED=false (/api/bootstrap/setup is script authority)"
 fi
 
 # Start backend in background as a single long-running process

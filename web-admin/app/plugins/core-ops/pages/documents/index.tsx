@@ -24,7 +24,7 @@ export default function DocumentEditorPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
         {saved && <span className="text-sm text-green-600">Saved</span>}
