@@ -86,7 +86,7 @@ export function I18nProvider({ children, initialData = {}, initialLocale }: I18n
 
   const [translations, setTranslations] = useState<Translations>(() => {
     if (!isInitialDataEmpty) return initialData;
-    return getCachedTranslations(effectiveLocale) || {};
+    return {};
   });
   const [locale, setLocaleState] = useState(effectiveLocale);
   const [loading, setLoading] = useState(false);
@@ -116,6 +116,10 @@ export function I18nProvider({ children, initialData = {}, initialLocale }: I18n
   useEffect(() => {
     if (!isInitialDataEmpty) return;
     let cancelled = false;
+    const cachedTranslations = getCachedTranslations(effectiveLocale);
+    if (cachedTranslations) {
+      setTranslations(cachedTranslations);
+    }
     (async () => {
       try {
         const res = await fetch(`/api/i18n/${effectiveLocale}`);
