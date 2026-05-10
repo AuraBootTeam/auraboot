@@ -9,7 +9,7 @@
 #   2. Polls until backend (6443 in container) and frontend ports respond.
 #   3. Logs into the docker backend and imports the 4 plugins required for
 #      the P0 specs in dependency order:
-#        core-bpm → platform-admin → acp-showcase → test-fixtures
+#        core-bpm → platform-admin → optional ACS specs → test-fixtures
 #      (Bootstrap only auto-imports org-management; everything else is
 #      manual because platform-admin's `bpm_management` parent menu lives
 #      in core-bpm.)

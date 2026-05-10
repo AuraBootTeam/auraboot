@@ -59,13 +59,28 @@ This document defines what is and is not part of AuraBoot's open-source distribu
 
 | Plugin | Namespace | Models | Purpose |
 |---|---|---|---|
+| `agent-control-plane` | `acp` | — | AI Mission Control and agent orchestration |
+| `asset-management` | `tasset` | 3 | Asset tracking template for IT / office assets |
+| `core-announcement` | `announcement` | 1 | System announcement management |
+| `core-aurabot` | `core-aurabot` | 0 | AI Center menus and permissions |
+| `core-bpm` | `core-bpm` | 0 | BPM menus and permissions |
+| `core-meta` | `core-meta` | 0 | Platform meta-management menus and permissions |
+| `crm-quick-start` | `tcrm` | 4 | Lightweight CRM template for small teams |
 | `crm-starter` | `crms` | 6 | Account / Contact / Lead / Opportunity / Activity / Campaign |
+| `golden-path` | `gp` | 3 | Reference plugin implementation pattern |
+| `hr-essentials` | `thr` | 3 | HR employee / attendance / leave template |
 | `org-management` | `org` | 3 | Department / Position / Employee |
 | `platform-admin` | `admin` | 0 | DSL-driven admin console (8 management pages) |
 | `page-manager` | `pgm` | 1 | Built-in page-schema management |
+| `project-management` | `tpm` | 3 | Lightweight project / task / milestone template |
 | `showcase` | `sc` | 1+ | 20+ field-type demo + Smart Components |
-| `agent-control-plane` | `acp` | — | AI Mission Control (8 LLM providers) |
-| `acp-showcase` | `acs` | — | ACP demo bundle |
+| `simple-inventory` | `tinv` | 4 | Simple inventory template |
+| `workflow-demo` | `wd` | 2 | Smart Engine leave-request workflow demo |
+
+The `test-fixtures` plugin is tracked for automated tests but is not imported by
+default bootstrap and is not part of the public demo/runtime profile. The
+`acp-showcase` directory is script-only; its former plugin manifest was removed
+during ACP platformization.
 
 ## What is NOT in OSS (commercial editions)
 
@@ -74,7 +89,7 @@ See the strategy doc in the enterprise repo for full pricing tiers. High-level:
 - **Dashboard Designer** and **Report Designer** (paid: Standard tier)
 - **IM** (real-time chat, WebSocket conversations) and **unified Inbox** advanced flows (paid: Professional)
 - **Mobile apps** (iOS SwiftUI + Android Compose) — paid: Enterprise
-- **Full business plugins**: Sales / Procurement / Inventory / Finance / Quality / full CRM (18 models) / Project Management / Contract & Cost (paid: Standard / Professional)
+- **Full business plugins**: Sales / Procurement / Inventory / Finance / Quality / full CRM (18 models) / enterprise Project Management suite / Contract & Cost (paid: Standard / Professional)
 - **Industry solution packs**: PCBA-ERP / Quarry / etc. (paid per-pack)
 - **Enterprise integrations**: OAuth2 / social login / Entitlement & License system / Payment / Stripe (paid: Professional / Enterprise)
 
@@ -100,7 +115,7 @@ This:
 1. Drops + recreates the database
 2. Starts the backend
 3. Bootstraps admin user + tenant
-4. Imports the 8 OSS plugins listed above
+4. Imports the core profile plus demo profile built-in plugins
 5. Starts the frontend
 
 After completion, http://localhost:5173 is a fully functional OSS deployment.
