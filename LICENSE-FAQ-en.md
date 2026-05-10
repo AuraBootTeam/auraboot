@@ -2,7 +2,7 @@
 
 > **Disclaimer:** This FAQ is an informal guide to help you understand [`LICENSE.txt`](./LICENSE.txt). It is **not a legal document** and has no legal effect. If anything in this FAQ conflicts with `LICENSE.txt`, **the English original of `LICENSE.txt` controls**. For binding interpretations or material business decisions, consult a lawyer or contact us at license@auraboot.com.
 >
-> Last updated: 2026-05-09 (LICENSE v1.1)
+> Last updated: 2026-05-10 (LICENSE v1.3)
 
 ---
 
@@ -36,7 +36,7 @@ You may keep modifications private even when deploying for customers. We encoura
 ### Q6. I'm an ISV delivering a project to a customer's own infrastructure. Does that count as distribution?
 **Yes, it's distribution — but it's fully permitted, with no obligation to ship source code.** All you need to do:
 - Preserve `LICENSE.txt` and copyright notices (§5.1, §5.3)
-- Preserve AuraBoot brand identity; the upper-left main logo may be replaced with your own (§5.2)
+- Preserve AuraBoot brand identity, including the upper-left main logo, footer, about page, and other visible brand information (§5.2)
 - Don't resell it as a low-code / AI platform SaaS service (§5.4)
 
 Your modifications, your business code, your plugins — **all may remain closed source**. This ISV / system integrator scenario is explicitly supported and friendly under this license.
@@ -49,10 +49,10 @@ Your modifications, your business code, your plugins — **all may remain closed
 ## 3. Branding & White-Labeling
 
 ### Q8. Can I remove AuraBoot's logo and name?
-- **The upper-left main logo:** may be replaced with your own (the §5.2 carve-out).
+- **The upper-left main logo:** must remain visible and may not be replaced (§5.2).
 - **Footer "Powered by AuraBoot," about page, copyright statements:** must remain visible.
 - **Copyright headers, license headers, attribution comments in the source:** must remain (§5.3).
-- **Full white-labeling (removing all branding):** requires a commercial license.
+- **Any white-labeling or removal of branding:** requires a commercial license.
 
 ### Q9. My product is built on AuraBoot, but customers shouldn't see "AuraBoot" anywhere. Is that allowed?
 If you only use AuraBoot to configure business applications (ERP / CRM / internal systems) and end users mainly interact with **your business UI**, this is fine. But administrative / configuration / about pages that expose the platform layer must keep AuraBoot branding — unless you obtain a commercial license.
@@ -125,13 +125,13 @@ Specific terms are governed by the commercial agreement signed between parties. 
 ## 7. Compliance & Enforcement
 
 ### Q19. What happens if I violate the license?
-§6.1: The license terminates automatically, with a 30-day cure period. If cured, the license is reinstated; if not cured within 30 days, **you must cease all use and destroy all copies**. If the violation causes commercial damage (e.g., unauthorized SaaS resale), the Licensor reserves the right to pursue legal remedies.
+§6.1's 30-day cure period means that if you breach the Community License, you have 30 days after becoming aware of the breach to fix the issue. If you cure the breach within that period, the Community License will not terminate because of that breach; if you do not cure it within 30 days, **you must cease all use and destroy all copies**. If the violation causes commercial damage (e.g., unauthorized SaaS resale), the Licensor reserves the right to pursue legal remedies.
 
 ### Q20. Which jurisdiction governs?
-PRC law (§8.1). Disputes are submitted to CIETAC (China International Economic and Trade Arbitration Commission) in Beijing, conducted in Chinese and English (§8.2).
+The Community License does not designate an exclusive governing law, court, arbitration institution, or dispute-resolution forum (§8.1). If the parties sign a Commercial License or another written agreement, that agreement may specify the governing law and dispute-resolution mechanism (§8.2).
 
-### Q21. My country doesn't accept Chinese jurisdiction. What then?
-For cross-border commercial customers, an alternative jurisdiction (e.g., Singapore / Hong Kong / customer's location) may be agreed in the commercial contract. Community users default to §8.1.
+### Q21. Can commercial customers agree on a different forum?
+Yes. For cross-border commercial customers, a commercial contract may specify the governing law and dispute-resolution forum (e.g., Singapore / Hong Kong / the customer's jurisdiction). The commercial contract controls over the Community License's general terms for the covered parties and scope.
 
 ---
 
@@ -141,7 +141,7 @@ For cross-border commercial customers, an alternative jurisdiction (e.g., Singap
 
 | Project | License | Multi-tenant SaaS Restriction | Branding Removable? |
 |---|---|---|---|
-| **AuraBoot** | Apache-2.0 + supplementary terms | Prohibits low-code / AI platform SaaS resale | Upper-left logo only |
+| **AuraBoot** | Apache-2.0 + supplementary terms | Prohibits low-code / AI platform SaaS resale | No removal or replacement |
 | Appsmith | Apache-2.0 | None | Fully removable |
 | ToolJet | AGPLv3 | Must open-source all modifications | Fully removable |
 | Budibase | GPL v3 + Commercial | Must open-source all modifications (GPL) | Commercial version only |
