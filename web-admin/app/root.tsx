@@ -87,10 +87,10 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
+  const token = await getTokenFromRequest(request);
 
   // Public marketing: skip user/menu fetch for anonymous visitors
   if (isPublicRoute(pathname)) {
-    const token = await getTokenFromRequest(request);
     if (!token) {
       // SSR cache: public routes without auth produce identical loader data
       // for the same pathname + locale combination. Cache for 30s to reduce
@@ -125,8 +125,11 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     }
   }
 
+  if (!token && !isPublicRoute(pathname)) {
+    return redirect(`/login?redirectTo=${encodeURIComponent(pathname)}`, 302);
+  }
+
   // Authenticated flow (existing logic)
-  const token = await getTokenFromRequest(request);
 
   async function fetchSpaces(): Promise<any[]> {
     if (!token) return [];
