@@ -82,10 +82,9 @@ auraboot:
     version: 1.0.0
   bootstrap:
     enabled: ${AURABOOT_BOOTSTRAP_ENABLED:false}
-    # Phase 3: when true, the demo profile of built-in plugins (core-meta,
-    # core-bpm, core-aurabot, page-manager, crm-starter, showcase,
-    # agent-control-plane, acp-showcase, workflow-demo) is imported in addition
-    # to the always-on core profile. Default false — prod-safe.
+    # Phase 3: when true, the demo profile of built-in plugins (crm-starter,
+    # showcase, agent-control-plane, workflow-demo) is imported in addition to
+    # the always-on core profile. Default false — prod-safe.
     demo-seed: ${AURABOOT_DEMO_SEED:false}
   entitlement:
     enabled: false

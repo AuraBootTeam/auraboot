@@ -25,9 +25,9 @@ import java.util.List;
  * The base directory is auto-detected ({@code platform/../plugins} when running
  * via {@code gradlew bootRun}) or configured via {@code aura.builtin-plugins.dir}.
  *
- * <p>Phase 3 introduces a 2-profile split (see
- * {@link BuiltinPluginImportService} javadoc): {@link Profile#CORE} (always
- * imported, 2 plugins) vs {@link Profile#DEMO} (opt-in, 9 plugins). The
+ * <p>Phase 3 uses a 2-profile split (see {@link BuiltinPluginImportService}
+ * javadoc): {@link Profile#CORE} (always imported, 6 plugins) vs
+ * {@link Profile#DEMO} (opt-in, 4 plugins). The
  * {@code includeDemoPlugins} flag flows from
  * {@code BootstrapRepairService.RepairOptions} → wizard payload
  * ({@code BootstrapRequest.seedDemoData}) or startup env ({@code AURABOOT_DEMO_SEED}).
@@ -72,7 +72,6 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
             new BuiltinPlugin("crm-starter",           "com.auraboot.crm-starter",         Profile.DEMO),
             new BuiltinPlugin("showcase",              "com.auraboot.showcase",            Profile.DEMO),
             new BuiltinPlugin("agent-control-plane",   "com.auraboot.agent-control-plane", Profile.DEMO),
-            new BuiltinPlugin("acp-showcase",          "com.auraboot.acp-showcase",        Profile.DEMO),
             new BuiltinPlugin("workflow-demo",         "com.auraboot.workflow-demo",       Profile.DEMO)
     );
 

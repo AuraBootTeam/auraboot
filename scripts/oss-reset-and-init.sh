@@ -7,10 +7,10 @@
 #
 # History:
 #   2026-05-09 — §7.5 removed (Phase 3 / bootstrap-unified Op 6+8): plugin
-#                import for both core (org-management, platform-admin) and
-#                demo (core-meta/core-bpm/core-aurabot/page-manager/
-#                crm-starter/showcase/agent-control-plane/acp-showcase/
-#                workflow-demo) profiles is now in-process via
+#                import for core (core-meta/core-bpm/core-aurabot/page-manager/
+#                org-management/platform-admin) and demo
+#                (crm-starter/showcase/agent-control-plane/workflow-demo)
+#                profiles is now in-process via
 #                BuiltinPluginImportService, gated by AURABOOT_DEMO_SEED.
 #                test-fixtures is seeded by the Playwright setup project
 #                (web-admin/tests/api/setup/03-import-test-fixtures.spec.ts).
@@ -508,9 +508,9 @@ GRANT_SQL
     # Step 7.5: (REMOVED 2026-05-09 — Phase 3 of bootstrap-unified)
     #
     # Plugin import for the core+demo profiles is now done in-process by
-    # BuiltinPluginImportService during BootstrapStartupRunner (org-management,
-    # platform-admin, core-meta, core-bpm, core-aurabot, page-manager,
-    # crm-starter, showcase, agent-control-plane, acp-showcase, workflow-demo).
+    # BuiltinPluginImportService during BootstrapStartupRunner (core-meta,
+    # core-bpm, core-aurabot, page-manager, org-management, platform-admin,
+    # crm-starter, showcase, agent-control-plane, workflow-demo).
     # Demo profile is gated by AURABOOT_DEMO_SEED (exported above; defaults
     # true here, false in production application.yml).
     #
