@@ -13,6 +13,9 @@
 #   GA_E2E_SKIP_UP=1          Reuse the existing GA stack without calling up.sh.
 #   GA_E2E_SKIP_BOOTSTRAP=1   Skip plugin/user bootstrap.
 #   GA_E2E_SKIP_SEED=1        Skip showcase seed phases before all.
+#   GA_E2E_AUTH_ONCE=0        Keep the old all-flow behavior and re-run auth after seed.
+#   GA_E2E_CHROMIUM_WORKERS=N Default chromium workers for the Docker runner (default: 3).
+#   GA_E2E_FORCE_PNPM_INSTALL=1 Re-run pnpm install even when dependency inputs are unchanged.
 
 set -euo pipefail
 
@@ -109,7 +112,22 @@ runner_command() {
     seed)
       gate_block='echo "[ga-showcase-docker] seed phase complete";'
       ;;
-    all|auth|chromium|deep)
+    all)
+      if [[ "${GA_E2E_SKIP_SEED:-0}" != "1" && "${GA_E2E_AUTH_ONCE:-1}" = "1" ]]; then
+        gate_block='
+          cd /repo/web-admin;
+          echo "[ga-showcase-docker] reusing seed auth storage; running chromium + deep only";
+          ../scripts/ga-showcase-e2e.sh chromium;
+          ../scripts/ga-showcase-e2e.sh deep;
+        '
+      else
+        gate_block='
+          cd /repo/web-admin;
+          ../scripts/ga-showcase-e2e.sh all;
+        '
+      fi
+      ;;
+    auth|chromium|deep)
       gate_block="
         cd /repo/web-admin;
         ../scripts/ga-showcase-e2e.sh $phase;
@@ -120,11 +138,10 @@ runner_command() {
   cat <<EOF
 set -euo pipefail
 export GA_SHOWCASE_SKIP_RUNNER_GUARD=1
-corepack enable
-corepack prepare pnpm@9 --activate
-pnpm config set store-dir /pnpm-store
-cd /repo
-pnpm install --no-frozen-lockfile --prefer-offline
+export GA_SHOWCASE_AUTH_WORKERS="\${GA_SHOWCASE_AUTH_WORKERS:-1}"
+export GA_SHOWCASE_CHROMIUM_WORKERS="\${GA_SHOWCASE_CHROMIUM_WORKERS:-\${GA_E2E_CHROMIUM_WORKERS:-3}}"
+export GA_SHOWCASE_DEEP_WORKERS="\${GA_SHOWCASE_DEEP_WORKERS:-1}"
+bash /repo/scripts/ga-e2e-prepare-deps.sh /repo
 cd /repo/web-admin
 if [[ "\${GA_E2E_SKIP_BROWSER_INSTALL:-0}" = "1" ]]; then
   echo "[ga-showcase-docker] GA_E2E_SKIP_BROWSER_INSTALL=1 - using image-provided Playwright browsers"

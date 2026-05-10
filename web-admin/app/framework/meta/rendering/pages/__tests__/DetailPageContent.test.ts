@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildDetailRecordEndpoint, resolveDetailFieldComponent } from '../DetailPageContent';
+import {
+  buildDetailRecordEndpoint,
+  resolveDetailFieldComponent,
+  resolveSubTableDataSourceConfig,
+} from '../DetailPageContent';
 
 describe('buildDetailRecordEndpoint', () => {
   it('builds the direct record endpoint used by detail pages', () => {
@@ -26,5 +30,25 @@ describe('resolveDetailFieldComponent', () => {
   it('keeps existing primitive mappings for dates', () => {
     expect(resolveDetailFieldComponent({ dataType: 'date' })).toBe('date');
     expect(resolveDetailFieldComponent({ dataType: 'datetime' })).toBe('datetime');
+  });
+});
+
+describe('resolveSubTableDataSourceConfig', () => {
+  it('resolves canonical block dataSource IDs from schema dataSources before rendering sub-tables', () => {
+    const config = {
+      id: 'subtable_ds_dataSource',
+      type: 'api' as const,
+      endpoint: '/api/dynamic/showcase_all_fields/list',
+      params: {
+        pageNum: '1',
+        pageSize: '5',
+      },
+    };
+
+    expect(
+      resolveSubTableDataSourceConfig('subtable_ds_dataSource', {
+        subtable_ds_dataSource: config,
+      }),
+    ).toEqual(config);
   });
 });

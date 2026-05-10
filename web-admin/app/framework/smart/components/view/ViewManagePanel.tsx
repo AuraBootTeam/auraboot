@@ -400,7 +400,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     <>
       {/* Backdrop overlay */}
       <div
-        className="fixed inset-0 z-40 bg-black/50 transition-opacity duration-200"
+        className="fixed inset-0 z-[1100] bg-black/50 transition-opacity duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -408,7 +408,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       {/* Panel */}
       <div
         className={cn(
-          'fixed top-0 right-0 z-50 h-full w-[min(95vw,52rem)] bg-white shadow-xl',
+          'fixed top-0 right-0 z-[1110] h-full w-[min(95vw,52rem)] bg-white shadow-xl',
           'flex flex-col',
           'animate-in slide-in-from-right duration-200',
         )}

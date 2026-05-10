@@ -158,6 +158,51 @@ describe('SubTableViewer', () => {
     expect(screen.getByTestId('subtable-viewer').textContent).toMatch(/No data|暂无数据/i);
   });
 
+  it('loads API dataSource rows from endpoint configs with interpolated params', async () => {
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [{ pid: 'row-1', taskName: 'D5 DataSource Row', status: 'active' }],
+      },
+    });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          dataSource: {
+            type: 'api',
+            endpoint: '/api/dynamic/showcase_all_fields/list',
+            params: {
+              pageNum: '1',
+              pageSize: '5',
+              filters: '[{"fieldName":"pid","operator":"EQ","value":"${record.pid}"}]',
+            },
+          },
+        } as any}
+        parentRecordId="record-1"
+        parentRecordData={{ pid: '01KR8WEQZ0EXXF28KMA2B06YEN' }}
+        t={(key) => (key === 'common.noData' ? 'No data' : key)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith('/api/dynamic/showcase_all_fields/list', {
+        method: 'get',
+        params: {
+          pageNum: '1',
+          pageSize: '5',
+          filters:
+            '[{"fieldName":"pid","operator":"EQ","value":"01KR8WEQZ0EXXF28KMA2B06YEN"}]',
+        },
+        token: undefined,
+      });
+    });
+
+    await expect(screen.findByTestId('sortable-row-row-1')).resolves.toBeInTheDocument();
+    expect(screen.getByTestId('subtable-viewer').textContent).toContain('D5 DataSource Row');
+  });
+
   it('renders configured empty state copy and action label', async () => {
     fetchResultMock.mockResolvedValue({
       code: '0',

@@ -235,7 +235,7 @@ test.describe('List Page UX Features', () => {
     // Panel should open with checkboxes for column visibility
     const panel = page.locator('[data-testid="column-settings-panel"]');
     if (await panel.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      const checkboxes = panel.locator('input[type="checkbox"]');
+      const checkboxes = panel.getByRole('checkbox');
       const count = await checkboxes.count();
       expect(count).toBeGreaterThan(0);
 

@@ -146,6 +146,7 @@ services:
       # CI mode for vite to avoid interactive prompts if any.
       CI: "true"
       NODE_ENV: development
+      PNPM_STORE_DIR: /pnpm-store
       # SSR-side fetch base URL. Without this, app/shared/services/http-client
       # falls back to "use the incoming request origin", which becomes the
       # host port (5174) - unreachable from inside the container - so SSR
@@ -162,6 +163,7 @@ services:
       # does not leak into the container (osxfs perf + symlink quirks).
       - ga_e2e_node_modules:/repo/node_modules
       - ga_e2e_web_admin_node_modules:/repo/web-admin/node_modules
+      - ga_e2e_pnpm_store:/pnpm-store
     depends_on:
       backend:
         condition: service_healthy
@@ -170,15 +172,8 @@ services:
     command: >-
       sh -c "
       set -e;
-      if command -v pnpm >/dev/null 2>&1; then
-        pnpm --version;
-      else
-        corepack enable;
-        corepack prepare pnpm@9 --activate;
-      fi;
-      cd /repo;
-      pnpm install --no-frozen-lockfile --prefer-offline;
-      cd web-admin;
+      bash /repo/scripts/ga-e2e-prepare-deps.sh /repo;
+      cd /repo/web-admin;
       sh ../scripts/sync-platform-plugins.sh;
       node ../scripts/generate-plugin-routes.mjs;
       pnpm exec concurrently --names 'web,bff' --prefix-colors 'cyan,green' --restart-tries 5 --restart-after 2000 'pnpm dev:web' 'pnpm dev:bff'
@@ -231,11 +226,12 @@ services:
       backend:
         condition: service_healthy
       ga-e2e-frontend:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   ga_e2e_node_modules:
   ga_e2e_web_admin_node_modules:
+  ga_e2e_pnpm_store:
   ga_e2e_runner_node_modules:
   ga_e2e_runner_web_admin_node_modules:
   ga_e2e_runner_pnpm_store:

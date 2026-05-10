@@ -134,7 +134,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           // API data source mode (e.g., NamedQuery)
           const ds = (config as any).dataSource;
           // Interpolate ${recordId} and ${record.field} placeholders in URL
-          let rawUrl = ds.url || '/api/datasource/list';
+          let rawUrl = ds.endpoint || ds.url || '/api/datasource/list';
           rawUrl = interpolateRecordValue(rawUrl);
           endpoint = rawUrl;
           const params: Record<string, string> = {};

@@ -22,7 +22,7 @@ All three are gated behind the `ga-e2e-stack` compose profile and a distinct `CO
 ./scripts/docker-ga-e2e-down.sh --purge   # stop + drop volumes (fresh DB on next up)
 ```
 
-`up.sh` waits up to 5 minutes for the frontend container's first-boot `pnpm install`. Subsequent `up` cycles reuse the named `ga_e2e_node_modules` / `ga_e2e_web_admin_node_modules` volumes and finish in seconds.
+`up.sh` waits up to 5 minutes for the frontend container's first-boot dependency preparation. Subsequent `up` cycles reuse the named `ga_e2e_node_modules` / `ga_e2e_web_admin_node_modules` / `ga_e2e_pnpm_store` volumes. `scripts/ga-e2e-prepare-deps.sh` fingerprints `pnpm-lock.yaml` and workspace package manifests, then skips `pnpm install` when the fingerprint is unchanged.
 
 ## Running Playwright against the stack
 
@@ -34,6 +34,22 @@ NO_PROXY=localhost \
   npx playwright test tests/e2e/showcase/... \
     --reporter=line --output=test-results/ga-a 2>&1 | tee /tmp/pw-ga-$(date +%Y%m%d-%H%M%S).log
 ```
+
+For the pure Docker runner:
+
+```bash
+GA_E2E_SKIP_UP=1 GA_E2E_SKIP_BOOTSTRAP=1 ./scripts/docker-ga-showcase-e2e.sh auth
+GA_E2E_CHROMIUM_WORKERS=3 ./scripts/docker-ga-showcase-e2e.sh chromium
+GA_E2E_FORCE_PNPM_INSTALL=1 ./scripts/docker-ga-showcase-e2e.sh auth
+```
+
+Preparation speed controls:
+
+- default: skip `pnpm install` when the dependency fingerprint and named `node_modules` volumes match.
+- `GA_E2E_FORCE_PNPM_INSTALL=1`: force a fresh install.
+- `GA_E2E_SKIP_PNPM_INSTALL=1`: skip install even if the fingerprint is stale; use only for local diagnostics.
+- `GA_E2E_AUTH_ONCE=0`: restore the old `all` behavior and re-run auth after seed.
+- `GA_E2E_CHROMIUM_WORKERS=N`: tune Docker runner chromium workers; default is `3`, while deep remains `1`.
 
 `PW_SKIP_WEBSERVER=1` is required — the docker stack is the webServer; without this Playwright tries to start a host vite on top.
 
