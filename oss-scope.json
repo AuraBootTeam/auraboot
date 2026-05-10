@@ -1,7 +1,8 @@
 {
   "version": "1.1",
   "last_updated": "2026-04-19",
-  "description": "Single source of truth for AuraBoot open-source scope. Defines which backend modules, plugins, and tests belong to the OSS distribution. Adjust this file when moving features between OSS and enterprise.",
+  "_reconciliation_note": "AS OF 2026-05-10 the `plugins` array is OUT OF SYNC with the filesystem. plugins/ has 22 directories on FS but this manifest declares 6, only 2 of which exist. Tooling that consumes this file uses `test_paths[]` (oss-test.sh, playwright.oss.config.ts), so script behavior is unaffected — but `docs/community/oss-scope.md` references this manifest and any reader diffing it against the repo will catch the drift. PRE-LAUNCH OWNER ACTION: reconcile plugins[] against `ls plugins/`, decide which to declare as community-scope, bump version + last_updated.",
+  "description": "Single source of truth for AuraBoot source-available scope. Defines which backend modules, plugins, and tests belong to the community distribution. Adjust this file when moving features between OSS and enterprise.",
 
   "platform_modules": [
     "application",
