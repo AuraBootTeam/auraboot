@@ -1,0 +1,125 @@
+name: Docker Quickstart
+
+# Smoke-tests the README's `docker compose --profile full up --build -d` path
+# end-to-end on every PR. Catches the class of breakage that hid silently for
+# 8 weeks because frontend.yml/build-image.yml never started the stack and
+# Playwright defaults to the Vite dev server (:5173) rather than the BFF/SSR
+# entrypoint (:3000) the public docs recommend.
+#
+# What this guards against (in order of likelihood):
+#   1. pnpm-lock.yaml drift after dependabot package.json bumps
+#   2. Dockerfile base image / Gradle / toolchain mismatch
+#   3. docker-compose env-var omissions that crash a container
+#   4. BFF / react-router build-mode mismatch (e.g. import path drift,
+#      future bumps that change unstable_* exports)
+#   5. backend bootstrap regressions that stop the stack from going healthy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker-compose.yml'
+      - 'docker-compose.*.yml'
+      - 'platform/Dockerfile'
+      - 'web-admin/Dockerfile'
+      - 'web-admin/app/server/**'
+      - 'web-admin/package.json'
+      - 'pnpm-lock.yaml'
+      - 'platform/build.gradle'
+      - 'platform/gradle/wrapper/**'
+      - 'scripts/dev/verify-quickstart.sh'
+      - '.github/workflows/quickstart.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docker-compose.yml'
+      - 'docker-compose.*.yml'
+      - 'platform/Dockerfile'
+      - 'web-admin/Dockerfile'
+      - 'web-admin/app/server/**'
+      - 'web-admin/package.json'
+      - 'pnpm-lock.yaml'
+      - 'platform/build.gradle'
+      - 'platform/gradle/wrapper/**'
+      - 'scripts/dev/verify-quickstart.sh'
+      - '.github/workflows/quickstart.yml'
+  workflow_dispatch:
+
+jobs:
+  quickstart:
+    name: docker compose --profile full + smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & start full stack
+        run: docker compose --profile full up --build -d
+
+      - name: Wait for backend healthy
+        # Backend port 6443 is intentionally not exposed to host; we hit it
+        # through the docker network via `docker compose exec`.
+        run: |
+          for i in $(seq 1 60); do
+            if docker compose exec -T backend wget -q --spider http://localhost:6443/actuator/health 2>/dev/null; then
+              echo "backend healthy after ${i}×3s"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "backend never came up after 180s"
+          docker compose logs --tail 200 backend
+          exit 1
+
+      - name: Frontend reachable on host port 3000
+        # The README sends users to localhost:3000; assert it serves something
+        # other than the SPA-fallback 500 we've been silently shipping.
+        run: |
+          # Root is expected to redirect to /login (auth-gated). Either 200 or
+          # 302 is acceptable here; only 500/connection-refused is a failure.
+          status=$(curl -s -o /tmp/root.html -w "%{http_code}" -m 15 http://localhost:3000/)
+          echo "GET / → ${status}"
+          if [ "$status" = "500" ] || [ "$status" = "000" ]; then
+            echo "frontend is broken — first 100 lines of body:"
+            head -100 /tmp/root.html
+            echo "--- frontend logs ---"
+            docker compose logs --tail 200 frontend
+            exit 1
+          fi
+
+      - name: Login API contract via BFF proxy
+        # End-to-end smoke: BFF /api/* proxy + backend /api/auth/login + the
+        # bootstrap-seeded admin credentials all aligned.
+        run: |
+          response=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@example.com","password":"Test2026x"}')
+          echo "$response" | head -c 200
+          echo
+          echo "$response" | grep -q '"jwt"' || {
+            echo "login did not return a JWT"
+            docker compose logs --tail 100 backend
+            docker compose logs --tail 100 frontend
+            exit 1
+          }
+
+      - name: Authenticated API smoke (real endpoints)
+        run: |
+          token=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@example.com","password":"Test2026x"}' \
+            | sed -n 's/.*"jwt":"\([^"]*\)".*/\1/p')
+          [ -n "$token" ] || { echo "no token"; exit 1; }
+          for ep in /api/auth/me /api/menu /api/permissions; do
+            curl -fsS -m 10 -H "Authorization: Bearer $token" \
+              "http://localhost:3000$ep" -o /dev/null \
+              && echo "$ep → 200" \
+              || { echo "$ep failed"; exit 1; }
+          done
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile full down -v
