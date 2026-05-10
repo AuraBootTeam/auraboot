@@ -7,6 +7,9 @@ import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
+import com.auraboot.framework.aurabot.skill.SkillRequest;
+import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
@@ -18,6 +21,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +57,9 @@ public class ToolLoopService implements ToolExecutionPort {
     private final ObjectMapper objectMapper;
     private final ToolProviderRegistry toolProviderRegistry;
     private final ResultContractEmitter resultContractEmitter;
+
+    @Autowired(required = false)
+    private SkillToolExecutor skillToolExecutor;
 
     /**
      * Execute a tool call within an agent run.
@@ -179,6 +186,10 @@ public class ToolLoopService implements ToolExecutionPort {
                 result = executeDslCommandWithAction(toolDef.getSourceCode(), input, tenantId, runPid, toolDef);
             } else if ("dsl_query".equals(toolType)) {
                 result = executeDslQueryWithAction(toolDef.getSourceCode(), input, tenantId, runPid, toolDef);
+            } else if ("AURABOT_SKILL".equals(toolType)) {
+                result = executeAuraBotSkill(toolDef, input);
+            } else if (isProviderBackedTool(toolDef)) {
+                result = executeProviderTool(toolDef, input, tenantId);
             } else if ("api_call".equals(toolType)) {
                 result = executeApiCall(toolDef.getSourceCode(), input);
             } else if ("llm_native".equals(toolType)) {
@@ -229,6 +240,98 @@ public class ToolLoopService implements ToolExecutionPort {
 
             return "Error: " + e.getMessage();
         }
+    }
+
+    // ========== AuraBot Skill Tools ==========
+
+    private String executeAuraBotSkill(AgentToolDefinition toolDef, Map<String, Object> input)
+            throws com.fasterxml.jackson.core.JsonProcessingException {
+        if (skillToolExecutor == null) {
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "error", "AuraBot skill executor is not available in the current runtime."));
+        }
+        String skillName = resolveAuraBotSkillName(toolDef);
+        SkillRequest request = SkillRequest.builder()
+                .skillName(skillName)
+                .params(objectMapper.valueToTree(input != null ? input : Map.of()))
+                .build();
+        SkillToolExecutor.DispatchOutcome outcome = skillToolExecutor.dispatch(skillName, request);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        if (outcome.kind() == SkillToolExecutor.OutcomeKind.EXECUTED) {
+            SkillResult skillResult = outcome.result();
+            response.put("success", true);
+            response.put("data", skillResult == null ? null : skillResult.getPayload());
+            if (skillResult != null && skillResult.getStatus() != null) {
+                response.put("status", skillResult.getStatus().name());
+            }
+            return objectMapper.writeValueAsString(response);
+        }
+
+        SkillResult preview = outcome.preview();
+        response.put("success", false);
+        response.put("approvalRequired", true);
+        response.put("skillName", skillName);
+        response.put("riskLevel", outcome.riskLevel());
+        response.put("preview", preview == null ? null
+                : (preview.getPreview() != null ? preview.getPreview() : preview.getPayload()));
+        response.put("previewToken", outcome.previewToken());
+        response.put("error", "AuraBot skill requires confirmation before execution.");
+        return objectMapper.writeValueAsString(response);
+    }
+
+    private String resolveAuraBotSkillName(AgentToolDefinition toolDef) {
+        String sourceCode = toolDef.getSourceCode();
+        if (sourceCode != null && !sourceCode.isBlank()) {
+            return sourceCode;
+        }
+        String name = toolDef.getName();
+        if (name != null && name.startsWith("aurabot:")) {
+            return name.substring("aurabot:".length());
+        }
+        return name;
+    }
+
+    // ========== Provider-backed Tools ==========
+
+    private boolean isProviderBackedTool(AgentToolDefinition toolDef) {
+        String name = toolDef.getName();
+        String sourceCode = toolDef.getSourceCode();
+        if (hasProviderPrefix(name) || hasProviderPrefix(sourceCode)) {
+            return true;
+        }
+        String toolType = toolDef.getToolType();
+        return "platform".equals(toolType)
+                || "custom".equals(toolType)
+                || "mcp".equals(toolType)
+                || "built_in".equals(toolType);
+    }
+
+    private boolean hasProviderPrefix(String toolCode) {
+        return toolCode != null && (toolCode.startsWith("platform.")
+                || toolCode.startsWith("custom:")
+                || toolCode.startsWith("mcp:"));
+    }
+
+    private String executeProviderTool(AgentToolDefinition toolDef, Map<String, Object> input, Long tenantId)
+            throws com.fasterxml.jackson.core.JsonProcessingException {
+        String toolCode = toolDef.getSourceCode() != null && !toolDef.getSourceCode().isBlank()
+                ? toolDef.getSourceCode()
+                : toolDef.getName();
+        ProviderExecutionResult providerResult = toolProviderRegistry.execute(
+                tenantId, toolCode, input != null ? input : Map.of());
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", providerResult.isSuccess());
+        if (providerResult.getData() != null) {
+            response.putAll(providerResult.getData());
+        }
+        if (providerResult.getErrorMessage() != null) {
+            response.put("error", providerResult.getErrorMessage());
+        }
+        response.put("durationMs", providerResult.getDurationMs());
+        return objectMapper.writeValueAsString(response);
     }
 
     // ========== DSL Command ==========

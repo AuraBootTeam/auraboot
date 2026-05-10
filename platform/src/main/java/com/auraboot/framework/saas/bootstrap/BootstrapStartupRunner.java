@@ -27,7 +27,7 @@ import java.io.InputStream;
  * </ul>
  *
  * <p>Both are now expressed as a single idempotent call to
- * {@link BootstrapRepairService#repairAll}, which guarantees the 9 invariants
+ * {@link BootstrapRepairService#repairAll}, which guarantees the bootstrap invariants
  * regardless of whether the DB is empty, partially seeded, or fully provisioned.
  * Restarts are safe: if every invariant already holds, every step returns
  * {@link RepairStepResult.Status#PRESENT} and no rows are written.
@@ -87,7 +87,7 @@ public class BootstrapStartupRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        log.info("BootstrapStartupRunner: auraboot.bootstrap.enabled=true, demo-seed={} → running repairAll() for the 9 invariants",
+        log.info("BootstrapStartupRunner: auraboot.bootstrap.enabled=true, demo-seed={} → running repairAll() for bootstrap invariants",
                 demoSeed);
 
         BootstrapRepairService.RepairOptions opts = loadOptions();
