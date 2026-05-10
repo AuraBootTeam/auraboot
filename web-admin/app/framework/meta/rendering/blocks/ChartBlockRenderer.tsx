@@ -53,7 +53,7 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
   const chartProps = useMemo(() => {
     const config = (block as any).chartConfig || {};
     const visualization = (block as any).visualization || {};
-    const dataSourceId = block.dataSource;
+    const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
 
     // Build dataSource config for Smart chart component
     const dataSource = dataSourceId
