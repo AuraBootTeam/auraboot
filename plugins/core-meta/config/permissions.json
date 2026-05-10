@@ -78,5 +78,15 @@
     "resource": "/meta/named-queries",
     "action": "view",
     "resourceType": "menu"
+  },
+  {
+    "code": "meta.changelog.read",
+    "name": "变更日志查看",
+    "description": "查看数据变更历史记录",
+    "type": "function",
+    "module": "meta",
+    "resource": "changelog",
+    "action": "read",
+    "resourceType": "function"
   }
 ]
