@@ -40,7 +40,7 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
   // Try to pull value from data source (first row, valueField column). Fallback
   // to the inline value declared in `statCard.value`.
   const value = useMemo(() => {
-    const dataSourceId = block.dataSource;
+    const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
     if (dataSourceId) {
       try {
         const data: any = runtime.getDataSourceManager().getData(dataSourceId);

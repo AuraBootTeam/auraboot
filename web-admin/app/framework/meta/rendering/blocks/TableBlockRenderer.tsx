@@ -116,7 +116,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   }, [columns]);
 
   // 获取表格数据 - 从 DataSource
-  const dataSourceId = block.dataSource;
+  const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
   const rawData = dataSourceId ? dataSourceManager.getData(dataSourceId) : [];
 
   // Tree configuration — enables expandable hierarchical rows
@@ -184,7 +184,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     }
 
     // 自定义 render 表达式
-    if (column.render) {
+    if (typeof column.render === 'string') {
       try {
         const rendered = evaluator.evaluateTemplate(column.render, {
           ...context,

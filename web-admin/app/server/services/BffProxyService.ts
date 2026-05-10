@@ -33,6 +33,12 @@ export class BffProxyService {
     this.backendUrl = options.target;
   }
 
+  private setHeaderIfForwardable(res: Response, name: string, value: unknown): void {
+    if (typeof value === 'string' || typeof value === 'number' || Array.isArray(value)) {
+      res.setHeader(name, value);
+    }
+  }
+
   /**
    * Get SSE endpoints from configuration
    */
@@ -238,15 +244,9 @@ export class BffProxyService {
       const contentDisposition = response.headers['content-disposition'];
       const contentLength = response.headers['content-length'];
 
-      if (contentType) {
-        res.setHeader('Content-Type', contentType);
-      }
-      if (contentDisposition) {
-        res.setHeader('Content-Disposition', contentDisposition);
-      }
-      if (contentLength) {
-        res.setHeader('Content-Length', contentLength);
-      }
+      this.setHeaderIfForwardable(res, 'Content-Type', contentType);
+      this.setHeaderIfForwardable(res, 'Content-Disposition', contentDisposition);
+      this.setHeaderIfForwardable(res, 'Content-Length', contentLength);
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
       // 发送二进制数据

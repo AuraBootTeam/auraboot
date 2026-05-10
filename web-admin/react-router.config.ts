@@ -3,7 +3,7 @@ import 'react-router';
 
 export default {
   future: {
-    unstable_middleware: true, // 👈 Enable middleware
+    v8_middleware: true, // Enable route middleware
     // ...Other future or unstable flags
   },
   ssr: true,
@@ -11,6 +11,6 @@ export default {
 
 declare module 'react-router' {
   interface Future {
-    unstable_middleware: true; // 👈 Enable middleware types
+    v8_middleware: true; // Enable middleware types
   }
 }

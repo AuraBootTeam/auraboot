@@ -11,7 +11,10 @@ import { useState, useEffect } from 'react';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
-import { DslMigrator } from '~/framework/meta/migration';
+import {
+  canonicalizePageSchemaDto,
+  type PageSchemaDTO,
+} from '~/framework/meta/utils/canonicalizePageDsl';
 
 /**
  * In-memory schema cache with LRU eviction.
@@ -61,30 +64,6 @@ export interface UseSchemaLoaderResult {
   loading: boolean;
   error: Error | null;
   reload: () => Promise<void>;
-}
-
-/**
- * PageSchemaDTO response structure
- *
- * Fields: kind, blocks, layout, title, profile, schemaVersion
- */
-interface PageSchemaDTO {
-  pid: string;
-  pageKey: string;
-  modelCode: string | null;
-  modelCategory: string | null;
-  name: string;
-  title: string | Record<string, string>;
-  description: string;
-  kind: string;
-  commandCode?: string;
-  blocks: any[];
-  layout: Record<string, any>;
-  profile: string;
-  schemaVersion: number;
-  metaInfo: Record<string, unknown>;
-  isTemplate: boolean;
-  extension?: Record<string, any>;
 }
 
 /**
@@ -154,31 +133,7 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
         throw new Error(`No schema found for pageKey: ${pageKey}`);
       }
 
-      // Build raw schema from DTO — always use v2 structure
-      const raw: Record<string, any> = {
-        kind: pageSchemaDTO.kind,
-        title: pageSchemaDTO.title,
-        name: pageSchemaDTO.name,
-        blocks: pageSchemaDTO.blocks || [],
-        layout: pageSchemaDTO.layout || { type: 'stack' },
-        profile: pageSchemaDTO.profile || 'admin',
-        schemaVersion: pageSchemaDTO.schemaVersion,
-        pageKey: pageSchemaDTO.pageKey,
-        commandCode: pageSchemaDTO.commandCode,
-        modelCode: pageSchemaDTO.modelCode,
-        modelCategory: pageSchemaDTO.modelCategory,
-        ...(pageSchemaDTO.extension?.dataSource && {
-          dataSource: pageSchemaDTO.extension.dataSource,
-        }),
-        ...(pageSchemaDTO.extension?.options && {
-          options: pageSchemaDTO.extension.options,
-        }),
-        // Propagate extension so consumers (e.g. relatedPages) can read it
-        ...(pageSchemaDTO.extension && { extension: pageSchemaDTO.extension }),
-      };
-
-      // Migrate to current schema version (throws on error)
-      const merged = DslMigrator.migrate(raw) as unknown as UnifiedSchema;
+      const merged = canonicalizePageSchemaDto(pageSchemaDTO);
 
       // Dev-mode DSL validation
       if (process.env.NODE_ENV === 'development') {

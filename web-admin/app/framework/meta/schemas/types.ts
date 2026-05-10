@@ -41,7 +41,7 @@ export interface BlockConfig {
   table?: TableConfig;
   columns?: number | ColumnConfig[];
   rowActions?: ButtonConfig[];
-  dataSource?: string;
+  dataSource?: string | DataSourceConfig;
 
   // List tabs
   tabs?: ListTabConfig[] | DetailTabConfig[];
@@ -228,14 +228,16 @@ export interface ColumnConfig {
   required?: boolean;
 
   // 自定义渲染
-  render?: string;
+  render?: string | Record<string, unknown>;
+  /** Custom cell renderer registry key. Keep valueType reserved for built-in semantic types. */
+  cellRenderer?: string;
 
   // 操作列
   isActionColumn?: boolean;
   buttons?: ButtonConfig[];
 
   // Tag map for valueType: 'tag' — maps raw value to { label, color }
-  tagMap?: Record<string, { label: string; color: string }>;
+  tagMap?: Record<string, { label: string | LocalizedText; color: string }>;
 
   // 字典配置
   dictCode?: string; // 绑定的字典编码，自动显示字典标签而非原始值
@@ -327,8 +329,8 @@ export interface ButtonConfig {
 
 // Table 配置
 export interface TableConfig {
-  rowKey: string;
-  dataSource: string;
+  rowKey?: string;
+  dataSource?: string;
   pagination?: PaginationConfig;
   selection?: SelectionConfig;
   columns: ColumnConfig[];
@@ -355,7 +357,7 @@ export interface SelectionConfig {
 export interface ListTabConfig {
   key: string;
   label: string | LocalizedText;
-  filter: TabFilterExpression | null;
+  filter?: TabFilterExpression | null;
   /** Detail tab blocks (present only when tab is a DetailTabConfig in a union context) */
   blocks?: BlockConfig[];
 }
@@ -533,6 +535,8 @@ export interface UnifiedSchema {
   /** DSL schema format version (single integer, default 1). */
   schemaVersion?: number;
   id: string;
+  /** Runtime page key from PageSchemaDTO.pageKey. */
+  pageKey?: string;
   title: string | LocalizedText;
   /** Page name (from PageSchemaDTO.name; effective name fallback when title is missing). */
   name?: string;
@@ -546,6 +550,9 @@ export interface UnifiedSchema {
 
   // Model Category (DOCUMENT, MASTER, TRANSACTION, REFERENCE, ENTITY, ACTIVITY)
   modelCategory?: string;
+
+  /** Default command associated with the page, when provided by PageSchemaDTO. */
+  commandCode?: string;
 
   // Page-level data source (overrides default model table query)
   dataSource?: PageDataSourceConfig;
@@ -587,6 +594,9 @@ export interface UnifiedSchema {
   // Multi-view support — when true, show view type tabs (Table/Kanban/Calendar/etc.)
   // Default: false (only table view, no view switcher)
   enableMultiView?: boolean;
+
+  /** Page-level runtime options propagated from PageSchemaDTO.extension.options. */
+  options?: Record<string, unknown>;
 
   // Page-level extension properties (e.g., showShare, showReport for detail pages)
   extension?: Record<string, any>;
