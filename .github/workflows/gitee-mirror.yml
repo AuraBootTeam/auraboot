@@ -5,8 +5,8 @@ on:
     branches: [main]
     tags: ['*']
   schedule:
-    # Hourly safety net in case a push event was missed
-    - cron: '17 * * * *'
+    # Weekday safety net (UTC 03:17 Mon-Fri) in case a push event was missed
+    - cron: '17 3 * * 1-5'
   workflow_dispatch:
 
 permissions:
