@@ -1,4 +1,4 @@
-import { redirect, type unstable_MiddlewareFunction } from 'react-router';
+import { redirect, type MiddlewareFunction } from 'react-router';
 import { sessionStorage } from '~/shared/services/session.js';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { PLUGIN_PUBLIC_ROUTES } from '~/plugins/_public-routes';
@@ -55,7 +55,7 @@ export function isPublicApiRoute(apiPath: string): boolean {
   );
 }
 
-export function createSessionMiddleware(): unstable_MiddlewareFunction<Response> {
+export function createSessionMiddleware(): MiddlewareFunction<Response> {
   return async ({ request }, next) => {
     let session = await sessionStorage.getSession(request.headers.get('Cookie'));
 
