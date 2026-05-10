@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
 import { tenantPreferenceService } from '~/shared/services/tenantPreferenceService';
 import TimezoneSelect from '~/ui/TimezoneSelect';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 type MetaArgs = Record<string, unknown>;
 
@@ -70,7 +71,7 @@ export default function SystemPreferencesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white">
-        <div className="mx-auto max-w-4xl px-6 py-6">
+        <div className={workspacePageClassName('header')}>
           <h1 className="text-2xl font-bold text-gray-900">System Preferences</h1>
           <p className="mt-1 text-sm text-gray-500">
             Tenant-level display policy, lower priority than user preferences
@@ -78,7 +79,7 @@ export default function SystemPreferencesPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl px-6 py-8">
+      <div className={workspacePageClassName('contentRelaxed')}>
         <div className="rounded-lg bg-white p-6 shadow-sm">
           <h2 className="mb-2 text-lg font-semibold text-gray-900">Datetime Display Format</h2>
           <p className="mb-4 text-sm text-gray-500">

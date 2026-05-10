@@ -18,6 +18,7 @@ import {
   type ServiceType,
   type ConfigLevel,
 } from '~/shared/admin/cloud-config-core';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 // ---------------------------------------------------------------------------
 // Page-specific constants
@@ -75,7 +76,7 @@ export default function CloudConfigPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <div className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="mx-auto max-w-7xl px-6 py-5">
+        <div className={workspacePageClassName('header')}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <CloudIcon className="h-7 w-7 text-blue-600" />
@@ -98,7 +99,7 @@ export default function CloudConfigPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-6">
+      <div className={workspacePageClassName('content')}>
         {/* Level toggle + Service type tabs */}
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           {/* Level & Tabs bar */}

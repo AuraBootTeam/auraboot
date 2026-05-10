@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 type MetaArgs = Record<string, unknown>;
 
@@ -126,7 +127,7 @@ export default function I18nCoveragePage() {
   // Render: main content
   // --------------------------------------------------------------------------
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-6">
+    <div className={workspacePageClassName('contentPadded', 'space-y-8')}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

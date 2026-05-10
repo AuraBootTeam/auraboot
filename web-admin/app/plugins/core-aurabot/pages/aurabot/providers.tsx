@@ -31,6 +31,7 @@ import {
 import { useToastContext } from '~/contexts/ToastContext';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -282,7 +283,7 @@ export default function LlmProvidersPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <div className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="mx-auto max-w-6xl px-6 py-5">
+        <div className={workspacePageClassName('header')}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
@@ -307,7 +308,7 @@ export default function LlmProvidersPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-6">
+      <div className={workspacePageClassName('content')}>
         {/* Level toggle + count */}
         <div className="mb-5 flex items-center justify-between">
           <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-600 dark:bg-gray-700">

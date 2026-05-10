@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { get, ErrorCodes } from '~/shared/services/http-client';
 import NotificationRuleList from '~/framework/smart/components/notification/NotificationRuleList';
-import NotificationRuleBuilder from '~/framework/smart/components/notification/NotificationRuleBuilder';
-import type { NotificationRule } from '~/framework/smart/components/notification/NotificationRuleBuilder';
+import NotificationRuleBuilder, {
+  type NotificationRule,
+} from '~/framework/smart/components/notification/NotificationRuleBuilder';
 import { BellAlertIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 /**
  * Notification Rules management page.
@@ -73,7 +75,7 @@ export default function NotificationRulesPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Page header */}
       <div className="border-b border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div className={workspacePageClassName('headerCompact')}>
           <div className="flex items-center justify-between py-5">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/30">
@@ -98,7 +100,7 @@ export default function NotificationRulesPage() {
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className={workspacePageClassName('contentCompact')}>
         {/* Stats bar */}
         {!loading && rules.length > 0 && (
           <div className="mb-6 grid grid-cols-3 gap-4">

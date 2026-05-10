@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { get, post } from '~/shared/services/http-client';
 import { useToastContext } from '~/contexts/ToastContext';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -109,7 +110,7 @@ export default function InfrastructurePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    <div className={workspacePageClassName('contentPadded')}>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ServerStackIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
@@ -135,7 +136,6 @@ export default function InfrastructurePage() {
           icon={<CloudIcon className="h-6 w-6" />}
           title="File Storage"
           provider={status.storage.provider}
-          type={status.storage.type}
           description={PROVIDER_DESCRIPTIONS[status.storage.provider]}
           details={[
             { label: 'Type', value: status.storage.type },
@@ -152,7 +152,6 @@ export default function InfrastructurePage() {
           icon={<SignalIcon className="h-6 w-6" />}
           title="Message Queue"
           provider={status.mq.provider}
-          type={status.mq.type}
           description={PROVIDER_DESCRIPTIONS[status.mq.provider]}
           details={[{ label: 'Type', value: status.mq.type }]}
           testResult={testResults.mq}
@@ -166,7 +165,6 @@ export default function InfrastructurePage() {
           icon={<ServerStackIcon className="h-6 w-6" />}
           title="Redis"
           provider={status.redis.connected ? 'Connected' : 'Disconnected'}
-          type="redis"
           description={
             status.redis.version ? `Redis ${status.redis.version}` : status.redis.error || 'Unknown'
           }
@@ -185,7 +183,6 @@ export default function InfrastructurePage() {
           icon={<CircleStackIcon className="h-6 w-6" />}
           title="Database"
           provider="PostgreSQL"
-          type="postgresql"
           description={status.database.url || 'Configured'}
           details={[{ label: 'Connection', value: status.database.url || 'N/A' }]}
           isProduction={true}
@@ -203,7 +200,6 @@ function InfraCard({
   icon,
   title,
   provider,
-  type,
   description,
   details,
   testResult,
@@ -214,7 +210,6 @@ function InfraCard({
   icon: React.ReactNode;
   title: string;
   provider: string;
-  type: string;
   description?: string;
   details: { label: string; value: string }[];
   testResult?: TestResult;

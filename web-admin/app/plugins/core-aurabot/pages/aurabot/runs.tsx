@@ -14,6 +14,7 @@ import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
 import { TraceStatusBadge } from '~/plugins/core-aurabot/pages/ai-trace/components/TraceStatusBadge';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 // ============================================================================
 // Types — Run Log
@@ -354,7 +355,7 @@ export default function RunLogsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <div className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="mx-auto max-w-7xl px-6 py-5">
+        <div className={workspacePageClassName('header')}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600">
@@ -380,7 +381,7 @@ export default function RunLogsPage() {
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-7xl px-6 py-6">
+      <div className={workspacePageClassName('content')}>
         {activeTab === 'runs' ? (
           <RunLogContent l={l} refreshKey={refreshKey} />
         ) : (

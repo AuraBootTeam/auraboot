@@ -25,6 +25,7 @@ import {
   type ServiceType,
   type ConfigLevel,
 } from '~/shared/admin/cloud-config-core';
+import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -125,7 +126,7 @@ export default function PromptTemplatesPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900" data-testid="prompt-templates-page">
       {/* Header */}
       <div className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="mx-auto max-w-7xl px-6 py-5">
+        <div className={workspacePageClassName('header')}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600">
@@ -172,7 +173,7 @@ export default function PromptTemplatesPage() {
       </div>
 
       {/* Split pane */}
-      <div className="mx-auto max-w-7xl px-6 py-6">
+      <div className={workspacePageClassName('content')}>
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* Left Panel — Template List */}
           <div className="w-full shrink-0 lg:w-80">
