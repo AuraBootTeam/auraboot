@@ -56,7 +56,7 @@ Every data operation flows through a unified pipeline: schema validation → per
 SmartEngine-based BPMN 2.0 engine with visual process design, human task assignment, approval inbox, escalation rules, and SLA tracking.
 
 ### Plugin System
-PF4J-based plugin architecture. The OSS repo ships 16 first-party plugins (CRM, HR, BPM, asset management, AI / agent control plane, dashboards, etc.). Plugins are declarative JSON packages that add models, fields, commands, pages, and menus. Install from a marketplace or build your own with the CLI.
+PF4J-based plugin architecture. The OSS repo ships ~20 first-party plugins covering CRM, HR, BPM, asset management, AI / agent control plane, dashboards, and more. Plugins are declarative JSON packages that add models, fields, commands, pages, and menus. Install from a marketplace or build your own with the CLI.
 
 ### Multi-Tenant RBAC
 Row-level tenant isolation, role-based access control at resource/operation/data levels, and a complete permission system with menus, routes, and API-level enforcement.
@@ -187,7 +187,7 @@ auraboot/
 ├── web-admin/                # React frontend + BFF
 │   ├── app/                  #   Application source
 │   └── tests/                #   E2E and API tests
-├── plugins/                  # Plugin packages (16 first-party in OSS repo)
+├── plugins/                  # Plugin packages (~20 first-party in OSS repo)
 │   ├── crm/                  #   CRM plugin
 │   ├── sales/                #   Sales management
 │   ├── procurement/          #   Procurement
