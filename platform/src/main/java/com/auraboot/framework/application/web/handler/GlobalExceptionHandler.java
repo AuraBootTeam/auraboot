@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import org.springframework.beans.factory.annotation.Value;
 
@@ -326,6 +327,18 @@ public class GlobalExceptionHandler {
 
         ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, detail);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Handle missing static resources separately from unexpected server errors.
+     * Spring raises this for unknown API paths after controller mapping fails.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleNoResourceFoundException(NoResourceFoundException ex) {
+        log.warn("No resource found: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.NOT_FOUND, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     /**
