@@ -82,7 +82,7 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center"
+      className="fixed inset-0 z-[1200] flex items-center justify-center"
       data-testid="confirm-dialog"
     >
       {/* Backdrop */}

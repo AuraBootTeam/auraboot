@@ -127,7 +127,7 @@ function buildSubtableBlocks(): any[] {
         ],
       },
     },
-    // ----- Mode C: dataSource (URL endpoint + params hash with interpolation) -----
+    // ----- Mode C: dataSource (API endpoint + params hash with interpolation) -----
     // Uses the platform's dynamic list endpoint; SubTableViewer appends params
     // as query string. ${recordId} is interpolated by SubTableViewer at fetch
     // time (placeholder syntax in `dataSource.params`). The platform list API
@@ -137,7 +137,8 @@ function buildSubtableBlocks(): any[] {
       blockType: 'sub-table',
       title: 'D5 DataSource Mode',
       dataSource: {
-        url: `/api/dynamic/${MODEL_CODE}/list`,
+        endpoint: `/api/dynamic/${MODEL_CODE}/list`,
+        autoFetch: false,
         params: {
           pageNum: '1',
           pageSize: '5',

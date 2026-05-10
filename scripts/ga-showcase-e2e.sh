@@ -8,6 +8,11 @@
 #   ./scripts/ga-showcase-e2e.sh all
 #
 # The GA stack must already be running via docker-ga-e2e-up/bootstrap.
+#
+# Worker tuning:
+#   GA_SHOWCASE_AUTH_WORKERS=1
+#   GA_SHOWCASE_CHROMIUM_WORKERS=2
+#   GA_SHOWCASE_DEEP_WORKERS=1
 
 set -euo pipefail
 
@@ -55,6 +60,23 @@ export PW_OPERATOR_STORAGE_STATE="${PW_OPERATOR_STORAGE_STATE:-$PW_STORAGE_DIR/o
 export PW_VIEWER_STORAGE_STATE="${PW_VIEWER_STORAGE_STATE:-$PW_STORAGE_DIR/viewer.json}"
 
 mkdir -p "$PW_STORAGE_DIR" test-results
+
+worker_count() {
+  local name="$1"
+  local default_value="$2"
+  local value="${!name:-$default_value}"
+
+  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: $name must be a positive integer, got '$value'" >&2
+    exit 2
+  fi
+
+  printf '%s' "$value"
+}
+
+AUTH_WORKERS="$(worker_count GA_SHOWCASE_AUTH_WORKERS 1)"
+CHROMIUM_WORKERS="$(worker_count GA_SHOWCASE_CHROMIUM_WORKERS "${PW_WORKERS:-2}")"
+DEEP_WORKERS="$(worker_count GA_SHOWCASE_DEEP_WORKERS 1)"
 
 find_competing_runners() {
   local marker="${1:-}"
@@ -116,8 +138,9 @@ run_auth() {
   local log="/tmp/pw-ga-showcase-auth-$(date +%Y%m%d-%H%M%S).log"
   echo "=== GA showcase auth ==="
   echo "Log: $log"
+  echo "Workers: $AUTH_WORKERS"
   run_guarded "$output" "$log" npx playwright test -c playwright.config.ts tests/auth.setup.ts \
-    --project=auth --reporter=line --workers=1 --output="$output"
+    --project=auth --no-deps --reporter=line --workers="$AUTH_WORKERS" --output="$output"
 }
 
 run_chromium() {
@@ -125,8 +148,9 @@ run_chromium() {
   local log="/tmp/pw-ga-showcase-chromium-no-deps-$(date +%Y%m%d-%H%M%S).log"
   echo "=== GA showcase chromium --no-deps ==="
   echo "Log: $log"
+  echo "Workers: $CHROMIUM_WORKERS"
   run_guarded "$output" "$log" npx playwright test -c playwright.config.ts tests/e2e/showcase/ \
-    --project=chromium --no-deps --reporter=line --workers=2 --output="$output"
+    --project=chromium --no-deps --reporter=line --workers="$CHROMIUM_WORKERS" --output="$output"
 }
 
 run_deep() {
@@ -134,8 +158,9 @@ run_deep() {
   local log="/tmp/pw-ga-showcase-chromium-deep-no-deps-$(date +%Y%m%d-%H%M%S).log"
   echo "=== GA showcase chromium-deep --no-deps ==="
   echo "Log: $log"
+  echo "Workers: $DEEP_WORKERS"
   run_guarded "$output" "$log" npx playwright test -c playwright.config.ts tests/e2e/showcase/ \
-    --project=chromium-deep --no-deps --reporter=line --workers=1 --output="$output"
+    --project=chromium-deep --no-deps --reporter=line --workers="$DEEP_WORKERS" --output="$output"
 }
 
 case "$PHASE" in

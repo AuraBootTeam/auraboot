@@ -44,7 +44,13 @@ import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestio
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
 import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import type { BlockConfig, ButtonConfig, DetailTabConfig, FieldConfig } from '~/framework/meta/schemas/types';
+import type {
+  BlockConfig,
+  ButtonConfig,
+  DataSourceConfig,
+  DetailTabConfig,
+  FieldConfig,
+} from '~/framework/meta/schemas/types';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 
@@ -85,6 +91,18 @@ export function resolveDetailFieldComponent(meta?: {
 
 export function buildDetailRecordEndpoint(tableName: string, recordId: string): string {
   return buildApiEndpoint(tableName, recordId);
+}
+
+export function resolveSubTableDataSourceConfig(
+  dataSource: BlockConfig['dataSource'] | undefined,
+  schemaDataSources?: Record<string, DataSourceConfig>,
+  dataSourceManager?: { getConfig: (id: string) => DataSourceConfig | undefined } | null,
+): BlockConfig['dataSource'] | undefined {
+  if (typeof dataSource !== 'string') {
+    return dataSource;
+  }
+
+  return schemaDataSources?.[dataSource] ?? dataSourceManager?.getConfig(dataSource) ?? dataSource;
 }
 
 /**
@@ -636,6 +654,8 @@ export function DetailPageContent(props: PageContentProps) {
                       getDictItems={getDictItems}
                       enrichField={enrichField}
                       runtime={runtime as SchemaRuntime}
+                      schemaDataSources={schema?.dataSources}
+                      dataSourceManager={dataSourceManager}
                     />
                   );
                 })}
@@ -661,7 +681,9 @@ export function DetailPageContent(props: PageContentProps) {
                 onDataChange={reloadRecord}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
-                    runtime={runtime as SchemaRuntime}
+                runtime={runtime as SchemaRuntime}
+                schemaDataSources={schema?.dataSources}
+                dataSourceManager={dataSourceManager}
               />
             ))}
             {directSubTableBlocks.map((block: BlockConfig, blockIndex: number) => (
@@ -678,7 +700,9 @@ export function DetailPageContent(props: PageContentProps) {
                 onDataChange={reloadRecord}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
-                    runtime={runtime as SchemaRuntime}
+                runtime={runtime as SchemaRuntime}
+                schemaDataSources={schema?.dataSources}
+                dataSourceManager={dataSourceManager}
               />
             ))}
             {directMonthlyGridBlocks.map((block: BlockConfig, blockIndex: number) => (
@@ -695,7 +719,9 @@ export function DetailPageContent(props: PageContentProps) {
                 onDataChange={reloadRecord}
                 getDictItems={getDictItems}
                 enrichField={enrichField}
-                    runtime={runtime as SchemaRuntime}
+                runtime={runtime as SchemaRuntime}
+                schemaDataSources={schema?.dataSources}
+                dataSourceManager={dataSourceManager}
               />
             ))}
 
@@ -779,6 +805,8 @@ function DetailBlockRenderer({
   getDictItems,
   enrichField,
   runtime,
+  schemaDataSources,
+  dataSourceManager,
 }: {
   block: BlockConfig;
   recordData: RecordData;
@@ -794,6 +822,8 @@ function DetailBlockRenderer({
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
   enrichField?: (field: FieldConfig) => FieldConfig;
   runtime?: SchemaRuntime;
+  schemaDataSources?: Record<string, DataSourceConfig>;
+  dataSourceManager?: { getConfig: (id: string) => DataSourceConfig | undefined };
 }) {
   const resolveModelFieldLabel = useCallback(
     (fieldCode: string): string => {
@@ -853,6 +883,11 @@ function DetailBlockRenderer({
 
   if (block.blockType === 'sub-table') {
     // Support both nested block.subTable and flat block-level properties
+    const blockDataSource = resolveSubTableDataSourceConfig(
+      (block as any).dataSource,
+      schemaDataSources,
+      dataSourceManager,
+    );
     const subTableConfig =
       block.subTable ||
       ((block as any).modelCode || (block as any).foreignKey || (block as any).dataSource
@@ -862,7 +897,7 @@ function DetailBlockRenderer({
             columns: (block as any).columns || [],
             actions: (block as any).actions,
             readOnly: true,
-            dataSource: (block as any).dataSource,
+            dataSource: blockDataSource,
           }
         : null);
     if (subTableConfig) {
