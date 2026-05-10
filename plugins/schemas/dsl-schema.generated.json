@@ -8,14 +8,11 @@
         "kind": {
           "type": "string",
           "enum": [
-            "Page",
-            "List",
-            "Form",
-            "Detail",
-            "PageLayout",
-            "Dashboard",
-            "Record",
-            "Transaction"
+            "page",
+            "list",
+            "form",
+            "detail",
+            "page_layout"
           ]
         },
         "version": {
@@ -27,6 +24,9 @@
         "id": {
           "type": "string"
         },
+        "pageKey": {
+          "type": "string"
+        },
         "title": {
           "anyOf": [
             {
@@ -36,6 +36,9 @@
               "$ref": "#/definitions/LocalizedText"
             }
           ]
+        },
+        "name": {
+          "type": "string"
         },
         "description": {
           "anyOf": [
@@ -56,6 +59,9 @@
         "modelCategory": {
           "type": "string"
         },
+        "commandCode": {
+          "type": "string"
+        },
         "dataSource": {
           "$ref": "#/definitions/PageDataSourceConfig"
         },
@@ -68,10 +74,10 @@
         "layout": {
           "$ref": "#/definitions/LayoutConfig"
         },
-        "areas": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/AreaConfig"
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BlockConfig"
           }
         },
         "dataSources": {
@@ -187,7 +193,7 @@
         "id",
         "title",
         "layout",
-        "areas"
+        "blocks"
       ],
       "additionalProperties": false,
       "allOf": [
@@ -201,7 +207,7 @@
           },
           "then": {
             "properties": {
-              "areas": {
+              "blocks": {
                 "description": "List pages should contain at least one table block",
                 "x-recommended-block-types": [
                   "table",
@@ -223,7 +229,7 @@
           },
           "then": {
             "properties": {
-              "areas": {
+              "blocks": {
                 "description": "Form pages should contain form-section and form-buttons blocks",
                 "x-recommended-block-types": [
                   "form",
@@ -245,7 +251,7 @@
           },
           "then": {
             "properties": {
-              "areas": {
+              "blocks": {
                 "description": "Detail pages typically contain tabs with sub-tables",
                 "x-recommended-block-types": [
                   "tabs",
@@ -267,7 +273,7 @@
           },
           "then": {
             "properties": {
-              "areas": {
+              "blocks": {
                 "description": "Dashboard pages should contain chart and stat-card blocks",
                 "x-recommended-block-types": [
                   "chart",
@@ -356,116 +362,26 @@
     "LayoutConfig": {
       "type": "object",
       "properties": {
-        "areas": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "areasConfig": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/AreaLayoutConfig"
-          }
-        }
-      },
-      "required": [
-        "areas",
-        "areasConfig"
-      ],
-      "additionalProperties": false
-    },
-    "AreaLayoutConfig": {
-      "type": "object",
-      "properties": {
         "type": {
           "type": "string",
           "enum": [
             "grid",
-            "flex"
+            "stack"
           ]
         },
         "cols": {
           "type": "number"
         },
-        "rows": {
+        "colGap": {
           "type": "number"
         },
         "rowGap": {
           "type": "number"
         },
-        "colGap": {
+        "gap": {
           "type": "number"
-        },
-        "direction": {
-          "type": "string",
-          "enum": [
-            "row",
-            "column"
-          ]
-        },
-        "justify": {
-          "type": "string",
-          "enum": [
-            "start",
-            "end",
-            "center",
-            "space-between",
-            "space-around"
-          ]
-        },
-        "align": {
-          "type": "string",
-          "enum": [
-            "start",
-            "end",
-            "center",
-            "stretch"
-          ]
-        },
-        "padding": {
-          "type": [
-            "string",
-            "number"
-          ]
-        },
-        "width": {
-          "type": [
-            "number",
-            "string"
-          ]
-        },
-        "height": {
-          "type": [
-            "number",
-            "string"
-          ]
         }
       },
-      "required": [
-        "type"
-      ],
-      "additionalProperties": false
-    },
-    "AreaConfig": {
-      "type": "object",
-      "properties": {
-        "blocks": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/BlockConfig"
-          }
-        },
-        "visibleWhen": {
-          "type": "string"
-        },
-        "className": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "blocks"
-      ],
       "additionalProperties": false
     },
     "BlockConfig": {
@@ -531,7 +447,14 @@
           }
         },
         "dataSource": {
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/DataSourceConfig"
+            }
+          ]
         },
         "tabs": {
           "anyOf": [
@@ -659,10 +582,19 @@
     "BlockLayoutConfig": {
       "type": "object",
       "properties": {
+        "col": {
+          "type": "number"
+        },
         "colSpan": {
           "type": "number"
         },
         "rowSpan": {
+          "type": "number"
+        },
+        "order": {
+          "type": "number"
+        },
+        "row": {
           "type": "number"
         },
         "columns": {
@@ -1090,6 +1022,23 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "state_transition"
+            },
+            "command": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "navigate"
             },
             "to": {
@@ -1156,6 +1105,36 @@
           "required": [
             "type",
             "handler"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "bpm"
+            },
+            "processDefinitionKey": {
+              "type": "string",
+              "description": "BPMN process definition key (matches <process id=\"...\"> in the .bpmn file)"
+            },
+            "businessKeyField": {
+              "type": "string",
+              "description": "Field name on the source record that provides the businessKey"
+            },
+            "variables": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Variable name → expression mapping. Expression grammar:\n- \"$.field\" / \"$.parent.child\" — JSONPath-style record lookup (dot paths only)\n- Any non-\"$\"-prefixed value — treated as literal Bracket syntax (\"$.list[0]\") is rejected at runtime to match backend BpmActionExecutor."
+            }
+          },
+          "required": [
+            "type",
+            "processDefinitionKey",
+            "businessKeyField"
           ],
           "additionalProperties": false
         }
@@ -1266,8 +1245,6 @@
         }
       },
       "required": [
-        "rowKey",
-        "dataSource",
         "columns"
       ],
       "additionalProperties": false
@@ -1405,7 +1382,11 @@
             "image",
             "user_identity",
             "reference",
-            "button"
+            "button",
+            "url",
+            "email",
+            "color",
+            "link"
           ]
         },
         "editable": {
@@ -1418,7 +1399,19 @@
           "type": "boolean"
         },
         "render": {
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          ]
+        },
+        "cellRenderer": {
+          "type": "string",
+          "description": "Custom cell renderer registry key. Keep valueType reserved for built-in semantic types."
         },
         "isActionColumn": {
           "type": "boolean"
@@ -1435,7 +1428,14 @@
             "type": "object",
             "properties": {
               "label": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/LocalizedText"
+                  }
+                ]
               },
               "color": {
                 "type": "string"
@@ -1545,8 +1545,7 @@
       },
       "required": [
         "key",
-        "label",
-        "filter"
+        "label"
       ],
       "additionalProperties": false
     },
@@ -1719,6 +1718,42 @@
           },
           "description": "Cross-row validation rules (e.g., total amount <= budget).",
           "x-requiresInlineEdit": "true"
+        },
+        "emptyState": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
+            "actionLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
         }
       },
       "required": [

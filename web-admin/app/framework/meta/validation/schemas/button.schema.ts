@@ -7,10 +7,16 @@ export const apiActionSchema = z.object({
   successMessage: localizedTextSchema.optional(),
 });
 
+const actionDefSchema = z
+  .object({
+    type: z.string().min(1),
+  })
+  .passthrough();
+
 export const buttonSchema = z
   .object({
     code: z.string().min(1),
-    action: z.string().optional(),
+    action: z.union([z.string(), actionDefSchema]).optional(),
     content: localizedTextSchema.optional(),
     label: localizedTextSchema.optional(),
     primary: z.boolean().optional(),
