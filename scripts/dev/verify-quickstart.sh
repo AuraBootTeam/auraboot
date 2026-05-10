@@ -105,7 +105,10 @@ fi
 
 step "7/8 Authenticated API smoke"
 if [ -n "$TOKEN" ]; then
-  for endpoint in /api/auth/me /api/menu /api/permissions; do
+  # Endpoints any authenticated user can hit (no specific permission code).
+  # /api/menu and /api/permissions root paths have no GET handler;
+  # /api/permissions/tree needs a permission grant (403 for admin without it).
+  for endpoint in /api/auth/me /api/menu/user; do
     if curl -fsS -m 5 -H "Authorization: Bearer $TOKEN" "http://localhost:3000$endpoint" -o /dev/null; then
       ok "$endpoint → 200"
     else
