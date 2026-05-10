@@ -85,25 +85,47 @@ The `full` profile builds and starts PostgreSQL + the Spring Boot backend + the 
 
 **Prerequisites:** Java 21+, Node.js 20+, PostgreSQL 15+ (Docker stack ships 16), Redis 7+, pnpm 9+
 
+**Start local services first** — `oss-reset-and-init.sh` connects to local PostgreSQL and Redis. Brew/apt-installed services do **not** auto-start:
+
+| OS | Command |
+|---|---|
+| macOS (Homebrew) | `brew services start postgresql@16 redis` |
+| Linux (systemd) | `sudo systemctl start postgresql redis` |
+| Windows | See [docs/getting-started/installation.md](docs/getting-started/installation.md) |
+
+The script preflights both endpoints and aborts with a clear message if either is unreachable.
+
+#### Recommended: one-shot script
+
+The `oss-reset-and-init.sh` script handles **everything**: DB reset, backend startup, `/api/bootstrap/setup`, frontend startup, plugin import, and storage state generation. Use this for a clean, working environment.
+
 ```bash
-# 1. Clone the repository
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
-
-# 2. Initialize the database
 ./scripts/oss-reset-and-init.sh
+```
 
-# 3. Start the backend (Spring Boot, port 6443)
+When the script exits successfully, the system is fully bootstrapped and both backend (`http://localhost:6443`) and frontend (`http://localhost:5173`) are running in the background (logs at `/tmp/aura-backend.log`, `/tmp/aura-web.log`, `/tmp/aura-bff.log`).
+
+#### Advanced: stepwise (for debugging individual layers)
+
+Use this when you need to inspect a single layer in isolation — e.g. to attach a debugger to the backend or rebuild plugins without restarting the dev session.
+
+```bash
+# 1. Reset DB only — backend + frontend stay stopped, /setup wizard handles bootstrap
+./scripts/oss-reset-and-init.sh --no-bootstrap
+
+# 2. Start the backend (Spring Boot, port 6443) in a dedicated terminal
 cd platform
 ./gradlew bootRun
 
-# 4. In a new terminal — start the frontend (Vite + BFF, port 5173)
+# 3. Start the frontend (Vite + BFF, port 5173) in another terminal
 cd web-admin
 pnpm install
 pnpm dev:full
-```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+# 4. Open http://localhost:5173/setup in a browser to drive the bootstrap wizard
+```
 
 `pnpm dev:full` is the default foreground developer entrypoint. If you need the frontend in background mode, run `pnpm sync-plugins` once and then start `pnpm dev:web` and `pnpm dev:bff` separately.
 

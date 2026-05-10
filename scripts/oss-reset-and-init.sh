@@ -153,6 +153,31 @@ check_http() {
     return 1
 }
 
+# Step 0: Preflight — required local services must be running.
+# PG / Redis are external dependencies the platform connects to. If absent
+# the rest of the script fails inside `set -e` with cryptic JDBC errors.
+# Surface a clear actionable message instead.
+echo -e "${YELLOW}Step 0: Checking local service prerequisites...${NC}"
+if ! pg_isready -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" >/dev/null 2>&1; then
+    echo -e "${RED}   PostgreSQL is not reachable at ${PG_HOST}:${PG_PORT} (user=${PG_USER}).${NC}"
+    echo "   Start it with one of:"
+    echo "     macOS (Homebrew):  brew services start postgresql@16"
+    echo "     Linux (systemd):   sudo systemctl start postgresql"
+    echo "     Docker:            see docker-compose.yml"
+    echo "   Or set PG_HOST / PG_PORT / PG_USER if running on a non-default endpoint."
+    exit 1
+fi
+echo -e "${GREEN}   PostgreSQL ready${NC}"
+
+if ! redis-cli ping >/dev/null 2>&1; then
+    echo -e "${RED}   Redis is not reachable at default endpoint (127.0.0.1:6379).${NC}"
+    echo "   Start it with one of:"
+    echo "     macOS (Homebrew):  brew services start redis"
+    echo "     Linux (systemd):   sudo systemctl start redis"
+    exit 1
+fi
+echo -e "${GREEN}   Redis ready${NC}"
+
 # Step 1: Stop backend service
 echo -e "${YELLOW}Step 1: Stopping backend service...${NC}"
 pkill -f "com.auraboot.framework.application.MetaApplication" 2>/dev/null || true
@@ -335,6 +360,21 @@ fi
 # Step 5: Start frontend
 echo -e "${YELLOW}Step 5: Starting frontend...${NC}"
 cd "$WEB_ADMIN_DIR"
+
+# Step 5.0: Preflight — ensure pnpm workspace dependencies are installed.
+# Fresh-clone scenario: web-admin/node_modules absent → react-router / tsx
+# binaries unresolved → dev:web/dev:bff fail with "command not found".
+# Use --frozen-lockfile so lockfile drift surfaces here instead of silently
+# rewriting the lockfile and producing a corrupt install.
+if [ ! -d "$WEB_ADMIN_DIR/node_modules" ] || [ ! -d "$PROJECT_ROOT/node_modules" ]; then
+    echo "   web-admin/node_modules or root node_modules missing — installing pnpm workspace deps..."
+    if ! (cd "$PROJECT_ROOT" && pnpm install --frozen-lockfile); then
+        echo -e "${RED}   pnpm install --frozen-lockfile failed.${NC}"
+        echo "   If lockfile is out of sync with package.json, run 'pnpm install' manually,"
+        echo "   commit the updated lockfile, and rerun this script."
+        exit 1
+    fi
+fi
 
 echo "   Running plugin sync before starting dev servers..."
 pnpm sync-plugins > /tmp/aura-sync-plugins.log 2>&1
