@@ -2,7 +2,7 @@
 
 > Companion to [`readme-screenshots-spec.md`](./readme-screenshots-spec.md). This
 > covers logo / banner / OG image / favicon / social-platform avatars. Every
-> platform we list in [`oss-launch-strategy.md`](../../../auraboot-website/docs/oss-launch-strategy.md#21-全平台账号注册)
+> platform we list in the website launch strategy
 > needs the same assets, and they all need to look identical.
 
 ## Asset matrix (build all of these once)
