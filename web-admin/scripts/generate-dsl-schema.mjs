@@ -131,7 +131,7 @@ function addPageTypeDiscriminator(schema) {
       if: { properties: { kind: { const: 'List' } } },
       then: {
         properties: {
-          areas: {
+          blocks: {
             description: 'List pages should contain at least one table block',
             'x-recommended-block-types': ['table', 'filters', 'toolbar', 'tabs'],
           },
@@ -142,7 +142,7 @@ function addPageTypeDiscriminator(schema) {
       if: { properties: { kind: { const: 'Form' } } },
       then: {
         properties: {
-          areas: {
+          blocks: {
             description: 'Form pages should contain form-section and form-buttons blocks',
             'x-recommended-block-types': ['form', 'form-section', 'form-buttons', 'form-wizard'],
           },
@@ -153,7 +153,7 @@ function addPageTypeDiscriminator(schema) {
       if: { properties: { kind: { const: 'Detail' } } },
       then: {
         properties: {
-          areas: {
+          blocks: {
             description: 'Detail pages typically contain tabs with sub-tables',
             'x-recommended-block-types': ['tabs', 'sub-table', 'form-section', 'description'],
           },
@@ -164,7 +164,7 @@ function addPageTypeDiscriminator(schema) {
       if: { properties: { kind: { const: 'Dashboard' } } },
       then: {
         properties: {
-          areas: {
+          blocks: {
             description: 'Dashboard pages should contain chart and stat-card blocks',
             'x-recommended-block-types': ['chart', 'stat-card', 'table', 'description'],
           },

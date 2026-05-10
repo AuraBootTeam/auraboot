@@ -3,6 +3,7 @@ import { localizedTextSchema } from './localized-text.schema';
 import { fieldSchema } from './field.schema';
 import { columnSchema } from './column.schema';
 import { buttonSchema } from './button.schema';
+import { dataSourceConfigSchema } from './data-source.schema';
 
 /**
  * Block types aligned with BlockRenderer.tsx switch-case.
@@ -51,8 +52,8 @@ const paginationConfigSchema = z.object({
 });
 
 const tableConfigSchema = z.object({
-  rowKey: z.string(),
-  dataSource: z.string(),
+  rowKey: z.string().optional(),
+  dataSource: z.string().optional(),
   pagination: paginationConfigSchema.optional(),
   selection: selectionConfigSchema.optional(),
   columns: z.array(columnSchema),
@@ -67,14 +68,15 @@ const tabFilterExpressionSchema = z.object({
 const listTabConfigSchema = z.object({
   key: z.string(),
   label: localizedTextSchema,
-  filter: tabFilterExpressionSchema.nullable(),
-});
+  filter: tabFilterExpressionSchema.nullable().optional(),
+}).passthrough();
 
 const detailTabConfigSchema = z.object({
   key: z.string(),
   label: localizedTextSchema,
   blocks: z.array(z.lazy(() => blockSchema)),
-});
+  filter: tabFilterExpressionSchema.nullable().optional(),
+}).passthrough();
 
 const defaultSortSchema = z.object({
   field: z.string(),
@@ -123,7 +125,7 @@ export const blockSchema: z.ZodType<any> = z
     table: tableConfigSchema.optional(),
     columns: z.union([z.number(), z.array(columnSchema)]).optional(),
     rowActions: z.array(buttonSchema).optional(),
-    dataSource: z.string().optional(),
+    dataSource: z.union([z.string(), dataSourceConfigSchema]).optional(),
     tabs: z.union([z.array(listTabConfigSchema), z.array(detailTabConfigSchema)]).optional(),
     subTable: subTableConfigSchema.optional(),
     defaultSort: defaultSortSchema.optional(),

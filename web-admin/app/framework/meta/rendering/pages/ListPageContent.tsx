@@ -1357,13 +1357,15 @@ export function ListPageContent(props: PageContentProps) {
       }
 
       // Use CellRendererRegistry for valueType-based rendering
-      return cellRendererRegistry.render(effectiveValueType, {
+      const rendererType = (column as any).cellRenderer || effectiveValueType;
+      return cellRendererRegistry.render(rendererType, {
         value,
         record,
         column: {
           field: column.field,
           label: typeof column.label === 'string' ? column.label : undefined,
           valueType: effectiveValueType,
+          cellRenderer: (column as any).cellRenderer,
           format: column.format,
           dateTimeFormats,
           render: column.render,

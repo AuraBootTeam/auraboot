@@ -83,7 +83,7 @@ export interface StrictBlockConfig {
   table?: TableConfig;
   columns?: number | ColumnConfig[];
   rowActions?: ButtonConfig[];
-  dataSource?: string;
+  dataSource?: string | DataSourceConfig;
 
   // List tabs
   tabs?: ListTabConfig[] | DetailTabConfig[];
@@ -233,12 +233,15 @@ export interface DslSchema {
   version: string;
   schemaVersion?: number;
   id: string;
+  pageKey?: string;
   title: string | LocalizedText;
+  name?: string;
   description?: string | LocalizedText;
 
   profile?: string;
   modelCode?: string;
   modelCategory?: string;
+  commandCode?: string;
 
   dataSource?: PageDataSourceConfig;
   stateBinding?: Record<string, string>;

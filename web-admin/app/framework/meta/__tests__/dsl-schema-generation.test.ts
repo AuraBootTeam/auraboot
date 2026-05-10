@@ -15,8 +15,8 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('should have 43 definitions', () => {
-    expect(Object.keys(defs).length).toBe(43);
+  it('should have 41 definitions', () => {
+    expect(Object.keys(defs).length).toBe(41);
   });
 
   it('should have DslSchema definition', () => {
@@ -75,13 +75,13 @@ describe('DSL Generated Schema', () => {
     expect(defs.DslSchema.required).toContain('kind');
   });
 
-  it('DslSchema should have version, id, title, layout, areas as required', () => {
+  it('DslSchema should have version, id, title, layout, blocks as required', () => {
     const required = defs.DslSchema.required;
     expect(required).toContain('version');
     expect(required).toContain('id');
     expect(required).toContain('title');
     expect(required).toContain('layout');
-    expect(required).toContain('areas');
+    expect(required).toContain('blocks');
   });
 
   // --- DslSchema.kind enum ---
@@ -91,12 +91,11 @@ describe('DSL Generated Schema', () => {
     expect(kindProp?.type).toBe('string');
     expect(kindProp?.enum).toEqual(
       expect.arrayContaining([
-        'Page',
-        'List',
-        'Form',
-        'Detail',
-        'Dashboard',
-        'PageLayout',
+        'page',
+        'list',
+        'form',
+        'detail',
+        'page_layout',
       ]),
     );
   });
@@ -123,6 +122,32 @@ describe('DSL Generated Schema', () => {
     expect(vt?.type).toBe('string');
     expect(vt?.enum).toEqual(
       expect.arrayContaining(['text', 'boolean', 'date', 'currency', 'tag']),
+    );
+  });
+
+  it('ColumnConfig.cellRenderer should be a string extension hook', () => {
+    const renderer = defs.ColumnConfig.properties?.cellRenderer;
+    expect(renderer?.type).toBe('string');
+  });
+
+  it('ColumnConfig.tagMap labels should allow localized text', () => {
+    const tagMapEntry = defs.ColumnConfig.properties?.tagMap?.additionalProperties;
+    const label = tagMapEntry?.properties?.label;
+    expect(label?.anyOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'string' }),
+        expect.objectContaining({ $ref: '#/definitions/LocalizedText' }),
+      ]),
+    );
+  });
+
+  it('BlockConfig.dataSource should allow string ids or inline configs', () => {
+    const dataSource = defs.BlockConfig.properties?.dataSource;
+    expect(dataSource?.anyOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'string' }),
+        expect.objectContaining({ $ref: '#/definitions/DataSourceConfig' }),
+      ]),
     );
   });
 
