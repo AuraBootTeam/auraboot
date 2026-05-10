@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider, useI18n } from '../I18nContext';
 
@@ -59,6 +60,27 @@ describe('I18nContext missing-key warnings', () => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/i18n/zh-CN');
     });
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not use cached translations during the hydration-sensitive first render', () => {
+    window.localStorage.setItem(
+      'i18n_cache_zh-CN',
+      JSON.stringify({
+        search: {
+          placeholder: 'Cached Search',
+        },
+      }),
+    );
+
+    const html = renderToString(
+      <I18nProvider initialData={{}} initialLocale="zh-CN">
+        <TranslationProbe i18nKey="search.placeholder" />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('i18n-loading');
+    expect(html).toContain('search.placeholder');
+    expect(html).not.toContain('Cached Search');
   });
 
   it('warns after recovery finishes and the key is still missing', async () => {
