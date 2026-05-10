@@ -3,7 +3,7 @@
 # Stage 2: Runtime with JRE 21
 
 # ── Stage 1: Build ──────────────────────────────────────────
-FROM eclipse-temurin:25-jdk AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ COPY vendor* ./vendor/
 RUN ./gradlew bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────
-FROM eclipse-temurin:25-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
