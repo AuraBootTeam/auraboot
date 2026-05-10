@@ -113,7 +113,13 @@ jobs:
             -d '{"email":"admin@example.com","password":"Test2026x"}' \
             | sed -n 's/.*"jwt":"\([^"]*\)".*/\1/p')
           [ -n "$token" ] || { echo "no token"; exit 1; }
-          for ep in /api/auth/me /api/menu /api/permissions; do
+          # Stick to endpoints that any authenticated user can hit without
+          # specific permission grants — the smoke test asserts BFF proxy +
+          # backend auth + dispatch all work, not RBAC semantics. The earlier
+          # /api/menu and /api/permissions choices were wrong: their root
+          # paths have no GET handler (500), and /api/permissions/tree
+          # requires a specific permission code (403 even for admin).
+          for ep in /api/auth/me /api/menu/user; do
             curl -fsS -m 10 -H "Authorization: Bearer $token" \
               "http://localhost:3000$ep" -o /dev/null \
               && echo "$ep → 200" \
