@@ -6,6 +6,15 @@
 #                 NEVER auto-compensate missing data — that masks bootstrap failures.
 #
 # History:
+#   2026-05-10 — §8 seed is capability-aware for the OSS/full-CRM split:
+#                base showcase seed remains fail-fast; commercial CRM seed runs
+#                only when full CRM quote/complaint commands are present unless
+#                SHOWCASE_COMMERCIAL_SEED=required; dashboard-default targets
+#                SHOWCASE_DEFAULT_DASHBOARD_CODE or the best imported CRM
+#                dashboard (crm_dashboard, else crm_overview).
+#   2026-05-10 — §8 seed is now fail-fast: Playwright seed output is written to
+#                per-step logs, failures print the tail and stop the script, and
+#                final invariants verify CRM/showcase/arsenal/default dashboard.
 #   2026-05-09 — §7.5 removed (Phase 3 / bootstrap-unified Op 6+8): plugin
 #                import for both core (org-management, platform-admin) and
 #                demo (core-meta/core-bpm/core-aurabot/page-manager/
@@ -52,6 +61,7 @@
 # Skip seed data: SKIP_SEED=1 ./scripts/oss-reset-and-init.sh
 
 set -e
+set -o pipefail
 
 # Parse arguments
 NO_BOOTSTRAP=0
@@ -61,14 +71,18 @@ for arg in "$@"; do
             NO_BOOTSTRAP=1
             ;;
         -h|--help)
+            HELP_VITE_BASE="http://localhost:${VITE_PORT:-5173}"
             echo "Usage: $0 [--no-bootstrap]"
             echo ""
             echo "  (default)       Reset DB, start services, bootstrap system, import plugins, seed demo data"
             echo "  --no-bootstrap  Reset DB and start services only; system stays uninitialized"
-            echo "                  (visit ${AURA_VITE_BASE}/setup to bootstrap via the web wizard)"
+            echo "                  (visit ${HELP_VITE_BASE}/setup to bootstrap via the web wizard)"
             echo ""
             echo "Env vars:"
             echo "  SKIP_SEED=1     Skip Playwright showcase seed (step 8)"
+            echo "  AURABOOT_DEMO_SEED=false  Disable demo plugin import (use with SKIP_SEED=1)"
+            echo "  SHOWCASE_COMMERCIAL_SEED=auto|required|skip  Control full-CRM commercial seed"
+            echo "  SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_overview|crm_dashboard  Override demo default dashboard"
             echo "  AURA_ENV=test   Also import test-fixtures plugin"
             exit 0
             ;;
@@ -123,7 +137,24 @@ export PG_HOST="${PG_HOST:-localhost}"
 export PG_PORT="${PG_PORT:-5432}"
 export PG_USER="${PG_USER:-${USER:-ghj}}"
 export PG_DB="${PG_DB:-aura_boot}"
+export AURABOOT_DEMO_SEED="${AURABOOT_DEMO_SEED:-true}"
+export SHOWCASE_COMMERCIAL_SEED="${SHOWCASE_COMMERCIAL_SEED:-auto}"
 export AURA_PSQL_BASE="psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}"
+
+BOOTSTRAP_SEED_DEMO_DATA=true
+case "$AURABOOT_DEMO_SEED" in
+    false|FALSE|False|0|no|NO|No)
+        BOOTSTRAP_SEED_DEMO_DATA=false
+        ;;
+esac
+
+case "$SHOWCASE_COMMERCIAL_SEED" in
+    auto|required|skip) ;;
+    *)
+        echo "SHOWCASE_COMMERCIAL_SEED must be one of: auto, required, skip"
+        exit 1
+        ;;
+esac
 
 # shellcheck source=lib/multi-worktree-guard.sh
 source "$SCRIPT_DIR/lib/multi-worktree-guard.sh"
@@ -139,6 +170,12 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}=== AuraBoot Environment Reset & Initialization ===${NC}"
 echo ""
 
+if [ "$NO_BOOTSTRAP" != "1" ] && [ "$BOOTSTRAP_SEED_DEMO_DATA" = "false" ] && [ "${SKIP_SEED:-0}" != "1" ]; then
+    echo -e "${RED}AURABOOT_DEMO_SEED=false disables demo plugin import, so Step 8 showcase seed cannot run.${NC}"
+    echo "Set SKIP_SEED=1 or enable AURABOOT_DEMO_SEED=true."
+    exit 1
+fi
+
 check_http() {
     local name="$1"
     local url="$2"
@@ -151,6 +188,66 @@ check_http() {
     fi
     echo -e "${RED}   ${name} is not ready (HTTP ${code}, expected: ${expected})${NC}"
     return 1
+}
+
+run_seed_step() {
+    local label="$1"
+    local log_file="$2"
+    shift 2
+
+    mkdir -p "$(dirname "$log_file")"
+    echo "   ${label}..."
+
+    if NO_PROXY=localhost "$@" > "$log_file" 2>&1; then
+        tail -3 "$log_file" | sed 's/^/     /' || true
+        echo -e "${GREEN}   ${label} complete${NC}"
+    else
+        local status=$?
+        echo -e "${RED}   ${label} failed (exit ${status}). Last 80 log lines:${NC}"
+        tail -80 "$log_file" || true
+        echo "   Full log: $log_file"
+        exit "$status"
+    fi
+}
+
+psql_scalar() {
+    psql_run -tAc "$1" | tr -d '[:space:]'
+}
+
+command_definition_exists() {
+    local command_code="$1"
+    [ "$(psql_scalar "select exists(select 1 from ab_command_definition where code = '${command_code}')")" = "t" ]
+}
+
+dashboard_definition_exists() {
+    local dashboard_code="$1"
+    [ "$(psql_scalar "select exists(select 1 from ab_dashboard where code = '${dashboard_code}')")" = "t" ]
+}
+
+ensure_dashboard_definition_exists() {
+    local dashboard_code="$1"
+    if ! dashboard_definition_exists "$dashboard_code"; then
+        echo -e "${RED}   Required dashboard '${dashboard_code}' is not imported.${NC}"
+        echo "   Set SHOWCASE_DEFAULT_DASHBOARD_CODE to an imported dashboard code or import the matching plugin resources."
+        exit 1
+    fi
+}
+
+select_default_showcase_dashboard() {
+    if [ -n "${SHOWCASE_DEFAULT_DASHBOARD_CODE:-}" ]; then
+        ensure_dashboard_definition_exists "$SHOWCASE_DEFAULT_DASHBOARD_CODE"
+        return
+    fi
+
+    if dashboard_definition_exists "crm_dashboard"; then
+        export SHOWCASE_DEFAULT_DASHBOARD_CODE="crm_dashboard"
+    elif dashboard_definition_exists "crm_overview"; then
+        export SHOWCASE_DEFAULT_DASHBOARD_CODE="crm_overview"
+    else
+        echo -e "${RED}   No CRM dashboard is imported for demo default selection.${NC}"
+        echo "   Expected crm_dashboard (full CRM) or crm_overview (OSS crm-starter)."
+        exit 1
+    fi
 }
 
 # Step 0: Preflight — required local services must be running.
@@ -214,6 +311,7 @@ if [ "$NO_BOOTSTRAP" = "1" ]; then
     echo "   AURABOOT_BOOTSTRAP_ENABLED=false (--no-bootstrap escape hatch)"
 else
     echo "   AURABOOT_BOOTSTRAP_ENABLED=false (/api/bootstrap/setup is script authority)"
+    echo "   AURABOOT_DEMO_SEED=${AURABOOT_DEMO_SEED} (bootstrap seedDemoData=${BOOTSTRAP_SEED_DEMO_DATA})"
 fi
 
 # Start backend in background as a single long-running process
@@ -265,14 +363,14 @@ else
         echo "   Calling /api/bootstrap/setup..."
         BOOTSTRAP_RESP=$(NO_PROXY=localhost curl -s -w "\n%{http_code}" -X POST ${AURA_BE_BASE}/api/bootstrap/setup \
             -H "Content-Type: application/json" \
-            -d '{
-                "companyName": "AuraBoot Dev",
-                "adminEmail": "admin@example.com",
-                "adminPassword": "Test2026x",
-                "adminDisplayName": "Admin User",
-                "systemMode": "single",
-                "seedDemoData": true
-            }' 2>/dev/null)
+            -d "{
+                \"companyName\": \"AuraBoot Dev\",
+                \"adminEmail\": \"admin@example.com\",
+                \"adminPassword\": \"Test2026x\",
+                \"adminDisplayName\": \"Admin User\",
+                \"systemMode\": \"single\",
+                \"seedDemoData\": ${BOOTSTRAP_SEED_DEMO_DATA}
+            }" 2>/dev/null)
 
         BOOTSTRAP_BODY=$(echo "$BOOTSTRAP_RESP" | sed '$d')
         BOOTSTRAP_HTTP=$(echo "$BOOTSTRAP_RESP" | tail -1)
@@ -508,11 +606,10 @@ GRANT_SQL
     # Step 7.5: (REMOVED 2026-05-09 — Phase 3 of bootstrap-unified)
     #
     # Plugin import for the core+demo profiles is now done in-process by
-    # BuiltinPluginImportService during BootstrapStartupRunner (org-management,
-    # platform-admin, core-meta, core-bpm, core-aurabot, page-manager,
-    # crm-starter, showcase, agent-control-plane, acp-showcase, workflow-demo).
-    # Demo profile is gated by AURABOOT_DEMO_SEED (exported above; defaults
-    # true here, false in production application.yml).
+    # BuiltinPluginImportService. In this script the /api/bootstrap/setup path
+    # invokes BootstrapEngineService step 9; startup-runner imports are disabled
+    # above to keep one bootstrap authority. Demo profile is controlled by the
+    # seedDemoData request field, which is derived from AURABOOT_DEMO_SEED.
     #
     # The internal-only `test-fixtures` plugin is NOT imported via the platform.
     # It is seeded by the Playwright setup project (web-admin/tests/api/setup/
@@ -530,14 +627,18 @@ GRANT_SQL
 
     # Step 7.8: Seed CS Agent definition
     echo -e "${YELLOW}Step 7.8: Seeding CS Agent definition...${NC}"
-    psql_run -f "$SCRIPT_DIR/seed-cs-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
+    CS_AGENT_LOG="/tmp/aura-seed-cs-agent.log"
+    psql_run -f "$SCRIPT_DIR/seed-cs-agent.sql" -P pager=off > "$CS_AGENT_LOG" 2>&1
+    grep -E "NOTICE|ERROR" "$CS_AGENT_LOG" | tail -5 || tail -5 "$CS_AGENT_LOG" || true
     echo -e "${GREEN}   CS Agent seed complete${NC}"
 
     # Step 7.9: Seed AuraBot agent definition (GAP-296)
     # Per-tenant aurabot agent_definition row so AuraBotAgentResolver hot-paths
     # never fall back to the inline LAZY_SEED_AURABOT branch.
     echo -e "${YELLOW}Step 7.9: Seeding AuraBot agent definition...${NC}"
-    psql_run -f "$SCRIPT_DIR/seed-aurabot-agent.sql" -P pager=off 2>&1 | grep -E "NOTICE|ERROR" | tail -5
+    AURABOT_AGENT_LOG="/tmp/aura-seed-aurabot-agent.log"
+    psql_run -f "$SCRIPT_DIR/seed-aurabot-agent.sql" -P pager=off > "$AURABOT_AGENT_LOG" 2>&1
+    grep -E "NOTICE|ERROR" "$AURABOT_AGENT_LOG" | tail -5 || tail -5 "$AURABOT_AGENT_LOG" || true
     echo -e "${GREEN}   AuraBot agent seed complete${NC}"
 
     # Step 8: Seed showcase demo data (optional — skip with SKIP_SEED=1)
@@ -546,34 +647,57 @@ GRANT_SQL
         cd "$WEB_ADMIN_DIR"
 
         SEED_CONFIG="playwright.seed.config.ts"
+        SEED_LOG_DIR="$WEB_ADMIN_DIR/test-results/seed/reset-and-init"
 
-        echo "   Seeding core data (org + CRM accounts/leads/opportunities)..."
-        NO_PROXY=localhost npx playwright test seed-showcase-data --config=$SEED_CONFIG --reporter=line 2>&1 | tail -3
-        echo -e "${GREEN}   Core seed complete${NC}"
+        run_seed_step "Core seed (org + CRM accounts/leads/opportunities)" "$SEED_LOG_DIR/seed-showcase-data.log" \
+            npx playwright test seed-showcase-data --config="$SEED_CONFIG" --reporter=line
 
-        echo "   Seeding extended data (bulk accounts/leads/activities)..."
-        NO_PROXY=localhost npx playwright test seed-showcase-extended --config=$SEED_CONFIG --reporter=line 2>&1 | tail -3
-        echo -e "${GREEN}   Extended seed complete${NC}"
+        run_seed_step "Extended seed (bulk accounts/leads/activities)" "$SEED_LOG_DIR/seed-showcase-extended.log" \
+            npx playwright test seed-showcase-extended --config="$SEED_CONFIG" --reporter=line
 
-        echo "   Seeding workflow data (BPMN/automation/webhook)..."
-        NO_PROXY=localhost npx playwright test seed-showcase-workflow --config=$SEED_CONFIG --reporter=line 2>&1 | tail -3
-        echo -e "${GREEN}   Workflow seed complete${NC}"
+        run_seed_step "Workflow seed (BPMN/automation/webhook)" "$SEED_LOG_DIR/seed-showcase-workflow.log" \
+            npx playwright test seed-showcase-workflow --config="$SEED_CONFIG" --reporter=line
 
-        echo "   Seeding AI data (agents/knowledge base)..."
-        NO_PROXY=localhost npx playwright test seed-showcase-ai --config=$SEED_CONFIG --reporter=line 2>&1 | tail -3
-        echo -e "${GREEN}   AI seed complete${NC}"
+        run_seed_step "AI seed (agents/knowledge base)" "$SEED_LOG_DIR/seed-showcase-ai.log" \
+            npx playwright test seed-showcase-ai --config="$SEED_CONFIG" --reporter=line
 
-        echo "   Seeding arsenal showcase (all-fields + dashboard + report + BPMN + automation)..."
-        NO_PROXY=localhost npx playwright test seed-showcase-arsenal --config=$SEED_CONFIG --reporter=line 2>&1 | tail -3
-        echo -e "${GREEN}   Arsenal seed complete${NC}"
+        run_seed_step "Arsenal seed (all-fields + dashboard + report + BPMN + automation)" "$SEED_LOG_DIR/seed-showcase-arsenal.log" \
+            npx playwright test seed-showcase-arsenal --config="$SEED_CONFIG" --reporter=line
 
-        echo "   Seeding supplementary data (more contacts + leads + activities)..."
-        NO_PROXY=localhost npx playwright test seed-showcase-supplement --config=$SEED_CONFIG --reporter=line 2>&1 | tail -3
-        echo -e "${GREEN}   Supplement seed complete${NC}"
+        run_seed_step "Supplement seed (more contacts + leads + activities)" "$SEED_LOG_DIR/seed-showcase-supplement.log" \
+            npx playwright test seed-showcase-supplement --config="$SEED_CONFIG" --reporter=line
 
-        echo "   Seeding commercial data (quotes/complaints/IM/email/opp-contacts)..."
-        NO_PROXY=localhost npx playwright test seed-showcase-commercial --config=$SEED_CONFIG --reporter=line 2>&1 | tail -3
-        echo -e "${GREEN}   Commercial seed complete${NC}"
+        case "$SHOWCASE_COMMERCIAL_SEED" in
+            skip)
+                echo -e "${YELLOW}   Commercial seed skipped (SHOWCASE_COMMERCIAL_SEED=skip)${NC}"
+                ;;
+            auto)
+                if command_definition_exists "crm:create_quote" && command_definition_exists "crm:create_complaint"; then
+                    run_seed_step "Commercial seed (quotes/complaints/IM/email/opp-contacts)" "$SEED_LOG_DIR/seed-showcase-commercial.log" \
+                        npx playwright test seed-showcase-commercial --config="$SEED_CONFIG" --reporter=line
+                else
+                    echo -e "${YELLOW}   Commercial seed skipped: full CRM quote/complaint commands are not imported.${NC}"
+                    echo "     OSS crm-starter supports base CRM seed; full commercial seed requires the enterprise CRM plugin."
+                fi
+                ;;
+            required)
+                if ! command_definition_exists "crm:create_quote" || ! command_definition_exists "crm:create_complaint"; then
+                    echo -e "${RED}   Commercial seed required but full CRM quote/complaint commands are not imported.${NC}"
+                    echo "   Import the enterprise CRM plugin resources, or set SHOWCASE_COMMERCIAL_SEED=auto/skip."
+                    exit 1
+                fi
+                run_seed_step "Commercial seed (quotes/complaints/IM/email/opp-contacts)" "$SEED_LOG_DIR/seed-showcase-commercial.log" \
+                    npx playwright test seed-showcase-commercial --config="$SEED_CONFIG" --reporter=line
+                ;;
+        esac
+
+        run_seed_step "Seed invariants (CRM + arsenal)" "$SEED_LOG_DIR/seed-showcase-invariants.log" \
+            npx playwright test seed-showcase-invariants --config="$SEED_CONFIG" --reporter=line
+
+        select_default_showcase_dashboard
+        echo "   Demo default dashboard target: ${SHOWCASE_DEFAULT_DASHBOARD_CODE}"
+        run_seed_step "CRM dashboard demo default (${SHOWCASE_DEFAULT_DASHBOARD_CODE})" "$SEED_LOG_DIR/seed-showcase-dashboard-default.log" \
+            npx playwright test seed-showcase-dashboard-default --config="$SEED_CONFIG" --reporter=line
 
         echo -e "${GREEN}   All showcase data seeded successfully${NC}"
     else
