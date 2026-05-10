@@ -79,5 +79,5 @@ If you are new to AuraBoot, follow this path:
 ## Quick Links
 
 - [GitHub Repository](https://github.com/AuraBootTeam/auraboot)
-- [Discord Community](https://discord.gg/auraboot)
+- [Discord Community](https://discord.gg/p2fW5A2MW6)
 - [Report an Issue](https://github.com/AuraBootTeam/auraboot/issues)
