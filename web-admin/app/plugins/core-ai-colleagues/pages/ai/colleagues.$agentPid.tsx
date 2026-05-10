@@ -1796,7 +1796,7 @@ export default function AIColleagueDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
+      <div className="mx-auto w-full max-w-5xl p-6">
         <div className="animate-pulse space-y-6">
           <div className="h-8 w-48 rounded bg-gray-200 dark:bg-gray-700" />
           <div className="h-10 w-full rounded bg-gray-200 dark:bg-gray-700" />
@@ -1809,7 +1809,7 @@ export default function AIColleagueDetailPage() {
   if (!agent) return null;
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
+    <div className="mx-auto w-full max-w-5xl p-6">
       {/* Dialogs */}
       {showEnrollDialog && agentPid && (
         <EnrollEmployeeDialog

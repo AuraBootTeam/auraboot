@@ -23,6 +23,21 @@ const noProxyHttpsAgent = new https.Agent({
   keepAliveMsecs: 30000,
 });
 
+type ResponseHeaderValue = string | number | readonly string[];
+
+function toResponseHeaderValue(value: unknown): ResponseHeaderValue | undefined {
+  if (typeof value === 'string' || typeof value === 'number') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const stringValues = value.filter((item): item is string => typeof item === 'string');
+    return stringValues.length > 0 ? stringValues : undefined;
+  }
+
+  return undefined;
+}
+
 /**
  * BFF代理服务 - 统一处理API请求代理
  */
@@ -31,12 +46,6 @@ export class BffProxyService {
 
   constructor(options: { target: string }) {
     this.backendUrl = options.target;
-  }
-
-  private setHeaderIfForwardable(res: Response, name: string, value: unknown): void {
-    if (typeof value === 'string' || typeof value === 'number' || Array.isArray(value)) {
-      res.setHeader(name, value);
-    }
   }
 
   /**
@@ -240,13 +249,19 @@ export class BffProxyService {
       });
 
       // 转发响应头
-      const contentType = response.headers['content-type'];
-      const contentDisposition = response.headers['content-disposition'];
-      const contentLength = response.headers['content-length'];
+      const contentType = toResponseHeaderValue(response.headers['content-type']);
+      const contentDisposition = toResponseHeaderValue(response.headers['content-disposition']);
+      const contentLength = toResponseHeaderValue(response.headers['content-length']);
 
-      this.setHeaderIfForwardable(res, 'Content-Type', contentType);
-      this.setHeaderIfForwardable(res, 'Content-Disposition', contentDisposition);
-      this.setHeaderIfForwardable(res, 'Content-Length', contentLength);
+      if (contentType !== undefined) {
+        res.setHeader('Content-Type', contentType);
+      }
+      if (contentDisposition !== undefined) {
+        res.setHeader('Content-Disposition', contentDisposition);
+      }
+      if (contentLength !== undefined) {
+        res.setHeader('Content-Length', contentLength);
+      }
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
       // 发送二进制数据

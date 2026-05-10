@@ -420,7 +420,7 @@ export default function AIColleaguesPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
+    <div className="mx-auto w-full max-w-7xl p-6">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>

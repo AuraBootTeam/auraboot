@@ -17,6 +17,7 @@ import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.auraboot.framework.saas.constant.SystemMode;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantBootstrapService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
@@ -28,11 +29,12 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID;
 
 /**
- * Idempotent repair-step service for the 9 bootstrap invariants.
+ * Idempotent repair-step service for the bootstrap invariants.
  *
  * <p>Phase 2.2 of the bootstrap-unified plan
  * ({@code docs/plans/2026-05/bootstrap-unified.md}). Each public {@code repairXxx}
@@ -67,6 +69,7 @@ public class BootstrapRepairService {
     public static final String STEP_ADMIN_MEMBERSHIP    = "admin_membership";
     public static final String STEP_ADMIN_ROLE_GRANT    = "admin_role_grant";
     public static final String STEP_BUSINESS_TENANT     = "business_tenant";
+    public static final String STEP_BUSINESS_TENANT_BOOTSTRAP = "business_tenant_bootstrap";
     public static final String STEP_BUILTIN_PLUGINS     = "builtin_plugins";
     public static final String STEP_JWT_SECRET          = "jwt_secret";
 
@@ -79,6 +82,7 @@ public class BootstrapRepairService {
             STEP_ADMIN_MEMBERSHIP,
             STEP_ADMIN_ROLE_GRANT,
             STEP_BUSINESS_TENANT,
+            STEP_BUSINESS_TENANT_BOOTSTRAP,
             STEP_BUILTIN_PLUGINS,
             STEP_JWT_SECRET);
 
@@ -92,6 +96,7 @@ public class BootstrapRepairService {
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
     private final MenuMapper menuMapper;
+    private final TenantBootstrapService tenantBootstrapService;
 
     // ────────────────────────────────────────────────────────────────────
     // Public step API — one method per invariant
@@ -350,6 +355,54 @@ public class BootstrapRepairService {
         }
     }
 
+    /**
+     * Invariant 8: Business Tenant default template bootstrap has run before any
+     * plugin/model import can auto-generate permissions.
+     *
+     * <p>This creates the default tenant roles and system/template permission
+     * bindings through {@link TenantBootstrapService}. Keeping this before
+     * {@link #repairBuiltinPlugins} preserves the normal auto-permission path:
+     * model permissions are bound when they are created, not repaired afterward.
+     */
+    public RepairStepResult repairBusinessTenantBootstrap(RepairOptions opts) {
+        try {
+            User admin = userService.findByEmail(opts.adminEmail());
+            Tenant businessTenant = tenantService.findByName(opts.companyName());
+            if (admin == null || businessTenant == null) {
+                return RepairStepResult.error(STEP_BUSINESS_TENANT_BOOTSTRAP,
+                        "admin user or Business Tenant missing — earlier steps must run first");
+            }
+
+            List<Role> roles = roleService.findByTenantId(businessTenant.getId());
+            Set<String> roleCodes = roles.stream()
+                    .map(Role::getCode)
+                    .collect(java.util.stream.Collectors.toSet());
+            Set<String> requiredRoleCodes = Set.of("tenant_admin", "operator", "viewer");
+
+            if (roleCodes.containsAll(requiredRoleCodes)) {
+                return RepairStepResult.present(STEP_BUSINESS_TENANT_BOOTSTRAP,
+                        "Business Tenant template roles already exist");
+            }
+            if (!roleCodes.isEmpty()) {
+                return RepairStepResult.error(STEP_BUSINESS_TENANT_BOOTSTRAP,
+                        "Business Tenant has partial template roles; refusing to run bootstrap over mixed state");
+            }
+
+            TenantBootstrapService.BootstrapResult result =
+                    tenantBootstrapService.bootstrapTenant(businessTenant.getId(), admin.getId());
+            if (!result.isSuccess()) {
+                return RepairStepResult.error(STEP_BUSINESS_TENANT_BOOTSTRAP, result.getMessage());
+            }
+            return RepairStepResult.repaired(STEP_BUSINESS_TENANT_BOOTSTRAP,
+                    "Business Tenant template bootstrap complete — roles=" + result.getRolesCreated()
+                            + ", menus=" + result.getMenusCreated()
+                            + ", permissions=" + result.getPermissionsAssigned());
+        } catch (Exception e) {
+            log.error("repairBusinessTenantBootstrap failed", e);
+            return RepairStepResult.error(STEP_BUSINESS_TENANT_BOOTSTRAP, e.getMessage());
+        }
+    }
+
     /** Invariant 8: built-in plugins imported for the Business Tenant (idempotent — see {@link BuiltinPluginImportService}). */
     public RepairStepResult repairBuiltinPlugins(RepairOptions opts) {
         try {
@@ -376,7 +429,7 @@ public class BootstrapRepairService {
     }
 
     /**
-     * Invariant 9: JWT secret consistency. Today the secret is sourced from
+     * Invariant 10: JWT secret consistency. Today the secret is sourced from
      * {@code application.yml#security.jwt.secret} (env override
      * {@code JWT_SECRET}); there is no {@code system_config.jwt_secret} row in OSS.
      * This step is a structural placeholder that records the current source — Phase 2.4
@@ -392,7 +445,7 @@ public class BootstrapRepairService {
     // ────────────────────────────────────────────────────────────────────
 
     /**
-     * Run all 9 repair steps in their canonical order. Returns a {@link RepairReport}
+     * Run all repair steps in their canonical order. Returns a {@link RepairReport}
      * with one {@link RepairStepResult} per step. Stops at the first error step (subsequent
      * steps may depend on the failed one).
      */
@@ -407,6 +460,8 @@ public class BootstrapRepairService {
         results.add(repairBusinessTenant(opts));
         if (lastIsError(results)) return RepairReport.from(results);
         results.add(repairAdminMembership(opts));
+        if (lastIsError(results)) return RepairReport.from(results);
+        results.add(repairBusinessTenantBootstrap(opts));
         if (lastIsError(results)) return RepairReport.from(results);
         // Order: platform_admin role + grant must come AFTER admin user + membership exist.
         results.add(repairPlatformAdminRole(opts));
@@ -432,6 +487,7 @@ public class BootstrapRepairService {
             case STEP_ADMIN_MEMBERSHIP    -> repairAdminMembership(opts);
             case STEP_ADMIN_ROLE_GRANT    -> repairAdminRoleGrant(opts);
             case STEP_BUSINESS_TENANT     -> repairBusinessTenant(opts);
+            case STEP_BUSINESS_TENANT_BOOTSTRAP -> repairBusinessTenantBootstrap(opts);
             case STEP_BUILTIN_PLUGINS     -> repairBuiltinPlugins(opts);
             case STEP_JWT_SECRET          -> repairJwtSecret(opts);
             default -> RepairStepResult.error(stepName, "unknown step: " + stepName);
