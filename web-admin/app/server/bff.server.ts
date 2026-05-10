@@ -5,6 +5,7 @@ import axios from 'axios';
 import * as http from 'http';
 import * as https from 'https';
 import dns from 'node:dns';
+import { createRequestHandler } from '@react-router/express';
 import { BffProxyService } from '~/server/services/BffProxyService';
 import { bffFlowDesignerService } from '~/server/services/BffFlowDesignerService';
 
@@ -225,15 +226,30 @@ app.use(express.static('build/client', {
   },
 }));
 
-// SPA fallback — serve index.html for all non-API routes
-app.get('*', (req, res) => {
-  if (process.env.NODE_ENV === 'development') {
+// Non-API route handler.
+// - Dev: BFF returns 404; Vite/react-router dev middleware (in pnpm dev:full)
+//   serves the page. Same behavior as before.
+// - Prod: react-router config has `ssr: true` + the build produces
+//   `build/server/index.js` (no static `build/client/index.html`). Hand the
+//   request to react-router's express adapter so SSR actually happens.
+//   The previous `sendFile('index.html')` was SPA-mode placeholder code that
+//   never matched the SSR build output → silent 500 since 2026-03-26.
+if (process.env.NODE_ENV === 'development') {
+  app.get('*', (_req, res) => {
     res.status(404).json({ error: 'Route not found in BFF' });
-  } else {
-    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.sendFile('index.html', { root: 'build/client' });
-  }
-});
+  });
+} else {
+  app.all(
+    '*',
+    createRequestHandler({
+      // @ts-expect-error - build output exists at runtime in the docker image
+      // (web-admin/Dockerfile stage 1 runs `pnpm exec react-router build`),
+      // but the TS path doesn't exist in the source tree.
+      build: () => import('../../build/server/index.js'),
+      mode: 'production',
+    })
+  );
+}
 
 // Error logging middleware
 app.use(errorLogger);
