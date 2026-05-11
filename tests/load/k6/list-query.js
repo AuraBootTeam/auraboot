@@ -9,13 +9,21 @@ export const options = {
   },
 };
 
-const PAGE_KEY = __ENV.LIST_PAGE_KEY || 'ab_announcement';
+const PAGE_KEY = __ENV.LIST_PAGE_KEY || '';
+const DEFAULT_LIST_PATH = '/api/meta/models?pageNum=1&pageSize=20';
+const LIST_PATH = __ENV.LIST_PATH || DEFAULT_LIST_PATH;
 
-export default function () {
-  const token = login();
+export function setup() {
+  return { token: login() };
+}
+
+export default function (data) {
+  const path = PAGE_KEY
+    ? `/api/dynamic/${PAGE_KEY}/list?pageNum=1&pageSize=20`
+    : LIST_PATH;
   const response = http.get(
-    `${BASE_URL}/api/dynamic/${PAGE_KEY}/list?pageNum=1&pageSize=20`,
-    { headers: jsonHeaders(token) },
+    `${BASE_URL}${path}`,
+    { headers: jsonHeaders(data.token) },
   );
 
   assertApiSuccess(response, 'dynamic list query');
