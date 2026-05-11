@@ -1635,6 +1635,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             updateReq.setTitle(dto.getTitle());
             updateReq.setDescription(dto.getDescription());
             updateReq.setScope(dto.getEffectiveScope());
+            updateReq.setIsDefault(Boolean.TRUE.equals(dto.getIsDefault()));
             updateReq.setLayoutConfig(layoutConfigNode);
             updateReq.setWidgets(widgetsNode);
             dashboardService.update(existing.getPid(), updateReq);
@@ -1648,6 +1649,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             createReq.setTitle(dto.getTitle());
             createReq.setDescription(dto.getDescription());
             createReq.setScope(dto.getEffectiveScope());
+            createReq.setIsDefault(Boolean.TRUE.equals(dto.getIsDefault()));
             createReq.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
             createReq.setLayoutConfig(layoutConfigNode);
             createReq.setWidgets(widgetsNode);

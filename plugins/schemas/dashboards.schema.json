@@ -37,6 +37,11 @@
       "default": "published",
       "description": "Lifecycle status. Plugin dashboards default to 'published'."
     },
+    "isDefault": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, mark this dashboard as the default dashboard after plugin import."
+    },
     "sortOrder": {
       "type": "integer",
       "minimum": 0,

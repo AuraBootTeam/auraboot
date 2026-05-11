@@ -29,6 +29,7 @@ import java.util.Map;
  *   "description": "Key CRM metrics",
  *   "scope": "global",
  *   "status": "published",
+ *   "isDefault": true,
  *   "layoutConfig": { "columns": 12, "rowHeight": 100, "gap": 16, "compactType": "vertical" },
  *   "widgets": [
  *     {
@@ -77,6 +78,12 @@ public class DashboardDefinitionDTO {
      */
     @Builder.Default
     private String status = "published";
+
+    /**
+     * Whether this dashboard should become the default dashboard after import.
+     */
+    @Builder.Default
+    private Boolean isDefault = false;
 
     /**
      * Layout configuration object.
