@@ -87,6 +87,7 @@ services:
       SPRING_PROFILES_ACTIVE: community
       AURABOOT_BOOTSTRAP_ENABLED: "true"
       AURA_BUILTIN_PLUGINS_DIR: /app/plugins
+      AURA_PLUGINS_DIR: /app/pf4j-plugins
       MANAGEMENT_TRACING_ENABLED: "false"
     volumes:
       - backend_data:/app/data
