@@ -87,7 +87,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
                 WHERE tm.tenant_id = ?
                   AND tm.status = 'active'
                   AND tm.deleted_flag = FALSE
-                ORDER BY CASE WHEN u.email = 'admin@example.com' THEN 0 ELSE 1 END,
+                ORDER BY CASE WHEN u.email = 'admin@auraboot.com' THEN 0 ELSE 1 END,
                          tm.created_at ASC
                 LIMIT 1
                 """,

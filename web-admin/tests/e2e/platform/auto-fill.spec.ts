@@ -26,7 +26,7 @@ async function getAuthCookies(
 ): Promise<string> {
   const loginRes = await request.post(`${BASE_URL}/api/auth/login`, {
     data: {
-      email: 'admin@example.com',
+      email: 'admin@auraboot.com',
       password: 'Test2026x',
     },
   });

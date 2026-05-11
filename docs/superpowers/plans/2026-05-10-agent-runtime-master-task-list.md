@@ -71,6 +71,7 @@ AuraBot 在本地 host 环境执行“统计客户信息”时暴露出核心链
 | C7 | P3 | DONE | Memory / Learning Loop / SkillDraft / Shadow Promotion 验证 | backend target `BUILD SUCCESSFUL`；shadow viewer unit `5 passed`；shadow/learning/memory real E2E `9 passed` |
 | C8 | P2 | DONE | Replay 与 AI Trace 调查链路互跳 | run detail 返回 tenant-scoped `traceId`；Replay drawer 可打开 Trace；Trace detail 可回到相关 Run；backend/frontend/E2E 已验证 |
 | C9 | P2 | DONE | Conversation turn 全量回放 + result-contract 深链 | run detail 聚合 `ab_agent_run -> ab_agent_task.input_data -> ab_im_message`，action row 可打开对应 `ResultContractView`；backend/frontend/E2E 已验证 |
+| C10 | P1 | DONE | main-sync fresh isolated bootstrap/admin gate 修复 | `BootstrapStartupRunner` 发布 wizard 等价 status contract；PG env alias、setup wait、默认 admin 账号契约已修复；`admin-agent-runs.spec.ts` fresh isolated target `23 passed / 1 skipped` |
 
 ### C 系列执行记录
 
@@ -81,6 +82,7 @@ AuraBot 在本地 host 环境执行“统计客户信息”时暴露出核心链
 - C7 复查结论：Memory/Learning/SkillDraft/Shadow Promotion 已有产品实现与文档。补修 `_real-backend-helpers.ts`，公共 real-backend E2E helper 不再依赖 shell `psql`，并兼容 Node `pg` boolean 输出。
 - C8 修复点：`AgentRunController.detail` 通过 run metadata `traceId` 或 `ab_ai_trace.session_id = runId` 解析 trace，所有查询均限定当前 tenant；`AiTraceController.getTrace` 改为 tenant-scoped detail + spans，跨租户 trace 返回 404；前端 Replay drawer 增加 `Open Trace`，Trace detail 只在 metadata/session 表明来自 agent run 时展示 `Open Run`。
 - C9 修复点：`AgentRunController.detail` 增加 `conversationTurn` 与 `resultContracts` 只读 projection；只有存在 `turnId`、`conversationId` 或 `inboundMessageId` 时才返回 turn 对象，避免普通 run 出现空回放对象；前端 Replay drawer 增加 Conversation / Results tab 与 action-to-contract 深链。
+- C10 修复点：main-sync fresh isolated E2E 暴露出 bootstrap runner 修完不变量后没有写 `system.initialized` / `system.setup_at`，setup spec 因 status false 进入 wizard fallback；同时 Playwright DB helper 不识别 libpq `PGHOST` / `PGPORT` / `PGUSER` / `PGDATABASE`，默认 admin 账号仍有旧 `example.com` 账号残留。详见 `docs/superpowers/plans/2026-05-11-agent-runtime-main-sync-closeout.md`。
 - C4 验证命令：
   - `./gradlew :test --tests com.auraboot.framework.plugin.service.impl.PluginResourceImporterImplApplyTest2 -x jacocoTestReport` -> `BUILD SUCCESSFUL`
   - `pnpm --dir web-admin exec tsc --noEmit --pretty false` -> exit 0

@@ -4,7 +4,7 @@
  */
 export const TEST_ACCOUNTS = {
   admin: {
-    email: 'admin@example.com',
+    email: 'admin@auraboot.com',
     password: 'Test2026x',
     name: 'Admin',
   },

@@ -80,7 +80,7 @@ test.describe('D6 — SLA panel: userTask SLA config (single-level + multi-level
     // -------------------------------------------------------------------------
     // Admin session preloaded via storageState (tests/storage/admin.json).
 
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     // -------------------------------------------------------------------------
     // Build the process: start → task_approve (userTask) → end
