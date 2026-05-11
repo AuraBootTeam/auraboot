@@ -45,8 +45,28 @@ jobs:
           # don't have on GitHub. --force-with-lease requires a known remote
           # ref to compare against, which fails on a fresh empty Gitee repo.
           # For a unidirectional mirror, --force is the correct semantic.
-          git push --force gitee refs/remotes/origin/main:refs/heads/main
-          git push --force gitee --tags
+          retry_git_push() {
+            local description="$1"
+            shift
+
+            local attempt=1
+            local delay=20
+            until "$@"; do
+              local exit_code=$?
+              if [ "$attempt" -ge 3 ]; then
+                echo "ERROR: ${description} failed after ${attempt} attempts (exit ${exit_code})"
+                return "$exit_code"
+              fi
+
+              echo "WARN: ${description} failed on attempt ${attempt} (exit ${exit_code}); retrying in ${delay}s"
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          retry_git_push "push main to Gitee" git push --force gitee refs/remotes/origin/main:refs/heads/main
+          retry_git_push "push tags to Gitee" git push --force gitee --tags
 
       - name: Status
         if: success()

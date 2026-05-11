@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.2-blue.svg" alt="License"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-AuraBoot_v1.3-blue.svg" alt="License"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/actions/workflows/backend.yml"><img src="https://github.com/AuraBootTeam/auraboot/actions/workflows/backend.yml/badge.svg?branch=main" alt="Backend CI"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/actions/workflows/frontend.yml"><img src="https://github.com/AuraBootTeam/auraboot/actions/workflows/frontend.yml/badge.svg?branch=main" alt="Frontend CI"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
@@ -298,11 +298,11 @@ To report a security vulnerability, please email [security@auraboot.com](mailto:
 
 ## License
 
-AuraBoot is released under the [AuraBoot License v1.1](LICENSE.txt), a source-available license based on Apache 2.0 with supplementary terms.:
+AuraBoot is released under the [AuraBoot License v1.3](LICENSE.txt), a source-available license based on Apache 2.0 with supplementary terms.
 
 - **Free for internal use** — Use, modify, and deploy for your own business applications. No obligation to open-source your modifications.
 - **Free for ISV / project delivery** — Build and deliver business applications (ERP, CRM, vertical SaaS) to customers, with your changes kept private.
-- **Attribution required** — Retain copyright notices and "Powered by AuraBoot" branding (the upper-left main logo may be replaced).
+- **Attribution required** — Retain copyright notices, license notices, and AuraBoot brand information.
 - **Platform restriction** — You may not offer AuraBoot itself as a hosted low-code / no-code / AI platform service without a commercial license.
 
 📖 **See the [License FAQ (中文)](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md)** for common questions about commercial use, modification, redistribution, and SaaS boundaries.
