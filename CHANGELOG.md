@@ -26,6 +26,47 @@ each before upgrading.
 
 ---
 
+## [0.1.0-beta.2] - 2026-05-11
+
+Follow-up beta focused on public release health, reproducible quickstart
+startup, GHCR pullability, and baseline smoke evidence.
+
+### Highlights
+- Docker quickstart now starts without PF4J ERROR noise while still importing
+  the built-in declarative plugin packages.
+- GHCR package visibility and anonymous manifest access were verified for
+  public beta image tags.
+- Public k6 smoke baselines were added for auth, list query, and command
+  dry-run paths.
+
+### Added
+- Public k6 smoke scripts and baseline comparison artifacts for auth, list
+  query, and command execution health checks (#164).
+
+### Changed
+- Login rate-limit defaults were raised for public smoke and benchmark runs so
+  local validation is not distorted by synthetic load (#164).
+- Docker quickstart points PF4J runtime plugin scanning at `/app/pf4j-plugins`
+  while keeping declarative built-in plugin packages mounted at `/app/plugins`
+  for bootstrap import (#166).
+
+### Fixed
+- Sanitized performance baseline summaries so generated artifacts do not retain
+  setup tokens (#164).
+- Removed Docker quickstart startup ERROR lines caused by PF4J attempting to
+  load declarative DSL plugin directories as backend JAR plugins (#166).
+
+### Security
+- Gitleaks, OSS boundary checks, CodeQL, and required build/quality gates are
+  green for the release commits.
+
+### Known issues
+- k6 smoke thresholds pass with 0% error rate, but the warm local baseline
+  comparison still reports a warning for list-query p50 variance. List-query
+  p95 remains within baseline.
+
+---
+
 ## [0.1.0-beta.1] - 2026-05-11
 
 First public beta of AuraBoot, a source-available AI-native business platform
