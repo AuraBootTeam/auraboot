@@ -76,6 +76,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -669,7 +670,7 @@ class PluginResourceImporterImplApplyTest2 {
     @DisplayName("importDashboard CREATE branch: no existing -> dashboardService.create + publish")
     void importDashboard_create_happyPath() {
         DashboardDefinitionDTO dto = DashboardDefinitionDTO.builder()
-                .code("d1").title("Dash").widgets(List.of("w1")).build();
+                .code("d1").title("Dash").widgets(List.of("w1")).isDefault(true).build();
         ObjectMapper realMapper = new ObjectMapper();
         when(objectMapper.valueToTree(any())).thenReturn(realMapper.valueToTree(List.of("w1")));
         when(objectMapper.createObjectNode()).thenReturn(realMapper.createObjectNode());
@@ -684,7 +685,7 @@ class PluginResourceImporterImplApplyTest2 {
 
         assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
         assertThat(result.getResourcePid()).isEqualTo("dash-pid-new");
-        verify(dashboardService).create(any(DashboardCreateRequest.class));
+        verify(dashboardService).create(argThat(request -> Boolean.TRUE.equals(request.getIsDefault())));
         // status default = "published" -> publish should be called
         verify(dashboardService).publish("dash-pid-new");
     }
@@ -710,7 +711,7 @@ class PluginResourceImporterImplApplyTest2 {
     @DisplayName("importDashboard UPDATE branch: existing -> dashboardService.update")
     void importDashboard_update_happyPath() {
         DashboardDefinitionDTO dto = DashboardDefinitionDTO.builder()
-                .code("d1").title("Dash Upd").widgets(List.of("w1")).build();
+                .code("d1").title("Dash Upd").widgets(List.of("w1")).isDefault(true).build();
         ObjectMapper realMapper = new ObjectMapper();
         when(objectMapper.valueToTree(any())).thenReturn(realMapper.valueToTree(List.of("w1")));
         when(objectMapper.createObjectNode()).thenReturn(realMapper.createObjectNode());
@@ -724,7 +725,8 @@ class PluginResourceImporterImplApplyTest2 {
 
         assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
         assertThat(result.getResourcePid()).isEqualTo("dash-pid-exist");
-        verify(dashboardService).update(eq("dash-pid-exist"), any(DashboardUpdateRequest.class));
+        verify(dashboardService).update(eq("dash-pid-exist"),
+                argThat(request -> Boolean.TRUE.equals(request.getIsDefault())));
         verify(dashboardService, never()).create(any());
     }
 

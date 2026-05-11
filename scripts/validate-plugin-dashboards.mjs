@@ -95,6 +95,10 @@ function validateDashboard(obj, filePath) {
     errors.push(`status must be one of draft|published (got ${JSON.stringify(obj.status)})`);
   }
 
+  if (obj.isDefault !== undefined && typeof obj.isDefault !== 'boolean') {
+    errors.push(`isDefault must be a boolean (got ${JSON.stringify(obj.isDefault)})`);
+  }
+
   return errors;
 }
 
