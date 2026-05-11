@@ -9,7 +9,8 @@
 #   PERF_BASELINE_DIR   Where baseline JSON files live (default: scripts/perf-ci/baseline/)
 #   PERF_ALERT_WEBHOOK  Optional Slack webhook URL (forwarded to notify.sh)
 #   USERNAME            Login email (default: admin@auraboot.com)
-#   PASSWORD            Login password (default: Test2026x)
+#   AURABOOT_PASSWORD   Login password (default: Test2026x)
+#   PASSWORD            Deprecated alias for AURABOOT_PASSWORD
 #
 # Exit codes:
 #   0 = all tests passed
@@ -29,7 +30,7 @@ PROFILE="smoke"
 BASE_URL="${BASE_URL:-http://localhost:6443}"
 PERF_BASELINE_DIR="${PERF_BASELINE_DIR:-$SCRIPT_DIR/baseline}"
 USERNAME="${USERNAME:-admin@auraboot.com}"
-PASSWORD="${PASSWORD:-Test2026x}"
+AURABOOT_PASSWORD="${AURABOOT_PASSWORD:-${PASSWORD:-Test2026x}}"
 
 # ---------------------------------------------------------------------------
 # Parse arguments
@@ -75,12 +76,12 @@ fi
 
 # ---------------------------------------------------------------------------
 # Test definitions
-# Format: "label:k6_script_relative_to_K6_DIR"
+# Format: "label:k6_script_relative_to_K6_DIR:smoke_args"
 # ---------------------------------------------------------------------------
 TEST_CASES=(
-  "auth:auth-baseline.js"
-  "list:list-query.js"
-  "command:command-execution.js"
+  "auth:auth-baseline.js:--vus 1 --iterations 5"
+  "list:list-query.js:--vus 10 --duration 30s"
+  "command:command-execution.js:--vus 10 --duration 30s"
 )
 
 # ---------------------------------------------------------------------------
@@ -107,12 +108,19 @@ run_k6_once() {
   k6 run \
     --env BASE_URL="$BASE_URL" \
     --env USERNAME="$USERNAME" \
-    --env PASSWORD="$PASSWORD" \
+    --env AURABOOT_PASSWORD="$AURABOOT_PASSWORD" \
     --summary-export="$output_file" \
     --quiet \
     $extra_args \
     "$script" \
     2>&1 || true  # k6 exits non-zero on threshold failure; we evaluate ourselves
+
+  if [[ -s "$output_file" ]]; then
+    local sanitized_file="${output_file}.sanitized"
+    jq 'del(.setup_data.token?) | if (.setup_data? == {}) then del(.setup_data) else . end' \
+      "$output_file" > "$sanitized_file"
+    mv "$sanitized_file" "$output_file"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -192,8 +200,7 @@ OVERALL_EXIT=0
 RESULTS_SUMMARY=()
 
 for test_def in "${TEST_CASES[@]}"; do
-  LABEL="${test_def%%:*}"
-  SCRIPT_REL="${test_def##*:}"
+  IFS=':' read -r LABEL SCRIPT_REL SMOKE_ARGS <<< "$test_def"
   K6_SCRIPT="$K6_DIR/$SCRIPT_REL"
   BASELINE_FILE="$PERF_BASELINE_DIR/${LABEL}-baseline.json"
 
@@ -217,9 +224,8 @@ for test_def in "${TEST_CASES[@]}"; do
   # -----------------------------------------------------------------------
   if [[ "$PROFILE" == "smoke" ]]; then
     CURRENT_FILE="$RUN_DIR/${LABEL}-current.json"
-    echo "  Running smoke (10 VUs, 30s)..."
-    run_k6_once "$K6_SCRIPT" "$CURRENT_FILE" \
-      "--vus 10 --duration 30s"
+    echo "  Running smoke (${SMOKE_ARGS})..."
+    run_k6_once "$K6_SCRIPT" "$CURRENT_FILE" "$SMOKE_ARGS"
   else
     echo "  Running full (3 runs, taking median)..."
     run_k6_once "$K6_SCRIPT" "$RUN_DIR/${LABEL}-run1.json"

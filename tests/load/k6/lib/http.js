@@ -3,7 +3,7 @@ import { check, fail } from 'k6';
 
 export const BASE_URL = __ENV.BASE_URL || 'http://localhost:6443';
 export const USERNAME = __ENV.USERNAME || 'admin@auraboot.com';
-export const PASSWORD = __ENV.PASSWORD || 'Test2026x';
+export const PASSWORD = __ENV.AURABOOT_PASSWORD || __ENV.PASSWORD || 'Test2026x';
 
 export function login() {
   const response = http.post(
