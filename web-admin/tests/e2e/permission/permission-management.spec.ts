@@ -10,8 +10,8 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { BASE_URL } from '../../helpers/environments';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
 
 function uniqueCode(prefix = 'e2e_role') {
   return `${prefix}_${Date.now()}`;

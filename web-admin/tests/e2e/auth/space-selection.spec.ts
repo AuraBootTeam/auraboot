@@ -18,6 +18,7 @@
 
 import { test, expect } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { BACKEND_URL } from '../../helpers/environments';
 
 const ADMIN = DEFAULT_TEST_ACCOUNT;
 
@@ -72,7 +73,7 @@ test.describe('Space Selection API', () => {
     expect(businessSpace).toBeTruthy();
 
     // Select the business space — call backend directly to avoid BFF precision issues
-    const backendUrl = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
+    const backendUrl = BACKEND_URL;
     const selectRes = await page.request.fetch(`${backendUrl}/api/tenant-selection/process`, {
       method: 'POST',
       headers: {
@@ -109,7 +110,7 @@ test.describe('Space Selection API', () => {
     expect(platformSpace).toBeTruthy();
 
     // Select the platform space — call backend directly to avoid BFF precision issues
-    const backendUrl = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
+    const backendUrl = BACKEND_URL;
     const selectRes = await page.request.fetch(`${backendUrl}/api/tenant-selection/process`, {
       method: 'POST',
       headers: {

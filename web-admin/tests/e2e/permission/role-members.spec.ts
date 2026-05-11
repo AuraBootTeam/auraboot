@@ -116,7 +116,7 @@ test.describe('Permission Management — Role Members Tab', () => {
     // Resolve baseURL the same way the runner does — PLAYWRIGHT_BASE_URL is
     // the canonical signal under docker isolated stacks (e.g. :5174 on r2).
     const baseURL =
-      process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173';
+      BASE_URL;
 
     // Create test role via API
     const resp = await page.request.post(`${baseURL}/api/roles`, {

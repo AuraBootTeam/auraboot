@@ -57,7 +57,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173'),
+      baseURL: (BASE_URL),
     });
     const page = await ctx.newPage();
     await page.request.put('/api/admin/login-channels', {
@@ -75,7 +75,7 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
       storageState: 'tests/storage/admin.json',
-      baseURL: (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173'),
+      baseURL: (BASE_URL),
     });
     const page = await ctx.newPage();
     await page.request.put('/api/admin/login-channels', {
