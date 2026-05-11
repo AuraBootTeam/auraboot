@@ -17,32 +17,8 @@ name: Docker Quickstart
 on:
   push:
     branches: [main]
-    paths:
-      - 'docker-compose.yml'
-      - 'docker-compose.*.yml'
-      - 'platform/Dockerfile'
-      - 'web-admin/Dockerfile'
-      - 'web-admin/app/server/**'
-      - 'web-admin/package.json'
-      - 'pnpm-lock.yaml'
-      - 'platform/build.gradle'
-      - 'platform/gradle/wrapper/**'
-      - 'scripts/dev/verify-quickstart.sh'
-      - '.github/workflows/quickstart.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'docker-compose.yml'
-      - 'docker-compose.*.yml'
-      - 'platform/Dockerfile'
-      - 'web-admin/Dockerfile'
-      - 'web-admin/app/server/**'
-      - 'web-admin/package.json'
-      - 'pnpm-lock.yaml'
-      - 'platform/build.gradle'
-      - 'platform/gradle/wrapper/**'
-      - 'scripts/dev/verify-quickstart.sh'
-      - '.github/workflows/quickstart.yml'
   workflow_dispatch:
 
 jobs:
@@ -52,14 +28,48 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect Docker quickstart changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            if [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base="$(git rev-list --max-parents=0 "$head" | tail -1)"
+            fi
+          fi
+
+          if git diff --name-only "$base" "$head" \
+            | grep -E '^(docker-compose(\..*)?\.yml|platform/Dockerfile|web-admin/Dockerfile|web-admin/app/server/|web-admin/package\.json|pnpm-lock\.yaml|platform/build\.gradle|platform/gradle/wrapper/|scripts/dev/verify-quickstart\.sh|\.github/workflows/quickstart\.yml)' >/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No Docker quickstart changes; required check reports success without starting compose."
+          fi
 
       - name: Set up Docker Buildx
+        if: steps.changes.outputs.run == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Build & start full stack
+        if: steps.changes.outputs.run == 'true'
         run: docker compose --profile full up --build -d
 
       - name: Wait for backend healthy
+        if: steps.changes.outputs.run == 'true'
         # Backend port 6443 is intentionally not exposed to host; we hit it
         # through the docker network via `docker compose exec`.
         run: |
@@ -75,6 +85,7 @@ jobs:
           exit 1
 
       - name: Frontend reachable on host port 3000
+        if: steps.changes.outputs.run == 'true'
         # The README sends users to localhost:3000; assert it serves something
         # other than the SPA-fallback 500 we've been silently shipping.
         run: |
@@ -105,6 +116,7 @@ jobs:
           exit 1
 
       - name: Login API contract via BFF proxy
+        if: steps.changes.outputs.run == 'true'
         # End-to-end smoke: BFF /api/* proxy + backend /api/auth/login + the
         # bootstrap-seeded admin credentials all aligned.
         run: |
@@ -121,6 +133,7 @@ jobs:
           }
 
       - name: Authenticated API smoke (real endpoints)
+        if: steps.changes.outputs.run == 'true'
         run: |
           token=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
             -H "Content-Type: application/json" \
@@ -141,5 +154,5 @@ jobs:
           done
 
       - name: Tear down
-        if: always()
+        if: always() && steps.changes.outputs.run == 'true'
         run: docker compose --profile full down -v
