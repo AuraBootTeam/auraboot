@@ -440,7 +440,7 @@ test.describe('Login — Email OTP', () => {
 
   test.beforeAll(async () => {
     const adminRequest = await playwrightRequest.newContext({
-      baseURL: (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:5173'),
+      baseURL: (BASE_URL),
       storageState: 'tests/storage/admin.json',
     });
     try {

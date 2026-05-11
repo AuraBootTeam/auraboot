@@ -19,8 +19,8 @@ import { test, expect } from '../../fixtures';
 import { test as baseTest } from '@playwright/test';
 import { navigateToDynamicPage, waitForDynamicPageLoad, extractRecordId } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
+import { BASE_URL } from '../../helpers/environments';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
 
 test.describe('Permission Depth — Menu Visibility', () => {
   /**

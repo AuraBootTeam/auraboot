@@ -26,7 +26,7 @@ const PG_CONN = {
   port: Number(process.env.PGPORT ?? 5432),
   database: process.env.PGDATABASE ?? 'aura_boot',
   user: process.env.PGUSER ?? 'auraboot',
-  password: process.env.PGPASSWORD ?? 'auraboot_dev',
+  password: process.env['PGPASSWORD'] ?? 'auraboot_dev',
 };
 
 async function seedE2etRecord(): Promise<void> {

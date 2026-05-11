@@ -31,7 +31,7 @@ function resolveAdminTenantId(): string {
     // the host-DB tenant id, which then propagated into every menu /
     // seeded row insert and tripped FK violations on docker DB.
     const backendUrl =
-      process.env.BACKEND_URL || `http://localhost:${process.env.BE_PORT ?? '6443'}`;
+      BACKEND_URL;
     const out = execSync(
       `curl -s -X POST ${backendUrl}/api/auth/login -H 'Content-Type: application/json' ` +
         `-d '{"email":"admin@example.com","password":"Test2026x"}'`,
@@ -95,8 +95,8 @@ const PG_FLAGS = `-h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB} -P pager
 // PGPASSWORD is the standard libpq env — pass it through if set so docker
 // stacks with non-trust auth can connect. Don't override if the operator
 // has already set it.
-const PG_ENV = process.env.PGPASSWORD
-  ? { ...process.env, PGPASSWORD: process.env.PGPASSWORD }
+const PG_ENV = process.env['PGPASSWORD']
+  ? { ...process.env, PGPASSWORD: process.env['PGPASSWORD'] }
   : process.env;
 
 export const AI_CENTER_MENU_ID = resolveAiCenterMenuId();
