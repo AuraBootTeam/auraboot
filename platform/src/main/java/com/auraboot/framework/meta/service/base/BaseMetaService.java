@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
  * @since 2.0.0
  */
 @Slf4j
+@SuppressWarnings("java/log-injection")
 public abstract class BaseMetaService {
 
     /**

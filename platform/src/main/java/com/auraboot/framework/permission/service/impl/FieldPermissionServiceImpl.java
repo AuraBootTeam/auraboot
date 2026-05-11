@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("java/log-injection")
 public class FieldPermissionServiceImpl implements FieldPermissionService {
 
     private final MetaModelService metaModelService;
