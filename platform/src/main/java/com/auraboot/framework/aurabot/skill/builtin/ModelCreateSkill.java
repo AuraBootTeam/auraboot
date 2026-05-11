@@ -18,6 +18,7 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -120,7 +121,7 @@ public class ModelCreateSkill implements AuraBotSkill {
 
     @Override
     public Set<String> requiredPermissions() {
-        return Set.of("MODEL.CREATE");
+        return Set.of(MetaPermission.MODEL_MANAGE);
     }
 
     @Override
