@@ -80,6 +80,9 @@ public class AgentRunController {
     /** Hard cap on returned child runs per run. */
     private static final int MAX_CHILD_RUNS = 200;
 
+    /** Hard cap on returned messages per reconstructed conversation turn. */
+    private static final int MAX_CONVERSATION_MESSAGES = 50;
+
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
@@ -612,7 +615,7 @@ public class AgentRunController {
             return List.of();
         }
 
-        String sql = "SELECT m.id, m.conversation_id, m.sender_type, m.sender_id, m.seq, " +
+        String anchorSql = "SELECT m.id, m.conversation_id, m.sender_type, m.sender_id, m.seq, " +
                 "       m.message_type, m.content, m.card_payload::text AS card_payload, " +
                 "       m.client_msg_id, m.triage_bucket, m.triage_confidence::text AS triage_confidence, " +
                 "       m.triage_reason_codes::text AS triage_reason_codes, " +
@@ -622,7 +625,38 @@ public class AgentRunController {
                 "   AND (" + predicates + ") " +
                 " ORDER BY m.seq ASC, m.id ASC";
 
-        return jdbcTemplate.query(sql, CONVERSATION_MESSAGE_ROW_MAPPER, args.toArray());
+        List<AgentConversationMessageItem> anchors =
+                jdbcTemplate.query(anchorSql, CONVERSATION_MESSAGE_ROW_MAPPER, args.toArray());
+        if (anchors.isEmpty()) {
+            return List.of();
+        }
+
+        Long minSeq = null;
+        Long maxSeq = null;
+        for (AgentConversationMessageItem message : anchors) {
+            Long seq = message.getSeq();
+            if (seq == null) {
+                continue;
+            }
+            minSeq = minSeq == null ? seq : Math.min(minSeq, seq);
+            maxSeq = maxSeq == null ? seq : Math.max(maxSeq, seq);
+        }
+        if (minSeq == null || maxSeq == null || minSeq.equals(maxSeq)) {
+            return anchors;
+        }
+
+        String rangeSql = "SELECT m.id, m.conversation_id, m.sender_type, m.sender_id, m.seq, " +
+                "       m.message_type, m.content, m.card_payload::text AS card_payload, " +
+                "       m.client_msg_id, m.triage_bucket, m.triage_confidence::text AS triage_confidence, " +
+                "       m.triage_reason_codes::text AS triage_reason_codes, " +
+                "       m.thinking_content, m.thinking_signature, m.created_at " +
+                "  FROM ab_im_message m " +
+                " WHERE m.tenant_id = ? AND m.conversation_id = ? " +
+                "   AND m.seq BETWEEN ? AND ? " +
+                " ORDER BY m.seq ASC, m.id ASC " +
+                " LIMIT ?";
+        return jdbcTemplate.query(rangeSql, CONVERSATION_MESSAGE_ROW_MAPPER,
+                tenantId, conversationId, minSeq, maxSeq, MAX_CONVERSATION_MESSAGES);
     }
 
     private List<AgentResultContractItem> buildResultContracts(List<AgentActionItem> actions) {
