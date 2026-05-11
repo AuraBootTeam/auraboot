@@ -1,6 +1,6 @@
 # Introduction to AuraBoot
 
-AuraBoot is an open-source platform for building business applications using declarative JSON instead of writing boilerplate code. You define your data models, pages, commands, and workflows in JSON DSL -- the platform generates the database schema, REST APIs, and UI automatically. AI capabilities are built into the core: an in-app copilot, agent orchestration, ChatBI, and a RAG knowledge base that work with multiple LLM providers.
+AuraBoot is a source-available platform for building business applications using declarative JSON instead of writing boilerplate code. You define your data models, pages, commands, and workflows in JSON DSL -- the platform generates the database schema, REST APIs, and UI automatically. AI capabilities are built into the core: an in-app copilot, agent orchestration, ChatBI, and a RAG knowledge base that work with multiple LLM providers.
 
 ## Key Value Propositions
 
@@ -57,14 +57,14 @@ AuraBoot is designed for data-driven business applications. Here are examples of
 | **Plugin system** | PF4J + JSON packages | Python modules | N/A | N/A | N/A |
 | **Multi-tenancy** | Row-level isolation, built-in | Per-database | N/A | N/A | N/A |
 | **Self-hosted** | Yes (Docker) | Yes | Yes | Yes | Yes (paid) |
-| **Open source** | Source-available (AuraBoot License) | LGPL (Community) | AGPL | Apache 2.0 | Proprietary |
+| **License** | Source-available (AuraBoot License) | LGPL (Community) | AGPL | Apache 2.0 | Proprietary |
 | **Best for** | Custom business apps with complex workflows | Full ERP suite | Quick DB frontend | Internal tool dashboards | Internal tool dashboards |
 
 ## License Model
 
-AuraBoot uses an **open core** model:
+AuraBoot uses a **source-available community edition + commercial enterprise edition** model:
 
-- **Community Edition (Free)** -- DSL engine, page designer, command pipeline, AI copilot, BPM workflows, plugin system, multi-tenant RBAC. Source-available under the [AuraBoot License v1.0](../../LICENSE.txt) (based on Apache 2.0).
+- **Community Edition (Free)** -- DSL engine, page designer, command pipeline, AI copilot, BPM workflows, plugin system, multi-tenant RBAC. Source-available under the [AuraBoot License v1.3](../../LICENSE.txt) (based on Apache 2.0 with supplementary terms).
 - **Enterprise Edition (Paid)** -- Agent orchestration (ACP), real-time messaging (IM), CRM/ERP plugin suite, mobile apps (iOS + Android), priority support with SLA.
 
 The community edition is free for internal use. You can use, modify, and deploy it for your own business applications. Attribution is required ("Powered by AuraBoot"). Offering AuraBoot as a hosted platform service requires a commercial license.
