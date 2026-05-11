@@ -15,6 +15,7 @@ import java.util.Map;
  * All queries run in System Tenant context or against G1 tables (no tenant filter).
  */
 @RestController
+@SuppressWarnings("java/spring-disabled-csrf-protection")
 @RequestMapping("/api/platform")
 @RequiredArgsConstructor
 public class PlatformStatsController {

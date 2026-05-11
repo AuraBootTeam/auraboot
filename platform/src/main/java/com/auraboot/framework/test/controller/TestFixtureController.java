@@ -13,6 +13,7 @@ import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.test.dto.FixtureRequest;
 import com.auraboot.framework.test.dto.FixtureResult;
 import com.auraboot.framework.user.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -44,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TestFixtureController {
 
     private static final Map<String, FixtureResult> activeFixtures = new ConcurrentHashMap<>();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Autowired
     private CommandExecutor commandExecutor;
@@ -114,6 +116,7 @@ public class TestFixtureController {
                 case "inbox_alert" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "alert", "medium", "E2E Alert Item");
                 case "inbox_mention" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "mention", "low", "E2E Mention Item");
                 case "inbox_assignment" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "assignment", "high", "E2E Assignment Item");
+                case "inbox_route" -> createInboxRouteFixture(runId, request.getParams(), authHeader);
                 case "customers" -> createCustomersFixture(runId, request.getParams());
                 case "multiview" -> createMultiviewFixture(runId, request.getParams());
                 case "chat" -> createChatFixture(runId, request.getParams());
@@ -511,6 +514,166 @@ public class TestFixtureController {
                     .recordIds(itemIds)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
+        }
+    }
+
+    /**
+     * Fixture: "inbox_route"
+     * Creates dynamic records and matching inbox cards whose cardData.actions route
+     * to those records. Used by mobile E2E to verify card-level actions such as
+     * follow_up/open/open_record instead of relying on pre-existing tenant data.
+     */
+    private FixtureResult createInboxRouteFixture(String runId, Map<String, Object> params, String authHeader) {
+        Object inboxService;
+        try {
+            inboxService = requireRuntimeBean(
+                    new String[]{"inboxService", "inboxServiceImpl"},
+                    new String[]{
+                            "com.auraboot.framework.inbox.service.InboxService",
+                            "com.auraboot.framework.inbox.service.InboxServiceImpl"
+                    }
+            );
+        } catch (Exception e) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_route").testRunId(runId)
+                    .recordsCreated(0).recordIds(List.of())
+                    .metadata(Map.of("error", "Inbox module is not available (enterprise-core not loaded)"))
+                    .build();
+        }
+
+        int count = params != null && params.containsKey("count")
+                ? ((Number) params.get("count")).intValue()
+                : 1;
+        String modelCode = params != null && params.containsKey("modelCode")
+                ? params.get("modelCode").toString()
+                : "e2et_order";
+        String action = params != null && params.containsKey("action")
+                ? params.get("action").toString()
+                : "open";
+        String actionLabel = params != null && params.containsKey("actionLabel")
+                ? params.get("actionLabel").toString()
+                : "Open seeded record";
+        String actionStyle = params != null && params.containsKey("actionStyle")
+                ? params.get("actionStyle").toString()
+                : "primary";
+        String itemType = params != null && params.containsKey("itemType")
+                ? params.get("itemType").toString()
+                : ("follow_up".equals(action) ? "alert" : "task");
+        String titlePrefix = params != null && params.containsKey("titlePrefix")
+                ? params.get("titlePrefix").toString()
+                : "E2E Routed Inbox";
+
+        Long tenantId = null;
+        if (params != null && params.containsKey("tenantId")) {
+            tenantId = Long.parseLong(params.get("tenantId").toString());
+        }
+        if (tenantId == null) {
+            var tenant = tenantService.findByName("e2e_test");
+            if (tenant != null) {
+                tenantId = tenant.getId();
+            }
+        }
+        var user = userService.findByEmail("e2e@test.local");
+        if (tenantId == null || user == null) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("inbox_route").testRunId(runId)
+                    .recordsCreated(0).recordIds(List.of())
+                    .metadata(Map.of("error", "Cannot resolve tenant/user — call POST /api/test/seed first"))
+                    .build();
+        }
+
+        List<String> inboxIds = new ArrayList<>();
+        List<String> routeRecordIds = new ArrayList<>();
+        try {
+            Class<?> inboxItemClass = Class.forName("com.auraboot.framework.inbox.model.InboxItem");
+            Method createItemMethod = inboxService.getClass().getMethod("createItem", inboxItemClass);
+
+            for (int i = 0; i < count; i++) {
+                Map<String, Object> record = new HashMap<>();
+                if ("e2et_order".equals(modelCode)) {
+                    record.put("e2et_order_no", "route_" + runId + "_" + (i + 1));
+                    record.put("e2et_order_status", "draft");
+                } else {
+                    record.put("name", "route_" + runId + "_" + (i + 1));
+                }
+                String recordPid = executeCreateCommand(modelCode, record);
+                if (recordPid == null || recordPid.isBlank()) {
+                    throw new IllegalStateException("Failed to create route record for " + modelCode);
+                }
+                routeRecordIds.add(recordPid);
+
+                Object item = inboxItemClass.getDeclaredConstructor().newInstance();
+                inboxItemClass.getMethod("setTenantId", Long.class).invoke(item, tenantId);
+                inboxItemClass.getMethod("setUserId", Long.class).invoke(item, user.getId());
+                inboxItemClass.getMethod("setItemType", String.class).invoke(item, itemType);
+                inboxItemClass.getMethod("setTitle", String.class).invoke(item, titlePrefix + " [" + runId + "-" + (i + 1) + "]");
+                inboxItemClass.getMethod("setSubtitle", String.class).invoke(item, "Seeded route action for " + modelCode);
+                inboxItemClass.getMethod("setPriority", String.class).invoke(item, "medium");
+                inboxItemClass.getMethod("setStatus", String.class).invoke(item, StatusConstants.PENDING);
+                inboxItemClass.getMethod("setSourceType", String.class).invoke(item, "command");
+                inboxItemClass.getMethod("setSourceId", String.class).invoke(item, recordPid);
+                inboxItemClass.getMethod("setModelCode", String.class).invoke(item, modelCode);
+                Long numericRecordId = parseLongOrNull(recordPid);
+                if (numericRecordId != null) {
+                    inboxItemClass.getMethod("setRecordId", Long.class).invoke(item, numericRecordId);
+                }
+                inboxItemClass.getMethod("setDeepLink", String.class)
+                        .invoke(item, "auraboot://object/" + modelCode + "/" + recordPid);
+
+                Map<String, Object> card = new LinkedHashMap<>();
+                card.put("sourceRecordId", recordPid);
+                card.put("recordId", recordPid);
+                card.put("sourceRecordPid", recordPid);
+                card.put("modelCode", modelCode);
+                card.put("actions", List.of(Map.of(
+                        "action", action,
+                        "label", actionLabel,
+                        "style", actionStyle
+                )));
+                inboxItemClass.getMethod("setCardPayload", String.class)
+                        .invoke(item, OBJECT_MAPPER.writeValueAsString(card));
+
+                Object created = createItemMethod.invoke(inboxService, item);
+                Object id = inboxItemClass.getMethod("getId").invoke(created);
+                inboxIds.add(String.valueOf(id));
+            }
+
+            return FixtureResult.builder()
+                    .success(true)
+                    .fixtureName("inbox_route")
+                    .testRunId(runId)
+                    .recordsCreated(inboxIds.size())
+                    .recordIds(inboxIds)
+                    .metadata(Map.of(
+                            "modelCode", modelCode,
+                            "itemType", itemType,
+                            "action", action,
+                            "routeRecordIds", routeRecordIds,
+                            "tenantId", tenantId,
+                            "userId", user.getId()
+                    ))
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to create inbox_route fixture: {}", e.getMessage(), e);
+            return FixtureResult.builder()
+                    .success(false)
+                    .fixtureName("inbox_route")
+                    .testRunId(runId)
+                    .recordsCreated(inboxIds.size())
+                    .recordIds(inboxIds)
+                    .metadata(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    private Long parseLongOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 

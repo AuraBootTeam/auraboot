@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("java/log-injection")
 public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBuilderService {
 
     private final DynamicDataMapper dynamicDataMapper;

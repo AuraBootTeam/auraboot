@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@SuppressWarnings("java/spring-disabled-csrf-protection")
 @RequestMapping("/api/marketplace/solutions")
 @RequiredArgsConstructor
 @Tag(name = "Solution Marketplace", description = "Industry solution browsing APIs")

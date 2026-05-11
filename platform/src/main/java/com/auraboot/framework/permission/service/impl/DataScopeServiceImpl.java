@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("java/log-injection")
 public class DataScopeServiceImpl implements DataScopeService {
 
     private final RoleDataScopeMapper roleDataScopeMapper;
