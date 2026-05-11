@@ -36,6 +36,22 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("now") Instant now);
 
     /**
+     * Find shares for a specific public record PID.
+     */
+    @Select("""
+        SELECT * FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND resource_code = #{resourceCode}
+          AND record_pid = #{recordPid}
+          AND (expires_at IS NULL OR expires_at > #{now})
+        """)
+    List<RecordShare> findByRecordPid(
+            @Param("tenantId") Long tenantId,
+            @Param("resourceCode") String resourceCode,
+            @Param("recordPid") String recordPid,
+            @Param("now") Instant now);
+
+    /**
      * Find shares where a specific member is the direct subject.
      */
     @Select("""
@@ -94,6 +110,45 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("now") Instant now);
 
     /**
+     * Check if a public record PID is shared with a subject PID.
+     */
+    @Select("""
+        SELECT COUNT(*) FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND resource_code = #{resourceCode}
+          AND record_pid = #{recordPid}
+          AND subject_type = #{subjectType}
+          AND subject_pid = #{subjectPid}
+          AND (expires_at IS NULL OR expires_at > #{now})
+        """)
+    int countByRecordPidAndSubjectPid(
+            @Param("tenantId") Long tenantId,
+            @Param("resourceCode") String resourceCode,
+            @Param("recordPid") String recordPid,
+            @Param("subjectType") String subjectType,
+            @Param("subjectPid") String subjectPid,
+            @Param("now") Instant now);
+
+    /**
+     * Check if a public record PID is shared with a legacy member ID.
+     */
+    @Select("""
+        SELECT COUNT(*) FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND resource_code = #{resourceCode}
+          AND record_pid = #{recordPid}
+          AND subject_type = 'member'
+          AND subject_id = #{userId}
+          AND (expires_at IS NULL OR expires_at > #{now})
+        """)
+    int countByRecordPidAndUser(
+            @Param("tenantId") Long tenantId,
+            @Param("resourceCode") String resourceCode,
+            @Param("recordPid") String recordPid,
+            @Param("userId") Long userId,
+            @Param("now") Instant now);
+
+    /**
      * Check if a specific record is shared with any of the given roles.
      */
     @Select("""
@@ -114,6 +169,30 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("tenantId") Long tenantId,
             @Param("resourceCode") String resourceCode,
             @Param("recordId") Long recordId,
+            @Param("roleIds") List<Long> roleIds,
+            @Param("now") Instant now);
+
+    /**
+     * Check if a public record PID is shared with any of the given legacy role IDs.
+     */
+    @Select("""
+        <script>
+        SELECT COUNT(*) FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND resource_code = #{resourceCode}
+          AND record_pid = #{recordPid}
+          AND subject_type = 'role'
+          AND subject_id IN
+          <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>
+            #{id}
+          </foreach>
+          AND (expires_at IS NULL OR expires_at > #{now})
+        </script>
+        """)
+    int countByRecordPidAndRoles(
+            @Param("tenantId") Long tenantId,
+            @Param("resourceCode") String resourceCode,
+            @Param("recordPid") String recordPid,
             @Param("roleIds") List<Long> roleIds,
             @Param("now") Instant now);
 
