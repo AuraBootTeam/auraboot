@@ -10,6 +10,7 @@ import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -32,14 +33,18 @@ public class AuditTrailController {
     /**
      * Get audit trail for a specific entity.
      * GET /api/audit/trail?entityType=pe_sales_order&entityId=123
+     * GET /api/audit/trail?entityType=pe_sales_order&entityPid=01K...
      */
     @GetMapping("/trail")
     @RequirePermission(MetaPermission.META_AUDIT_TRAIL_READ)
     public ApiResponse<List<AuditTrail>> getAuditTrail(
             @RequestParam String entityType,
-            @RequestParam Long entityId) {
+            @RequestParam(required = false) Long entityId,
+            @RequestParam(required = false) String entityPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<AuditTrail> trail = auditTrailService.getAuditTrail(tenantId, entityType, entityId);
+        List<AuditTrail> trail = StringUtils.hasText(entityPid)
+                ? auditTrailService.getAuditTrailByPid(tenantId, entityType, entityPid)
+                : auditTrailService.getAuditTrail(tenantId, entityType, entityId);
         return ApiResponse.success(trail);
     }
 

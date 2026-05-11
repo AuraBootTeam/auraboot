@@ -61,6 +61,9 @@ public class SodViolationLog {
     @TableField("entity_id")
     private Long entityId;
 
+    @TableField("entity_pid")
+    private String entityPid;
+
     /**
      * Enforcement level at the time of violation: HARD, SOFT, AUDIT_ONLY.
      */

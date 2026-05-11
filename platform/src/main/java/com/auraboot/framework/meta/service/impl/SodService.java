@@ -76,7 +76,13 @@ public class SodService {
      */
     public SodCheckResult checkSod(String commandCode, Long actorId, String actorName,
                                     String entityType, Long entityId) {
+        return checkSod(commandCode, actorId, actorName, entityType, entityId, null);
+    }
+
+    public SodCheckResult checkSod(String commandCode, Long actorId, String actorName,
+                                    String entityType, Long entityId, String entityPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        String normalizedEntityPid = normalizePid(entityPid);
 
         List<SodRule> matchingRules = getMatchingRules(tenantId, commandCode);
         if (matchingRules.isEmpty()) {
@@ -93,7 +99,7 @@ public class SodService {
 
             // Check audit trail for conflict
             boolean hasConflict = checkAuditTrailForConflict(
-                    tenantId, actorId, otherCommand, entityType, entityId, rule.getEntityScope());
+                    tenantId, actorId, otherCommand, entityType, entityId, normalizedEntityPid, rule.getEntityScope());
 
             if (hasConflict) {
                 String enforcementOutcome = mapEnforcementToOutcome(rule.getEnforcement());
@@ -111,7 +117,7 @@ public class SodService {
 
                 // Record violation log
                 logViolation(tenantId, rule, actorId, actorName,
-                        commandCode, otherCommand, entityType, entityId, enforcementOutcome);
+                        commandCode, otherCommand, entityType, entityId, normalizedEntityPid, enforcementOutcome);
 
                 // Track the worst enforcement level
                 worstOutcome = resolveWorstOutcome(worstOutcome, enforcementOutcome);
@@ -278,14 +284,21 @@ public class SodService {
      * on the same entity (respecting entity scope).
      */
     private boolean checkAuditTrailForConflict(Long tenantId, Long actorId, String conflictingCommand,
-                                                String entityType, Long entityId, String entityScope) {
+                                                String entityType, Long entityId, String entityPid, String entityScope) {
         switch (entityScope) {
             case "same_record":
                 // Check if the same actor executed the conflicting command on the exact same record
-                if (entityType == null || entityId == null) {
+                if (entityType == null) {
                     return false; // Cannot check SAME_RECORD without entity info
                 }
-                List<AuditTrail> recordTrail = auditTrailMapper.getByEntity(tenantId, entityType, entityId);
+                List<AuditTrail> recordTrail;
+                if (StringUtils.hasText(entityPid)) {
+                    recordTrail = auditTrailMapper.getByEntityPid(tenantId, entityType, entityPid);
+                } else if (entityId != null) {
+                    recordTrail = auditTrailMapper.getByEntity(tenantId, entityType, entityId);
+                } else {
+                    return false;
+                }
                 return recordTrail.stream()
                         .anyMatch(t -> conflictingCommand.equals(t.getCommandCode())
                                 && actorId.equals(t.getActorId()));
@@ -317,7 +330,7 @@ public class SodService {
      */
     private void logViolation(Long tenantId, SodRule rule, Long actorId, String actorName,
                                String commandAttempted, String conflictingCommand,
-                               String entityType, Long entityId, String outcome) {
+                               String entityType, Long entityId, String entityPid, String outcome) {
         try {
             SodViolationLog violation = new SodViolationLog();
             violation.setTenantId(tenantId);
@@ -330,6 +343,7 @@ public class SodService {
             violation.setConflictingActorId(actorId); // same actor for SoD
             violation.setEntityType(entityType);
             violation.setEntityId(entityId);
+            violation.setEntityPid(entityPid);
             violation.setEnforcement(rule.getEnforcement());
             violation.setOutcome(outcome);
 
@@ -371,6 +385,10 @@ public class SodService {
     private void invalidateCache(Long tenantId) {
         ruleCache.remove(tenantId);
         log.debug("SoD rule cache invalidated for tenant {}", tenantId);
+    }
+
+    private String normalizePid(String pid) {
+        return StringUtils.hasText(pid) ? pid.trim() : null;
     }
 
     private void validate(SodRuleCreateRequest request) {
