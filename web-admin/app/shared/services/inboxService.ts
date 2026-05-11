@@ -22,8 +22,12 @@ export interface InboxItem {
   sourceType?: string; // 'bpm' | 'im' | 'command' | 'ai' | 'notification'
   sourceId?: string;
   modelCode?: string;
+  sourceModel?: string;
   recordId?: number;
+  sourceRecordId?: string;
+  sourceRecordPid?: string;
   cardPayload?: string; // JSON string
+  cardData?: Record<string, unknown>;
   actionTaken?: string;
   actedAt?: string;
   deepLink?: string;

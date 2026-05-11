@@ -264,8 +264,12 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
 
   const handleRowClick = useCallback(
     (row: Record<string, unknown>) => {
-      if (!data?.meta?.dimensions?.length) return;
-      const dimension = data.meta.dimensions[0];
+      const dimension =
+        data?.meta?.dimensions?.[0] ||
+        Object.keys(drillDown?.paramMapping || {}).find((field) =>
+          Object.prototype.hasOwnProperty.call(row, field),
+        );
+      if (!dimension) return;
       const filter: FilterConfig = { field: dimension, operator: 'eq', value: row[dimension] };
       if (drillDown?.enabled && onDrillDown) onDrillDown([filter]);
       if (linkage?.enabled && linkage?.emitFilter && onLinkageEmit) onLinkageEmit([filter]);

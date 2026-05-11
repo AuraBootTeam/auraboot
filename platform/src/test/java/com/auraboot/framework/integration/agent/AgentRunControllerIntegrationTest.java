@@ -119,10 +119,10 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
     private String seedAction(String runPid, String actionCode, String status) {
         String pid = UniqueIdGenerator.generate();
         jdbc.update("INSERT INTO ab_agent_action " +
-                        "(pid, tenant_id, run_id, action_code, action_type, target_model, " +
+                        "(pid, tenant_id, run_id, action_code, action_type, target_model, target_record_id, " +
                         " action_status, executed_at, before_snapshot, after_snapshot, " +
                         " field_changes, risk_level, cost_usd) " +
-                        "VALUES (?, ?, ?, ?, 'data_write', 'crm_account', ?, NOW(), " +
+                        "VALUES (?, ?, ?, ?, 'data_write', 'crm_account', 'REC-PID-001', ?, NOW(), " +
                         " '{\"name\":\"old\"}'::jsonb, '{\"name\":\"new\"}'::jsonb, " +
                         " '[{\"field\":\"name\",\"from\":\"old\",\"to\":\"new\"}]'::jsonb, " +
                         " 'L1', 0.000123)",
@@ -132,7 +132,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
 
     private String seedApproval(String runPid, String toolName) {
         return seedApproval(runPid, "Approve " + toolName, "Tool: " + toolName,
-                "{\"toolName\":\"" + toolName + "\"}");
+                "{\"toolName\":\"" + toolName + "\",\"targetRecordId\":\"REC-PID-001\"}");
     }
 
     private String seedApproval(String runPid, String title, String description, String requestData) {
@@ -369,6 +369,8 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         AgentActionItem first = d.getActions().get(0);
         assertThat(first.getActionCode()).startsWith("crm.account.");
         assertThat(first.getTargetModel()).isEqualTo("crm_account");
+        assertThat(first.getTargetRecordId()).isEqualTo("REC-PID-001");
+        assertThat(first.getTargetRecordPid()).isEqualTo("REC-PID-001");
         assertThat(first.getRiskLevel()).isEqualTo("L1");
         assertThat(first.getBeforeSnapshot()).contains("\"name\"").contains("old");
         assertThat(first.getAfterSnapshot()).contains("new");
@@ -589,6 +591,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(trail.getAuthorizationDecisions().get(0).isRequireApproval()).isTrue();
         assertThat(trail.getApprovals()).hasSize(1);
         assertThat(trail.getApprovals().get(0).getPid()).isEqualTo(approvalPid);
+        assertThat(trail.getApprovals().get(0).getTargetPid()).isEqualTo("REC-PID-001");
         assertThat(trail.getApprovals().get(0).getApprovalStatus()).isEqualTo("pending");
         assertThat(trail.getResultContracts()).hasSize(1);
         assertThat(trail.getResultContracts().get(0).getActionPid()).isEqualTo(actionPid);

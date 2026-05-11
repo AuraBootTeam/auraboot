@@ -169,7 +169,10 @@ public class ImEventListener {
             Map<String, Object> card = new LinkedHashMap<>();
             card.put("cardType", "command_completed");
             card.put("modelCode", event.getModelCode());
+            card.put("sourceModel", event.getModelCode());
             card.put("recordId", event.getRecordId());
+            card.put("recordPid", event.getRecordId());
+            card.put("sourceRecordPid", event.getRecordId());
             card.put("commandCode", event.getCommandCode());
             card.put("operationType", event.getOperationType());
 

@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.*;
@@ -37,6 +38,7 @@ public class MarketplaceInstallService {
     private final ObjectMapper objectMapper;
     private final EntitlementChecker entitlementChecker;
     private final EntitlementProvisioner entitlementProvisioner;
+    private final MarketplacePaidService marketplacePaidService;
 
     @Transactional
     public ImportExecuteResult install(String pluginId, MarketplaceInstallRequest request) {
@@ -77,6 +79,7 @@ public class MarketplaceInstallService {
                 return v;
             }
         });
+        enforceLicenseBeforeInstall(tenantId, mpPlugin, version, request);
 
         // Parse manifest from snapshot
         PluginManifestExtended manifest;
@@ -213,6 +216,31 @@ public class MarketplaceInstallService {
         log.info("S2S install: pluginId={}", pluginId);
         MarketplaceInstallRequest request = new MarketplaceInstallRequest();
         request.setAutoPublishPages(true);
+        request.setInstallToken(installToken);
         return install(pluginId, request);
+    }
+
+    private void enforceLicenseBeforeInstall(
+            Long tenantId,
+            MarketplacePlugin plugin,
+            MarketplaceVersion version,
+            MarketplaceInstallRequest request
+    ) {
+        String licenseMode = StringUtils.hasText(plugin.getLicenseMode()) ? plugin.getLicenseMode() : "free";
+        if ("free".equalsIgnoreCase(licenseMode)) {
+            return;
+        }
+        if (entitlementChecker.isEnabled() && entitlementChecker.isPluginActive(tenantId, plugin.getPluginId())) {
+            return;
+        }
+        if (!StringUtils.hasText(request.getInstallToken())) {
+            throw new RuntimeException("Marketplace license or install token required before installing plugin: " + plugin.getPluginId());
+        }
+        marketplacePaidService.authorizeInstallTokenForInstall(
+                request.getInstallToken(),
+                plugin.getPid(),
+                version.getPid(),
+                request.getTargetInstanceUrl()
+        );
     }
 }

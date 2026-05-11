@@ -49,11 +49,11 @@ class DslToolProviderTest extends BaseIntegrationTest {
     // ========== Execute: get: prefix ==========
 
     @Test
-    void execute_getWithoutRecordId_fails() {
+    void execute_getWithoutRecordPid_fails() {
         Long tenantId = getTestTenant().getId();
         var result = dslToolProvider.execute(tenantId, "get:crm_account", Map.of());
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getErrorMessage()).contains("recordId is required");
+        assertThat(result.getErrorMessage()).contains("recordPid is required");
         assertThat(result.getDurationMs()).isGreaterThanOrEqualTo(0);
     }
 
@@ -281,11 +281,12 @@ class DslToolProviderTest extends BaseIntegrationTest {
         assertThat(schema).containsEntry("type", "object");
         @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        assertThat(properties).containsKey("recordPid");
         assertThat(properties).containsKey("recordId");
         List<String> required = ((List<?>) schema.get("required")).stream()
                 .map(String::valueOf)
                 .toList();
-        assertThat(required).containsExactly("recordId");
+        assertThat(required).containsExactly("recordPid");
     }
 
     @Test

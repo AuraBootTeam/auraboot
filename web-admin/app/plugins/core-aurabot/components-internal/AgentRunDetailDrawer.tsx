@@ -173,6 +173,16 @@ function ActionRow({
               {action.intentSummary}
             </div>
           )}
+          {(action.targetModel || action.targetRecordPid || action.targetRecordId) && (
+            <div data-testid={`action-target-${action.pid}`}>
+              <span className="text-gray-500">Target PID: </span>
+              <span className="font-mono">
+                {[action.targetModel, action.targetRecordPid ?? action.targetRecordId]
+                  .filter(Boolean)
+                  .join(' / ')}
+              </span>
+            </div>
+          )}
           {action.errorMessage && (
             <div className="text-red-700">
               <span className="text-gray-500">Error: </span>

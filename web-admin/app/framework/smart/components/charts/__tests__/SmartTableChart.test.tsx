@@ -7,7 +7,7 @@
  * authored — the dashboard JSON pattern crm-starter ships.
  */
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mockUseChartData = vi.fn();
@@ -129,5 +129,43 @@ describe('SmartTableChart - widget config columns + i18n', () => {
     expect(screen.getByText('Beta')).toBeInTheDocument();
     // Placeholder must not be shown when the shorthand is configured.
     expect(screen.queryByText('Please configure data source')).not.toBeInTheDocument();
+  });
+
+  it('uses drillDown paramMapping source field for identity named-query rows', () => {
+    const onDrillDown = vi.fn();
+    mockUseChartData.mockReturnValue({
+      data: {
+        rows: [{ purchase_pid: 'PUR-001', provider: 'local_test' }],
+        summary: {},
+        meta: { dimensions: [], metrics: ['provider', 'purchase_pid'] },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <SmartTableChart
+        dataSource={{ type: 'namedQuery', queryCode: 'recent_events' }}
+        table={{
+          columns: [
+            { field: 'provider', label: 'Provider' },
+            { field: 'purchase_pid', label: 'Purchase PID' },
+          ],
+        }}
+        drillDown={{
+          enabled: true,
+          action: 'navigate',
+          targetPage: '/p/provider_event',
+          paramMapping: { purchase_pid: 'purchase_pid' },
+        }}
+        onDrillDown={onDrillDown}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('PUR-001').closest('tr')!);
+    expect(onDrillDown).toHaveBeenCalledWith([
+      { field: 'purchase_pid', operator: 'eq', value: 'PUR-001' },
+    ]);
   });
 });

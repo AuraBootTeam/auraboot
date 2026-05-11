@@ -105,7 +105,19 @@ public class InboxItem {
 
     @JsonProperty("sourceRecordId")
     public String getSourceRecordId() {
-        return recordId != null ? String.valueOf(recordId) : null;
+        String recordPid = getSourceRecordPid();
+        return recordPid != null ? recordPid : (recordId != null ? String.valueOf(recordId) : null);
+    }
+
+    @JsonProperty("sourceRecordPid")
+    public String getSourceRecordPid() {
+        Map<String, Object> data = getCardData();
+        return firstNonBlank(
+                stringValue(data, "sourceRecordPid"),
+                stringValue(data, "recordPid"),
+                stringValue(data, "sourceRecordId"),
+                stringValue(data, "recordId"),
+                recordId != null ? String.valueOf(recordId) : null);
     }
 
     @JsonProperty("cardData")
@@ -118,5 +130,29 @@ public class InboxItem {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static String stringValue(Map<String, Object> map, String key) {
+        if (map == null || key == null || !map.containsKey(key)) {
+            return null;
+        }
+        Object value = map.get(key);
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }

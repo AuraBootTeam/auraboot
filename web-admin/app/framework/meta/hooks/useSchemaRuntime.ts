@@ -30,6 +30,8 @@ import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { useToastContext } from '~/contexts/ToastContext';
 
+type RuntimeToastLevel = 'success' | 'error' | 'info' | 'warning';
+
 export interface UseSchemaRuntimeOptions {
   /** Schema 对象 */
   schema: UnifiedSchema | null;
@@ -60,6 +62,9 @@ export interface UseSchemaRuntimeOptions {
 
   /** 租户信息 (可选) */
   tenant?: any;
+
+  /** Optional toast bridge. Uses ToastContext when omitted. */
+  showToast?: (message: string, level?: RuntimeToastLevel) => void;
 }
 
 // createToastHandler removed — replaced by useToastContext in useSchemaRuntime
@@ -98,9 +103,13 @@ function buildGlobalState(options: UseSchemaRuntimeOptions) {
  */
 export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntime | null {
   const [runtime, setRuntime] = useState<SchemaRuntime | null>(null);
-  const { showSuccessToast, showErrorToast, showInfoToast } = useToastContext();
+  const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const toastHandler = useCallback(
-    (message: string, level: 'success' | 'error' | 'info' = 'info') => {
+    (message: string, level: RuntimeToastLevel = 'info') => {
+      if (options.showToast) {
+        options.showToast(message, level);
+        return;
+      }
       switch (level) {
         case 'success':
           showSuccessToast(message);
@@ -108,12 +117,15 @@ export function useSchemaRuntime(options: UseSchemaRuntimeOptions): SchemaRuntim
         case 'error':
           showErrorToast(message);
           break;
+        case 'warning':
+          showWarningToast(message);
+          break;
         default:
           showInfoToast(message);
           break;
       }
     },
-    [showSuccessToast, showErrorToast, showInfoToast],
+    [options.showToast, showSuccessToast, showErrorToast, showWarningToast, showInfoToast],
   );
 
   const { schema, dataSourceManager, navigate, disableAutoFetch = true } = options;

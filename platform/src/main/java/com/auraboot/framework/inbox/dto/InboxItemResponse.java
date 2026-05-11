@@ -80,6 +80,7 @@ public class InboxItemResponse {
      * The {@link #from(InboxItem)} factory enforces this.
      */
     private String sourceRecordId;
+    private String sourceRecordPid;
 
     /**
      * @deprecated Use {@link #cardData} (parsed Map) instead. {@code cardPayload}
@@ -143,6 +144,8 @@ public class InboxItemResponse {
     private String clientItemId;
 
     public static InboxItemResponse from(InboxItem item) {
+        Map<String, Object> cardData = parseCardPayload(item.getCardPayload());
+        String sourceRecordPid = resolveSourceRecordPid(item, cardData);
         return InboxItemResponse.builder()
                 .id(item.getId())
                 .itemType(item.getItemType())
@@ -156,9 +159,10 @@ public class InboxItemResponse {
                 .modelCode(item.getModelCode())
                 .sourceModel(item.getModelCode())
                 .recordId(item.getRecordId())
-                .sourceRecordId(item.getRecordId() != null ? String.valueOf(item.getRecordId()) : null)
+                .sourceRecordId(item.getRecordId() != null ? String.valueOf(item.getRecordId()) : sourceRecordPid)
+                .sourceRecordPid(sourceRecordPid)
                 .cardPayload(item.getCardPayload())
-                .cardData(parseCardPayload(item.getCardPayload()))
+                .cardData(cardData)
                 .actionTaken(item.getActionTaken())
                 .actedAt(item.getActedAt())
                 .deepLink(item.getDeepLink())
@@ -168,6 +172,39 @@ public class InboxItemResponse {
                 .expiresAt(item.getExpiresAt())
                 .clientItemId(item.getClientItemId())
                 .build();
+    }
+
+    private static String resolveSourceRecordPid(InboxItem item, Map<String, Object> cardData) {
+        return firstNonBlank(
+                stringValue(cardData, "sourceRecordPid"),
+                stringValue(cardData, "recordPid"),
+                stringValue(cardData, "sourceRecordId"),
+                stringValue(cardData, "recordId"),
+                item.getRecordId() != null ? String.valueOf(item.getRecordId()) : null);
+    }
+
+    private static String stringValue(Map<String, Object> map, String key) {
+        if (map == null || key == null || !map.containsKey(key)) {
+            return null;
+        }
+        Object value = map.get(key);
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static Map<String, Object> parseCardPayload(String raw) {

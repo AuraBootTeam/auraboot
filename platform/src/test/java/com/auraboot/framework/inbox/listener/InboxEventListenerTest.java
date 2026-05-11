@@ -44,8 +44,12 @@ class InboxEventListenerTest {
         assertThat(item.getItemType()).isEqualTo("assignment");
         assertThat(item.getTitle()).isEqualTo("Activate Campaign");
         assertThat(item.getSubtitle()).isEqualTo("Campaign #01KTESTCAMPAIGN");
+        assertThat(item.getRecordId()).isNull();
         assertThat(item.getDeepLink()).isEqualTo("auraboot://object/crm_campaign/01KTESTCAMPAIGN");
         assertThat(item.getCardPayload()).contains("\"commandCode\":\"crm:activate_campaign\"");
+        assertThat(item.getCardPayload())
+                .contains("\"sourceRecordPid\":\"01KTESTCAMPAIGN\"")
+                .contains("\"recordPid\":\"01KTESTCAMPAIGN\"");
     }
 
     @Test

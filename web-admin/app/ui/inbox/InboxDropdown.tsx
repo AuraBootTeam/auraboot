@@ -109,8 +109,14 @@ export function InboxHeaderWidget() {
 
     if (item.itemType === 'approval' && item.sourceId) {
       navigate(`/inbox?task=${item.sourceId}`);
-    } else if (item.modelCode && item.recordId) {
-      navigate(`/p/${item.modelCode}/${item.recordId}`);
+    } else if (item.sourceModel ?? item.modelCode) {
+      const modelCode = item.sourceModel ?? item.modelCode;
+      const recordPid = item.sourceRecordPid ?? item.sourceRecordId ?? (item.recordId != null ? String(item.recordId) : undefined);
+      if (recordPid) {
+        navigate(`/p/${modelCode}/view/${recordPid}`);
+        return;
+      }
+      navigate('/inbox');
     } else {
       navigate('/inbox');
     }
