@@ -16,6 +16,7 @@
 #   - login with default creds returns a JWT
 #   - backend `/actuator/health` responds inside the container
 #   - 3 sample API endpoints respond in expected shape (via BFF proxy)
+#   - default `/dashboards` data resolves to seeded CRM overview widgets
 #   - logs have zero ERROR-level lines that aren't in the known-noise list
 
 set -euo pipefail
@@ -40,14 +41,14 @@ fail() { echo "  ❌ $*"; FAIL=$((FAIL+1)); }
 warn() { echo "  ⚠️  $*"; WARN=$((WARN+1)); }
 step() { echo ""; echo "==> $*"; }
 
-step "1/8 Pre-flight"
+step "1/9 Pre-flight"
 command -v docker >/dev/null      && ok "docker installed" || fail "docker missing"
 docker info >/dev/null 2>&1       && ok "docker daemon up" || fail "docker daemon down"
 command -v curl >/dev/null        && ok "curl installed"   || fail "curl missing"
 [ "$FAIL" -eq 0 ] || { echo "Pre-flight failed; aborting."; exit 1; }
 
 if [ $CLEAN_CLONE -eq 1 ]; then
-  step "2/8 Fresh clone (--clean-clone)"
+  step "2/9 Fresh clone (--clean-clone)"
   REPO_ROOT="/tmp/auraboot-quickstart-verify-$$"
   git clone --depth 1 https://github.com/AuraBootTeam/auraboot.git "$REPO_ROOT"
   ok "cloned to $REPO_ROOT"
@@ -55,7 +56,7 @@ fi
 
 cd "$REPO_ROOT"
 
-step "3/8 docker compose up (target: < 5min cold start)"
+step "3/9 docker compose up (target: < 5min cold start)"
 T0=$(date +%s)
 # The README quickstart uses the `full` profile to bring up postgres + backend + frontend.
 # Without --profile full, only postgres starts (backend/frontend are gated behind it).
@@ -68,7 +69,7 @@ else
   warn "compose up took ${DURATION}s (target < 300s)"
 fi
 
-step "4/8 Wait for backend health (target: < 180s — backend healthcheck has 120s start_period)"
+step "4/9 Wait for backend health (target: < 180s — backend healthcheck has 120s start_period)"
 # Backend port 6443 is intentionally NOT exposed to host in docker-compose.yml,
 # so we exec into the container and curl actuator from inside.
 ATTEMPTS=0
@@ -83,7 +84,7 @@ until docker compose exec -T backend wget -q --spider http://localhost:6443/actu
 done
 [ $ATTEMPTS -le 60 ] && ok "backend healthy after ${ATTEMPTS}×3s"
 
-step "5/8 Frontend reachable (BFF/SSR on host port 3000)"
+step "5/9 Frontend reachable (BFF/SSR on host port 3000)"
 FRONTEND_STATUS="000"
 ATTEMPTS=0
 while true; do
@@ -103,7 +104,7 @@ while true; do
   sleep 2
 done
 
-step "6/8 Login API contract (via BFF proxy)"
+step "6/9 Login API contract (via BFF proxy)"
 # Frontend BFF proxies /api/* to backend; we go through it to mirror real user flow.
 LOGIN_RESPONSE="FAIL"
 for _ in $(seq 1 20); do
@@ -122,7 +123,7 @@ else
   TOKEN=""
 fi
 
-step "7/8 Authenticated API smoke"
+step "7/9 Authenticated API smoke"
 if [ -n "$TOKEN" ]; then
   # Endpoints any authenticated user can hit (no specific permission code).
   # /api/menu and /api/permissions root paths have no GET handler;
@@ -136,7 +137,34 @@ if [ -n "$TOKEN" ]; then
   done
 fi
 
-step "8/8 Log scan (looking for ERROR-level surprises)"
+step "8/9 Dashboard UI smoke"
+if [ -n "$TOKEN" ]; then
+  DEFAULT_DASHBOARD="FAIL"
+  for _ in $(seq 1 30); do
+    DEFAULT_DASHBOARD=$(curl -fsS -m 5 -H "Authorization: Bearer $TOKEN" \
+      http://localhost:3000/api/dashboards/default 2>/dev/null || echo "FAIL")
+    echo "$DEFAULT_DASHBOARD" | grep -q '"code":"crm_overview"' && break
+    sleep 2
+  done
+  if echo "$DEFAULT_DASHBOARD" | grep -q '"code":"crm_overview"'; then
+    ok "default dashboard is crm_overview"
+  else
+    fail "default dashboard is not crm_overview; response: $(echo "$DEFAULT_DASHBOARD" | head -c 200)"
+  fi
+
+  if echo "$DEFAULT_DASHBOARD" | grep -Eiq 'Internal system error|Application Error'; then
+    fail "default dashboard API returned an internal error"
+  elif echo "$DEFAULT_DASHBOARD" | grep -Eq '最新商机|Recent Opportunities' \
+    && echo "$DEFAULT_DASHBOARD" | grep -Eq '最新线索|Recent Leads'; then
+    ok "default dashboard contains recent opportunities and leads widgets"
+  else
+    fail "default dashboard missing CRM overview widgets; response: $(echo "$DEFAULT_DASHBOARD" | tr '\n' ' ' | head -c 300)"
+  fi
+else
+  fail "cannot verify default dashboard without login token"
+fi
+
+step "9/9 Log scan (looking for ERROR-level surprises)"
 KNOWN_NOISE='Connection refused: connect|temporary failure|retrying|com.zaxxer.hikari.pool|Task :|^$'
 ERR_LINES=$(docker compose logs backend 2>/dev/null | grep "ERROR\b" || true)
 if [ -z "$ERR_LINES" ]; then
