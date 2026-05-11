@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { Client } from 'pg';
-import { BACKEND_URL } from '../../helpers/environments';
+import { BACKEND_URL, loadEnv } from '../../helpers/environments';
 
 const TEST_ACCOUNT = { email: 'admin@auraboot.com', password: 'Test2026x' };
-const PG_HOST = process.env.PG_HOST ?? 'localhost';
-const PG_PORT = process.env.PG_PORT ?? '5432';
-const PG_USER = process.env.PG_USER ?? 'ghj';
-const PG_DB = process.env.PG_DB ?? 'aura_boot';
-const PG_PASSWORD = process.env.PGPASSWORD ?? process.env.PG_PASSWORD;
+const TEST_ENV = loadEnv();
+const PG_HOST = process.env.PGHOST ?? TEST_ENV.pg.host;
+const PG_PORT = process.env.PGPORT ?? TEST_ENV.pg.port;
+const PG_USER = process.env.PGUSER ?? TEST_ENV.pg.user;
+const PG_DB = process.env.PGDATABASE ?? TEST_ENV.pg.db;
+const PG_PASSWORD = process.env['PGPASSWORD'] ?? process.env['PG_PASSWORD'];
 const STUB_TOOL_USE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
 
 type AuthContext = {

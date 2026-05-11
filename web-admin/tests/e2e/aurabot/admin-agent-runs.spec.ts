@@ -47,6 +47,7 @@ import { test, expect, type Page } from '../../fixtures';
 import { Client } from 'pg';
 import { randomUUID } from 'crypto';
 import { ADMIN_TENANT_ID } from './_real-backend-helpers';
+import { loadEnv } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Constants — pid prefixes are unique per spec so global teardown can target
@@ -103,12 +104,13 @@ const RUN_FAILED_COMPLETED_OFFSET_SEC = 1; // → 1000ms → "1.00s"
 // database clients.
 // ---------------------------------------------------------------------------
 
+const TEST_ENV = loadEnv();
 const PG_CONN = {
-  host: process.env.PGHOST ?? process.env.PG_HOST ?? 'localhost',
-  port: Number(process.env.PGPORT ?? process.env.PG_PORT ?? '5432'),
-  user: process.env.PGUSER ?? process.env.PG_USER ?? process.env.USER ?? 'ghj',
-  database: process.env.PGDATABASE ?? process.env.PG_DB ?? 'aura_boot',
-  password: process.env.PGPASSWORD ?? process.env.PG_PASSWORD,
+  host: process.env.PGHOST ?? TEST_ENV.pg.host,
+  port: Number(process.env.PGPORT ?? TEST_ENV.pg.port),
+  user: process.env.PGUSER ?? TEST_ENV.pg.user,
+  database: process.env.PGDATABASE ?? TEST_ENV.pg.db,
+  password: process.env['PGPASSWORD'] ?? process.env['PG_PASSWORD'],
 };
 
 async function psql(sql: string): Promise<string> {

@@ -16,7 +16,7 @@
  */
 
 import type { FullConfig } from '@playwright/test';
-import { BASE_URL } from './helpers/environments';
+import { BASE_URL, loadEnv } from './helpers/environments';
 
 const ADMIN_STORAGE = process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json';
 
@@ -245,12 +245,13 @@ DELETE FROM ab_agent_task
 
 async function executeCleanupSql(sql: string): Promise<void> {
   const { Client } = await import('pg');
+  const testEnv = loadEnv();
   const client = new Client({
-    host: process.env.PGHOST ?? process.env.PG_HOST ?? 'localhost',
-    port: Number(process.env.PGPORT ?? process.env.PG_PORT ?? '5432'),
-    user: process.env.PGUSER ?? process.env.PG_USER ?? 'ghj',
-    database: process.env.PGDATABASE ?? process.env.PG_DB ?? 'aura_boot',
-    password: process.env.PGPASSWORD ?? process.env.PG_PASSWORD,
+    host: process.env.PGHOST ?? testEnv.pg.host,
+    port: Number(process.env.PGPORT ?? testEnv.pg.port),
+    user: process.env.PGUSER ?? testEnv.pg.user,
+    database: process.env.PGDATABASE ?? testEnv.pg.db,
+    password: process.env['PGPASSWORD'] ?? process.env['PG_PASSWORD'],
   });
 
   await client.connect();
