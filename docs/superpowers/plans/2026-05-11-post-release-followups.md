@@ -50,7 +50,7 @@
 - [x] Add authenticated dynamic list query scenario.
 - [x] Add command-pipeline dry-run scenario.
 - [x] Document the local/public benchmark workflow.
-- [ ] Capture fresh baseline JSON from a warmed public beta stack and attach numbers to #150.
+- [x] Capture fresh baseline JSON from a warmed public beta stack and attach numbers to #150.
 
 ### Task 4: Release Health Check
 
@@ -70,4 +70,4 @@
 
 - [x] Create or update `v0.1.0-beta.2` milestone.
 - [x] Assign #148, #149, #150, #152 to the milestone after owner confirmation.
-- [ ] Keep Page Designer UX and mobile coverage as product-quality work, not release-infra work.
+- [x] Keep Page Designer UX and mobile coverage as product-quality work, not release-infra work.

@@ -24,6 +24,22 @@ Defaults are chosen to work on the public Docker quickstart stack after built-in
 OSS plugins are imported. Override `LIST_PAGE_KEY`, `LIST_PATH`, or
 `COMMAND_CODE` when capturing baselines for a seeded application dataset.
 
+## Current Reference Baselines
+
+These committed reference numbers come from the public quickstart benchmark
+suite refreshed for the beta.2 line after PR #164. They are suitable for
+smoke/regression comparison on a warmed local Docker quickstart stack; publish
+machine-specific numbers in issue #150 before treating them as release SLOs.
+
+| Scenario | Source file | p50 | p95 | Error rate |
+|----------|-------------|-----|-----|------------|
+| Auth login | `auth-baseline.json` | 83.831 ms | 95.2808 ms | 0 |
+| DSL list query | `list-baseline.json` | 27.571 ms | 55.551 ms | 0 |
+| Command dry-run | `command-baseline.json` | 39.276 ms | 70.6245 ms | 0 |
+
+The current baseline JSON files do not include `p(99)` values. The comparator
+therefore treats p99 as skipped until new k6 exports include that percentile.
+
 ## How to Capture a New Baseline
 
 1. Ensure k6 and jq are installed:
