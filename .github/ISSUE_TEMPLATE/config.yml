@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Discord (community chat)
-    url: https://discord.gg/p2fW5A2MW6
-    about: Quick questions, community discussion
   - name: 📝 Product feedback / private question
     url: https://www.auraboot.com/contact?interest=feedback
     about: Beta feedback, unclear setup, licensing boundary questions, and private notes
