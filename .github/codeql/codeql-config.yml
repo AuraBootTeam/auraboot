@@ -8,6 +8,8 @@ query-filters:
   # than ambient browser cookies. The CSRF rule reports read-only controllers
   # and other authenticated API endpoints as new high-severity alerts.
   - exclude:
+      id: java/csrf-unprotected-request-type
+  - exclude:
       id: java/spring-disabled-csrf-protection
 
   # The platform logs metadata identifiers through SLF4J structured parameters.
