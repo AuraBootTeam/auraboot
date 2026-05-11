@@ -36,6 +36,7 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
 import { Client as PgClient } from 'pg';
 import { uniqueId } from '../helpers/index';
+import { BACKEND_URL } from '../../helpers/environments';
 
 const ADMIN_EMAIL = 'admin@example.com';
 const ADMIN_PASSWORD = 'Test2026x';
@@ -44,11 +45,8 @@ const PG_CONN = {
   port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
   database: process.env.PGDATABASE ?? 'aura_boot',
   user: process.env.PGUSER ?? 'ghj',
-  password: process.env.PGPASSWORD,
+  password: process.env['PGPASSWORD'],
 };
-
-const BACKEND_URL =
-  process.env.BACKEND_URL ?? `http://127.0.0.1:${process.env.BE_PORT ?? '6443'}`;
 
 const UID = uniqueId('TENUI');
 const PROCESS_KEY_A = `tenui_a_${UID}`;

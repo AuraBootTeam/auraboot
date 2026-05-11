@@ -148,7 +148,7 @@ export interface StyleSettings {
  */
 export interface WidgetConfig {
   title: string;
-  dataSource: DataSourceConfig;
+  dataSource?: DataSourceConfig;
   visualization?: Record<string, unknown>;
   style?: StyleSettings;
   linkage?: LinkageConfig;

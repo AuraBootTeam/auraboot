@@ -21,7 +21,7 @@ const uniqueId = () => `cfv_${Date.now()}_${Math.random().toString(36).slice(2, 
 
 // Helper: login and get token
 async function getToken(): Promise<string> {
-  const resp = await fetch(`${process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`}/api/auth/login`, {
+  const resp = await fetch(`${BACKEND_URL}/api/auth/login`, {
     method: 'post',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -43,7 +43,7 @@ async function executeCommand(
   const body: Record<string, unknown> = { payload };
   if (targetRecordId) body.targetRecordId = targetRecordId;
 
-  const resp = await fetch(`${process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`}/api/meta/commands/execute/${commandCode}`, {
+  const resp = await fetch(`${BACKEND_URL}/api/meta/commands/execute/${commandCode}`, {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',

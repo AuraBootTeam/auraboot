@@ -56,7 +56,10 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width - 32);
+        const nextWidth = Math.max(0, Math.floor(entry.contentRect.width - 32));
+        setContainerWidth((currentWidth) => (
+          Math.abs(currentWidth - nextWidth) <= 1 ? currentWidth : nextWidth
+        ));
       }
     });
 

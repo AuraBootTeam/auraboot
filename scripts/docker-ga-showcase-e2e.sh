@@ -89,14 +89,30 @@ runner_command() {
       cd /repo/web-admin;
       rm -rf tests/storage/ga-docker;
       ../scripts/ga-showcase-e2e.sh auth;
-      for seed in data extended workflow ai arsenal supplement commercial; do
+      seeds=(data extended workflow ai arsenal supplement);
+      case "${SHOWCASE_COMMERCIAL_SEED:-auto}" in
+        skip)
+          echo "[ga-showcase-docker] seed-showcase-commercial SKIP (SHOWCASE_COMMERCIAL_SEED=skip)";
+          ;;
+        required)
+          seeds+=(commercial);
+          ;;
+        auto|"")
+          echo "[ga-showcase-docker] seed-showcase-commercial SKIP (OSS crm-starter lacks full CRM quote/complaint commands)";
+          ;;
+        *)
+          echo "[ga-showcase-docker] SHOWCASE_COMMERCIAL_SEED must be auto|required|skip" >&2;
+          exit 1;
+          ;;
+      esac;
+      seeds+=(invariants dashboard-default);
+      for seed in "${seeds[@]}"; do
         echo "[ga-showcase-docker] seed-showcase-${seed}";
-        if npx playwright test --config=playwright.seed.config.ts \
+        if SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
+          npx playwright test --config=playwright.seed.config.ts \
           -g "seed-showcase-${seed}" --reporter=line \
           --output="test-results/ga-docker-seed-${seed}"; then
           echo "[ga-showcase-docker] seed-showcase-${seed} OK";
-        elif [[ "$seed" = "commercial" ]]; then
-          echo "[ga-showcase-docker] seed-showcase-commercial PARTIAL (known Quote-model gap)";
         else
           echo "[ga-showcase-docker] seed-showcase-${seed} FAILED" >&2;
           exit 1;
