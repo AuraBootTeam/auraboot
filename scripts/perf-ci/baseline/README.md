@@ -17,12 +17,26 @@ when comparing current run results against established baselines.
 
 ## How to Capture a New Baseline
 
-1. Ensure the server is running and warmed up:
+1. Ensure k6 and jq are installed:
+   ```bash
+   k6 version
+   jq --version
+   ```
+
+2. Ensure the server is running and warmed up:
    ```bash
    curl -s http://localhost:6443/actuator/health
    ```
 
-2. Run the relevant k6 test with `--summary-export`:
+3. Run the full public benchmark suite:
+   ```bash
+   BASE_URL=http://localhost:6443 \
+   USERNAME=admin@auraboot.com \
+   PASSWORD=Test2026x \
+   scripts/perf-ci/run-perf-regression.sh --profile smoke
+   ```
+
+4. Run the relevant k6 test with `--summary-export`:
    ```bash
    k6 run \
      --env BASE_URL=http://localhost:6443 \
@@ -32,13 +46,13 @@ when comparing current run results against established baselines.
      tests/load/k6/auth-baseline.js
    ```
 
-3. Repeat for `list-query.js` → `list-baseline.json`
+5. Repeat for `list-query.js` → `list-baseline.json`
    and `command-execution.js` → `command-baseline.json`.
 
-4. Commit the updated baselines:
+6. Commit the updated baselines:
    ```bash
    git add scripts/perf-ci/baseline/
-   git commit -m "perf(baseline): update regression baselines — $(date +%Y-%m-%d)"
+   git commit -m "perf: update regression baselines $(date +%Y-%m-%d)"
    ```
 
 ## When to Update Baselines
