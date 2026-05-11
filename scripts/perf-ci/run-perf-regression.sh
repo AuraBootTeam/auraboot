@@ -114,6 +114,13 @@ run_k6_once() {
     $extra_args \
     "$script" \
     2>&1 || true  # k6 exits non-zero on threshold failure; we evaluate ourselves
+
+  if [[ -s "$output_file" ]]; then
+    local sanitized_file="${output_file}.sanitized"
+    jq 'del(.setup_data.token?) | if (.setup_data? == {}) then del(.setup_data) else . end' \
+      "$output_file" > "$sanitized_file"
+    mv "$sanitized_file" "$output_file"
+  fi
 }
 
 # ---------------------------------------------------------------------------

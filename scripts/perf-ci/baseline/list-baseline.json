@@ -115,9 +115,6 @@
             "rate": 9.701613188108672
         }
     },
-    "setup_data": {
-        "token": "eyJraWQiOiJrZXktMSIsImFsZyI6IkhTMzg0In0.eyJuYW1lIjoiYWRtaW5AYXVyYWJvb3QuY29tIiwidGVuYW50SWQiOjMxMjA3ODI2NTM3ODU0MTU2OCwibWVtYmVySWQiOjMxMjA3ODI2NTQ2NjYyMTk1Miwic3ViIjoiMDFLUkFLRzRDQk44NUNEQTc4UzVWS0ZLMTUiLCJpYXQiOjE3Nzg0NzI4NjksImV4cCI6MTc3ODU1OTI2OX0.JST4sQy0RZDYtCGQxpi6x8XV9okxcW0TKIZ6Zsj5wAn4b-Xv0GTwoW5yayVi97P_"
-    },
     "root_group": {
         "id": "d41d8cd98f00b204e9800998ecf8427e",
         "groups": {
