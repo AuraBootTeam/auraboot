@@ -22,6 +22,8 @@ export const RESOURCES: PluginResource[] = [
   { key: 'meta.named-queries', path: '/meta/named-queries', title: { en: 'Named Queries', zh: '命名查询' }, icon: 'search', menu: { order: 40, group: 'meta' }, file: './plugins/core-meta/pages/meta/named-queries/index.tsx' },
   { key: 'meta.named-queries.new', path: '/meta/named-queries/new', title: { en: 'New Named Query', zh: '新建命名查询' }, menu: false, parentKey: 'meta.named-queries', file: './plugins/core-meta/pages/meta/named-queries/new.tsx' },
   { key: 'meta.named-queries.detail', path: '/meta/named-queries/:pid', title: { en: 'Named Query', zh: '命名查询详情' }, menu: false, parentKey: 'meta.named-queries', file: './plugins/core-meta/pages/meta/named-queries/$pid.tsx' },
+  // Command pipeline
+  { key: 'meta.commands.workbench', path: '/meta/commands/workbench', title: { en: 'Command Workbench', zh: '命令工作台' }, icon: 'workflow', menu: { order: 45, group: 'meta' }, file: './plugins/core-meta/pages/meta/commands/workbench.tsx' },
   // Misc
   { key: 'meta.ai-modeling', path: '/meta/ai-modeling', title: { en: 'AI Modeling', zh: 'AI 建模' }, icon: 'sparkles', menu: false, file: './plugins/core-meta/pages/meta/ai-modeling/index.tsx' },
 ]

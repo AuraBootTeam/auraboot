@@ -182,8 +182,7 @@ public class AgentChatPortImpl implements AgentChatPort {
             }
             return response;
         } catch (Exception e) {
-            log.warn("Approved pending tool execution failed: approvalPid={}, tool={}, error={}",
-                    approvalPid, pending.getToolName(), e.getMessage(), e);
+            log.warn("Approved pending tool execution failed: errorType={}", e.getClass().getSimpleName());
             response.put("success", false);
             response.put("error", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
             return response;

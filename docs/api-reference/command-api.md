@@ -1,6 +1,6 @@
 # Command API Reference
 
-The Command system is AuraBoot's unified data operation pipeline. Every create, update, delete, and state transition flows through a configurable 20-stage pipeline. Commands are defined in DSL JSON and executed via the Command API.
+The Command system is AuraBoot's unified data operation pipeline. Every create, update, delete, and state transition flows through a configurable 20+ stage pipeline. Commands are defined in DSL JSON and executed via the Command API.
 
 ## Execute a Command
 
@@ -137,7 +137,7 @@ Sending the same request again returns the original result without creating a du
 
 ---
 
-## The 20-Stage Pipeline
+## The 20+ Stage Pipeline
 
 Every command execution passes through these stages in order:
 

@@ -43,7 +43,7 @@ crm:win_opportunity      # Mark an opportunity as won
 
 ## The Execution Pipeline
 
-The command engine processes every command through a **multi-stage pipeline**. Each stage has a specific responsibility, and stages execute in strict order. The pipeline currently contains **22+ stages** (expanded from the original 20-stage design).
+The command engine processes every command through a **multi-stage pipeline**. Each stage has a specific responsibility, and stages execute in strict order. The pipeline currently contains **22+ stages**.
 
 ### Pipeline Overview
 

@@ -612,7 +612,7 @@ GRANT_SQL
     # /api/bootstrap/setup path invokes BootstrapEngineService step 9;
     # startup-runner imports are disabled above to keep one bootstrap
     # authority. Demo profile is controlled by the seedDemoData request field,
-    # derived from AURABOOT_DEMO_SEED.
+    # which is derived from AURABOOT_DEMO_SEED.
     #
     # The internal-only `test-fixtures` plugin is NOT imported via the platform.
     # It is seeded by the Playwright setup project (web-admin/tests/api/setup/

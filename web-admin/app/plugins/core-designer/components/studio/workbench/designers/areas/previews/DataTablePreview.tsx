@@ -7,14 +7,18 @@
 import React from 'react';
 import {
   parseColumnShorthand,
+  resolveLocalizedText,
   type DslBlock,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface DataTablePreviewProps {
   block: DslBlock;
 }
 
 export const DataTablePreview: React.FC<DataTablePreviewProps> = ({ block }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const columns = block.columns || [];
   const hasSelection = !!block.selection;
 
@@ -35,7 +39,7 @@ export const DataTablePreview: React.FC<DataTablePreviewProps> = ({ block }) => 
               )}
               {parsedColumns.length === 0 ? (
                 <th className="px-3 py-2 text-left font-normal text-gray-400">
-                  点击右侧面板添加列
+                  {l('点击右侧面板添加列', 'Add columns from the right panel')}
                 </th>
               ) : (
                 parsedColumns.map((col, index) => (
@@ -45,7 +49,7 @@ export const DataTablePreview: React.FC<DataTablePreviewProps> = ({ block }) => 
                     style={{ width: col.width }}
                   >
                     <div className="flex items-center gap-1">
-                      <span>{col.field}</span>
+                      <span>{resolveLocalizedText((col as any).label, locale) || col.field}</span>
                       {col.sortable && (
                         <svg
                           className="h-3 w-3 text-gray-400"
@@ -114,10 +118,10 @@ export const DataTablePreview: React.FC<DataTablePreviewProps> = ({ block }) => 
 
       {/* Pagination hint */}
       <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2 text-xs text-gray-400">
-        <span>共 -- 条</span>
+        <span>{l('共 -- 条', '-- rows')}</span>
         <div className="flex items-center gap-2">
-          <span>每页 10 条</span>
-          <span>第 1 页</span>
+          <span>{l('每页 10 条', '10 / page')}</span>
+          <span>{l('第 1 页', 'Page 1')}</span>
         </div>
       </div>
     </div>
@@ -138,12 +142,14 @@ interface CellPreviewProps {
 }
 
 const CellPreview: React.FC<CellPreviewProps> = ({ column, rowIndex: _rowIndex }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   // Actions column
   if (column.field === '$actions' || column.actions) {
     return (
       <div className="flex items-center gap-2">
-        <span className="cursor-pointer text-blue-500">查看</span>
-        <span className="cursor-pointer text-blue-500">编辑</span>
+        <span className="cursor-pointer text-blue-500">{l('查看', 'View')}</span>
+        <span className="cursor-pointer text-blue-500">{l('编辑', 'Edit')}</span>
       </div>
     );
   }
@@ -153,7 +159,7 @@ const CellPreview: React.FC<CellPreviewProps> = ({ column, rowIndex: _rowIndex }
     case 'tag':
       return (
         <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
-          状态
+          {l('状态', 'Status')}
         </span>
       );
     case 'datetime':

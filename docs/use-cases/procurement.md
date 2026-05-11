@@ -6,7 +6,7 @@
 
 ### Problem Statement
 
-Manufacturing companies need a comprehensive procurement system that goes beyond basic purchase orders. They need supplier relationship management, outsource order tracking (for contract manufacturing), three-way matching (PO vs. receipt vs. invoice), supplier performance scoring, contract lifecycle management, and spend analytics. AuraBoot's Procurement plugin delivers all of this through a zero-code DSL configuration approach with full state machine-driven workflows.
+Manufacturing companies often need procurement workflows that go beyond basic purchase orders: supplier relationship management, outsource order tracking, three-way matching (PO vs. receipt vs. invoice), supplier performance scoring, contract lifecycle management, and spend analytics. AuraBoot's Procurement plugin models these areas through DSL configuration and state machine-driven workflows, with code hooks available where project-specific behavior is needed.
 
 ### Target Users
 

@@ -13,6 +13,7 @@ import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import com.auraboot.framework.plugin.pf4j.PluginExtensionRegistryBridge;
 import com.auraboot.framework.plugin.service.PluginImportService;
 import com.auraboot.framework.plugin.service.PluginResourceService;
 import com.auraboot.framework.plugin.service.PluginSignatureVerifier;
@@ -70,6 +71,7 @@ class PluginPackageServiceImplCoreTest {
     @Mock private PluginResourceService pluginResourceService;
     @Mock private AuraPluginManager auraPluginManager;
     @Mock private ExtensionRegistry extensionRegistry;
+    @Mock private PluginExtensionRegistryBridge pluginExtensionRegistryBridge;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private PluginDirectoryLoader directoryLoader;
     @Mock private PluginSignatureVerifier signatureVerifier;

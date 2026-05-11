@@ -1,6 +1,6 @@
 # AuraBoot Use Cases
 
-AuraBoot powers solutions across industries. Each use case below shows a complete, production-ready business application built entirely through JSON DSL configuration -- no custom code required for core business logic.
+AuraBoot powers solutions across industries. Each use case below shows how a business application can be assembled through JSON DSL configuration, with custom code reserved for the parts that truly need it.
 
 ## Capability Matrix
 
@@ -40,7 +40,7 @@ AuraBoot powers solutions across industries. Each use case below shows a complet
 | [HR Leave Management](./hr-leave-management.md) | Employee records, leave requests, multi-level approval, balance tracking | 2 |
 | [Knowledge Base](./knowledge-base.md) | Documents, articles, categories, version tracking, RAG-powered AI search | 5 |
 | [PCBA Industry Solution](./pcba-industry-solution.md) | End-to-end PCBA: CRM → Sales → Procurement → Manufacturing → QA → Shipping (10 plugins) | 60+ |
-| [AI Agent Platform](./ai-agent-platform.md) | Multi-agent orchestration, autonomous AI employees, tool registry, governance | 16 |
+| [AI Agent Platform](./ai-agent-platform.md) | Multi-agent orchestration, AI-assisted work, tool registry, governance | 16 |
 
 ## Platform Capabilities Demonstrated
 

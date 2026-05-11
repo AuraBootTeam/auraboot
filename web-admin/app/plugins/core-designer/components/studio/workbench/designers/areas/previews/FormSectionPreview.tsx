@@ -14,6 +14,7 @@ import {
   type DslBlock,
   type DslFieldRef,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface FormSectionPreviewProps {
   block: DslBlock;
@@ -30,8 +31,10 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
   onFieldSelect,
   readonly,
 }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const fields = block.fields || [];
-  const title = resolveLocalizedText(block.title);
+  const title = resolveLocalizedText(block.title, locale);
   const collapsible = block.collapsible;
   const isDetailSection = block.blockType === 'detail-section';
   const columnsCount = (block.props as any)?.columns || 2;
@@ -71,7 +74,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
           </div>
           {isDetailSection && (
             <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-400">
-              只读
+              {l('只读', 'Read only')}
             </span>
           )}
         </div>
@@ -81,7 +84,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
       <div className="p-4">
         {fields.length === 0 ? (
           <div className="rounded border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400">
-            点击右侧面板添加字段
+            {l('点击右侧面板添加字段', 'Add fields from the right panel')}
           </div>
         ) : (
           <SortableContext items={fieldIds} strategy={rectSortingStrategy}>
@@ -97,8 +100,12 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
                   <SortableFieldItem
                     key={fieldId}
                     id={fieldId}
-                    fieldName={field.field || `字段${index + 1}`}
-                    placeholder={resolveLocalizedText(field.placeholder) || undefined}
+                    fieldName={
+                      resolveLocalizedText(field.label, locale) ||
+                      field.field ||
+                      l(`字段${index + 1}`, `Field ${index + 1}`)
+                    }
+                    placeholder={resolveLocalizedText(field.placeholder, locale) || undefined}
                     required={field.required}
                     isDetailSection={isDetailSection}
                     isSelected={selectedFieldIndex === index}
@@ -114,7 +121,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
         )}
         {fields.length > 8 && (
           <div className="mt-3 text-center text-xs text-gray-400">
-            +{fields.length - 8} 更多字段
+            {l(`+${fields.length - 8} 更多字段`, `+${fields.length - 8} more fields`)}
           </div>
         )}
       </div>
@@ -150,6 +157,8 @@ const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
   disabled,
   onSelect,
 }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     disabled,
@@ -221,7 +230,7 @@ const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
             isDragging ? 'border-blue-300 bg-blue-50' : 'border-gray-200'
           }`}
         >
-          {placeholder || '请输入...'}
+          {placeholder || l('请输入...', 'Enter...')}
         </div>
       )}
     </div>

@@ -32,7 +32,7 @@ Every business application in AuraBoot is assembled from these resource types:
 | **Models** | `config/models.json` | Define business entities (e.g., Contract, Employee). Each model maps to a database table. |
 | **Fields** | `config/fields/*.json` | Define the columns of a model -- data type, constraints, display behavior. |
 | **Bindings** | `config/bindings/*.json` | Bind fields to models with sequence, visibility, and editability settings. |
-| **Commands** | `config/commands/*.json` | Define data operations -- create, update, delete, state transitions. Each command flows through a [20-stage pipeline](./commands.md). |
+| **Commands** | `config/commands/*.json` | Define data operations -- create, update, delete, state transitions. Each command flows through a [20+ stage pipeline](./commands.md). |
 | **Pages** | `config/pages/*.json` | Define UI layouts -- list pages, forms, detail views, dashboards. Built from composable [blocks](./pages-and-layouts.md). |
 | **Dicts** | `config/dicts.json` | Define enumeration dictionaries -- dropdown options, status values, category trees. |
 | **Formulas** | `config/formulas/*.json` | Define computed fields and aggregation rules (sum, count, average across related records). |
@@ -339,7 +339,7 @@ flowchart TB
 
     subgraph Runtime["Runtime Engine"]
         CACHE[In-Memory Cache]
-        PIPE[20-Stage Command Pipeline]
+        PIPE[20+ Stage Command Pipeline]
         DYN[DynamicController]
     end
 

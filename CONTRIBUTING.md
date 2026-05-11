@@ -25,7 +25,7 @@ All participants are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/<your-username>/auraboot.git
+gh repo fork AuraBootTeam/auraboot --clone
 cd auraboot
 
 # 2. Initialize the database
@@ -192,7 +192,7 @@ The signature is recorded against your GitHub username and applies to all your f
 
 **Trivial contributions are exempt** (typo fixes, formatting). See [CLA.md § Trivial Contributions](CLA.md#trivial-contributions) for the full list.
 
-For organizations, a Corporate CLA may be required if your employer holds rights to your work. Contact license@auraboot.com.
+For organizations, a Corporate CLA may be required if your employer holds rights to your work. Contact us through https://www.auraboot.com/contact.
 
 ---
 

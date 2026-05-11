@@ -20,12 +20,9 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 
-export type LocalizedTextValue =
-  | string
-  | { [locale: string]: string }
-  | undefined
-  | null;
+export type LocalizedTextValue = string | { [locale: string]: string } | undefined | null;
 
 export interface LocalizedTextInputProps {
   value: LocalizedTextValue;
@@ -74,11 +71,7 @@ function readLocale(v: LocalizedTextValue, locale: string): string {
  *   - Only zh-CN filled and component not expanded → plain string
  *   - Otherwise → object form with whichever locales have content
  */
-function buildOutput(
-  zh: string,
-  en: string,
-  expanded: boolean,
-): LocalizedTextValue {
+function buildOutput(zh: string, en: string, expanded: boolean): LocalizedTextValue {
   const zhTrim = zh;
   const enTrim = en;
   if (!zhTrim && !enTrim) return undefined;
@@ -105,6 +98,8 @@ export const LocalizedTextInput: React.FC<LocalizedTextInputProps> = ({
   testId,
   className,
 }) => {
+  const { locale } = useI18n();
+  const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
   // Auto-expand when the incoming value is already an object-form with en-US
   // content, so reopening a page with multilingual data shows both inputs.
   const initialExpanded = useMemo(() => {
@@ -169,7 +164,7 @@ export const LocalizedTextInput: React.FC<LocalizedTextInputProps> = ({
               data-testid={testId ? `${testId}-toggle` : undefined}
               className="text-[10px] text-blue-600 hover:underline disabled:text-gray-400"
             >
-              {expanded ? '- 折叠' : '+ 多语言'}
+              {expanded ? l('- 折叠', '- Collapse') : l('+ 多语言', '+ Locales')}
             </button>
           )}
         </div>
@@ -187,7 +182,9 @@ export const LocalizedTextInput: React.FC<LocalizedTextInputProps> = ({
           value={zh}
           onChange={(e) => handleLocaleChange('zh-CN', e.target.value)}
           placeholder={
-            i18nMode ? '$i18n:your.key' : placeholder || (expanded ? '中文' : undefined)
+            i18nMode
+              ? '$i18n:your.key'
+              : placeholder || (expanded ? l('中文', 'Chinese') : undefined)
           }
           disabled={disabled}
           data-testid={testId ? `${testId}-zh` : undefined}
@@ -205,7 +202,7 @@ export const LocalizedTextInput: React.FC<LocalizedTextInputProps> = ({
             type="text"
             value={en}
             onChange={(e) => handleLocaleChange('en-US', e.target.value)}
-            placeholder="English"
+            placeholder={l('英文', 'English')}
             disabled={disabled}
             data-testid={testId ? `${testId}-en` : undefined}
             className={`w-[calc(100%-2rem)] rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none ${disabled ? 'bg-gray-50 text-gray-400' : 'bg-white'}`}

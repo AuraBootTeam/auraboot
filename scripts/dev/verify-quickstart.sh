@@ -8,10 +8,11 @@
 # Usage:
 #   ./scripts/dev/verify-quickstart.sh                  # uses repo root
 #   ./scripts/dev/verify-quickstart.sh --clean-clone    # also git clone fresh into /tmp
+#   POSTGRES_PORT=15432 ./scripts/dev/verify-quickstart.sh  # if local PostgreSQL already uses 5432
 #
 # Pass criteria:
 #   - docker compose --profile full up -d completes within 5 minutes
-#   - http://localhost:3000 (BFF/SSR) returns 200 within ~180s of compose up
+#   - http://localhost:3000 (BFF/SSR) returns a ready 2xx/3xx response within ~120s of compose up
 #   - login with default creds returns a JWT
 #   - backend `/actuator/health` responds inside the container
 #   - 3 sample API endpoints respond in expected shape (via BFF proxy)
@@ -83,17 +84,35 @@ done
 [ $ATTEMPTS -le 60 ] && ok "backend healthy after ${ATTEMPTS}×3s"
 
 step "5/8 Frontend reachable (BFF/SSR on host port 3000)"
-if curl -fsS -m 5 http://localhost:3000 -o /dev/null; then
-  ok "http://localhost:3000 returns 200"
-else
-  fail "frontend not reachable"
-fi
+FRONTEND_STATUS="000"
+ATTEMPTS=0
+while true; do
+  FRONTEND_STATUS=$(curl -sS -m 5 -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null || echo "000")
+  case "$FRONTEND_STATUS" in
+    200|301|302|303|307|308)
+      ok "http://localhost:3000 returns ${FRONTEND_STATUS} after ${ATTEMPTS}×2s"
+      break
+      ;;
+  esac
+  ATTEMPTS=$((ATTEMPTS + 1))
+  if [ $ATTEMPTS -gt 60 ]; then
+    fail "frontend not reachable; last status=${FRONTEND_STATUS}"
+    docker compose logs --tail 80 frontend 2>/dev/null || true
+    break
+  fi
+  sleep 2
+done
 
 step "6/8 Login API contract (via BFF proxy)"
 # Frontend BFF proxies /api/* to backend; we go through it to mirror real user flow.
-LOGIN_RESPONSE=$(curl -fsS -m 5 -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@auraboot.com","password":"Test2026x"}' 2>/dev/null || echo "FAIL")
+LOGIN_RESPONSE="FAIL"
+for _ in $(seq 1 20); do
+  LOGIN_RESPONSE=$(curl -fsS -m 5 -X POST http://localhost:3000/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@auraboot.com","password":"Test2026x"}' 2>/dev/null || echo "FAIL")
+  echo "$LOGIN_RESPONSE" | grep -q '"jwt"' && break
+  sleep 2
+done
 # AuraBoot wraps responses as ApiResponse<AuthenticationResponse> → JWT is at $.data.jwt.
 if echo "$LOGIN_RESPONSE" | grep -q '"jwt"'; then
   ok "login returns JWT (data.jwt)"
@@ -119,18 +138,25 @@ fi
 
 step "8/8 Log scan (looking for ERROR-level surprises)"
 KNOWN_NOISE='Connection refused: connect|temporary failure|retrying|com.zaxxer.hikari.pool|Task :|^$'
-ERR_COUNT=$(docker compose logs backend 2>/dev/null \
-  | grep -c "ERROR\b" \
-  | head -1)
-ERR_REAL=$(docker compose logs backend 2>/dev/null \
-  | grep "ERROR\b" \
-  | grep -vE "$KNOWN_NOISE" \
-  | wc -l | tr -d ' ')
+ERR_LINES=$(docker compose logs backend 2>/dev/null | grep "ERROR\b" || true)
+if [ -z "$ERR_LINES" ]; then
+  ERR_COUNT=0
+  ERR_REAL=0
+  ERR_REAL_LINES=""
+else
+  ERR_COUNT=$(printf '%s\n' "$ERR_LINES" | wc -l | tr -d ' ')
+  ERR_REAL_LINES=$(printf '%s\n' "$ERR_LINES" | grep -vE "$KNOWN_NOISE" || true)
+  if [ -z "$ERR_REAL_LINES" ]; then
+    ERR_REAL=0
+  else
+    ERR_REAL=$(printf '%s\n' "$ERR_REAL_LINES" | wc -l | tr -d ' ')
+  fi
+fi
 if [ "${ERR_REAL:-0}" -eq 0 ]; then
   ok "no unexpected ERROR lines in backend logs"
 else
   warn "$ERR_REAL ERROR lines (out of $ERR_COUNT total) need triage:"
-  docker compose logs platform 2>/dev/null | grep "ERROR\b" | grep -vE "$KNOWN_NOISE" | head -5
+  printf '%s\n' "$ERR_REAL_LINES" | head -5
 fi
 
 # --- Summary ---

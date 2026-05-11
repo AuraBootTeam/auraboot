@@ -9,6 +9,7 @@ import React, { useState, useMemo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import type { BlockType, PageKind } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { SmartComponentLibrary } from './SmartComponentLibrary';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface BlockLibraryProps {
   pageKind: PageKind;
@@ -29,12 +30,12 @@ type BlockCategory = 'form' | 'display' | 'layout' | 'chart' | 'all';
 /**
  * Category display configuration
  */
-const CATEGORY_CONFIG: Record<BlockCategory, { label: string; icon: string }> = {
-  all: { label: '全部', icon: '' },
-  form: { label: '表单', icon: '📝' },
-  display: { label: '展示', icon: '📊' },
-  layout: { label: '布局', icon: '📐' },
-  chart: { label: '图表', icon: '📈' },
+const CATEGORY_CONFIG: Record<BlockCategory, { label: Record<'zh-CN' | 'en-US', string>; icon: string }> = {
+  all: { label: { 'zh-CN': '全部', 'en-US': 'All' }, icon: '' },
+  form: { label: { 'zh-CN': '表单', 'en-US': 'Form' }, icon: '📝' },
+  display: { label: { 'zh-CN': '展示', 'en-US': 'Display' }, icon: '📊' },
+  layout: { label: { 'zh-CN': '布局', 'en-US': 'Layout' }, icon: '📐' },
+  chart: { label: { 'zh-CN': '图表', 'en-US': 'Chart' }, icon: '📈' },
 };
 
 /**
@@ -150,6 +151,29 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
   },
 ];
 
+const BLOCK_TYPE_EN: Record<BlockType, { name: string; description: string }> = {
+  filters: { name: 'Filter Form', description: 'Form with filter conditions' },
+  'form-section': { name: 'Form Section', description: 'Form field group' },
+  'form-buttons': { name: 'Form Buttons', description: 'Submit and cancel buttons' },
+  table: { name: 'Data Table', description: 'Table for displaying data' },
+  'detail-section': { name: 'Detail Section', description: 'Read-only detail display' },
+  text: { name: 'Text Content', description: 'Static text or description' },
+  toolbar: { name: 'Toolbar Buttons', description: 'Action button group' },
+  'selection-info': { name: 'Selection Info', description: 'Show selected item information' },
+  'stat-card': { name: 'Stat Card', description: 'Metric summary card' },
+  'chart-card': { name: 'Chart Card', description: 'Chart visualization' },
+};
+
+function blockName(blockInfo: BlockTypeInfo, locale: string): string {
+  return locale === 'zh-CN' ? blockInfo.name : BLOCK_TYPE_EN[blockInfo.type]?.name || blockInfo.name;
+}
+
+function blockDescription(blockInfo: BlockTypeInfo, locale: string): string {
+  return locale === 'zh-CN'
+    ? blockInfo.description
+    : BLOCK_TYPE_EN[blockInfo.type]?.description || blockInfo.description;
+}
+
 /**
  * Single draggable block item
  */
@@ -157,9 +181,15 @@ interface DraggableBlockItemProps {
   blockInfo: BlockTypeInfo;
   disabled?: boolean;
   onAdd?: (type: BlockType) => void;
+  locale: string;
 }
 
-const DraggableBlockItem: React.FC<DraggableBlockItemProps> = ({ blockInfo, disabled, onAdd }) => {
+const DraggableBlockItem: React.FC<DraggableBlockItemProps> = ({
+  blockInfo,
+  disabled,
+  onAdd,
+  locale,
+}) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `library:${blockInfo.type}`,
     disabled,
@@ -186,8 +216,8 @@ const DraggableBlockItem: React.FC<DraggableBlockItemProps> = ({ blockInfo, disa
     >
       <span className="text-xl">{blockInfo.icon}</span>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-gray-900">{blockInfo.name}</div>
-        <div className="truncate text-xs text-gray-500">{blockInfo.description}</div>
+        <div className="text-sm font-medium text-gray-900">{blockName(blockInfo, locale)}</div>
+        <div className="truncate text-xs text-gray-500">{blockDescription(blockInfo, locale)}</div>
       </div>
     </div>
   );
@@ -258,9 +288,10 @@ interface CategoryTabsProps {
   categories: BlockCategory[];
   selected: BlockCategory;
   onSelect: (category: BlockCategory) => void;
+  locale: string;
 }
 
-const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selected, onSelect }) => {
+const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selected, onSelect, locale }) => {
   return (
     <div className="flex flex-wrap gap-1">
       {categories.map((cat) => (
@@ -274,7 +305,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selected, onSel
           }`}
         >
           {CATEGORY_CONFIG[cat].icon && <span className="mr-1">{CATEGORY_CONFIG[cat].icon}</span>}
-          {CATEGORY_CONFIG[cat].label}
+          {CATEGORY_CONFIG[cat].label[locale === 'zh-CN' ? 'zh-CN' : 'en-US']}
         </button>
       ))}
     </div>
@@ -282,6 +313,8 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({ categories, selected, onSel
 };
 
 export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKind, readonly, onAddBlock }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   // Normalize to lowercase — DB stores PascalCase (e.g. "List") but
   // BLOCK_TYPES.availableIn uses lowercase ("list").
   const pageKind = (rawPageKind?.toLowerCase() ?? 'list') as PageKind;
@@ -313,15 +346,15 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       blocks = blocks.filter((block) => {
-        const nameMatch = block.name.toLowerCase().includes(query);
-        const descMatch = block.description.toLowerCase().includes(query);
+        const nameMatch = blockName(block, locale).toLowerCase().includes(query);
+        const descMatch = blockDescription(block, locale).toLowerCase().includes(query);
         const keywordMatch = block.keywords?.some((kw) => kw.toLowerCase().includes(query));
         return nameMatch || descMatch || keywordMatch;
       });
     }
 
     return blocks;
-  }, [pageKind, searchQuery, selectedCategory]);
+  }, [pageKind, searchQuery, selectedCategory, locale]);
 
   // Group blocks by category for display
   const groupedBlocks = useMemo(() => {
@@ -360,7 +393,7 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
           }`}
         >
-          📦 Blocks
+          📦 {l('区块', 'Blocks')}
         </button>
         <button
           onClick={() => setActiveTab('components')}
@@ -371,7 +404,7 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
           }`}
         >
-          🧩 Smart 组件
+          🧩 {l('智能组件', 'Smart Components')}
         </button>
       </div>
 
@@ -385,13 +418,14 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="搜索 Block..."
+              placeholder={l('搜索区块...', 'Search blocks...')}
               data-testid="library-search"
             />
             <CategoryTabs
               categories={availableCategories}
               selected={selectedCategory}
               onSelect={setSelectedCategory}
+              locale={locale}
             />
           </div>
 
@@ -412,7 +446,9 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
                     d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <p className="text-sm">{searchQuery ? '未找到匹配的 Block' : '暂无可用 Block'}</p>
+                <p className="text-sm">
+                  {searchQuery ? l('未找到匹配的区块', 'No matching blocks') : l('暂无可用区块', 'No blocks available')}
+                </p>
               </div>
             ) : selectedCategory === 'all' ? (
               // Show grouped blocks
@@ -421,7 +457,13 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
                   <div key={category}>
                     <h4 className="mb-2 flex items-center gap-1 text-xs font-medium tracking-wider text-gray-500 uppercase">
                       <span>{CATEGORY_CONFIG[category as BlockCategory].icon}</span>
-                      <span>{CATEGORY_CONFIG[category as BlockCategory].label}</span>
+                      <span>
+                        {
+                          CATEGORY_CONFIG[category as BlockCategory].label[
+                            locale === 'zh-CN' ? 'zh-CN' : 'en-US'
+                          ]
+                        }
+                      </span>
                     </h4>
                     <div className="space-y-2">
                       {blocks.map((blockInfo) => (
@@ -430,6 +472,7 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
                           blockInfo={blockInfo}
                           disabled={readonly}
                           onAdd={onAddBlock}
+                          locale={locale}
                         />
                       ))}
                     </div>
@@ -444,6 +487,7 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
                     key={blockInfo.type}
                     blockInfo={blockInfo}
                     disabled={readonly}
+                    locale={locale}
                   />
                 ))}
               </div>
@@ -455,7 +499,7 @@ export const BlockLibrary: React.FC<BlockLibraryProps> = ({ pageKind: rawPageKin
             className="border-t border-gray-100 px-3 py-2 text-xs text-gray-400"
             data-testid="library-count"
           >
-            共 {filteredBlocks.length} 个 Block
+            {l(`共 ${filteredBlocks.length} 个区块`, `${filteredBlocks.length} block(s)`)}
           </div>
         </>
       )}

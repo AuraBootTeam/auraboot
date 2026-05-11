@@ -9,7 +9,7 @@ This document defines what is and is not part of AuraBoot's open-source distribu
 ### Platform engine (core differentiation)
 
 - DSL engine (model / field / command / page) — auto-generates CRUD
-- Command Pipeline (20-stage, SideEffect, state machine, Precondition)
+- Command Pipeline (20+ stages, SideEffect, state machine, Precondition)
 - Plugin framework (L1 / L2 / Platform / Solution layers, Marketplace UI)
 - Multi-tenancy (TenantLineInterceptor, tenant isolation)
 - RBAC (roles / permissions / menus / data scopes)
@@ -108,7 +108,7 @@ This script reads `oss-scope.json` and runs Playwright with a strict per-project
 ### Reset the OSS standalone environment
 
 ```bash
-DATABASE_USERNAME=<your-pg-user> ./scripts/oss-reset-and-init.sh
+DATABASE_USERNAME=postgres ./scripts/oss-reset-and-init.sh
 ```
 
 This:
@@ -118,7 +118,7 @@ This:
 4. Imports the core profile plus demo profile built-in plugins
 5. Starts the frontend
 
-After completion, http://localhost:5173 is a fully functional OSS deployment.
+After completion, `http://localhost:5173` is a working source-development stack for the OSS edition.
 
 ### Test naming-space convention
 

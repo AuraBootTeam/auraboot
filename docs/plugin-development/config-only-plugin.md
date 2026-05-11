@@ -1,6 +1,6 @@
 # Config-Only Plugin Tutorial
 
-This is a step-by-step tutorial for building a complete AuraBoot plugin using only JSON configuration files. By the end, you will have a fully functional **Task Tracker** with:
+This is a step-by-step tutorial for building a small AuraBoot plugin using JSON configuration files. By the end, you will have a working **Task Tracker** with:
 
 - A data model with 10+ fields
 - CRUD commands (create, update, delete)

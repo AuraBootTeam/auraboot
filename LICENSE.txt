@@ -147,8 +147,8 @@ following conditions:
 
 7. COMMERCIAL LICENSE — RIGHTS AND OBLIGATIONS
 
-7.1 A Commercial License may be obtained by contacting the Licensor at
-    https://www.auraboot.com/ or via email at license@auraboot.com.
+7.1 A Commercial License may be obtained by contacting the Licensor through
+    https://www.auraboot.com/contact.
 
 7.2 The Commercial License grants additional rights beyond those in the Open
     Source License, including but not limited to:
