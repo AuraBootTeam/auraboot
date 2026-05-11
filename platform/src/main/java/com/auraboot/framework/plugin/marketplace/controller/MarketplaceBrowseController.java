@@ -21,7 +21,7 @@ public class MarketplaceBrowseController {
 
     private final MarketplaceBrowseService browseService;
 
-    // lgtm[java/spring-disabled-csrf-protection] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/plugins")
     @Operation(summary = "Search marketplace plugins")
     public ApiResponse<List<MarketplacePluginDTO>> searchPlugins(
@@ -31,28 +31,28 @@ public class MarketplaceBrowseController {
         return ApiResponse.ok(browseService.search(keyword, category, sort));
     }
 
-    // lgtm[java/spring-disabled-csrf-protection] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/plugins/{pluginId}")
     @Operation(summary = "Get plugin detail")
     public ApiResponse<MarketplacePluginDetailDTO> getPluginDetail(@PathVariable String pluginId) {
         return ApiResponse.ok(browseService.getDetail(pluginId));
     }
 
-    // lgtm[java/spring-disabled-csrf-protection] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/plugins/{pluginId}/versions")
     @Operation(summary = "Get plugin versions")
     public ApiResponse<List<MarketplaceVersionDTO>> getVersions(@PathVariable String pluginId) {
         return ApiResponse.ok(browseService.getVersions(pluginId));
     }
 
-    // lgtm[java/spring-disabled-csrf-protection] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/categories")
     @Operation(summary = "Get marketplace categories")
     public ApiResponse<List<MarketplaceCategory>> getCategories() {
         return ApiResponse.ok(browseService.getCategories());
     }
 
-    // lgtm[java/spring-disabled-csrf-protection] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/featured")
     @Operation(summary = "Get featured plugins")
     public ApiResponse<List<MarketplacePluginDTO>> getFeatured() {

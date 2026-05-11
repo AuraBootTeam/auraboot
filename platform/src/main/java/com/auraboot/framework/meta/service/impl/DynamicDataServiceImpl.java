@@ -171,7 +171,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 queryBuilder.addRawCondition(rowFilter);
             }
         } catch (Exception e) {
-            // lgtm[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
             log.error("Failed to apply row-level data permission for model {} — returning empty result for security", modelCode, e);
             throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
         }
@@ -184,7 +184,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 queryBuilder.addRawCondition(domainFilter);
             }
         } catch (Exception e) {
-            // lgtm[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
             log.error("Failed to apply domain filter for model {} — returning empty result for security", modelCode, e);
             throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
         }
@@ -237,7 +237,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 countBuilder.addRawCondition(countRowFilter);
             }
         } catch (Exception e) {
-            // lgtm[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
             log.error("Failed to apply row-level data permission to count query for model {} — denying access", modelCode, e);
             throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
         }
@@ -250,7 +250,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 countBuilder.addRawCondition(countDomainFilter);
             }
         } catch (Exception e) {
-            // lgtm[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
             log.error("Failed to apply domain filter to count query for model {} — denying access", modelCode, e);
             throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
         }
@@ -274,7 +274,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 records = dataPermissionEngine.applyFieldMasking(records, maskRules);
             }
         } catch (Exception e) {
-            // lgtm[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
             log.error("Failed to apply field masking for model {} — returning empty result for security", modelCode, e);
             throw new MetaServiceException("Field masking evaluation failed for model: " + modelCode, e);
         }
@@ -284,7 +284,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Long userId = getCurrentUserId();
             records = fieldMaskService.applyMaskingForList(modelCode, records, userId);
         } catch (Exception e) {
-            // lgtm[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
             log.error("Failed to apply configurable field masking for model {} — returning empty result for security", modelCode, e);
             throw new MetaServiceException("Configurable field masking failed for model: " + modelCode, e);
         }
@@ -338,7 +338,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 hidden.forEach(record::remove);
             }
         } catch (Exception e) {
-            // lgtm[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
             log.warn("Failed to apply field permission filter for model {}: {}", modelCode, e.getMessage(), e);
         }
         return records;
@@ -540,7 +540,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     }
                 }
             } catch (Exception e) {
-                // lgtm[java/log-injection] Field/model codes are validated metadata identifiers and are logged as structured parameters only.
+                // codeql[java/log-injection] Field/model codes are validated metadata identifiers and are logged as structured parameters only.
                 log.warn("Failed to enrich REFERENCE display for field {} in model {}: {}",
                         fieldCode, modelCode, e.getMessage(), e);
             }
@@ -633,7 +633,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * Passes through filter conditions and sort fields from the dynamic query request.
      */
     private PaginationResult<Map<String, Object>> listFromNamedQuery(String queryCode, DynamicQueryRequest request) {
-        // lgtm[java/log-injection] Named query codes are validated metadata identifiers and are logged as structured parameters only.
+        // codeql[java/log-injection] Named query codes are validated metadata identifiers and are logged as structured parameters only.
         log.debug("NamedQuery list: code={}", queryCode);
         NamedQueryTestRequest nqRequest = new NamedQueryTestRequest();
         nqRequest.setPage(request.getPageNum());
