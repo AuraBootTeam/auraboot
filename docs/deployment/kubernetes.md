@@ -64,20 +64,14 @@ data:
 
 Sensitive values stored as Kubernetes Secrets:
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: auraboot-secrets
-  namespace: auraboot
-type: Opaque
-stringData:
-  DATABASE_URL: "jdbc:postgresql://postgres-svc:5432/aura_boot?charSet=UTF8"
-  DATABASE_USERNAME: "auraboot"
-  DATABASE_PASSWORD: "<strong-password>"
-  JWT_SECRET: "<openssl rand -hex 32>"
-  FIELD_ENCRYPTION_KEY: "<openssl rand -base64 32>"
-  ANTHROPIC_API_KEY: "<your-key>"  # Optional: for AI features
+```bash
+kubectl -n auraboot create secret generic auraboot-secrets \
+  --from-literal=DATABASE_URL="jdbc:postgresql://postgres-svc:5432/aura_boot?charSet=UTF8" \
+  --from-literal=DATABASE_USERNAME="auraboot" \
+  --from-literal=DATABASE_PASSWORD="${DATABASE_PASSWORD}" \
+  --from-literal=JWT_SECRET="${JWT_SECRET}" \
+  --from-literal=FIELD_ENCRYPTION_KEY="${FIELD_ENCRYPTION_KEY}" \
+  --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 ```
 
 ---

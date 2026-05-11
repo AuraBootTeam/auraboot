@@ -13,7 +13,7 @@ describe('DynamicField', () => {
         data: {
           pid: 'user-1',
           displayName: 'Admin User',
-          email: 'admin@example.com',
+          email: 'admin@auraboot.com',
         },
       }),
     }) as unknown as typeof fetch;

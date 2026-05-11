@@ -7,6 +7,7 @@ import {
   BeakerIcon,
 } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
+import { ResultHelper } from '~/utils/type';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,34 +32,53 @@ interface AuditLogEntry {
   errorMessage?: string;
   executionTimeMs?: number;
   phaseReached: string;
-  phaseTimings?: string;
+  phaseTimings?: string | Record<string, number>;
   requestPayload?: string;
   executionResult?: string;
   createdAt: string;
 }
 
 const PIPELINE_PHASES = [
-  'init',
   'load',
   'schema_validate',
   'idempotency_check',
   'entitlement_check',
+  'authorization',
   'sod_check',
   'state_check',
   'assert',
   'pre_invariant',
+  'cross_field_validation',
+  'pre_actions',
   'auto_set',
   'field_map',
   'computed_fields',
+  'change_tracking',
   'handler',
   'side_effect',
+  'roll_up',
   'post_action',
+  'post_execution',
   'effect',
   'domain_event',
+  'api_call',
   'webhook',
   'post_invariant',
-  'completed',
+  'governance_snapshot',
+  'completion',
 ];
+
+function parsePhaseTimings(value: AuditLogEntry['phaseTimings']): Record<string, number> {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as Record<string, number>;
+    } catch {
+      return {};
+    }
+  }
+  return value;
+}
 
 // ─── Phase Waterfall ──────────────────────────────────────────────────────────
 
@@ -153,7 +173,7 @@ export default function CommandWorkbenchPage() {
         `/api/meta/commands/audit-logs?commandCode=${encodeURIComponent(code)}&pageSize=1`,
       );
       const data = await res.json();
-      if (data.code === 0 && data.data.records?.length > 0) {
+      if (ResultHelper.isSuccess(data) && data.data.records?.length > 0) {
         setAuditLog(data.data.records[0]);
       }
     } catch {
@@ -182,12 +202,12 @@ export default function CommandWorkbenchPage() {
       });
       const data = await res.json();
 
-      if (data.code === 0) {
+      if (ResultHelper.isSuccess(data)) {
         setResult(data.data);
         // Fetch audit log to get phase timings (available after execution)
         setTimeout(() => fetchLatestAuditLog(commandCode), 300);
       } else {
-        setError(data.message ?? l('执行失败', 'Execution failed'));
+        setError(data.message ?? data.desc ?? l('执行失败', 'Execution failed'));
         setTimeout(() => fetchLatestAuditLog(commandCode), 300);
       }
     } catch (err) {
@@ -200,14 +220,17 @@ export default function CommandWorkbenchPage() {
   // Build phase waterfall from audit log
   const buildPhaseEntries = (): PhaseEntry[] => {
     if (!auditLog) return [];
-    const timings: Record<string, number> = auditLog.phaseTimings
-      ? JSON.parse(auditLog.phaseTimings)
-      : {};
+    const timings = parsePhaseTimings(auditLog.phaseTimings);
     const reachedIndex = PIPELINE_PHASES.indexOf(auditLog.phaseReached);
+    const lastTimedIndex = Math.max(
+      -1,
+      ...Object.keys(timings).map((phase) => PIPELINE_PHASES.indexOf(phase)),
+    );
+    const effectiveReachedIndex = Math.max(reachedIndex, lastTimedIndex);
 
     return PIPELINE_PHASES.map((phase, idx) => {
-      if (idx > reachedIndex) return { phase, status: 'skipped' as const };
-      const isFailed = !auditLog.success && idx === reachedIndex;
+      if (idx > effectiveReachedIndex) return { phase, status: 'skipped' as const };
+      const isFailed = !auditLog.success && idx === effectiveReachedIndex;
       return {
         phase,
         durationMs: timings[phase],

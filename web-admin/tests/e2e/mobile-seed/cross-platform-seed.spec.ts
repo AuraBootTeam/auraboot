@@ -15,7 +15,7 @@ import { join } from 'path';
  */
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:6443';
-const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@example.com';
+const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@auraboot.com';
 const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'Test2026x';
 
 test.use({ storageState: 'tests/storage/admin.json' });

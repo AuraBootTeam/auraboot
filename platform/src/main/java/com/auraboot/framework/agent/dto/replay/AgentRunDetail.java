@@ -23,7 +23,9 @@ import java.util.List;
  *   <li>{@link #childRuns} — runs whose {@code parent_run_id} equals this
  *       run's pid, letting the drawer render the spawn tree.</li>
  *   <li>{@link #bif} — upstream grounding frame; {@code null} when the run
- *       has no BIF (legacy or non-grounded path).</li>
+ *       has no persisted BIF.</li>
+ *   <li>{@link #traceId} — tenant-scoped AI trace id for deep-linking from
+ *       replay to waterfall/span detail; {@code null} when no trace exists.</li>
  * </ul>
  */
 @Data
@@ -35,4 +37,7 @@ public class AgentRunDetail {
     private List<AgentInterruptItem> interruptLog;
     private List<AgentRunListItem> childRuns;
     private AgentBifSummary bif;
+    private String traceId;
+    private AgentConversationTurnReplay conversationTurn;
+    private List<AgentResultContractItem> resultContracts;
 }

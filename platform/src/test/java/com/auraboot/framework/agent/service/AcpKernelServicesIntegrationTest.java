@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration tests for the 4 ACP kernel services extracted from AgentRunService:
- * - ToolLoopService (DSL command/query execution via ToolExecutionPort)
+ * - ToolLoopService (DSL command/query execution through the canonical runtime)
  * - PlanService (plan persist/load/findPending)
  * - RunLifecycleService (run record CRUD, heartbeat)
  *

@@ -167,14 +167,24 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const canImport = canManage;
   const canExport = canManage;
   const { locale } = useI18n();
+  const l = useCallback(
+    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
+    [locale],
+  );
 
   const statusInfo = pageMeta?.status ? PAGE_STATUS_INFO[pageMeta.status] : null;
+  const statusLabels = {
+    draft: l('草稿', 'Draft'),
+    published: l('已发布', 'Published'),
+    modified: l('有更改', 'Modified'),
+    archived: l('已归档', 'Archived'),
+  } as const;
   const zoomPresets = [50, 75, 100, 125, 150, 200];
   const devices = [
-    { id: 'desktop', label: '桌面', width: 1920 },
-    { id: 'laptop', label: '笔记本', width: 1440 },
-    { id: 'tablet', label: '平板', width: 768 },
-    { id: 'mobile', label: '手机', width: 375 },
+    { id: 'desktop', label: l('桌面', 'Desktop'), width: 1920 },
+    { id: 'laptop', label: l('笔记本', 'Laptop'), width: 1440 },
+    { id: 'tablet', label: l('平板', 'Tablet'), width: 768 },
+    { id: 'mobile', label: l('手机', 'Mobile'), width: 375 },
   ];
   const currentDeviceMeta = devices.find((item) => item.id === currentDevice) ?? devices[0];
 
@@ -184,10 +194,10 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return '刚刚';
-    if (diffMin < 60) return `${diffMin} 分钟前`;
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  }, []);
+    if (diffMin < 1) return l('刚刚', 'just now');
+    if (diffMin < 60) return l(`${diffMin} 分钟前`, `${diffMin}m ago`);
+    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  }, [l, locale]);
 
   return (
     <div className="border-b border-slate-200 bg-white px-4 py-3">
@@ -205,20 +215,20 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="返回页面列表"
+              title={l('返回页面列表', 'Back to pages')}
               onClick={onBack}
               data-testid="toolbar-back"
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="max-w-[420px] truncate text-2xl font-semibold tracking-tight text-slate-950">
-                  {pageMeta?.title ?? '未命名页面'}
+                  {pageMeta?.title ?? l('未命名页面', 'Untitled page')}
                 </h1>
                 {statusInfo && (
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusInfo.color} ${statusInfo.bgColor}`}
                   >
-                    {statusInfo.label}
+                    {pageMeta?.status ? statusLabels[pageMeta.status] : ''}
                   </span>
                 )}
                 <span
@@ -229,15 +239,15 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   }`}
                   data-testid="toolbar-draft-state"
                 >
-                  {hasUnsavedChanges ? '待保存' : '已同步'}
+                  {hasUnsavedChanges ? l('待保存', 'Unsaved') : l('已同步', 'Synced')}
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                <span>页面设计器</span>
+                <span>{l('页面设计器', 'Page Designer')}</span>
                 <span className="text-slate-300">/</span>
-                <span>当前设备：{currentDeviceMeta.label}</span>
+                <span>{l('当前设备：', 'Device: ')}{currentDeviceMeta.label}</span>
                 <span className="text-slate-300">/</span>
-                <span>缩放 {zoomLevel}%</span>
+                <span>{l('缩放', 'Zoom')} {zoomLevel}%</span>
               </div>
             </div>
           </div>
@@ -269,17 +279,21 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    <span className="font-medium text-blue-700">正在保存</span>
+                    <span className="font-medium text-blue-700">{l('正在保存', 'Saving')}</span>
                   </>
                 ) : lastSavedAt ? (
                   <>
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    <span className="text-slate-700">已保存 {formatLastSaved(lastSavedAt)}</span>
+                    <span className="text-slate-700">
+                      {l('已保存', 'Saved')} {formatLastSaved(lastSavedAt)}
+                    </span>
                   </>
                 ) : hasUnsavedChanges ? (
-                  <span className="font-medium text-amber-600">存在未保存修改</span>
+                  <span className="font-medium text-amber-600">
+                    {l('存在未保存修改', 'Unsaved changes')}
+                  </span>
                 ) : (
-                  <span className="text-slate-500">等待第一次保存</span>
+                  <span className="text-slate-500">{l('等待第一次保存', 'Not saved yet')}</span>
                 )}
               </div>
             )}
@@ -301,15 +315,15 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              label="预览"
-              title="预览页面"
+              label={l('预览', 'Preview')}
+              title={l('预览页面', 'Preview page')}
               onClick={onPreview}
               data-testid="toolbar-preview"
             />
             <ToolbarButton
               icon={<span className="text-sm">&#x2728;</span>}
-              label="AI 助手"
-              title="切换 AI 助手面板"
+              label={l('AI 助手', 'AI Assistant')}
+              title={l('切换 AI 助手面板', 'Toggle AI assistant panel')}
               onClick={onToggleAiPanel || (() => setShowAiGenerate(true))}
               active={aiPanelOpen}
               data-testid="toolbar-ai-generate"
@@ -326,8 +340,8 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                     />
                   </svg>
                 }
-                label="模板"
-                title="另存为模板"
+                label={l('模板', 'Template')}
+                title={l('另存为模板', 'Save as template')}
                 onClick={() => setShowSaveAsTemplate(true)}
                 data-testid="toolbar-save-as-template"
               />
@@ -361,8 +375,8 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   </svg>
                 )
               }
-              label="保存"
-              title="保存"
+              label={l('保存', 'Save')}
+              title={l('保存', 'Save')}
               disabledTitle={
                 !canSave
                   ? (DESIGNER_I18N.permissions.missingManage[locale] ??
@@ -402,8 +416,8 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   </svg>
                 )
               }
-              label="发布"
-              title="发布页面"
+              label={l('发布', 'Publish')}
+              title={l('发布页面', 'Publish page')}
               disabledTitle={
                 !canPublish
                   ? (DESIGNER_I18N.permissions.missingManage[locale] ??
@@ -420,10 +434,10 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
 
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-            工作台
+            {l('工作台', 'Workbench')}
           </div>
 
-          <ControlGroup label="历史">
+          <ControlGroup label={l('历史', 'History')}>
             <ToolbarButton
               icon={
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -435,7 +449,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="撤销"
+              title={l('撤销', 'Undo')}
               onClick={onUndo}
               disabled={!canUndo}
               size="sm"
@@ -452,7 +466,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="重做"
+              title={l('重做', 'Redo')}
               onClick={onRedo}
               disabled={!canRedo}
               size="sm"
@@ -469,13 +483,13 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="清空"
+              title={l('清空', 'Clear')}
               onClick={onClear}
               size="sm"
             />
           </ControlGroup>
 
-          <ControlGroup label="缩放">
+          <ControlGroup label={l('缩放', 'Zoom')}>
             <ToolbarButton
               icon={
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -487,7 +501,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="缩小"
+              title={l('缩小', 'Zoom out')}
               onClick={onZoomOut}
               disabled={zoomLevel <= 25}
               size="sm"
@@ -528,7 +542,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                     }}
                     className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                   >
-                    适配屏幕
+                    {l('适配屏幕', 'Fit screen')}
                   </button>
                 </div>
               )}
@@ -544,7 +558,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="放大"
+              title={l('放大', 'Zoom in')}
               onClick={onZoomIn}
               disabled={zoomLevel >= 200}
               size="sm"
@@ -552,7 +566,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
             />
           </ControlGroup>
 
-          <ControlGroup label="设备">
+          <ControlGroup label={l('设备', 'Device')}>
             <div className="relative">
               <button
                 type="button"
@@ -593,7 +607,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
             </div>
           </ControlGroup>
 
-          <ControlGroup label="版本">
+          <ControlGroup label={l('版本', 'Version')}>
             <ToolbarButton
               icon={
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -605,8 +619,8 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              label="历史"
-              title="版本历史"
+              label={l('历史', 'History')}
+              title={l('版本历史', 'Version history')}
               onClick={onVersionHistory}
             />
             <ToolbarButton
@@ -620,7 +634,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="导入"
+              title={l('导入', 'Import')}
               disabledTitle={
                 DESIGNER_I18N.permissions.missingManage[locale] ??
                 DESIGNER_I18N.permissions.missingManage['en-US']
@@ -641,7 +655,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="导出"
+              title={l('导出', 'Export')}
               disabledTitle={
                 DESIGNER_I18N.permissions.missingManage[locale] ??
                 DESIGNER_I18N.permissions.missingManage['en-US']
@@ -653,7 +667,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
             />
           </ControlGroup>
 
-          <ControlGroup label="更多">
+          <ControlGroup label={l('更多', 'More')}>
             <ToolbarButton
               icon={
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -671,7 +685,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="设置"
+              title={l('设置', 'Settings')}
               onClick={onSettings}
               size="sm"
               data-testid="toolbar-settings"
@@ -687,7 +701,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
                   />
                 </svg>
               }
-              title="快捷键帮助"
+              title={l('快捷键帮助', 'Keyboard shortcuts')}
               onClick={onShortcutHelp}
               size="sm"
             />

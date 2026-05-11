@@ -26,7 +26,7 @@ when comparing current run results against established baselines.
    ```bash
    k6 run \
      --env BASE_URL=http://localhost:6443 \
-     --env USERNAME=admin@example.com \
+     --env USERNAME=admin@auraboot.com \
      --env PASSWORD=Test2026x \
      --summary-export scripts/perf-ci/baseline/auth-baseline.json \
      tests/load/k6/auth-baseline.js

@@ -30,7 +30,7 @@ test.describe('BPM designer — receiveTask', { tag: ['@bpm-regression'] }, () =
   test('flow with receiveTask — L1 designerJson + L2 BPMN XML', async ({ page, request }) => {
     const ts = Date.now();
     const processKey = `e2e_designer_recv_${ts}`;
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     await openDesigner(page, { processKey, name: `Receive ${ts}` });
 

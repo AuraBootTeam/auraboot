@@ -137,8 +137,8 @@ Navigate to [http://localhost:5173](http://localhost:5173) and log in with:
 
 | Field | Value |
 |---|---|
-| Email | `admin@example.com` |
-| Password | `ChangeMeOnFirstLogin!` |
+| Email | `admin@auraboot.com` |
+| Password | `Test2026x` |
 
 ---
 
@@ -240,7 +240,7 @@ For more detail (requires authentication):
 
 ```bash
 curl http://localhost:6443/actuator/health \
-  -H "Authorization: Bearer <your-jwt-token>"
+  -H "Authorization: Bearer $JWT"
 ```
 
 ---
@@ -252,7 +252,7 @@ After installation, verify each component:
 - [ ] PostgreSQL is running: `docker compose ps` shows `postgres` as `healthy`
 - [ ] Backend is running: `curl http://localhost:6443/actuator/health` returns `{"status":"UP"}`
 - [ ] Frontend is accessible: Browser opens [http://localhost:5173](http://localhost:5173) (source) or [http://localhost:3000](http://localhost:3000) (Docker)
-- [ ] Login works: `admin@example.com` / `ChangeMeOnFirstLogin!`
+- [ ] Login works: `admin@auraboot.com` / `Test2026x`
 - [ ] API docs load: [http://localhost:6443/swagger-ui.html](http://localhost:6443/swagger-ui.html)
 
 ## Running Tests

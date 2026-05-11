@@ -33,7 +33,7 @@ context resolved via `MetaContext` (set by the JWT filter chain).
 | POST | `/skill/execute` | Commit path. Idempotent via Redis claim + DB unique index. Replays return `200` with body `code=IDEMPOTENCY_REPLAY`. |
 | POST | `/skill/undo` | Single-row reversal by `undoToken`. 30-minute window; later → `410 UNDO_EXPIRED`. |
 | POST | `/skill/batch-undo` | Best-effort batch reversal by `batchId`, newest-first. Partial failures listed in `payload.failed`. |
-| GET  | `/stream/{traceId}` | Reserved for streaming skills. Currently returns `503` placeholder. |
+| GET  | `/stream/{traceId}` | Reserved for streaming skills. Currently returns `503 STREAMING_NOT_AVAILABLE`. |
 
 ## 3. Error codes
 
@@ -114,7 +114,7 @@ curl -s -X POST http://localhost:8080/api/aurabot/v2/skill/execute \
 6. List required permission codes via `requiredPermissions()`. Empty set is
    allowed (e.g. dev-only diagnostic skills).
 7. Add i18n entries:
-   `aurabot.skill.<your-name>.displayName` / `.description` in both `_en` and
+   `aurabot.skill.<skill-name>.displayName` / `.description` in both `_en` and
    `_zh_CN` bundles. `displayName()` should return the bundle key.
 
 ## 6. Capability flag semantics
@@ -164,4 +164,4 @@ accordingly.
 
 - SPI Contract spec: `auraboot-enterprise/docs/superpowers/specs/2026-05-08-aurabot-skill-spi-contract.md`
 - C-2 batch plan: `auraboot-enterprise/docs/superpowers/plans/2026-05-08-aurabot-skill-spi-backend-batches.md`
-- AuraBot V3 shell (C-1): `auraboot/docs/architecture/` (TBD when C-1 wires the FE).
+- AuraBot V3 shell docs: `auraboot/docs/architecture/`

@@ -37,6 +37,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 STACK_DIR="$PROJECT_ROOT/.aura-stack"
+PARENT_DIR="$(dirname "$PROJECT_ROOT")"
+GRANDPARENT_DIR="$(dirname "$PARENT_DIR")"
 
 # ---------- argument parsing ----------
 
@@ -177,6 +179,64 @@ if [ -z "$OFFSET" ]; then
     exit 3
 fi
 
+# ---------- enterprise plugin mount ----------
+
+resolve_enterprise_plugins_dir() {
+    if [ -n "${ENTERPRISE_PLUGINS_DIR:-}" ]; then
+        if [ -d "$ENTERPRISE_PLUGINS_DIR" ]; then
+            (cd "$ENTERPRISE_PLUGINS_DIR" && pwd)
+            return
+        fi
+        echo "ERROR: ENTERPRISE_PLUGINS_DIR is set but not a directory: $ENTERPRISE_PLUGINS_DIR" >&2
+        exit 2
+    fi
+
+    local enterprise_repo_name="auraboot-${AURABOOT_ENTERPRISE_REPO_SUFFIX:-enterprise}"
+    local candidate
+    for candidate in \
+        "$PARENT_DIR/agent-runtime-unification-enterprise/plugins" \
+        "$PARENT_DIR/$enterprise_repo_name/plugins" \
+        "$GRANDPARENT_DIR/$enterprise_repo_name/plugins"; do
+        if [ -d "$candidate" ]; then
+            (cd "$candidate" && pwd)
+            return
+        fi
+    done
+
+    mkdir -p "$STACK_DIR/empty-enterprise-plugins"
+    (cd "$STACK_DIR/empty-enterprise-plugins" && pwd)
+}
+
+ENTERPRISE_PLUGINS_DIR="$(resolve_enterprise_plugins_dir)"
+
+resolve_enterprise_plugin_jars_dir() {
+    if [ -n "${ENTERPRISE_PLUGIN_JARS_DIR:-}" ]; then
+        if [ -d "$ENTERPRISE_PLUGIN_JARS_DIR" ]; then
+            (cd "$ENTERPRISE_PLUGIN_JARS_DIR" && pwd)
+            return
+        fi
+        echo "ERROR: ENTERPRISE_PLUGIN_JARS_DIR is set but not a directory: $ENTERPRISE_PLUGIN_JARS_DIR" >&2
+        exit 2
+    fi
+
+    local enterprise_repo_name="auraboot-${AURABOOT_ENTERPRISE_REPO_SUFFIX:-enterprise}"
+    local candidate
+    for candidate in \
+        "$PARENT_DIR/agent-runtime-unification-enterprise/build/plugin-jars" \
+        "$PARENT_DIR/$enterprise_repo_name/build/plugin-jars" \
+        "$GRANDPARENT_DIR/$enterprise_repo_name/build/plugin-jars"; do
+        if [ -d "$candidate" ]; then
+            (cd "$candidate" && pwd)
+            return
+        fi
+    done
+
+    mkdir -p "$STACK_DIR/empty-enterprise-plugin-jars"
+    (cd "$STACK_DIR/empty-enterprise-plugin-jars" && pwd)
+}
+
+ENTERPRISE_PLUGIN_JARS_DIR="$(resolve_enterprise_plugin_jars_dir)"
+
 # ---------- persist port assignments ----------
 
 mkdir -p "$STACK_DIR"
@@ -192,6 +252,8 @@ BE_PORT=$BE_PORT
 VITE_PORT=$VITE_PORT
 BFF_PORT=$BFF_PORT
 REDIS_PORT=$REDIS_PORT
+ENTERPRISE_PLUGINS_DIR=$ENTERPRISE_PLUGINS_DIR
+ENTERPRISE_PLUGIN_JARS_DIR=$ENTERPRISE_PLUGIN_JARS_DIR
 ENV
 
 # ---------- summary ----------
@@ -206,6 +268,8 @@ Isolated stack plan
   vite (browser): http://localhost:$VITE_PORT
   bff:            http://localhost:$BFF_PORT
   redis:          localhost:$REDIS_PORT
+  enterprise:     $ENTERPRISE_PLUGINS_DIR
+  plugin jars:    $ENTERPRISE_PLUGIN_JARS_DIR
   env file:       $STACK_ENV_FILE
 
 SUMMARY
@@ -220,6 +284,8 @@ fi
 # Export so docker compose substitutes them into docker-compose.isolated.yml.
 export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
 export PG_PORT BE_PORT VITE_PORT BFF_PORT REDIS_PORT
+export ENTERPRISE_PLUGINS_DIR
+export ENTERPRISE_PLUGIN_JARS_DIR
 export AURABOOT_BFF_ALLOWED_PORTS="$BFF_PORT,$VITE_PORT"
 
 cd "$PROJECT_ROOT"

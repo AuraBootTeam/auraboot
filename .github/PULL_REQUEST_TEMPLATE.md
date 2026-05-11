@@ -27,7 +27,7 @@
 
 - [ ] Existing tests still pass: `./gradlew test` and/or `pnpm test`
 - [ ] New tests added (if applicable)
-- [ ] Tested manually against a clean stack: `docker compose up -d` then verified the change
+- [ ] Tested manually against a clean stack: `docker compose --profile full up --build -d` then verified the change
 
 ## Breaking changes (if any)
 

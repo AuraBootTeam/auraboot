@@ -9,7 +9,7 @@
 
 ## Context
 
-AuraBoot is an open-source AI-native low-code business platform. The open-source repository currently has:
+AuraBoot is a source-available, self-hosted low-code platform for business apps. The open-source repository currently has:
 - A solid README.md with feature overview and quick start
 - CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md, DEPLOY.md
 - **No `/docs/` directory** — all documentation links in README point to enterprise docs that don't exist in the open-source repo
@@ -35,7 +35,7 @@ auraboot/docs/
 ├── core-concepts/
 │   ├── dsl-engine.md                      # DSL philosophy & how it works
 │   ├── models-and-fields.md               # 22 field types, relations, formulas
-│   ├── commands.md                        # 20-stage pipeline, CRUD + custom
+│   ├── commands.md                        # 20+ stage pipeline, CRUD + custom
 │   ├── pages-and-layouts.md               # Page kinds, blocks, designers
 │   ├── permissions.md                     # RBAC, multi-tenant, data-level
 │   └── state-machines.md                  # Status flows, guards, transitions
@@ -117,7 +117,7 @@ auraboot/docs/
 #### quick-start.md
 - Prerequisites: Docker, Git
 - 3-step setup: clone → docker compose up → open browser
-- First login (admin@example.com / default password)
+- First login (admin@auraboot.com / default password)
 - Explore the demo workspace (pre-loaded CRM data)
 - ~5 minutes end-to-end
 
@@ -171,7 +171,7 @@ Each document follows the pattern:
 - Indexing and performance considerations
 
 #### commands.md
-- 20-stage pipeline diagram
+- 20+ stage pipeline diagram
 - Built-in command types: CREATE, UPDATE, DELETE, STATUS_TRANSITION
 - Custom command handlers (Java extension point)
 - Command bindings: model → commands mapping

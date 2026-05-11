@@ -89,7 +89,7 @@ test.describe('BPM designer — userTask assigneeType matrix', { tag: ['@bpm-reg
       const processKey = `e2e_designer_assignee_${c.label}_${ts}`;
       const taskId = 'task_approve';
 
-      const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+      const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
       // Build the flow: start → userTask(configured) → end
       await openDesigner(page, { processKey, name: `Assignee ${c.label} ${ts}` });

@@ -81,6 +81,17 @@ public interface AiTraceMapper extends BaseMapper<AiTrace> {
     @Select("SELECT * FROM ab_ai_trace WHERE trace_id = #{traceId} LIMIT 1")
     AiTrace selectByTraceId(@Param("traceId") String traceId);
 
+    @ResultMap("mybatis-plus_AiTrace")
+    @Select("""
+        SELECT * FROM ab_ai_trace
+        WHERE tenant_id = #{tenantId}
+          AND trace_id = #{traceId}
+        LIMIT 1
+    """)
+    AiTrace selectByTenantAndTraceId(
+            @Param("tenantId") Long tenantId,
+            @Param("traceId") String traceId);
+
     @Select("""
         SELECT
             COUNT(*)                                                     AS total_traces,

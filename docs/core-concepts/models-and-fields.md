@@ -501,7 +501,7 @@ Rich text content with formatting. Implemented as a `text` field with `renderCom
 
 ### AI Field
 
-An AI-powered auto-generated field. Implemented as a `text` field with `renderComponent: "aifield"`.
+An AI-assisted auto-generated field. Implemented as a `text` field with `renderComponent: "aifield"`.
 
 ```json
 {

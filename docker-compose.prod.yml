@@ -5,13 +5,13 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # Required env vars (set in .env or export):
-#   GHCR_REPO    — e.g. ghcr.io/your-org/auraboot
+#   GHCR_REPO    — e.g. ghcr.io/aurabootteam/auraboot
 #   IMAGE_TAG    — e.g. latest, v1.0.0, main, or a commit sha
 #   DB_PASSWORD  — PostgreSQL password (override default)
 
 services:
   backend:
-    image: ${GHCR_REPO:-ghcr.io/your-org/auraboot}/backend:${IMAGE_TAG:-latest}
+    image: ${GHCR_REPO:-ghcr.io/aurabootteam/auraboot}/backend:${IMAGE_TAG:-latest}
     container_name: auraboot-backend
     restart: unless-stopped
     ports:
@@ -36,7 +36,7 @@ services:
       retries: 3
 
   frontend:
-    image: ${GHCR_REPO:-ghcr.io/your-org/auraboot}/frontend:${IMAGE_TAG:-latest}
+    image: ${GHCR_REPO:-ghcr.io/aurabootteam/auraboot}/frontend:${IMAGE_TAG:-latest}
     container_name: auraboot-frontend
     restart: unless-stopped
     ports:

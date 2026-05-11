@@ -68,7 +68,7 @@ class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         currentPermissions.clear();
         // model:query has empty oneOf-required; we'll always supply modelCode.
-        // model:create requires MODEL.CREATE; tests grant as needed.
+        // model:create requires meta.model.update; tests grant as needed.
         MetaContext.setContext(getTestTenant().getId(), 1L, null, "it-c5-t3-user");
 
         when(userPermissionService.getUserPermissionIds(eq(1L)))
@@ -110,7 +110,7 @@ class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("dispatch(LOW skill) executes inline and returns EXECUTED")
     void dispatchLow_executesInline() {
-        currentPermissions.add("MODEL.READ");
+        currentPermissions.add("meta.model.read");
 
         // model:query (LOW) — keyword form so it doesn't require an existing row.
         ObjectNode params = objectMapper.createObjectNode().put("keyword", "no-such-model-xyz");
@@ -132,7 +132,7 @@ class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("dispatch(HIGH skill) returns PREVIEW_PENDING with preview + token")
     void dispatchHigh_returnsPreviewPending() {
-        currentPermissions.add("MODEL.CREATE");
+        currentPermissions.add("meta.model.update");
 
         ObjectNode params = objectMapper.createObjectNode()
                 .put("code", testModelCode)
@@ -161,7 +161,7 @@ class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("confirm(HIGH skill, valid token) executes and writes ab_meta_model row")
     void confirmHigh_executesAndReturnsResult() {
-        currentPermissions.add("MODEL.CREATE");
+        currentPermissions.add("meta.model.update");
 
         ObjectNode params = objectMapper.createObjectNode()
                 .put("code", testModelCode)
@@ -202,7 +202,7 @@ class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("confirm(invalid token) throws SkillSpiException PREVIEW_TOKEN_INVALID")
     void confirmInvalidToken_throws() {
-        currentPermissions.add("MODEL.CREATE");
+        currentPermissions.add("meta.model.update");
 
         ObjectNode params = objectMapper.createObjectNode()
                 .put("code", testModelCode)

@@ -10,7 +10,7 @@
  *   1. system_config row + system.initialized=true
  *   2. System Tenant row (name='System')
  *   3. platform_admin role row in System Tenant
- *   4. admin@example.com user
+ *   4. admin@auraboot.com user
  *   5. admin → System Tenant membership
  *   6. admin → platform_admin role grant
  *   7. Business Tenant row
