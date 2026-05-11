@@ -9,10 +9,13 @@ export const options = {
   },
 };
 
-const COMMAND_CODE = __ENV.COMMAND_CODE || 'announcement:create_announcement';
+const COMMAND_CODE = __ENV.COMMAND_CODE || 'admin:create_scheduled_task';
 
-export default function () {
-  const token = login();
+export function setup() {
+  return { token: login() };
+}
+
+export default function (data) {
   const now = Date.now();
   const response = http.post(
     `${BASE_URL}/api/meta/commands/execute/${encodeURIComponent(COMMAND_CODE)}`,
@@ -21,13 +24,20 @@ export default function () {
       dryRun: true,
       operationType: 'CREATE',
       payload: {
-        title: `Perf smoke ${now}`,
-        content: 'Created by k6 dry-run benchmark.',
-        priority: 'normal',
-        pinned: false,
+        name: `Perf smoke ${now}`,
+        description: 'Created by k6 dry-run benchmark.',
+        task_type: 'noop',
+        cron_expression: '0 0 * * * ?',
+        interval_ms: 60000,
+        handler_bean: 'noop',
+        handler_method: 'run',
+        params: '{}',
+        max_retries: 0,
+        timeout_ms: 1000,
+        enabled: false,
       },
     }),
-    { headers: jsonHeaders(token) },
+    { headers: jsonHeaders(data.token) },
   );
 
   assertApiSuccess(response, 'command dry-run');

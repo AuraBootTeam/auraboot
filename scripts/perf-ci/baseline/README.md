@@ -12,8 +12,17 @@ when comparing current run results against established baselines.
 | Label     | k6 script              | Description                     |
 |-----------|------------------------|---------------------------------|
 | `auth`    | `auth-baseline.js`     | Login / token acquisition       |
-| `list`    | `list-query.js`        | List endpoint with pagination   |
-| `command` | `command-execution.js` | Command execution (write paths) |
+| `list`    | `list-query.js`        | Metadata list endpoint          |
+| `command` | `command-execution.js` | Dry-run command execution       |
+
+The smoke runner intentionally uses a low-volume login sample for `auth` and
+higher concurrency for authenticated API scenarios. Login endpoints commonly
+have abuse protection, so list and command benchmarks authenticate once in
+`setup()` and reuse the token during the scenario.
+
+Defaults are chosen to work on the public Docker quickstart stack after built-in
+OSS plugins are imported. Override `LIST_PAGE_KEY`, `LIST_PATH`, or
+`COMMAND_CODE` when capturing baselines for a seeded application dataset.
 
 ## How to Capture a New Baseline
 
@@ -32,7 +41,7 @@ when comparing current run results against established baselines.
    ```bash
    BASE_URL=http://localhost:6443 \
    USERNAME=admin@auraboot.com \
-   PASSWORD=Test2026x \
+   AURABOOT_PASSWORD=Test2026x \
    scripts/perf-ci/run-perf-regression.sh --profile smoke
    ```
 
@@ -41,7 +50,7 @@ when comparing current run results against established baselines.
    k6 run \
      --env BASE_URL=http://localhost:6443 \
      --env USERNAME=admin@auraboot.com \
-     --env PASSWORD=Test2026x \
+     --env AURABOOT_PASSWORD=Test2026x \
      --summary-export scripts/perf-ci/baseline/auth-baseline.json \
      tests/load/k6/auth-baseline.js
    ```
