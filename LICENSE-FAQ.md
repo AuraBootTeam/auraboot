@@ -1,6 +1,6 @@
 # AuraBoot License FAQ
 
-> **声明**:本 FAQ 仅为方便理解 [`LICENSE.txt`](./LICENSE.txt) 而提供的非正式说明,不构成法律意见,不具备法律效力。如本 FAQ 与 `LICENSE.txt` 存在任何不一致,**一律以 `LICENSE.txt` 英文正本为准**。重大商业决策请咨询法律顾问,或通过 license@auraboot.com 与我们直接确认。
+> **声明**:本 FAQ 仅为方便理解 [`LICENSE.txt`](./LICENSE.txt) 而提供的非正式说明,不构成法律意见,不具备法律效力。如本 FAQ 与 `LICENSE.txt` 存在任何不一致,**一律以 `LICENSE.txt` 英文正本为准**。重大商业决策请咨询法律顾问,或通过 https://www.auraboot.com/contact 与我们直接确认。
 >
 > Last updated: 2026-05-10 (LICENSE v1.3)
 
@@ -79,10 +79,10 @@
 ### Q11. 我做了一个"垂直行业 SaaS"(比如餐饮 SaaS、教育 SaaS),底层用 AuraBoot,允许吗?
 **允许,即使是多租户。** 因为你卖的是"餐饮/教育业务应用",不是"通用低代码平台"。租户用的是你预配置好的业务功能,而不是来"自己搭应用"。
 
-如果你的产品同时提供"租户自己用低代码改业务流程"的能力,边界开始模糊 — 建议联系 license@auraboot.com 确认。
+如果你的产品同时提供"租户自己用低代码改业务流程"的能力,边界开始模糊 — 建议通过 https://www.auraboot.com/contact 确认。
 
 ### Q12. 商业 License 能解锁多租户低代码 SaaS 吗?
-**仅靠 Commercial License 不够**。按 §5.4(并经 §7.3 强化)要求,把 AuraBoot 作为平台 SaaS 对外提供,**必须同时**(a)持有 Commercial License,(b)取得我方就该具体部署的**书面 SaaS / OEM 分发权利**。普通 Commercial License(用于 white-label / 去品牌)本身不授权多租户低代码平台 SaaS 转售。如果你的商业模式是平台 SaaS,需要在 Commercial License 之上单独签订 SaaS / OEM rider。联系 license@auraboot.com 协商。
+**仅靠 Commercial License 不够**。按 §5.4(并经 §7.3 强化)要求,把 AuraBoot 作为平台 SaaS 对外提供,**必须同时**(a)持有 Commercial License,(b)取得我方就该具体部署的**书面 SaaS / OEM 分发权利**。普通 Commercial License(用于 white-label / 去品牌)本身不授权多租户低代码平台 SaaS 转售。如果你的商业模式是平台 SaaS,需要在 Commercial License 之上单独签订 SaaS / OEM rider。请通过 https://www.auraboot.com/contact 协商。
 
 ---
 
@@ -115,7 +115,7 @@ CLA 不要求你放弃版权,只是授予项目长期、不可撤销的使用许
 仅自部署、仅做项目交付、仅做垂直业务 SaaS — **都不需要商业 License**。
 
 ### Q17. 商业 License 怎么获取?
-邮件 license@auraboot.com 或访问 https://www.auraboot.com/。
+通过网站表单联系:https://www.auraboot.com/contact。
 
 ### Q18. 商业 License 是 perpetual 还是订阅?
 具体条款以双方签订的商业合同为准。一般有 perpetual buy-out 和 annual subscription 两种形态可选,后者包含升级和支持。
@@ -146,15 +146,15 @@ CLA 不要求你放弃版权,只是授予项目长期、不可撤销的使用许
 | ToolJet | AGPLv3 | 必须开源全部改动 | 完全可改 |
 | Budibase | GPL v3 + Commercial | 必须开源全部改动(GPL) | 商业版可改 |
 
-**总结**:AuraBoot 在"自部署 + ISV 项目交付 + 垂直 SaaS"场景下比 AGPL/GPL 系更友好(不强制开源你的业务代码),但比纯 Apache 系多了一道"防云厂商白嫖"的护栏。
+**总结**:AuraBoot 在"自部署 + ISV 项目交付 + 垂直 SaaS"场景下比 AGPL/GPL 系更友好(不强制开源你的业务代码),但比纯 Apache 系多了一道护栏:避免把 AuraBoot 本身包装成多租户低代码平台服务后再转售。
 
 ---
 
 ## 九、还有疑问?
 
-- **法律层面问题**:license@auraboot.com
+- **法律层面问题**:https://www.auraboot.com/contact
 - **技术贡献问题**:CONTRIBUTING.md
 - **安全漏洞披露**:SECURITY.md
-- **商业合作 / OEM**:license@auraboot.com
+- **商业合作 / OEM**:https://www.auraboot.com/contact
 
 本 FAQ 会随社区反馈持续更新。欢迎在 GitHub Issue 中提问,我们会把高频问题补充进来。

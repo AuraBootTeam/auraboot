@@ -1,6 +1,6 @@
 # Warehouse & Inventory Management
 
-> Inventory tracking, receiving, shipping, stock transfers, stock counts, lot/serial number traceability, pick order management, inventory holds/allocations, and a real-time analytics dashboard -- all built from DSL configuration with zero custom code.
+> Inventory tracking, receiving, shipping, stock transfers, stock counts, lot/serial number traceability, pick order management, inventory holds/allocations, and a real-time analytics dashboard -- mostly built from DSL configuration.
 
 **Plugin:** `com.auraboot.inventory` | **Namespace:** `inv` | **Version:** 1.0.0
 

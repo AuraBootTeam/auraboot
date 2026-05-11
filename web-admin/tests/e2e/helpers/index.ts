@@ -16,6 +16,7 @@
  */
 
 import { type Page, type Locator, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 
 export function normalizeDynamicPageKey(pageKey: string): string {
   return pageKey.replace(/-/g, '_');
@@ -26,11 +27,11 @@ export function normalizeDynamicPageKey(pageKey: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Generate a unique test identifier based on timestamp and random suffix.
+ * Generate a unique test identifier based on timestamp and UUID suffix.
  */
 export function uniqueId(prefix = 'e2e'): string {
   const ts = Date.now();
-  const rand = Math.random().toString(36).slice(2, 7);
+  const rand = randomUUID().replace(/-/g, '').slice(0, 7);
   return `${prefix}_${ts}_${rand}`;
 }
 

@@ -1,6 +1,6 @@
 # Quick Start (5 Minutes)
 
-Get AuraBoot running locally with Docker Compose. By the end of this guide, you will have a fully functional AuraBoot instance with a PostgreSQL database, Spring Boot backend, and React frontend.
+Get AuraBoot running locally with Docker Compose. By the end of this guide, you will have a working AuraBoot instance with a PostgreSQL database, Spring Boot backend, and React frontend.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ Receiving objects: 100% ...
 ## Step 2: Start the Services
 
 ```bash
-docker compose --profile full up -d
+docker compose --profile full up --build -d
 ```
 
 This starts three containers:
@@ -75,7 +75,7 @@ Use the default admin credentials:
 | Field | Value |
 |---|---|
 | Email | `admin@auraboot.com` |
-| Password | `ChangeMeOnFirstLogin!` |
+| Password | `Test2026x` |
 
 After login, you land on the workspace dashboard.
 
@@ -123,7 +123,7 @@ If you see migration or schema errors, reset the database:
 
 ```bash
 docker compose down -v
-docker compose --profile full up -d
+docker compose --profile full up --build -d
 ```
 
 The `-v` flag removes the data volume, giving you a clean database.
@@ -142,7 +142,7 @@ Then restart:
 
 ```bash
 docker compose down
-docker compose --profile full up -d
+docker compose --profile full up --build -d
 ```
 
 ### Container logs reference

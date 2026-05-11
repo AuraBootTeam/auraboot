@@ -492,7 +492,7 @@ public class AgentRunController {
             String traceId = traceNode.asText();
             return traceId == null || traceId.isBlank() ? null : traceId.trim();
         } catch (Exception e) {
-            log.debug("Ignoring malformed agent run metadata for run {}: {}", runId, e.getMessage());
+            log.debug("Ignoring malformed agent run metadata: errorType={}", e.getClass().getSimpleName());
             return null;
         }
     }

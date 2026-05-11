@@ -1,6 +1,6 @@
 # AI Agent Platform
 
-> Multi-agent orchestration, autonomous AI employees, human-in-the-loop governance, and intelligent automation -- AuraBoot's Agent Control Plane (ACP) turns your business platform into an AI-native operating system.
+> Multi-agent orchestration, AI-assisted work, human-in-the-loop governance, and intelligent automation -- AuraBoot's Agent Control Plane (ACP) adds an AI-assisted operating layer to your business platform.
 
 ## Business Overview
 

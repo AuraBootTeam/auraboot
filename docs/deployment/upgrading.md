@@ -81,7 +81,7 @@ curl -s http://localhost:6443/actuator/info | jq .
 # Smoke test
 curl -s -X POST http://localhost:6443/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@auraboot.com","password":"your-password"}' | jq .code
+  -d "{\"email\":\"admin@auraboot.com\",\"password\":\"${AURABOOT_ADMIN_PASSWORD}\"}" | jq .code
 ```
 
 ---

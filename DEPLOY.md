@@ -7,7 +7,7 @@ Only PostgreSQL is required — Redis and MinIO are optional.
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/auraboot.git
+git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
 
 # Configure environment (optional — defaults work for evaluation)
@@ -179,7 +179,7 @@ Example nginx config snippet:
 ```nginx
 server {
     listen 443 ssl;
-    server_name your-domain.com;
+    server_name app.example.com;
 
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;

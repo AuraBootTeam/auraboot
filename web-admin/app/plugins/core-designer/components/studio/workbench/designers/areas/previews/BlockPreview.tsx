@@ -16,6 +16,7 @@ import { DataTablePreview } from './DataTablePreview';
 import { FormSectionPreview } from './FormSectionPreview';
 import { ToolbarPreview } from './ToolbarPreview';
 import { useBlockDropZone } from '../hooks/useBlockDropZone';
+import { useI18n } from '~/contexts/I18nContext';
 
 /**
  * Selected field info structure
@@ -47,6 +48,8 @@ export const BlockPreview: React.FC<BlockPreviewProps> = ({
   onFieldSelect,
   readonly,
 }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const { setNodeRef, showDropIndicator, dropLabel, canAcceptFields } = useBlockDropZone({
     block,
     disabled: readonly,
@@ -100,7 +103,7 @@ export const BlockPreview: React.FC<BlockPreviewProps> = ({
             }}
             className="rounded bg-red-500 p-1.5 text-white transition-colors hover:bg-red-600"
             data-testid="block-delete"
-            title="删除"
+            title={l('删除', 'Delete')}
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -121,7 +124,7 @@ export const BlockPreview: React.FC<BlockPreviewProps> = ({
         </span>
         {canAcceptFields && !showDropIndicator && (
           <span className="text-[10px] text-gray-400 opacity-0 transition-opacity group-hover:opacity-100">
-            拖拽字段到此处
+            {l('拖拽字段到此处', 'Drop fields here')}
           </span>
         )}
       </div>
@@ -191,6 +194,8 @@ const BlockContent: React.FC<{
  * Selection info preview
  */
 const SelectionInfoPreview: React.FC<{ block: DslBlock }> = ({ block: _block }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   return (
     <div className="bg-blue-50 p-3">
       <div className="flex items-center gap-2 text-blue-700">
@@ -202,8 +207,10 @@ const SelectionInfoPreview: React.FC<{ block: DslBlock }> = ({ block: _block }) 
             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <span className="text-sm">已选择 0 项</span>
-        <button className="ml-2 text-xs text-blue-600 hover:underline">清除</button>
+        <span className="text-sm">{l('已选择 0 项', '0 selected')}</span>
+        <button className="ml-2 text-xs text-blue-600 hover:underline">
+          {l('清除', 'Clear')}
+        </button>
       </div>
     </div>
   );
@@ -213,9 +220,13 @@ const SelectionInfoPreview: React.FC<{ block: DslBlock }> = ({ block: _block }) 
  * Stat card preview
  */
 const StatCardPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   return (
     <div className="bg-gradient-to-br from-blue-50 to-white p-4">
-      <div className="mb-1 text-xs text-gray-500">{resolveLocalizedText(block.title) || '统计指标'}</div>
+      <div className="mb-1 text-xs text-gray-500">
+        {resolveLocalizedText(block.title, locale) || l('统计指标', 'Metric')}
+      </div>
       <div className="text-2xl font-semibold text-gray-900">--</div>
       <div className="mt-1 text-xs text-green-600">+0%</div>
     </div>
@@ -226,9 +237,13 @@ const StatCardPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
  * Chart card preview
  */
 const ChartCardPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   return (
     <div className="p-4">
-      <div className="mb-3 text-sm font-medium text-gray-900">{resolveLocalizedText(block.title) || '图表'}</div>
+      <div className="mb-3 text-sm font-medium text-gray-900">
+        {resolveLocalizedText(block.title, locale) || l('图表', 'Chart')}
+      </div>
       <div className="flex h-24 items-center justify-center rounded bg-gray-100">
         <svg
           className="h-8 w-8 text-gray-300"
@@ -252,9 +267,13 @@ const ChartCardPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
  * Text preview
  */
 const TextPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   return (
     <div className="p-4">
-      <div className="text-sm text-gray-600">{(block.props as any)?.content || '文本内容...'}</div>
+      <div className="text-sm text-gray-600">
+        {(block.props as any)?.content || l('文本内容...', 'Text content...')}
+      </div>
     </div>
   );
 };

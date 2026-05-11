@@ -45,6 +45,21 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     String getCommandType();
 
     /**
+     * Enumerate all command types this handler can process.
+     *
+     * <p>Runtime dispatch still calls {@link #supports(String)}, but import-time
+     * validation needs a finite list of handler codes to register. Handlers that
+     * override {@code supports(...)} for aliases must override this method with
+     * the same set of supported codes.
+     *
+     * @return supported command type identifiers
+     */
+    default Set<String> getSupportedCommandTypes() {
+        String commandType = getCommandType();
+        return commandType == null ? Set.of() : Set.of(commandType);
+    }
+
+    /**
      * Execute the command.
      *
      * @param context command execution context

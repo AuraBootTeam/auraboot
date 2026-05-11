@@ -1,6 +1,6 @@
 <p align="center">
   <h1 align="center">AuraBoot</h1>
-  <p align="center"><strong>AI-native low-code business platform — source-available, self-hosted</strong></p>
+  <p align="center"><strong>Self-hosted low-code for business apps — source-available, beta</strong></p>
 </p>
 
 <p align="center">
@@ -12,7 +12,6 @@
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>
   <a href="#"><img src="https://img.shields.io/badge/PostgreSQL-16-336791.svg" alt="PostgreSQL"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/stargazers"><img src="https://img.shields.io/github/stars/AuraBootTeam/auraboot?style=social" alt="GitHub Stars"></a>
-  <a href="https://discord.gg/p2fW5A2MW6"><img src="https://img.shields.io/badge/Discord-Join-7289da?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center">
@@ -20,6 +19,9 @@
   <a href="#key-features">Features</a> •
   <a href="#architecture">Architecture</a> •
   <a href="https://docs.auraboot.com">Docs</a> •
+  <a href="https://www.auraboot.com/demo">Demo</a> •
+  <a href="https://www.auraboot.com/trust">Trust</a> •
+  <a href="https://www.auraboot.com/contact?interest=feedback">Feedback</a> •
   <a href="#community">Community</a>
 </p>
 
@@ -27,17 +29,30 @@
 
 ## What is AuraBoot?
 
-AuraBoot is a source-available, self-hosted platform for building business applications using a declarative DSL (Domain-Specific Language) instead of writing boilerplate code. Define your data models, pages, commands, and workflows in JSON — the platform generates the database schema, REST APIs, and UI automatically. AI capabilities are built into the core: an in-app copilot, agent orchestration, ChatBI, and a RAG knowledge base that work with multiple LLM providers.
+AuraBoot is a source-available, self-hosted platform for building business applications using a declarative DSL (Domain-Specific Language) instead of writing the same CRUD, permission, workflow, and audit plumbing again. Define your data models, pages, commands, and workflows in JSON — the platform generates the database schema, REST APIs, and UI automatically. AI-assisted features such as AuraBot, ChatBI, agents, and RAG run on the same application model when you need them.
 
-<!-- Screenshots (dashboard, page designer, command pipeline, AI copilot) land
-     with v0.1.0-beta.1; capture spec at docs/community/readme-screenshots-spec.md -->
+## Product Preview
+
+| Dashboard | Page Designer |
+|---|---|
+| ![AuraBoot dashboard](docs/assets/screenshots/dashboard.png) | ![AuraBoot page designer](docs/assets/screenshots/page-designer.png) |
+
+| Command Pipeline | AuraBot Trace |
+|---|---|
+| ![AuraBoot command pipeline](docs/assets/screenshots/command-pipeline.png) | ![AuraBoot AuraBot trace](docs/assets/screenshots/aurabot.png) |
+
+## Public Demo Path
+
+- **Website walkthrough:** [auraboot.com/demo](https://www.auraboot.com/demo) shows the core model -> page -> command loop.
+- **PCBA Pilot package:** the PCBA manufacturing package is available for scoped design-partner pilots. It is not GA and should not be described as a full ERP replacement.
+- **Trust posture:** [auraboot.com/trust](https://www.auraboot.com/trust) documents the current source-available license posture, security contact, and SOC 2 readiness position. AuraBoot does not claim SOC 2 Type I or Type II certification today.
 
 ## Key Features
 
 ### DSL Engine
 Define models, fields, commands, pages, and formulas in declarative JSON. A single model definition creates the database table, REST endpoints, form validation, and list/detail pages with no code generation step.
 
-### 20-Stage Command Pipeline
+### 20+ Stage Command Pipeline
 Every data operation flows through a unified pipeline: schema validation → permission check → state machine → field mapping → handler → side effects → webhooks → audit. Fully configurable per command through DSL.
 
 ### 3 Visual Designers
@@ -45,7 +60,7 @@ Every data operation flows through a unified pipeline: schema validation → per
 - **BPMN Designer** — Visual workflow editor with human tasks, SLA monitoring, and approval routing
 - **Automation Designer** — Event-driven automation rules with triggers, conditions, and actions
 
-### AI Full Stack
+### AI-Assisted Workflows
 - **AuraBot** — In-app AI assistant for natural language queries, data operations, and guided workflows
 - **Agent Control Plane (ACP)** — Orchestrate AI agents with skills, tools, and memory
 - **ChatBI** — Ask questions about your data in natural language, get charts and tables back
@@ -75,6 +90,12 @@ docker compose --profile full up --build -d
 ```
 
 The `full` profile builds and starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Cold start takes 2–4 minutes (the backend health check has a 120s start period). Open [http://localhost:3000](http://localhost:3000) and log in:
+
+If local PostgreSQL is already using port 5432, keep your local service running and start AuraBoot with a different host port:
+
+```bash
+POSTGRES_PORT=15432 docker compose --profile full up --build -d
+```
 
 | | |
 |---|---|
@@ -182,7 +203,7 @@ If you are working on AI features, run both `test` and `testAi`. The AI stack li
 │  └──────┬──────┘  └──────────────┘  └────────────────────────┘ │
 │         │                                                       │
 │  ┌──────▼──────────────────────────────────────────────────┐   │
-│  │              20-Stage Command Pipeline                   │   │
+│  │              20+ Stage Command Pipeline                  │   │
 │  │  LOAD → VALIDATE → PERMISSION → STATE → LOCK → HANDLER │   │
 │  │  → EFFECT → SIDE_EFFECT → WEBHOOK → AUDIT → COMPLETED  │   │
 │  └─────────────────────────────────────────────────────────┘   │
@@ -243,7 +264,7 @@ auraboot/
 ### Core Concepts
 - [DSL Engine](docs/core-concepts/dsl-engine.md) — Declarative configuration philosophy
 - [Models & Fields](docs/core-concepts/models-and-fields.md) — 22 field types, relations, formulas
-- [Commands](docs/core-concepts/commands.md) — 20-stage pipeline reference
+- [Commands](docs/core-concepts/commands.md) — 20+ stage pipeline reference
 - [Pages & Layouts](docs/core-concepts/pages-and-layouts.md) — Page kinds, blocks, designers
 - [Permissions](docs/core-concepts/permissions.md) — RBAC, multi-tenant, data-level security
 - [State Machines](docs/core-concepts/state-machines.md) — Status flows and transitions
@@ -269,7 +290,7 @@ auraboot/
 | Capability | Community (Free) | Enterprise |
 |---|:---:|:---:|
 | DSL Engine + Page Designer | ✓ | ✓ |
-| 20-Stage Command Pipeline | ✓ | ✓ |
+| 20+ Stage Command Pipeline | ✓ | ✓ |
 | AI Copilot (AuraBot) | ✓ | ✓ |
 | BPM Workflow Engine | ✓ | ✓ |
 | Plugin System + CLI | ✓ | ✓ |
@@ -280,13 +301,14 @@ auraboot/
 | Mobile Apps (iOS + Android) | — | ✓ |
 | Priority Support + SLA | — | ✓ |
 
-For enterprise licensing, contact [license@auraboot.com](mailto:license@auraboot.com) or visit [auraboot.com](https://www.auraboot.com).
+For enterprise licensing, use the [AuraBoot contact form](https://www.auraboot.com/contact).
 
 ## Community
 
+- [Website feedback form](https://www.auraboot.com/contact?interest=feedback) — Product feedback, beta issues, licensing questions, and private notes
 - [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — Ask questions and share ideas
 - [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — Report bugs or request features
-- [Discord](https://discord.gg/p2fW5A2MW6) — Join the community chat
+- [Discord](https://discord.gg/p2fW5A2MW6) — Community chat only; use the website form for feedback that needs follow-up
 
 ## Contributing
 
@@ -298,7 +320,7 @@ To report a security vulnerability, please email [security@auraboot.com](mailto:
 
 ## License
 
-AuraBoot is released under the [AuraBoot License v1.3](LICENSE.txt), a source-available license based on Apache 2.0 with supplementary terms.
+AuraBoot is released under the [AuraBoot License v1.3](LICENSE.txt), a source-available license based on Apache 2.0 with supplementary terms:
 
 - **Free for internal use** — Use, modify, and deploy for your own business applications. No obligation to open-source your modifications.
 - **Free for ISV / project delivery** — Build and deliver business applications (ERP, CRM, vertical SaaS) to customers, with your changes kept private.
@@ -307,7 +329,7 @@ AuraBoot is released under the [AuraBoot License v1.3](LICENSE.txt), a source-av
 
 📖 **See the [License FAQ (中文)](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md)** for common questions about commercial use, modification, redistribution, and SaaS boundaries.
 
-For commercial licensing (multi-tenant low-code SaaS, white-labeling, or removing branding), contact [license@auraboot.com](mailto:license@auraboot.com).
+For commercial licensing (multi-tenant low-code SaaS, white-labeling, or removing branding), use the [AuraBoot contact form](https://www.auraboot.com/contact).
 
 ---
 

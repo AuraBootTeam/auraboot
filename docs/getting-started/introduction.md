@@ -1,16 +1,16 @@
 # Introduction to AuraBoot
 
-AuraBoot is a source-available platform for building business applications using declarative JSON instead of writing boilerplate code. You define your data models, pages, commands, and workflows in JSON DSL -- the platform generates the database schema, REST APIs, and UI automatically. AI capabilities are built into the core: an in-app copilot, agent orchestration, ChatBI, and a RAG knowledge base that work with multiple LLM providers.
+AuraBoot is a source-available, self-hosted platform for building business applications using declarative JSON instead of rewriting the same CRUD, permission, workflow, and audit plumbing for every project. You define your data models, pages, commands, and workflows in JSON DSL -- the platform generates the database schema, REST APIs, and UI automatically. AI-assisted features such as AuraBot, ChatBI, agents, and RAG run on the same application model when they are useful.
 
 ## Key Value Propositions
 
-- **Zero boilerplate** -- Define a model in JSON, get a database table, CRUD APIs, list/form/detail pages, and permission checks automatically. No code generation step.
-- **20-stage command pipeline** -- Every data operation flows through a configurable pipeline: validation, permission check, state machine, field mapping, handler, side effects, webhooks, audit. You control each stage through DSL.
+- **Less boilerplate** -- Define a model in JSON, get a database table, CRUD APIs, list/form/detail pages, and permission checks automatically. No code generation step.
+- **20+ stage command pipeline** -- Every data operation flows through a configurable pipeline: validation, permission check, state machine, field mapping, handler, side effects, webhooks, audit. You control each stage through DSL.
 - **3 visual designers** -- Page Designer (drag-and-drop pages with 20+ block types), BPMN Designer (workflow editor with human tasks and SLA), Automation Designer (event-driven rules with triggers and actions).
-- **AI-native** -- In-app AI assistant (AuraBot), agent orchestration (ACP), ChatBI for natural language analytics, and RAG knowledge base. Works with OpenAI, Anthropic, Zhipu GLM, and more.
+- **AI-assisted workflows** -- In-app assistant (AuraBot), agent orchestration (ACP), ChatBI for natural language analytics, and RAG knowledge base. Works with OpenAI, Anthropic, Zhipu GLM, and more.
 - **Plugin system** -- PF4J-based architecture. Plugins are declarative JSON packages that add models, fields, commands, pages, and menus. Build your own with the CLI or install from the marketplace.
 - **Multi-tenant RBAC** -- Row-level tenant isolation, role-based access control at resource/operation/data levels, menu and API-level permission enforcement.
-- **Production-ready stack** -- Spring Boot 3.5, React 19, PostgreSQL 16 with pgvector, Redis 7, Docker Compose deployment.
+- **Self-hosted stack** -- Spring Boot 3.5, React 19, PostgreSQL 16 with pgvector, Redis 7, Docker Compose deployment.
 
 ## Who Should Use AuraBoot
 
@@ -49,10 +49,10 @@ AuraBoot is designed for data-driven business applications. Here are examples of
 |---|---|---|---|---|---|
 | **Approach** | DSL-driven platform | Monolithic ERP | Spreadsheet-to-API | UI builder for APIs | UI builder for APIs |
 | **Data model definition** | JSON DSL (auto-generates DB + API + UI) | Python ORM models | GUI on existing DB | External DB/API | External DB/API |
-| **Command pipeline** | 20-stage configurable pipeline | ORM hooks | N/A | N/A | N/A |
+| **Command pipeline** | 20+ stage configurable pipeline | ORM hooks | N/A | N/A | N/A |
 | **State machine** | Built-in (DSL-configured) | Custom code | N/A | Custom code | Custom code |
 | **Page builder** | 3 designers (Page, BPMN, Automation) | Studio (limited) | Grid views | Drag-drop widgets | Drag-drop widgets |
-| **AI integration** | Core (copilot, agents, ChatBI, RAG) | Third-party | N/A | Third-party | Third-party |
+| **AI integration** | Optional app-aware features (copilot, agents, ChatBI, RAG) | Third-party | N/A | Third-party | Third-party |
 | **BPM / Workflows** | BPMN 2.0 engine (SmartEngine) | Basic workflows | N/A | N/A | N/A |
 | **Plugin system** | PF4J + JSON packages | Python modules | N/A | N/A | N/A |
 | **Multi-tenancy** | Row-level isolation, built-in | Per-database | N/A | N/A | N/A |

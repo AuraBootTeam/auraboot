@@ -398,7 +398,7 @@ Set environment variables:
 export SPRING_MAIL_HOST=smtp.example.com
 export SPRING_MAIL_PORT=587
 export SPRING_MAIL_USERNAME=noreply@example.com
-export SPRING_MAIL_PASSWORD=your-password
+export SPRING_MAIL_PASSWORD="${SMTP_PASSWORD}"
 ```
 
 ### Step 3: Test

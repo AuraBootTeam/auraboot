@@ -1,6 +1,7 @@
 package com.auraboot.framework.email.mapper;
 
 import com.auraboot.framework.email.model.EmailSequenceEnrollment;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -19,6 +20,7 @@ public interface EmailSequenceEnrollmentMapper extends BaseMapper<EmailSequenceE
      * Fetches all active enrollments whose {@code next_send_at} is due (in the past or now).
      * Called by the sequence executor job on a scheduled basis.
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("""
         SELECT * FROM ab_email_sequence_enrollment
         WHERE status      = 'active'

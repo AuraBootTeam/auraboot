@@ -516,8 +516,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
     private void syncPublishedModelsForUpdatedField(Field existingField, String fieldCode) {
         if (existingField.getId() == null) {
-            log.warn("Skipping schema sync for reimported field without database id: code={}, pid={}",
-                    fieldCode, existingField.getPid());
+            log.warn("Skipping schema sync for reimported field without database id");
             return;
         }
 
@@ -535,8 +534,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 throw new PluginException("Failed to sync schema after updating field " + fieldCode
                         + " for model " + modelCode + ": " + errorMessage);
             }
-            log.info("Synced published model after field reimport: fieldCode={}, modelCode={}",
-                    fieldCode, modelCode);
+            log.info("Synced published model after field reimport");
         }
     }
 
