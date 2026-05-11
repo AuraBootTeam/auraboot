@@ -18,6 +18,7 @@ public class AuditTrailEvent {
     private String eventType;
     private String entityType;
     private Long entityId;
+    private String entityPid;
     private String commandCode;
     private String operationType;
     private Long actorId;

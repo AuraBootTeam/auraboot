@@ -35,14 +35,16 @@ public class SodCheckPhase implements CommandPhase {
     public void execute(CommandPipelineContext ctx) {
         String entityType = ctx.getCommand().getModelCode();
         Long entityId = null;
+        String entityPid = null;
         if (ctx.getRequest() != null && StringUtils.hasText(ctx.getRequest().getTargetRecordId())) {
+            String targetRecordId = ctx.getRequest().getTargetRecordId().trim();
             try {
-                entityId = Long.parseLong(ctx.getRequest().getTargetRecordId());
+                entityId = Long.parseLong(targetRecordId);
             } catch (NumberFormatException e) {
-                // Non-numeric record IDs (e.g. PIDs) — skip entity-level SoD
+                entityPid = targetRecordId;
             }
         }
         String actorName = MetaContext.exists() ? MetaContext.getCurrentUsername() : null;
-        sodService.checkSod(ctx.getCommandCode(), ctx.getUserId(), actorName, entityType, entityId);
+        sodService.checkSod(ctx.getCommandCode(), ctx.getUserId(), actorName, entityType, entityId, entityPid);
     }
 }

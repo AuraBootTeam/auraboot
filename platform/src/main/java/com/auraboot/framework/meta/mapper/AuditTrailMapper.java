@@ -30,7 +30,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
      * Get the latest audit record for a tenant (by highest sequence_no).
      * Used to retrieve the previous hash for chain linking.
      */
-    @Select("SELECT id, tenant_id, sequence_no, event_type, entity_type, entity_id, " +
+    @Select("SELECT id, tenant_id, sequence_no, event_type, entity_type, entity_id, entity_pid, " +
             "command_code, operation_type, actor_id, actor_name, actor_ip, timestamp, " +
             "previous_hash, record_hash " +
             "FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
@@ -57,6 +57,16 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
     List<AuditTrail> getByEntity(@Param("tenantId") Long tenantId,
                                   @Param("entityType") String entityType,
                                   @Param("entityId") Long entityId);
+
+    /**
+     * Get audit trail for a specific entity PID (model + public record PID).
+     */
+    @Select("SELECT * FROM ab_audit_trail WHERE tenant_id = #{tenantId} " +
+            "AND entity_type = #{entityType} AND entity_pid = #{entityPid} " +
+            "ORDER BY sequence_no ASC")
+    List<AuditTrail> getByEntityPid(@Param("tenantId") Long tenantId,
+                                     @Param("entityType") String entityType,
+                                     @Param("entityPid") String entityPid);
 
     /**
      * Get audit records by actor within a time range.
@@ -113,7 +123,7 @@ public interface AuditTrailMapper extends BaseMapper<AuditTrail> {
      */
     @Select("""
         <script>
-        SELECT id, tenant_id, event_type, entity_type, entity_id,
+        SELECT id, tenant_id, event_type, entity_type, entity_id, entity_pid,
                command_code, operation_type, actor_id, actor_name, timestamp, changed_fields
         FROM ab_audit_trail
         WHERE tenant_id = #{tenantId}
