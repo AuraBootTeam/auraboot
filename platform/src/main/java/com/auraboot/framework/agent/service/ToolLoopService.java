@@ -1,7 +1,10 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
-import com.auraboot.framework.agent.port.ToolExecutionPort;
+import com.auraboot.framework.agent.authorization.BlastRadius;
+import com.auraboot.framework.agent.authorization.EffectClass;
+import com.auraboot.framework.agent.authorization.RuntimeAuthorizationService;
+import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
 import com.auraboot.framework.agent.provider.ProviderExecutionResult;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.trace.AiTraceService;
@@ -26,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,13 +41,15 @@ import java.util.stream.Collectors;
  * Extracted from AgentRunService — handles all tool execution dispatch:
  * dsl_command, dsl_query, api_call, llm_native.
  *
- * Implements ToolExecutionPort so AuraBotChatService (core module) can delegate
- * tool execution here without depending on any external distribution boundary.
+ * Entry adapters must call {@link #executeToolCall(Long, String, String, String, String, Map, List, TraceContext)}
+ * or {@link #confirmAuraBotSkill(Long, String, String, String, String, Map, List, String, TraceContext)}
+ * so authorization, effects, actions, result contracts, and traces stay in one
+ * runtime path.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ToolLoopService implements ToolExecutionPort {
+public class ToolLoopService {
 
     private static final int MAX_HALLUCINATION_COUNT = 3;
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
@@ -57,9 +64,13 @@ public class ToolLoopService implements ToolExecutionPort {
     private final ObjectMapper objectMapper;
     private final ToolProviderRegistry toolProviderRegistry;
     private final ResultContractEmitter resultContractEmitter;
+    private final RuntimeAuthorizationService runtimeAuthorizationService;
 
     @Autowired(required = false)
     private SkillToolExecutor skillToolExecutor;
+
+    @Autowired(required = false)
+    private AgentRuntimeObservabilityService observabilityService;
 
     /**
      * Execute a tool call within an agent run.
@@ -136,9 +147,32 @@ public class ToolLoopService implements ToolExecutionPort {
             return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
         }
 
+        RuntimeAuthorizationService.IncrementalAuthorization authorization =
+                runtimeAuthorizationService.authorizeIncremental(buildToolCallIntent(
+                        tenantId, runPid, toolName, toolDef, input));
+        if (!authorization.granted()) {
+            String reason = authorization.rejectedReason() == null
+                    ? "denied_by_runtime_authorization"
+                    : authorization.rejectedReason();
+            log.info("Runtime authorization deny: tenant={} run={} tool={} reason={} by={}",
+                    tenantId, runPid, toolName, reason, authorization.rejectedBy());
+            return "Error: Runtime authorization denied for tool '" + toolName + "': " + reason;
+        }
+        if (authorization.requireApproval()) {
+            String approvalPid = authorization.approvalRequestId() == null
+                    ? ""
+                    : authorization.approvalRequestId();
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "approvalRequired", true,
+                    "approvalPid", approvalPid,
+                    "message", "Runtime authorization requires human approval."));
+        }
+
         // BIF-risk-aware approval: force approval when current-turn BIF says risk ≥ L3
         // AND this is a write tool (cmd_*), regardless of per-tool flag. Closes the
         // D1 Grounding → Approval Gate loop (spec §5.1 RiskEvaluator quality gate).
+        boolean auraBotSkill = isAuraBotSkill(toolDef);
         boolean requiresApproval = toolDef.isRequiresApproval();
         if (!requiresApproval) {
             com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
@@ -148,7 +182,7 @@ public class ToolLoopService implements ToolExecutionPort {
                         bif.getRiskLevel(), toolName);
             }
         }
-        if (requiresApproval) {
+        if (requiresApproval && !auraBotSkill) {
             String approvalPid = approvalGate.checkAndRequestApproval(
                     tenantId, runPid, taskPid, toolName, toolDef.getDescription(), input, true);
             if (approvalPid != null) {
@@ -162,10 +196,10 @@ public class ToolLoopService implements ToolExecutionPort {
             return toJsonResult(Map.of(
                     "success", false,
                     "approvalRequired", true,
-                    "error", "This tool requires human approval, but no matching approval policy could create a request. No data was changed."));
+                        "error", "This tool requires human approval, but no matching approval policy could create a request. No data was changed."));
         }
 
-        if (toolDef.isRequiresConfirmation()) {
+        if (toolDef.isRequiresConfirmation() && !auraBotSkill) {
             resultContractEmitter.emitConfirmationRequired(toolName, toolDef, input, 0);
             return "Error: This tool requires user confirmation before execution. No data was changed.";
         }
@@ -195,18 +229,29 @@ public class ToolLoopService implements ToolExecutionPort {
             } else if ("llm_native".equals(toolType)) {
                 try { aiTraceService.endSpan(spanCtx, Map.of("status", "delegated"), "success"); }
                 catch (Exception traceEx) { log.debug("Failed to end span: {}", traceEx.getMessage()); }
+                recordToolExecution(toolType, true, "delegated");
                 return objectMapper.writeValueAsString(Map.of(
                         "status", "delegated",
                         "message", "This tool is handled natively by the LLM provider."));
             } else {
                 try { aiTraceService.endSpan(spanCtx, "Unsupported tool type: " + toolType, "error"); }
                 catch (Exception traceEx) { log.debug("Failed to end span: {}", traceEx.getMessage()); }
-                return "Error: Unsupported tool type: " + toolType;
+                recordUnsupportedToolType(toolType);
+                recordToolExecution(toolType, false, "unsupported_type");
+                log.error("agent-runtime-unsupported-tool-type tenantId={} runId={} toolName={} toolType={} sourceCode={}",
+                        tenantId, runPid, toolName, toolType, toolDef.getSourceCode());
+                return toJsonResult(Map.of(
+                        "success", false,
+                        "errorCode", "unsupported_tool_type",
+                        "error", "Unsupported tool type: " + toolType,
+                        "toolName", toolName,
+                        "toolType", toolType == null ? "unknown" : toolType));
             }
 
             long latencyMs = System.currentTimeMillis() - startMs;
             boolean success = isToolResultSuccess(result);
             updateToolStats(tenantId, toolName, success, latencyMs, success ? null : result);
+            recordToolExecution(toolType, success, "executed");
 
             // Emit ResultContract for structured frontend rendering (PR-11). No-op if
             // ResponseSinkContext has no sink bound (non-chat callers: tests, ad-hoc skill runs).
@@ -215,6 +260,14 @@ public class ToolLoopService implements ToolExecutionPort {
             } else if ("dsl_command".equals(toolDef.getToolType())) {
                 resultContractEmitter.emitCommandResult(toolName, toolDef, result, latencyMs, success,
                         success ? null : result);
+            } else if (isProviderBackedTool(toolDef) || auraBotSkill) {
+                resultContractEmitter.emitProviderResult(toolName, toolDef, result, latencyMs, success);
+                Map<String, Object> parsedResult = parseToolResultMap(result);
+                if (success || !auraBotSkill) {
+                    actionRecorder.recordProviderAction(tenantId, runPid, toolRef(toolName, toolDef),
+                            toolDef, input != null ? input : Map.of(), parsedResult,
+                            success ? null : result, deriveEffects(toolName, toolDef));
+                }
             }
 
             try { aiTraceService.endSpan(spanCtx, result, success ? "success" : "error"); }
@@ -224,6 +277,7 @@ public class ToolLoopService implements ToolExecutionPort {
         } catch (Exception e) {
             long latencyMs = System.currentTimeMillis() - startMs;
             updateToolStats(tenantId, toolName, false, latencyMs, e.getMessage());
+            recordToolExecution(toolDef != null ? toolDef.getToolType() : null, false, "exception");
             log.error("Tool execution failed: tool={}, error={}", toolName, e.getMessage());
 
             if (toolDef != null) {
@@ -232,6 +286,13 @@ public class ToolLoopService implements ToolExecutionPort {
                     resultContractEmitter.emitQueryResult(toolName, toolDef, "Error: " + e.getMessage(), latencyMs, false);
                 } else if ("dsl_command".equals(type)) {
                     resultContractEmitter.emitCommandResult(toolName, toolDef, null, latencyMs, false, e.getMessage());
+                } else if (isProviderBackedTool(toolDef) || isAuraBotSkill(toolDef)) {
+                    resultContractEmitter.emitProviderResult(toolName, toolDef, null, latencyMs, false);
+                    if (!isAuraBotSkill(toolDef)) {
+                        actionRecorder.recordProviderAction(tenantId, runPid, toolRef(toolName, toolDef),
+                                toolDef, input != null ? input : Map.of(), Map.of(),
+                                e.getMessage(), deriveEffects(toolName, toolDef));
+                    }
                 }
             }
 
@@ -281,16 +342,186 @@ public class ToolLoopService implements ToolExecutionPort {
         return objectMapper.writeValueAsString(response);
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public String confirmAuraBotSkill(Long tenantId, String runPid, String taskPid, String agentCode,
+                                      String toolName, Map<String, Object> input,
+                                      List<AgentToolDefinition> tools, String previewToken,
+                                      TraceContext traceCtx) {
+        StepContext.setRunPid(runPid);
+        try {
+            return confirmAuraBotSkillInternal(tenantId, runPid, taskPid, agentCode,
+                    toolName, input, tools, previewToken, traceCtx);
+        } finally {
+            StepContext.clearRunPid();
+        }
+    }
+
+    private String confirmAuraBotSkillInternal(Long tenantId, String runPid, String taskPid, String agentCode,
+                                               String toolName, Map<String, Object> input,
+                                               List<AgentToolDefinition> tools, String previewToken,
+                                               TraceContext traceCtx) {
+        AgentToolDefinition toolDef = findToolDef(tools, toolName);
+        if (toolDef == null) {
+            incrementMisuseCount(tenantId, toolName);
+            return "Error: Unknown tool '" + toolName + "'. Available tools: " +
+                    (tools == null ? "" : tools.stream()
+                            .map(AgentToolDefinition::getName)
+                            .limit(10)
+                            .collect(Collectors.joining(", ")));
+        }
+        if (!"AURABOT_SKILL".equals(toolDef.getToolType())) {
+            return "Error: Tool '" + toolName + "' is not an AuraBot skill.";
+        }
+
+        ToolAclChecker.Decision acl = toolAclChecker.check(
+                tenantId, null, null, "interactive", toolName);
+        if (!acl.isAllowed()) {
+            String reason = acl.getReason() == null ? "denied_by_tool_acl" : acl.getReason();
+            return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
+        }
+
+        RuntimeAuthorizationService.IncrementalAuthorization authorization =
+                runtimeAuthorizationService.authorizeIncremental(buildToolCallIntent(
+                        tenantId, runPid, toolName, toolDef, input));
+        if (!authorization.granted()) {
+            String reason = authorization.rejectedReason() == null
+                    ? "denied_by_runtime_authorization"
+                    : authorization.rejectedReason();
+            log.info("Runtime authorization deny: tenant={} run={} tool={} reason={} by={}",
+                    tenantId, runPid, toolName, reason, authorization.rejectedBy());
+            return "Error: Runtime authorization denied for tool '" + toolName + "': " + reason;
+        }
+        if (authorization.requireApproval()) {
+            String approvalPid = authorization.approvalRequestId() == null
+                    ? ""
+                    : authorization.approvalRequestId();
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "approvalRequired", true,
+                    "approvalPid", approvalPid,
+                    "message", "Runtime authorization requires human approval."));
+        }
+        if (skillToolExecutor == null) {
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "error", "AuraBot skill executor is not available in the current runtime."));
+        }
+        if (previewToken == null || previewToken.isBlank()) {
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "error", "Preview token is required for AuraBot skill confirmation."));
+        }
+
+        long startMs = System.currentTimeMillis();
+        SpanContext spanCtx = null;
+        try {
+            spanCtx = aiTraceService.startSpan(traceCtx, null, "tool_confirm", toolName, input);
+        } catch (Exception e) {
+            log.debug("Failed to start confirm span for tool {}: {}", toolName, e.getMessage());
+        }
+
+        try {
+            String skillName = resolveAuraBotSkillName(toolDef);
+            SkillRequest request = SkillRequest.builder()
+                    .skillName(skillName)
+                    .params(objectMapper.valueToTree(input != null ? input : Map.of()))
+                    .build();
+            SkillToolExecutor.DispatchOutcome outcome =
+                    skillToolExecutor.confirm(skillName, request, previewToken);
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            if (outcome.kind() == SkillToolExecutor.OutcomeKind.EXECUTED) {
+                SkillResult skillResult = outcome.result();
+                response.put("success", true);
+                response.put("data", skillResult == null ? null : skillResult.getPayload());
+                if (skillResult != null && skillResult.getStatus() != null) {
+                    response.put("status", skillResult.getStatus().name());
+                }
+                long latencyMs = System.currentTimeMillis() - startMs;
+                updateToolStats(tenantId, toolName, true, latencyMs, null);
+                recordToolExecution(toolDef.getToolType(), true, "confirm");
+                String resultJson = objectMapper.writeValueAsString(response);
+                resultContractEmitter.emitProviderResult(toolName, toolDef, resultJson, latencyMs, true);
+                actionRecorder.recordProviderAction(tenantId, runPid, toolRef(toolName, toolDef),
+                        toolDef, input != null ? input : Map.of(), response,
+                        null, deriveEffects(toolName, toolDef));
+                try { aiTraceService.endSpan(spanCtx, response, "success"); }
+                catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", traceEx.getMessage()); }
+                return resultJson;
+            }
+
+            response.put("success", false);
+            response.put("error", "AuraBot skill confirmation did not execute.");
+            response.put("riskLevel", outcome.riskLevel());
+            long latencyMs = System.currentTimeMillis() - startMs;
+            updateToolStats(tenantId, toolName, false, latencyMs, String.valueOf(response.get("error")));
+            recordToolExecution(toolDef.getToolType(), false, "confirm");
+            resultContractEmitter.emitProviderResult(
+                    toolName, toolDef, objectMapper.writeValueAsString(response), latencyMs, false);
+            try { aiTraceService.endSpan(spanCtx, response, "error"); }
+            catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", traceEx.getMessage()); }
+            return objectMapper.writeValueAsString(response);
+        } catch (Exception e) {
+            long latencyMs = System.currentTimeMillis() - startMs;
+            updateToolStats(tenantId, toolName, false, latencyMs, e.getMessage());
+            recordToolExecution(toolDef.getToolType(), false, "confirm_exception");
+            try { aiTraceService.endSpan(spanCtx, e.getMessage(), "error"); }
+            catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", traceEx.getMessage()); }
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "error", e.getMessage() != null ? e.getMessage() : "Skill confirm failed"));
+        }
+    }
+
     private String resolveAuraBotSkillName(AgentToolDefinition toolDef) {
         String sourceCode = toolDef.getSourceCode();
         if (sourceCode != null && !sourceCode.isBlank()) {
+            String restored = restoreLlmSafeAuraBotSkillName(toolDef.getName(), sourceCode);
+            if (restored != null) {
+                return restored;
+            }
             return sourceCode;
         }
         String name = toolDef.getName();
         if (name != null && name.startsWith("aurabot:")) {
             return name.substring("aurabot:".length());
         }
+        String restored = restoreLlmSafeAuraBotSkillName(name, null);
+        if (restored != null) {
+            return restored;
+        }
         return name;
+    }
+
+    private String restoreLlmSafeAuraBotSkillName(String toolName, String sourceCode) {
+        if (sourceCode != null && sourceCode.contains(":")) {
+            return sourceCode;
+        }
+        if (toolName == null || !toolName.startsWith("aurabot_")) {
+            return null;
+        }
+        String safeSkillName = toolName.substring("aurabot_".length());
+        int namespaceEnd = safeSkillName.indexOf('_');
+        if (namespaceEnd <= 0 || namespaceEnd >= safeSkillName.length() - 1) {
+            return sourceCode;
+        }
+        return safeSkillName.substring(0, namespaceEnd)
+                + ":"
+                + safeSkillName.substring(namespaceEnd + 1);
+    }
+
+    private AgentToolDefinition findToolDef(List<AgentToolDefinition> tools, String name) {
+        if (tools == null) return null;
+        for (AgentToolDefinition tool : tools) {
+            if (tool.getName() != null && tool.getName().equals(name)) {
+                return tool;
+            }
+        }
+        return null;
+    }
+
+    private boolean isAuraBotSkill(AgentToolDefinition toolDef) {
+        return toolDef != null && "AURABOT_SKILL".equals(toolDef.getToolType());
     }
 
     // ========== Provider-backed Tools ==========
@@ -484,6 +715,121 @@ public class ToolLoopService implements ToolExecutionPort {
         return toolName != null && (toolName.startsWith("cmd_") || toolName.startsWith("cmd:"));
     }
 
+    private RuntimeAuthorizationService.ToolCallIntent buildToolCallIntent(
+            Long tenantId, String runPid, String toolName,
+            AgentToolDefinition toolDef, Map<String, Object> input) {
+        com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
+        String skillCode = null;
+        if (toolDef != null && "AURABOT_SKILL".equals(toolDef.getToolType())) {
+            skillCode = resolveAuraBotSkillName(toolDef);
+        }
+        if (skillCode == null && bif != null
+                && bif.getCandidateSkills() != null && !bif.getCandidateSkills().isEmpty()) {
+            skillCode = bif.getCandidateSkills().get(0);
+        }
+        return new RuntimeAuthorizationService.ToolCallIntent(
+                tenantId != null ? tenantId : 0L,
+                runPid,
+                StepContext.getStepIndex(),
+                StepContext.getParallelIndex(),
+                toolRef(toolName, toolDef),
+                skillCode,
+                null,
+                deriveEffects(toolName, toolDef),
+                deriveBlastRadius(toolName, toolDef),
+                hashArgs(input),
+                input != null ? input : Map.of(),
+                null);
+    }
+
+    private String toolRef(String toolName, AgentToolDefinition toolDef) {
+        if (toolDef != null && toolDef.getSourceCode() != null && !toolDef.getSourceCode().isBlank()
+                && !"AURABOT_SKILL".equals(toolDef.getToolType())) {
+            return toolDef.getSourceCode();
+        }
+        return toolName;
+    }
+
+    private Set<EffectClass> deriveEffects(String toolName, AgentToolDefinition toolDef) {
+        String type = toolDef != null ? toolDef.getToolType() : null;
+        String source = toolDef != null && toolDef.getSourceCode() != null ? toolDef.getSourceCode() : toolName;
+        String normalizedRisk = normalizeRiskLevel(toolDef != null ? toolDef.getRiskLevel() : null, "L1");
+
+        if ("dsl_query".equals(type)) {
+            return Set.of(EffectClass.READ_PLATFORM_DATA);
+        }
+        if ("llm_native".equals(type)) {
+            return Set.of(EffectClass.READ_CONTEXT);
+        }
+        if ("AURABOT_SKILL".equals(type)) {
+            String skillName = resolveAuraBotSkillName(toolDef);
+            if ("echo".equals(skillName)) {
+                return Set.of(EffectClass.READ_CONTEXT);
+            }
+            if (skillName != null && skillName.endsWith(":query")) {
+                return Set.of(EffectClass.READ_PLATFORM_DATA);
+            }
+            if ("model:create".equals(skillName) || "field:add".equals(skillName)) {
+                return Set.of(EffectClass.WRITE_PLATFORM_STATE);
+            }
+            return Set.of(isHighRisk(normalizedRisk)
+                    ? EffectClass.WRITE_PLATFORM_STATE
+                    : EffectClass.READ_CONTEXT);
+        }
+        if ("dsl_command".equals(type)) {
+            return Set.of(EffectClass.WRITE_PLATFORM_STATE);
+        }
+        if ("platform".equals(type)) {
+            if ("platform.list_models".equals(source)
+                    || "platform.execute_sql".equals(source)
+                    || "platform.model_suggest".equals(source)) {
+                return Set.of(EffectClass.READ_PLATFORM_DATA);
+            }
+            return Set.of(EffectClass.WRITE_PLATFORM_STATE);
+        }
+        if ("custom".equals(type) || "mcp".equals(type) || "api_call".equals(type)
+                || "built_in".equals(type) || hasProviderPrefix(source)) {
+            if (isWriteTool(toolName, toolDef) || isHighRisk(normalizedRisk)) {
+                return Set.of(EffectClass.EXTERNAL_NETWORK, EffectClass.WRITE_PLATFORM_STATE);
+            }
+            return Set.of(EffectClass.EXTERNAL_NETWORK);
+        }
+        return isWriteTool(toolName, toolDef)
+                ? Set.of(EffectClass.WRITE_PLATFORM_STATE)
+                : Set.of(EffectClass.READ_CONTEXT);
+    }
+
+    private BlastRadius deriveBlastRadius(String toolName, AgentToolDefinition toolDef) {
+        Set<EffectClass> effects = deriveEffects(toolName, toolDef);
+        String risk = normalizeRiskLevel(toolDef != null ? toolDef.getRiskLevel() : null, "L1");
+        if (effects.contains(EffectClass.TERMINAL_EXEC)
+                || effects.contains(EffectClass.SECRET_ACCESS)
+                || effects.contains(EffectClass.FILE_WRITE)
+                || "L4".equals(risk)) {
+            return BlastRadius.IRREVERSIBLE;
+        }
+        if (effects.contains(EffectClass.WRITE_PLATFORM_STATE)
+                || effects.contains(EffectClass.EXTERNAL_NETWORK)) {
+            return BlastRadius.SHARED_STATE;
+        }
+        return BlastRadius.REVERSIBLE;
+    }
+
+    private String hashArgs(Map<String, Object> input) {
+        try {
+            String json = objectMapper.writeValueAsString(input != null ? input : Map.of());
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(json.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private String normalizeRiskLevel(String riskLevel, String fallback) {
         if (riskLevel == null || riskLevel.isBlank()) {
             return fallback;
@@ -494,6 +840,10 @@ public class ToolLoopService implements ToolExecutionPort {
         }
         return switch (normalized) {
             case "L0", "L1", "L2", "L3", "L4" -> normalized;
+            case "LOW" -> "L0";
+            case "MEDIUM" -> "L2";
+            case "HIGH" -> "L3";
+            case "CRITICAL" -> "L4";
             default -> fallback;
         };
     }
@@ -560,6 +910,18 @@ public class ToolLoopService implements ToolExecutionPort {
         }
     }
 
+    private void recordToolExecution(String toolType, boolean success, String stage) {
+        if (observabilityService != null) {
+            observabilityService.recordToolExecution(toolType, success, stage);
+        }
+    }
+
+    private void recordUnsupportedToolType(String toolType) {
+        if (observabilityService != null) {
+            observabilityService.recordUnsupportedToolType(toolType);
+        }
+    }
+
     private String toJsonResult(Map<String, Object> result) {
         try {
             return objectMapper.writeValueAsString(result);
@@ -581,6 +943,23 @@ public class ToolLoopService implements ToolExecutionPort {
             // Non-JSON tool output is considered successful unless it starts with Error.
         }
         return true;
+    }
+
+    private Map<String, Object> parseToolResultMap(String result) {
+        if (result == null || result.startsWith("Error")) {
+            return Map.of();
+        }
+        try {
+            Object parsed = objectMapper.readValue(result, Object.class);
+            if (parsed instanceof Map<?, ?> map) {
+                Map<String, Object> out = new LinkedHashMap<>();
+                map.forEach((k, v) -> out.put(String.valueOf(k), v));
+                return out;
+            }
+        } catch (Exception ignored) {
+            // Non-JSON tool result has no structured action payload.
+        }
+        return Map.of();
     }
 
     private void incrementHallucinationCount(String runPid) {
@@ -619,10 +998,9 @@ public class ToolLoopService implements ToolExecutionPort {
         } catch (Exception ignored) {}
     }
 
-    // ========== ToolExecutionPort implementation (for AuraBot cross-module delegation) ==========
+    // ========== Package-local DSL helpers for legacy kernel tests only ==========
 
-    @Override
-    public Map<String, Object> executeDslCommand(Long tenantId, String runId, String commandCode, Map<String, Object> input) {
+    Map<String, Object> executeDslCommand(Long tenantId, String runId, String commandCode, Map<String, Object> input) {
         try {
             String result = executeDslCommandWithAction(commandCode, input, tenantId, runId, null);
             return objectMapper.readValue(result, MAP_TYPE);
@@ -631,8 +1009,7 @@ public class ToolLoopService implements ToolExecutionPort {
         }
     }
 
-    @Override
-    public Map<String, Object> executeDslQuery(Long tenantId, String runId, String queryCode, Map<String, Object> input) {
+    Map<String, Object> executeDslQuery(Long tenantId, String runId, String queryCode, Map<String, Object> input) {
         try {
             String result = executeDslQueryWithAction(queryCode, input, tenantId, runId, null);
             return objectMapper.readValue(result, MAP_TYPE);
@@ -641,22 +1018,4 @@ public class ToolLoopService implements ToolExecutionPort {
         }
     }
 
-    @Override
-    public Map<String, Object> executeTool(Long tenantId, String runId, String toolCode, Map<String, Object> input) {
-        try {
-            ProviderExecutionResult result = toolProviderRegistry.execute(
-                    tenantId, toolCode, input != null ? input : Map.of());
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("success", result.isSuccess());
-            if (result.getData() != null) {
-                response.putAll(result.getData());
-            }
-            if (result.getErrorMessage() != null) {
-                response.put("error", result.getErrorMessage());
-            }
-            return response;
-        } catch (Exception e) {
-            return Map.of("success", false, "error", e.getMessage());
-        }
-    }
 }

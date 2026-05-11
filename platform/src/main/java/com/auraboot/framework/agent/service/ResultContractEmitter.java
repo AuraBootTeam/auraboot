@@ -3,11 +3,13 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.dto.ResultContract;
+import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.ResponseSinkContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -41,6 +43,9 @@ public class ResultContractEmitter {
 
     private final ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private AgentRuntimeObservabilityService observabilityService;
+
     /**
      * Build a ResultContract for a dsl_query result and emit it.
      * resultJson is the shape produced by ToolLoopService.executeDslQuery:
@@ -49,7 +54,10 @@ public class ResultContractEmitter {
     public void emitQueryResult(String toolName, AgentToolDefinition toolDef,
                                 String resultJson, long durationMs, boolean success) {
         ResponseSink sink = ResponseSinkContext.get();
-        if (sink == null) return;
+        if (sink == null) {
+            recordResultContract("structured_result", "none", success ? "success" : "failed", false);
+            return;
+        }
 
         ResultContract.ResultContractBuilder b = ResultContract.builder()
                 .skillCode(toolName)
@@ -87,7 +95,7 @@ public class ResultContractEmitter {
             b.renderHint("summary").textSummary(success ? "(unparseable result)" : "Query failed");
         }
 
-        sink.onResultContract(b.build());
+        emit(sink, b.build());
     }
 
     /**
@@ -99,7 +107,10 @@ public class ResultContractEmitter {
                                    String resultJson, long durationMs, boolean success,
                                    String errorMessage) {
         ResponseSink sink = ResponseSinkContext.get();
-        if (sink == null) return;
+        if (sink == null) {
+            recordResultContract(success ? "action_proposal" : "text", "none", success ? "success" : "failed", false);
+            return;
+        }
 
         ResultContract.ResultContractBuilder b = ResultContract.builder()
                 .skillCode(toolName)
@@ -110,7 +121,7 @@ public class ResultContractEmitter {
 
         if (!success) {
             b.renderHint("summary").textSummary(errorMessage != null ? errorMessage : "Command failed");
-            sink.onResultContract(b.build());
+            emit(sink, b.build());
             return;
         }
 
@@ -131,7 +142,68 @@ public class ResultContractEmitter {
             b.renderHint("summary").textSummary("Command succeeded");
         }
 
-        sink.onResultContract(b.build());
+        emit(sink, b.build());
+    }
+
+    /**
+     * Build a ResultContract for provider-backed tools such as platform/custom/MCP.
+     */
+    public void emitProviderResult(String toolName, AgentToolDefinition toolDef,
+                                   String resultJson, long durationMs, boolean success) {
+        ResponseSink sink = ResponseSinkContext.get();
+        if (sink == null) {
+            recordResultContract(success ? "structured_result" : "text", "none", success ? "success" : "failed", false);
+            return;
+        }
+
+        ResultContract.ResultContractBuilder b = ResultContract.builder()
+                .skillCode(toolName)
+                .durationMs(durationMs)
+                .status(success ? "success" : "failed")
+                .actionability(resolveActionability())
+                .outputType(success ? "structured_result" : "text");
+
+        try {
+            Map<String, Object> parsed = resultJson == null || resultJson.startsWith("Error")
+                    ? Map.of()
+                    : objectMapper.readValue(resultJson, Map.class);
+            if (!success) {
+                Object error = parsed.get("error");
+                b.renderHint("summary")
+                        .textSummary(error != null ? String.valueOf(error) : "Provider tool failed");
+            } else if (parsed.get("records") instanceof List<?> records) {
+                b.renderHint("table")
+                        .table(toTable(records))
+                        .textSummary(records.size() + " rows");
+            } else if (parsed.get("models") instanceof List<?> models) {
+                b.renderHint("table")
+                        .table(toTable(models))
+                        .textSummary(models.size() + " models");
+            } else {
+                b.renderHint("card").data(parsed);
+                Object message = parsed.get("message");
+                if (message != null) {
+                    b.textSummary(String.valueOf(message));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to build ResultContract for provider tool {}: {}", toolName, e.getMessage());
+            b.renderHint("summary").textSummary(success ? "Provider tool succeeded" : "Provider tool failed");
+        }
+
+        emit(sink, b.build());
+    }
+
+    private List<Map<String, Object>> toTable(List<?> rows) {
+        List<Map<String, Object>> table = new ArrayList<>();
+        for (Object row : rows) {
+            if (row instanceof Map<?, ?> m) {
+                Map<String, Object> safeRow = new LinkedHashMap<>();
+                m.forEach((k, v) -> safeRow.put(String.valueOf(k), v));
+                table.add(safeRow);
+            }
+        }
+        return table;
     }
 
     /**
@@ -141,7 +213,10 @@ public class ResultContractEmitter {
     public void emitConfirmationRequired(String toolName, AgentToolDefinition toolDef,
                                          Map<String, Object> input, long durationMs) {
         ResponseSink sink = ResponseSinkContext.get();
-        if (sink == null) return;
+        if (sink == null) {
+            recordResultContract("action_proposal", "card", "partial_success", false);
+            return;
+        }
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("toolCode", toolName);
@@ -168,7 +243,22 @@ public class ResultContractEmitter {
                 .canContinueFrom(true)
                 .build();
 
+        emit(sink, contract);
+    }
+
+    private void emit(ResponseSink sink, ResultContract contract) {
         sink.onResultContract(contract);
+        recordResultContract(
+                contract.getOutputType(),
+                contract.getRenderHint(),
+                contract.getStatus(),
+                true);
+    }
+
+    private void recordResultContract(String outputType, String renderHint, String status, boolean emitted) {
+        if (observabilityService != null) {
+            observabilityService.recordResultContract(outputType, renderHint, status, emitted);
+        }
     }
 
     private String resolveActionability() {

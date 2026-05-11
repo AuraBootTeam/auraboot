@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.authorization.EffectClass;
 import com.auraboot.framework.agent.dto.ActionRecord;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -220,6 +221,145 @@ public class ActionRecorder {
             log.error("Failed to record read action for query {}: {}", queryCode, e.getMessage(), e);
             return null;
         }
+    }
+
+    /**
+     * Record a provider-backed tool action. Provider tools do not always map to
+     * CommandDefinition/NamedQuery metadata, so this records the provider tool
+     * reference directly while still preserving ActionEngine audit semantics.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public String recordProviderAction(Long tenantId, String runPid, String toolCode,
+                                       AgentToolDefinition toolDef, Map<String, Object> input,
+                                       Map<String, Object> providerResult, String error,
+                                       Set<EffectClass> effects) {
+        if (tenantId == null || runPid == null || toolCode == null) {
+            return null;
+        }
+        try {
+            boolean success = error == null;
+            boolean readOnly = isReadOnlyEffects(effects);
+            String actionPid = UniqueIdGenerator.generate();
+            String targetModel = deriveProviderTargetModel(toolCode, input, providerResult);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("pid", actionPid);
+            row.put("tenant_id", tenantId);
+            row.put("run_id", runPid);
+            Integer stepIndex = StepContext.getStepIndex();
+            if (stepIndex != null) {
+                row.put("step_index", stepIndex);
+            }
+            String parallelGroupId = StepContext.getParallelGroupId();
+            Integer parallelIndex = StepContext.getParallelIndex();
+            if (parallelGroupId != null) {
+                row.put("parallel_group_id", parallelGroupId);
+            }
+            if (parallelIndex != null) {
+                row.put("parallel_index", parallelIndex);
+            }
+            boolean auraBotSkill = toolDef != null && "AURABOT_SKILL".equals(toolDef.getToolType());
+            row.put("action_code", toolCode + (auraBotSkill ? ".skill" : ".provider"));
+            row.put("action_type", readOnly ? "read" : "execute");
+            row.put("transaction_scope", readOnly ? "read_only" : "shared_state");
+            row.put("side_effect_type", readOnly ? "none" : (auraBotSkill ? "aurabot_skill" : "provider_tool"));
+            row.put("intent_summary", (auraBotSkill ? "AuraBot skill " : "Provider tool ") + toolCode);
+            row.put("business_domain", deriveProviderDomain(toolCode));
+            row.put("business_operation", toolCode.replace(':', '.'));
+            row.put("target_model", targetModel);
+            row.put("affected_count", affectedCount(providerResult));
+            row.put("command_code", toolCode);
+            row.put("command_result", success ? "success" : "failed");
+            row.put("risk_level", toolDef != null ? toolDef.getRiskLevel() : "L1");
+            row.put("estimated_risk", toolDef != null ? toolDef.getRiskLevel() : "L1");
+            row.put("risk_deviation", false);
+            row.put("reversal_mode", readOnly ? "irreversible" : "manual_review");
+            row.put("action_status", success ? "success" : "failed");
+            row.put("error_message", error);
+            row.put("actor_type", "agent");
+            row.put("executed_at", LocalDateTime.now());
+            row.put("created_at", LocalDateTime.now());
+            row.put("fidelity", fidelityGrader.grade(toolDef != null ? toolDef.getToolType() : "provider"));
+            if (toolDef != null) {
+                row.put("tool_ref", toolDef.getName());
+            }
+            com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
+            String skillCode = resolveSkillCode(toolDef);
+            if (skillCode != null) {
+                row.put("skill_code", skillCode);
+            } else if (bif != null && bif.getCandidateSkills() != null && !bif.getCandidateSkills().isEmpty()) {
+                row.put("skill_code", bif.getCandidateSkills().get(0));
+            }
+            row.put("command_signature", fidelityGrader.commandSignature(toolCode, input));
+            row.put("actual_effects", objectMapper.writeValueAsString(effectNames(effects)));
+
+            Set<String> jsonbColumns = Set.of("actual_effects");
+            dynamicDataMapper.insertWithJsonb("ab_agent_action", row, jsonbColumns);
+            log.info("Provider action recorded: pid={}, tool={}, status={}",
+                    actionPid, toolCode, success ? "success" : "failed");
+            return actionPid;
+        } catch (Exception e) {
+            log.error("Failed to record provider action for {}: {}", toolCode, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    private boolean isReadOnlyEffects(Set<EffectClass> effects) {
+        return effects == null || effects.isEmpty()
+                || effects.stream().allMatch(effect ->
+                effect == EffectClass.READ_CONTEXT || effect == EffectClass.READ_PLATFORM_DATA);
+    }
+
+    private List<String> effectNames(Set<EffectClass> effects) {
+        if (effects == null || effects.isEmpty()) return List.of();
+        return effects.stream().map(EffectClass::name).sorted().toList();
+    }
+
+    private String deriveProviderDomain(String toolCode) {
+        if (toolCode == null || toolCode.isBlank()) return "platform";
+        int dot = toolCode.indexOf('.');
+        int colon = toolCode.indexOf(':');
+        int end = dot >= 0 ? dot : colon;
+        return end > 0 ? toolCode.substring(0, end) : "platform";
+    }
+
+    private String deriveProviderTargetModel(String toolCode, Map<String, Object> input,
+                                             Map<String, Object> providerResult) {
+        String inputModel = extractModelCode(input);
+        if (inputModel != null) return inputModel;
+        String resultModel = extractModelCode(providerResult);
+        if (resultModel != null) return resultModel;
+        return deriveProviderDomain(toolCode);
+    }
+
+    private String extractModelCode(Map<String, Object> source) {
+        if (source == null || source.isEmpty()) return null;
+        Object modelCode = source.get("modelCode");
+        if (modelCode == null) modelCode = source.get("code");
+        return modelCode != null ? String.valueOf(modelCode) : null;
+    }
+
+    private String resolveSkillCode(AgentToolDefinition toolDef) {
+        if (toolDef == null || !"AURABOT_SKILL".equals(toolDef.getToolType())) return null;
+        if (toolDef.getSourceCode() != null && !toolDef.getSourceCode().isBlank()) {
+            return toolDef.getSourceCode();
+        }
+        String name = toolDef.getName();
+        if (name != null && name.startsWith("aurabot:")) {
+            return name.substring("aurabot:".length());
+        }
+        return name;
+    }
+
+    private int affectedCount(Map<String, Object> providerResult) {
+        if (providerResult == null) return 0;
+        Object records = providerResult.get("records");
+        if (records instanceof List<?> list) return list.size();
+        Object models = providerResult.get("models");
+        if (models instanceof List<?> list) return list.size();
+        Object total = providerResult.get("total");
+        if (total instanceof Number n) return n.intValue();
+        return 1;
     }
 
     /**

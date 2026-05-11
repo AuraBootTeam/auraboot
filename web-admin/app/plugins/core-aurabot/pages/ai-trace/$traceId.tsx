@@ -29,7 +29,7 @@ interface TraceData {
   totalInputTokens: number;
   totalOutputTokens: number;
   totalCost: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, any> | null;
   tags: string[] | null;
   startTime: string;
   endTime: string | null;
@@ -84,6 +84,17 @@ function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+}
+
+function relatedAgentRunId(trace: TraceData): string | null {
+  const metadataRunId = trace.metadata?.runPid ?? trace.metadata?.runId;
+  if (typeof metadataRunId === 'string' && metadataRunId.trim()) {
+    return metadataRunId.trim();
+  }
+  if (typeof trace.metadata?.agentCode === 'string' && trace.sessionId) {
+    return trace.sessionId;
+  }
+  return null;
 }
 
 // ============================================================================
@@ -178,6 +189,7 @@ export default function TraceDetailPage() {
   }
 
   const selectedSpan = spans.find((s: SpanData) => s.spanId === selectedSpanId);
+  const linkedRunId = relatedAgentRunId(trace);
 
   const tabs: { key: DetailTab; label: string }[] = [
     { key: 'timeline', label: l('瀑布图', 'Timeline') },
@@ -237,6 +249,15 @@ export default function TraceDetailPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              {linkedRunId && (
+                <a
+                  href={`/admin/agent-runs?runId=${encodeURIComponent(linkedRunId)}`}
+                  className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                  data-testid="trace-related-run-link"
+                >
+                  {l('打开运行记录', 'Open Run')}
+                </a>
+              )}
               <button
                 onClick={handleCopyFullTrace}
                 className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"

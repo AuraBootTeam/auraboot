@@ -86,11 +86,6 @@ class ChatToolResolverIsReadOnlyTest {
                         true
                 ));
             }
-
-            @Override
-            public Map<String, Object> executeTool(Long tenantId, String toolCode, Map<String, Object> params) {
-                return Map.of();
-            }
         };
         ChatToolResolver mappedResolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
 
@@ -121,11 +116,6 @@ class ChatToolResolverIsReadOnlyTest {
                         new ToolDef("list:crm_lead", "List Leads", "Query CRM leads", Map.of("type", "object"), true),
                         new ToolDef("platform.execute_sql", "Execute SQL", "SQL fallback", Map.of("type", "object"), true)
                 );
-            }
-
-            @Override
-            public Map<String, Object> executeTool(Long tenantId, String toolCode, Map<String, Object> params) {
-                return Map.of();
             }
         };
         ChatToolResolver mappedResolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);

@@ -102,6 +102,23 @@ public interface MetaModelFieldBindingMapper extends BaseMapper<ModelFieldBindin
         """)
     String findModelCodeByFieldId(@Param("fieldId") Long fieldId);
 
+    /**
+     * Find all published entity models currently bound to a field.
+     * Used by plugin re-import to reconcile physical table schema after an
+     * existing field definition changes type.
+     */
+    @Select("""
+        SELECT DISTINCT m.code FROM ab_meta_model_field_binding b
+        JOIN ab_meta_model m ON b.model_id = m.id
+        WHERE b.field_id = #{fieldId}
+          AND b.deleted_flag = false
+          AND m.is_current = true
+          AND m.deleted_flag = false
+          AND m.status = 'published'
+        ORDER BY m.code
+        """)
+    List<String> findPublishedModelCodesByFieldId(@Param("fieldId") Long fieldId);
+
     // --- Methods for plugin resource management ---
 
     @Select("SELECT * FROM ab_meta_model_field_binding WHERE pid = #{pid}")
