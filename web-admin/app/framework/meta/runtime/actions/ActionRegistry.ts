@@ -885,6 +885,72 @@ actionRegistry.register(
   },
 );
 
+/**
+ * command.execute - Execute a DSL command from an ActionFlow.
+ *
+ * This is intentionally thin: it uses the same command-engine endpoint as
+ * useActionHandler and lets DSL pages compose dialog.form -> command.execute
+ * without adding page-specific React code.
+ */
+actionRegistry.register(
+  'command.execute',
+  async ({ args, fetchResult, token, expressionEvaluator, expressionContext }) => {
+    if (!fetchResult) {
+      console.error('[ActionRegistry] command.execute: fetchResult not provided');
+      return;
+    }
+
+    const command = args?.command;
+    if (!command) {
+      console.error('[ActionRegistry] command.execute: missing command');
+      return;
+    }
+
+    let targetRecordPid = args?.targetRecordPid;
+    let targetRecordId = args?.targetRecordId ?? targetRecordPid;
+    let payload = args?.payload || {};
+    let operationType = args?.operationType;
+
+    if (expressionEvaluator && expressionContext) {
+      if (typeof targetRecordPid === 'string') {
+        targetRecordPid = expressionEvaluator.evaluateTemplate(targetRecordPid, expressionContext);
+      }
+      if (typeof targetRecordId === 'string') {
+        targetRecordId = expressionEvaluator.evaluateTemplate(targetRecordId, expressionContext);
+      }
+      if (payload && typeof payload === 'object') {
+        payload = expressionEvaluator.evaluateObject(payload, expressionContext);
+      }
+      if (typeof operationType === 'string') {
+        operationType = expressionEvaluator.evaluateTemplate(operationType, expressionContext);
+      }
+    }
+    targetRecordId = targetRecordId ?? targetRecordPid;
+    targetRecordPid = targetRecordPid ?? targetRecordId;
+
+    const body: Record<string, any> = {
+      targetRecordPid,
+      targetRecordId,
+      payload,
+    };
+    if (operationType) {
+      body.operationType = String(operationType).toUpperCase();
+    }
+
+    const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+      method: 'post',
+      params: body,
+      token,
+    });
+
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error(result.desc || result.message || `Command ${command} failed`);
+    }
+
+    return result.data;
+  },
+);
+
 // ============================================
 // 辅助函数
 // ============================================

@@ -63,7 +63,7 @@ public class AiActionAuditController {
         String actionType = (String) body.get("actionType");
         String commandCode = (String) body.get("commandCode");
         String modelCode = (String) body.get("modelCode");
-        String recordId = (String) body.get("recordId");
+        String recordId = firstString(body, "targetPid", "recordPid", "targetRecordPid", "targetRecordId", "recordId");
         String riskLevel = (String) body.get("riskLevel");
         String userDecision = (String) body.get("userDecision");
         String executionResult = (String) body.get("executionResult");
@@ -104,5 +104,22 @@ public class AiActionAuditController {
                 "pageNum", pageNum,
                 "pageSize", pageSize
         ));
+    }
+
+    private static String firstString(Map<String, Object> body, String... keys) {
+        if (body == null || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            Object value = body.get(key);
+            if (value == null) {
+                continue;
+            }
+            String text = String.valueOf(value).trim();
+            if (!text.isEmpty()) {
+                return text;
+            }
+        }
+        return null;
     }
 }

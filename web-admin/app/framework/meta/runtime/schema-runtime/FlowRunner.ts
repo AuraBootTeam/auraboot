@@ -18,7 +18,7 @@ interface FlowRunnerDeps {
   dataSourceManager: DataSourceManager;
   schema: UnifiedSchema;
   navigate?: (path: string) => void;
-  showToast?: (message: string, level?: 'success' | 'error' | 'info') => void;
+  showToast?: (message: string, level?: 'success' | 'error' | 'info' | 'warning') => void;
   getAllFormFields: () => any[];
 }
 
@@ -29,12 +29,14 @@ export class FlowRunner {
     if (!steps || steps.length === 0) return;
 
     let currentIndex = 0;
+    let runtimeContext = this.withFreshState(context);
 
     while (currentIndex < steps.length) {
       const step = steps[currentIndex];
 
       if (step?.type === 'if') {
-        const condition = this.deps.evaluator.evaluateCondition(step.condition, context);
+        runtimeContext = this.withFreshState(runtimeContext);
+        const condition = this.deps.evaluator.evaluateCondition(step.condition, runtimeContext);
         const nextId = condition ? step.trueNext : step.falseNext;
         if (nextId) {
           const nextIndex = this.findStepIndex(steps, nextId);
@@ -45,7 +47,9 @@ export class FlowRunner {
       }
 
       if (step?.action) {
-        await this.executeAction(step, context);
+        runtimeContext = this.withFreshState(runtimeContext);
+        await this.executeAction(step, runtimeContext);
+        runtimeContext = this.withFreshState(runtimeContext);
       }
 
       if (step?.next) {
@@ -61,6 +65,19 @@ export class FlowRunner {
 
   private findStepIndex(steps: any[], stepId: string): number {
     return steps.findIndex((candidate) => candidate.id === stepId);
+  }
+
+  private withFreshState(context: ExpressionContext): ExpressionContext {
+    const fresh = this.deps.stateManager.getContext(this.deps.scopeId);
+    return {
+      ...context,
+      ...fresh,
+      record: (context as any).record,
+      row: (context as any).row,
+      args: (context as any).args,
+      fetchResult: (context as any).fetchResult,
+      __dataSourceManager: this.deps.dataSourceManager,
+    } as ExpressionContext;
   }
 
   private async executeAction(step: any, context: ExpressionContext): Promise<void> {

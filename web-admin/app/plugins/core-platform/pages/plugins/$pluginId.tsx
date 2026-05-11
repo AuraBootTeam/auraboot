@@ -15,6 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import InstallDialog from './components/InstallDialog';
 import UpgradeDialog from './components/UpgradeDialog';
+import CheckoutDialog from './components/CheckoutDialog';
 import ReviewSection from '~/ui/ReviewSection';
 
 interface PluginDetail {
@@ -57,6 +58,8 @@ interface PlanInfo {
   isDefault?: boolean;
   trialDays?: number;
   billingType?: string;
+  priceAmount?: number;
+  priceCurrency?: string;
 }
 
 interface FeatureInfo {
@@ -90,6 +93,7 @@ export default function MarketplaceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showInstall, setShowInstall] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
   const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [features, setFeatures] = useState<FeatureInfo[]>([]);
   const [activatingTrial, setActivatingTrial] = useState(false);
@@ -178,6 +182,7 @@ export default function MarketplaceDetailPage() {
     locale === 'zh-CN'
       ? detail.displayNameZh || detail.displayName
       : detail.displayNameEn || detail.displayName;
+  const requiresLicense = Boolean(detail.licenseMode && detail.licenseMode !== 'free');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -262,6 +267,15 @@ export default function MarketplaceDetailPage() {
                       {locale === 'zh-CN' ? '已安装' : 'Installed'} v{detail.installedVersion}
                     </span>
                   </div>
+                  {requiresLicense && (
+                    <button
+                      onClick={() => setShowCheckout(true)}
+                      className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-6 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-50"
+                      data-testid="marketplace-paid-checkout-open"
+                    >
+                      {locale === 'zh-CN' ? '购买' : 'Buy Now'}
+                    </button>
+                  )}
                   {detail.installedVersion && detail.installedVersion !== detail.latestVersion && (
                     <button
                       onClick={() => setShowUpgrade(true)}
@@ -276,13 +290,24 @@ export default function MarketplaceDetailPage() {
                 </>
               ) : (
                 <div className="flex flex-col items-end gap-2">
-                  <button
-                    onClick={() => setShowInstall(true)}
-                    className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
-                  >
-                    <ArrowDownTrayIcon className="h-4 w-4" />
-                    {locale === 'zh-CN' ? '安装' : 'Install'}
-                  </button>
+                  {requiresLicense ? (
+                    <button
+                      onClick={() => setShowCheckout(true)}
+                      className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                      data-testid="marketplace-paid-checkout-open"
+                    >
+                      {locale === 'zh-CN' ? '购买并获取令牌' : 'Buy and Get Token'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setShowInstall(true)}
+                      className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                      data-testid="marketplace-direct-install-open"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      {locale === 'zh-CN' ? '安装' : 'Install'}
+                    </button>
+                  )}
                   {detail.licenseMode === 'platform' && (
                     <button
                       onClick={handleActivateTrial}
@@ -507,6 +532,20 @@ export default function MarketplaceDetailPage() {
             setShowInstall(false);
             window.location.reload();
           }}
+        />
+      )}
+
+      {showCheckout && detail && (
+        <CheckoutDialog
+          pluginPid={detail.pid}
+          pluginName={displayName || detail.pluginId}
+          versionPid={detail.versions[0]?.pid}
+          plans={plans.map((plan) => ({
+            ...plan,
+            billingType: plan.billingType || 'one_time',
+          }))}
+          locale={locale}
+          onClose={() => setShowCheckout(false)}
         />
       )}
 

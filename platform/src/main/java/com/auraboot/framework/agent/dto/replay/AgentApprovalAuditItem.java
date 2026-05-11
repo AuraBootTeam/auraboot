@@ -15,6 +15,7 @@ public class AgentApprovalAuditItem {
     private String approvalTitle;
     private String approvalDescription;
     private String requestData;
+    private String targetPid;
     private String approvalStatus;
     private String policyId;
     private Long approverId;

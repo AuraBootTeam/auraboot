@@ -97,6 +97,28 @@ class InboxItemResponseCardActionsContractTest {
     }
 
     @Test
+    void responseExposesSourceRecordPidFromCardPayloadWhenLegacyRecordIdIsMissing() {
+        InboxItem item = new InboxItem();
+        item.setId(1L);
+        item.setModelCode("crm_campaign");
+        item.setCardPayload("""
+            {
+              "modelCode": "crm_campaign",
+              "sourceRecordPid": "01KTESTCAMPAIGN",
+              "recordPid": "01KTESTCAMPAIGN",
+              "recordId": "01KTESTCAMPAIGN"
+            }
+            """);
+
+        InboxItemResponse response = InboxItemResponse.from(item);
+
+        assertEquals("crm_campaign", response.getSourceModel());
+        assertNull(response.getRecordId(), "legacy numeric recordId must stay null for pid-only rows");
+        assertEquals("01KTESTCAMPAIGN", response.getSourceRecordPid());
+        assertEquals("01KTESTCAMPAIGN", response.getSourceRecordId());
+    }
+
+    @Test
     void cardData_isNullWhenCardPayloadIsBlank() {
         InboxItem item = new InboxItem();
         item.setId(1L);
