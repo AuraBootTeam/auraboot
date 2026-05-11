@@ -21,6 +21,7 @@ public class PlatformStatsController {
 
     private final JdbcTemplate jdbcTemplate;
 
+    // lgtm[java/spring-disabled-csrf-protection] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/stats")
     public ApiResponse<Map<String, Object>> getStats() {
         Long tenantCount = jdbcTemplate.queryForObject(
