@@ -360,16 +360,20 @@ CREATE TABLE IF NOT EXISTS ab_record_share (
     pid             VARCHAR(32) NOT NULL,
     tenant_id       BIGINT NOT NULL,
     resource_code   VARCHAR(100) NOT NULL,
-    record_id       BIGINT NOT NULL,
+    record_id       BIGINT,
+    record_pid      VARCHAR(64),
     subject_type    VARCHAR(20) NOT NULL,
-    subject_id      BIGINT NOT NULL,
+    subject_id      BIGINT,
+    subject_pid     VARCHAR(64),
     permission_mask VARCHAR(100),
     expires_at      TIMESTAMP,
     created_at      TIMESTAMP DEFAULT NOW(),
     created_by      BIGINT
 );
 CREATE INDEX IF NOT EXISTS idx_ab_record_share_record ON ab_record_share (tenant_id, resource_code, record_id);
+CREATE INDEX IF NOT EXISTS idx_ab_record_share_record_pid ON ab_record_share (tenant_id, resource_code, record_pid);
 CREATE INDEX IF NOT EXISTS idx_ab_record_share_subject ON ab_record_share (tenant_id, subject_type, subject_id);
+CREATE INDEX IF NOT EXISTS idx_ab_record_share_subject_pid ON ab_record_share (tenant_id, subject_type, subject_pid);
 
 
 -- 用户角色关联表

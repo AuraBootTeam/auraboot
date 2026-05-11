@@ -9,6 +9,7 @@ import com.auraboot.framework.rbac.service.UserRoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -50,6 +51,36 @@ public class RecordShareServiceImpl implements RecordShareService {
     }
 
     @Override
+    public void shareRecordByPid(Long tenantId, String resourceCode, String recordPid,
+                                 String subjectType, Long subjectId, String subjectPid,
+                                 String permissionMask, Instant expiresAt) {
+        if (!StringUtils.hasText(recordPid)) {
+            throw new RootUnCheckedException(BadParam, "recordPid is required");
+        }
+        if (subjectId == null && !StringUtils.hasText(subjectPid)) {
+            throw new RootUnCheckedException(BadParam, "subjectId or subjectPid is required");
+        }
+
+        RecordShare share = new RecordShare();
+        share.setPid(UniqueIdGenerator.generate());
+        share.setTenantId(tenantId);
+        share.setResourceCode(resourceCode);
+        share.setRecordPid(recordPid.trim());
+        share.setSubjectType(subjectType);
+        share.setSubjectId(subjectId);
+        share.setSubjectPid(normalizePid(subjectPid));
+        share.setPermissionMask(permissionMask);
+        share.setExpiresAt(expiresAt);
+        share.setCreatedAt(Instant.now());
+
+        recordShareMapper.insert(share);
+        log.info("Shared record {}/{} with {}:{} (mask={}, expires={})",
+                resourceCode, recordPid, subjectType,
+                StringUtils.hasText(subjectPid) ? subjectPid : subjectId,
+                permissionMask, expiresAt);
+    }
+
+    @Override
     public void unshareRecord(Long tenantId, String resourceCode, Long recordId,
                               String subjectType, Long subjectId) {
         int deleted = recordShareMapper.deleteShare(tenantId, resourceCode, recordId, subjectType, subjectId);
@@ -80,6 +111,43 @@ public class RecordShareServiceImpl implements RecordShareService {
     }
 
     @Override
+    public boolean isSharedByPid(Long tenantId, String resourceCode, String recordPid, Long memberId, String memberPid) {
+        if (!StringUtils.hasText(recordPid)) {
+            return false;
+        }
+        Instant now = Instant.now();
+        String normalizedRecordPid = recordPid.trim();
+        String normalizedMemberPid = normalizePid(memberPid);
+
+        if (StringUtils.hasText(normalizedMemberPid)) {
+            int directPidCount = recordShareMapper.countByRecordPidAndSubjectPid(
+                    tenantId, resourceCode, normalizedRecordPid, "member", normalizedMemberPid, now);
+            if (directPidCount > 0) {
+                return true;
+            }
+        }
+
+        if (memberId == null) {
+            return false;
+        }
+
+        int directLegacyCount = recordShareMapper.countByRecordPidAndUser(
+                tenantId, resourceCode, normalizedRecordPid, memberId, now);
+        if (directLegacyCount > 0) {
+            return true;
+        }
+
+        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
+        if (roleIds == null || roleIds.isEmpty()) {
+            return false;
+        }
+
+        int roleCount = recordShareMapper.countByRecordPidAndRoles(
+                tenantId, resourceCode, normalizedRecordPid, roleIds, now);
+        return roleCount > 0;
+    }
+
+    @Override
     public List<Long> getSharedRecordIds(Long tenantId, String resourceCode, Long memberId, String action) {
         List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
         return recordShareMapper.findSharedRecordIds(
@@ -94,6 +162,14 @@ public class RecordShareServiceImpl implements RecordShareService {
     }
 
     @Override
+    public List<RecordShare> listByRecordPid(Long tenantId, String resourceCode, String recordPid) {
+        if (!StringUtils.hasText(recordPid)) {
+            throw new RootUnCheckedException(BadParam, "recordPid is required");
+        }
+        return recordShareMapper.findByRecordPid(tenantId, resourceCode, recordPid.trim(), Instant.now());
+    }
+
+    @Override
     public void removeById(Long tenantId, Long shareId) {
         RecordShare share = recordShareMapper.selectById(shareId);
         if (share == null) {
@@ -104,5 +180,9 @@ public class RecordShareServiceImpl implements RecordShareService {
         }
         recordShareMapper.deleteById(shareId);
         log.info("Removed share id={} for resource={} record={}", shareId, share.getResourceCode(), share.getRecordId());
+    }
+
+    private String normalizePid(String pid) {
+        return StringUtils.hasText(pid) ? pid.trim() : null;
     }
 }
