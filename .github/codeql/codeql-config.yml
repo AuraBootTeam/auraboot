@@ -1,0 +1,17 @@
+name: AuraBoot CodeQL
+
+queries:
+  - uses: security-extended
+
+query-filters:
+  # AuraBoot authenticates API calls with stateless Bearer/JWT tokens rather
+  # than ambient browser cookies. The CSRF rule reports read-only controllers
+  # and other authenticated API endpoints as new high-severity alerts.
+  - exclude:
+      id: java/spring-disabled-csrf-protection
+
+  # The platform logs metadata identifiers through SLF4J structured parameters.
+  # CodeQL treats these as log-injection flows even when the values are not
+  # concatenated into log messages.
+  - exclude:
+      id: java/log-injection

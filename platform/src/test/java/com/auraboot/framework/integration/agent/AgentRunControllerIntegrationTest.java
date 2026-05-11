@@ -462,6 +462,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         String turnId = UniqueIdGenerator.generate();
         Long conversationId = TestIdGenerator.uniqueUserId();
         Long inboundMessageId = TestIdGenerator.uniqueUserId();
+        Long intermediateMessageId = TestIdGenerator.uniqueUserId();
         Long outboundMessageId = TestIdGenerator.uniqueUserId();
 
         seedConversation(conversationId);
@@ -473,7 +474,9 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
                 "统计客户信息");
         seedMessage(inboundMessageId, conversationId, "human", testUser.getId(), 1,
                 "text", "统计客户信息", "in-" + turnId, "acp_run");
-        seedMessage(outboundMessageId, conversationId, "agent", 1L, 2,
+        seedMessage(intermediateMessageId, conversationId, "agent", 1L, 2,
+                "tool_result", "查询工具返回 42 位客户", "tool-" + turnId, null);
+        seedMessage(outboundMessageId, conversationId, "agent", 1L, 3,
                 "ai_response", "已统计客户信息", "out-" + turnId, null);
 
         ApiResponse<AgentRunDetail> resp = controller.detail(runPid);
@@ -493,12 +496,13 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(turn.getFinalResponse()).isEqualTo("已统计客户信息");
         assertThat(turn.getResultContractIds()).containsExactly("rc-" + actionPid);
 
-        assertThat(turn.getMessages()).hasSize(2);
+        assertThat(turn.getMessages()).hasSize(3);
         assertThat(turn.getMessages())
                 .extracting(AgentConversationMessageItem::getMessageId)
-                .containsExactly(inboundMessageId, outboundMessageId);
+                .containsExactly(inboundMessageId, intermediateMessageId, outboundMessageId);
         assertThat(turn.getMessages().get(0).getTriageReasonCodes()).contains("agent-runtime-test");
-        assertThat(turn.getMessages().get(1).getThinkingContent()).isEqualTo("thinking trace");
+        assertThat(turn.getMessages().get(1).getContent()).isEqualTo("查询工具返回 42 位客户");
+        assertThat(turn.getMessages().get(2).getThinkingContent()).isEqualTo("thinking trace");
 
         assertThat(detail.getActions()).hasSize(1);
         assertThat(detail.getActions().get(0).getResultContractId()).isEqualTo("rc-" + actionPid);

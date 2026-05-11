@@ -43,6 +43,17 @@ function resolveTableRows(contract: ResultContract): Array<Record<string, unknow
   return Array.isArray(candidate) ? (candidate as Array<Record<string, unknown>>) : [];
 }
 
+function contractMetric(contract: ResultContract): string | null {
+  const rows = resolveTableRows(contract);
+  if (rows.length > 0) {
+    return `rows: ${rows.length}`;
+  }
+  if (contract.suggestedActions && contract.suggestedActions.length > 0) {
+    return `actions: ${contract.suggestedActions.length}`;
+  }
+  return null;
+}
+
 // ============================================================================
 // Variant renderers
 // ============================================================================
@@ -163,6 +174,7 @@ export interface ResultContractViewProps {
 export function ResultContractView({ contract }: ResultContractViewProps) {
   const statusStyle = STATUS_STYLE[contract.status] ?? STATUS_STYLE.unknown;
   const { color, Icon } = statusStyle;
+  const metric = contractMetric(contract);
 
   return (
     <div className="space-y-2" data-testid="result-contract">
@@ -181,6 +193,44 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
             <Clock className="w-3 h-3" />
             <span>{contract.durationMs}ms</span>
           </>
+        )}
+      </div>
+      <div
+        className="flex flex-wrap gap-1 text-[11px] text-gray-600"
+        data-testid="rc-protocol-meta"
+      >
+        <span
+          className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
+          data-testid="rc-meta-output-type"
+        >
+          output: {contract.outputType}
+        </span>
+        <span
+          className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
+          data-testid="rc-meta-actionability"
+        >
+          action: {contract.actionability}
+        </span>
+        {contract.renderHint && (
+          <span
+            className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
+            data-testid="rc-meta-render-hint"
+          >
+            render: {contract.renderHint}
+          </span>
+        )}
+        {metric && (
+          <span
+            className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
+            data-testid="rc-meta-metric"
+          >
+            {metric}
+          </span>
+        )}
+        {contract.canContinueFrom && (
+          <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-blue-700">
+            continuable
+          </span>
         )}
       </div>
 
