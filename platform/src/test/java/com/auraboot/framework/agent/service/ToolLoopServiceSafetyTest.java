@@ -3,6 +3,10 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.dto.ConfidenceScore;
+import com.auraboot.framework.agent.authorization.BlastRadius;
+import com.auraboot.framework.agent.authorization.EffectClass;
+import com.auraboot.framework.agent.authorization.RuntimeAuthorizationService;
+import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
 import com.auraboot.framework.agent.provider.ProviderExecutionResult;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.trace.AiTraceService;
@@ -27,6 +31,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -45,7 +50,9 @@ class ToolLoopServiceSafetyTest {
     @Mock private NamedQueryService namedQueryService;
     @Mock private ToolProviderRegistry toolProviderRegistry;
     @Mock private ResultContractEmitter resultContractEmitter;
+    @Mock private RuntimeAuthorizationService runtimeAuthorizationService;
     @Mock private SkillToolExecutor skillToolExecutor;
+    @Mock private AgentRuntimeObservabilityService observabilityService;
 
     private ToolLoopService service;
 
@@ -61,13 +68,41 @@ class ToolLoopServiceSafetyTest {
                 namedQueryService,
                 new ObjectMapper(),
                 toolProviderRegistry,
-                resultContractEmitter);
+                resultContractEmitter,
+                runtimeAuthorizationService);
         when(toolAclChecker.check(anyLong(), nullable(String.class), nullable(String.class), anyString(), anyString()))
                 .thenReturn(ToolAclChecker.Decision.builder()
                         .allowed(true)
                         .matchedPriority(-1)
                         .reason("test_allow")
                         .build());
+        lenient().when(runtimeAuthorizationService.authorizeIncremental(any()))
+                .thenReturn(RuntimeAuthorizationService.IncrementalAuthorization.grant());
+        ReflectionTestUtils.setField(service, "observabilityService", observabilityService);
+    }
+
+    @Test
+    @DisplayName("unsupported discovered tool type returns structured fail-fast signal")
+    void unsupportedToolTypeReturnsStructuredFailFastSignal() {
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("vendor.magic")
+                .description("Unsupported vendor tool")
+                .toolType("vendor_magic")
+                .sourceCode("vendor.magic")
+                .riskLevel("L1")
+                .build();
+
+        String result = service.executeToolCall(1L, "run-unsupported", "task-unsupported", "agent",
+                tool.getName(), Map.of("value", "x"), List.of(tool), null);
+
+        assertThat(result)
+                .contains("\"success\":false")
+                .contains("\"errorCode\":\"unsupported_tool_type\"")
+                .contains("\"toolName\":\"vendor.magic\"")
+                .contains("\"toolType\":\"vendor_magic\"");
+        verify(observabilityService).recordUnsupportedToolType("vendor_magic");
+        verify(observabilityService).recordToolExecution("vendor_magic", false, "unsupported_type");
+        verifyNoInteractions(toolProviderRegistry, commandExecutor, namedQueryService);
     }
 
     @AfterEach
@@ -172,7 +207,68 @@ class ToolLoopServiceSafetyTest {
 
         assertThat(result).contains("\"success\":true").contains("crm_customer");
         verify(toolProviderRegistry).execute(1L, "platform.list_models", input);
+        verify(resultContractEmitter).emitProviderResult(
+                eq("platform.list_models"), same(tool), anyString(), anyLong(), eq(true));
+        verify(actionRecorder).recordProviderAction(
+                eq(1L), eq("run-platform"), eq("platform.list_models"), same(tool),
+                eq(input), anyMap(), isNull(), eq(Set.of(EffectClass.READ_PLATFORM_DATA)));
         verifyNoInteractions(commandExecutor, namedQueryService);
+    }
+
+    @Test
+    @DisplayName("runtime authorization rejects mutating provider tools before execution")
+    void runtimeAuthorizationRejectsMutatingProviderToolBeforeExecution() {
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("platform.create_model")
+                .description("Create model")
+                .toolType("platform")
+                .sourceCode("platform.create_model")
+                .riskLevel("L3")
+                .requiresApproval(false)
+                .build();
+        when(runtimeAuthorizationService.authorizeIncremental(any()))
+                .thenReturn(RuntimeAuthorizationService.IncrementalAuthorization.reject(
+                        "WRITE_PLATFORM_STATE is forbidden", "tenant_policy"));
+
+        String result = service.executeToolCall(1L, "run-authz", "task-authz", "agent",
+                tool.getName(), Map.of("description", "Customer model"), List.of(tool), null);
+
+        assertThat(result)
+                .contains("Runtime authorization denied")
+                .contains("WRITE_PLATFORM_STATE is forbidden");
+        verify(runtimeAuthorizationService).authorizeIncremental(argThat(intent ->
+                intent.requiredEffects().contains(EffectClass.WRITE_PLATFORM_STATE)
+                        && intent.blastRadius() == BlastRadius.SHARED_STATE
+                        && "platform.create_model".equals(intent.toolRef())));
+        verifyNoInteractions(toolProviderRegistry, commandExecutor, namedQueryService);
+    }
+
+    @Test
+    @DisplayName("runtime authorization records read provider effects before execution")
+    void runtimeAuthorizationRunsForReadProviderTools() {
+        Map<String, Object> input = Map.of();
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("platform.list_models")
+                .description("List models")
+                .toolType("platform")
+                .sourceCode("platform.list_models")
+                .riskLevel("L0")
+                .build();
+        when(toolProviderRegistry.execute(eq(1L), eq("platform.list_models"), eq(input)))
+                .thenReturn(ProviderExecutionResult.builder()
+                        .success(true)
+                        .data(Map.of("models", List.of()))
+                        .durationMs(3)
+                        .build());
+
+        String result = service.executeToolCall(1L, "run-read", "task-read", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).contains("\"success\":true");
+        verify(runtimeAuthorizationService).authorizeIncremental(argThat(intent ->
+                intent.requiredEffects().contains(EffectClass.READ_PLATFORM_DATA)
+                        && intent.blastRadius() == BlastRadius.REVERSIBLE
+                        && "platform.list_models".equals(intent.toolRef())));
     }
 
     @Test
@@ -202,6 +298,141 @@ class ToolLoopServiceSafetyTest {
         verify(skillToolExecutor).dispatch(eq("echo"), argThat(req ->
                 req.getParams() != null && "hello".equals(req.getParams().get("text").asText())));
         verifyNoInteractions(toolProviderRegistry, commandExecutor, namedQueryService);
+    }
+
+    @Test
+    @DisplayName("model query AuraBot skill is authorized and audited as read-only")
+    void modelQueryAurabotSkillIsReadOnly() {
+        ReflectionTestUtils.setField(service, "skillToolExecutor", skillToolExecutor);
+        Map<String, Object> input = Map.of("keyword", "customer");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("aurabot:model:query")
+                .description("Query model")
+                .toolType("AURABOT_SKILL")
+                .sourceCode("model:query")
+                .riskLevel("low")
+                .build();
+        when(skillToolExecutor.dispatch(eq("model:query"), any(SkillRequest.class)))
+                .thenReturn(SkillToolExecutor.DispatchOutcome.executed(
+                        SkillResult.builder()
+                                .status(SkillResult.Status.SUCCESS)
+                                .payload(Map.of("total", 0))
+                                .build(),
+                        RiskLevel.LOW));
+
+        String result = service.executeToolCall(1L, "run-skill-query", "task-skill-query", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).contains("\"success\":true").contains("\"total\":0");
+        verify(runtimeAuthorizationService).authorizeIncremental(argThat(intent ->
+                intent.requiredEffects().contains(EffectClass.READ_PLATFORM_DATA)
+                        && intent.blastRadius() == BlastRadius.REVERSIBLE
+                        && "model:query".equals(intent.skillCode())));
+        verify(actionRecorder).recordProviderAction(
+                eq(1L), eq("run-skill-query"), eq("aurabot:model:query"), same(tool),
+                eq(input), anyMap(), isNull(), eq(Set.of(EffectClass.READ_PLATFORM_DATA)));
+    }
+
+    @Test
+    @DisplayName("high-risk AuraBot skills return preview tokens instead of generic approval requests")
+    void highRiskAurabotSkillReturnsPreviewTokenBeforeGenericApprovalGate() {
+        ReflectionTestUtils.setField(service, "skillToolExecutor", skillToolExecutor);
+        Map<String, Object> input = Map.of("code", "crm_customer");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("aurabot:model:create")
+                .description("Create model")
+                .toolType("AURABOT_SKILL")
+                .sourceCode("model:create")
+                .riskLevel("high")
+                .requiresApproval(true)
+                .requiresConfirmation(true)
+                .build();
+        when(skillToolExecutor.dispatch(eq("model:create"), any(SkillRequest.class)))
+                .thenReturn(SkillToolExecutor.DispatchOutcome.pending(
+                        SkillResult.builder()
+                                .status(SkillResult.Status.NEEDS_CONFIRM)
+                                .preview(Map.of("modelCode", "crm_customer"))
+                                .build(),
+                        "preview-1",
+                        RiskLevel.HIGH));
+
+        String result = service.executeToolCall(1L, "run-skill-preview", "task-skill-preview", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result)
+                .contains("\"approvalRequired\":true")
+                .contains("\"previewToken\":\"preview-1\"")
+                .contains("crm_customer");
+        verify(skillToolExecutor).dispatch(eq("model:create"), any(SkillRequest.class));
+        verify(approvalGate, never()).checkAndRequestApproval(any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(resultContractEmitter).emitProviderResult(
+                eq("aurabot:model:create"), same(tool), anyString(), anyLong(), eq(false));
+        verify(actionRecorder, never()).recordProviderAction(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("AuraBot skill confirm routes through ToolLoopService")
+    void aurabotSkillConfirmRoutesThroughToolLoopService() {
+        ReflectionTestUtils.setField(service, "skillToolExecutor", skillToolExecutor);
+        Map<String, Object> input = Map.of("name", "Customer");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("aurabot:model:create")
+                .description("Create model")
+                .toolType("AURABOT_SKILL")
+                .sourceCode("model:create")
+                .riskLevel("high")
+                .build();
+        when(skillToolExecutor.confirm(eq("model:create"), any(SkillRequest.class), eq("preview-1")))
+                .thenReturn(SkillToolExecutor.DispatchOutcome.executed(
+                        SkillResult.builder()
+                                .status(SkillResult.Status.SUCCESS)
+                                .payload(Map.of("modelCode", "crm_customer"))
+                                .build(),
+                        RiskLevel.HIGH));
+
+        String result = service.confirmAuraBotSkill(1L, "run-skill-confirm", "task-skill-confirm", "agent",
+                tool.getName(), input, List.of(tool), "preview-1", null);
+
+        assertThat(result).contains("\"success\":true").contains("crm_customer");
+        verify(skillToolExecutor).confirm(eq("model:create"), argThat(req ->
+                req.getParams() != null && "Customer".equals(req.getParams().get("name").asText())),
+                eq("preview-1"));
+        verify(resultContractEmitter).emitProviderResult(
+                eq("aurabot:model:create"), same(tool), anyString(), anyLong(), eq(true));
+        verify(actionRecorder).recordProviderAction(
+                eq(1L), eq("run-skill-confirm"), eq("aurabot:model:create"), same(tool),
+                eq(input), anyMap(), isNull(), eq(Set.of(EffectClass.WRITE_PLATFORM_STATE)));
+        verify(skillToolExecutor, never()).dispatch(anyString(), any(SkillRequest.class));
+        verifyNoInteractions(toolProviderRegistry, commandExecutor, namedQueryService);
+    }
+
+    @Test
+    @DisplayName("runtime authorization rejects AuraBot skill confirmation before execution")
+    void runtimeAuthorizationRejectsAurabotSkillConfirmBeforeExecution() {
+        ReflectionTestUtils.setField(service, "skillToolExecutor", skillToolExecutor);
+        Map<String, Object> input = Map.of("code", "crm_customer");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("aurabot:model:create")
+                .description("Create model")
+                .toolType("AURABOT_SKILL")
+                .sourceCode("model:create")
+                .riskLevel("high")
+                .build();
+        when(runtimeAuthorizationService.authorizeIncremental(any()))
+                .thenReturn(RuntimeAuthorizationService.IncrementalAuthorization.reject(
+                        "WRITE_PLATFORM_STATE is forbidden", "tenant_policy"));
+
+        String result = service.confirmAuraBotSkill(1L, "run-skill-authz", "task-skill-authz", "agent",
+                tool.getName(), input, List.of(tool), "preview-1", null);
+
+        assertThat(result)
+                .contains("Runtime authorization denied")
+                .contains("WRITE_PLATFORM_STATE is forbidden");
+        verify(runtimeAuthorizationService).authorizeIncremental(argThat(intent ->
+                intent.requiredEffects().contains(EffectClass.WRITE_PLATFORM_STATE)
+                        && "aurabot:model:create".equals(intent.toolRef())
+                        && "model:create".equals(intent.skillCode())));
+        verify(skillToolExecutor, never()).confirm(anyString(), any(SkillRequest.class), anyString());
     }
 
     @Test

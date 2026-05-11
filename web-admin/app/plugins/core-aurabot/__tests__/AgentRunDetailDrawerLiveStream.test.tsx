@@ -67,7 +67,14 @@ class MockEventSource {
 
 // ---- Helpers ---------------------------------------------------------------
 
-function buildDetail(overrides: { actions?: unknown[] } = {}) {
+function buildDetail(
+  overrides: {
+    actions?: unknown[];
+    traceId?: string | null;
+    conversationTurn?: unknown;
+    resultContracts?: unknown[];
+  } = {},
+) {
   return {
     run: {
       runId: 'RUN-test-1',
@@ -85,6 +92,9 @@ function buildDetail(overrides: { actions?: unknown[] } = {}) {
     interruptLog: [],
     childRuns: [],
     bif: null,
+    traceId: overrides.traceId ?? null,
+    conversationTurn: overrides.conversationTurn ?? null,
+    resultContracts: overrides.resultContracts ?? [],
   };
 }
 
@@ -101,6 +111,84 @@ function llmAction(stepIndex: number, code = 'llm_call') {
     beforeSnapshot: null,
     afterSnapshot: null,
     fieldChanges: null,
+    resultContractId: `rc-act-${stepIndex}`,
+  };
+}
+
+function conversationTurn() {
+  return {
+    runId: 'RUN-test-1',
+    taskPid: 'TASK-test-1',
+    turnId: 'TURN-test-1',
+    conversationId: 9001,
+    inboundMessageId: 900101,
+    outboundMessageId: 900102,
+    triageBucket: 'acp_run',
+    triageConfidence: '0.91',
+    triageReasonCodes: '["skill:stats"]',
+    userMessage: '统计客户信息',
+    finalResponse: '客户信息统计完成',
+    outcomeStatus: 'success',
+    startedAt: '2026-05-07T10:00:00Z',
+    completedAt: '2026-05-07T10:00:03Z',
+    resultContractIds: ['rc-act-1'],
+    messages: [
+      {
+        messageId: 900101,
+        conversationId: 9001,
+        senderType: 'human',
+        senderId: 1,
+        seq: 1,
+        messageType: 'text',
+        content: '统计客户信息',
+        cardPayload: null,
+        clientMsgId: 'in-TURN-test-1',
+        triageBucket: 'acp_run',
+        triageConfidence: '0.91',
+        triageReasonCodes: '["skill:stats"]',
+        thinkingContent: null,
+        thinkingSignature: null,
+        createdAt: '2026-05-07T10:00:00Z',
+      },
+      {
+        messageId: 900102,
+        conversationId: 9001,
+        senderType: 'agent',
+        senderId: 2,
+        seq: 2,
+        messageType: 'ai_response',
+        content: '客户信息统计完成',
+        cardPayload: null,
+        clientMsgId: 'out-TURN-test-1',
+        triageBucket: null,
+        triageConfidence: null,
+        triageReasonCodes: null,
+        thinkingContent: 'thinking trace',
+        thinkingSignature: 'sig-test',
+        createdAt: '2026-05-07T10:00:03Z',
+      },
+    ],
+  };
+}
+
+function resultContractItem() {
+  return {
+    contractId: 'rc-act-1',
+    actionPid: 'act-1',
+    source: 'ab_agent_action',
+    emittedAt: '2026-05-07T10:00:02Z',
+    contract: {
+      outputType: 'structured_result',
+      renderHint: 'summary',
+      actionability: 'read_only',
+      textSummary: 'Customer stats ready',
+      skillCode: 'platform.execute_sql',
+      durationMs: 12,
+      status: 'success',
+      data: {
+        totalCustomers: 42,
+      },
+    },
   };
 }
 
@@ -133,6 +221,18 @@ describe('AgentRunDetailDrawer · Live Stream tab (E.1)', () => {
 
     await screen.findByTestId('drawer-section-metadata');
     expect(screen.queryByTestId('drawer-tab-live-stream')).toBeNull();
+  });
+
+  it('renders Open Trace deep link when detail has traceId', async () => {
+    getAgentRunDetailMock.mockResolvedValue(
+      buildDetail({ traceId: 'trace-123' }),
+    );
+
+    render(<AgentRunDetailDrawer runId="RUN-trace" onClose={() => {}} onSelectRun={() => {}} />);
+
+    const link = await screen.findByTestId('open-trace-link');
+    expect(link).toHaveAttribute('href', '/aurabot/traces/trace-123');
+    expect(link).toHaveTextContent('Open Trace');
   });
 
   it('shows Live Stream tab and mounts EventSource when run contains llm_call', async () => {
@@ -191,5 +291,53 @@ describe('AgentRunDetailDrawer · Live Stream tab (E.1)', () => {
     const badge = await screen.findByTestId('live-stream-dropped-badge');
     expect(badge.textContent).toContain('7');
     expect(badge.textContent?.toLowerCase()).toContain('dropped');
+  });
+
+  it('renders full conversation turn replay tape', async () => {
+    getAgentRunDetailMock.mockResolvedValue(
+      buildDetail({ conversationTurn: conversationTurn() }),
+    );
+
+    render(<AgentRunDetailDrawer runId="RUN-conversation" onClose={() => {}} onSelectRun={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId('drawer-tab-conversation'));
+
+    const section = await screen.findByTestId('drawer-section-conversation');
+    expect(section).toHaveTextContent('TURN-test-1');
+    expect(section).toHaveTextContent('TASK-test-1');
+    expect(section).toHaveTextContent('9001');
+    expect(section).toHaveTextContent('统计客户信息');
+    expect(section).toHaveTextContent('客户信息统计完成');
+    expect(screen.getByTestId('conversation-message-900101')).toHaveTextContent('human');
+    expect(screen.getByTestId('conversation-message-900102')).toHaveTextContent('thinking trace');
+  });
+
+  it('deep-links from an action row to its selected result contract', async () => {
+    getAgentRunDetailMock.mockResolvedValue(
+      buildDetail({
+        actions: [
+          {
+            ...llmAction(1, 'platform.execute_sql'),
+            actionType: 'tool_call',
+            actionStatus: 'success',
+            intentSummary: '统计客户信息',
+            resultContractId: 'rc-act-1',
+          },
+        ],
+        resultContracts: [resultContractItem()],
+      }),
+    );
+
+    render(<AgentRunDetailDrawer runId="RUN-result" onClose={() => {}} onSelectRun={() => {}} />);
+
+    await screen.findByTestId('drawer-section-metadata');
+    fireEvent.click(screen.getByTestId('action-toggle-act-1'));
+    fireEvent.click(await screen.findByTestId('open-result-contract-act-1'));
+
+    const results = await screen.findByTestId('drawer-section-result-contracts');
+    expect(results).toHaveTextContent('rc-act-1');
+    expect(results).toHaveTextContent('Customer stats ready');
+    expect(results).toHaveTextContent('platform.execute_sql');
+    expect(screen.getByTestId('result-contract-item-rc-act-1')).toHaveClass('border-indigo-300');
   });
 });

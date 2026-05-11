@@ -9,6 +9,7 @@ import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -95,7 +96,7 @@ public class ModelQuerySkill implements AuraBotSkill {
 
     @Override
     public Set<String> requiredPermissions() {
-        return Set.of("MODEL.READ");
+        return Set.of(MetaPermission.MODEL_READ);
     }
 
     @Override

@@ -4,10 +4,16 @@
  * Covers the browser-level L2 write path:
  * sidebar -> comparison list -> AuraBot -> PCBA Agent -> supplier query ->
  * confirmation card -> confirmed draft creation -> list search.
+ *
+ * Setup boundary: plugin import, upstream product/supplier/price fixtures,
+ * Agent Definition seeding, and approval-policy seeding use API helpers. They
+ * do not count as the covered UI write path. The covered business writes still
+ * go through AuraBot in the browser, user confirmation, ToolLoopService, and
+ * the approval UI.
  */
 
 import { expect, test } from '../../fixtures';
-import type { Page, Locator } from '@playwright/test';
+import type { APIRequestContext, Page, Locator } from '@playwright/test';
 import {
   clickRowActionByLocator,
   executeCommandViaApi,
@@ -22,14 +28,130 @@ import { gotoAcpUiPage } from '../agent-control-plane/route-helpers';
 const PCBA_AGENT_CODE = 'pcba_procurement_comparison_agent';
 const PCBA_AGENT_NAME = 'PCBA Procurement Advisor';
 const COMPARISON_PATH = '/p/pe_procurement_comparison';
-const PRODUCT_CODE = 'PCBA-DEMO-RM-001';
-const PRODUCT_PID = '01KQ69DZCXDXZG830QK09ZCQV1';
-const SUPPLIER_PID = '01KQ69DZJS4XQH0QY6BBDQ6CEH';
+const STUB_TOOL_USE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
 const SUBMIT_REVIEW_TOOL = 'cmd_pe_submit_procurement_comparison';
 const APPROVAL_POLICY_NAME = 'E2E PCBA Agent Review Approval';
+const AURABOT_LAST_CONVERSATION_KEY = 'aurabot.lastConversationId';
+const OSS_PLUGIN_ROOT = process.env.OSS_PLUGIN_ROOT ?? '/app/plugins';
+const ENTERPRISE_PLUGIN_ROOT = process.env.ENTERPRISE_PLUGIN_ROOT ?? '/app/plugins-enterprise';
+
+const REQUIRED_PLUGIN_IMPORTS = [
+  { root: OSS_PLUGIN_ROOT, name: 'core-meta' },
+  { root: OSS_PLUGIN_ROOT, name: 'core-bpm' },
+  { root: OSS_PLUGIN_ROOT, name: 'core-announcement' },
+  { root: OSS_PLUGIN_ROOT, name: 'core-aurabot' },
+  { root: OSS_PLUGIN_ROOT, name: 'page-manager' },
+  { root: OSS_PLUGIN_ROOT, name: 'platform-admin' },
+  { root: OSS_PLUGIN_ROOT, name: 'org-management' },
+  { root: OSS_PLUGIN_ROOT, name: 'agent-control-plane' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'product-catalog' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'crm' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'sales' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'inventory' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'procurement' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'finance' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'quality' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'pcba-base' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'pcba-procurement' },
+  { root: ENTERPRISE_PLUGIN_ROOT, name: 'pcba-solution' },
+] as const;
+
+type PcbaProcurementFixture = {
+  productCode: string;
+  productPid: string;
+  supplierName: string;
+  supplierPid: string;
+};
 
 async function recordsFrom(response: { data?: any; records?: unknown[] }) {
   return response?.data?.records || response?.data?.content || response?.records || [];
+}
+
+async function importPluginDirectory(
+  request: APIRequestContext,
+  plugin: { root: string; name: string },
+) {
+  const path = `${plugin.root}/${plugin.name}`;
+  const response = await request.post('/api/plugins/import/import-directory-sync', {
+    data: {
+      path,
+      conflictStrategy: 'OVERWRITE',
+      autoPublishModels: true,
+      autoPublishFields: true,
+      autoPublishCommands: true,
+      autoPublishPages: true,
+    },
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 600000,
+  });
+  const body = await response.json().catch(() => ({}));
+  const data = body?.data ?? body;
+  const success = response.ok() && (data?.success === true || body?.success === true);
+  expect(
+    success,
+    `${plugin.name} import should succeed from ${path}: HTTP ${response.status()} ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+}
+
+async function executeRequiredCommand(
+  page: Page,
+  commandCode: string,
+  payload: Record<string, unknown>,
+) {
+  const result = await executeCommandViaApi(
+    page,
+    commandCode,
+    payload,
+    undefined,
+    'create',
+    { allowHttpError: true, timeoutMs: 30000 },
+  );
+  expect(result.recordId, `${commandCode} should create a record`).toBeTruthy();
+  return result.recordId;
+}
+
+function stubToolUse(name: string, input: Record<string, unknown>) {
+  return `${STUB_TOOL_USE_MARKER} ${JSON.stringify({ name, input })}`;
+}
+
+async function seedPcbaProcurementFixture(page: Page): Promise<PcbaProcurementFixture> {
+  const suffix = Date.now().toString(36).toUpperCase();
+  const productCode = `PCBA-DEMO-RM-${suffix}`;
+  const supplierName = `Shenzhen Precision Components ${suffix}`;
+
+  const productPid = await executeRequiredCommand(page, 'prod:create_product', {
+    prod_name: `STM32 MCU ${suffix}`,
+    prod_spec: 'MSL 3, industrial temperature',
+    prod_unit: 'pcs',
+    prod_type: 'raw_material',
+    prod_base_price: 8.5,
+    prod_cost_price: 7.8,
+    prod_currency: 'USD',
+    prod_custom_code: productCode,
+  });
+
+  const supplierPid = await executeRequiredCommand(page, 'pe:create_supplier', {
+    pe_supplier_name: supplierName,
+    pe_supplier_contact: 'Wang Lei',
+    pe_supplier_phone: '+86-755-5555-0101',
+    pe_sup_level: 'strategic',
+    pe_sup_lead_time_days: 14,
+    pe_sup_payment_terms: 'Net 45',
+  });
+
+  await executeRequiredCommand(page, 'pe:create_supplier_price', {
+    pe_sp_supplier_id: supplierPid,
+    pe_sp_product_id: productPid,
+    pe_sp_unit_price: 8.75,
+    pe_sp_currency: 'USD',
+    pe_sp_min_qty: 1000,
+    pe_sp_lead_time_days: 12,
+    pe_sp_valid_from: '2026-04-01',
+    pe_sp_valid_to: '2026-12-31',
+    pe_sp_remark: `PCBA agent E2E supplier price for ${suffix}`,
+  });
+
+  return { productCode, productPid, supplierName, supplierPid };
 }
 
 async function ensurePcbaProcurementAgent(page: Page) {
@@ -109,21 +231,25 @@ async function ensurePcbaReviewApprovalPolicy(page: Page) {
   expect(created.recordId, 'PCBA Agent review approval policy should be seedable').toBeTruthy();
 }
 
-async function createProcurementComparisonDraft(page: Page, comparisonCode: string) {
+async function createProcurementComparisonDraft(
+  page: Page,
+  comparisonCode: string,
+  fixture: PcbaProcurementFixture,
+) {
   const result = await executeCommandViaApi(
     page,
     'pe:create_procurement_comparison_draft',
     {
       pe_pc_code: comparisonCode,
-      pe_pc_product_id: PRODUCT_PID,
+      pe_pc_product_id: fixture.productPid,
       pe_pc_required_qty: 1200,
       pe_pc_need_date: '2026-05-30',
-      pe_pc_recommended_supplier_id: SUPPLIER_PID,
+      pe_pc_recommended_supplier_id: fixture.supplierPid,
       pe_pc_recommended_price: 8.75,
       pe_pc_recommended_lead_time_days: 12,
       pe_pc_supplier_score: 92,
       pe_pc_evidence_summary: 'E2E fixture: supplier quote, lead time, and score evidence.',
-      pe_pc_recommendation: 'Recommend Shenzhen Precision Components for human review.',
+      pe_pc_recommendation: `Recommend ${fixture.supplierName} for human review.`,
       pe_pc_risk_notes: 'Requires L3 approval before downstream purchase-order action.',
       pe_pc_source_run_id: `e2e-${comparisonCode}`,
     },
@@ -152,7 +278,9 @@ async function expandIfNeeded(page: Page, label: RegExp, targetHref: string) {
 }
 
 async function navigateToComparisonViaSidebar(page: Page) {
+  await page.addInitScript((key) => window.localStorage.removeItem(key), AURABOT_LAST_CONVERSATION_KEY);
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+  await page.evaluate((key) => window.localStorage.removeItem(key), AURABOT_LAST_CONVERSATION_KEY);
   await ensureSidebarExpanded(page);
 
   const nav = page.locator('nav').first();
@@ -176,6 +304,15 @@ async function openAuraBotPanel(page: Page) {
     await toggle.click();
   }
   await expect(panel).toBeVisible({ timeout: 10000 });
+  const historyTrigger = panel.getByTestId('aurabot-history-trigger');
+  if (await historyTrigger.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await historyTrigger.click();
+    const newSessionBtn = panel.getByTestId('aurabot-new-session');
+    await expect(newSessionBtn).toBeVisible({ timeout: 5000 });
+    await newSessionBtn.click();
+    await expect(panel.locator('textarea')).toBeVisible({ timeout: 5000 });
+  }
+  await page.evaluate((key) => window.localStorage.removeItem(key), AURABOT_LAST_CONVERSATION_KEY);
   return panel;
 }
 
@@ -297,7 +434,10 @@ async function requestReviewApprovalViaAuraBot(page: Page, comparisonCode: strin
 
   await sendAuraBotMessage(
     panel,
-    `请将采购比价草稿 ${comparisonCode} 提交人工复核。必须调用工具 ${SUBMIT_REVIEW_TOOL}，工具参数必须严格使用 {"recordId":"${comparisonPid}"}。不要创建新草稿，不要修改 recordId。`,
+    `请将采购比价草稿 ${comparisonCode} 提交人工复核。必须调用工具 ${SUBMIT_REVIEW_TOOL}，工具参数必须严格使用 {"recordId":"${comparisonPid}"}。不要创建新草稿，不要修改 recordId。\n${stubToolUse(
+      SUBMIT_REVIEW_TOOL,
+      { recordId: comparisonPid },
+    )}`,
   );
   await expect(panel).toContainText(SUBMIT_REVIEW_TOOL, { timeout: 120000 });
   await expect(panel).toContainText(/approval|审批/i, { timeout: 120000 });
@@ -341,12 +481,20 @@ async function actOnApprovalViaUi(
 }
 
 test.describe('PCBA Procurement Agent write flow', () => {
-  test.describe.configure({ timeout: 180000 });
+  test.describe.configure({ mode: 'serial', timeout: 180000 });
+
+  test.beforeAll(async ({ request }, testInfo) => {
+    testInfo.setTimeout(600000);
+    for (const plugin of REQUIRED_PLUGIN_IMPORTS) {
+      await importPluginDirectory(request, plugin);
+    }
+  });
 
   test('creates a procurement comparison draft after browser confirmation @critical', async ({
     page,
   }) => {
     const comparisonCode = `E2E-PCBA-CMP-${Date.now().toString(36).toUpperCase()}`;
+    const fixture = await seedPcbaProcurementFixture(page);
     await ensurePcbaProcurementAgent(page);
 
     await navigateToComparisonViaSidebar(page);
@@ -355,23 +503,43 @@ test.describe('PCBA Procurement Agent write flow', () => {
 
     await sendAuraBotMessage(
       panel,
-      `必须调用工具 nq_pe_procurement_comparison_supplier_options 查询供应商报价。工具参数必须严格使用 {"productId":"${PRODUCT_PID}"}，不得改写 productId。产品编码仅用于展示：${PRODUCT_CODE}。需求数量 1200，需求日期 2026-05-30。查询后给出推荐，并在表格中保留 product_id 和 supplier_id。`,
+      `必须调用工具 nq_pe_procurement_comparison_supplier_options 查询供应商报价。工具参数必须严格使用 {"productId":"${fixture.productPid}"}，不得改写 productId。产品编码仅用于展示：${fixture.productCode}。需求数量 1200，需求日期 2026-05-30。查询后给出推荐，并在表格中保留 product_id 和 supplier_id。\n${stubToolUse(
+        'nq_pe_procurement_comparison_supplier_options',
+        { productId: fixture.productPid },
+      )}`,
     );
     await expect(panel).toContainText('nq_pe_procurement_comparison_supplier_options', {
       timeout: 120000,
     });
-    await expect(panel).toContainText('Shenzhen Precision Components', { timeout: 120000 });
+    await expect(panel).toContainText(fixture.supplierName, { timeout: 120000 });
 
     await sendAuraBotMessage(
       panel,
-      `确认创建采购比价草稿。请使用上一轮推荐供应商 Shenzhen Precision Components，pe_pc_code 必须设置为 ${comparisonCode}，pe_pc_product_id 必须使用 ${PRODUCT_PID}，pe_pc_recommended_supplier_id 必须使用 ${SUPPLIER_PID}，数量 1200，需求日期 2026-05-30。`,
+      `确认创建采购比价草稿。请使用上一轮推荐供应商 ${fixture.supplierName}，pe_pc_code 必须设置为 ${comparisonCode}，pe_pc_product_id 必须使用 ${fixture.productPid}，pe_pc_recommended_supplier_id 必须使用 ${fixture.supplierPid}，数量 1200，需求日期 2026-05-30。\n${stubToolUse(
+        'cmd_pe_create_procurement_comparison_draft',
+        {
+          pe_pc_code: comparisonCode,
+          pe_pc_product_id: fixture.productPid,
+          pe_pc_required_qty: 1200,
+          pe_pc_need_date: '2026-05-30',
+          pe_pc_recommended_supplier_id: fixture.supplierPid,
+          pe_pc_recommended_price: 8.75,
+          pe_pc_recommended_lead_time_days: 12,
+          pe_pc_supplier_score: 92,
+          pe_pc_evidence_summary:
+            'E2E fixture: supplier quote, lead time, and score evidence.',
+          pe_pc_recommendation: `Recommend ${fixture.supplierName} for human review.`,
+          pe_pc_risk_notes: 'Requires L3 approval before downstream purchase-order action.',
+          pe_pc_source_run_id: `e2e-${comparisonCode}`,
+        },
+      )}`,
     );
     await expect(panel).toContainText('cmd_pe_create_procurement_comparison_draft', {
       timeout: 120000,
     });
     await expect(panel).toContainText(comparisonCode, { timeout: 120000 });
-    await expect(panel).toContainText(PRODUCT_PID, { timeout: 120000 });
-    await expect(panel).toContainText(SUPPLIER_PID, { timeout: 120000 });
+    await expect(panel).toContainText(fixture.productPid, { timeout: 120000 });
+    await expect(panel).toContainText(fixture.supplierPid, { timeout: 120000 });
 
     const executeResponsePromise = page.waitForResponse(
       (response) => response.url().includes('/api/ai/aurabot/execute'),
@@ -392,8 +560,8 @@ test.describe('PCBA Procurement Agent write flow', () => {
     expect(createdRecords).toHaveLength(1);
     expect(createdRecords[0]).toMatchObject({
       pe_pc_code: comparisonCode,
-      pe_pc_product_id: PRODUCT_PID,
-      pe_pc_recommended_supplier_id: SUPPLIER_PID,
+      pe_pc_product_id: fixture.productPid,
+      pe_pc_recommended_supplier_id: fixture.supplierPid,
       pe_pc_status: 'draft',
     });
 
@@ -406,9 +574,10 @@ test.describe('PCBA Procurement Agent write flow', () => {
     page,
   }) => {
     const comparisonCode = `E2E-PCBA-L3-OK-${Date.now().toString(36).toUpperCase()}`;
+    const fixture = await seedPcbaProcurementFixture(page);
     await ensurePcbaProcurementAgent(page);
     await ensurePcbaReviewApprovalPolicy(page);
-    const comparisonPid = await createProcurementComparisonDraft(page, comparisonCode);
+    const comparisonPid = await createProcurementComparisonDraft(page, comparisonCode, fixture);
 
     const approval = await requestReviewApprovalViaAuraBot(page, comparisonCode, comparisonPid);
     await waitForComparisonStatus(page, comparisonPid, 'draft');
@@ -423,9 +592,10 @@ test.describe('PCBA Procurement Agent write flow', () => {
     page,
   }) => {
     const comparisonCode = `E2E-PCBA-L3-NG-${Date.now().toString(36).toUpperCase()}`;
+    const fixture = await seedPcbaProcurementFixture(page);
     await ensurePcbaProcurementAgent(page);
     await ensurePcbaReviewApprovalPolicy(page);
-    const comparisonPid = await createProcurementComparisonDraft(page, comparisonCode);
+    const comparisonPid = await createProcurementComparisonDraft(page, comparisonCode, fixture);
 
     const approval = await requestReviewApprovalViaAuraBot(page, comparisonCode, comparisonPid);
     await waitForComparisonStatus(page, comparisonPid, 'draft');
