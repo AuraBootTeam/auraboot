@@ -36,10 +36,19 @@ class LoginRateLimiterTest {
 
     @Test
     void isAllowed_returnsFalseAfterManyAttempts() {
-        // Default cap is 600/min — exhaust it quickly
+        // Default cap is 3,000/min — high enough for quickstart and smoke tests.
         boolean lastResult = true;
-        for (int i = 0; i < 605 && lastResult; i++) {
+        for (int i = 0; i < 3_005 && lastResult; i++) {
             lastResult = limiter.isAllowed("burst-ip", null);
+        }
+        assertThat(lastResult).isFalse();
+    }
+
+    @Test
+    void isAllowed_returnsFalseAfterManyEmailAttempts() {
+        boolean lastResult = true;
+        for (int i = 0; i < 3_005 && lastResult; i++) {
+            lastResult = limiter.isAllowed(null, "burst@example.com");
         }
         assertThat(lastResult).isFalse();
     }
