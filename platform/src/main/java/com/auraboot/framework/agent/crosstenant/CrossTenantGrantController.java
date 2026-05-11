@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.crosstenant;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.permission.enums.RoleCodes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -83,8 +84,9 @@ public class CrossTenantGrantController {
         ApiResponse<Map<String, Object>> denied = guardPlatformAdmin();
         if (denied != null) return denied;
 
-        int offset = Math.max(0, (pageNum - 1) * pageSize);
-        int limit = Math.max(1, Math.min(pageSize, 200));
+        pageNum = PaginationSafetyUtils.pageNumber(pageNum);
+        int limit = PaginationSafetyUtils.pageSize(pageSize, 200);
+        int offset = PaginationSafetyUtils.offset(pageNum, limit, 200);
 
         String where = activeOnly
                 ? "WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())"
@@ -205,8 +207,9 @@ public class CrossTenantGrantController {
         Long parent = ((Number) grantRows.get(0).get("parent_tenant_id")).longValue();
         Long child = ((Number) grantRows.get(0).get("child_tenant_id")).longValue();
 
-        int offset = Math.max(0, (pageNum - 1) * pageSize);
-        int limit = Math.max(1, Math.min(pageSize, 500));
+        pageNum = PaginationSafetyUtils.pageNumber(pageNum);
+        int limit = PaginationSafetyUtils.pageSize(pageSize, 500);
+        int offset = PaginationSafetyUtils.offset(pageNum, limit, 500);
 
         List<Map<String, Object>> auditRows = jdbc.queryForList(
                 "SELECT id, grant_id, parent_tenant_id, child_tenant_id, "

@@ -25,13 +25,13 @@ describe('finance accounts command', () => {
   describe('filter options', () => {
     it('should build type filter', () => {
       const type = 'asset';
-      const filter = { fieldName: 'fin_acc_type', operator: 'EQ', value: type.toUpperCase() };
+      const filter = { fieldName: 'fin_acc_type', operator: 'EQ', value: type.toLowerCase() };
       expect(filter.value).toBe('asset');
     });
 
     it('should build status filter', () => {
       const status = 'active';
-      const filter = { fieldName: 'fin_acc_status', operator: 'EQ', value: status.toUpperCase() };
+      const filter = { fieldName: 'fin_acc_status', operator: 'EQ', value: status.toLowerCase() };
       expect(filter.value).toBe('active');
     });
 

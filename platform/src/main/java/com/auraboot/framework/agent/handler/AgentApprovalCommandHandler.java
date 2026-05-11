@@ -60,6 +60,7 @@ public class AgentApprovalCommandHandler implements CommandHandlerExtension {
     }
 
     @Override
+    @SuppressWarnings("java/user-controlled-bypass")
     public Object execute(CommandContext context) {
         String approvalPid = context.recordId();
         if (!StringUtils.hasText(approvalPid)) {
@@ -74,6 +75,9 @@ public class AgentApprovalCommandHandler implements CommandHandlerExtension {
             throw new BusinessException(ResponseCode.FORBIDDEN, "Current user is not authorized to approve this request");
         }
 
+        // Approval/reject actions are intentionally dispatched from user input
+        // only after approvalGateService confirms this tenant user is the
+        // authorized approver for the exact approval PID.
         if (APPROVE_COMMAND.equals(context.commandType())) {
             return approve(tenantId, approvalPid, userId);
         }

@@ -26,7 +26,7 @@ describe('finance gl-entries command', () => {
   describe('filter options', () => {
     it('should build status filter', () => {
       const status = 'posted';
-      const filter = { fieldName: 'fin_je_status', operator: 'EQ', value: status.toUpperCase() };
+      const filter = { fieldName: 'fin_je_status', operator: 'EQ', value: status.toLowerCase() };
       expect(filter.value).toBe('posted');
     });
 

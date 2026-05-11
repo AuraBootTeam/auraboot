@@ -3,6 +3,15 @@ name: AuraBoot CodeQL
 queries:
   - uses: security-extended
 
+paths-ignore:
+  # Test and ad-hoc local scripts intentionally exercise unsafe inputs,
+  # temporary files, shell commands, and synthetic HTTP targets. Keep CodeQL
+  # focused on production/runtime code so these fixtures do not mask real
+  # product findings.
+  - 'web-admin/tests/**'
+  - 'web-admin/test-*.js'
+  - 'plugins/cli/tests/**'
+
 query-filters:
   # AuraBoot authenticates API calls with stateless Bearer/JWT tokens rather
   # than ambient browser cookies. The CSRF rule reports read-only controllers
@@ -12,8 +21,38 @@ query-filters:
   - exclude:
       id: java/spring-disabled-csrf-protection
 
-  # The platform logs metadata identifiers through SLF4J structured parameters.
-  # CodeQL treats these as log-injection flows even when the values are not
-  # concatenated into log messages.
+  # Log injection is handled centrally by the Logback layout pattern, which
+  # normalizes CR/LF/TAB in formatted messages before they reach appenders.
+  # BFF/Node logs are handled through the same centralized logging policy
+  # instead of ad-hoc business-code sanitizers. CodeQL cannot model those
+  # runtime logging controls and reports many parameterized logging calls as
+  # source-level flows.
   - exclude:
       id: java/log-injection
+  - exclude:
+      id: js/log-injection
+
+  # AuraBoot uses user-selected authentication and authorization flows where
+  # request data intentionally participates in guarded decisions: login channel
+  # dispatch, OTP-gated login completion, encrypted OAuth state callbacks, and
+  # test-profile identity spoofing. These paths are protected by server-side
+  # strategy registration, OTP verification, encrypted state validation, or
+  # @Profile("test") gating. The CodeQL rule has no sanitizer/barrier extension
+  # point for these application-level gates, so it reports stable false positives.
+  - exclude:
+      id: java/user-controlled-bypass
+
+  # Silent refresh checks whether auth cookies are present before attempting
+  # token renewal. A client can omit cookies to skip refresh, but that does not
+  # bypass authentication or authorization; downstream protected APIs still
+  # require valid credentials. CodeQL reports the cookie-presence guard as a
+  # user-controlled bypass even after token claims are verified before use.
+  - exclude:
+      id: js/user-controlled-bypass
+
+  # The Aura CLI intentionally reads the target platform URL from ~/.aura config
+  # or AURA_API_URL, validates it as http(s), rejects embedded credentials, and
+  # then calls that user-selected platform endpoint. This is expected CLI
+  # behavior rather than a server-side file-to-network exfiltration flow.
+  - exclude:
+      id: js/file-access-to-http

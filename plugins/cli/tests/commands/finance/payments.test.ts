@@ -25,13 +25,13 @@ describe('finance payments command', () => {
   describe('filter options', () => {
     it('should build type filter', () => {
       const type = 'receipt';
-      const filter = { fieldName: 'fin_pay_type', operator: 'EQ', value: type.toUpperCase() };
+      const filter = { fieldName: 'fin_pay_type', operator: 'EQ', value: type.toLowerCase() };
       expect(filter.value).toBe('receipt');
     });
 
     it('should build status filter', () => {
       const status = 'confirmed';
-      const filter = { fieldName: 'fin_pay_status', operator: 'EQ', value: status.toUpperCase() };
+      const filter = { fieldName: 'fin_pay_status', operator: 'EQ', value: status.toLowerCase() };
       expect(filter.value).toBe('confirmed');
     });
 

@@ -181,6 +181,7 @@ public class PermissionMatrixController {
      */
     @GetMapping("/explain")
     @Operation(summary = "Explain permission decision for audit")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<PermissionExplanation> explain(
             @RequestParam Long memberId,
             @RequestParam String resource,

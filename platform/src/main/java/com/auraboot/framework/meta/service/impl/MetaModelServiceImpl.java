@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.util.DateUtil;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.Model;
@@ -55,6 +56,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     private static final Pattern MODEL_CODE_PATTERN = Pattern.compile("^[a-z][a-z0-9_]*$");
     private static final int MAX_MODEL_CODE_LENGTH = 64;
+
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
 
     private final MetaModelMapper metaModelMapper;
     private final MetaFieldMapper metaFieldMapper;
@@ -314,7 +319,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @CacheEvict(value = "modelDefinitions", key = "#modelCode + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()")
     public void refreshModelCache(String modelCode) {
         // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-        log.info("Refreshing model cache for: {} in tenant: {}", modelCode, getCurrentTenantId());
+        log.info("Refreshing model cache for: {} in tenant: {}", logSafe(modelCode), getCurrentTenantId());
     }
 
     @Override
@@ -329,7 +334,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return;
         }
         
-        log.info("Preloading models: {} for tenant: {}", modelCodes, getCurrentTenantId());
+        log.info("Preloading models: {} for tenant: {}", logSafe(modelCodes), getCurrentTenantId());
         
         for (String modelCode : modelCodes) {
             try {
@@ -337,7 +342,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             } catch (Exception e) {
                 // §P1 per-model tolerance: preload is best-effort warm-up; one
                 // missing or malformed model must not abort warming the others.
-                log.warn("Failed to preload model: {}, error: {}", modelCode, e.getMessage(), e);
+                log.warn("Failed to preload model: {}, error: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             }
         }
     }
@@ -391,7 +396,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             // and DDL preview where a thrown exception would collapse a batch. Surface
             // the failure in the result; log with stack trace so root cause is visible
             // in observability.
-            log.error("Model validation failed with exception for {}: {}", modelCode, e.getMessage(), e);
+            log.error("Model validation failed with exception for {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             return MetadataValidationResult.builder()
                     .valid(false)
                     .modelCode(modelCode)
@@ -409,7 +414,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             // exists-check semantics: any failure is treated as "not exists" so callers
             // (importer / re-import) can proceed to create. Real DB failures still
             // surface via the warn log + stack trace for ops triage.
-            log.warn("Error checking model existence: {}, error: {}", modelCode, e.getMessage(), e);
+            log.warn("Error checking model existence: {}, error: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             return false;
         }
     }
@@ -424,7 +429,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             // at debug so a real DB/connectivity failure remains observable when
             // troubleshooting unexpected re-creates during import.
             log.debug("Error checking field existence: model={}, field={}, error={}",
-                    modelCode, fieldCode, e.toString());
+                    logSafe(modelCode), logSafe(fieldCode), logSafe(e.toString()));
             return false;
         }
     }
@@ -454,7 +459,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * field list or auto-publish flag from the request.
      */
     private MetaModelDTO createDirectly(MetaModelCreateRequest request) {
-        log.info("直接创建模型(非Git-First): {}", request.getCode());
+        log.info("直接创建模型(非Git-First): {}", logSafe(request.getCode()));
 
         // Validate code is non-blank
         if (!StringUtils.hasText(request.getCode())) {
@@ -540,7 +545,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             throw new MetaServiceException("Failed to create model");
         }
         
-        log.info("模型创建成功: {}", model.getPid());
+        log.info("模型创建成功: {}", logSafe(model.getPid()));
 
         // Auto-bind system fields (id, pid, created_at, updated_at)
         autoBindSystemFields(model.getId());
@@ -550,7 +555,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         
         // 自动分配 permissions
         autoPermissionAssignmentService.autoAssignPermissions(request.getCode(), null);
-        log.info("Auto permission assignment completed for model: {}", request.getCode());
+        log.info("Auto permission assignment completed for model: {}", logSafe(request.getCode()));
         
         return dto;
     }
@@ -565,13 +570,13 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         for (String fieldCode : systemFieldCodes) {
             Field field = metaFieldMapper.findCurrentByCode(fieldCode);
             if (field == null) {
-                log.warn("System field not found: {}, skipping auto-bind", fieldCode);
+                log.warn("System field not found: {}, skipping auto-bind", logSafe(fieldCode));
                 continue;
             }
 
             // Check if already bound (prevent duplicates)
             if (fieldBindingMapper.countByModelAndField(modelId, field.getId()) > 0) {
-                log.debug("System field already bound: modelId={}, fieldCode={}", modelId, fieldCode);
+                log.debug("System field already bound: modelId={}, fieldCode={}", modelId, logSafe(fieldCode));
                 continue;
             }
 
@@ -589,7 +594,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             binding.setUpdatedAt(Instant.now());
 
             fieldBindingMapper.insert(binding);
-            log.info("Auto-bound system field: modelId={}, fieldCode={}", modelId, fieldCode);
+            log.info("Auto-bound system field: modelId={}, fieldCode={}", modelId, logSafe(fieldCode));
         }
     }
 
@@ -686,7 +691,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return null;
         }
 
-        log.debug("查询模型: pid={}", pid);
+        log.debug("查询模型: pid={}", logSafe(pid));
 
 
 
@@ -696,7 +701,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return convertToMetaModelDTO(model);
         } catch (ValidationException e) {
             // 如果模型不存在或不属于当前租户，返回 null
-            log.debug("模型不存在或不属于当前租户: pid={}", pid);
+            log.debug("模型不存在或不属于当前租户: pid={}", logSafe(pid));
             return null;
         }
     }
@@ -707,7 +712,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             throw new ValidationException(ResponseCode.CommonValidationFailed, "PID不能为空");
         }
 
-        log.info("删除模型: {}", pid);
+        log.info("删除模型: {}", logSafe(pid));
 
 
 
@@ -723,7 +728,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     
     private void deleteDirectly(Model model) {
-        log.info("直接删除模型(非Git-First): {}", model.getCode());
+        log.info("直接删除模型(非Git-First): {}", logSafe(model.getCode()));
         
         // 软删除
         int result = metaModelMapper.deleteById(model.getId());
@@ -734,7 +739,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         // 清除缓存
         refreshModelCache(model.getCode());
         
-        log.info("模型删除成功: {}", model.getPid());
+        log.info("模型删除成功: {}", logSafe(model.getPid()));
     }
     
     /**
@@ -998,7 +1003,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 // §P2 best-effort: malformed cross-field-rule JSON should not block
                 // model load. Caller treats null as "no rules"; warn log surfaces
                 // the bad config for the model owner to fix.
-                log.warn("Failed to parse cross-field rules for model {}: {}", model.getCode(), e.getMessage(), e);
+                log.warn("Failed to parse cross-field rules for model {}: {}", logSafe(model.getCode()), logSafe(e.getMessage()), e);
                 return null;
             }
         }
@@ -1511,7 +1516,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             // "not exists"; raised exception (DB down, schema mismatch) is surfaced
             // via error log + stack trace rather than thrown, since binding flows
             // batch-iterate over many ids and one DB hiccup must not abort the loop.
-            log.error("检查模型存在性失败: modelId={}, error={}", modelId, e.getMessage(), e);
+            log.error("检查模型存在性失败: modelId={}, error={}", modelId, logSafe(e.getMessage()), e);
             return false;
         }
     }
@@ -1522,7 +1527,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return metaFieldMapper.selectById(fieldId) != null;
         } catch (Exception e) {
             // exists-check semantics: see existsModelById above for full pattern note.
-            log.error("检查字段存在性失败: fieldId={}, error={}", fieldId, e.getMessage(), e);
+            log.error("检查字段存在性失败: fieldId={}, error={}", fieldId, logSafe(e.getMessage()), e);
             return false;
         }
     }
@@ -1533,7 +1538,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return fieldBindingMapper.countByModelAndField(modelId, fieldId) > 0;
         } catch (Exception e) {
             // exists-check semantics: see existsModelById above for full pattern note.
-            log.error("检查字段绑定关系失败: modelId={}, fieldId={}, error={}", modelId, fieldId, e.getMessage(), e);
+            log.error("检查字段绑定关系失败: modelId={}, fieldId={}, error={}", modelId, fieldId, logSafe(e.getMessage()), e);
             return false;
         }
     }
@@ -1591,7 +1596,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             if (model != null && model.isPublished()) {
                 Field field = metaFieldMapper.selectById(fieldId);
                 if (field != null) {
-                    log.info("模型已发布，执行 ALTER TABLE ADD COLUMN: modelCode={}, fieldCode={}", model.getCode(), field.getCode());
+                    log.info("模型已发布，执行 ALTER TABLE ADD COLUMN: modelCode={}, fieldCode={}",
+                            logSafe(model.getCode()), logSafe(field.getCode()));
                     schemaManagementService.addFieldToModel(model.getCode(), field.getCode());
                 }
             }
@@ -1599,7 +1605,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return binding;
 
         } catch (Exception e) {
-            log.error("绑定字段到模型失败: modelId={}, fieldId={}, error={}", modelId, fieldId, e.getMessage(), e);
+            log.error("绑定字段到模型失败: modelId={}, fieldId={}, error={}", modelId, fieldId, logSafe(e.getMessage()), e);
             throw new MetaServiceException("绑定字段到模型失败: " + e.getMessage(), e);
         }
     }
@@ -1623,7 +1629,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             if (model != null && model.isPublished()) {
                 Field field = metaFieldMapper.selectById(fieldId);
                 if (field != null) {
-                    log.info("模型已发布，执行 ALTER TABLE DROP COLUMN: modelCode={}, fieldCode={}", model.getCode(), field.getCode());
+                    log.info("模型已发布，执行 ALTER TABLE DROP COLUMN: modelCode={}, fieldCode={}",
+                            logSafe(model.getCode()), logSafe(field.getCode()));
                     schemaManagementService.removeFieldFromModel(model.getCode(), field.getCode());
                 }
             }
@@ -1640,7 +1647,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return success;
             
         } catch (Exception e) {
-            log.error("解绑字段失败: modelId={}, fieldId={}, error={}", modelId, fieldId, e.getMessage(), e);
+            log.error("解绑字段失败: modelId={}, fieldId={}, error={}", modelId, fieldId, logSafe(e.getMessage()), e);
             throw new MetaServiceException("解绑字段失败: " + e.getMessage(), e);
         }
     }
@@ -1662,7 +1669,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return bindings;
             
         } catch (Exception e) {
-            log.error("获取模型字段绑定失败: modelId={}, error={}", modelId, e.getMessage(), e);
+            log.error("获取模型字段绑定失败: modelId={}, error={}", modelId, logSafe(e.getMessage()), e);
             throw new MetaServiceException("获取模型字段绑定失败: " + e.getMessage(), e);
         }
     }
@@ -1676,7 +1683,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return Optional.ofNullable(binding);
             
         } catch (Exception e) {
-            log.error("获取字段绑定关系失败: modelId={}, fieldId={}, error={}", modelId, fieldId, e.getMessage(), e);
+            log.error("获取字段绑定关系失败: modelId={}, fieldId={}, error={}", modelId, fieldId, logSafe(e.getMessage()), e);
             throw new MetaServiceException("获取字段绑定关系失败: " + e.getMessage(), e);
         }
     }
@@ -1699,7 +1706,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             return binding;
             
         } catch (Exception e) {
-            log.error("更新字段绑定关系失败: bindingId={}, error={}", binding.getId(), e.getMessage(), e);
+            log.error("更新字段绑定关系失败: bindingId={}, error={}", binding.getId(), logSafe(e.getMessage()), e);
             throw new MetaServiceException("更新字段绑定关系失败: " + e.getMessage(), e);
         }
     }
@@ -1725,7 +1732,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     public List<MetaModelDTO> getVersionHistory(String code) {
-        log.info("获取模型版本历史: code={}", code);
+        log.info("获取模型版本历史: code={}", logSafe(code));
         
         // 查询所有版本
         List<Model> versions = metaModelMapper.findAllVersionsByCode(code);
@@ -1738,7 +1745,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     public MetaModelDTO getVersionDetail(String code, Integer version) {
-        log.info("获取模型版本详情: code={}, version={}", code, version);
+        log.info("获取模型版本详情: code={}, version={}", logSafe(code), version);
         
         Model model = metaModelMapper.findByCodeAndVersion(code, version);
         if (model == null) {
@@ -1750,7 +1757,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     public Map<String, Object> compareVersions(String code, Integer v1, Integer v2) {
-        log.info("对比模型版本: code={}, v1={}, v2={}", code, v1, v2);
+        log.info("对比模型版本: code={}, v1={}, v2={}", logSafe(code), v1, v2);
         
         // 获取两个版本的模型
         Model model1 = metaModelMapper.findByCodeAndVersion(code, v1);
@@ -1814,7 +1821,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     @Transactional
     public MetaModelDTO rollbackToVersion(String code, Integer version) {
-        log.info("回滚模型到指定版本: code={}, version={}", code, version);
+        log.info("回滚模型到指定版本: code={}, version={}", logSafe(code), version);
 
         // 1. Get target version
         Model targetModel = metaModelMapper.findByCodeAndVersion(code, version);
@@ -1824,7 +1831,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         // 2. Mark all versions as non-current
         int cleared = metaModelMapper.clearCurrentFlag(code);
-        log.debug("清除当前版本标记: code={}, count={}", code, cleared);
+        log.debug("清除当前版本标记: code={}, count={}", logSafe(code), cleared);
 
         // 3. Set target version as current
         int updated = metaModelMapper.setCurrentVersion(targetModel.getId());
@@ -1835,7 +1842,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         // 4. Clear cache
         refreshModelCache(code);
-        log.debug("缓存已刷新: code={}", code);
+        log.debug("缓存已刷新: code={}", logSafe(code));
 
         // 5. Return updated model
         Model currentModel = metaModelMapper.findCurrentByCode(code);
@@ -1888,7 +1895,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         log.info(
                 "分页查询模型列表: page={}, size={}, keyword={}, code={}, displayName={}, modelType={}, status={}, sourceType={}, sortField={}, sortOrder={}",
-                page, size, keyword, code, displayName, modelType, status, sourceType, sortField, sortOrder
+                page, size, logSafe(keyword), logSafe(code), logSafe(displayName), logSafe(modelType),
+                logSafe(status), logSafe(sourceType), logSafe(sortField), logSafe(sortOrder)
         );
 
         // Validate and set defaults
@@ -2005,7 +2013,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         // (e.g., BPM system tables managed outside DSL schema management)
         if (model.isViewType() || model.isSkipTableCreation()) {
             log.info("Publishing model (no table creation): pid={}, code={}, reason={}",
-                    pid, model.getCode(),
+                    logSafe(pid), logSafe(model.getCode()),
                     model.isViewType() ? "VIEW model" : "skipTableCreation=true");
         } else {
             // Validate: must have at least one field binding
@@ -2024,14 +2032,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                     List<String> expandedFields = moneyFieldTypeHandler.expandMoneyFields(model);
                     if (!expandedFields.isEmpty()) {
                         log.info("MONEY field expansion created {} field(s) for model {}: {}",
-                                expandedFields.size(), model.getCode(), String.join(", ", expandedFields));
+                                expandedFields.size(), logSafe(model.getCode()), logSafe(String.join(", ", expandedFields)));
                     }
                 } catch (Exception e) {
                     // §P2 best-effort: MONEY/i18n field expansion is a derived view;
                     // a parse failure should not prevent the underlying model from
                     // loading. Caller falls back to the un-expanded field set.
                     log.warn("MONEY field expansion failed for model {} (non-blocking): {}",
-                            model.getCode(), e.getMessage(), e);
+                            logSafe(model.getCode()), logSafe(e.getMessage()), e);
                 }
             }
 
@@ -2040,16 +2048,16 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 List<String> i18nFields = i18nFieldExpander.expandI18nFields(model);
                 if (!i18nFields.isEmpty()) {
                     log.info("i18n field expansion created {} field(s) for model {}: {}",
-                            i18nFields.size(), model.getCode(), String.join(", ", i18nFields));
+                            i18nFields.size(), logSafe(model.getCode()), logSafe(String.join(", ", i18nFields)));
                 }
             } catch (Exception e) {
                 // §P2 best-effort: see MONEY expansion above.
                 log.warn("i18n field expansion failed for model {} (non-blocking): {}",
-                        model.getCode(), e.getMessage(), e);
+                        logSafe(model.getCode()), logSafe(e.getMessage()), e);
             }
 
             // Create table via SchemaManagementService
-            log.info("Publishing model: pid={}, code={}", pid, model.getCode());
+            log.info("Publishing model: pid={}, code={}", logSafe(pid), logSafe(model.getCode()));
             SchemaOperationResult schemaResult = schemaManagementService.createTableByModel(model.getCode());
             if (schemaResult == null || !schemaResult.isSuccess()) {
                 String errorMessage = schemaResult != null && schemaResult.getErrorMessage() != null
@@ -2065,11 +2073,11 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         model.setUpdatedAt(Instant.now());
         metaModelMapper.updateById(model);
 
-        log.info("Model published successfully: pid={}, code={}", pid, model.getCode());
+        log.info("Model published successfully: pid={}, code={}", logSafe(pid), logSafe(model.getCode()));
 
         // Auto-create hierarchical permissions for the published model
         autoPermissionAssignmentService.autoAssignPermissions(model.getCode(), null);
-        log.info("Hierarchical permissions created for model: {}", model.getCode());
+        log.info("Hierarchical permissions created for model: {}", logSafe(model.getCode()));
 
         // Invalidate roll-up field registry (model fields may include rollUp config)
         rollUpFieldRegistry.invalidateModel(model.getCode());
@@ -2110,7 +2118,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             com.auraboot.framework.meta.entity.PageSchema existing =
                 pageSchemaMapper.selectAnyByPageKey(spec.pageKey());
             if (existing != null) {
-                log.debug("Page schema already exists, skipping auto-create: pageKey={}", spec.pageKey());
+                log.debug("Page schema already exists, skipping auto-create: pageKey={}", logSafe(spec.pageKey()));
                 continue;
             }
 
@@ -2152,7 +2160,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
             if (inserted > 0) {
                 log.info("Auto-created default page schema: pageKey={}, kind={}, modelCode={}",
-                    spec.pageKey(), spec.kind(), modelCode);
+                    logSafe(spec.pageKey()), logSafe(spec.kind()), logSafe(modelCode));
             }
         }
     }
@@ -2197,7 +2205,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             binding.setUpdatedAt(Instant.now());
             fieldBindingMapper.updateById(binding);
             marked++;
-            log.debug("Auto-marked field {} as searchable for model {}", code, modelId);
+            log.debug("Auto-marked field {} as searchable for model {}", logSafe(code), modelId);
         }
 
         if (marked > 0) {
@@ -2224,7 +2232,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         model.setUpdatedAt(Instant.now());
         metaModelMapper.updateById(model);
 
-        log.info("Model unpublished: pid={}, code={}", pid, model.getCode());
+        log.info("Model unpublished: pid={}, code={}", logSafe(pid), logSafe(model.getCode()));
         return convertToMetaModelDTO(model);
     }
 

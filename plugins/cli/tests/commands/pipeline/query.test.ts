@@ -16,7 +16,7 @@ describe('pipeline query command', () => {
     }
 
     it('should parse EQ filter', () => {
-      const f = parseFilter('crm_lead_status=NEW');
+      const f = parseFilter('crm_lead_status=new');
       expect(f).toEqual({ fieldName: 'crm_lead_status', operator: 'EQ', value: 'new' });
     });
 
@@ -36,7 +36,7 @@ describe('pipeline query command', () => {
     });
 
     it('should parse NEQ filter', () => {
-      const f = parseFilter('status!=CLOSED');
+      const f = parseFilter('status!=closed');
       expect(f).toEqual({ fieldName: 'status', operator: 'neq', value: 'closed' });
     });
   });

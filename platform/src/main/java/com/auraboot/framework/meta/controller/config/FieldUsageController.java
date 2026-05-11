@@ -35,6 +35,7 @@ public class FieldUsageController {
      */
     @GetMapping
     @RequirePermission(MetaPermission.FIELD_READ)
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<FieldUsageService.FieldUsageInfo> getFieldUsage(@PathVariable String fieldPid) {
         log.info("Getting field usage: fieldPid={}", fieldPid);
         
@@ -52,6 +53,7 @@ public class FieldUsageController {
      */
     @GetMapping("/models")
     @RequirePermission(MetaPermission.FIELD_READ)
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<List<FieldUsageService.ModelReference>> getModelsUsingField(@PathVariable String fieldPid) {
         log.info("Getting models using field: fieldPid={}", fieldPid);
         
@@ -69,6 +71,7 @@ public class FieldUsageController {
      */
     @GetMapping("/bindings")
     @RequirePermission(MetaPermission.FIELD_READ)
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<List<BindingConfiguration>> getBindingConfigurations(@PathVariable String fieldPid) {
         log.info("Getting binding configurations: fieldPid={}", fieldPid);
         
@@ -86,6 +89,7 @@ public class FieldUsageController {
      */
     @GetMapping("/report")
     @RequirePermission(MetaPermission.FIELD_READ)
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<FieldUsageService.FieldUsageReport> exportUsageReport(@PathVariable String fieldPid) {
         log.info("Exporting usage report: fieldPid={}", fieldPid);
         
@@ -103,6 +107,7 @@ public class FieldUsageController {
      */
     @GetMapping("/statistics")
     @RequirePermission(MetaPermission.FIELD_READ)
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<FieldUsageService.FieldUsageStatistics> getUsageStatistics(@PathVariable String fieldPid) {
         log.info("Getting usage statistics: fieldPid={}", fieldPid);
         

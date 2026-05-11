@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -51,6 +52,10 @@ import java.util.Set;
 public class DynamicController {
 
     static final int MAX_BATCH_SIZE = 500;
+
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
 
     @Autowired
     private DynamicDataService dynamicDataService;
@@ -115,7 +120,8 @@ public class DynamicController {
             @RequestParam(required = false) Long cursor) {
 
         log.info("分页查询数据: pageKey={}, pageNum={}, pageSize={}, keyword={}, filters={}, sortFields={}, queryCode={}, cursor={}",
-            pageKey, pageNum, pageSize, keyword, filters, sortFields, queryCode, cursor);
+            logSafe(pageKey), pageNum, pageSize, logSafe(keyword), logSafe(filters),
+                logSafe(sortFields), logSafe(queryCode), cursor);
 
         List<QueryCondition> conditions = parseFilters(filters);
         List<SortField> parsedSortFields = parseSortFields(sortFields, sortField, sortOrder);
@@ -153,7 +159,8 @@ public class DynamicController {
                 }
             }
         } catch (Exception e) {
-            log.debug("VIEW fallback to named query skipped for modelCode={}: {}", modelCode, e.getMessage());
+            log.debug("VIEW fallback to named query skipped for modelCode={}: {}",
+                    logSafe(modelCode), logSafe(e.getMessage()));
         }
 
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, queryRequest);
@@ -172,7 +179,7 @@ public class DynamicController {
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "NamedQuery code") @RequestParam String queryCode) {
 
-        log.info("Get filter schema: pageKey={}, queryCode={}", pageKey, queryCode);
+        log.info("Get filter schema: pageKey={}, queryCode={}", logSafe(pageKey), logSafe(queryCode));
 
         List<NamedQueryFieldDTO> fields = namedQueryService.getFields(queryCode);
         // Filter to searchable fields and sort by sort_order
@@ -207,7 +214,7 @@ public class DynamicController {
             }
         } catch (Exception e) {
             log.debug("Model lookup failed for normalized pageKey '{}', falling back to PageKeyConverter: {}",
-                    normalized, e.getMessage());
+                    logSafe(normalized), logSafe(e.getMessage()));
         }
         return PageKeyConverter.toModelCode(pageKey);
     }
@@ -219,7 +226,7 @@ public class DynamicController {
         try {
             return filterMapper.readValue(filters, new TypeReference<List<QueryCondition>>() {});
         } catch (Exception e) {
-            log.warn("Failed to parse filters: {}", filters, e);
+            log.warn("Failed to parse filters: {}", logSafe(filters), e);
             throw new com.auraboot.framework.meta.exception.MetaServiceException(
                 "Invalid filter format. Expected JSON array, e.g. [{\"fieldName\":\"status\",\"operator\":\"EQ\",\"value\":\"DRAFT\"}]");
         }
@@ -314,7 +321,7 @@ public class DynamicController {
     public ApiResponse<Map<String, Object>> getById(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录ID") @PathVariable String recordId) {
-        log.info("获取单条数据: {} - {}", pageKey, recordId);
+        log.info("获取单条数据: {} - {}", logSafe(pageKey), logSafe(recordId));
         String modelCode = resolveModelCode(pageKey);
         Map<String, Object> result = dynamicDataService.getById(modelCode, recordId);
         return ApiResponse.success(result);
@@ -335,7 +342,8 @@ public class DynamicController {
             @Parameter(description = "Platform: web or mobile") @RequestParam(defaultValue = "web") String platform,
             @Parameter(description = "Context: detail, list, or inbox") @RequestParam(defaultValue = "detail") String context) {
 
-        log.info("Get record capabilities: pageKey={}, recordId={}, platform={}, context={}", pageKey, recordId, platform, context);
+        log.info("Get record capabilities: pageKey={}, recordId={}, platform={}, context={}",
+                logSafe(pageKey), logSafe(recordId), logSafe(platform), logSafe(context));
         String modelCode = resolveModelCode(pageKey);
         Long userId = MetaContext.getCurrentUserId();
 
@@ -353,7 +361,7 @@ public class DynamicController {
     public ApiResponse<Object> create(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
-        log.info("创建数据: {}", pageKey);
+        log.info("创建数据: {}", logSafe(pageKey));
         String modelCode = resolveModelCode(pageKey);
         Map<String, Object> result = dynamicDataService.create(modelCode, data);
         return ApiResponse.success(result);
@@ -382,7 +390,7 @@ public class DynamicController {
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录ID") @PathVariable String recordId,
             @RequestBody Map<String, Object> data) {
-        log.info("更新数据: {} - {}", pageKey, recordId);
+        log.info("更新数据: {} - {}", logSafe(pageKey), logSafe(recordId));
         String modelCode = resolveModelCode(pageKey);
         Map<String, Object> result = dynamicDataService.update(modelCode, recordId, data);
         return ApiResponse.success(result);
@@ -397,7 +405,7 @@ public class DynamicController {
     public ApiResponse<Void> delete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录ID") @PathVariable String recordId) {
-        log.info("删除数据: {} - {}", pageKey, recordId);
+        log.info("删除数据: {} - {}", logSafe(pageKey), logSafe(recordId));
         String modelCode = resolveModelCode(pageKey);
         dynamicDataService.delete(modelCode, recordId);
         return ApiResponse.success(null);
@@ -415,7 +423,7 @@ public class DynamicController {
         if (dataList.size() > MAX_BATCH_SIZE) {
             return ApiResponse.error("Batch size " + dataList.size() + " exceeds maximum " + MAX_BATCH_SIZE);
         }
-        log.info("批量创建数据: {}, 数量: {}", pageKey, dataList.size());
+        log.info("批量创建数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
         DynamicBatchResponse result = dynamicDataService.batchCreate(modelCode, dataList);
         return ApiResponse.success(result);
@@ -433,7 +441,7 @@ public class DynamicController {
         if (dataList.size() > MAX_BATCH_SIZE) {
             return ApiResponse.error("Batch size " + dataList.size() + " exceeds maximum " + MAX_BATCH_SIZE);
         }
-        log.info("批量更新数据: {}, 数量: {}", pageKey, dataList.size());
+        log.info("批量更新数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
         DynamicBatchResponse result = dynamicDataService.batchUpdate(modelCode, dataList);
         return ApiResponse.success(result);
@@ -451,7 +459,7 @@ public class DynamicController {
         if (recordIds.size() > MAX_BATCH_SIZE) {
             return ApiResponse.error("Batch size " + recordIds.size() + " exceeds maximum " + MAX_BATCH_SIZE);
         }
-        log.info("批量删除数据: {}, 数量: {}", pageKey, recordIds.size());
+        log.info("批量删除数据: {}, 数量: {}", logSafe(pageKey), recordIds.size());
         String modelCode = resolveModelCode(pageKey);
         dynamicDataService.batchDelete(modelCode, recordIds);
         return ApiResponse.success(null);
@@ -466,7 +474,7 @@ public class DynamicController {
     public ApiResponse<Map<String, Object>> validate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
-        log.info("验证数据: {}", pageKey);
+        log.info("验证数据: {}", logSafe(pageKey));
         
         // 转换为新的接口调用
         String modelCode = resolveModelCode(pageKey);
@@ -493,7 +501,7 @@ public class DynamicController {
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "字段名称") @PathVariable String fieldName,
             @Parameter(description = "搜索关键词") @RequestParam(required = false) String keyword) {
-        log.info("获取字段选项: {} - {}", pageKey, fieldName);
+        log.info("获取字段选项: {} - {}", logSafe(pageKey), logSafe(fieldName));
         
         // 转换为新的接口调用
         String modelCode = resolveModelCode(pageKey);
@@ -526,7 +534,7 @@ public class DynamicController {
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "查询名称") @PathVariable String queryName,
             @RequestBody(required = false) Map<String, Object> queryParams) {
-        log.info("执行自定义查询: {} - {}", pageKey, queryName);
+        log.info("执行自定义查询: {} - {}", logSafe(pageKey), logSafe(queryName));
         String modelCode = resolveModelCode(pageKey);
         List<Map<String, Object>> result = dynamicDataService.executeCustomQuery(modelCode, queryName, queryParams);
         return ApiResponse.success(result);
@@ -542,7 +550,7 @@ public class DynamicController {
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "操作名称") @PathVariable String actionName,
             @RequestBody(required = false) Map<String, Object> actionParams) {
-        log.info("执行自定义操作: {} - {}", pageKey, actionName);
+        log.info("执行自定义操作: {} - {}", logSafe(pageKey), logSafe(actionName));
         
         // 转换为新的接口调用
         String modelCode = resolveModelCode(pageKey);
@@ -567,7 +575,7 @@ public class DynamicController {
     public ApiResponse<Map<String, Object>> exportData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> exportParams) {
-        log.info("导出数据: {}", pageKey);
+        log.info("导出数据: {}", logSafe(pageKey));
 
         // Parse export params
         String modelCode = resolveModelCode(pageKey);
@@ -605,7 +613,7 @@ public class DynamicController {
                                         .value(val)
                                         .build());
                             } catch (IllegalArgumentException e) {
-                                log.warn("Invalid operator in export condition: {}", op);
+                                log.warn("Invalid operator in export condition: {}", logSafe(op));
                             }
                         }
                     }
@@ -649,13 +657,13 @@ public class DynamicController {
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "文件路径") @RequestParam String file,
             HttpServletResponse response) throws java.io.IOException {
-        log.info("下载导出文件: pageKey={}, file={}", pageKey, file);
+        log.info("下载导出文件: pageKey={}, file={}", logSafe(pageKey), logSafe(file));
 
         // Security: validate file path is within temp directory to prevent path traversal
         java.nio.file.Path tempDir = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"));
         java.nio.file.Path filePath = java.nio.file.Paths.get(file).normalize().toAbsolutePath();
         if (!filePath.startsWith(tempDir.normalize().toAbsolutePath())) {
-            log.warn("Path traversal attempt blocked: {}", file);
+            log.warn("Path traversal attempt blocked: {}", logSafe(file));
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
             return;
         }
@@ -688,7 +696,7 @@ public class DynamicController {
         try {
             java.nio.file.Files.deleteIfExists(filePath);
         } catch (Exception e) {
-            log.warn("Failed to delete temp export file: {}", file);
+            log.warn("Failed to delete temp export file: {}", logSafe(file));
         }
     }
 
@@ -701,7 +709,7 @@ public class DynamicController {
     public ApiResponse<Map<String, Object>> importData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> importParams) {
-        log.info("导入数据: {}", pageKey);
+        log.info("导入数据: {}", logSafe(pageKey));
         
         // 转换为新的接口调用
         String modelCode = resolveModelCode(pageKey);
@@ -733,7 +741,7 @@ public class DynamicController {
     public ApiResponse<Map<String, Object>> getStats(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> statsParams) {
-        log.info("获取统计信息: {}", pageKey);
+        log.info("获取统计信息: {}", logSafe(pageKey));
         
         // 转换为新的接口调用
         String modelCode = resolveModelCode(pageKey);
@@ -751,7 +759,7 @@ public class DynamicController {
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录ID") @PathVariable String recordId,
             @Parameter(description = "关联名称") @PathVariable String relationName) {
-        log.info("获取关联数据: {} - {} - {}", pageKey, recordId, relationName);
+        log.info("获取关联数据: {} - {} - {}", logSafe(pageKey), logSafe(recordId), logSafe(relationName));
         
         // 转换为新的接口调用
         String modelCode = resolveModelCode(pageKey);
@@ -774,7 +782,7 @@ public class DynamicController {
     public ApiResponse<PageMetaResponse> getMeta(
             @Parameter(description = "页面Key") @PathVariable String pageKey) {
 
-        log.info("Get rich meta: pageKey={}", pageKey);
+        log.info("Get rich meta: pageKey={}", logSafe(pageKey));
         String modelCode = resolveModelCode(pageKey);
 
         // 1. Resolve model definition
@@ -801,7 +809,7 @@ public class DynamicController {
                 availableViews = deriveAvailableViews(pageSchema);
             }
         } catch (Exception e) {
-            log.debug("No page schema found for pageKey={}: {}", pageKey, e.getMessage());
+            log.debug("No page schema found for pageKey={}: {}", logSafe(pageKey), logSafe(e.getMessage()));
         }
 
         // 4. Permissions — check programmatically using resolved codes
@@ -842,7 +850,8 @@ public class DynamicController {
                                 .toList();
                     }
                 } catch (Exception e) {
-                    log.debug("Could not resolve options for field={}.{}: {}", modelCode, field.getCode(), e.getMessage());
+                    log.debug("Could not resolve options for field={}.{}: {}",
+                            logSafe(modelCode), logSafe(field.getCode()), logSafe(e.getMessage()));
                 }
             }
 
@@ -888,7 +897,7 @@ public class DynamicController {
                 }
             }
         } catch (Exception e) {
-            log.debug("Could not derive view types from schema: {}", e.getMessage());
+            log.debug("Could not derive view types from schema: {}", logSafe(e.getMessage()));
         }
 
         return new ArrayList<>(views);
@@ -922,7 +931,7 @@ public class DynamicController {
     @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> getPageMetadata(
             @Parameter(description = "页面Key") @PathVariable String pageKey) {
-        log.info("获取页面元数据: {}", pageKey);
+        log.info("获取页面元数据: {}", logSafe(pageKey));
 
         String modelCode = resolveModelCode(pageKey);
         Optional<ModelDefinition> modelOpt = metaModelService.getModelDefinition(modelCode);
@@ -1008,8 +1017,8 @@ public class DynamicController {
     public ApiResponse<JointSubTableSaveResponse> saveWithRelations(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody JointSubTableSaveRequest request) {
-        log.info("联合保存数据: pageKey={}, tables={}", pageKey,
-                request.getTables() != null ? request.getTables().keySet() : "null");
+        log.info("联合保存数据: pageKey={}, tables={}", logSafe(pageKey),
+                logSafe(request.getTables() != null ? request.getTables().keySet() : "null"));
 
         String modelCode = resolveModelCode(pageKey);
         JointSubTableSaveResponse result = dynamicDataService.saveWithRelations(modelCode, request);

@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.CommandAuditLogDTO;
 import com.auraboot.framework.meta.entity.CommandAuditLog;
@@ -46,8 +47,9 @@ public class CommandAuditLogService {
             int pageNum, int pageSize) {
 
         Long tenantId = MetaContext.getCurrentTenantId();
-        int clampedPageSize = Math.min(pageSize, 200);
-        int offset = (pageNum - 1) * clampedPageSize;
+        int safePageNum = PaginationSafetyUtils.pageNumber(pageNum);
+        int clampedPageSize = PaginationSafetyUtils.pageSize(pageSize, 200);
+        int offset = PaginationSafetyUtils.offset(safePageNum, clampedPageSize, 200);
 
         List<CommandAuditLog> rows = commandAuditLogMapper.queryLogs(
                 tenantId, commandCode, success, startDate, endDate,
@@ -59,7 +61,7 @@ public class CommandAuditLogService {
                 .map(CommandAuditLogDTO::from)
                 .toList();
 
-        return PaginationResult.of(dtos, total, pageNum, clampedPageSize);
+        return PaginationResult.of(dtos, total, safePageNum, clampedPageSize);
     }
 
     /**

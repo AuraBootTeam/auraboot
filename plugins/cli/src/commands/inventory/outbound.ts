@@ -38,10 +38,10 @@ export async function inventoryOutboundCommand(options: OutboundOptions): Promis
 
   const filters: FilterItem[] = [];
   if (options.status) {
-    filters.push({ fieldName: 'inv_out_status', operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: 'inv_out_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
   if (options.type) {
-    filters.push({ fieldName: 'inv_out_type', operator: 'EQ', value: options.type.toUpperCase() });
+    filters.push({ fieldName: 'inv_out_type', operator: 'EQ', value: options.type.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, 'inv_outbound', {

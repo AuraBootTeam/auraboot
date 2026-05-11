@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.Dict;
 import com.auraboot.framework.meta.entity.DictItem;
@@ -37,13 +38,17 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     private final DictItemMapper dictItemMapper;
     private static final int BATCH_PAGE_SIZE = 100;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     // ==================== 级联字典查询 ====================
 
     @Override
     @Cacheable(value = "cascadeDict", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #request.dictCode + ':' + #request.parentValue")
     public CascadeDictResult queryCascadeDict(CascadeDictRequest request) {
         ensureMetaContext("cascade dictionary query");
-        log.info("查询级联字典数据: dictCode={}, parentValue={}", request.getDictCode(), request.getParentValue());
+        log.info("查询级联字典数据: dictCode={}, parentValue={}", logSafe(request.getDictCode()), logSafe(request.getParentValue()));
         
         CascadeDictResult result = new CascadeDictResult(request.getDictCode(), request.getParentValue());
         
@@ -80,11 +85,11 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             result.setSuccess();
             result.updateStatistics();
             
-            log.info("级联字典数据查询成功: dictCode={}, itemCount={}", request.getDictCode(), items.size());
+            log.info("级联字典数据查询成功: dictCode={}, itemCount={}", logSafe(request.getDictCode()), items.size());
             return result;
             
         } catch (Exception e) {
-            log.error("查询级联字典数据失败: dictCode={}", request.getDictCode(), e);
+            log.error("查询级联字典数据失败: dictCode={}", logSafe(request.getDictCode()), e);
             result.setFailure("查询失败: " + e.getMessage());
             return result;
         }
@@ -94,7 +99,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     public List<DictItemData> getCascadeChildren(    
                                                String dictCode, String parentValue) {
         ensureMetaContext("cascade dictionary children query");
-        log.info("获取级联字典子项: dictCode={}, parentValue={}", dictCode, parentValue);
+        log.info("获取级联字典子项: dictCode={}, parentValue={}", logSafe(dictCode), logSafe(parentValue));
         
         CascadeDictRequest request = new CascadeDictRequest(   dictCode, parentValue);
         CascadeDictResult result = queryCascadeDict(request);
@@ -105,7 +110,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public List<DictItemData> getCascadeRoots(    String dictCode) {
         ensureMetaContext("cascade dictionary root query");
-        log.info("获取级联字典根项: dictCode={}", dictCode);
+        log.info("获取级联字典根项: dictCode={}", logSafe(dictCode));
         
         return getCascadeChildren(   dictCode, null);
     }
@@ -114,7 +119,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Cacheable(value = "cascadeTree", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #dictCode")
     public DictTreeNode buildCascadeTree(String dictCode) {
         ensureMetaContext("cascade dictionary tree build");
-        log.info("构建级联字典树: dictCode={}", dictCode);
+        log.info("构建级联字典树: dictCode={}", logSafe(dictCode));
         
         return buildCascadeTree(   dictCode, null);
     }
@@ -123,7 +128,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Cacheable(value = "cascadeTree", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #dictCode + ':' + #rootValue")
     public DictTreeNode buildCascadeTree(String dictCode, String rootValue) {
         ensureMetaContext("cascade dictionary tree build");
-        log.info("构建级联字典树: dictCode={}, rootValue={}", dictCode, rootValue);
+        log.info("构建级联字典树: dictCode={}, rootValue={}", logSafe(dictCode), logSafe(rootValue));
         
         try {
             // 获取所有字典项
@@ -132,7 +137,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             CascadeDictResult result = queryCascadeDict(request);
             
             if (!result.getSuccess()) {
-                log.warn("获取字典项失败: {}", result.getErrorMessage());
+                log.warn("获取字典项失败: {}", logSafe(result.getErrorMessage()));
                 return new DictTreeNode();
             }
             
@@ -170,7 +175,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             if (StringUtils.hasText(rootValue)) {
                 root = nodeMap.get(rootValue);
                 if (root == null) {
-                    log.warn("指定的根节点不存在: {}", rootValue);
+                    log.warn("指定的根节点不存在: {}", logSafe(rootValue));
                     return new DictTreeNode();
                 }
             } else {
@@ -195,11 +200,11 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             // 排序所有节点的子节点
             root.sortChildren();
             
-            log.info("级联字典树构建成功: dictCode={}, nodeCount={}", dictCode, nodeMap.size());
+            log.info("级联字典树构建成功: dictCode={}, nodeCount={}", logSafe(dictCode), nodeMap.size());
             return root;
             
         } catch (Exception e) {
-            log.error("构建级联字典树失败: dictCode={}", dictCode, e);
+            log.error("构建级联字典树失败: dictCode={}", logSafe(dictCode), e);
             return new DictTreeNode();
         }
     }
@@ -210,7 +215,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     public List<DictItemData> queryByParams(    
                                            String dictCode, Map<String, String> cascadeParams) {
         ensureMetaContext("cascade dictionary parameter query");
-        log.info("根据参数映射查询级联字典: dictCode={}, params={}", dictCode, cascadeParams);
+        log.info("根据参数映射查询级联字典: dictCode={}, params={}", logSafe(dictCode), logSafe(cascadeParams));
         
         CascadeDictRequest request = new CascadeDictRequest(   dictCode);
         request.setCascadeParams(cascadeParams);
@@ -222,7 +227,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     public List<DictItemData> queryByFilters(    
                                             String dictCode, Map<String, Object> filters) {
         ensureMetaContext("cascade dictionary filter query");
-        log.info("动态查询级联字典: dictCode={}, filters={}", dictCode, filters);
+        log.info("动态查询级联字典: dictCode={}, filters={}", logSafe(dictCode), logSafe(filters));
         
         CascadeDictRequest request = new CascadeDictRequest(   dictCode);
         request.setFilters(filters);
@@ -233,7 +238,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public List<DictItemData> queryByComposite(CascadeDictRequest request) {
         ensureMetaContext("cascade dictionary composite query");
-        log.info("复合查询级联字典: dictCode={}", request.getDictCode());
+        log.info("复合查询级联字典: dictCode={}", logSafe(request.getDictCode()));
         
         CascadeDictResult result = queryCascadeDict(request);
         return result.getSuccess() ? result.getItems() : new ArrayList<>();
@@ -244,7 +249,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public Map<String, Object> getCascadeStructure(    String dictCode) {
         ensureMetaContext("cascade dictionary structure query");
-        log.info("获取字典层级结构信息: dictCode={}", dictCode);
+        log.info("获取字典层级结构信息: dictCode={}", logSafe(dictCode));
         
         Map<String, Object> structure = new HashMap<>();
         
@@ -272,7 +277,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             structure.put("levelCounts", levelCounts);
             
         } catch (Exception e) {
-            log.error("获取字典层级结构信息失败: dictCode={}", dictCode, e);
+            log.error("获取字典层级结构信息失败: dictCode={}", logSafe(dictCode), e);
             structure.put("error", "获取失败: " + e.getMessage());
         }
         
@@ -283,7 +288,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     public List<DictItemData> getItemsByLevel(    
                                              String dictCode, Integer level) {
         ensureMetaContext("cascade dictionary level query");
-        log.info("获取指定层级的字典项: dictCode={}, level={}", dictCode, level);
+        log.info("获取指定层级的字典项: dictCode={}, level={}", logSafe(dictCode), level);
         
         CascadeDictRequest request = new CascadeDictRequest(   dictCode);
         CascadeDictResult result = queryCascadeDict(request);
@@ -298,7 +303,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public Integer getMaxLevel(    String dictCode) {
         ensureMetaContext("cascade dictionary max level query");
-        log.info("获取字典最大层级: dictCode={}", dictCode);
+        log.info("获取字典最大层级: dictCode={}", logSafe(dictCode));
         
         Map<String, Object> structure = getCascadeStructure(   dictCode);
         return (Integer) structure.getOrDefault("maxLevel", 0);
@@ -308,7 +313,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     public List<DictItemData> getNodePath(    
                                          String dictCode, String nodeValue) {
         ensureMetaContext("cascade dictionary node path query");
-        log.info("获取节点完整路径: dictCode={}, nodeValue={}", dictCode, nodeValue);
+        log.info("获取节点完整路径: dictCode={}, nodeValue={}", logSafe(dictCode), logSafe(nodeValue));
         
         List<DictItemData> path = new ArrayList<>();
         
@@ -338,7 +343,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             }
             
         } catch (Exception e) {
-            log.error("获取节点完整路径失败: dictCode={}, nodeValue={}", dictCode, nodeValue, e);
+            log.error("获取节点完整路径失败: dictCode={}, nodeValue={}", logSafe(dictCode), logSafe(nodeValue), e);
         }
         
         return path;
@@ -349,7 +354,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public void warmupCascadeCache(    String dictCode) {
         ensureMetaContext("cascade dictionary cache warmup");
-        log.info("预热级联字典缓存: dictCode={}", dictCode);
+        log.info("预热级联字典缓存: dictCode={}", logSafe(dictCode));
         
         try {
             // 预热基础查询缓存
@@ -359,9 +364,9 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             // 预热树结构缓存
             buildCascadeTree(   dictCode);
             
-            log.info("级联字典缓存预热完成: dictCode={}", dictCode);
+            log.info("级联字典缓存预热完成: dictCode={}", logSafe(dictCode));
         } catch (Exception e) {
-            log.warn("预热级联字典缓存失败: dictCode={}", dictCode, e);
+            log.warn("预热级联字典缓存失败: dictCode={}", logSafe(dictCode), e);
         }
     }
 
@@ -369,13 +374,13 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @CacheEvict(value = {"cascadeDict", "cascadeTree"}, allEntries = true)
     public void clearCascadeCache(String dictCode) {
         ensureMetaContext("cascade dictionary cache clear");
-        log.info("清除级联字典缓存: dictCode={}", dictCode);
+        log.info("清除级联字典缓存: dictCode={}", logSafe(dictCode));
     }
 
     @Override
     public void refreshCascadeCache(    String dictCode) {
         ensureMetaContext("cascade dictionary cache refresh");
-        log.info("刷新级联字典缓存: dictCode={}", dictCode);
+        log.info("刷新级联字典缓存: dictCode={}", logSafe(dictCode));
         
         // 先清除缓存
         clearCascadeCache(   dictCode);
@@ -389,7 +394,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public DictValidationResult validateCascadeConfig(    String dictCode) {
         ensureMetaContext("cascade dictionary config validation");
-        log.info("验证级联字典配置: dictCode={}", dictCode);
+        log.info("验证级联字典配置: dictCode={}", logSafe(dictCode));
         
         DictValidationResult result = new DictValidationResult();
         
@@ -418,7 +423,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             }
             
         } catch (Exception e) {
-            log.error("验证级联字典配置失败: dictCode={}", dictCode, e);
+            log.error("验证级联字典配置失败: dictCode={}", logSafe(dictCode), e);
             result.addError("验证失败: " + e.getMessage());
         }
         
@@ -428,7 +433,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public Map<String, Object> checkCascadeIntegrity(    String dictCode) {
         ensureMetaContext("cascade dictionary integrity check");
-        log.info("检查级联关系完整性: dictCode={}", dictCode);
+        log.info("检查级联关系完整性: dictCode={}", logSafe(dictCode));
         
         Map<String, Object> result = new HashMap<>();
         result.put("valid", true);
@@ -464,7 +469,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             result.put("orphanCount", orphanItems.size());
             
         } catch (Exception e) {
-            log.error("检查级联关系完整性失败: dictCode={}", dictCode, e);
+            log.error("检查级联关系完整性失败: dictCode={}", logSafe(dictCode), e);
             result.put("valid", false);
             result.put("message", "检查失败: " + e.getMessage());
         }
@@ -475,7 +480,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public boolean hasCircularReference(    String dictCode) {
         ensureMetaContext("cascade dictionary circular reference check");
-        log.info("检查循环引用: dictCode={}", dictCode);
+        log.info("检查循环引用: dictCode={}", logSafe(dictCode));
         
         try {
             CascadeDictRequest request = new CascadeDictRequest(   dictCode);
@@ -503,7 +508,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             return false;
             
         } catch (Exception e) {
-            log.error("检查循环引用失败: dictCode={}", dictCode, e);
+            log.error("检查循环引用失败: dictCode={}", logSafe(dictCode), e);
             return false;
         }
     }
@@ -564,7 +569,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public Map<String, Object> getCascadeStatistics(    String dictCode) {
         ensureMetaContext("cascade dictionary statistics");
-        log.info("获取级联字典统计信息: dictCode={}", dictCode);
+        log.info("获取级联字典统计信息: dictCode={}", logSafe(dictCode));
         
         Map<String, Object> statistics = new HashMap<>();
         
@@ -576,7 +581,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             statistics.put("timestamp", System.currentTimeMillis());
             
         } catch (Exception e) {
-            log.error("获取级联字典统计信息失败: dictCode={}", dictCode, e);
+            log.error("获取级联字典统计信息失败: dictCode={}", logSafe(dictCode), e);
             statistics.put("error", "获取失败: " + e.getMessage());
         }
         
@@ -586,7 +591,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
     @Override
     public Map<String, Object> getCascadePerformanceMetrics(    String dictCode) {
         ensureMetaContext("cascade dictionary performance metrics");
-        log.info("获取级联字典性能指标: dictCode={}", dictCode);
+        log.info("获取级联字典性能指标: dictCode={}", logSafe(dictCode));
         
         Map<String, Object> metrics = new HashMap<>();
         
@@ -614,7 +619,7 @@ public class DictCascadeServiceImpl implements DictCascadeService {
             }
             
         } catch (Exception e) {
-            log.error("获取级联字典性能指标失败: dictCode={}", dictCode, e);
+            log.error("获取级联字典性能指标失败: dictCode={}", logSafe(dictCode), e);
             metrics.put("error", "获取失败: " + e.getMessage());
         }
         

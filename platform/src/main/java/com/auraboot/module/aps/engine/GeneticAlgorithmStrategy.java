@@ -257,9 +257,9 @@ public class GeneticAlgorithmStrategy implements SchedulingStrategy {
 
         Chromosome mutated = c.copy();
         int i = random.nextInt(n);
-        int j = random.nextInt(n);
-        while (j == i && n > 1) {
-            j = random.nextInt(n);
+        int j = random.nextInt(n - 1);
+        if (j >= i) {
+            j++;
         }
         int temp = mutated.genes[i];
         mutated.genes[i] = mutated.genes[j];

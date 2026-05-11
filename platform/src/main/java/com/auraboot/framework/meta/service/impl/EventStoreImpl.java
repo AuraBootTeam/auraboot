@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.entity.EventSnapshot;
@@ -183,8 +184,9 @@ public class EventStoreImpl implements EventStore {
     public List<EventStoreEntry> getEventStream(Long tenantId, String aggregateType,
                                                  String aggregateId, int page, int size) {
         // page is 0-based index, so offset = page * size
-        int offset = Math.max(0, page) * size;
-        return eventStoreMapper.findEventsPaginated(tenantId, aggregateType, aggregateId, size, offset);
+        int safeSize = PaginationSafetyUtils.pageSize(size, 500);
+        int offset = PaginationSafetyUtils.zeroBasedOffset(page, safeSize, 500);
+        return eventStoreMapper.findEventsPaginated(tenantId, aggregateType, aggregateId, safeSize, offset);
     }
 
     // ==================== Private Helpers ====================

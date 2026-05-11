@@ -38,7 +38,7 @@ export async function financeGlEntriesCommand(options: GlEntryOptions): Promise<
 
   const filters: FilterItem[] = [];
   if (options.status) {
-    filters.push({ fieldName: 'fin_je_status', operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: 'fin_je_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, 'fin_journal_entry', {

@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.connector.service.ApiConnectorService;
 import com.auraboot.framework.meta.dto.*;
@@ -665,9 +666,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         // 10. Pagination — enforce policy maxRows and sandbox limit
         int effectiveMaxRows = policy.getEffectiveMaxRows(query.getStatusEnum());
-        int pageNum = request.getPage() != null ? request.getPage() : 1;
-        int pageSize = Math.min(request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
-        int offset = (pageNum - 1) * pageSize;
+        int pageNum = PaginationSafetyUtils.pageNumber(request.getPage() != null ? request.getPage() : 1);
+        int pageSize = PaginationSafetyUtils.pageSize(
+                request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
+        int offset = PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows);
 
         // Count total
         // Use WithoutTenant variant: NQ fromSql already contains #{params.tenantId} for tenant isolation.
@@ -1024,13 +1026,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 : new HashMap<>();
 
         // Add pagination hints for connectors that support them
-        int pageNum = request.getPage() != null ? request.getPage() : 1;
-        int pageSize = request.getSize() != null
-                ? Math.min(request.getSize(), policy.getEffectiveMaxRows(query.getStatusEnum()))
-                : 20;
+        int effectiveMaxRows = policy.getEffectiveMaxRows(query.getStatusEnum());
+        int pageNum = PaginationSafetyUtils.pageNumber(request.getPage() != null ? request.getPage() : 1);
+        int pageSize = PaginationSafetyUtils.pageSize(request.getSize() != null ? request.getSize() : 20, effectiveMaxRows);
         params.put("page", pageNum);
         params.put("pageSize", pageSize);
-        params.put("offset", (pageNum - 1) * pageSize);
+        params.put("offset", PaginationSafetyUtils.offset(pageNum, pageSize, effectiveMaxRows));
 
         try {
             Map<String, Object> response = apiConnectorService.invoke(

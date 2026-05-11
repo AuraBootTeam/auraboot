@@ -2,6 +2,7 @@ package com.auraboot.framework.email.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.email.mapper.EmailAccountMapper;
 import com.auraboot.framework.email.mapper.EmailMessageMapper;
 import com.auraboot.framework.email.mapper.EmailRecordLinkMapper;
@@ -259,11 +260,10 @@ public class EmailMessageController {
             @RequestParam(defaultValue = "10") int pageSize) {
 
         Long tenantId = MetaContext.getCurrentTenantId();
-        if (pageSize > 100) {
-            pageSize = 100;
-        }
+        pageNum = PaginationSafetyUtils.pageNumber(pageNum);
+        pageSize = PaginationSafetyUtils.pageSize(pageSize, 100);
 
-        int offset = (pageNum - 1) * pageSize;
+        int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 100);
         List<EmailMessage> messages = emailRecordLinkMapper.findMessagesByRecord(
                 tenantId, modelCode, recordId, pageSize, offset);
 
