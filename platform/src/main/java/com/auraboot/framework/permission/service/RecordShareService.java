@@ -27,6 +27,30 @@ public interface RecordShareService {
                      String permissionMask, Instant expiresAt);
 
     /**
+     * Share a record identified by stable public PID with a subject identified by PID.
+     *
+     * @param tenantId       tenant ID
+     * @param resourceCode   model/resource code
+     * @param recordPid      stable public record PID
+     * @param subjectType    subject type ("member", "role", "dept")
+     * @param subjectPid     stable public subject PID
+     * @param permissionMask optional permission mask (e.g. "read", "read,update")
+     * @param expiresAt      optional expiration time
+     */
+    default void shareRecordByPid(Long tenantId, String resourceCode, String recordPid,
+                                  String subjectType, String subjectPid,
+                                  String permissionMask, Instant expiresAt) {
+        shareRecordByPid(tenantId, resourceCode, recordPid, subjectType, null, subjectPid, permissionMask, expiresAt);
+    }
+
+    /**
+     * Share a record identified by stable public PID while optionally retaining a legacy subject ID.
+     */
+    void shareRecordByPid(Long tenantId, String resourceCode, String recordPid,
+                          String subjectType, Long subjectId, String subjectPid,
+                          String permissionMask, Instant expiresAt);
+
+    /**
      * Remove sharing of a record with a subject.
      *
      * @param tenantId     tenant ID
@@ -50,6 +74,11 @@ public interface RecordShareService {
     boolean isShared(Long tenantId, String resourceCode, Long recordId, Long memberId);
 
     /**
+     * Check if a PID-addressed record is shared with a member by subject PID or legacy IDs.
+     */
+    boolean isSharedByPid(Long tenantId, String resourceCode, String recordPid, Long memberId, String memberPid);
+
+    /**
      * Get all record IDs shared with a member (directly or via their roles).
      *
      * @param tenantId     tenant ID
@@ -70,6 +99,12 @@ public interface RecordShareService {
      */
     java.util.List<com.auraboot.framework.permission.entity.RecordShare> listByRecord(
             Long tenantId, String resourceCode, Long recordId);
+
+    /**
+     * List all shares for a specific record PID.
+     */
+    java.util.List<com.auraboot.framework.permission.entity.RecordShare> listByRecordPid(
+            Long tenantId, String resourceCode, String recordPid);
 
     /**
      * Remove a share by its ID.
