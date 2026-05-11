@@ -191,11 +191,12 @@ resolve_enterprise_plugins_dir() {
         exit 2
     fi
 
+    local enterprise_repo_name="auraboot-${AURABOOT_ENTERPRISE_REPO_SUFFIX:-enterprise}"
     local candidate
     for candidate in \
         "$PARENT_DIR/agent-runtime-unification-enterprise/plugins" \
-        "$PARENT_DIR/auraboot-enterprise/plugins" \
-        "$GRANDPARENT_DIR/auraboot-enterprise/plugins"; do
+        "$PARENT_DIR/$enterprise_repo_name/plugins" \
+        "$GRANDPARENT_DIR/$enterprise_repo_name/plugins"; do
         if [ -d "$candidate" ]; then
             (cd "$candidate" && pwd)
             return
@@ -218,11 +219,12 @@ resolve_enterprise_plugin_jars_dir() {
         exit 2
     fi
 
+    local enterprise_repo_name="auraboot-${AURABOOT_ENTERPRISE_REPO_SUFFIX:-enterprise}"
     local candidate
     for candidate in \
         "$PARENT_DIR/agent-runtime-unification-enterprise/build/plugin-jars" \
-        "$PARENT_DIR/auraboot-enterprise/build/plugin-jars" \
-        "$GRANDPARENT_DIR/auraboot-enterprise/build/plugin-jars"; do
+        "$PARENT_DIR/$enterprise_repo_name/build/plugin-jars" \
+        "$GRANDPARENT_DIR/$enterprise_repo_name/build/plugin-jars"; do
         if [ -d "$candidate" ]; then
             (cd "$candidate" && pwd)
             return
