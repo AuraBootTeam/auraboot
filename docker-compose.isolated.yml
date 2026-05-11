@@ -74,9 +74,8 @@ services:
       # Mount this worktree's plugins read-only so import-directory-sync
       # can resolve absolute paths like /app/plugins/<name>.
       - ./plugins:/app/plugins:ro
-      # Optional enterprise plugins. start-isolated.sh resolves this to either
-      # the sibling enterprise worktree, canonical enterprise repo, or an empty
-      # directory for OSS-only stacks.
+      # Optional enterprise plugins. Pass ENTERPRISE_PLUGINS_DIR explicitly;
+      # otherwise start-isolated.sh mounts an empty directory for OSS-only stacks.
       - ${ENTERPRISE_PLUGINS_DIR:-./.aura-stack/empty-enterprise-plugins}:/app/plugins-enterprise:ro
       # Optional enterprise PF4J backend handler jars. Config imports validate
       # command handlers before resource import, so handler jars must be loaded

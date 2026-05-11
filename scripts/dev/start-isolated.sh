@@ -37,8 +37,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 STACK_DIR="$PROJECT_ROOT/.aura-stack"
-PARENT_DIR="$(dirname "$PROJECT_ROOT")"
-GRANDPARENT_DIR="$(dirname "$PARENT_DIR")"
 
 # ---------- argument parsing ----------
 
@@ -61,6 +59,12 @@ Options:
   --no-build       (deprecated; kept for back-compat — same as default)
   --dry-run        Print resolved plan and exit without starting docker
   --help           Show this message
+
+Environment:
+  ENTERPRISE_PLUGINS_DIR      Optional absolute/relative plugin root to mount at
+                              /app/plugins-enterprise. Defaults to an empty dir.
+  ENTERPRISE_PLUGIN_JARS_DIR  Optional absolute/relative PF4J jar root to mount at
+                              /app/plugin-jars. Defaults to an empty dir.
 
 Default behaviour (since 2026-05-08): --no-build. The first stack of a worktree
 populates the shared aura_gradle_cache + aura_m2_cache named volumes; later
@@ -191,17 +195,6 @@ resolve_enterprise_plugins_dir() {
         exit 2
     fi
 
-    local candidate
-    for candidate in \
-        "$PARENT_DIR/agent-runtime-unification-enterprise/plugins" \
-        "$PARENT_DIR/auraboot-enterprise/plugins" \
-        "$GRANDPARENT_DIR/auraboot-enterprise/plugins"; do
-        if [ -d "$candidate" ]; then
-            (cd "$candidate" && pwd)
-            return
-        fi
-    done
-
     mkdir -p "$STACK_DIR/empty-enterprise-plugins"
     (cd "$STACK_DIR/empty-enterprise-plugins" && pwd)
 }
@@ -217,17 +210,6 @@ resolve_enterprise_plugin_jars_dir() {
         echo "ERROR: ENTERPRISE_PLUGIN_JARS_DIR is set but not a directory: $ENTERPRISE_PLUGIN_JARS_DIR" >&2
         exit 2
     fi
-
-    local candidate
-    for candidate in \
-        "$PARENT_DIR/agent-runtime-unification-enterprise/build/plugin-jars" \
-        "$PARENT_DIR/auraboot-enterprise/build/plugin-jars" \
-        "$GRANDPARENT_DIR/auraboot-enterprise/build/plugin-jars"; do
-        if [ -d "$candidate" ]; then
-            (cd "$candidate" && pwd)
-            return
-        fi
-    done
 
     mkdir -p "$STACK_DIR/empty-enterprise-plugin-jars"
     (cd "$STACK_DIR/empty-enterprise-plugin-jars" && pwd)

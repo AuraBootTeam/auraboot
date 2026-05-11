@@ -12,7 +12,7 @@
  */
 
 import { execFileSync, execSync } from 'node:child_process';
-import { BACKEND_URL } from '../../helpers/playwright-env';
+import { BACKEND_URL, PG_ENV } from '../../helpers/environments';
 
 // Admin primary tenant — matches the JWT issued by
 // `admin@auraboot.com / Test2026x`. Keep in sync with
@@ -83,22 +83,6 @@ function resolveAiCenterMenuId(): string {
 // `auraboot-enterprise/.../feedback_psql_helpers_must_be_env_aware.md`.
 // ---------------------------------------------------------------------------
 
-const PG_HOST = process.env.PGHOST || process.env.PG_HOST || 'localhost';
-const PG_PORT = process.env.PGPORT || process.env.PG_PORT || '5432';
-const PG_USER = process.env.PGUSER || process.env.PG_USER || 'ghj';
-const PG_DB = process.env.PGDATABASE || process.env.PG_DB || 'aura_boot';
-// PGPASSWORD is the standard libpq env — pass it through if set so docker
-// stacks with non-trust auth can connect. Don't override if the operator
-// has already set it.
-const PG_ENV = {
-  ...process.env,
-  PGHOST: PG_HOST,
-  PGPORT: PG_PORT,
-  PGUSER: PG_USER,
-  PGDATABASE: PG_DB,
-  PGPASSWORD: process.env.PGPASSWORD || process.env.PG_PASSWORD || '',
-};
-
 export const AI_CENTER_MENU_ID = resolveAiCenterMenuId();
 
 function psql(sql: string): string {
@@ -126,7 +110,7 @@ process.stdin.on('end', async () => {
     port: Number(process.env.PGPORT || '5432'),
     user: process.env.PGUSER || 'ghj',
     database: process.env.PGDATABASE || 'aura_boot',
-    password: process.env.PGPASSWORD || undefined,
+    password: process.env['PGPASSWORD'] || undefined,
   });
   try {
     await client.connect();

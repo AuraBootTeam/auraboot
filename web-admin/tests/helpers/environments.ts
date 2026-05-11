@@ -50,12 +50,32 @@ const PG_HOST = envValue('PG_HOST', 'PGHOST', 'localhost');
 const PG_PORT = envValue('PG_PORT', 'PGPORT', '5432');
 const PG_USER = process.env.PG_USER ?? process.env.PGUSER ?? process.env.USER ?? 'ghj';
 const PG_DB = envValue('PG_DB', 'PGDATABASE', 'aura_boot');
+const PG_PASSWORD = process.env['PGPASSWORD'] ?? process.env['PG_PASSWORD'];
 
 /**
  * `psql -h <host> -p <port> -U <user> -d <db>` prefix. Append your own
  * flags (-tA, -P pager=off, -c, -f, etc.) at the call site.
  */
 export const PSQL_BASE = `psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}`;
+
+/** node-postgres connection contract for E2E DB seed/cleanup helpers. */
+export const PG_CONN = Object.freeze({
+  host: PG_HOST,
+  port: Number(PG_PORT),
+  user: PG_USER,
+  database: PG_DB,
+  password: PG_PASSWORD,
+});
+
+/** Process env overlay for subprocesses that use libpq-style PG* variables. */
+export const PG_ENV = Object.freeze({
+  ...process.env,
+  PGHOST: PG_HOST,
+  PGPORT: PG_PORT,
+  PGUSER: PG_USER,
+  PGDATABASE: PG_DB,
+  ...(PG_PASSWORD ? { PGPASSWORD: PG_PASSWORD } : {}),
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // First-class Environment profiles (Phase 3 — env-scripts-testing v3)

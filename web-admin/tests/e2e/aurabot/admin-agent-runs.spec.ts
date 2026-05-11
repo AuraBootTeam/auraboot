@@ -46,6 +46,7 @@
 import { test, expect, type Page } from '../../fixtures';
 import { Client } from 'pg';
 import { randomUUID } from 'crypto';
+import { PG_CONN } from '../../helpers/environments';
 import { ADMIN_TENANT_ID } from './_real-backend-helpers';
 
 // ---------------------------------------------------------------------------
@@ -102,14 +103,6 @@ const RUN_FAILED_COMPLETED_OFFSET_SEC = 1; // → 1000ms → "1.00s"
 // isolated frontend E2E image intentionally ships Node dependencies, not CLI
 // database clients.
 // ---------------------------------------------------------------------------
-
-const PG_CONN = {
-  host: process.env.PGHOST ?? process.env.PG_HOST ?? 'localhost',
-  port: Number(process.env.PGPORT ?? process.env.PG_PORT ?? '5432'),
-  user: process.env.PGUSER ?? process.env.PG_USER ?? process.env.USER ?? 'ghj',
-  database: process.env.PGDATABASE ?? process.env.PG_DB ?? 'aura_boot',
-  password: process.env.PGPASSWORD ?? process.env.PG_PASSWORD,
-};
 
 async function psql(sql: string): Promise<string> {
   return withPg(async (client) => {
