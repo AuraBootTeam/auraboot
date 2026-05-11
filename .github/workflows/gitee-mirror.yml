@@ -45,7 +45,7 @@ jobs:
           # don't have on GitHub. --force-with-lease requires a known remote
           # ref to compare against, which fails on a fresh empty Gitee repo.
           # For a unidirectional mirror, --force is the correct semantic.
-          git push --force gitee main
+          git push --force gitee refs/remotes/origin/main:refs/heads/main
           git push --force gitee --tags
 
       - name: Status
