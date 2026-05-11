@@ -34,8 +34,8 @@ source scripts/dev/r2-env-export.sh <topic>
 # 4. Bootstrap + import plugins via Aura CLI.
 for p in core-meta core-bpm core-aurabot page-manager platform-admin \
          org-management crm-starter showcase agent-control-plane \
-         acp-showcase workflow-demo test-fixtures; do
-  [ -d "plugins/$p" ] && aura plugin publish "plugins/$p" \
+         workflow-demo test-fixtures; do
+  [ -f "plugins/$p/plugin.json" ] && aura plugin publish "plugins/$p" \
       --target "$BACKEND_URL" \
       --user admin@example.com --password Test2026x --yes
 done

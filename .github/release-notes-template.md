@@ -83,7 +83,7 @@ Returning contributors: `@u4`, `@u5`. Thanks!
 
 - Full changelog: [vA.B.C...vX.Y.Z](https://github.com/AuraBootTeam/auraboot/compare/vA.B.C...vX.Y.Z)
 - Discussions: [Release discussion thread](https://github.com/AuraBootTeam/auraboot/discussions)
-- Discord: [Discord](https://discord.gg/auraboot)
+- Discord: [Discord](https://discord.gg/p2fW5A2MW6)
 - Migration questions: license@auraboot.com or #help on Discord
 
 ---

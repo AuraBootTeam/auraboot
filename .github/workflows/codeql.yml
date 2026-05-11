@@ -52,10 +52,10 @@ jobs:
         working-directory: ./platform
         run: |
           chmod +x gradlew
-          # CodeQL needs compiled classes, not distributable jars. Keep the
-          # manual build on source compilation so provider packaging tasks do
-          # not trip Gradle implicit-dependency validation during analysis.
-          ./gradlew clean compileJava compileTestJava compileIntegrationTestJava -x test --no-daemon
+          # CodeQL only needs compiled classes. `assemble` also runs bootJar,
+          # which can race Gradle's implicit dependency validation for the
+          # provider modules that compileOnly-depend on the root project.
+          ./gradlew clean classes -x test --no-daemon
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
