@@ -23,6 +23,11 @@ public class CircularDependencyValidator implements PluginValidator {
     }
 
     @Override
+    public boolean requiresReferenceValidation() {
+        return true;
+    }
+
+    @Override
     public List<PluginValidationMessage> validate(PluginValidationContext ctx) {
         PluginManifestExtended manifest = ctx.getManifest();
 
