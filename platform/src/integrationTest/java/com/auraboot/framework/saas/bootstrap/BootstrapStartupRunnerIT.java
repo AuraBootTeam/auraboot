@@ -2,6 +2,7 @@ package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.integration.IntegrationTestBase;
 import com.auraboot.framework.saas.config.service.SystemConfigService;
+import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,10 +63,17 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
         // the merge from BootstrapStartupListener.
         runner.run(null);
 
+        assertThat(systemConfigService.isInitialized())
+                .as("startup bootstrap must publish the same status contract as the wizard")
+                .isTrue();
+        assertThat(systemConfigService.get(SystemConfigKeys.SYSTEM_SETUP_AT))
+                .as("startup bootstrap must record setup timestamp")
+                .isPresent();
+
         // Verify the 9 bootstrap invariants now hold by re-running repairAll() with
         // the seed-config defaults — every step must be PRESENT (no creates).
         var opts = BootstrapRepairService.RepairOptions.of(
-                "admin@example.com", "Test2026x", "Admin",
+                "admin@auraboot.com", "Test2026x", "Admin",
                 "AuraBoot Dev", "single", "http://localhost:6443");
         RepairReport second = repair.repairAll(opts);
 
@@ -79,7 +87,7 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
         // No duplicate admin / tenants.
         Integer adminUsers = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_user WHERE email = ?",
-                Integer.class, "admin@example.com");
+                Integer.class, "admin@auraboot.com");
         assertThat(adminUsers).isEqualTo(1);
 
         Integer systemTenants = jdbc.queryForObject(
@@ -97,15 +105,17 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
         runner.run(null);
         Integer adminCountAfterFirst = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_user WHERE email = ?",
-                Integer.class, "admin@example.com");
+                Integer.class, "admin@auraboot.com");
         assertThat(adminCountAfterFirst).isEqualTo(1);
+        String setupAtAfterFirst = systemConfigService.get(SystemConfigKeys.SYSTEM_SETUP_AT).orElseThrow();
 
         // Second invocation must not duplicate anything and must not throw.
+        Thread.sleep(5);
         runner.run(null);
 
         Integer adminCountAfterSecond = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_user WHERE email = ?",
-                Integer.class, "admin@example.com");
+                Integer.class, "admin@auraboot.com");
         assertThat(adminCountAfterSecond)
                 .as("admin user must not be duplicated across restarts")
                 .isEqualTo(1);
@@ -116,6 +126,9 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
         assertThat(platformAdminRoles)
                 .as("platform_admin role must not be duplicated")
                 .isEqualTo(1);
+        assertThat(systemConfigService.get(SystemConfigKeys.SYSTEM_SETUP_AT))
+                .as("startup bootstrap must preserve the original setup timestamp")
+                .contains(setupAtAfterFirst);
     }
 
     /**
@@ -157,7 +170,8 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
             }
         };
         BootstrapStartupRunner stubbedRunner = new BootstrapStartupRunner(
-                stub, new com.fasterxml.jackson.databind.ObjectMapper());
+                stub, new com.fasterxml.jackson.databind.ObjectMapper(),
+                org.mockito.Mockito.mock(SystemConfigService.class));
 
         assertThatThrownBy(() -> stubbedRunner.run(null))
                 .isInstanceOf(IllegalStateException.class)
@@ -177,7 +191,8 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
             }
         };
         BootstrapStartupRunner stubbedRunner = new BootstrapStartupRunner(
-                stub, new com.fasterxml.jackson.databind.ObjectMapper());
+                stub, new com.fasterxml.jackson.databind.ObjectMapper(),
+                org.mockito.Mockito.mock(SystemConfigService.class));
 
         // Should not throw — builtin_plugins is documented as non-fatal.
         stubbedRunner.run(null);

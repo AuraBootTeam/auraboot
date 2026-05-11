@@ -137,7 +137,7 @@ Navigate to [http://localhost:5173](http://localhost:5173) and log in with:
 
 | Field | Value |
 |---|---|
-| Email | `admin@example.com` |
+| Email | `admin@auraboot.com` |
 | Password | `ChangeMeOnFirstLogin!` |
 
 ---
@@ -252,7 +252,7 @@ After installation, verify each component:
 - [ ] PostgreSQL is running: `docker compose ps` shows `postgres` as `healthy`
 - [ ] Backend is running: `curl http://localhost:6443/actuator/health` returns `{"status":"UP"}`
 - [ ] Frontend is accessible: Browser opens [http://localhost:5173](http://localhost:5173) (source) or [http://localhost:3000](http://localhost:3000) (Docker)
-- [ ] Login works: `admin@example.com` / `ChangeMeOnFirstLogin!`
+- [ ] Login works: `admin@auraboot.com` / `ChangeMeOnFirstLogin!`
 - [ ] API docs load: [http://localhost:6443/swagger-ui.html](http://localhost:6443/swagger-ui.html)
 
 ## Running Tests

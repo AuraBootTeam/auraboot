@@ -1,6 +1,8 @@
 package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.saas.bootstrap.dto.BootstrapRequest;
+import com.auraboot.framework.saas.config.service.SystemConfigService;
+import com.auraboot.framework.saas.constant.SystemConfigKeys;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +15,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
+import java.time.Instant;
 
 /**
  * Unified startup-time bootstrap runner (Phase 2.3 of the bootstrap-unified plan,
@@ -70,6 +73,7 @@ public class BootstrapStartupRunner implements ApplicationRunner {
 
     private final BootstrapRepairService bootstrapRepairService;
     private final ObjectMapper objectMapper;
+    private final SystemConfigService systemConfigService;
 
     /**
      * Phase 3: when {@code true}, the demo profile of built-in plugins
@@ -126,6 +130,17 @@ public class BootstrapStartupRunner implements ApplicationRunner {
                     "BootstrapStartupRunner: one or more invariants failed to repair — "
                             + "see prior ERROR log lines. Refusing to continue startup.");
         }
+
+        finalizeStartupBootstrap();
+    }
+
+    private void finalizeStartupBootstrap() {
+        systemConfigService.initialize(SystemConfigKeys.SYSTEM_INITIALIZED, "true",
+                "system", "boolean", "Whether the system has been bootstrapped", true);
+        if (systemConfigService.get(SystemConfigKeys.SYSTEM_SETUP_AT).isEmpty()) {
+            systemConfigService.initialize(SystemConfigKeys.SYSTEM_SETUP_AT, Instant.now().toString(),
+                    "system", "string", "System setup timestamp", true);
+        }
     }
 
     /**
@@ -158,7 +173,7 @@ public class BootstrapStartupRunner implements ApplicationRunner {
                     SEED_CONFIG_RESOURCE, e.getMessage());
         }
         return BootstrapRepairService.RepairOptions.of(
-                "admin@example.com",
+                "admin@auraboot.com",
                 "Test2026x",
                 "Admin",
                 "AuraBoot Dev",
