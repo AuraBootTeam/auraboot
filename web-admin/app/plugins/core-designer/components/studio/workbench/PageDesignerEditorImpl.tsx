@@ -24,9 +24,13 @@ import { usePageSchemaHistory } from '~/plugins/core-designer/components/studio/
 import { useDesignerShortcuts } from '~/plugins/core-designer/components/studio/hooks/shortcuts/useDesignerShortcuts';
 import { pageManagerService } from '~/plugins/core-designer/components/studio/services/page-manager';
 import type { PageMeta } from '~/plugins/core-designer/components/studio/services/page-manager';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import {
+  resolveLocalizedText,
+  type PageSchema,
+} from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { DEVICE_PRESETS } from '~/plugins/core-designer/components/studio/workbench/canvas/devices/presets';
 import { initRegistry } from '~/plugins/core-designer/components/studio/registry';
+import { useI18n } from '~/contexts/I18nContext';
 
 // Populate WidgetRegistry + BlockRegistry on first import so the
 // schema-driven WidgetSpecificPanel (08c195f0) and block palette have
@@ -81,6 +85,7 @@ export default function PageDesignerEditorImpl() {
   const [error, setError] = useState<string | null>(null);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const { showSuccessToast } = useToastContext();
+  const { locale } = useI18n();
 
   // PageSchema V2 state
   const [schema, setSchema] = useState<PageSchema | null>(null);
@@ -347,12 +352,18 @@ export default function PageDesignerEditorImpl() {
         (p) => p.id === toolbarState.currentDevice || p.type === toolbarState.currentDevice,
       )?.width ?? null)
     : null;
+  const localizedMeta = meta
+    ? {
+        ...meta,
+        title: resolveLocalizedText(schema?.title, locale) || meta.title,
+      }
+    : undefined;
 
   return (
     <div className="flex h-screen flex-col bg-gray-50">
       {/* Toolbar */}
       <DesignerToolbar
-        pageMeta={meta || undefined}
+        pageMeta={localizedMeta}
         hasUnsavedChanges={toolbarState.hasUnsavedChanges}
         canUndo={dslHistory.canUndo}
         canRedo={dslHistory.canRedo}

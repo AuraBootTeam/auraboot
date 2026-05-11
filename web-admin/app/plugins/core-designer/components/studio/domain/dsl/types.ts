@@ -82,10 +82,12 @@ export interface PageSchema {
  */
 export function resolveLocalizedText(
   v: string | { [locale: string]: string } | undefined | null,
+  locale = 'zh-CN',
 ): string {
   if (v === null || v === undefined) return '';
   if (typeof v === 'string') return v;
   if (typeof v === 'object') {
+    if (typeof v[locale] === 'string') return v[locale];
     if (typeof v['zh-CN'] === 'string') return v['zh-CN'];
     if (typeof v['en-US'] === 'string') return v['en-US'];
     for (const k of Object.keys(v)) {
@@ -445,4 +447,3 @@ export interface DslStep {
   next?: string | Record<string, string>;
   terminal?: boolean;
 }
-

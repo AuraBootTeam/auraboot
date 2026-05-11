@@ -1,6 +1,6 @@
 # AuraBoot License FAQ
 
-> **Disclaimer:** This FAQ is an informal guide to help you understand [`LICENSE.txt`](./LICENSE.txt). It is **not a legal document** and has no legal effect. If anything in this FAQ conflicts with `LICENSE.txt`, **the English original of `LICENSE.txt` controls**. For binding interpretations or material business decisions, consult a lawyer or contact us at license@auraboot.com.
+> **Disclaimer:** This FAQ is an informal guide to help you understand [`LICENSE.txt`](./LICENSE.txt). It is **not a legal document** and has no legal effect. If anything in this FAQ conflicts with `LICENSE.txt`, **the English original of `LICENSE.txt` controls**. For binding interpretations or material business decisions, consult a lawyer or contact us through https://www.auraboot.com/contact.
 >
 > Last updated: 2026-05-10 (LICENSE v1.3)
 
@@ -79,10 +79,10 @@ If you only use AuraBoot to configure business applications (ERP / CRM / interna
 ### Q11. I'm building a vertical-industry SaaS (e.g., restaurant SaaS, education SaaS) on AuraBoot. Is this allowed, even multi-tenant?
 **Yes, even multi-tenant is allowed.** Because what you sell is "restaurant / education business applications," not a "general low-code platform." Tenants use your pre-configured business features, not low-code authoring.
 
-If your product also exposes "tenants can use low-code to modify their own business workflows," the boundary becomes ambiguous — please contact license@auraboot.com to confirm.
+If your product also exposes "tenants can use low-code to modify their own business workflows," the boundary becomes ambiguous — please contact us through https://www.auraboot.com/contact to confirm.
 
 ### Q12. Does a commercial license unlock multi-tenant low-code SaaS?
-**No, not by itself.** Per §5.4 (and reinforced by §7.3), platform-as-a-service distribution requires **both** a Commercial License AND an explicit written grant of SaaS / OEM distribution rights for the specific deployment. A standard Commercial License (e.g., for white-labeling or removing branding) does not by itself authorize you to host AuraBoot itself as a multi-tenant low-code platform service. If that's your business model, a separate SaaS / OEM rider or addendum to your Commercial License is required. Contact license@auraboot.com to negotiate the rider.
+**No, not by itself.** Per §5.4 (and reinforced by §7.3), platform-as-a-service distribution requires **both** a Commercial License AND an explicit written grant of SaaS / OEM distribution rights for the specific deployment. A standard Commercial License (e.g., for white-labeling or removing branding) does not by itself authorize you to host AuraBoot itself as a multi-tenant low-code platform service. If that's your business model, a separate SaaS / OEM rider or addendum to your Commercial License is required. Contact us through https://www.auraboot.com/contact to negotiate the rider.
 
 ---
 
@@ -115,7 +115,7 @@ If your plugin **directly copies AuraBoot core code**, that copied portion remai
 Self-hosting only, ISV project delivery only, vertical business SaaS only — **none of these require a commercial license.**
 
 ### Q17. How do I obtain a commercial license?
-Email license@auraboot.com or visit https://www.auraboot.com/.
+Use the website contact form at https://www.auraboot.com/contact.
 
 ### Q18. Is the commercial license perpetual or subscription-based?
 Specific terms are governed by the commercial agreement signed between parties. Generally we offer two options: perpetual buy-out and annual subscription (the latter includes upgrades and support).
@@ -152,9 +152,9 @@ Yes. For cross-border commercial customers, a commercial contract may specify th
 
 ## 9. Still Have Questions?
 
-- **Legal questions:** license@auraboot.com
+- **Legal questions:** https://www.auraboot.com/contact
 - **Contribution questions:** see CONTRIBUTING.md
 - **Security disclosure:** see SECURITY.md
-- **Commercial / OEM partnerships:** license@auraboot.com
+- **Commercial / OEM partnerships:** https://www.auraboot.com/contact
 
 This FAQ is updated based on community feedback. Open a GitHub Issue if you have a question — frequently asked ones get added here.

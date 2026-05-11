@@ -15,6 +15,7 @@ import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import com.auraboot.framework.plugin.pf4j.PluginExtensionRegistryBridge;
 import com.auraboot.framework.plugin.service.PluginImportService;
 import com.auraboot.framework.plugin.service.PluginPackageService;
 import com.auraboot.framework.plugin.service.PluginResourceService;
@@ -68,6 +69,7 @@ public class PluginPackageServiceImpl implements PluginPackageService {
     private final PluginResourceService pluginResourceService;
     private final AuraPluginManager auraPluginManager;
     private final ExtensionRegistry extensionRegistry;
+    private final PluginExtensionRegistryBridge pluginExtensionRegistryBridge;
     private final PlatformTransactionManager transactionManager;
     private final PluginDirectoryLoader directoryLoader;
     private final PluginSignatureVerifier signatureVerifier;
@@ -495,7 +497,10 @@ public class PluginPackageServiceImpl implements PluginPackageService {
 
             // Refresh extension registry to discover new extensions
             extensionRegistry.refreshAllCaches();
-            log.info("Extension registry refreshed after loading plugin: {}", backendPluginId);
+            PluginExtensionRegistryBridge.BridgeResult bridgeResult =
+                    pluginExtensionRegistryBridge.bridgePluginCommandHandlers();
+            log.info("Extension registries refreshed after loading plugin {}: {} command handlers registered, {} skipped",
+                    backendPluginId, bridgeResult.registered(), bridgeResult.skipped());
 
             // Update plugin record
             updatePluginBackendStatus(pluginPid, backendPluginId, "started", null);

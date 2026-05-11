@@ -1,5 +1,6 @@
 package com.auraboot.framework.email.job;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.email.mapper.EmailAccountMapper;
 import com.auraboot.framework.email.model.EmailAccount;
 import com.auraboot.framework.email.service.EmailSyncService;
@@ -45,6 +46,13 @@ public class EmailSyncJob {
         int success = 0;
         int failed  = 0;
         for (EmailAccount account : accounts) {
+            Long tenantId = account.getTenantId();
+            if (tenantId == null) {
+                failed++;
+                log.warn("Email sync job skipped account without tenantId: accountId={}", account.getId());
+                continue;
+            }
+            MetaContext.setSystemTenantContext(tenantId);
             try {
                 emailSyncService.syncAccount(account);
                 success++;
@@ -52,6 +60,8 @@ public class EmailSyncJob {
                 failed++;
                 log.error("Email sync job failed for accountId={}: {}",
                         account.getId(), e.getMessage(), e);
+            } finally {
+                MetaContext.clear();
             }
         }
 

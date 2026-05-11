@@ -68,7 +68,7 @@ You understand that the decision to include Your Contribution in any project or 
 
 ## 8. Acceptance
 
-This CLA is accepted electronically by You signing your GitHub username via the CLA Assistant bot on each pull request, OR by signing a written copy of this Agreement and sending it to license@auraboot.com.
+This CLA is accepted electronically by You signing your GitHub username via the CLA Assistant bot on each pull request, OR by signing a written copy of this Agreement and following the contact instructions at https://www.auraboot.com/contact.
 
 ---
 
@@ -94,4 +94,4 @@ paperwork. It does NOT cover substantive contributions of any kind.
 
 ---
 
-Questions: license@auraboot.com
+Questions: https://www.auraboot.com/contact

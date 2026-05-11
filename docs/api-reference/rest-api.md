@@ -19,7 +19,7 @@ Obtain a JWT token by posting credentials to the login endpoint.
 ```bash
 curl -s -X POST http://localhost:6443/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "admin@example.com", "password": "ChangeMeOnFirstLogin!"}'
+  -d '{"email": "admin@auraboot.com", "password": "Test2026x"}'
 ```
 
 **Response:**

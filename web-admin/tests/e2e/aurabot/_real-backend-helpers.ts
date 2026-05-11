@@ -15,7 +15,7 @@ import { execFileSync, execSync } from 'node:child_process';
 import { BACKEND_URL } from '../../helpers/playwright-env';
 
 // Admin primary tenant — matches the JWT issued by
-// `admin@example.com / Test2026x`. Keep in sync with
+// `admin@auraboot.com / Test2026x`. Keep in sync with
 // scripts/reset-and-init.sh.
 /**
  * Admin's primary tenant. Resolved lazily at first import by querying
@@ -33,7 +33,7 @@ function resolveAdminTenantId(): string {
       BACKEND_URL;
     const out = execSync(
       `curl -s -X POST ${backendUrl}/api/auth/login -H 'Content-Type: application/json' ` +
-        `-d '{"email":"admin@example.com","password":"Test2026x"}'`,
+        `-d '{"email":"admin@auraboot.com","password":"Test2026x"}'`,
     ).toString();
     const parsed = JSON.parse(out);
     const token = parsed?.data?.jwt;

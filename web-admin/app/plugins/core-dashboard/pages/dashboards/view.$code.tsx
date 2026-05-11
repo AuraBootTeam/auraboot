@@ -11,17 +11,23 @@ import { ArrowPathIcon, PencilSquareIcon, ArrowLeftIcon } from '@heroicons/react
 import { ChartBarSquareIcon } from '@heroicons/react/24/outline';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
 
 export default function DashboardViewByCode() {
   const { showSuccessToast } = useToastContext();
+  const { locale } = useI18n();
   const { code } = useParams<{ code: string }>();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
+  const l = useCallback(
+    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
+    [locale],
+  );
 
   const loadDashboard = useCallback(async () => {
     if (!code) return;
@@ -32,11 +38,11 @@ export default function DashboardViewByCode() {
       setDashboard(data);
     } catch (err) {
       setDashboard(null);
-      setError(`Dashboard not found: ${code}`);
+      setError(`${l('未找到仪表盘', 'Dashboard not found')}: ${code}`);
     } finally {
       setLoading(false);
     }
-  }, [code]);
+  }, [code, l]);
 
   useEffect(() => {
     loadDashboard();
@@ -44,8 +50,8 @@ export default function DashboardViewByCode() {
 
   const handleRefresh = useCallback(async () => {
     await loadDashboard();
-    showSuccessToast('Data refreshed');
-  }, [loadDashboard]);
+    showSuccessToast(l('数据已刷新', 'Data refreshed'));
+  }, [loadDashboard, l, showSuccessToast]);
 
   return (
     <div className="flex h-full flex-col">
@@ -71,7 +77,7 @@ export default function DashboardViewByCode() {
             className="inline-flex items-center rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
           >
             <ArrowPathIcon className={`mr-1.5 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            {l('刷新', 'Refresh')}
           </button>
           {dashboard && (
             <ExportPdfButton
@@ -86,7 +92,7 @@ export default function DashboardViewByCode() {
               className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-blue-700"
             >
               <PencilSquareIcon className="mr-1.5 h-4 w-4" />
-              Edit
+              {l('编辑', 'Edit')}
             </Link>
           )}
         </div>
@@ -97,7 +103,7 @@ export default function DashboardViewByCode() {
         {loading && (
           <div className="flex h-64 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
-            <span className="ml-3 text-gray-500">Loading...</span>
+            <span className="ml-3 text-gray-500">{l('加载中...', 'Loading...')}</span>
           </div>
         )}
 
@@ -105,7 +111,7 @@ export default function DashboardViewByCode() {
           <div className="flex h-64 flex-col items-center justify-center text-red-500">
             <p>{error}</p>
             <button onClick={handleRefresh} className="mt-3 text-sm text-blue-600 hover:underline">
-              Retry
+              {l('重试', 'Retry')}
             </button>
           </div>
         )}
@@ -123,9 +129,11 @@ export default function DashboardViewByCode() {
         {!loading && !error && !dashboard && (
           <div className="flex h-64 flex-col items-center justify-center text-gray-400">
             <ChartBarSquareIcon className="mb-4 h-16 w-16 text-gray-300" />
-            <p className="text-lg font-medium text-gray-500">Dashboard not found</p>
+            <p className="text-lg font-medium text-gray-500">
+              {l('未找到仪表盘', 'Dashboard not found')}
+            </p>
             <p className="mt-1 text-sm">
-              No dashboard with code{' '}
+              {l('没有找到编码为', 'No dashboard with code')}{' '}
               <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
                 {code}
               </code>

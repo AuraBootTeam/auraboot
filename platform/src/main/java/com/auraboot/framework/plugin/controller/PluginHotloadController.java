@@ -4,6 +4,7 @@ import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import com.auraboot.framework.plugin.pf4j.PluginExtensionRegistryBridge;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.pf4j.PluginDescriptor;
@@ -43,6 +44,7 @@ public class PluginHotloadController {
 
     private final AuraPluginManager pluginManager;
     private final ExtensionRegistry extensionRegistry;
+    private final PluginExtensionRegistryBridge pluginExtensionRegistryBridge;
 
     /**
      * Upload and hot-load a plugin JAR.
@@ -76,8 +78,7 @@ public class PluginHotloadController {
                         HotloadResult.failure("Load failed", "Failed to load the plugin"));
             }
 
-            // Refresh extension cache
-            extensionRegistry.refreshPluginCache(pluginId);
+            refreshPluginRegistries(pluginId);
 
             // Get plugin info
             PluginWrapper wrapper = pluginManager.getPluginWrapper(pluginId);
@@ -110,8 +111,7 @@ public class PluginHotloadController {
                     HotloadResult.failure("Reload failed", "Failed to reload the plugin"));
         }
 
-        // Refresh extension cache
-        extensionRegistry.refreshPluginCache(pluginId);
+        refreshPluginRegistries(pluginId);
 
         PluginWrapper wrapper = pluginManager.getPluginWrapper(pluginId);
         PluginInfo info = toPluginInfo(wrapper);
@@ -208,7 +208,7 @@ public class PluginHotloadController {
                     HotloadResult.failure("Start failed", "Failed to start the plugin, state: " + state));
         }
 
-        extensionRegistry.refreshPluginCache(pluginId);
+        refreshPluginRegistries(pluginId);
         return ResponseEntity.ok(HotloadResult.success("start", pluginId, toPluginInfo(wrapper)));
     }
 
@@ -275,6 +275,14 @@ public class PluginHotloadController {
                 wrapper.getPluginPath().toString(),
                 wrapper.getPluginClassLoader().getClass().getSimpleName()
         );
+    }
+
+    private void refreshPluginRegistries(String pluginId) {
+        extensionRegistry.refreshPluginCache(pluginId);
+        PluginExtensionRegistryBridge.BridgeResult result =
+                pluginExtensionRegistryBridge.bridgePluginCommandHandlers();
+        log.info("Plugin registries refreshed after plugin {}: {} command handlers registered, {} skipped",
+                pluginId, result.registered(), result.skipped());
     }
 
     // ========== Response DTOs ==========

@@ -18,7 +18,7 @@ docker compose --profile full up --build -d
 open http://localhost:3000
 ```
 
-Default credentials: `admin@example.com` / `ChangeMeOnFirstLogin!`
+Default credentials: `admin@auraboot.com` / `Test2026x`
 
 ---
 
@@ -257,7 +257,7 @@ For production, place an nginx reverse proxy in front of the frontend:
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name your-domain.com;
+    server_name app.example.com;
 
     ssl_certificate     /etc/nginx/ssl/cert.pem;
     ssl_certificate_key /etc/nginx/ssl/key.pem;
@@ -287,7 +287,7 @@ server {
 
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name app.example.com;
     return 301 https://$host$request_uri;
 }
 ```
@@ -370,7 +370,7 @@ If ports 3000, 5432, or 6443 are in use:
 
 ```bash
 # Change frontend port
-AURABOOT_PORT=8080 docker compose --profile full up -d
+AURABOOT_PORT=8080 docker compose --profile full up --build -d
 
 # Or stop conflicting processes
 lsof -i :3000

@@ -16,7 +16,7 @@ services:
     container_name: auraboot-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aura_boot}
       POSTGRES_USER: ${POSTGRES_USER:-auraboot}
@@ -86,6 +86,7 @@ services:
       FRONTEND_BASE_URL: http://localhost:${AURABOOT_PORT:-3000}
       SPRING_PROFILES_ACTIVE: community
       AURABOOT_BOOTSTRAP_ENABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     volumes:
       - backend_data:/app/data
     depends_on:

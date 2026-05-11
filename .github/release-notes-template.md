@@ -61,7 +61,7 @@ deprecated until vX.Y.Z+1 / vX+1.0.0; act before that date.
 For Docker Compose users:
 ```bash
 docker compose pull
-docker compose up -d
+docker compose --profile full up --build -d
 ```
 
 For source builds:
@@ -84,7 +84,7 @@ Returning contributors: `@u4`, `@u5`. Thanks!
 - Full changelog: [vA.B.C...vX.Y.Z](https://github.com/AuraBootTeam/auraboot/compare/vA.B.C...vX.Y.Z)
 - Discussions: [Release discussion thread](https://github.com/AuraBootTeam/auraboot/discussions)
 - Discord: [Discord](https://discord.gg/p2fW5A2MW6)
-- Migration questions: license@auraboot.com or #help on Discord
+- Feedback and migration questions: [website contact form](https://www.auraboot.com/contact?interest=feedback)
 
 ---
 
@@ -97,5 +97,5 @@ Returning contributors: `@u4`, `@u5`. Thanks!
 - [ ] Tagged with annotated tag: `git tag -a vX.Y.Z -m "AuraBoot vX.Y.Z"`
 - [ ] Tag pushed: `git push origin vX.Y.Z` (triggers build-image workflow → GHCR)
 - [ ] GHCR image confirmed published before announcing
-- [ ] Twitter / Discord / WeChat OA cross-posted within 4h of release
+- [ ] Twitter / GitHub Discussions / WeChat OA cross-posted within 4h of release
 - [ ] First-time contributors @-tagged in the discussion thread

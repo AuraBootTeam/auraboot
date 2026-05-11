@@ -7,6 +7,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface SortableFieldProps {
   id: string;
@@ -29,6 +30,8 @@ export const SortableField: React.FC<SortableFieldProps> = ({
   columnsCount = 2,
   disabled,
 }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     disabled,
@@ -77,7 +80,7 @@ export const SortableField: React.FC<SortableFieldProps> = ({
             isDragging ? 'border-blue-300 bg-blue-50' : 'border-gray-200'
           }`}
         >
-          {placeholder || '请输入...'}
+          {placeholder || l('请输入...', 'Enter...')}
         </div>
       )}
     </div>

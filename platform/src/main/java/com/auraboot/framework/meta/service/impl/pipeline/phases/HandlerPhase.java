@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -89,7 +90,7 @@ public class HandlerPhase implements CommandPhase {
             }
 
             try {
-                CommandHandler handler = applicationContext.getBean(rule.getHandlerClass(), CommandHandler.class);
+                CommandHandler handler = resolveCommandHandler(rule.getHandlerClass());
                 if (dryRun && !handler.getClass().isAnnotationPresent(DryRunSafe.class)) {
                     log.info("Dry-run: skipping handler {} (class not marked @DryRunSafe)",
                             handler.getClass().getName());
@@ -130,6 +131,17 @@ public class HandlerPhase implements CommandPhase {
         }
 
         return handlerResults;
+    }
+
+    private CommandHandler resolveCommandHandler(String handlerClass) {
+        try {
+            return applicationContext.getBean(handlerClass, CommandHandler.class);
+        } catch (NoSuchBeanDefinitionException missingByBeanName) {
+            return applicationContext.getBeansOfType(CommandHandler.class).values().stream()
+                    .filter(handler -> handlerClass.equals(handler.getHandlerName()))
+                    .findFirst()
+                    .orElseThrow(() -> missingByBeanName);
+        }
     }
 
     private void persistHandlerResults(String modelCode,

@@ -23,7 +23,7 @@
  *   - API helpers only seed the draft record (one call) and cross-check state
  *     (no assertion depends on the API being the sole surface).
  *
- * Known environment constraint: admin@example.com carries tenant_admin only
+ * Known environment constraint: admin@auraboot.com carries tenant_admin only
  * (no wd_manager/wd_hr role binding), but the deployed wd_leave_approval
  * BPMN has NO smart:assigneeType attribute on task_manager_approve /
  * task_hr_approve (see IdAndGroupTaskAssigneeDispatcher fallback: "assign to

@@ -61,7 +61,7 @@ export interface TodoTaskRecord {
  */
 export async function loginAsAdmin(request: APIRequestContext): Promise<string> {
   const resp = await request.post('/api/auth/login', {
-    data: { email: 'admin@example.com', password: 'Test2026x' },
+    data: { email: 'admin@auraboot.com', password: 'Test2026x' },
     headers: { 'Content-Type': 'application/json' },
   });
   if (!resp.ok()) {

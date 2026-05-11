@@ -37,7 +37,7 @@ The JWT token is cached in `~/.aura/credentials.json` (mode 0600) and auto-renew
 ### Non-interactive login
 
 ```bash
-aura login -u admin@example.com -p Test2026x
+aura login -u admin@auraboot.com -p Test2026x
 ```
 
 ### Login to a specific tenant
@@ -79,13 +79,13 @@ Checks backend connectivity, database status, and service health. Returns exit c
 |---------|-------------|
 | `aura login` | Authenticate and cache token |
 | `aura status` | Health check |
-| `aura ask "..."` | AI-powered natural language query (SSE streaming) |
+| `aura ask "..."` | AI-assisted natural language query (SSE streaming) |
 | `aura plan "..."` | Generate structured execution plan |
 | `aura shell` | Interactive shell with tab completion |
 | `aura query` | Query entity data |
 | `aura exec` | Execute DSL commands |
 | `aura create` | Bulk create records (pipeline) |
-| `aura analyze` | AI-powered data analysis (pipeline) |
+| `aura analyze` | AI-assisted data analysis (pipeline) |
 | `aura plugin validate` | Validate plugin structure |
 | `aura plugin publish` | Import/publish a plugin |
 | `aura plugin diff` | Compare local plugin with deployed version |
@@ -493,7 +493,7 @@ aura> exit
 Start AuraBoot as an MCP (Model Context Protocol) server for integration with AI coding tools like Claude Code:
 
 ```bash
-aura mcp-server --token <jwt>
+aura mcp serve
 ```
 
 ### Configuration for Claude Code
@@ -504,7 +504,7 @@ Add to `~/.claude/mcp_servers.json`:
 {
   "aura": {
     "command": "aura",
-    "args": ["mcp-server", "--token", "<your-jwt-token>"]
+    "args": ["mcp", "serve"]
   }
 }
 ```
@@ -594,7 +594,7 @@ AURA_AGENT_MODE=1 aura crm leads
 {
   "local": {
     "jwt": "eyJ...",
-    "email": "admin@example.com",
+    "email": "admin@auraboot.com",
     "expiresAt": "2026-04-12T08:00:00Z"
   }
 }

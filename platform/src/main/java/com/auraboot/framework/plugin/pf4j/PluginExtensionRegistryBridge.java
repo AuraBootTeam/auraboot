@@ -10,6 +10,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.util.Set;
+
 /**
  * Bridges PF4J-loaded plugin extensions into the import-time
  * {@link CommandHandlerRegistry}.
@@ -51,28 +53,50 @@ public class PluginExtensionRegistryBridge {
 
     @EventListener(ApplicationReadyEvent.class)
     public void bridge() {
+        bridgePluginCommandHandlers();
+    }
+
+    public BridgeResult bridgePluginCommandHandlers() {
         int registered = 0;
         int skipped = 0;
         for (CommandHandlerExtension ext : pluginManager.getExtensionsOfType(CommandHandlerExtension.class)) {
-            String code = ext.getCommandType();
-            if (code == null || code.isBlank()) {
-                log.warn("Skipping plugin extension {} — getCommandType() returned blank",
+            String primaryCode = ext.getCommandType();
+            var commandTypes = ext.getSupportedCommandTypes();
+            if (commandTypes == null) {
+                commandTypes = primaryCode == null ? Set.of() : Set.of(primaryCode);
+            }
+            if (commandTypes == null || commandTypes.isEmpty()) {
+                log.warn("Skipping plugin extension {} — getSupportedCommandTypes() returned no command types",
                         ext.getClass().getName());
                 skipped++;
                 continue;
             }
-            if (commandHandlerRegistry.isRegistered(code)) {
-                // Platform built-in or another plugin already won — keep first registration.
-                log.debug("Plugin extension {} reuses already-registered code '{}'",
-                        ext.getClass().getSimpleName(), code);
-                continue;
+            for (String code : commandTypes) {
+                if (code == null || code.isBlank()) {
+                    log.warn("Skipping plugin extension {} — supported command type was blank",
+                            ext.getClass().getName());
+                    skipped++;
+                    continue;
+                }
+                if (commandHandlerRegistry.isRegistered(code)) {
+                    // Platform built-in or another plugin already won — keep first registration.
+                    log.debug("Plugin extension {} reuses already-registered code '{}'",
+                            ext.getClass().getSimpleName(), code);
+                    continue;
+                }
+                String source = "plugin:" + ext.getClass().getSimpleName();
+                String description = code.equals(primaryCode)
+                        ? "Plugin command handler"
+                        : "Plugin command handler alias of " + primaryCode;
+                commandHandlerRegistry.register(new CommandHandlerRegistry.HandlerMeta(
+                        code, source, description, null, null));
+                registered++;
             }
-            String source = "plugin:" + ext.getClass().getSimpleName();
-            commandHandlerRegistry.register(new CommandHandlerRegistry.HandlerMeta(
-                    code, source, "Plugin command handler", null, null));
-            registered++;
         }
         log.info("PluginExtensionRegistryBridge: registered {} plugin command handlers ({} skipped)",
                 registered, skipped);
+        return new BridgeResult(registered, skipped);
     }
+
+    public record BridgeResult(int registered, int skipped) {}
 }

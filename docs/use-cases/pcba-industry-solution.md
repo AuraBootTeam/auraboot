@@ -384,7 +384,7 @@ erDiagram
 
 ### The Binding System
 
-The `pcba-base` plugin demonstrates a powerful pattern -- adding industry-specific fields to generic models without modifying the original plugin:
+The `pcba-base` plugin demonstrates a useful pattern -- adding industry-specific fields to generic models without modifying the original plugin:
 
 ```
 pcba-base/config/fields/

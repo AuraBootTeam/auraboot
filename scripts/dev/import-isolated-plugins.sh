@@ -26,7 +26,7 @@ Options:
                      OSS + enterprise plugins needed by the PCBA agent E2E.
 
 Environment:
-  ADMIN_EMAIL        default: admin@example.com
+  ADMIN_EMAIL        default: admin@auraboot.com
   ADMIN_PASSWORD     default: Test2026x
 USAGE
 }
@@ -75,7 +75,7 @@ source "$STACK_ENV_FILE"
 
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-auraboot-$SLUG}"
 BACKEND_URL="${BACKEND_URL:-http://localhost:${BE_PORT}}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@auraboot.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Test2026x}"
 BACKEND_CONTAINER="${PROJECT_NAME}-backend"
 

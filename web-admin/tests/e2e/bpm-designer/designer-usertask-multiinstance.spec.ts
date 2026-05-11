@@ -74,7 +74,7 @@ test.describe('BPM designer — userTask multiInstance', { tag: ['@bpm-regressio
       completionCondition: '${nrOfCompletedInstances >= nrOfInstances}',
     });
 
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     // L1
     const pdResp = await request.get(
@@ -120,7 +120,7 @@ test.describe('BPM designer — userTask multiInstance', { tag: ['@bpm-regressio
       completionCondition: '${taskResult == "approved"}',
     }, { deploy: false });
 
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     // L2 only (L1 shape identical to test A pattern, covered already)
     const xmlResp = await request.get(

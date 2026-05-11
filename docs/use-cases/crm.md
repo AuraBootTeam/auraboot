@@ -18,7 +18,7 @@ Sales teams struggle with fragmented tools: spreadsheets for leads, email for fo
 ### Key Capabilities
 
 - Lead capture from 10+ sources (web forms, email, social media, exhibitions, webhooks)
-- Lead scoring with AI-powered evaluation
+- Lead scoring with AI-assisted evaluation
 - Lead qualification lifecycle: New -> Contacted -> Qualified -> Converted / Lost
 - Opportunity pipeline: Discovery -> Qualification -> Proposal -> Negotiation -> Won/Lost
 - Account 360-degree view with contacts, opportunities, activities, and complaints

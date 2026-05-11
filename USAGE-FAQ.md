@@ -42,7 +42,7 @@ Not in the community edition. AuraBoot relies on `pgvector` for the RAG knowledg
 
 In your PostgreSQL database. The platform metadata (model definitions, page configs, command pipelines) lives in `meta_*` tables; business data lives in tables created when plugins are installed (e.g. `tcrm_lead` from crm-quick-start).
 
-Drop AuraBoot tomorrow and your tables remain queryable — there's no proprietary file format. Schema is documented in [docs/architecture/data-model.md](docs/architecture/data-model.md) (TODO).
+Drop AuraBoot tomorrow and your tables remain queryable — there's no proprietary file format. Schema is documented in [docs/architecture/data-model.md](docs/architecture/data-model.md).
 
 ### Q. Will my schema change between minor versions?
 
@@ -60,7 +60,7 @@ There's no automated importer in the community edition. The general path:
 2. Define equivalent models in AuraBoot's DSL.
 3. Use the bulk-import endpoint (`/api/{model}/import`) per model.
 
-If you have a substantial migration (>10K records, complex relationships), license@auraboot.com — we offer migration consulting.
+If you have a substantial migration (>10K records, complex relationships), use https://www.auraboot.com/contact — we offer migration consulting.
 
 ---
 
@@ -76,7 +76,7 @@ A plugin scaffolding CLI exists (`pnpm aura plugin init <name>`) for the basic b
 
 Yes — your plugin is your own work, with its own license. AuraBoot's source-available license does not propagate to plugin code (see [LICENSE-FAQ.md Q15](LICENSE-FAQ.md#q15-can-i-build-and-sell-plugins-for-auraboot)).
 
-### Q. The 20-stage pipeline doesn't have an extension point I need.
+### Q. The command pipeline doesn't have an extension point I need.
 
 Open an issue describing the use case. We're conservative about adding stages — each one is a new contract — but real gaps get added. As workaround, the `handler` stage accepts arbitrary Java/TS code; you can do the orchestration there until we add a proper stage.
 
@@ -88,7 +88,7 @@ Open an issue describing the use case. We're conservative about adding stages �
 
 Documented benchmark suite is on the M2 roadmap. As a rough guide, a single AuraBoot instance on a 4 vCPU / 8 GB host handles **a few hundred QPS for typical CRUD endpoints** with PostgreSQL on the same host. Headroom mostly depends on the plugin pipeline complexity (number of stages + side effects per command).
 
-If you have a specific scale target (e.g., 10K writes/min), open an issue or email — we'll size it together.
+If you have a specific scale target (e.g., 10K writes/min), open an issue or use the website contact form — we'll size it together.
 
 ### Q. Can I run multiple instances behind a load balancer?
 
@@ -107,7 +107,7 @@ No. They're entirely optional. If you don't configure an LLM provider, the AI pa
 
 ### Q. Can I use a local LLM (Ollama, vLLM)?
 
-Yes. Configure `auraboot.ai.provider=openai-compatible` with `base-url=http://your-ollama:11434/v1` and a dummy api-key. AuraBoot speaks the OpenAI-compatible chat-completions API.
+Yes. Configure `auraboot.ai.provider=openai-compatible` with `base-url=http://ollama.local:11434/v1` and a local adapter API key. AuraBoot speaks the OpenAI-compatible chat-completions API.
 
 ### Q. Does the RAG knowledge base ingest my files into a vendor cloud?
 
@@ -143,6 +143,6 @@ Yes — the platform keeps audit forever by default, but `auraboot.audit.retenti
 
 - GitHub Discussions: https://github.com/AuraBootTeam/auraboot/discussions
 - Discord: https://discord.gg/p2fW5A2MW6
-- For commercial / partnership questions: license@auraboot.com
+- For commercial / partnership questions: https://www.auraboot.com/contact
 
 We add new questions here whenever they come up more than twice.

@@ -42,9 +42,9 @@ the project. Treat it like a billboard.
 
 **Required elements**:
 - Wordmark
-- 5-10 word tagline (current: "AI-native low-code business platform")
+- 5-10 word tagline (current: "Self-hosted low-code for business apps")
 - One visual that hints at the product (e.g., the page designer or a
-  schematic of the 20-stage pipeline)
+  schematic of the 20+ stage pipeline)
 - Subtle "Open source" / "Source-available" badge
 - DO NOT include star count / contributor count (changes constantly)
 
@@ -55,8 +55,8 @@ the project. Treat it like a billboard.
 │                                                │
 │   [Wordmark]                                   │
 │                                                │
-│   AI-native low-code platform                  │
-│   built on a 20-stage command pipeline         │
+│   Self-hosted low-code for business apps       │
+│   built on a 20+ stage command pipeline        │
 │                                                │
 │   ┌────────────┐                               │
 │   │  [pipeline │     Apache 2.0 + supplementary│

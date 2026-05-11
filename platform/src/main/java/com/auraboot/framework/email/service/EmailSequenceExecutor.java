@@ -1,5 +1,6 @@
 package com.auraboot.framework.email.service;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.email.mapper.EmailAccountMapper;
 import com.auraboot.framework.email.mapper.EmailMessageMapper;
 import com.auraboot.framework.email.mapper.EmailSequenceEnrollmentMapper;
@@ -61,6 +62,12 @@ public class EmailSequenceExecutor {
         log.info("processDueEnrollments: {} due enrollments found", due.size());
 
         for (EmailSequenceEnrollment enrollment : due) {
+            Long tenantId = enrollment.getTenantId();
+            if (tenantId == null) {
+                log.warn("Skipping email sequence enrollment without tenantId: enrollmentId={}", enrollment.getId());
+                continue;
+            }
+            MetaContext.setSystemTenantContext(tenantId);
             try {
                 processEnrollment(enrollment);
             } catch (Exception e) {
@@ -68,6 +75,8 @@ public class EmailSequenceExecutor {
                 // Mark enrollment as failed so it doesn't block the queue
                 sequenceService.updateEnrollmentStatus(enrollment.getId(),
                         EmailConstants.ENROLLMENT_FAILED);
+            } finally {
+                MetaContext.clear();
             }
         }
     }

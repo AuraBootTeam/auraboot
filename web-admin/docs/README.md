@@ -320,7 +320,7 @@ process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443'
 
 - `http://localhost:5173/` 不再停留在空白页
 - 未登录访问 `/` 会正确 `302 -> /login`
-- 使用 `admin@example.com / Test2026x` 可以成功登录
+- 使用 `admin@auraboot.com / Test2026x` 可以成功登录
 - 登录后会进入 `/dashboards`
 - 页面主框架、菜单、仪表盘主体都能正常渲染
 

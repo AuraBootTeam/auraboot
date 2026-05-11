@@ -1,6 +1,6 @@
 # AuraBoot Documentation
 
-Welcome to the AuraBoot documentation. AuraBoot is an open-source AI-native low-code platform for building business applications using declarative JSON DSL.
+Welcome to the AuraBoot documentation. AuraBoot is a source-available, self-hosted low-code platform for building business applications using declarative JSON DSL.
 
 ## Start Here
 
@@ -22,7 +22,7 @@ If you are new to AuraBoot, follow this path:
 | **Core Concepts** | |
 | [DSL Engine](core-concepts/dsl-engine.md) | Declarative configuration philosophy and resolution lifecycle |
 | [Models & Fields](core-concepts/models-and-fields.md) | 22 field types, relations, formulas, and computed fields |
-| [Commands](core-concepts/commands.md) | 20-stage command pipeline reference |
+| [Commands](core-concepts/commands.md) | 20+ stage command pipeline reference |
 | [Pages & Layouts](core-concepts/pages-and-layouts.md) | Page kinds (list/form/detail/dashboard), block types, layout system |
 | [Permissions](core-concepts/permissions.md) | RBAC, multi-tenant isolation, data-level security |
 | [State Machines](core-concepts/state-machines.md) | Status flows, guards, transitions, and side effects |

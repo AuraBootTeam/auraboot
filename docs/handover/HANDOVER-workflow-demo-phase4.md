@@ -53,7 +53,7 @@ POST /api/bpm/tasks/<taskId>/reject
 
 ## 测试账号
 
-- admin@example.com / Test2026x（已绑 wd_manager + wd_hr）
+- admin@auraboot.com / Test2026x（已绑 wd_manager + wd_hr）
 - admin userId: 302959828878364672
 - admin memberId: 302959828941279232
 - tenantId: 302959828911919104

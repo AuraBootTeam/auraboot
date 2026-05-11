@@ -25,7 +25,7 @@ test.describe('Member Invite Flow', () => {
   const getBackendJwt = async (page: import('@playwright/test').Page): Promise<string> => {
     if (backendJwt) return backendJwt;
     const resp = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-      data: { email: 'admin@example.com', password: 'Test2026x' },
+      data: { email: 'admin@auraboot.com', password: 'Test2026x' },
     });
     if (!resp.ok()) {
       throw new Error(`Failed to obtain backend JWT: HTTP ${resp.status()}`);
