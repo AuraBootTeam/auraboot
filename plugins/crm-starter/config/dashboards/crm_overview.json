@@ -6,6 +6,7 @@
   "description": "Lightweight CRM demo dashboard: recent opportunities + recent leads",
   "scope": "global",
   "status": "published",
+  "isDefault": true,
   "sortOrder": 0,
   "layoutConfig": {
     "columns": 12,
