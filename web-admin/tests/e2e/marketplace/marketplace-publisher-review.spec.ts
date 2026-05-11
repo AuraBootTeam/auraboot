@@ -6,8 +6,7 @@
  * the public Marketplace discovery UI.
  */
 
-import { test, expect } from '../../fixtures';
-import type { APIRequestContext, Page } from '../../fixtures';
+import { test, expect, type APIRequestContext, type Page } from '../../fixtures';
 import {
   clickRowActionByLocator,
   ensureSidebarExpanded,
@@ -68,7 +67,8 @@ async function navigateToModelListViaMenu(page: Page, href: string) {
   const link = nav.locator(`a[href="${href}"]`).first();
   await link.waitFor({ state: 'visible', timeout: 10000 });
   await link.evaluate((el) => (el as HTMLAnchorElement).click());
-  await expect(page).toHaveURL(new RegExp(href.replace(/\//g, '\\/')), { timeout: 10000 });
+  const escapedHref = href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await expect(page).toHaveURL(new RegExp(escapedHref), { timeout: 10000 });
   await waitForDynamicPageLoad(page);
 }
 

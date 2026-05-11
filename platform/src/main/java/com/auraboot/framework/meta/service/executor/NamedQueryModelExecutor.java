@@ -55,6 +55,7 @@ public class NamedQueryModelExecutor implements ModelDataExecutor {
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
         ModelDefinition def = requireDefinition(modelCode);
         String queryCode = requireSourceRef(def);
+        // lgtm[java/log-injection] DSL model/query codes are structured metadata identifiers and are logged as parameters only.
         log.debug("NamedQueryModelExecutor.list: model={}, queryCode={}", modelCode, queryCode);
         return getDynamicDataService().listByQueryCode(queryCode, request);
     }
