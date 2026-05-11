@@ -1,5 +1,6 @@
 package com.auraboot.framework.im.controller;
 
+import com.auraboot.framework.agentchat.event.ImMessageSentEvent;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
@@ -8,9 +9,11 @@ import com.auraboot.framework.im.dto.MessageSearchResult;
 import com.auraboot.framework.im.dto.ForwardMessageRequest;
 import com.auraboot.framework.im.dto.ReadReceiptSummary;
 import com.auraboot.framework.im.dto.SendMessageRequest;
+import com.auraboot.framework.im.model.ImConversation;
 import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.service.ImConversationService;
 import com.auraboot.framework.im.service.ImMessageService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,10 +26,14 @@ public class ImMessageController {
 
     private final ImMessageService messageService;
     private final ImConversationService conversationService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ImMessageController(ImMessageService messageService, ImConversationService conversationService) {
+    public ImMessageController(ImMessageService messageService,
+                               ImConversationService conversationService,
+                               ApplicationEventPublisher eventPublisher) {
         this.messageService = messageService;
         this.conversationService = conversationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @PostMapping("/conversations/{id}/messages")
@@ -42,6 +49,7 @@ public class ImMessageController {
 
         request.setConversationId(id);
         ImMessage msg = messageService.sendMessage(request, userId, tenantId);
+        publishMessageSentEvent(msg, request, tenantId);
         Map<Long, ConversationMemberInfo> senderMap = buildSenderMap(id, tenantId);
         return ApiResponse.success(toResponse(msg, senderMap));
     }
@@ -126,6 +134,22 @@ public class ImMessageController {
     private Map<Long, ConversationMemberInfo> buildSenderMap(Long conversationId, Long tenantId) {
         return conversationService.getMembers(conversationId, tenantId).stream()
                 .collect(Collectors.toMap(ConversationMemberInfo::getMemberId, m -> m, (a, b) -> a));
+    }
+
+    private void publishMessageSentEvent(ImMessage saved, SendMessageRequest request, Long tenantId) {
+        ImConversation conversation = conversationService.getById(saved.getConversationId(), tenantId);
+        String conversationType = conversation != null ? conversation.getType() : null;
+        eventPublisher.publishEvent(new ImMessageSentEvent(
+                this,
+                saved.getConversationId(),
+                tenantId,
+                saved.getSenderId(),
+                saved.getSenderType(),
+                saved.getContent(),
+                request.getMentions(),
+                saved.getId(),
+                conversationType,
+                saved.getSeq()));
     }
 
     /** Convert ImMessage entity to enriched response DTO. */
