@@ -25,6 +25,18 @@ public interface AiTraceSpanMapper extends BaseMapper<AiTraceSpan> {
     @ResultMap("mybatis-plus_AiTraceSpan")
     List<AiTraceSpan> selectByTraceId(@Param("traceId") String traceId);
 
+    @Select("""
+        SELECT * FROM ab_ai_trace_span
+        WHERE tenant_id = #{tenantId}
+          AND trace_id = #{traceId}
+        ORDER BY sequence_order ASC
+    """)
+    @InterceptorIgnore(tenantLine = "true")
+    @ResultMap("mybatis-plus_AiTraceSpan")
+    List<AiTraceSpan> selectByTenantAndTraceId(
+            @Param("tenantId") Long tenantId,
+            @Param("traceId") String traceId);
+
     @Insert("""
         INSERT INTO ab_ai_trace_span (
             span_id, trace_id, parent_span_id, tenant_id, type, name, input, status, level, start_time, sequence_order

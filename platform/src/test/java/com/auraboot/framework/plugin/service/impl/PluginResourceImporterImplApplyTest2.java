@@ -18,6 +18,7 @@ import com.auraboot.framework.meta.dto.MetaFieldDTO;
 import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.dto.NamedQueryDTO;
+import com.auraboot.framework.meta.dto.SchemaOperationResult;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.BindingRuleMapper;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
@@ -72,6 +73,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -315,6 +318,71 @@ class PluginResourceImporterImplApplyTest2 {
     }
 
     @Test
+    @DisplayName("importField UPDATE syncs published bound models after schema-affecting reimport")
+    void importField_update_syncsPublishedBoundModels() {
+        when(metaFieldService.isFieldExists("approver_id")).thenReturn(true);
+
+        com.auraboot.framework.meta.entity.Field existing = new com.auraboot.framework.meta.entity.Field();
+        existing.setId(42L);
+        existing.setPid("field-pid-approver");
+        existing.setCode("approver_id");
+        existing.setDataType("integer");
+        when(metaFieldMapper.findCurrentByCode("approver_id")).thenReturn(existing);
+        when(extensionConverter.toBean(any())).thenReturn(null);
+        when(metaFieldMapper.updateFieldInPlace(eq("field-pid-approver"), eq("long"), any(), any(), any(), eq("plg")))
+                .thenReturn(1);
+        when(fieldBindingMapper.findPublishedModelCodesByFieldId(42L))
+                .thenReturn(List.of("agent_approval"));
+        when(schemaManagementService.updateTableByModel("agent_approval"))
+                .thenReturn(SchemaOperationResult.builder().success(true).build());
+
+        FieldDefinitionDTO dto = FieldDefinitionDTO.builder()
+                .code("approver_id")
+                .displayName("Approver")
+                .dataType("long")
+                .build();
+
+        PluginResource result = importer.importField(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE, false);
+
+        assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
+        verify(schemaManagementService).updateTableByModel("agent_approval");
+    }
+
+    @Test
+    @DisplayName("importField UPDATE fails closed when bound published model schema sync fails")
+    void importField_update_schemaSyncFailureThrows() {
+        when(metaFieldService.isFieldExists("approver_id")).thenReturn(true);
+
+        com.auraboot.framework.meta.entity.Field existing = new com.auraboot.framework.meta.entity.Field();
+        existing.setId(42L);
+        existing.setPid("field-pid-approver");
+        existing.setCode("approver_id");
+        when(metaFieldMapper.findCurrentByCode("approver_id")).thenReturn(existing);
+        when(extensionConverter.toBean(any())).thenReturn(null);
+        when(metaFieldMapper.updateFieldInPlace(any(), any(), any(), any(), any(), any())).thenReturn(1);
+        when(fieldBindingMapper.findPublishedModelCodesByFieldId(42L))
+                .thenReturn(List.of("agent_approval"));
+        when(schemaManagementService.updateTableByModel("agent_approval"))
+                .thenReturn(SchemaOperationResult.builder()
+                        .success(false)
+                        .errorMessage("cannot cast")
+                        .build());
+
+        FieldDefinitionDTO dto = FieldDefinitionDTO.builder()
+                .code("approver_id")
+                .displayName("Approver")
+                .dataType("long")
+                .build();
+
+        assertThatThrownBy(() -> importer.importField(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE, false))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("Failed to sync schema after updating field approver_id")
+                .hasMessageContaining("cannot cast");
+    }
+
+    @Test
     @DisplayName("importField UPDATE: zero rows updated -> throws PluginException")
     void importField_update_zeroRows_throws() {
         when(metaFieldService.isFieldExists("f1")).thenReturn(true);
@@ -503,7 +571,7 @@ class PluginResourceImporterImplApplyTest2 {
                 anyString(), eq(1L), eq(99L), eq("published"),
                 eq("p2"), any(), any(), any(), any(), any(), any(),
                 any(), any(), eq(2),
-                any(), any(),
+                anyBoolean(), any(),
                 any(), eq(0), any(), eq("plg"));
     }
 
@@ -526,7 +594,7 @@ class PluginResourceImporterImplApplyTest2 {
         assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
         assertThat(result.getResourcePid()).isEqualTo("page-pid-exist");
         verify(pageSchemaMapper).updateForPluginImport(any(), any(), any(), any(), any(), any(),
-                any(), any(), eq(2), any(), any(), any(), any(), eq("plg"),
+                any(), any(), eq(2), anyBoolean(), any(), anyInt(), any(), eq("plg"),
                 eq("page-pid-exist"), eq(1L));
         verify(pageSchemaMapper, never()).publishByPid(anyString());
     }

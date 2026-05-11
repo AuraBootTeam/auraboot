@@ -11,6 +11,7 @@
 
 import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import type { ResultContract } from '../types/ResultContract';
 
 // ---------------------------------------------------------------------------
 // DTO types — mirror Java DTOs field-for-field
@@ -31,6 +32,7 @@ export interface AgentRunListItem {
 
 export interface AgentActionItem {
   pid: string;
+  resultContractId: string | null;
   stepIndex: number | null;
   toolCallIndex: number | null;
   actionCode: string | null;
@@ -81,12 +83,60 @@ export interface AgentBifSummary {
   channel: string | null;
 }
 
+export interface AgentConversationMessageItem {
+  messageId: number;
+  conversationId: number;
+  senderType: string | null;
+  senderId: number | null;
+  seq: number | null;
+  messageType: string | null;
+  content: string | null;
+  cardPayload: string | null;
+  clientMsgId: string | null;
+  triageBucket: string | null;
+  triageConfidence: string | null;
+  triageReasonCodes: string | null;
+  thinkingContent: string | null;
+  thinkingSignature: string | null;
+  createdAt: string | null;
+}
+
+export interface AgentConversationTurnReplay {
+  runId: string;
+  taskPid: string | null;
+  turnId: string | null;
+  conversationId: number | null;
+  inboundMessageId: number | null;
+  outboundMessageId: number | null;
+  triageBucket: string | null;
+  triageConfidence: string | null;
+  triageReasonCodes: string | null;
+  userMessage: string | null;
+  finalResponse: string | null;
+  outcomeStatus: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  messages: AgentConversationMessageItem[];
+  resultContractIds: string[];
+}
+
+export interface AgentResultContractItem {
+  contractId: string;
+  actionPid: string | null;
+  source: string | null;
+  contract: ResultContract;
+  emittedAt: string | null;
+}
+
 export interface AgentRunDetail {
   run: AgentRunListItem;
   actions: AgentActionItem[];
   interruptLog: AgentInterruptItem[];
   childRuns: AgentRunListItem[];
   bif: AgentBifSummary | null;
+  traceId: string | null;
+  conversationTurn: AgentConversationTurnReplay | null;
+  resultContracts: AgentResultContractItem[];
 }
 
 export interface AgentRunPage {

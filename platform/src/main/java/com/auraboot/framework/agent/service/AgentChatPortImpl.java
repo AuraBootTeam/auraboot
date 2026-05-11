@@ -1,5 +1,7 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
@@ -25,9 +27,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Default implementation of {@link AgentChatPort}.
@@ -97,6 +101,18 @@ public class AgentChatPortImpl implements AgentChatPort {
     @Autowired(required = false)
     private MeterRegistry meterRegistry;
 
+    /**
+     * Named-agent tool execution must use the same guarded kernel as ACP runs:
+     * unknown-tool rejection, Tool ACL, BIF risk escalation, approval gate, tool
+     * stats, and trace handling all live behind {@link ToolLoopService}.
+     *
+     * <p>Optional only to keep isolated unit construction cheap; if Spring cannot
+     * wire it, tool execution fails closed instead of falling back to a direct
+     * provider call.
+     */
+    @Autowired(required = false)
+    private ToolLoopService toolLoopService;
+
     // =========================================================================
     // AgentChatPort implementation
     // =========================================================================
@@ -112,6 +128,66 @@ public class AgentChatPortImpl implements AgentChatPort {
         if (agentDef == null) return agentCode;
         Object name = agentDef.get("name");
         return name != null ? String.valueOf(name) : agentCode;
+    }
+
+    @Override
+    public Map<String, Object> executeApprovedPendingTool(Long tenantId, String approvalPid) {
+        if (approvalPid == null || approvalPid.isBlank()) {
+            return Map.of("handled", false);
+        }
+
+        ChatSessionStore.PendingTool pending = chatSessionStore.consumePending(approvalPid);
+        if (pending == null) {
+            return Map.of("handled", false);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("handled", true);
+        response.put("approvalPid", approvalPid);
+        response.put("toolName", pending.getToolName());
+
+        if (tenantId == null || pending.getTenantId() == null || !tenantId.equals(pending.getTenantId())) {
+            response.put("success", false);
+            response.put("error", "Tenant mismatch for approved pending tool. No tool was executed.");
+            return response;
+        }
+        if (toolLoopService == null) {
+            response.put("success", false);
+            response.put("error", "Agent tool execution kernel is not available. No tool was executed.");
+            return response;
+        }
+        if (pending.getAgentToolDefinitions() == null || pending.getAgentToolDefinitions().isEmpty()) {
+            response.put("success", false);
+            response.put("error", "Approved pending tool has no tool definition snapshot. No tool was executed.");
+            return response;
+        }
+
+        try {
+            List<AgentToolDefinition> approvedDefs = markToolApproved(
+                    pending.getAgentToolDefinitions(), pending.getToolName());
+            String rawResult = toolLoopService.executeToolCall(
+                    tenantId,
+                    pending.getRunPid(),
+                    pending.getTaskPid(),
+                    pending.getAgentCode(),
+                    pending.getToolName(),
+                    pending.getInput() != null ? pending.getInput() : Map.of(),
+                    approvedDefs,
+                    null);
+            Map<String, Object> result = normalizeToolLoopResult(rawResult);
+            response.put("success", Boolean.TRUE.equals(result.get("success")));
+            response.put("result", result);
+            if (result.get("error") != null) {
+                response.put("error", result.get("error"));
+            }
+            return response;
+        } catch (Exception e) {
+            log.warn("Approved pending tool execution failed: approvalPid={}, tool={}, error={}",
+                    approvalPid, pending.getToolName(), e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            return response;
+        }
     }
 
     @Override
@@ -170,7 +246,7 @@ public class AgentChatPortImpl implements AgentChatPort {
             toolDefs = overrides.toolDefsOverride();
             recordOverrideUsage("toolDefsOverride");
         } else {
-            toolDefs = discoverToolDefinitions(tenantId, agentCode, request.getMessage());
+            toolDefs = discoverToolDefinitions(tenantId, ctx.userId(), agentCode, request.getMessage(), agentDef);
         }
         List<ToolDefinition> extraToolsForMerge = overrides != null ? overrides.extraTools() : null;
         if (extraToolsForMerge != null && !extraToolsForMerge.isEmpty()) {
@@ -179,6 +255,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         // DC.1 (Q-DC.1=β) merge contract preserved: name collisions resolve
         // to extraTools (caller knows conversation-scope semantics).
         toolDefs = mergeExtraTools(toolDefs, extraToolsForMerge);
+        toolDefs = toLlmFacingToolDefinitions(toolDefs);
         List<LlmChatRequest.Tool> tools = toLlmTools(toolDefs);
 
         // Build conversation: prefer the persisted multi-turn tape (so any prior
@@ -293,7 +370,32 @@ public class AgentChatPortImpl implements AgentChatPort {
                     }
 
                     ToolDefinition def = findToolDef(toolDefs, toolName);
+                    boolean auraBotSkill = isAuraBotSkillTool(def);
                     boolean requiresConfirmation = def != null && def.isRequiresConfirmation();
+
+                    if (auraBotSkill) {
+                        sink.onToolStart(toolId, toolName, input);
+                        Map<String, Object> result = executeToolSafely(ctx, agentCode, toolName, input, toolDefs);
+                        boolean success = Boolean.TRUE.equals(result.get("success"));
+                        if (isAuraBotSkillPreviewPending(result)) {
+                            sink.onConfirmRequired(toolId, toolName, buildToolDescription(toolName, input),
+                                    input, ctx.turnId());
+                            storeAuraBotSkillPendingTool(result, ctx, agentCode, sessionId, toolId, toolName, input,
+                                    toolDefs, messages, providerCode, config, model, systemPrompt, maxTokens, round, persistTape);
+                            confirmationRequired = true;
+                            pendingToolId = toolId;
+                            break;
+                        }
+                        sink.onToolResult(toolId, result, success);
+                        if (isApprovalRequiredResult(result)) {
+                            storeApprovalPendingTool(result, ctx, agentCode, sessionId, toolId, toolName, input,
+                                    toolDefs, messages, providerCode, config, model, systemPrompt, maxTokens, round);
+                            if (persistTape) persistMessages(sessionId, messages);
+                            return buildApprovalRequiredOutcome(result, toolName, input, sink);
+                        }
+                        toolResultBlocks.add(buildToolResultBlock(toolId, result));
+                        continue;
+                    }
 
                     if (requiresConfirmation) {
                         // Stream confirm_required and suspend the turn. The frontend
@@ -336,11 +438,18 @@ public class AgentChatPortImpl implements AgentChatPort {
                         break;
                     }
 
-                    // Read-only tool: auto-execute and feed result back to the LLM.
+                    // Read-only tool: auto-execute through the ACP tool kernel
+                    // and feed the result back to the LLM.
                     sink.onToolStart(toolId, toolName, input);
-                    Map<String, Object> result = executeToolSafely(toolName, input);
+                    Map<String, Object> result = executeToolSafely(ctx, agentCode, toolName, input, toolDefs);
                     boolean success = Boolean.TRUE.equals(result.get("success"));
                     sink.onToolResult(toolId, result, success);
+                    if (isApprovalRequiredResult(result)) {
+                        storeApprovalPendingTool(result, ctx, agentCode, sessionId, toolId, toolName, input,
+                                toolDefs, messages, providerCode, config, model, systemPrompt, maxTokens, round);
+                        if (persistTape) persistMessages(sessionId, messages);
+                        return buildApprovalRequiredOutcome(result, toolName, input, sink);
+                    }
                     toolResultBlocks.add(buildToolResultBlock(toolId, result));
                 }
 
@@ -372,14 +481,19 @@ public class AgentChatPortImpl implements AgentChatPort {
     // Tool discovery
     // =========================================================================
 
-    private List<ToolDefinition> discoverToolDefinitions(Long tenantId, String agentCode, String userMessage) {
+    private List<ToolDefinition> discoverToolDefinitions(Long tenantId, Long userId,
+                                                         String agentCode, String userMessage,
+                                                         Map<String, Object> agentDef) {
         try {
-            com.auraboot.framework.agent.dto.BusinessIntentFrame bif = groundingService.ground(
+            BusinessIntentFrame bif = groundingService.ground(
                     tenantId, userMessage,
                     GroundingService.GroundingContext.builder().build());
 
+            List<ToolDefinition> explicitDefs = discoverExplicitAgentTools(tenantId, userId, agentCode, agentDef, bif);
+
             ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
                     .tenantId(tenantId)
+                    .userId(userId)
                     .agentCode(agentCode)
                     .modelHint(bif != null ? bif.getObject() : null)
                     .intentHint(bif != null ? bif.getIntent() : null)
@@ -387,11 +501,193 @@ public class AgentChatPortImpl implements AgentChatPort {
                     .build();
 
             List<ToolDefinition> defs = toolProviderRegistry.discoverAll(ctx);
-            return defs == null ? Collections.emptyList() : defs;
+            return mergeExplicitTools(explicitDefs, defs);
         } catch (Exception e) {
             log.warn("Tool discovery failed for agent {}: {}", agentCode, e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    private List<ToolDefinition> discoverExplicitAgentTools(Long tenantId, Long userId, String agentCode,
+                                                            Map<String, Object> agentDef, BusinessIntentFrame bif) {
+        List<String> explicitCodes = explicitToolCodes(agentDef);
+        if (explicitCodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<String> discoveryHints = new LinkedHashSet<>();
+        for (String code : explicitCodes) {
+            String hint = resolveExplicitToolModelHint(tenantId, code);
+            if (hint != null && !hint.isBlank()) {
+                discoveryHints.add(hint);
+            }
+        }
+        if (discoveryHints.isEmpty() && bif != null && bif.getObject() != null && !bif.getObject().isBlank()) {
+            discoveryHints.add(bif.getObject());
+        }
+        if (discoveryHints.isEmpty()) {
+            discoveryHints.add(null);
+        }
+
+        Map<String, ToolDefinition> byCode = new LinkedHashMap<>();
+        Set<String> explicitSet = new LinkedHashSet<>(explicitCodes);
+        for (String modelHint : discoveryHints) {
+            ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
+                    .tenantId(tenantId)
+                    .userId(userId)
+                    .agentCode(agentCode)
+                    .modelHint(modelHint)
+                    .intentHint(bif != null ? bif.getIntent() : null)
+                    .maxResults(100)
+                    .build();
+            List<ToolDefinition> discovered = toolProviderRegistry.discoverAll(ctx);
+            if (discovered == null) {
+                continue;
+            }
+            for (ToolDefinition def : discovered) {
+                if (def == null || def.getToolCode() == null) {
+                    continue;
+                }
+                if (explicitSet.contains(def.getToolCode())) {
+                    byCode.putIfAbsent(def.getToolCode(), def);
+                }
+            }
+        }
+
+        for (String code : explicitCodes) {
+            if (!byCode.containsKey(code)) {
+                log.warn("Explicit agent tool was not discoverable: agent={}, tool={}", agentCode, code);
+            }
+        }
+        return new ArrayList<>(byCode.values());
+    }
+
+    private List<ToolDefinition> mergeExplicitTools(List<ToolDefinition> explicitTools,
+                                                    List<ToolDefinition> discoveredTools) {
+        Map<String, ToolDefinition> byCode = new LinkedHashMap<>();
+        if (explicitTools != null) {
+            for (ToolDefinition tool : explicitTools) {
+                if (tool != null && tool.getToolCode() != null) {
+                    byCode.put(tool.getToolCode(), tool);
+                }
+            }
+        }
+        if (discoveredTools != null) {
+            for (ToolDefinition tool : discoveredTools) {
+                if (tool != null && tool.getToolCode() != null) {
+                    byCode.putIfAbsent(tool.getToolCode(), tool);
+                }
+            }
+        }
+        return new ArrayList<>(byCode.values());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> explicitToolCodes(Map<String, Object> agentDef) {
+        if (agentDef == null || agentDef.get("tools") == null) {
+            return Collections.emptyList();
+        }
+        Object raw = agentDef.get("tools");
+        List<Object> values = new ArrayList<>();
+        if (raw instanceof List<?> list) {
+            values.addAll((List<Object>) list);
+        } else {
+            String text = String.valueOf(raw).trim();
+            if (text.isBlank()) {
+                return Collections.emptyList();
+            }
+            if (text.startsWith("[")) {
+                try {
+                    values.addAll(objectMapper.readValue(text, List.class));
+                } catch (Exception e) {
+                    log.warn("Failed to parse agent tools JSON: {}", e.getMessage());
+                    return Collections.emptyList();
+                }
+            } else {
+                for (String item : text.split(",")) {
+                    values.add(item);
+                }
+            }
+        }
+
+        Set<String> codes = new LinkedHashSet<>();
+        for (Object value : values) {
+            String code = null;
+            if (value instanceof Map<?, ?> map) {
+                Object rawCode = map.get("toolCode");
+                if (rawCode == null) rawCode = map.get("code");
+                if (rawCode == null) rawCode = map.get("name");
+                if (rawCode != null) code = String.valueOf(rawCode);
+            } else if (value != null) {
+                code = String.valueOf(value);
+            }
+            if (code != null && !code.isBlank()) {
+                codes.add(code.trim());
+            }
+        }
+        return new ArrayList<>(codes);
+    }
+
+    private String resolveExplicitToolModelHint(Long tenantId, String toolCode) {
+        if (toolCode == null || toolCode.isBlank()) {
+            return null;
+        }
+        if (toolCode.startsWith("cmd:")) {
+            return loadCommandModelCode(tenantId, toolCode.substring("cmd:".length()));
+        }
+        if (toolCode.startsWith("nq:")) {
+            return inferNamedQueryModelCode(tenantId, toolCode.substring("nq:".length()));
+        }
+        if (toolCode.startsWith("list:")) {
+            return toolCode.substring("list:".length());
+        }
+        if (toolCode.startsWith("get:")) {
+            return toolCode.substring("get:".length());
+        }
+        return null;
+    }
+
+    private String loadCommandModelCode(Long tenantId, String commandCode) {
+        try {
+            String sql = "SELECT model_code FROM ab_command_definition " +
+                    "WHERE tenant_id = #{params.tenantId} " +
+                    "AND code = #{params.commandCode} " +
+                    "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
+                    "AND (is_current = TRUE OR is_current IS NULL) " +
+                    "LIMIT 1";
+            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
+                    Map.of("tenantId", tenantId, "commandCode", commandCode));
+            return firstString(rows, "model_code");
+        } catch (Exception e) {
+            log.warn("Failed to resolve command model for explicit tool {}: {}", commandCode, e.getMessage());
+            return null;
+        }
+    }
+
+    private String inferNamedQueryModelCode(Long tenantId, String queryCode) {
+        try {
+            String sql = "SELECT code FROM ab_meta_model " +
+                    "WHERE tenant_id = #{params.tenantId} " +
+                    "AND #{params.queryCode} LIKE code || '%' " +
+                    "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
+                    "AND (is_current = TRUE OR is_current IS NULL) " +
+                    "ORDER BY length(code) DESC " +
+                    "LIMIT 1";
+            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
+                    Map.of("tenantId", tenantId, "queryCode", queryCode));
+            return firstString(rows, "code");
+        } catch (Exception e) {
+            log.warn("Failed to infer named-query model for explicit tool {}: {}", queryCode, e.getMessage());
+            return null;
+        }
+    }
+
+    private String firstString(List<Map<String, Object>> rows, String key) {
+        if (rows == null || rows.isEmpty() || rows.get(0) == null || rows.get(0).get(key) == null) {
+            return null;
+        }
+        String value = String.valueOf(rows.get(0).get(key));
+        return value.isBlank() ? null : value;
     }
 
     /**
@@ -440,6 +736,42 @@ public class AgentChatPortImpl implements AgentChatPort {
         return merged;
     }
 
+    private List<ToolDefinition> toLlmFacingToolDefinitions(List<ToolDefinition> defs) {
+        if (defs == null || defs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<ToolDefinition> mapped = new ArrayList<>();
+        for (ToolDefinition def : defs) {
+            if (def == null || def.getToolCode() == null || def.getToolCode().isBlank()) {
+                continue;
+            }
+            String originalCode = def.getToolCode();
+            String llmName = toLlmSafeToolName(originalCode);
+            String sourceCode = def.getSourceCode();
+            if (sourceCode == null || sourceCode.isBlank()) {
+                sourceCode = originalCode;
+            }
+            mapped.add(ToolDefinition.builder()
+                    .toolCode(llmName)
+                    .toolName(def.getToolName())
+                    .description(def.getDescription())
+                    .providerCode(def.getProviderCode())
+                    .toolType(def.getToolType())
+                    .sourceCode(sourceCode)
+                    .riskLevel(def.getRiskLevel())
+                    .confirmationPolicy(def.getConfirmationPolicy())
+                    .requiresApproval(def.isRequiresApproval())
+                    .requiresConfirmation(def.isRequiresConfirmation())
+                    .parameterSchema(def.getParameterSchema())
+                    .build());
+        }
+        return mapped;
+    }
+
+    private String toLlmSafeToolName(String toolCode) {
+        return toolCode.replace(':', '_').replace('.', '_');
+    }
+
     private List<LlmChatRequest.Tool> toLlmTools(List<ToolDefinition> defs) {
         List<LlmChatRequest.Tool> tools = new ArrayList<>();
         for (ToolDefinition def : defs) {
@@ -466,17 +798,265 @@ public class AgentChatPortImpl implements AgentChatPort {
         return null;
     }
 
-    private Map<String, Object> executeToolSafely(String toolName, Map<String, Object> input) {
+    private Map<String, Object> executeToolSafely(TurnContext ctx, String agentCode, String toolName,
+                                                  Map<String, Object> input, List<ToolDefinition> toolDefs) {
         try {
-            // Route to the appropriate tool provider via the registry. Real
-            // execution wiring lives behind the read-only tool path; for now we
-            // return a deterministic stub so the loop reaches end_turn.
-            log.debug("Agent chat tool call: tool={}, input={}", toolName, input);
-            return Map.of("success", true, "message", "Tool executed: " + toolName);
+            if (findToolDef(toolDefs, toolName) == null) {
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("success", false);
+                response.put("error", unknownToolMessage(toolName, toolDefs));
+                response.put("durationMs", 0L);
+                return response;
+            }
+            if (toolLoopService == null) {
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("success", false);
+                response.put("error", "Agent tool execution kernel is not available. No tool was executed.");
+                response.put("durationMs", 0L);
+                return response;
+            }
+            log.debug("Agent chat tool call via ToolLoopService: tool={}, input={}", toolName, input);
+            String rawResult = toolLoopService.executeToolCall(
+                    ctx.tenantId(),
+                    ctx.turnId(),
+                    ctx.taskPid(),
+                    agentCode,
+                    toolName,
+                    input != null ? input : Map.of(),
+                    toAgentToolDefinitions(toolDefs),
+                    null);
+            return normalizeToolLoopResult(rawResult);
         } catch (Exception e) {
             log.warn("Tool execution failed in agent chat: tool={}, error={}", toolName, e.getMessage());
-            return Map.of("success", false, "error", e.getMessage());
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("success", false);
+            response.put("error", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            response.put("durationMs", 0L);
+            return response;
         }
+    }
+
+    private List<AgentToolDefinition> toAgentToolDefinitions(List<ToolDefinition> toolDefs) {
+        if (toolDefs == null || toolDefs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<AgentToolDefinition> result = new ArrayList<>();
+        for (ToolDefinition def : toolDefs) {
+            if (def == null || def.getToolCode() == null) continue;
+            result.add(AgentToolDefinition.builder()
+                    .name(def.getToolCode())
+                    .description(def.getDescription())
+                    .inputSchema(def.getParameterSchema())
+                    .toolType(def.getToolType())
+                    .sourceCode(def.getSourceCode())
+                    .requiresApproval(def.isRequiresApproval())
+                    .requiresConfirmation(def.isRequiresConfirmation())
+                    .riskLevel(def.getRiskLevel())
+                    .confirmationPolicy(def.getConfirmationPolicy())
+                    .build());
+        }
+        return result;
+    }
+
+    private List<AgentToolDefinition> markToolApproved(List<AgentToolDefinition> toolDefs, String approvedToolName) {
+        if (toolDefs == null || toolDefs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<AgentToolDefinition> result = new ArrayList<>();
+        for (AgentToolDefinition def : toolDefs) {
+            if (def == null) continue;
+            boolean approvedTarget = approvedToolName != null && approvedToolName.equals(def.getName());
+            result.add(AgentToolDefinition.builder()
+                    .name(def.getName())
+                    .description(def.getDescription())
+                    .inputSchema(def.getInputSchema())
+                    .toolType(def.getToolType())
+                    .sourceCode(def.getSourceCode())
+                    .requiresApproval(approvedTarget ? false : def.isRequiresApproval())
+                    .requiresConfirmation(def.isRequiresConfirmation())
+                    .riskLevel(def.getRiskLevel())
+                    .confirmationPolicy(def.getConfirmationPolicy())
+                    .nativeToolConfig(def.getNativeToolConfig())
+                    .build());
+        }
+        return result;
+    }
+
+    private boolean isAuraBotSkillTool(ToolDefinition def) {
+        if (def == null) return false;
+        if ("AURABOT_SKILL".equals(def.getToolType())) return true;
+        String code = def.getToolCode();
+        return code != null && code.startsWith("aurabot:");
+    }
+
+    private boolean isAuraBotSkillPreviewPending(Map<String, Object> result) {
+        if (result == null) return false;
+        return Boolean.TRUE.equals(result.get("approvalRequired"))
+                && result.get("previewToken") instanceof String token
+                && !token.isBlank();
+    }
+
+    private void storeAuraBotSkillPendingTool(Map<String, Object> result, TurnContext ctx, String agentCode,
+                                              String sessionId, String toolId, String toolName,
+                                              Map<String, Object> input, List<ToolDefinition> toolDefs,
+                                              List<LlmChatRequest.Message> messages,
+                                              String providerCode, LlmProviderFactory.ProviderConfig config,
+                                              String model, String systemPrompt, int maxTokens, int round,
+                                              boolean persistTape) {
+        String description = buildToolDescription(toolName, input);
+        Map<String, Object> extension = new LinkedHashMap<>();
+        extension.put("_aurabot_skill", true);
+        extension.put("previewToken", result.get("previewToken"));
+        extension.put("preview", result.get("preview"));
+        extension.put("riskLevel", result.get("riskLevel"));
+
+        chatSessionStore.storePending(ctx.turnId(),
+                ChatSessionStore.PendingTool.builder()
+                        .turnId(ctx.turnId())
+                        .tenantId(ctx.tenantId())
+                        .userId(ctx.userId())
+                        .humanMemberId(ctx.humanMemberId())
+                        .conversationId(ctx.conversationId())
+                        .agentCode(agentCode)
+                        .sessionId(sessionId)
+                        .channelSessionPid(ctx.channelSessionId())
+                        .toolId(toolId)
+                        .toolName(toolName)
+                        .input(input != null ? input : Map.of())
+                        .description(description)
+                        .runPid(ctx.turnId())
+                        .taskPid(ctx.taskPid())
+                        .agentToolDefinitions(toAgentToolDefinitions(toolDefs))
+                        .messages(serializeMessages(messages))
+                        .providerCode(providerCode)
+                        .apiKey(config != null ? config.getApiKey() : null)
+                        .baseUrl(config != null ? config.getBaseUrl() : null)
+                        .model(model)
+                        .systemPrompt(systemPrompt)
+                        .maxTokens(maxTokens)
+                        .currentLoop(round)
+                        .extension(extension)
+                        .build());
+        if (persistTape) {
+            persistMessages(sessionId, messages);
+        }
+    }
+
+    private void storeApprovalPendingTool(Map<String, Object> result, TurnContext ctx, String agentCode,
+                                          String sessionId, String toolId, String toolName,
+                                          Map<String, Object> input, List<ToolDefinition> toolDefs,
+                                          List<LlmChatRequest.Message> messages,
+                                          String providerCode, LlmProviderFactory.ProviderConfig config,
+                                          String model, String systemPrompt, int maxTokens, int round) {
+        String approvalPid = approvalPidFrom(result);
+        if (approvalPid == null) {
+            return;
+        }
+        chatSessionStore.storePending(approvalPid,
+                ChatSessionStore.PendingTool.builder()
+                        .turnId(ctx.turnId())
+                        .tenantId(ctx.tenantId())
+                        .userId(ctx.userId())
+                        .humanMemberId(ctx.humanMemberId())
+                        .conversationId(ctx.conversationId())
+                        .agentCode(agentCode)
+                        .sessionId(sessionId)
+                        .channelSessionPid(ctx.channelSessionId())
+                        .toolId(toolId)
+                        .toolName(toolName)
+                        .input(input != null ? input : Map.of())
+                        .description(buildToolDescription(toolName, input))
+                        .runPid(ctx.turnId())
+                        .taskPid(ctx.taskPid())
+                        .agentToolDefinitions(toAgentToolDefinitions(toolDefs))
+                        .messages(serializeMessages(messages))
+                        .providerCode(providerCode)
+                        .apiKey(config != null ? config.getApiKey() : null)
+                        .baseUrl(config != null ? config.getBaseUrl() : null)
+                        .model(model)
+                        .systemPrompt(systemPrompt)
+                        .maxTokens(maxTokens)
+                        .currentLoop(round)
+                        .build());
+    }
+
+    private String unknownToolMessage(String toolName, List<ToolDefinition> toolDefs) {
+        String available = toolDefs == null || toolDefs.isEmpty()
+                ? "<none>"
+                : toolDefs.stream()
+                .filter(t -> t != null && t.getToolCode() != null)
+                .map(ToolDefinition::getToolCode)
+                .limit(10)
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("<none>");
+        return "Unknown tool '" + toolName + "'. Available tools: " + available;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> normalizeToolLoopResult(String rawResult) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        if (rawResult == null || rawResult.isBlank()) {
+            response.put("success", false);
+            response.put("error", "Tool execution returned no result");
+            response.put("durationMs", 0L);
+            return response;
+        }
+        String trimmed = rawResult.trim();
+        if (trimmed.startsWith("{")) {
+            try {
+                Map<String, Object> parsed = objectMapper.readValue(trimmed, Map.class);
+                if (!parsed.containsKey("success")) {
+                    parsed = new LinkedHashMap<>(parsed);
+                    parsed.put("success", !parsed.containsKey("error"));
+                }
+                return parsed;
+            } catch (Exception e) {
+                log.debug("Failed to parse tool loop result as JSON: {}", e.getMessage());
+            }
+        }
+        boolean success = !trimmed.startsWith("Error:");
+        response.put("success", success);
+        if (success) {
+            response.put("data", trimmed);
+        } else {
+            response.put("error", trimmed);
+        }
+        response.put("durationMs", 0L);
+        return response;
+    }
+
+    private boolean isApprovalRequiredResult(Map<String, Object> result) {
+        return result != null && Boolean.TRUE.equals(result.get("approvalRequired"));
+    }
+
+    private String approvalPidFrom(Map<String, Object> result) {
+        if (result == null) return null;
+        Object rawPid = result.get("approvalPid");
+        String approvalPid = rawPid != null ? String.valueOf(rawPid) : null;
+        return approvalPid == null || approvalPid.isBlank() ? null : approvalPid;
+    }
+
+    private TurnOutcome buildApprovalRequiredOutcome(Map<String, Object> result, String toolName,
+                                                     Map<String, Object> input, ResponseSink sink) {
+        String approvalPid = approvalPidFrom(result);
+        if (approvalPid == null) {
+            String error = String.valueOf(result.getOrDefault("error",
+                    "Approval required but no approval pid available. No data was changed."));
+            sink.onError(error, null);
+            return new TurnOutcome.Failed(error, null);
+        }
+
+        String description = String.valueOf(result.getOrDefault("message", "Approval required"));
+        Map<String, Object> confirmInput = new LinkedHashMap<>();
+        confirmInput.put("toolName", toolName);
+        confirmInput.put("input", input != null ? input : Map.of());
+        sink.onConfirmRequired(
+                approvalPid,
+                "agent_approval_gate",
+                description,
+                confirmInput,
+                approvalPid);
+        return new TurnOutcome.PendingConfirmation(approvalPid, "", approvalPid);
     }
 
     private String buildToolDescription(String toolName, Map<String, Object> input) {

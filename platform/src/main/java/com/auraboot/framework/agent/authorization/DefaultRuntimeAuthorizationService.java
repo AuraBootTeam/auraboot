@@ -1,9 +1,11 @@
 package com.auraboot.framework.agent.authorization;
 
+import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -63,6 +65,9 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private AgentRuntimeObservabilityService observabilityService;
+
     public DefaultRuntimeAuthorizationService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -99,6 +104,7 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
                 "default-policy", 1, "default impl: all effects granted",
                 false, null,
                 buildSessionScopeKey(input.tenantId(), input.userId(), null, input.channelSessionId()));
+        recordAuthorizationDecision("plan", "granted");
 
         return new PlanAuthorization(
                 input.planHash(),
@@ -125,6 +131,7 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
                 "default-policy", 1, "default impl: granted",
                 false, null,
                 buildSessionScopeKey(intent.tenantId(), null, null, intent.channelSessionId()));
+        recordAuthorizationDecision("incremental", "granted");
 
         return IncrementalAuthorization.grant();
     }
@@ -184,5 +191,11 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
         return tenantId + ":" + (userId == null ? "" : userId)
                 + ":" + (profileId == null ? "" : profileId)
                 + ":" + channelSessionId;
+    }
+
+    private void recordAuthorizationDecision(String kind, String decision) {
+        if (observabilityService != null) {
+            observabilityService.recordAuthorizationDecision(kind, decision);
+        }
     }
 }
