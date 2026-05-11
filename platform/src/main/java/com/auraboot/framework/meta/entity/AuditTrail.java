@@ -40,6 +40,9 @@ public class AuditTrail {
     @TableField("entity_id")
     private Long entityId;
 
+    @TableField("entity_pid")
+    private String entityPid;
+
     @TableField("command_code")
     private String commandCode;
 

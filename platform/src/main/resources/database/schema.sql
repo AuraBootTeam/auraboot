@@ -3968,6 +3968,7 @@ CREATE TABLE IF NOT EXISTS ab_audit_trail (
     event_type      VARCHAR(50) NOT NULL,
     entity_type     VARCHAR(255),
     entity_id       BIGINT,
+    entity_pid      VARCHAR(64),
     command_code    VARCHAR(255),
     operation_type  VARCHAR(50),
     actor_id        BIGINT NOT NULL,
@@ -3985,6 +3986,8 @@ CREATE TABLE IF NOT EXISTS ab_audit_trail (
 
 CREATE INDEX IF NOT EXISTS idx_audit_trail_entity
     ON ab_audit_trail (tenant_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_trail_entity_pid
+    ON ab_audit_trail (tenant_id, entity_type, entity_pid);
 CREATE INDEX IF NOT EXISTS idx_audit_trail_actor
     ON ab_audit_trail (tenant_id, actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_trail_timestamp
@@ -4093,6 +4096,7 @@ CREATE TABLE IF NOT EXISTS ab_sod_violation_log (
     conflicting_actor_id BIGINT NOT NULL,
     entity_type         VARCHAR(255),
     entity_id           BIGINT,
+    entity_pid          VARCHAR(64),
     enforcement         VARCHAR(50) NOT NULL,
     outcome             VARCHAR(50) NOT NULL,
     override_by         BIGINT,
@@ -4104,6 +4108,8 @@ CREATE INDEX IF NOT EXISTS idx_sod_violation_tenant
     ON ab_sod_violation_log (tenant_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sod_violation_actor
     ON ab_sod_violation_log (tenant_id, actor_id);
+CREATE INDEX IF NOT EXISTS idx_sod_violation_entity_pid
+    ON ab_sod_violation_log (tenant_id, entity_type, entity_pid);
 
 -- =====================================================================
 -- Unified Async Task Framework
