@@ -1,6 +1,6 @@
 package com.auraboot.framework.aurabot.service;
 
-import com.auraboot.framework.agent.port.ToolDiscoveryPort;
+import com.auraboot.framework.agent.service.ToolLoopService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +18,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * ACP P0-5: ChatToolExecutor stateless invariant.
@@ -39,29 +48,22 @@ class ChatToolExecutorConcurrencyTest {
     @Test
     @DisplayName("execute_invokedFrom10Threads_noStateLeak")
     void execute_invokedFrom10Threads_noStateLeak() throws Exception {
-        // Stub ToolDiscoveryPort echoes the resolved tool code + tenant id back
+        // Stub ToolLoopService echoes the resolved tool code + tenant id back
         // so we can detect any cross-thread cross-talk.
         ConcurrentHashMap<String, Long> seenTenants = new ConcurrentHashMap<>();
         Set<String> calls = ConcurrentHashMap.newKeySet();
-        ToolDiscoveryPort port = new ToolDiscoveryPort() {
-            @Override
-            public java.util.List<ToolDef> discoverTools(Long tenantId, java.util.List<String> candidateSkills,
-                                                          String modelHint, String intentHint, int maxTools) {
-                return java.util.List.of();
-            }
-            @Override
-            public Map<String, Object> executeTool(Long tenantId, String toolCode, Map<String, Object> input) {
-                seenTenants.put(toolCode, tenantId);
-                calls.add(toolCode + "::" + tenantId);
-                Map<String, Object> r = new java.util.LinkedHashMap<>();
-                r.put("success", true);
-                r.put("tool", toolCode);
-                r.put("tenant", tenantId);
-                return r;
-            }
-        };
+        ToolLoopService toolLoopService = mock(ToolLoopService.class);
+        when(toolLoopService.executeToolCall(anyLong(), anyString(), isNull(), eq("aurabot"),
+                anyString(), anyMap(), anyList(), any()))
+                .thenAnswer(invocation -> {
+                    Long tenantId = invocation.getArgument(0, Long.class);
+                    String toolCode = invocation.getArgument(4, String.class);
+                    seenTenants.put(toolCode, tenantId);
+                    calls.add(toolCode + "::" + tenantId);
+                    return "{\"success\":true,\"tool\":\"" + toolCode + "\",\"tenant\":" + tenantId + "}";
+                });
 
-        ChatToolExecutor executor = new ChatToolExecutor(port, null, null,
+        ChatToolExecutor executor = new ChatToolExecutor(toolLoopService, null,
                 new com.fasterxml.jackson.databind.ObjectMapper());
 
         int N = 10;
@@ -79,7 +81,7 @@ class ChatToolExecutorConcurrencyTest {
                     MetaContext.setContext(tenantId, 1L, "u" + tenantId, "user" + tenantId);
                     Map<String, Object> result = executor.execute(toolName, Map.of("k", "v"), null);
                     assertThat(result.get("success")).isEqualTo(true);
-                    assertThat(result.get("tenant")).isEqualTo(tenantId);
+                    assertThat(((Number) result.get("tenant")).longValue()).isEqualTo(tenantId);
                 } catch (Throwable t) {
                     errors.incrementAndGet();
                     t.printStackTrace();

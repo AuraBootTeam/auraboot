@@ -259,15 +259,12 @@ public class ChatSessionStore {
         @Builder.Default
         private long createdAt = Instant.now().toEpochMilli();
 
-        // C-5 T5: provider-specific resume payload. Carries whatever the suspend
-        // path needs to drive the resume — e.g. AuraBot Skill SPI uses keys
-        // {@code _aurabot_skill=true / previewToken / preview / riskLevel} so
-        // {@code resumeApprovedTurnFromPending} can call
-        // {@link com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor#confirm}
-        // instead of re-running the dispatch. Jackson serializes the map into
-        // JSON for Redis round-tripping; nested values must be JSON-friendly
-        // (primitives / strings / maps / lists). May be {@code null} when the
-        // suspended tool has no extension contract.
+        // Provider-specific resume payload. AuraBot Skill SPI stores
+        // _aurabot_skill / previewToken / preview / riskLevel so resume can
+        // call ToolLoopService confirm instead of re-running preview dispatch.
+        // Jackson serializes the map into JSON for Redis round-tripping; nested
+        // values must be JSON-friendly. May be null when the suspended tool has
+        // no extension contract.
         private Map<String, Object> extension;
     }
 

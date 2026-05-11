@@ -6,6 +6,8 @@ import com.auraboot.framework.agent.trace.entity.AiTrace;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -39,9 +41,15 @@ public class AiTraceController {
 
     @GetMapping("/{traceId}")
     public TraceDetailResponse getTrace(@PathVariable String traceId) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        AiTrace trace = aiTraceService.getTrace(tenantId, traceId);
+        if (trace == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "trace_not_found");
+        }
+
         TraceDetailResponse resp = new TraceDetailResponse();
-        resp.setTrace(aiTraceService.getTrace(traceId));
-        resp.setSpans(aiTraceService.getSpans(traceId));
+        resp.setTrace(trace);
+        resp.setSpans(aiTraceService.getSpans(tenantId, traceId));
         return resp;
     }
 }

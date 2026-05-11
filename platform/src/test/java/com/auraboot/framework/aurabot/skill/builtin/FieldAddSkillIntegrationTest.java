@@ -413,13 +413,13 @@ public class FieldAddSkillIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Spec §6.2 #8 — registry.list filters out field:add when caller lacks MODEL.UPDATE+FIELD.CREATE")
+    @DisplayName("Spec §6.2 #8 — registry.list filters out field:add when caller lacks meta.model.update+meta.field.update")
     public void permission_missing_excludesFromDiscovery() {
-        // Caller missing FIELD.CREATE — must NOT see field:add.
-        Set<String> insufficient = Set.of("MODEL.UPDATE");
+        // Caller missing meta.field.update — must NOT see field:add.
+        Set<String> insufficient = Set.of("meta.model.update");
         List<SkillMeta> visibleInsufficient = skillRegistry.list(insufficient);
         assertThat(visibleInsufficient)
-                .as("missing FIELD.CREATE → field:add hidden")
+                .as("missing meta.field.update → field:add hidden")
                 .extracting(SkillMeta::getName)
                 .doesNotContain("field:add");
 
@@ -431,10 +431,10 @@ public class FieldAddSkillIntegrationTest extends BaseIntegrationTest {
                 .doesNotContain("field:add");
 
         // Both perms present — must see field:add (positive control).
-        Set<String> sufficient = Set.of("MODEL.UPDATE", "FIELD.CREATE");
+        Set<String> sufficient = Set.of("meta.model.update", "meta.field.update");
         List<SkillMeta> visibleOk = skillRegistry.list(sufficient);
         assertThat(visibleOk)
-                .as("MODEL.UPDATE + FIELD.CREATE → field:add visible")
+                .as("meta.model.update + meta.field.update → field:add visible")
                 .extracting(SkillMeta::getName)
                 .contains("field:add");
     }

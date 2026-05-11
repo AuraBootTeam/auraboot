@@ -47,7 +47,7 @@ services:
       # `ab_aurabot_skill_run` table added in this worktree is initialised
       # on first boot. Operator must run `docker compose down -v` to pick
       # up subsequent schema.sql edits.
-      - /Users/ghj/work/auraboot-worktrees/aurabot-skill-spi-c2/platform/src/main/resources/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./platform/src/main/resources/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
 
   redis:
     container_name: auraboot-skills-c2-redis
