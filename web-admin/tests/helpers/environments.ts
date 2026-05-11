@@ -10,7 +10,7 @@
  * so any caller behaves identically against the host stack with no env
  * vars set. To target a per-worktree isolated docker stack, source
  * `scripts/dev/r2-env-export.sh <slug>` (or set BE_PORT / VITE_PORT /
- * BFF_PORT / PG_PORT manually); to be explicit about host mode, source
+ * BFF_PORT / PG_PORT, or libpq PGPORT, manually); to be explicit about host mode, source
  * `scripts/dev/host-env-export.sh`.
  *
  * Why this exists: every time a spec hard-codes `'http://localhost:6443'`
@@ -30,6 +30,10 @@ const BE_PORT = process.env.BE_PORT ?? '6443';
 const VITE_PORT = process.env.VITE_PORT ?? '5173';
 const BFF_PORT = process.env.BFF_PORT ?? '3500';
 
+function envValue(primary: string, alias: string, fallback: string): string {
+  return process.env[primary] ?? process.env[alias] ?? fallback;
+}
+
 /** Direct backend HTTP base — for specs that bypass vite/BFF and call the API directly. */
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? `http://localhost:${BE_PORT}`;
@@ -42,16 +46,36 @@ export const BASE_URL =
 export const BFF_URL =
   process.env.BFF_URL ?? `http://localhost:${BFF_PORT}`;
 
-const PG_HOST = process.env.PG_HOST ?? 'localhost';
-const PG_PORT = process.env.PG_PORT ?? '5432';
-const PG_USER = process.env.PG_USER ?? process.env.USER ?? 'ghj';
-const PG_DB = process.env.PG_DB ?? 'aura_boot';
+const PG_HOST = envValue('PG_HOST', 'PGHOST', 'localhost');
+const PG_PORT = envValue('PG_PORT', 'PGPORT', '5432');
+const PG_USER = process.env.PG_USER ?? process.env.PGUSER ?? process.env.USER ?? 'ghj';
+const PG_DB = envValue('PG_DB', 'PGDATABASE', 'aura_boot');
+const PG_PASSWORD = process.env['PGPASSWORD'] ?? process.env['PG_PASSWORD'];
 
 /**
  * `psql -h <host> -p <port> -U <user> -d <db>` prefix. Append your own
  * flags (-tA, -P pager=off, -c, -f, etc.) at the call site.
  */
 export const PSQL_BASE = `psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}`;
+
+/** node-postgres connection contract for E2E DB seed/cleanup helpers. */
+export const PG_CONN = Object.freeze({
+  host: PG_HOST,
+  port: Number(PG_PORT),
+  user: PG_USER,
+  database: PG_DB,
+  password: PG_PASSWORD,
+});
+
+/** Process env overlay for subprocesses that use libpq-style PG* variables. */
+export const PG_ENV = Object.freeze({
+  ...process.env,
+  PGHOST: PG_HOST,
+  PGPORT: PG_PORT,
+  PGUSER: PG_USER,
+  PGDATABASE: PG_DB,
+  ...(PG_PASSWORD ? { PGPASSWORD: PG_PASSWORD } : {}),
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // First-class Environment profiles (Phase 3 — env-scripts-testing v3)
@@ -187,11 +211,11 @@ export function loadEnv(profile: EnvProfile = 'host'): EnvironmentSpec {
   const bePort = process.env.BE_PORT ?? defaults.bePort;
   const vitePort = process.env.VITE_PORT ?? defaults.vitePort;
   const bffPort = process.env.BFF_PORT ?? defaults.bffPort;
-  const pgPort = process.env.PG_PORT ?? defaults.pgPort;
+  const pgPort = process.env.PG_PORT ?? process.env.PGPORT ?? defaults.pgPort;
   const redisPort = process.env.REDIS_PORT ?? defaults.redisPort;
-  const pgHost = process.env.PG_HOST ?? defaults.pgHost;
-  const pgUser = process.env.PG_USER ?? process.env.USER ?? defaults.pgUser;
-  const pgDb = process.env.PG_DB ?? defaults.pgDb;
+  const pgHost = process.env.PG_HOST ?? process.env.PGHOST ?? defaults.pgHost;
+  const pgUser = process.env.PG_USER ?? process.env.PGUSER ?? process.env.USER ?? defaults.pgUser;
+  const pgDb = process.env.PG_DB ?? process.env.PGDATABASE ?? defaults.pgDb;
   return {
     name: profile,
     ports: { be: bePort, vite: vitePort, bff: bffPort, pg: pgPort, redis: redisPort },

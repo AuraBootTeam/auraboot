@@ -43,11 +43,13 @@
  */
 
 import { execSync } from 'node:child_process';
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 import { BACKEND_URL, PSQL_BASE } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
+const AUTO_BOOTSTRAP_WAIT_MS = Number(process.env.AURA_AUTO_BOOTSTRAP_WAIT_MS ?? '90000');
+const BOOTSTRAP_POLL_MS = 2000;
 
 /** Built-in plugin pluginIds imported by the platform on bootstrap (canonical: BuiltinPluginImportServiceImpl). */
 const BUILTIN_PLUGIN_IDS = [
@@ -74,22 +76,44 @@ function psqlInt(query: string): number {
   return n;
 }
 
+async function readBootstrapStatus(request: APIRequestContext): Promise<{
+  initialized: boolean;
+  inProgress: boolean;
+}> {
+  const status = await request.get(`${BACKEND_URL}/api/bootstrap/status`);
+  expect(status.ok()).toBeTruthy();
+  const body = await status.json();
+  return {
+    initialized: body?.data?.initialized === true,
+    inProgress: body?.data?.inProgress === true,
+  };
+}
+
+async function waitForAutoBootstrap(request: APIRequestContext): Promise<boolean> {
+  const deadline = Date.now() + AUTO_BOOTSTRAP_WAIT_MS;
+  do {
+    const status = await readBootstrapStatus(request);
+    if (status.initialized) return true;
+    await new Promise((resolve) => setTimeout(resolve, BOOTSTRAP_POLL_MS));
+  } while (Date.now() < deadline);
+  return false;
+}
+
 test.describe.configure({ mode: 'serial' });
 
 test('00-bootstrap: ensure system is initialized via /api/bootstrap/setup', async ({
   request,
 }) => {
-  const status = await request.get(`${BACKEND_URL}/api/bootstrap/status`);
-  expect(status.ok()).toBeTruthy();
-  const statusBody = await status.json();
-  const initialized = statusBody?.data?.initialized === true;
+  let { initialized } = await readBootstrapStatus(request);
+  if (!initialized) {
+    initialized = await waitForAutoBootstrap(request);
+  }
 
   if (!initialized) {
     // Phase 2.4: backend's BootstrapStartupRunner now auto-bootstraps on
-    // first start. The wizard endpoint short-circuits when the system is
-    // already initialized (back-compat), so a successful response can be
-    // either code='0' (we initialized) OR a body whose message contains
-    // "already initialized" (auto-runner beat us).
+    // first start. Health can be reachable while startup repair is still
+    // finalizing; wait before falling back to the wizard to avoid racing the
+    // runner and creating duplicate bootstrap roles.
     const setup = await request.post(`${BACKEND_URL}/api/bootstrap/setup`, {
       data: {
         companyName: COMPANY_NAME,

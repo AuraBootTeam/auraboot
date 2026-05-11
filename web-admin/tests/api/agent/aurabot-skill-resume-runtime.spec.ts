@@ -1,15 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { Client } from 'pg';
-import { BACKEND_URL, loadEnv } from '../../helpers/environments';
+import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
 
 const TEST_ACCOUNT = { email: 'admin@auraboot.com', password: 'Test2026x' };
-const TEST_ENV = loadEnv();
-const PG_HOST = process.env.PGHOST ?? TEST_ENV.pg.host;
-const PG_PORT = process.env.PGPORT ?? TEST_ENV.pg.port;
-const PG_USER = process.env.PGUSER ?? TEST_ENV.pg.user;
-const PG_DB = process.env.PGDATABASE ?? TEST_ENV.pg.db;
-const PG_PASSWORD = process.env['PGPASSWORD'] ?? process.env['PG_PASSWORD'];
 const STUB_TOOL_USE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
 
 type AuthContext = {
@@ -142,13 +136,7 @@ function parseSse(text: string): SseEvent[] {
 }
 
 async function psql(sql: string): Promise<string> {
-  const client = new Client({
-    host: PG_HOST,
-    port: Number(PG_PORT),
-    user: PG_USER,
-    database: PG_DB,
-    password: PG_PASSWORD,
-  });
+  const client = new Client(PG_CONN);
   await client.connect();
   try {
     const result = await client.query(sql);

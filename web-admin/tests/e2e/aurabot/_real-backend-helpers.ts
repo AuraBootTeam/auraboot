@@ -12,8 +12,7 @@
  */
 
 import { execFileSync, execSync } from 'node:child_process';
-import { BACKEND_URL } from '../../helpers/playwright-env';
-import { loadEnv } from '../../helpers/environments';
+import { BACKEND_URL, PG_ENV } from '../../helpers/environments';
 
 // Admin primary tenant — matches the JWT issued by
 // `admin@auraboot.com / Test2026x`. Keep in sync with
@@ -30,8 +29,7 @@ function resolveAdminTenantId(): string {
     // Hardcoding :6443 made every docker-stack run silently fall back to
     // the host-DB tenant id, which then propagated into every menu /
     // seeded row insert and tripped FK violations on docker DB.
-    const backendUrl =
-      BACKEND_URL;
+    const backendUrl = BACKEND_URL;
     const out = execSync(
       `curl -s -X POST ${backendUrl}/api/auth/login -H 'Content-Type: application/json' ` +
         `-d '{"email":"admin@auraboot.com","password":"Test2026x"}'`,
@@ -84,23 +82,6 @@ function resolveAiCenterMenuId(): string {
 // Canonical pattern documented in
 // `auraboot-enterprise/.../feedback_psql_helpers_must_be_env_aware.md`.
 // ---------------------------------------------------------------------------
-
-const TEST_ENV = loadEnv();
-const PG_HOST = process.env.PGHOST || TEST_ENV.pg.host;
-const PG_PORT = process.env.PGPORT || TEST_ENV.pg.port;
-const PG_USER = process.env.PGUSER || TEST_ENV.pg.user;
-const PG_DB = process.env.PGDATABASE || TEST_ENV.pg.db;
-// PGPASSWORD is the standard libpq env — pass it through if set so docker
-// stacks with non-trust auth can connect. Don't override if the operator
-// has already set it.
-const PG_ENV = {
-  ...process.env,
-  PGHOST: PG_HOST,
-  PGPORT: PG_PORT,
-  PGUSER: PG_USER,
-  PGDATABASE: PG_DB,
-  PGPASSWORD: process.env['PGPASSWORD'] || process.env['PG_PASSWORD'] || '',
-};
 
 export const AI_CENTER_MENU_ID = resolveAiCenterMenuId();
 
