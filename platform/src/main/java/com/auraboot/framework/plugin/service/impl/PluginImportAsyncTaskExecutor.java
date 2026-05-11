@@ -23,11 +23,13 @@ import org.springframework.stereotype.Component;
  * {
  *   "directoryPath": "/absolute/path/to/plugin-dir",
  *   "conflictStrategy": "overwrite",
+ *   "validateReferences": true,
  *   "autoPublishModels": true,
  *   "autoPublishFields": true,
  *   "autoPublishCommands": true,
  *   "autoPublishPages": true,
  *   "autoDeployProcesses": false,
+ *   "createResourcePermissions": true,
  *   "tenantId": 123456,
  *   "userId": 789,
  *   "userPid": "01ABC...",
@@ -95,11 +97,13 @@ public class PluginImportAsyncTaskExecutor implements AsyncTaskExecutor {
             ImportRequest importRequest = ImportRequest.builder()
                     .importId(preview.getImportId())
                     .conflictStrategy(ImportRequest.ConflictStrategy.valueOf(conflictStrategy))
-                    .autoDeployProcesses(inputParams.path("autoDeployProcesses").asBoolean(false))
-                    .autoPublishModels(inputParams.path("autoPublishModels").asBoolean(true))
-                    .autoPublishFields(inputParams.path("autoPublishFields").asBoolean(true))
-                    .autoPublishCommands(inputParams.path("autoPublishCommands").asBoolean(true))
-                    .autoPublishPages(inputParams.path("autoPublishPages").asBoolean(true))
+                    .validateReferences(nullableBoolean(inputParams, "validateReferences"))
+                    .autoDeployProcesses(nullableBoolean(inputParams, "autoDeployProcesses"))
+                    .autoPublishModels(nullableBoolean(inputParams, "autoPublishModels"))
+                    .autoPublishFields(nullableBoolean(inputParams, "autoPublishFields"))
+                    .autoPublishCommands(nullableBoolean(inputParams, "autoPublishCommands"))
+                    .autoPublishPages(nullableBoolean(inputParams, "autoPublishPages"))
+                    .createResourcePermissions(nullableBoolean(inputParams, "createResourcePermissions"))
                     .build();
 
             // Step 3: Execute import (25% - 95%)
@@ -144,5 +148,13 @@ public class PluginImportAsyncTaskExecutor implements AsyncTaskExecutor {
             log.error("Async plugin import failed: directory={}", directoryPath, e);
             return AsyncTaskResult.fail("Plugin import failed: " + e.getMessage());
         }
+    }
+
+    private Boolean nullableBoolean(JsonNode inputParams, String fieldName) {
+        JsonNode value = inputParams.get(fieldName);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        return value.asBoolean();
     }
 }

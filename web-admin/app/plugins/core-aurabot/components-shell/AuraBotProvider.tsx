@@ -438,6 +438,17 @@ function derivePageContextFromRoute(
   pathname: string,
   params: Record<string, string | undefined>,
 ): PageContext {
+  const normalizedPath = pathname.replace(/\/+$/, '') || '/';
+
+  if (normalizedPath === '/quality/defects') {
+    return {
+      pageType: 'list',
+      pageKey: 'qc_defect_record',
+      modelCode: 'qc_defect_record',
+      breadcrumb: ['质量管理', '缺陷记录'],
+    };
+  }
+
   // /p/:pageKey/view/:recordId → detail
   if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
     const pageKey = params.pageKey || '';

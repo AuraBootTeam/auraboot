@@ -34,6 +34,11 @@ public class ExtensionValidator implements PluginValidator {
     }
 
     @Override
+    public boolean requiresReferenceValidation() {
+        return true;
+    }
+
+    @Override
     public List<PluginValidationMessage> validate(PluginValidationContext ctx) {
         List<PluginValidationMessage> messages = new ArrayList<>();
         PluginManifestExtended manifest = ctx.getManifest();

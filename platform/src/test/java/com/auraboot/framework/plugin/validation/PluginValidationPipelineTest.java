@@ -625,6 +625,48 @@ class PluginValidationPipelineTest {
         return manifest;
     }
 
+    private PluginManifestExtended manifestWithUnregisteredHandlerCommand() {
+        CommandDefinitionDTO command = CommandDefinitionDTO.builder()
+                .code("qc:calculate_spc_limits")
+                .modelCode("qc_spc_chart")
+                .type("custom")
+                .handler("qc:calculate_spc_limits")
+                .build();
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        manifest.setCommands(List.of(command));
+        return manifest;
+    }
+
+    @Test
+    void validationPipeline_unregisteredHandlerBlocksWhenReferenceValidationEnabled() {
+        PluginValidationPipeline pipeline = new PluginValidationPipeline(List.of(buildExtensionValidator()));
+
+        PluginValidationResult result = pipeline.validate(PluginValidationContext.builder()
+                .pluginId("test")
+                .manifest(manifestWithUnregisteredHandlerCommand())
+                .validateReferences(true)
+                .build());
+
+        assertFalse(result.isValid());
+        assertTrue(result.getMessages().stream()
+                .anyMatch(m -> "S-EXT-HANDLER".equals(m.getCode()) && m.isError()));
+    }
+
+    @Test
+    void validationPipeline_unregisteredHandlerDoesNotBlockWhenReferenceValidationDisabled() {
+        PluginValidationPipeline pipeline = new PluginValidationPipeline(List.of(buildExtensionValidator()));
+
+        PluginValidationResult result = pipeline.validate(PluginValidationContext.builder()
+                .pluginId("test")
+                .manifest(manifestWithUnregisteredHandlerCommand())
+                .validateReferences(false)
+                .build());
+
+        assertTrue(result.isValid());
+        assertTrue(result.getMessages().stream()
+                .noneMatch(m -> "S-EXT-HANDLER".equals(m.getCode())));
+    }
+
     @Test
     void extensionValidator_compatibleType_noWarning() {
         // STRING + SmartInput is a valid combination — no warning expected
