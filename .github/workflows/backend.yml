@@ -3,14 +3,8 @@ name: Backend CI
 on:
   push:
     branches: [main]
-    paths:
-      - 'platform/**'
-      - '.github/workflows/backend.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'platform/**'
-      - '.github/workflows/backend.yml'
 
 concurrency:
   group: backend-${{ github.ref }}
@@ -33,23 +27,53 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect backend changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            if [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base="$(git rev-list --max-parents=0 "$head" | tail -1)"
+            fi
+          fi
+
+          if git diff --name-only "$base" "$head" \
+            | grep -E '^(platform/|\.github/workflows/backend\.yml)' >/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No backend changes; required check reports success without running Gradle."
+          fi
 
       - name: Set up JDK ${{ matrix.java }}
+        if: steps.changes.outputs.run == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
 
       - name: Set up Gradle
+        if: steps.changes.outputs.run == 'true'
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Make gradlew executable
+        if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: chmod +x ./gradlew
 
       - name: Compile (main + test sources)
+        if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: ./gradlew --no-daemon compileJava compileTestJava
 
@@ -57,18 +81,22 @@ jobs:
       # green even though we don't run the suite in CI yet (running requires
       # a seeded Postgres — schema init script is Phase 2.2 backlog).
       - name: Compile (integrationTest sources)
+        if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: ./gradlew --no-daemon compileIntegrationTestJava
 
       - name: Checkstyle (main)
+        if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: ./gradlew --no-daemon checkstyleMain
 
       - name: PMD (main)
+        if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: ./gradlew --no-daemon pmdMain
 
       - name: Assemble jar
+        if: steps.changes.outputs.run == 'true'
         working-directory: platform
         run: ./gradlew --no-daemon jar
 

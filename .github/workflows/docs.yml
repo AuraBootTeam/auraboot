@@ -7,16 +7,8 @@ name: Docs CI
 on:
   push:
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'scripts/check-docs.sh'
-      - '.github/workflows/docs.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'scripts/check-docs.sh'
-      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
@@ -35,17 +27,52 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            if [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base="$(git rev-list --max-parents=0 "$head" | tail -1)"
+            fi
+          fi
+
+          if git diff --name-only "$base" "$head" \
+            | grep -E '^(docs/|scripts/check-docs\.sh|\.github/workflows/docs\.yml)' >/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No docs changes; required check reports success without markdownlint."
+          fi
 
       - name: Set up Node.js 20
+        if: steps.changes.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install markdownlint-cli2
+        if: steps.changes.outputs.run == 'true'
         run: npm install -g markdownlint-cli2
 
       - name: Make script executable
+        if: steps.changes.outputs.run == 'true'
         run: chmod +x scripts/check-docs.sh
 
       - name: Run docs quality check (strict — dead links fail CI)
+        if: steps.changes.outputs.run == 'true'
         run: bash scripts/check-docs.sh --strict
