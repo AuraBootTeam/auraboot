@@ -1,0 +1,77 @@
+name: Release notes
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, without the leading v'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark the GitHub Release as a prerelease'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish GitHub Release notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve release metadata
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+
+          if [ -z "$version" ]; then
+            echo "ERROR: release version could not be resolved"
+            exit 1
+          fi
+
+          prerelease="${INPUT_PRERELEASE:-true}"
+          tag="v${version}"
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          node scripts/extract-changelog-release.mjs \
+            "${{ steps.meta.outputs.version }}" \
+            --out /tmp/release-notes.md
+
+      - name: Publish or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE_FLAG: ${{ steps.meta.outputs.prerelease == 'true' && '--prerelease' || '' }}
+        run: |
+          tag="${{ steps.meta.outputs.tag }}"
+          title="AuraBoot ${{ steps.meta.outputs.version }}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" \
+              --title "$title" \
+              --notes-file /tmp/release-notes.md \
+              $PRERELEASE_FLAG
+          else
+            gh release create "$tag" \
+              --title "$title" \
+              --notes-file /tmp/release-notes.md \
+              $PRERELEASE_FLAG
+          fi
