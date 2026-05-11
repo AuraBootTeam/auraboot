@@ -321,7 +321,7 @@ public class DataScopeServiceImpl implements DataScopeService {
             }
             return null;
         } catch (Exception e) {
-            // lgtm[java/log-injection] Resource codes are validated metadata identifiers and are logged as structured parameters only.
+            // codeql[java/log-injection] Resource codes are validated metadata identifiers and are logged as structured parameters only.
             log.debug("Could not load dataScope config for model {}: {}", resourceCode, e.getMessage());
             return null;
         }
