@@ -51,7 +51,9 @@ class MobileSearchControllerTest {
                         "id", 1001L,
                         "pid", "order-pid-1",
                         "e2et_order_no", "visual_order_1",
-                        "e2et_order_status", "draft"
+                        "e2et_order_status", "draft",
+                        "created_by", 99L,
+                        "updated_by", 100L
                 )), 1L, 1, 3));
 
         ApiResponse<MobileSearchResult> response = controller.search("visual", null, null, 20);
@@ -67,6 +69,8 @@ class MobileSearchControllerTest {
         assertEquals("order-pid-1", hit.getRecordPid());
         assertEquals("visual_order_1", hit.getDisplayName());
         assertEquals("record", hit.getType());
+        assertFalse(hit.getFields().containsKey("created_by"));
+        assertFalse(hit.getFields().containsKey("updated_by"));
 
         ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
         verify(dynamicDataService).list(eq("e2et_order"), requestCaptor.capture());
