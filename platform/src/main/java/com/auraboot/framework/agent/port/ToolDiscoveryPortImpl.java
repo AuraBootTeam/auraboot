@@ -1,7 +1,7 @@
 package com.auraboot.framework.agent.port;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
-import com.auraboot.framework.agent.provider.ProviderExecutionResult;
+import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
@@ -9,6 +9,7 @@ import com.auraboot.framework.agent.service.AgentSkillService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -24,6 +25,9 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
 
     private final AgentSkillService agentSkillService;
     private final ToolProviderRegistry toolProviderRegistry;
+
+    @Autowired(required = false)
+    private AgentRuntimeObservabilityService observabilityService;
 
     @Override
     public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
@@ -41,7 +45,13 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
                             atd.getName(),
                             atd.getDescription(),
                             atd.getInputSchema() != null ? atd.getInputSchema() : Map.of(),
-                            isReadOnlyTool(atd)
+                            isReadOnlyTool(atd),
+                            atd.getToolType(),
+                            atd.getSourceCode(),
+                            atd.isRequiresApproval(),
+                            atd.isRequiresConfirmation(),
+                            atd.getRiskLevel(),
+                            atd.getConfirmationPolicy()
                     );
                     if (!queryOnly || toolDef.readOnly()) {
                         skillTools.add(toolDef);
@@ -53,7 +63,9 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
 
         if (!skillTools.isEmpty() && (modelHint == null || modelHint.isBlank())) {
             log.debug("ToolDiscoveryPort: found {} tools from skill resolution", skillTools.size());
-            return limitTools(skillTools, maxTools);
+            List<ToolDef> result = limitTools(skillTools, maxTools);
+            recordDiscovery("skill", queryOnly, result.size());
+            return result;
         }
 
         // Phase 2: Fallback to ToolProviderRegistry discovery, filtered by intent
@@ -72,7 +84,13 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
                         td.getToolName(),
                         enhanceDescription(td.getToolCode(), td.getDescription()),
                         td.getParameterSchema() != null ? td.getParameterSchema() : Map.of(),
-                        isReadOnlyToolDefinition(td)
+                        isReadOnlyToolDefinition(td),
+                        td.getToolType(),
+                        td.getSourceCode(),
+                        td.isRequiresApproval(),
+                        td.isRequiresConfirmation(),
+                        td.getRiskLevel(),
+                        td.getConfirmationPolicy()
                 ))
                 // For query intent: only keep read-only tools (nq, list, get, platform.execute_sql, platform.list_models)
                 .filter(td -> !queryOnly || td.readOnly())
@@ -82,6 +100,7 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
         if (skillTools.isEmpty()) {
             log.debug("ToolDiscoveryPort: found {} tools from provider registry (queryOnly={})",
                     providerTools.size(), queryOnly);
+            recordDiscovery("provider", queryOnly, providerTools.size());
             return providerTools;
         }
 
@@ -91,23 +110,8 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
 
         log.debug("ToolDiscoveryPort: merged {} provider tools with {} skill tools (queryOnly={})",
                 providerTools.size(), skillTools.size(), queryOnly);
+        recordDiscovery("mixed", queryOnly, result.size());
         return result;
-    }
-
-    @Override
-    public Map<String, Object> executeTool(Long tenantId, String toolCode, Map<String, Object> params) {
-        ProviderExecutionResult result = toolProviderRegistry.execute(tenantId, toolCode, params);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("success", result.isSuccess());
-        if (result.getData() != null) {
-            response.put("data", result.getData());
-        }
-        if (result.getErrorMessage() != null) {
-            response.put("error", result.getErrorMessage());
-        }
-        response.put("durationMs", result.getDurationMs());
-        return response;
     }
 
     private boolean isReadOnlyTool(AgentToolDefinition atd) {
@@ -162,6 +166,12 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
             if (tool != null && existing.add(tool.code())) {
                 target.add(tool);
             }
+        }
+    }
+
+    private void recordDiscovery(String source, boolean queryOnly, int returnedCount) {
+        if (observabilityService != null) {
+            observabilityService.recordToolDiscovery(source, queryOnly, returnedCount);
         }
     }
 }

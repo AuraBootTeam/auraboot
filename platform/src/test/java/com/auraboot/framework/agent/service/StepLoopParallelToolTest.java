@@ -405,7 +405,7 @@ class StepLoopParallelToolTest {
             // constructor stores the references but does not deref them.
             // Adding new abstract dependencies upstream that ToolLoopService
             // actually uses in its constructor body would break this stub.
-            super(null, null, null, null, null, null, null, new ObjectMapper(), null, null);
+            super(null, null, null, null, null, null, null, new ObjectMapper(), null, null, null);
         }
 
         @Override

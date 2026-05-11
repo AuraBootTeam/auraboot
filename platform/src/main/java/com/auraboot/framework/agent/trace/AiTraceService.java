@@ -226,12 +226,12 @@ public class AiTraceService {
         return traceMapper.selectPageWithResultMap(new Page<>(pageNum, pageSize), qw);
     }
 
-    public AiTrace getTrace(String traceId) {
-        return traceMapper.selectByTraceId(traceId);
+    public AiTrace getTrace(Long tenantId, String traceId) {
+        return traceMapper.selectByTenantAndTraceId(tenantId, traceId);
     }
 
-    public List<AiTraceSpan> getSpans(String traceId) {
-        return spanMapper.selectByTraceId(traceId);
+    public List<AiTraceSpan> getSpans(Long tenantId, String traceId) {
+        return spanMapper.selectByTenantAndTraceId(tenantId, traceId);
     }
 
     public TraceStatsResponse getStats(Long tenantId) {

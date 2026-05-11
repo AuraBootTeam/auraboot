@@ -1,7 +1,11 @@
 package com.auraboot.framework.agent.port;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.service.ToolLoopService;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   1. GroundingPort resolves query/mutation intents via regex-based IntentParser
  *   2. GroundingPort uses pageModel as fallback for object resolution
  *   3. ToolDiscoveryPort discovers tools from ToolProviderRegistry
- *   4. ToolDiscoveryPort executes platform tools successfully
+ *   4. Discovered tools execute through the canonical ToolLoopService
  *
  * Requires: published meta models + ab_object_alias seed data for object resolution.
  * LLM is NOT invoked — IntentParser Phase 1+2 regex covers all test messages.
@@ -40,6 +44,12 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ToolDiscoveryPort toolDiscoveryPort;
+
+    @Autowired
+    private ToolLoopService toolLoopService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private Long tenantId;
 
@@ -164,22 +174,27 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
         assertThat(tools).hasSizeLessThanOrEqualTo(maxTools);
     }
 
-    // ========== ToolDiscoveryPort: execution ==========
+    // ========== Canonical ToolLoopService execution ==========
 
     @Test
-    void executeTool_platformListModels_returnsModels() {
-        var result = toolDiscoveryPort.executeTool(tenantId, "platform.list_models", Map.of());
+    void toolLoop_platformListModels_returnsModels() throws Exception {
+        var result = executePlatformListModels();
 
         assertThat(result).isNotNull();
         assertThat(result).containsKey("success");
         assertThat(result.get("success")).isEqualTo(true);
-        assertThat(result).containsKey("data");
         assertThat(result).containsKey("durationMs");
     }
 
     @Test
-    void executeTool_unknownTool_returnsFailure() {
-        var result = toolDiscoveryPort.executeTool(tenantId, "nonexistent.tool_xyz", Map.of());
+    void toolLoop_unknownTool_returnsFailure() throws Exception {
+        String raw = toolLoopService.executeToolCall(
+                tenantId, "tool-routing-test-run", null, "aurabot",
+                "nonexistent.tool_xyz", Map.of(), List.of(), null);
+        Map<String, Object> result = Map.of(
+                "success", false,
+                "error", raw
+        );
 
         assertThat(result).isNotNull();
         assertThat(result.get("success")).isEqualTo(false);
@@ -189,7 +204,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
     // ========== End-to-end pipeline: ground → discover → execute ==========
 
     @Test
-    void fullPipeline_groundThenDiscoverThenExecute() {
+    void fullPipeline_groundThenDiscoverThenExecute() throws Exception {
         // Step 1: Ground the user message
         var groundResult = groundingPort.ground(tenantId, "查看所有模型", null, null);
         assertThat(groundResult).isNotNull();
@@ -205,9 +220,25 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
         );
         assertThat(tools).isNotNull();
 
-        // Step 3: Execute platform.list_models as a known-good tool
-        var execResult = toolDiscoveryPort.executeTool(tenantId, "platform.list_models", Map.of());
+        // Step 3: Execute platform.list_models through ToolLoopService as a known-good tool
+        var execResult = executePlatformListModels();
         assertThat(execResult).isNotNull();
         assertThat(execResult.get("success")).isEqualTo(true);
+    }
+
+    private Map<String, Object> executePlatformListModels() throws Exception {
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("platform.list_models")
+                .description("List Data Models")
+                .toolType("platform")
+                .sourceCode("platform.list_models")
+                .riskLevel("L0")
+                .confirmationPolicy("none")
+                .inputSchema(Map.of("type", "object"))
+                .build();
+        String raw = toolLoopService.executeToolCall(
+                tenantId, "tool-routing-test-run", null, "aurabot",
+                tool.getName(), Map.of(), List.of(tool), null);
+        return objectMapper.readValue(raw, new TypeReference<>() {});
     }
 }

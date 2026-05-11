@@ -17,6 +17,7 @@ import com.auraboot.framework.meta.dto.RemoveFieldRequest;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -125,7 +126,7 @@ public class FieldAddSkill implements AuraBotSkill {
     @Override
     public Set<String> requiredPermissions() {
         // Registry uses containsAll — caller must hold BOTH.
-        return Set.of("MODEL.UPDATE", "FIELD.CREATE");
+        return Set.of(MetaPermission.MODEL_MANAGE, MetaPermission.FIELD_MANAGE);
     }
 
     @Override

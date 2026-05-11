@@ -22,9 +22,9 @@ package com.auraboot.framework.agent.service;
  * ThreadLocal single-purpose and avoids leaking step state across unrelated
  * background jobs that share the same async executor.
  *
- * <p>Using ThreadLocal instead of threading the index through every
- * ToolExecutionPort signature keeps the port interface stable for callers
- * that don't care about Step structure (e.g. ad-hoc tool invocations).
+     * <p>Using ThreadLocal instead of threading the index through every
+     * {@code ToolLoopService.executeToolCall} caller keeps the canonical runtime
+     * entry stable for callers that don't care about Step structure.
  */
 public final class StepContext {
 

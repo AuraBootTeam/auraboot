@@ -22,8 +22,12 @@ import {
   type AgentInterruptItem,
   type AgentRunListItem,
   type AgentBifSummary,
+  type AgentConversationTurnReplay,
+  type AgentConversationMessageItem,
+  type AgentResultContractItem,
 } from '../services/agentRunsApi';
 import LiveStreamSection from './LiveStreamSection';
+import { ResultContractView } from './ResultContractView';
 
 /**
  * Heuristic mirror of {@code LiveStreamSection.isLlmAction}. Determines
@@ -121,7 +125,13 @@ function MetadataSection({ run }: { run: AgentRunListItem }) {
   );
 }
 
-function ActionRow({ action }: { action: AgentActionItem }) {
+function ActionRow({
+  action,
+  onOpenResult,
+}: {
+  action: AgentActionItem;
+  onOpenResult?: (contractId: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const hasDiff = action.beforeSnapshot || action.afterSnapshot || action.fieldChanges;
   return (
@@ -147,6 +157,16 @@ function ActionRow({ action }: { action: AgentActionItem }) {
       </button>
       {open && (
         <div className="mt-2 ml-10 text-xs space-y-2" data-testid={`action-detail-${action.pid}`}>
+          {action.resultContractId && onOpenResult && (
+            <button
+              type="button"
+              onClick={() => onOpenResult(action.resultContractId!)}
+              className="rounded border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+              data-testid={`open-result-contract-${action.pid}`}
+            >
+              Open Result
+            </button>
+          )}
           {action.intentSummary && (
             <div>
               <span className="text-gray-500">Intent: </span>
@@ -193,7 +213,13 @@ function ActionRow({ action }: { action: AgentActionItem }) {
   );
 }
 
-function ActionsSection({ actions }: { actions: AgentActionItem[] }) {
+function ActionsSection({
+  actions,
+  onOpenResult,
+}: {
+  actions: AgentActionItem[];
+  onOpenResult?: (contractId: string) => void;
+}) {
   return (
     <section data-testid="drawer-section-actions" className="border-b border-gray-200 p-4">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">
@@ -204,7 +230,7 @@ function ActionsSection({ actions }: { actions: AgentActionItem[] }) {
       ) : (
         <ul className="space-y-0">
           {actions.map((a) => (
-            <ActionRow key={a.pid} action={a} />
+            <ActionRow key={a.pid} action={a} onOpenResult={onOpenResult} />
           ))}
         </ul>
       )}
@@ -294,17 +320,146 @@ function BifSection({ bif }: { bif: AgentBifSummary | null }) {
   );
 }
 
+function MessageRow({ message }: { message: AgentConversationMessageItem }) {
+  return (
+    <li
+      className="rounded border border-gray-200 bg-white p-3 text-xs"
+      data-testid={`conversation-message-${message.messageId}`}
+    >
+      <div className="mb-1 flex items-center gap-2">
+        <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-700">
+          {message.senderType ?? 'unknown'}
+        </span>
+        <span className="font-mono text-gray-500">seq {message.seq ?? '-'}</span>
+        <span className="font-mono text-gray-500">{message.clientMsgId ?? '-'}</span>
+      </div>
+      <div className="whitespace-pre-wrap text-sm text-gray-900">
+        {message.content ?? message.cardPayload ?? '-'}
+      </div>
+      {(message.triageBucket || message.thinkingContent) && (
+        <div className="mt-2 grid gap-1 text-[11px] text-gray-500">
+          {message.triageBucket && (
+            <div>
+              Triage: {message.triageBucket}
+              {message.triageConfidence ? ` · ${message.triageConfidence}` : ''}
+            </div>
+          )}
+          {message.thinkingContent && <div>Thinking: {message.thinkingContent}</div>}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function ConversationSection({ turn }: { turn: AgentConversationTurnReplay | null }) {
+  if (!turn) {
+    return (
+      <section data-testid="drawer-section-conversation" className="p-4">
+        <h3 className="mb-3 text-sm font-semibold text-gray-700">Conversation Turn</h3>
+        <div className="text-xs text-gray-500">No conversation turn data.</div>
+      </section>
+    );
+  }
+  const fields: Array<[string, string]> = [
+    ['Turn ID', turn.turnId ?? '-'],
+    ['Task PID', turn.taskPid ?? '-'],
+    ['Conversation', turn.conversationId != null ? String(turn.conversationId) : '-'],
+    ['Inbound Message', turn.inboundMessageId != null ? String(turn.inboundMessageId) : '-'],
+    ['Outbound Message', turn.outboundMessageId != null ? String(turn.outboundMessageId) : '-'],
+    ['Outcome', turn.outcomeStatus ?? '-'],
+    ['Triage', turn.triageBucket ?? '-'],
+  ];
+  return (
+    <section data-testid="drawer-section-conversation" className="p-4">
+      <h3 className="mb-3 text-sm font-semibold text-gray-700">Conversation Turn</h3>
+      <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+        {fields.map(([k, v]) => (
+          <div key={k} className="flex flex-col">
+            <dt className="text-gray-500">{k}</dt>
+            <dd className="break-all font-mono text-gray-900">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {turn.userMessage && (
+        <div className="mb-3 rounded border border-gray-200 bg-gray-50 p-3 text-sm">
+          <div className="mb-1 text-xs font-medium text-gray-500">User Message</div>
+          <div className="whitespace-pre-wrap text-gray-900">{turn.userMessage}</div>
+        </div>
+      )}
+      {turn.finalResponse && (
+        <div className="mb-3 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm">
+          <div className="mb-1 text-xs font-medium text-emerald-700">Final Response</div>
+          <div className="whitespace-pre-wrap text-gray-900">{turn.finalResponse}</div>
+        </div>
+      )}
+      <h4 className="mb-2 text-xs font-semibold text-gray-600">
+        Message Tape ({turn.messages?.length ?? 0})
+      </h4>
+      {turn.messages && turn.messages.length > 0 ? (
+        <ul className="space-y-2">
+          {turn.messages.map((message) => (
+            <MessageRow key={message.messageId} message={message} />
+          ))}
+        </ul>
+      ) : (
+        <div className="text-xs text-gray-500">No persisted messages for this turn.</div>
+      )}
+    </section>
+  );
+}
+
+function ResultContractsSection({
+  contracts,
+  selectedContractId,
+}: {
+  contracts: AgentResultContractItem[];
+  selectedContractId: string | null;
+}) {
+  return (
+    <section data-testid="drawer-section-result-contracts" className="p-4">
+      <h3 className="mb-3 text-sm font-semibold text-gray-700">
+        Result Contracts ({contracts.length})
+      </h3>
+      {contracts.length === 0 ? (
+        <div className="text-xs text-gray-500">No result contracts.</div>
+      ) : (
+        <div className="space-y-3">
+          {contracts.map((item) => {
+            const selected = selectedContractId === item.contractId;
+            return (
+              <article
+                key={item.contractId}
+                className={`rounded border p-3 ${
+                  selected ? 'border-indigo-300 bg-indigo-50/50' : 'border-gray-200 bg-white'
+                }`}
+                data-testid={`result-contract-item-${item.contractId}`}
+              >
+                <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+                  <span className="font-mono text-gray-700">{item.contractId}</span>
+                  {item.actionPid && <span>Action {shortPid(item.actionPid)}</span>}
+                </div>
+                <ResultContractView contract={item.contract} />
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Drawer shell
 // ---------------------------------------------------------------------------
 
-type DrawerTab = 'overview' | 'live-stream';
+type DrawerTab = 'overview' | 'conversation' | 'results' | 'live-stream';
 
 export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Props) {
   const [detail, setDetail] = useState<AgentRunDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DrawerTab>('overview');
+  const [selectedResultContractId, setSelectedResultContractId] = useState<string | null>(null);
 
   const showLiveStreamTab = useMemo(
     () => (detail ? automationContainsLlmNode(detail.actions) : false),
@@ -321,7 +476,10 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
     setError(null);
     getAgentRunDetail(runId)
       .then((d) => {
-        if (!cancelled) setDetail(d);
+        if (!cancelled) {
+          setDetail(d);
+          setSelectedResultContractId(d.resultContracts?.[0]?.contractId ?? null);
+        }
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
@@ -391,6 +549,30 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
               >
                 Overview
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('conversation')}
+                data-testid="drawer-tab-conversation"
+                className={`px-2 py-1 text-xs rounded ${
+                  activeTab === 'conversation'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                Conversation
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('results')}
+                data-testid="drawer-tab-results"
+                className={`px-2 py-1 text-xs rounded ${
+                  activeTab === 'results'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                Results
+              </button>
               {showLiveStreamTab && (
                 <button
                   type="button"
@@ -405,15 +587,39 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
                   Live Stream
                 </button>
               )}
+              {detail.traceId && (
+                <a
+                  href={`/aurabot/traces/${encodeURIComponent(detail.traceId)}`}
+                  className="ml-auto rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                  data-testid="open-trace-link"
+                >
+                  Open Trace
+                </a>
+              )}
             </nav>
             {activeTab === 'overview' && (
               <>
                 <MetadataSection run={detail.run} />
-                <ActionsSection actions={detail.actions} />
+                <ActionsSection
+                  actions={detail.actions}
+                  onOpenResult={(contractId) => {
+                    setSelectedResultContractId(contractId);
+                    setActiveTab('results');
+                  }}
+                />
                 <InterruptsSection rows={detail.interruptLog} />
                 <ChildRunsSection rows={detail.childRuns} parentRunId={detail.run.runId} onSelectRun={onSelectRun} />
                 <BifSection bif={detail.bif} />
               </>
+            )}
+            {activeTab === 'conversation' && (
+              <ConversationSection turn={detail.conversationTurn} />
+            )}
+            {activeTab === 'results' && (
+              <ResultContractsSection
+                contracts={detail.resultContracts ?? []}
+                selectedContractId={selectedResultContractId}
+              />
             )}
             {activeTab === 'live-stream' && showLiveStreamTab && (
               <LiveStreamSection runId={runId} actions={detail.actions} />
