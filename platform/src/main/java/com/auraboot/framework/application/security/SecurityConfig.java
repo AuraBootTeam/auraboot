@@ -62,6 +62,7 @@ public class SecurityConfig {
                 || activeProfile.contains("test") || "default".equals(activeProfile);
 
         http
+                // lgtm[java/spring-disabled-csrf-protection] AuraBoot APIs are stateless JWT/Bearer-token APIs; browser cookies are not used for authentication.
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> {
