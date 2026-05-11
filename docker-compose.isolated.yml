@@ -74,8 +74,14 @@ services:
       # Mount this worktree's plugins read-only so import-directory-sync
       # can resolve absolute paths like /app/plugins/<name>.
       - ./plugins:/app/plugins:ro
-      # Optional sibling enterprise plugins (no-op if absent).
-      - ../auraboot-enterprise/plugins:/app/plugins-enterprise:ro
+      # Optional enterprise plugins. start-isolated.sh resolves this to either
+      # the sibling enterprise worktree, canonical enterprise repo, or an empty
+      # directory for OSS-only stacks.
+      - ${ENTERPRISE_PLUGINS_DIR:-./.aura-stack/empty-enterprise-plugins}:/app/plugins-enterprise:ro
+      # Optional enterprise PF4J backend handler jars. Config imports validate
+      # command handlers before resource import, so handler jars must be loaded
+      # at backend startup rather than discovered from JSON plugin directories.
+      - ${ENTERPRISE_PLUGIN_JARS_DIR:-./.aura-stack/empty-enterprise-plugin-jars}:/app/plugin-jars:ro
       # Cross-stack shared caches — first stack populates, all others reuse.
       # See Dockerfile.dev (GRADLE_USER_HOME=/gradle-cache, MAVEN_HOME=/m2-cache)
       # and docs/plans/2026-05/2026-05-08-docker-warm-stack-and-suite-r2.md §1A/§1B.
@@ -103,6 +109,14 @@ services:
       # uq_user_soul_profile_active collision. Host workflow keeps the
       # default community profile via base docker-compose.yml.
       SPRING_PROFILES_ACTIVE: community,test
+      # Optional deterministic LLM for isolated E2E/API tests that need to
+      # exercise the chat transport and tool runtime without real provider
+      # credentials. Defaults off so regular isolated stacks keep production
+      # provider semantics unless the operator opts in.
+      AGENT_LLM_STUB_MODE: ${AGENT_LLM_STUB_MODE:-false}
+      # AuraPluginManager scans this directory on startup and bridges PF4J
+      # CommandHandlerExtension implementations into the import-time registry.
+      AURA_PLUGINS_DIR: /app/plugin-jars
       # CORS allow-list covers the in-container hostnames plus host-mapped
       # variants. Frontend host ports are env-var driven for parity.
       FRONTEND_BASE_URL: http://localhost:${VITE_PORT:-5174}
@@ -146,6 +160,8 @@ services:
       # localhost) avoids ::1 IPv6-first resolution on Alpine/Debian.
       BFF_INTERNAL_URL: http://127.0.0.1:3500
       PUPPETEER_SKIP_DOWNLOAD: "true"
+      OSS_PLUGIN_ROOT: /app/plugins
+      ENTERPRISE_PLUGIN_ROOT: /app/plugins-enterprise
     volumes:
       - ./:/repo:cached
       - isolated_node_modules:/repo/node_modules

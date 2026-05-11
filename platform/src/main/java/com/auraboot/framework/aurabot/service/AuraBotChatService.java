@@ -1,11 +1,13 @@
 package com.auraboot.framework.aurabot.service;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.LlmProviderFactory.ProviderConfig;
 import com.auraboot.framework.agent.provider.LlmProviderFactory.ProviderInfo;
+import com.auraboot.framework.agent.service.ToolLoopService;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
@@ -68,25 +70,12 @@ public class AuraBotChatService {
     @Qualifier("asyncTaskExecutor")
     private final Executor asyncTaskExecutor;
 
-    /**
-     * C-5 T5: AuraBot Skill SPI confirm executor. Resume path detects a
-     * pending skill (extension {@code _aurabot_skill=true}) and dispatches
-     * via {@link com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor#confirm}
-     * with the persisted preview token instead of re-running
-     * {@link ChatToolExecutor#execute} (which would loop back to PREVIEW_PENDING).
-     * Optional so non-skill tests do not need the bean wired.
-     */
-    @Autowired(required = false)
-    private com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor skillToolExecutor;
-
     /** Optional RAG context provider from the shared AI runtime. */
     @Autowired(required = false)
     private RagContextProvider ragContextProvider;
 
-    // Phase B.0: AgentChatPort was previously injected here so the legacy
-    // streamChat() wrapper could route named-agent traffic. After B.0 the
-    // wrapper is gone and AgentChatPort lives in ConversationTurnServiceImpl
-    // where dispatch on agentCode happens — chat service is aurabot-only.
+    // ConversationTurnServiceImpl owns agentCode dispatch. This service is the
+    // aurabot-only turn implementation behind that chokepoint.
 
     /** Optional D1 Grounding service (computes BIF per turn). */
     @Autowired(required = false)
@@ -103,11 +92,19 @@ public class AuraBotChatService {
     /**
      * Optional User Soul Profile reader (plan §5.5 / PR-77 Phase 3). When a profile
      * exists for the current user, a compact "About this user" block is prepended
-     * to the chat system prompt. Made optional so tests that don't wire the bean
-     * and legacy contexts continue to compose prompts unchanged.
+     * to the chat system prompt. Made optional so focused tests that don't wire
+     * the bean continue to compose prompts unchanged.
      */
     @Autowired(required = false)
     private com.auraboot.framework.agent.service.UserSoulProfileReader userSoulProfileReader;
+
+    /**
+     * Resume must execute the exact tool definition snapshot captured at
+     * suspend time. Falling back to name heuristics can corrupt canonical DSL
+     * command codes such as {@code cmd:pe:create_procurement_comparison_draft}.
+     */
+    @Autowired(required = false)
+    private ToolLoopService toolLoopService;
 
     @Value("${aurabot.max-tool-rounds:20}")
     private int maxToolRounds;
@@ -242,40 +239,20 @@ public class AuraBotChatService {
         return hint.toString();
     }
 
-    // Phase B.0 deletion: the legacy `streamChat(Long, Long, String, String, Long,
-    // ChatRequest, SseEmitter)` public async wrapper has been removed. After A.5
-    // the AuraBotController went through `turnService.runTurn` for aurabot turns
-    // while still calling this wrapper for named-agent turns; B.0 collapses both
-    // paths through `ConversationTurnServiceImpl.runTurn`'s dispatch on agentCode,
-    // so this wrapper has no callers and is gone.
-    //
-    // The sync core `executeAuraBotTurn(TurnContext, ChatRequest, ResponseSink)`
-    // below is the canonical aurabot entry; named-agent goes through
-    // `AgentChatPort.runAgentTurn`. The named-agent fallback when AgentChatPort
-    // bean is missing now lives in `ConversationTurnServiceImpl.runTurn`.
-
-    // Phase B.6 deletion: the legacy `resumeAfterConfirmation(...)` public async
-    // wrapper has been removed. After B.6 the AuraBotController routes /execute
-    // through `turnService.resumeTurn(pendingTurnId, decision, sink)` which:
-    //   1. consumes the pending state from ChatSessionStore (turnId-keyed),
-    //   2. validates the requesting user owns the suspended turn,
-    //   3. dispatches APPROVED to `resumeApprovedTurnFromPending` below, or
-    //      DENIED / CANCELLED to a TurnOutcome.Interrupted directly,
-    //   4. fires the regular finalizeTurn -> persistence + event + audit pipeline.
-    //
-    // The public entry is now a single chokepoint just like `/chat/stream`.
+    // Public conversation entrypoints are centralized in ConversationTurnService.
+    // This class exposes the sync aurabot implementation invoked by runTurn and
+    // resumeTurn, with ResponseSink carrying SSE / broadcast / future transports.
 
     // =========================================================================
     // Core sync entry (Phase A.3 — Q-A.4=A')
     // =========================================================================
 
     /**
-     * Phase A.3 sync core. Handles the {@code aurabot} main path only — the named-agent
-     * path stays in {@link #streamChat} until Phase B+ adds a group-chat adapter.
+     * Sync core for the {@code aurabot} main path. Named-agent execution is
+     * handled by AgentChatPort from ConversationTurnServiceImpl.
      *
      * <p>Returns a real {@link TurnOutcome} reflecting actual completion; never returns null.
-     * Sync internally — the caller (legacy {@code streamChat} or
-     * {@code ConversationTurnService.runTurn} in A.4) owns the async boundary.
+     * Sync internally — {@code ConversationTurnService.runTurn} owns the async boundary.
      *
      * <p>Side effects this method does NOT manage:
      * <ul>
@@ -310,9 +287,8 @@ public class AuraBotChatService {
     }
 
     private TurnOutcome doStreamChatInnerSinkAware(TurnContext ctx, ChatRequest request, ResponseSink sink) {
-        // Phase A.3: aurabot-only path. Named-agent routing has been hoisted to the caller
-        // (legacy streamChat in this service, AuraBotController in A.5+). This method assumes
-        // agentCode is null/blank/"aurabot".
+        // Aurabot-only path. Named-agent routing is owned by the conversation
+        // chokepoint, so this method assumes agentCode is null/blank/"aurabot".
         Long tenantId = ctx.tenantId();
 
         // 1. Resolve provider and config
@@ -431,10 +407,10 @@ public class AuraBotChatService {
 
         // Phase C.3-cleanup (post-C.3e): the chokepoint routes ACP_RUN +
         // CONTEXTUAL_ANSWER buckets to the ACP runtime, leaving only
-        // LIGHT_CHAT (and the null-bucket defensive fallback) on this path.
+        // LIGHT_CHAT (and the null-bucket guard) on this path.
         // LIGHT_CHAT is "trivial chat" by definition (greeting / thanks /
         // small talk per design §3.6) and never needs tools — so we always
-        // take the text-only streaming path. The legacy doToolLoop body
+        // take the text-only streaming path. The previous local doToolLoop body
         // and its buildLlmMessages helper have been deleted; tool resolution
         // above remains because the resolver's metadata feeds the system
         // prompt's tool hint (buildSystemPrompt(tenantId, request, resolved))
@@ -498,15 +474,6 @@ public class AuraBotChatService {
         String toolId = pending.getToolId();
         String sessionId = pending.getSessionId();
 
-        // Note: pending.getAgentCode() may be a named-agent code. The pre-merge
-        // route was AgentChatPort.resumeAgentToolAfterConfirmation, but B.6
-        // collapsed resume routing into ConversationTurnService.resumeTurn —
-        // that entry is responsible for dispatching named-agent resume to
-        // AgentChatPort if/when a real implementation lands. Until then the
-        // generic tool-execution flow below works for both aurabot and named
-        // agents because PendingTool.{providerCode/apiKey/baseUrl/model/
-        // systemPrompt} are captured at suspend time regardless of port.
-
         // --- Trace: find active trace for this session ---
         TraceContext trace = aiTraceService.findActiveTrace(sessionId);
         String tid = trace != null ? trace.getTraceId() : null;
@@ -519,12 +486,8 @@ public class AuraBotChatService {
         aiTraceService.updateSpanStatus(pending.getToolSpanId(), "confirmed");
         sink.onToolStart(toolId, pending.getToolName(), pending.getInput());
 
-        // C-5 T5: AuraBot Skill SPI resume branch. When the suspended tool
-        // carries an {@code _aurabot_skill=true} extension marker, route
-        // through {@link SkillToolExecutor#confirm} so the persisted preview
-        // token is consumed exactly once. Calling {@link ChatToolExecutor#execute}
-        // would loop back through dispatch and re-emit PREVIEW_PENDING because
-        // a MEDIUM+ skill never auto-executes.
+        // Execute through the chat adapter. The adapter routes normal tool
+        // execution and AuraBot skill confirmation into ToolLoopService.
         Map<String, Object> result = executeResumeTool(pending);
         boolean success = Boolean.TRUE.equals(result.get("success"));
 
@@ -632,14 +595,11 @@ public class AuraBotChatService {
                                 llmSpan != null ? llmSpan.getSpanId() : null, "tool", toolName, input);
                         sink.onToolStart(newToolId, toolName, input);
                         Map<String, Object> innerResult = chatToolExecutor.execute(
-                                toolName, input, pending.getModelCode());
+                                toolName, input, pending.getModelCode(),
+                                effectiveRunPid(pending, ctx.turnId()),
+                                pending.getTaskPid(), pending.getAgentCode());
 
-                        // C-5 T5: an inline-routed aurabot skill may still demand a
-                        // preview when its risk level is MEDIUM+ (executor returns
-                        // a {@code _aurabot_skill_pending} marker). Convert that
-                        // into a fresh suspend so the same chokepoint resume path
-                        // covers the second-stage confirmation.
-                        if (Boolean.TRUE.equals(innerResult.get("_aurabot_skill_pending"))) {
+                        if (isAurabotSkillPreviewPending(toolName, innerResult)) {
                             aiTraceService.endSpan(toolSpan, null, "pending");
                             suspendForAurabotSkill(ctx, pending, sink, messages,
                                     newToolId, toolName, input, innerResult, round);
@@ -653,15 +613,13 @@ public class AuraBotChatService {
                         sink.onToolResult(newToolId, innerResult, innerSuccess);
                         toolResultBlocks.add(buildToolResultBlock(newToolId, innerResult));
                     } else if (isAurabotSkillTool(toolName)) {
-                        // C-5 T5: MEDIUM+ aurabot skill in the continuation loop.
-                        // Drive the executor to produce the preview body + token,
-                        // then suspend through the same chokepoint as the legacy
-                        // write-tool branch below — only the marker payload differs.
                         SpanContext toolSpan = aiTraceService.startSpan(trace,
                                 llmSpan != null ? llmSpan.getSpanId() : null, "tool", toolName, input);
                         Map<String, Object> innerResult = chatToolExecutor.execute(
-                                toolName, input, pending.getModelCode());
-                        if (!Boolean.TRUE.equals(innerResult.get("_aurabot_skill_pending"))) {
+                                toolName, input, pending.getModelCode(),
+                                effectiveRunPid(pending, ctx.turnId()),
+                                pending.getTaskPid(), pending.getAgentCode());
+                        if (!isAurabotSkillPreviewPending(toolName, innerResult)) {
                             // LOW skill that slipped past isReadOnly classification —
                             // treat as a normal executed result and continue the loop.
                             boolean innerSuccess = Boolean.TRUE.equals(innerResult.get("success"));
@@ -705,6 +663,9 @@ public class AuraBotChatService {
                                 .input(input)
                                 .description(description)
                                 .modelCode(pending.getModelCode())
+                                .runPid(effectiveRunPid(pending, ctx.turnId()))
+                                .taskPid(pending.getTaskPid())
+                                .agentToolDefinitions(pending.getAgentToolDefinitions())
                                 .messages(serializeMessages(messages))
                                 .providerCode(pending.getProviderCode())
                                 .apiKey(pending.getApiKey())
@@ -742,56 +703,103 @@ public class AuraBotChatService {
     }
 
     // =========================================================================
-    // C-5 T5: AuraBot Skill SPI suspend / resume helpers
+    // AuraBot Skill SPI suspend / resume helpers
     // =========================================================================
 
     /**
      * Resolve the executor result for the {@link #doResumeApprovedInner} first
-     * tool. When the persisted pending entry carries the AuraBot Skill SPI
-     * extension marker, the resume runs through
-     * {@link com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor#confirm}
-     * with the captured preview token; otherwise it falls back to the legacy
-     * {@link ChatToolExecutor#execute} path.
+     * tool. Both normal execution and AuraBot skill confirmation route through
+     * ChatToolExecutor, which delegates to ToolLoopService.
      */
     private Map<String, Object> executeResumeTool(ChatSessionStore.PendingTool pending) {
         Map<String, Object> ext = pending.getExtension();
         boolean isSkillResume = ext != null && Boolean.TRUE.equals(ext.get("_aurabot_skill"));
         if (!isSkillResume) {
-            return chatToolExecutor.execute(
-                    pending.getToolName(), pending.getInput(), pending.getModelCode());
-        }
-        if (skillToolExecutor == null) {
-            log.warn("AuraBot skill resume requested but SkillToolExecutor bean is missing; "
-                    + "falling back to ChatToolExecutor.execute (will likely re-emit PREVIEW_PENDING)");
-            return chatToolExecutor.execute(
-                    pending.getToolName(), pending.getInput(), pending.getModelCode());
+            if (toolLoopService != null
+                    && pending.getAgentToolDefinitions() != null
+                    && !pending.getAgentToolDefinitions().isEmpty()) {
+                return executeResumeToolSnapshot(pending);
+            }
+            return chatToolExecutor.executeConfirmed(
+                    pending.getToolName(), pending.getInput(), pending.getModelCode(),
+                    effectiveRunPid(pending, pending.getTurnId()),
+                    pending.getTaskPid(), pending.getAgentCode());
         }
         String previewToken = ext.get("previewToken") instanceof String s ? s : null;
+        return chatToolExecutor.confirmAuraBotSkill(
+                pending.getToolName(), pending.getInput(), pending.getModelCode(),
+                previewToken,
+                effectiveRunPid(pending, pending.getTurnId()),
+                pending.getTaskPid(), pending.getAgentCode());
+    }
+
+    private Map<String, Object> executeResumeToolSnapshot(ChatSessionStore.PendingTool pending) {
         try {
-            com.auraboot.framework.aurabot.skill.SkillRequest req =
-                    com.auraboot.framework.aurabot.skill.SkillRequest.builder()
-                            .skillName(pending.getToolName())
-                            .params(objectMapper.valueToTree(
-                                    pending.getInput() != null ? pending.getInput() : Map.of()))
-                            .build();
-            com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor.DispatchOutcome confirmed =
-                    skillToolExecutor.confirm(pending.getToolName(), req, previewToken);
-            com.auraboot.framework.aurabot.skill.SkillResult result = confirmed.result();
-            Map<String, Object> envelope = new LinkedHashMap<>();
-            envelope.put("success", true);
-            envelope.put("data", result == null ? null : result.getPayload());
-            return envelope;
-        } catch (RuntimeException e) {
-            // Surface skill SPI failures as a typed error envelope so the LLM
-            // can recover (or apologise) instead of swallowing the throw —
-            // matches the ChatToolExecutor contract for skill dispatch.
-            log.warn("AuraBot skill confirm failed for {}: {}",
-                    pending.getToolName(), e.getMessage());
-            Map<String, Object> err = new LinkedHashMap<>();
-            err.put("success", false);
-            err.put("error", e.getMessage() != null ? e.getMessage() : "Skill confirm failed");
-            return err;
+            String raw = toolLoopService.executeToolCall(
+                    MetaContext.getCurrentTenantId(),
+                    effectiveRunPid(pending, pending.getTurnId()),
+                    pending.getTaskPid(),
+                    pending.getAgentCode(),
+                    pending.getToolName(),
+                    pending.getInput() != null ? pending.getInput() : Map.of(),
+                    markPendingToolConfirmed(pending.getAgentToolDefinitions(), pending.getToolName()),
+                    null);
+            return parseToolLoopResult(raw);
+        } catch (Exception e) {
+            log.error("ToolLoopService resume execution failed for {}: {}", pending.getToolName(), e.getMessage(), e);
+            return errorResult(e.getMessage());
         }
+    }
+
+    private List<AgentToolDefinition> markPendingToolConfirmed(List<AgentToolDefinition> tools, String toolName) {
+        if (tools == null || tools.isEmpty()) {
+            return List.of();
+        }
+        List<AgentToolDefinition> confirmed = new ArrayList<>();
+        for (AgentToolDefinition tool : tools) {
+            if (tool == null) {
+                continue;
+            }
+            boolean target = toolName != null && toolName.equals(tool.getName());
+            confirmed.add(AgentToolDefinition.builder()
+                    .name(tool.getName())
+                    .description(tool.getDescription())
+                    .inputSchema(tool.getInputSchema())
+                    .toolType(tool.getToolType())
+                    .sourceCode(tool.getSourceCode())
+                    .requiresApproval(tool.isRequiresApproval())
+                    .requiresConfirmation(target ? false : tool.isRequiresConfirmation())
+                    .riskLevel(tool.getRiskLevel())
+                    .confirmationPolicy(tool.getConfirmationPolicy())
+                    .nativeToolConfig(tool.getNativeToolConfig())
+                    .build());
+        }
+        return confirmed;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseToolLoopResult(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return errorResult("Empty tool result");
+        }
+        if (raw.startsWith("Error")) {
+            return errorResult(raw);
+        }
+        try {
+            return objectMapper.readValue(raw, Map.class);
+        } catch (Exception e) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("success", true);
+            result.put("data", raw);
+            return result;
+        }
+    }
+
+    private static Map<String, Object> errorResult(String message) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", false);
+        result.put("error", message != null ? message : "Unknown error");
+        return result;
     }
 
     /**
@@ -807,17 +815,41 @@ public class AuraBotChatService {
                         + ":")) {
             return true;
         }
-        return skillToolExecutor != null
-                && !toolName.contains(":")
-                && skillToolExecutor.handlesBareSkillName(toolName);
+        if (toolName.startsWith(
+                com.auraboot.framework.aurabot.skill.provider.AuraBotSkillToolProvider.PROVIDER_CODE
+                        + "_")) {
+            return true;
+        }
+        String providerToolCode = chatToolResolver.getProviderToolCode(toolName);
+        return providerToolCode != null && providerToolCode.startsWith(
+                com.auraboot.framework.aurabot.skill.provider.AuraBotSkillToolProvider.PROVIDER_CODE
+                        + ":");
+    }
+
+    private boolean isAurabotSkillPreviewPending(String toolName, Map<String, Object> result) {
+        if (!isAurabotSkillTool(toolName) || result == null) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(result.get("_aurabot_skill_pending"))) {
+            return true;
+        }
+        return Boolean.TRUE.equals(result.get("approvalRequired"))
+                && result.get("previewToken") instanceof String token
+                && !token.isBlank();
+    }
+
+    private String effectiveRunPid(ChatSessionStore.PendingTool pending, String fallback) {
+        if (pending != null && pending.getRunPid() != null && !pending.getRunPid().isBlank()) {
+            return pending.getRunPid();
+        }
+        return fallback;
     }
 
     /**
      * Persist a fresh {@link ChatSessionStore.PendingTool} for an AuraBot skill
      * preview and emit the {@code confirm_required} SSE event so the FE renders
-     * the preview card. The {@code extension} map carries the marker map so the
-     * subsequent resume calls {@link com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor#confirm}
-     * with the same preview token.
+     * the preview card. The {@code extension} map carries the preview token so
+     * the subsequent resume calls ToolLoopService confirm with the same token.
      */
     private void suspendForAurabotSkill(TurnContext ctx,
                                         ChatSessionStore.PendingTool basis,
@@ -851,6 +883,9 @@ public class AuraBotChatService {
                 .input(input)
                 .description(description)
                 .modelCode(basis.getModelCode())
+                .runPid(effectiveRunPid(basis, ctx.turnId()))
+                .taskPid(basis.getTaskPid())
+                .agentToolDefinitions(basis.getAgentToolDefinitions())
                 .messages(serializeMessages(messages))
                 .providerCode(basis.getProviderCode())
                 .apiKey(basis.getApiKey())
@@ -1125,7 +1160,7 @@ public class AuraBotChatService {
         return sb.toString();
     }
 
-    // Keep backward-compatible overload for existing callers/tests
+    // Package-private overload used by focused prompt tests.
     String buildSystemPrompt(Long tenantId, ChatRequest request) {
         return buildSystemPrompt(tenantId, request, (ChatToolResolver.ResolvedTools) null);
     }

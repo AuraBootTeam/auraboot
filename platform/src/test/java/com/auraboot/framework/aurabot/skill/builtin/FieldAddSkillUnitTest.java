@@ -72,7 +72,7 @@ class FieldAddSkillUnitTest {
     }
 
     @Test
-    @DisplayName("metadata: name=field:add, MEDIUM, undo+dryRun, perms MODEL.UPDATE+FIELD.CREATE")
+    @DisplayName("metadata: name=field:add, MEDIUM, undo+dryRun, perms meta.model.update+meta.field.update")
     void metadata_correct() {
         assertThat(skill.name()).isEqualTo("field:add");
         assertThat(skill.displayName()).isEqualTo("aurabot.skill.field.add.displayName");
@@ -82,7 +82,7 @@ class FieldAddSkillUnitTest {
         assertThat(skill.supportsUndo()).isTrue();
         assertThat(skill.supportsStreaming()).isFalse();
         assertThat(skill.requiredPermissions())
-                .containsExactlyInAnyOrder("MODEL.UPDATE", "FIELD.CREATE");
+                .containsExactlyInAnyOrder("meta.model.update", "meta.field.update");
         assertThat(skill.paramsSchema()).isNotNull();
         assertThat(skill.paramsSchema().get("required"))
                 .isNotNull();

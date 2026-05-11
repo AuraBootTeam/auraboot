@@ -176,18 +176,11 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
         // Phase C.3d (Q-C3.3=α): the resumption token is opaque to the
         // frontend — it can be either (a) a ChatSessionStore.PendingTool key
-        // (legacy chat tool-loop suspension, set by AuraBotChatService B.6
-        // path) or (b) an ab_agent_approval.pid (new ACP path written by
-        // dispatchToAcpRun via the C.3d mapRunToTurnOutcome PendingApproval
-        // branch). We try the chat-store first because consumePending atomically
-        // removes the entry; if the token is actually an approval pid the
-        // store returns null and we fall through to the approval lookup.
-        ChatSessionStore.PendingTool pending = chatSessionStore.consumePending(pendingTurnId);
-        if (pending != null) {
-            return resumeChatPendingTool(pending, decision, sink);
-        }
-
-        // Try ACP approval path (only when the gate bean is wired)
+        // (legacy chat tool-loop suspension) or (b) an ab_agent_approval.pid
+        // (ACP approval gate and approval-keyed chat pending tools). Approval
+        // lookup must win when both stores contain the same token; otherwise a
+        // forged / stale approvalPid could bypass policy authorization by
+        // consuming the chat pending payload directly.
         if (agentApprovalGateService != null) {
             Long tenantId = MetaContext.getCurrentTenantId();
             Map<String, Object> approval = tenantId != null
@@ -196,6 +189,11 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             if (approval != null) {
                 return resumeAcpApproval(approval, decision, sink);
             }
+        }
+
+        ChatSessionStore.PendingTool pending = chatSessionStore.consumePending(pendingTurnId);
+        if (pending != null) {
+            return resumeChatPendingTool(pending, decision, sink);
         }
 
         String msg = "No pending tool or approval found for pendingTurnId=" + pendingTurnId
@@ -327,6 +325,12 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                         capturingSink.onError(msg, null);
                         yield new TurnOutcome.Failed(msg, null);
                     }
+                    Map<String, Object> chatToolResult = agentChatPort != null
+                            ? agentChatPort.executeApprovedPendingTool(tenantId, approvalPid)
+                            : Map.of("handled", false);
+                    if (Boolean.TRUE.equals(chatToolResult.get("handled"))) {
+                        yield mapApprovedChatToolOutcome(approvalPid, chatToolResult, capturingSink);
+                    }
                     yield syncResumeAcpRun(ctx, taskPid, runPid, capturingSink);
                 }
                 case DENIED -> {
@@ -354,6 +358,22 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             log.warn("resumeAcpApproval finalizeTurn threw, swallowing: {}", e.getMessage(), e);
         }
         return outcome;
+    }
+
+    private TurnOutcome mapApprovedChatToolOutcome(String approvalPid, Map<String, Object> chatToolResult,
+                                                    ResponseSink sink) {
+        boolean success = Boolean.TRUE.equals(chatToolResult.get("success"));
+        Map<String, Object> meta = new LinkedHashMap<>(chatToolResult);
+        meta.put("approvalPid", approvalPid);
+        if (success) {
+            String msg = "Approved tool executed.";
+            sink.onDone(msg, null);
+            return new TurnOutcome.Success(msg, meta);
+        }
+        String error = String.valueOf(chatToolResult.getOrDefault(
+                "error", "Approved tool execution failed. No data was changed."));
+        sink.onError(error, null);
+        return new TurnOutcome.Failed(error, null);
     }
 
     /**

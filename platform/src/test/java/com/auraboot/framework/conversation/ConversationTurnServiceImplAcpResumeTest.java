@@ -1,5 +1,6 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
 import com.auraboot.framework.agent.service.AgentRunService;
 import com.auraboot.framework.agent.service.RunOutcome;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
@@ -77,6 +79,9 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
     @MockitoBean
     private AgentRunService agentRunService;
 
+    @MockitoBean
+    private AgentChatPort agentChatPort;
+
     private ResponseSink sink;
 
     @BeforeEach
@@ -86,6 +91,8 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
         // ChatSessionStore returns null for every lookup so the dispatcher
         // falls through to the approval path (path #2 above).
         when(chatSessionStore.consumePending(anyString())).thenReturn(null);
+        when(agentChatPort.executeApprovedPendingTool(anyLong(), anyString()))
+                .thenReturn(Map.of("handled", false));
     }
 
     @AfterEach
@@ -153,6 +160,44 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
             verify(sink, times(1)).onDone(eq("Action completed."), any());
             // legacy chat path NEVER triggered
             verify(chatService, never()).resumeApprovedTurnFromPending(any(), any(), any());
+        });
+    }
+
+    @Test
+    @DisplayName("APPROVED chat approval payload -> approve gate + executeApprovedPendingTool; ACP run resume skipped")
+    void approved_chatApprovalPayloadExecutesPendingToolInsteadOfAcpResume() {
+        withTestIdentity(() -> {
+            Long tenantId = getTestTenant().getId();
+            String approvalPid = "APPROVAL_PID_CHAT";
+            String runPid = "TURN_PID_CHAT";
+            String taskPid = "TASK_PID_CHAT";
+
+            when(agentApprovalGateService.findApproval(eq(tenantId), eq(approvalPid)))
+                    .thenReturn(pendingApprovalRow(approvalPid, runPid, taskPid));
+            when(agentApprovalGateService.approve(
+                    eq(tenantId), eq(approvalPid), anyLong(), eq(false)))
+                    .thenReturn(Map.of("pid", approvalPid, "approval_status", "approved"));
+            when(agentChatPort.executeApprovedPendingTool(eq(tenantId), eq(approvalPid)))
+                    .thenReturn(Map.of(
+                            "handled", true,
+                            "success", true,
+                            "toolName", "platform.create_model",
+                            "result", Map.of("success", true, "data", Map.of("pid", "model-1"))));
+
+            TurnOutcome outcome = turnService.resumeTurn(approvalPid, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+            assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+            TurnOutcome.Success success = (TurnOutcome.Success) outcome;
+            assertThat(success.finalResponse()).contains("Approved tool executed");
+            assertThat(success.meta()).containsEntry("approvalPid", approvalPid);
+            assertThat(success.meta()).containsEntry("toolName", "platform.create_model");
+            verify(agentApprovalGateService, times(1))
+                    .approve(eq(tenantId), eq(approvalPid), anyLong(), eq(false));
+            verify(agentChatPort, times(1))
+                    .executeApprovedPendingTool(eq(tenantId), eq(approvalPid));
+            verify(agentRunService, never())
+                    .executeTaskSync(anyLong(), anyString(), anyString(), anyString());
+            verify(sink, times(1)).onDone(contains("Approved tool executed"), any());
         });
     }
 
