@@ -80,15 +80,29 @@ jobs:
         run: |
           # Root is expected to redirect to /login (auth-gated). Either 200 or
           # 302 is acceptable here; only 500/connection-refused is a failure.
-          status=$(curl -s -o /tmp/root.html -w "%{http_code}" -m 15 http://localhost:3000/)
-          echo "GET / → ${status}"
-          if [ "$status" = "500" ] || [ "$status" = "000" ]; then
-            echo "frontend is broken — first 100 lines of body:"
-            head -100 /tmp/root.html
-            echo "--- frontend logs ---"
-            docker compose logs --tail 200 frontend
-            exit 1
-          fi
+          status="000"
+          curl_exit=0
+          for i in $(seq 1 20); do
+            set +e
+            status=$(curl -sS -o /tmp/root.html -w "%{http_code}" -m 15 http://localhost:3000/)
+            curl_exit=$?
+            set -e
+            echo "GET / attempt ${i}: status=${status} curl_exit=${curl_exit}"
+            if [ "$curl_exit" = "0" ] && [ "$status" != "500" ] && [ "$status" != "000" ]; then
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "frontend is broken after retries - first 100 lines of body:"
+          head -100 /tmp/root.html || true
+          echo "--- compose ps ---"
+          docker compose ps
+          echo "--- frontend logs ---"
+          docker compose logs --tail 200 frontend
+          echo "--- backend logs ---"
+          docker compose logs --tail 100 backend
+          exit 1
 
       - name: Login API contract via BFF proxy
         # End-to-end smoke: BFF /api/* proxy + backend /api/auth/login + the
