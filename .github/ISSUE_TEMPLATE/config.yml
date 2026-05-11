@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Discord (community chat)
-    url: https://discord.gg/p2fW5A2MW6
-    about: Quick questions, community discussion
+  - name: 📝 Product feedback / private question
+    url: https://www.auraboot.com/contact?interest=feedback
+    about: Beta feedback, unclear setup, licensing boundary questions, and private notes
   - name: 📚 Documentation
     url: https://docs.auraboot.com
     about: User guides and API reference
@@ -10,5 +10,5 @@ contact_links:
     url: https://github.com/AuraBootTeam/auraboot/blob/main/SECURITY.md
     about: Do NOT open a public issue — please follow responsible disclosure
   - name: ⚖️ Licensing / commercial inquiries
-    url: mailto:license@auraboot.com
+    url: https://www.auraboot.com/contact?interest=license
     about: SaaS hosting, white-labeling, OEM, enterprise editions

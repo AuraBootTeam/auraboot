@@ -503,6 +503,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         // 4. Evict cache
         evictFieldCache(existingField.getPid());
 
+        syncPublishedModelsForUpdatedField(existingField, dto.getCode());
+
         log.info("Field updated in place for plugin reimport: code={}, pid={}",
                  dto.getCode(), existingField.getPid());
 
@@ -510,6 +512,30 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.FIELD,
                 existingField.getPid(), null, dto.getCode(), dto.getEffectiveDisplayName(),
                 ResourceAction.UPDATE, null, extension);
+    }
+
+    private void syncPublishedModelsForUpdatedField(Field existingField, String fieldCode) {
+        if (existingField.getId() == null) {
+            log.warn("Skipping schema sync for reimported field without database id");
+            return;
+        }
+
+        List<String> modelCodes = fieldBindingMapper.findPublishedModelCodesByFieldId(existingField.getId());
+        if (modelCodes == null || modelCodes.isEmpty()) {
+            return;
+        }
+
+        for (String modelCode : modelCodes) {
+            SchemaOperationResult schemaResult = schemaManagementService.updateTableByModel(modelCode);
+            if (schemaResult == null || !schemaResult.isSuccess()) {
+                String errorMessage = schemaResult != null && schemaResult.getErrorMessage() != null
+                        ? schemaResult.getErrorMessage()
+                        : "unknown schema sync error";
+                throw new PluginException("Failed to sync schema after updating field " + fieldCode
+                        + " for model " + modelCode + ": " + errorMessage);
+            }
+            log.info("Synced published model after field reimport");
+        }
     }
 
     /**

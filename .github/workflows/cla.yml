@@ -57,6 +57,6 @@ jobs:
 
             Once signed, your future PRs are auto-approved by the bot. Trivial fixes (typos, formatting) are exempt — see the [CLA document](https://github.com/AuraBootTeam/auraboot/blob/main/CLA.md#trivial-contributions) for details.
 
-            Questions: license@auraboot.com
+            Questions: https://www.auraboot.com/contact
           custom-allsigned-prcomment: |
             ✅ All Contributors have signed the CLA. Thanks!

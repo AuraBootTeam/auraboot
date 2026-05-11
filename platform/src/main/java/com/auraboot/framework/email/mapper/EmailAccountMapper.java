@@ -1,6 +1,7 @@
 package com.auraboot.framework.email.mapper;
 
 import com.auraboot.framework.email.model.EmailAccount;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.*;
 
@@ -30,6 +31,7 @@ public interface EmailAccountMapper extends BaseMapper<EmailAccount> {
     /**
      * Finds all active accounts across all tenants (used by the background sync job).
      */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("""
         SELECT * FROM ab_email_account
         WHERE status = 'active'

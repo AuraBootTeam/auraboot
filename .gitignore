@@ -90,6 +90,7 @@ DerivedData/
 
 *.png
 !web-admin/public/*.png
+!docs/assets/screenshots/*.png
 *.hprof
 
 report.json

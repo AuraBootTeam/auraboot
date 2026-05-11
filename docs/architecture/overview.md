@@ -24,7 +24,7 @@ graph TB
         direction TB
         Auth["Auth & Security<br/>(JWT, RBAC)"]
         DSL["DSL Engine"]
-        CMD["Command Pipeline<br/>(20 stages)"]
+        CMD["Command Pipeline<br/>(20+ stages)"]
         BPM["BPM Engine<br/>(SmartEngine BPMN 2.0)"]
         AI["AI Core<br/>(AuraBot, ACP, ChatBI, RAG)"]
         Plugin["Plugin Framework<br/>(PF4J)"]
@@ -81,7 +81,7 @@ Browser
         → Permission Check (RBAC)
           → Controller (Dynamic / Command / DataSource / etc.)
             → Service Layer
-              → Command Pipeline (20 stages, for write operations)
+              → Command Pipeline (20+ stages, for write operations)
                 → MyBatis-Plus / PostgreSQL
               → Event Bus → Webhooks / Notifications
     ← JSON Response
@@ -133,7 +133,7 @@ The core of AuraBoot. Parses declarative JSON definitions to create:
 
 - **Models** -- Data structure definitions that auto-generate database tables
 - **Fields** -- Typed field definitions with validation, defaults, and display rules
-- **Commands** -- Data operations that flow through the 20-stage pipeline
+- **Commands** -- Data operations that flow through the 20+ stage pipeline
 - **Pages** -- UI layouts defined as blocks (table, form, chart, etc.)
 - **Formulas** -- Computed fields and cross-record calculations
 
@@ -141,7 +141,7 @@ Models and fields are stored in `ab_model` and `ab_field` tables. Dynamic data i
 
 ### Command Pipeline
 
-Every write operation (create, update, delete, state transition) flows through a 20-stage pipeline:
+Every write operation (create, update, delete, state transition) flows through a 20+ stage pipeline:
 
 ```
 LOAD → VALIDATE → PERMISSION → STATE → LOCK → PRE_HANDLER
@@ -163,7 +163,7 @@ Built on PF4J. Plugins are declarative JSON packages that can add:
 - Named queries and data sources
 - i18n translations
 
-Plugins are imported via the CLI (`aura plugin publish plugins/crm --yes`) or the Plugin API. The platform ships with 27+ community plugins covering CRM, sales, procurement, HR, and more.
+Plugins are imported via the CLI (`aura plugin publish plugins/crm --yes`) or the Plugin API. The platform ships with reusable community plugin packages covering CRM, sales, procurement, HR, and more.
 
 ### AI Core
 

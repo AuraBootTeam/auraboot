@@ -46,6 +46,7 @@ import { BlockDragPreview } from './areas/BlockDragPreview';
 import { SortableBlock } from './areas/SortableBlock';
 import { DRAG_TYPES } from '~/plugins/core-designer/components/studio/workbench/constants';
 import { useApiSchemaDetection } from '~/plugins/core-designer/components/studio/hooks/fields/useApiSchemaDetection';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface BlocksDesignerProps {
   schema: PageSchema;
@@ -80,6 +81,12 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   previewMode = false,
   isCustomApiMode,
 }) => {
+  const { locale } = useI18n();
+  const l = useCallback(
+    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
+    [locale],
+  );
+
   // API schema detection for custom API mode
   const apiDataSource = isCustomApiMode ? (schema as any).dataSource : undefined;
   const apiDetection = useApiSchemaDetection(isCustomApiMode ? apiDataSource : undefined);
@@ -152,7 +159,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
           break;
         case 'form-section':
         case 'detail-section':
-          newBlock.title = 'Section Title';
+          newBlock.title = l('区段标题', 'Section Title');
           newBlock.fields = [];
           break;
         case 'table':
@@ -168,7 +175,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
       onSchemaChange({ ...schema, blocks: [...blocks, newBlock] });
       setSelectedBlockId(newBlock.id);
     },
-    [schema, blocks, onSchemaChange, readonly],
+    [schema, blocks, onSchemaChange, readonly, l],
   );
 
   const removeBlock = useCallback(
@@ -407,7 +414,11 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const kindLabel =
-    schema.kind === 'list' ? 'List Page' : schema.kind === 'form' ? 'Form Page' : 'Detail Page';
+    schema.kind === 'list'
+      ? l('列表页', 'List Page')
+      : schema.kind === 'form'
+        ? l('表单页', 'Form Page')
+        : l('详情页', 'Detail Page');
 
   return (
     <DndContext
@@ -430,7 +441,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                 }`}
               >
-                Fields
+                {l('字段', 'Fields')}
               </button>
               <button
                 onClick={() => setLeftPanelTab('blocks')}
@@ -441,7 +452,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                 }`}
               >
-                Blocks
+                {l('区块', 'Blocks')}
               </button>
               <button
                 onClick={() => setLeftPanelTab('outline')}
@@ -452,7 +463,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                 }`}
               >
-                Outline
+                {l('大纲', 'Outline')}
               </button>
             </div>
 
@@ -463,7 +474,9 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
               {leftPanelTab === 'outline' && (
                 <div className="overflow-auto p-3">
                   {blocks.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-gray-400">No blocks yet</p>
+                    <p className="py-4 text-center text-xs text-gray-400">
+                      {l('暂无区块', 'No blocks yet')}
+                    </p>
                   ) : (
                     <ul className="space-y-1">
                       {blocks.map((block) => (
@@ -476,7 +489,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                                 : 'text-gray-600 hover:bg-gray-50'
                             }`}
                           >
-                            {resolveLocalizedText(block.title) || block.blockType}
+                            {resolveLocalizedText(block.title, locale) || block.blockType}
                           </button>
                         </li>
                       ))}
@@ -505,7 +518,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                     onClick={() => onSave(schema)}
                     className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                   >
-                    Save
+                    {l('保存', 'Save')}
                   </button>
                 )}
               </div>
@@ -528,8 +541,12 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                       d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                     />
                   </svg>
-                  <p className="text-sm font-medium text-gray-400">Drag blocks from the left panel</p>
-                  <p className="mt-1 text-xs text-gray-300">or switch to the Blocks tab to add</p>
+                  <p className="text-sm font-medium text-gray-400">
+                    {l('从左侧面板拖拽区块', 'Drag blocks from the left panel')}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-300">
+                    {l('或切换到区块标签添加', 'or switch to the Blocks tab to add')}
+                  </p>
                 </div>
               ) : (
                 <SortableContext items={blockIds} strategy={verticalListSortingStrategy}>
@@ -560,7 +577,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                 onClick={() => setLeftPanelTab('blocks')}
                 className="w-full rounded-lg border-2 border-dashed border-gray-200 py-3 text-sm text-gray-400 transition-colors hover:border-blue-300 hover:text-blue-500"
               >
-                + Add Block (open Blocks panel)
+                {l('+ 添加区块（打开区块面板）', '+ Add Block (open Blocks panel)')}
               </button>
             )}
           </div>
@@ -613,7 +630,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                 <circle cx="15" cy="19" r="1.5" />
               </svg>
               <span className="truncate text-sm font-medium text-gray-700">
-                {resolveLocalizedText(draggedBlock.title) || draggedBlock.blockType}
+                {resolveLocalizedText(draggedBlock.title, locale) || draggedBlock.blockType}
               </span>
             </div>
             <div className="mt-1 truncate text-xs text-gray-400">{draggedBlock.blockType}</div>

@@ -17,6 +17,7 @@ import { DataSourceEditor } from './editors/DataSourceEditor';
 import { TabFilterEditor } from './editors/TabFilterEditor';
 import { viewModelService } from '~/plugins/core-designer/components/studio/services/viewmodel/ViewModelService';
 import { get } from '~/shared/services/http-client';
+import { useI18n } from '~/contexts/I18nContext';
 
 /**
  * Selected field info structure
@@ -59,6 +60,19 @@ const BLOCK_INFO: Record<string, { name: string; icon: string }> = {
   text: { name: 'Text Content', icon: '📃' },
 };
 
+const BLOCK_INFO_ZH: Record<string, string> = {
+  filters: '筛选表单',
+  'form-section': '表单区段',
+  'detail-section': '详情区段',
+  'form-buttons': '表单按钮',
+  toolbar: '工具栏按钮',
+  'selection-info': '选择信息',
+  table: '数据表格',
+  'stat-card': '统计卡片',
+  'chart-card': '图表卡片',
+  text: '文本内容',
+};
+
 export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
   block,
   modelCode,
@@ -73,6 +87,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
   onTestDetect,
   testStatus,
 }) => {
+  const { locale } = useI18n();
   // Resolve field dataType from model metadata
   const [fieldDataType, setFieldDataType] = useState<string>('string');
   useEffect(() => {
@@ -166,6 +181,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
   }
 
   const info = BLOCK_INFO[block.blockType] || { name: block.blockType, icon: '📦' };
+  const blockName = locale === 'zh-CN' ? (BLOCK_INFO_ZH[block.blockType] || info.name) : info.name;
 
   return (
     <div className="flex h-full flex-col">
@@ -174,7 +190,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
         <div className="flex items-center gap-2">
           <span className="text-xl">{info.icon}</span>
           <div>
-            <h3 className="text-sm font-medium text-gray-900">{info.name}</h3>
+            <h3 className="text-sm font-medium text-gray-900">{blockName}</h3>
             <p className="font-mono text-xs text-gray-400">{block.id}</p>
           </div>
         </div>
@@ -184,7 +200,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
       <div className="flex-1 overflow-auto">
         {/* DataSource editor for CUSTOM API mode (page-level, above block settings) */}
         {isCustomApiMode && onDataSourceChange && (
-          <EditorSection title="Data Source">
+          <EditorSection titleZh="数据源" titleEn="Data Source">
             <DataSourceEditor
               dataSource={(dataSource || {}) as any}
               onChange={onDataSourceChange as any}
@@ -205,6 +221,8 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
  * Empty state when no block is selected
  */
 const EmptyState: React.FC = () => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   return (
     <div className="flex h-full items-center justify-center p-6" data-testid="properties-empty">
       <div className="text-center text-gray-400">
@@ -221,8 +239,8 @@ const EmptyState: React.FC = () => {
             d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
           />
         </svg>
-        <p className="text-sm">Select a block</p>
-        <p className="mt-1 text-xs">to edit its properties</p>
+        <p className="text-sm">{l('选择一个区块', 'Select a block')}</p>
+        <p className="mt-1 text-xs">{l('以编辑它的属性', 'to edit its properties')}</p>
       </div>
     </div>
   );
@@ -240,10 +258,12 @@ interface BlockEditorsProps {
 
 const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange, readonly }) => {
   const sections: React.ReactNode[] = [];
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
 
   // Basic settings for all blocks
   sections.push(
-    <EditorSection key="settings" title="Settings">
+    <EditorSection key="settings" titleZh="设置" titleEn="Settings">
       <BlockSettingsEditor block={block} onChange={onChange} readonly={readonly} />
     </EditorSection>,
   );
@@ -255,7 +275,12 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
     block.blockType === 'detail-section'
   ) {
     sections.push(
-      <EditorSection key="fields" title="Fields" hint="Drag fields from left panel">
+      <EditorSection
+        key="fields"
+        titleZh="字段"
+        titleEn="Fields"
+        hint={l('从左侧面板拖拽字段', 'Drag fields from left panel')}
+      >
         <FieldsEditor
           fields={block.fields || []}
           modelCode={modelCode}
@@ -271,7 +296,12 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
   // Columns editor for table
   if (block.blockType === 'table') {
     sections.push(
-      <EditorSection key="columns" title="Columns" hint="Drag fields from left panel">
+      <EditorSection
+        key="columns"
+        titleZh="列"
+        titleEn="Columns"
+        hint={l('从左侧面板拖拽字段', 'Drag fields from left panel')}
+      >
         <ColumnsEditor
           columns={block.columns || []}
           modelCode={modelCode}
@@ -286,7 +316,7 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
   // Tab filter editor for tabs blocks
   if ((block as any).blockType === 'tabs') {
     sections.push(
-      <EditorSection key="tabs" title="Tabs">
+      <EditorSection key="tabs" titleZh="标签页" titleEn="Tabs">
         <TabFilterEditor
           tabs={(block as any).tabs || []}
           onChange={(tabs) => onChange({ tabs } as any)}
@@ -303,7 +333,7 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
     block.blockType === 'filters'
   ) {
     sections.push(
-      <EditorSection key="actions" title="Actions">
+      <EditorSection key="actions" titleZh="操作" titleEn="Actions">
         <ActionsEditor
           buttons={block.buttons || []}
           actions={block.actions || []}
@@ -322,12 +352,15 @@ const BlockEditors: React.FC<BlockEditorsProps> = ({ block, modelCode, onChange,
  * Editor section wrapper
  */
 interface EditorSectionProps {
-  title: string;
+  titleZh: string;
+  titleEn: string;
   hint?: string;
   children: React.ReactNode;
 }
 
-const EditorSection: React.FC<EditorSectionProps> = ({ title, hint, children }) => {
+const EditorSection: React.FC<EditorSectionProps> = ({ titleZh, titleEn, hint, children }) => {
+  const { locale } = useI18n();
+  const title = locale === 'zh-CN' ? titleZh : titleEn;
   return (
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between">

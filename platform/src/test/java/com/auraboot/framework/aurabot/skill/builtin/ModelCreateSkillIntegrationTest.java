@@ -225,13 +225,13 @@ class ModelCreateSkillIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Registry.list excludes model:create for caller without MODEL.CREATE")
+    @DisplayName("Registry.list excludes model:create for caller without meta.model.update")
     void permission_missing_excludesFromDiscovery() {
-        Set<String> noModelCreate = Set.of("MODEL.READ");
+        Set<String> noModelCreate = Set.of("meta.model.read");
         List<SkillMeta> metas = registry.list(noModelCreate);
         assertThat(metas).extracting("name").doesNotContain("model:create");
 
-        Set<String> withCreate = Set.of("MODEL.CREATE");
+        Set<String> withCreate = Set.of("meta.model.update");
         List<SkillMeta> metas2 = registry.list(withCreate);
         assertThat(metas2).extracting("name").contains("model:create");
     }

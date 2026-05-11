@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,7 +32,14 @@ class PluginExtensionRegistryBridgeTest {
 
     private CommandHandlerExtension stubExtension(String code) {
         CommandHandlerExtension ext = org.mockito.Mockito.mock(CommandHandlerExtension.class);
-        when(ext.getCommandType()).thenReturn(code);
+        Set<String> supportedCodes = code == null || code.isBlank() ? Set.of() : Set.of(code);
+        when(ext.getSupportedCommandTypes()).thenReturn(supportedCodes);
+        return ext;
+    }
+
+    private CommandHandlerExtension stubExtension(String primaryCode, Set<String> supportedCodes) {
+        CommandHandlerExtension ext = org.mockito.Mockito.mock(CommandHandlerExtension.class);
+        when(ext.getSupportedCommandTypes()).thenReturn(supportedCodes);
         return ext;
     }
 
@@ -41,7 +49,7 @@ class PluginExtensionRegistryBridgeTest {
         when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(ext));
         when(commandHandlerRegistry.isRegistered("plugin.demo.run")).thenReturn(false);
 
-        bridge.bridge();
+        PluginExtensionRegistryBridge.BridgeResult result = bridge.bridgePluginCommandHandlers();
 
         ArgumentCaptor<CommandHandlerRegistry.HandlerMeta> captor =
                 ArgumentCaptor.forClass(CommandHandlerRegistry.HandlerMeta.class);
@@ -49,6 +57,8 @@ class PluginExtensionRegistryBridgeTest {
         CommandHandlerRegistry.HandlerMeta meta = captor.getValue();
         assertThat(meta.code()).isEqualTo("plugin.demo.run");
         assertThat(meta.source()).startsWith("plugin:");
+        assertThat(result.registered()).isEqualTo(1);
+        assertThat(result.skipped()).isEqualTo(0);
     }
 
     @Test
@@ -87,6 +97,27 @@ class PluginExtensionRegistryBridgeTest {
         bridge.bridge();
 
         verify(commandHandlerRegistry, times(1)).register(any());
+    }
+
+    @Test
+    void registers_supported_command_type_aliases() {
+        CommandHandlerExtension ext = stubExtension(
+                "pe:allocate_inventory",
+                Set.of("pe:allocate_inventory", "pe:hold_inventory"));
+        when(pluginManager.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(ext));
+        when(commandHandlerRegistry.isRegistered("pe:allocate_inventory")).thenReturn(false);
+        when(commandHandlerRegistry.isRegistered("pe:hold_inventory")).thenReturn(false);
+
+        PluginExtensionRegistryBridge.BridgeResult result = bridge.bridgePluginCommandHandlers();
+
+        ArgumentCaptor<CommandHandlerRegistry.HandlerMeta> captor =
+                ArgumentCaptor.forClass(CommandHandlerRegistry.HandlerMeta.class);
+        verify(commandHandlerRegistry, times(2)).register(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(CommandHandlerRegistry.HandlerMeta::code)
+                .containsExactlyInAnyOrder("pe:allocate_inventory", "pe:hold_inventory");
+        assertThat(result.registered()).isEqualTo(2);
+        assertThat(result.skipped()).isEqualTo(0);
     }
 
     @Test

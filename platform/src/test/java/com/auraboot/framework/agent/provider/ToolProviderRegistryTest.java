@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration tests for {@link ToolProviderRegistry}.
  *
- * <p>Verifies that all four ToolProvider beans are auto-discovered by Spring,
+ * <p>Verifies that all ToolProvider beans are auto-discovered by Spring,
  * that routing via {@link ToolProviderRegistry#execute} reaches the right provider,
  * and that {@link ToolProviderRegistry#discoverAll} aggregates results across providers.
  */
@@ -34,9 +34,9 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
     // ========== Provider Registration ==========
 
     @Test
-    void registryHasAllFourProviders() {
+    void registryHasAllRegisteredProviders() {
         var codes = registry.getProviderCodes();
-        assertThat(codes).containsExactlyInAnyOrder("dsl", "platform", "custom", "mcp");
+        assertThat(codes).containsExactlyInAnyOrder("dsl", "platform", "custom", "mcp", "aurabot");
     }
 
     @Test

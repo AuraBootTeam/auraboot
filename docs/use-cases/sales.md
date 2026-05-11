@@ -1,6 +1,6 @@
 # Sales Management
 
-> Sales pipeline, quoting, orders, shipments, returns, credit memos, RMA, pricing, and revenue tracking -- all driven by DSL configuration with zero custom code.
+> Sales pipeline, quoting, orders, shipments, returns, credit memos, RMA, pricing, and revenue tracking -- mostly driven by declarative DSL configuration.
 
 ## Business Overview
 
@@ -22,7 +22,7 @@ Manufacturing and distribution companies need an integrated sales management sys
 ### Key Capabilities
 
 1. **Sales Quotation Management** -- Create, send, track, accept/reject quotations with revision control
-2. **Quotation-to-Order Conversion** -- One-click conversion from accepted quotation to sales order
+2. **Quotation-to-Order Conversion** -- Single-step conversion from accepted quotation to sales order
 3. **Sales Order Lifecycle** -- Full state machine: Draft -> Pending -> Approved -> Delivering -> Completed
 4. **Multi-Currency Support** -- Automatic exchange rate conversion with base currency tracking
 5. **Document Line Items** -- Parent-child document model with auto-calculated totals

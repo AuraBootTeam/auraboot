@@ -4,10 +4,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port interface for tool discovery and execution via ToolProviderRegistry.
+ * Port interface for tool discovery via ToolProviderRegistry.
  * <p>
- * Allows AuraBotChatService to discover and execute tools from the provider-aware
- * registry without compile-time coupling to a specific registry implementation.
+ * Allows AuraBot chat to discover provider-aware tools without compile-time
+ * coupling to a specific registry implementation. Execution is intentionally not
+ * exposed here; all chat tool calls must enter the canonical ToolLoopService.
  * <p>
  * The registry-backed implementation registers as a Spring bean in the shared AI runtime.
  */
@@ -26,16 +27,6 @@ public interface ToolDiscoveryPort {
     List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills, String modelHint, String intentHint, int maxTools);
 
     /**
-     * Execute a tool by code with the given parameters.
-     *
-     * @param tenantId current tenant ID
-     * @param toolCode tool code (e.g., "cmd:crm_lead_create", "platform.list_models")
-     * @param params   tool input parameters
-     * @return execution result as map (success, data, message/error)
-     */
-    Map<String, Object> executeTool(Long tenantId, String toolCode, Map<String, Object> params);
-
-    /**
      * Definition of a discoverable tool.
      *
      * @param code        tool code including provider prefix (e.g., "cmd:crm_lead_create")
@@ -43,12 +34,33 @@ public interface ToolDiscoveryPort {
      * @param description tool description for LLM function-calling
      * @param inputSchema JSON Schema describing the tool's input parameters
      * @param readOnly    true if the tool only reads data (no side effects)
+     * @param toolType    canonical ToolLoopService tool type
+     * @param sourceCode  canonical source code used by the executor
+     * @param requiresApproval whether Approval Gate must run before execution
+     * @param requiresConfirmation whether user confirmation is required
+     * @param riskLevel risk level carried from provider metadata
+     * @param confirmationPolicy provider confirmation policy
      */
     record ToolDef(
             String code,
             String name,
             String description,
             Map<String, Object> inputSchema,
-            boolean readOnly
-    ) {}
+            boolean readOnly,
+            String toolType,
+            String sourceCode,
+            boolean requiresApproval,
+            boolean requiresConfirmation,
+            String riskLevel,
+            String confirmationPolicy
+    ) {
+        public ToolDef(String code,
+                       String name,
+                       String description,
+                       Map<String, Object> inputSchema,
+                       boolean readOnly) {
+            this(code, name, description, inputSchema, readOnly,
+                    null, null, false, false, null, null);
+        }
+    }
 }

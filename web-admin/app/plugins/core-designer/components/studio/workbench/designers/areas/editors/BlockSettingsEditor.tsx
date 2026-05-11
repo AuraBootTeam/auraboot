@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import type { DslBlock } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface BlockSettingsEditorProps {
   block: DslBlock;
@@ -23,12 +24,12 @@ type PropertyGroup = 'basic' | 'layout' | 'data' | 'appearance' | 'behavior';
 /**
  * Group configuration
  */
-const GROUP_CONFIG: Record<PropertyGroup, { label: string; icon: string }> = {
-  basic: { label: '基本', icon: '📝' },
-  layout: { label: '布局', icon: '📐' },
-  data: { label: '数据', icon: '📊' },
-  appearance: { label: '外观', icon: '🎨' },
-  behavior: { label: '行为', icon: '⚡' },
+const GROUP_CONFIG: Record<PropertyGroup, { label: Record<'zh-CN' | 'en-US', string>; icon: string }> = {
+  basic: { label: { 'zh-CN': '基本', 'en-US': 'Basic' }, icon: '📝' },
+  layout: { label: { 'zh-CN': '布局', 'en-US': 'Layout' }, icon: '📐' },
+  data: { label: { 'zh-CN': '数据', 'en-US': 'Data' }, icon: '📊' },
+  appearance: { label: { 'zh-CN': '外观', 'en-US': 'Appearance' }, icon: '🎨' },
+  behavior: { label: { 'zh-CN': '行为', 'en-US': 'Behavior' }, icon: '⚡' },
 };
 
 export const BlockSettingsEditor: React.FC<BlockSettingsEditorProps> = ({
@@ -37,6 +38,8 @@ export const BlockSettingsEditor: React.FC<BlockSettingsEditorProps> = ({
   readonly,
 }) => {
   const [activeGroup, setActiveGroup] = useState<PropertyGroup>('basic');
+  const { locale } = useI18n();
+  const localeKey = locale === 'zh-CN' ? 'zh-CN' : 'en-US';
 
   // Get available groups for this block type
   const availableGroups = getAvailableGroups(block.blockType);
@@ -58,7 +61,7 @@ export const BlockSettingsEditor: React.FC<BlockSettingsEditorProps> = ({
               data-testid={`property-group-${group}`}
             >
               <span className="mr-1">{GROUP_CONFIG[group].icon}</span>
-              {GROUP_CONFIG[group].label}
+              {GROUP_CONFIG[group].label[localeKey]}
             </button>
           ))}
         </div>
@@ -125,6 +128,8 @@ interface PropertyEditorProps {
  * Basic properties (title, id, visibility)
  */
 const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, readonly }) => {
+  const { locale } = useI18n();
+  const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const showTitle =
     block.blockType === 'form-section' ||
     block.blockType === 'detail-section' ||
@@ -135,12 +140,12 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
     <div className="space-y-4">
       {/* Title — accepts LocalizedText (zh-CN + en-US) */}
       {showTitle && (
-        <PropertyField label="标题" testId="block-title">
+        <PropertyField label={l('标题', 'Title')} testId="block-title">
           <LocalizedTextInput
             value={block.title as LocalizedTextValue}
             onChange={(next) => onChange({ title: (next ?? undefined) as DslBlock['title'] })}
             disabled={readonly}
-            placeholder="输入标题"
+            placeholder={l('输入标题', 'Enter title')}
             testId="block-title-input"
           />
         </PropertyField>
@@ -148,20 +153,24 @@ const BasicProperties: React.FC<PropertyEditorProps> = ({ block, onChange, reado
 
       {/* Text content */}
       {block.blockType === 'text' && (
-        <PropertyField label="内容" testId="text-content">
+        <PropertyField label={l('内容', 'Content')} testId="text-content">
           <textarea
             value={(block.props as any)?.content || ''}
             onChange={(e) => onChange({ props: { ...block.props, content: e.target.value } })}
             disabled={readonly}
             className="property-input min-h-[80px] resize-y"
-            placeholder="输入文本内容"
+            placeholder={l('输入文本内容', 'Enter text content')}
             data-testid="text-content-input"
           />
         </PropertyField>
       )}
 
       {/* Visibility condition */}
-      <PropertyField label="显示条件" hint="SpEL 表达式" testId="block-visible">
+      <PropertyField
+        label={l('显示条件', 'Visibility condition')}
+        hint={l('SpEL 表达式', 'SpEL expression')}
+        testId="block-visible"
+      >
         <input
           type="text"
           value={block.visible || ''}

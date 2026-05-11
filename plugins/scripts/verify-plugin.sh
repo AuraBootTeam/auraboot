@@ -12,7 +12,7 @@
 # Environment variables:
 #   API_BASE      - Backend API URL (default: http://localhost:6443)
 #   FRONTEND_BASE - Frontend URL (default: http://localhost:5173)
-#   AUTH_EMAIL    - Login email (default: admin@example.com)
+#   AUTH_EMAIL    - Login email (default: admin@auraboot.com)
 #   AUTH_PASSWORD - Login password (default:  Test2026x)
 #
 
@@ -23,7 +23,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ZIP_FILE="$PROJECT_DIR/dist/asset-management-plugin.zip"
 API_BASE="${API_BASE:-http://localhost:6443}"
 FRONTEND_BASE="${FRONTEND_BASE:-http://localhost:5173}"
-AUTH_EMAIL="${AUTH_EMAIL:-admin@example.com}"
+AUTH_EMAIL="${AUTH_EMAIL:-admin@auraboot.com}"
 AUTH_PASSWORD="${AUTH_PASSWORD:- Test2026x}"
 AUTH_TOKEN=""
 

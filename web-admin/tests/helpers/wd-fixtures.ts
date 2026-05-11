@@ -110,7 +110,7 @@ async function ensureUser(
     // extraRoleCodes. For example, wd_manager needs tenant_admin to access the BPM
     // Task Center (system.process.execute permission is in tenant_admin only).
     if (opts.extraRoleCodes && opts.extraRoleCodes.length > 0) {
-      const adminToken = await loginAs(api, 'admin@example.com', 'Test2026x');
+      const adminToken = await loginAs(api, 'admin@auraboot.com', 'Test2026x');
       await ensureExtraRoles(api, adminToken, opts.email, opts.roleCode, opts.extraRoleCodes);
     }
     // Re-login to get a fresh JWT that includes the newly-assigned role permissions.
@@ -118,7 +118,7 @@ async function ensureUser(
   }
 
   // User missing — create via admin API
-  const adminToken = await loginAs(api, 'admin@example.com', 'Test2026x');
+  const adminToken = await loginAs(api, 'admin@auraboot.com', 'Test2026x');
 
   const createResp = await api.post(`${BACKEND_URL}/api/admin/users`, {
     data: {

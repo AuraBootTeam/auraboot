@@ -135,8 +135,8 @@ First-time contributors this release: @user1, @user2. Thanks!
 - Entries land in `[Unreleased]` as part of the PR that ships them.
 - On release-cut, the section is renamed `[X.Y.Z] - YYYY-MM-DD` and a
   fresh `[Unreleased]` skeleton is added on top.
-- Each release also gets a GitHub Release with the same body — automated
-  via `.github/workflows/release-notes.yml` (TODO).
+- Each release also gets a GitHub Release with the same body via
+  `.github/workflows/release-notes.yml`.
 - Use the icons (✨ ♻️ ⚠️ 🗑 🐛 🔒 💥) consistently — they make the
   changelog scannable.
 - Link each entry to the PR or issue (`(#PR)`) so readers can audit

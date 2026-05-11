@@ -1,5 +1,6 @@
 package com.auraboot.framework.email;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.email.mapper.EmailAccountMapper;
 import com.auraboot.framework.email.mapper.EmailMessageMapper;
 import com.auraboot.framework.email.mapper.EmailSequenceEnrollmentMapper;
@@ -12,6 +13,7 @@ import com.auraboot.framework.email.service.EmailSendService;
 import com.auraboot.framework.email.service.EmailSequenceExecutor;
 import com.auraboot.framework.email.service.EmailSequenceService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -55,15 +59,42 @@ class EmailSequenceExecutorProcessTest {
                 accountMapper, messageMapper, emailSendService, sequenceService);
     }
 
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
+    }
+
     private static EmailSequenceEnrollment enrollment(long id, long accId, int currentStep) {
         EmailSequenceEnrollment e = new EmailSequenceEnrollment();
         e.setId(id);
+        e.setTenantId(42L);
         e.setAccountId(accId);
         e.setSequenceId(99L);
         e.setContactEmail("c@x.com");
         e.setCurrentStep(currentStep);
         e.setEnrolledAt(Instant.now().minusSeconds(3600));
         return e;
+    }
+
+    @Test
+    @DisplayName("Due enrollment binds tenant context during processing and clears it afterwards")
+    void bindsTenantContextForEnrollment() {
+        EmailSequenceEnrollment e = enrollment(10L, 20L, 5);
+        e.setTenantId(77L);
+        EmailAccount account = new EmailAccount();
+        account.setId(20L);
+        when(enrollmentMapper.findDueEnrollments()).thenReturn(List.of(e));
+        when(accountMapper.selectById(20L)).thenAnswer(invocation -> {
+            assertEquals(77L, MetaContext.getCurrentTenantId());
+            return account;
+        });
+        when(messageMapper.countInboundFrom(anyLong(), anyString(), any())).thenReturn(0);
+        when(stepMapper.findBySequenceId(99L)).thenReturn(List.of(step(1, 0, "s", "b")));
+
+        executor.processDueEnrollments();
+
+        assertFalse(MetaContext.exists());
+        verify(sequenceService).updateEnrollmentStatus(10L, EmailConstants.ENROLLMENT_COMPLETED);
     }
 
     private static EmailSequenceStep step(int order, int delayDays, String subj, String body) {

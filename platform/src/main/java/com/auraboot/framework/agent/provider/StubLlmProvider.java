@@ -3,6 +3,8 @@ package com.auraboot.framework.agent.provider;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.LlmChunk;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -26,14 +28,11 @@ import java.util.Map;
  * not a production fallback, and the red-line on "no fallback" still holds for
  * real providers (a misconfigured Anthropic key still surfaces as an error).
  *
- * <p>The stub answers every {@link #chat} call with a single text block
- * containing {@code "[stub response]"} and stop_reason {@code "end_turn"}. It
- * does NOT emit tool_use blocks because the AuraBot turn loop interprets
- * tool_use as "call a platform/MCP tool" — emitting a fake tool call here
- * would cascade into either an unknown-tool error or an infinite loop. The
- * stub therefore always declares the turn finished. Suites that rely on
- * tool_use behaviour mock the chat layer directly via Playwright route
- * interception and bypass this provider entirely.
+ * <p>The stub answers normal calls with a single text block containing
+ * {@code "[stub response]"} and stop_reason {@code "end_turn"}. When a test
+ * turn has just returned a {@code tool_result}, the final text includes a
+ * compact deterministic digest of that result so browser E2E can assert the
+ * real tool loop outcome without a real LLM summarizer.
  *
  * <p>Streaming: {@link #streamChat} emits a single delta chunk followed by a
  * terminal {@code done} chunk wrapping the same response. This matches the
@@ -54,8 +53,20 @@ public class StubLlmProvider implements LlmProvider {
     /** Provider code; matches the conventional {@code stub} identifier. */
     public static final String PROVIDER_CODE = "stub";
 
+    /**
+     * Explicit E2E-only directive. When the latest user message contains this
+     * marker followed by a JSON object `{id,name,input}`, the stub returns one
+     * deterministic tool_use block. The marker is intentionally noisy so normal
+     * development prompts cannot trigger tool execution accidentally.
+     */
+    public static final String TOOL_USE_MARKER = "@@AURABOOT_STUB_TOOL_USE@@";
+
     /** Fixed response text returned for every chat request. */
     static final String STUB_RESPONSE_TEXT = "[stub response]";
+
+    private static final int MAX_TOOL_RESULT_DIGEST_CHARS = 2000;
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Override
     public String getProviderCode() {
@@ -79,11 +90,19 @@ public class StubLlmProvider implements LlmProvider {
 
     @Override
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) {
+        LlmChatResponse scripted = scriptedToolUseResponse(request);
+        if (scripted != null) {
+            return scripted;
+        }
         return buildStubResponse(request);
     }
 
     @Override
     public Flux<LlmChunk> streamChat(LlmChatRequest request, String apiKey, String baseUrl) {
+        LlmChatResponse scripted = scriptedToolUseResponse(request);
+        if (scripted != null) {
+            return Flux.just(LlmChunk.done(0L, scripted));
+        }
         LlmChatResponse aggregate = buildStubResponse(request);
         // Emit one delta chunk + one terminal done chunk so downstream
         // aggregators that expect at least one delta before the terminal frame
@@ -117,13 +136,17 @@ public class StubLlmProvider implements LlmProvider {
      * gets non-zero values and behaves like a real call.
      */
     private LlmChatResponse buildStubResponse(LlmChatRequest request) {
+        String responseText = latestToolResultDigest(request);
+        if (responseText == null || responseText.isBlank()) {
+            responseText = STUB_RESPONSE_TEXT;
+        }
         List<LlmChatResponse.ContentBlock> content = new ArrayList<>(1);
         content.add(LlmChatResponse.ContentBlock.builder()
                 .type("text")
-                .text(STUB_RESPONSE_TEXT)
+                .text(responseText)
                 .build());
         int inputTokens = estimateInputTokens(request);
-        int outputTokens = Math.max(1, STUB_RESPONSE_TEXT.length() / 4);
+        int outputTokens = Math.max(1, responseText.length() / 4);
         return LlmChatResponse.builder()
                 .stopReason("end_turn")
                 .content(content)
@@ -133,6 +156,189 @@ public class StubLlmProvider implements LlmProvider {
                 .cacheReadInputTokens(0)
                 .build();
     }
+
+    private String latestToolResultDigest(LlmChatRequest request) {
+        Object result = latestToolResult(request);
+        if (result == null) {
+            return null;
+        }
+        Object normalized = normalizeToolResult(result);
+        String json;
+        try {
+            json = OBJECT_MAPPER.writeValueAsString(normalized);
+        } catch (Exception e) {
+            json = String.valueOf(normalized);
+        }
+        return STUB_RESPONSE_TEXT + "\n" + truncate(json, MAX_TOOL_RESULT_DIGEST_CHARS);
+    }
+
+    private Object latestToolResult(LlmChatRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return null;
+        }
+        for (int i = request.getMessages().size() - 1; i >= 0; i--) {
+            LlmChatRequest.Message message = request.getMessages().get(i);
+            if (message == null || message.getContent() == null) continue;
+            Object content = message.getContent();
+            if (!(content instanceof List<?> list)) continue;
+            for (int j = list.size() - 1; j >= 0; j--) {
+                Object item = list.get(j);
+                Object result = toolResultPayload(item);
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Object toolResultPayload(Object item) {
+        if (item instanceof LlmChatRequest.ContentBlock block
+                && "tool_result".equals(block.getType())) {
+            return block.getResult();
+        }
+        if (item instanceof Map<?, ?> map
+                && "tool_result".equals(String.valueOf(map.get("type")))) {
+            Object result = map.get("result");
+            return result != null ? result : map.get("content");
+        }
+        return null;
+    }
+
+    private Object normalizeToolResult(Object result) {
+        if (result instanceof String s) {
+            String trimmed = s.trim();
+            if ((trimmed.startsWith("{") && trimmed.endsWith("}"))
+                    || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+                try {
+                    return OBJECT_MAPPER.readValue(trimmed, Object.class);
+                } catch (Exception ignored) {
+                    return trimmed;
+                }
+            }
+            return trimmed;
+        }
+        return result;
+    }
+
+    private String truncate(String value, int maxChars) {
+        if (value == null || value.length() <= maxChars) {
+            return value;
+        }
+        return value.substring(0, Math.max(0, maxChars - 3)) + "...";
+    }
+
+    private LlmChatResponse scriptedToolUseResponse(LlmChatRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return null;
+        }
+        ToolUseDirective directive = latestToolUseDirective(request);
+        if (directive == null || hasToolResultAfter(request, directive.messageIndex())) {
+            return null;
+        }
+        String json = directive.json();
+        if (json.isBlank()) {
+            return null;
+        }
+        try {
+            Map<String, Object> payload = OBJECT_MAPPER.readValue(
+                    json, new TypeReference<Map<String, Object>>() {});
+            Object name = payload.get("name");
+            if (name == null || String.valueOf(name).isBlank()) {
+                return null;
+            }
+            Object input = payload.get("input");
+            String id = payload.get("id") == null
+                    ? "toolu-stub"
+                    : String.valueOf(payload.get("id"));
+            LlmChatResponse.ContentBlock toolUse = LlmChatResponse.ContentBlock.builder()
+                    .type("tool_use")
+                    .id(id)
+                    .name(String.valueOf(name))
+                    .input(toStringObjectMap(input))
+                    .build();
+            return LlmChatResponse.builder()
+                    .stopReason("tool_use")
+                    .content(List.of(toolUse))
+                    .inputTokens(estimateInputTokens(request))
+                    .outputTokens(1)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Ignoring malformed stub tool_use directive: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private ToolUseDirective latestToolUseDirective(LlmChatRequest request) {
+        for (int i = request.getMessages().size() - 1; i >= 0; i--) {
+            LlmChatRequest.Message message = request.getMessages().get(i);
+            if (message == null || !"user".equals(message.getRole())) continue;
+            String text = userText(message);
+            if (text == null) continue;
+            int marker = text.indexOf(TOOL_USE_MARKER);
+            if (marker >= 0) {
+                return new ToolUseDirective(
+                        i,
+                        text.substring(marker + TOOL_USE_MARKER.length()).trim());
+            }
+        }
+        return null;
+    }
+
+    private boolean hasToolResultAfter(LlmChatRequest request, int messageIndex) {
+        for (int i = messageIndex + 1; i < request.getMessages().size(); i++) {
+            LlmChatRequest.Message message = request.getMessages().get(i);
+            if (message == null || message.getContent() == null) continue;
+            Object content = message.getContent();
+            if (content instanceof List<?> list) {
+                for (Object item : list) {
+                    if (item instanceof LlmChatRequest.ContentBlock block
+                            && "tool_result".equals(block.getType())) {
+                        return true;
+                    }
+                    if (item instanceof Map<?, ?> map
+                            && "tool_result".equals(String.valueOf(map.get("type")))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private Map<String, Object> toStringObjectMap(Object input) {
+        if (!(input instanceof Map<?, ?> map) || map.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        map.forEach((key, value) -> out.put(String.valueOf(key), value));
+        return out;
+    }
+
+    private String userText(LlmChatRequest.Message message) {
+        Object content = message.getContent();
+        if (content instanceof String s) {
+            return s;
+        }
+        if (content instanceof List<?> list) {
+            StringBuilder joined = new StringBuilder();
+            for (Object item : list) {
+                if (item instanceof LlmChatRequest.ContentBlock block && block.getText() != null) {
+                    joined.append(block.getText());
+                } else if (item instanceof LlmChatRequest.MessageContentBlock block && block.getText() != null) {
+                    joined.append(block.getText());
+                } else if (item instanceof Map<?, ?> map && map.get("text") != null) {
+                    joined.append(map.get("text"));
+                }
+            }
+            if (!joined.isEmpty()) {
+                return joined.toString();
+            }
+        }
+        return null;
+    }
+
+    private record ToolUseDirective(int messageIndex, String json) {}
 
     /**
      * Cheap input-token estimate: sum of system prompt + every message

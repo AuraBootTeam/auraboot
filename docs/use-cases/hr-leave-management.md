@@ -23,7 +23,7 @@ Managing employee leave with spreadsheets and email chains creates chaos: manage
 2. **Leave Request Submission** -- Form-based leave request with type, dates, days, and reason
 3. **Multi-Type Leave** -- Annual, sick, personal, maternity, bereavement, and custom leave types
 4. **State Machine Workflow** -- Draft -> Pending -> Approved/Rejected with full audit trail
-5. **Manager Approval** -- One-click approve/reject with confirmation dialogs
+5. **Manager Approval** -- Guided approve/reject actions with confirmation dialogs
 6. **Rejection Reasons** -- Required reason field on rejection for transparency
 7. **Edit Before Approval** -- Modify pending requests (dates, days, reason)
 8. **Request Cancellation** -- Cancel approved requests before the leave date
