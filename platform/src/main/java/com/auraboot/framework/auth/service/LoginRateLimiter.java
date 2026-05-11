@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * Sliding-window rate limiter for login attempts.
  * Tracks attempts per IP and per email independently.
  * <p>
- * Defaults: max 10 attempts per IP per minute, max 5 attempts per email per minute.
+ * Defaults: max 3,000 attempts per IP per minute, max 3,000 attempts per email per minute.
  * After exceeding the limit, further attempts are blocked until the window slides.
  * <p>
  * Stale entries are evicted every 5 minutes to prevent unbounded memory growth.
@@ -27,8 +27,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class LoginRateLimiter {
 
     private static final long WINDOW_MS = 60_000L;
-    private static final int MAX_PER_IP = 600;
-    private static final int MAX_PER_EMAIL = 600;
+    private static final int MAX_PER_IP = 3_000;
+    private static final int MAX_PER_EMAIL = 3_000;
     private static final int MAX_KEYS = 10_000;
 
     private final Map<String, Deque<Long>> ipWindows = new ConcurrentHashMap<>();
