@@ -33,7 +33,7 @@
  *   - 0 page.goto('/admin/agent-runs') direct navigation in spec body
  *   - 0 page.request.put|post|delete (one GET for ground-truth fetch only)
  *   - 0 waitForTimeout / afterAll cleanup
- *   - 0 retries:N / test.skip wrapping a product gap
+ *   - 0 Playwright retry config / test.skip wrapping a product gap
  *   - UI ops (page.click / locator.click) > page.request count
  *   - Specific value assertions, never "toBeVisible"-only on primary data
  *
@@ -78,13 +78,15 @@ const TASK_ID = `${TASK_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(
 const TURN_ID = `${TURN_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
 const CONVERSATION_ID = Date.now() * 1000 + Math.floor(Math.random() * 900);
 const INBOUND_MESSAGE_ID = CONVERSATION_ID + 1;
-const OUTBOUND_MESSAGE_ID = CONVERSATION_ID + 2;
+const INTERMEDIATE_MESSAGE_ID = CONVERSATION_ID + 2;
+const OUTBOUND_MESSAGE_ID = CONVERSATION_ID + 3;
 const RESULT_CONTRACT_ID = `rc-${ACTION_PID}`;
 const AGENT_CODE = 'aurabot.replay.e2e';
 // ab_agent_bif.intent is VARCHAR(32). Use a short stable code, not free-form text.
 const INTENT_TEXT = 'replay_e2e_query';
 const ACTION_INTENT_TEXT = 'replay e2e action intent — sales.list';
 const TURN_USER_MESSAGE = '统计客户信息';
+const TURN_INTERMEDIATE_MESSAGE = '查询工具返回 42 位客户';
 const TURN_FINAL_RESPONSE = '客户信息统计完成';
 
 // Stable ground-truth values that MUST be reflected in the UI cells.
@@ -289,11 +291,11 @@ async function seedAgentTaskForConversationTurn(): Promise<void> {
 async function seedConversationTurnMessages(): Promise<void> {
   await psql(`
     INSERT INTO ab_im_conversation
-      (id, tenant_id, type, name, max_seq, created_at, updated_at)
-    VALUES
-      (${CONVERSATION_ID}, ${ADMIN_TENANT_ID}, 'BOT',
-       ${sqlString(`${CONVERSATION_PREFIX}_${RUN_OK}`)}, 2,
-       NOW() - INTERVAL '10 seconds', NOW());
+	      (id, tenant_id, type, name, max_seq, created_at, updated_at)
+	    VALUES
+	      (${CONVERSATION_ID}, ${ADMIN_TENANT_ID}, 'BOT',
+	       ${sqlString(`${CONVERSATION_PREFIX}_${RUN_OK}`)}, 3,
+	       NOW() - INTERVAL '10 seconds', NOW());
 
     INSERT INTO ab_im_message
       (id, conversation_id, tenant_id, sender_id, sender_type, seq,
@@ -305,16 +307,20 @@ async function seedConversationTurnMessages(): Promise<void> {
        ${sqlString(`in-${TURN_ID}`)}, 'acp_run', 0.92,
        '["agent-runs-e2e"]'::jsonb, NOW() - INTERVAL '9 seconds');
 
-    INSERT INTO ab_im_message
-      (id, conversation_id, tenant_id, sender_id, sender_type, seq,
-       message_type, content, client_msg_id, thinking_content,
-       thinking_signature, created_at)
-    VALUES
-      (${OUTBOUND_MESSAGE_ID}, ${CONVERSATION_ID}, ${ADMIN_TENANT_ID},
-       2, 'agent', 2, 'ai_response', ${sqlString(TURN_FINAL_RESPONSE)},
-       ${sqlString(`out-${TURN_ID}`)}, 'e2e thinking trace',
-       'e2e-thinking-signature', NOW() - INTERVAL '5 seconds');
-  `);
+	    INSERT INTO ab_im_message
+	      (id, conversation_id, tenant_id, sender_id, sender_type, seq,
+	       message_type, content, client_msg_id, thinking_content,
+	       thinking_signature, created_at)
+	    VALUES
+	      (${INTERMEDIATE_MESSAGE_ID}, ${CONVERSATION_ID}, ${ADMIN_TENANT_ID},
+	       2, 'agent', 2, 'tool_result', ${sqlString(TURN_INTERMEDIATE_MESSAGE)},
+	       ${sqlString(`tool-${TURN_ID}`)}, 'e2e tool thinking trace',
+	       'e2e-tool-thinking-signature', NOW() - INTERVAL '7 seconds'),
+	      (${OUTBOUND_MESSAGE_ID}, ${CONVERSATION_ID}, ${ADMIN_TENANT_ID},
+	       2, 'agent', 3, 'ai_response', ${sqlString(TURN_FINAL_RESPONSE)},
+	       ${sqlString(`out-${TURN_ID}`)}, 'e2e thinking trace',
+	       'e2e-thinking-signature', NOW() - INTERVAL '5 seconds');
+	  `);
 }
 
 // Idempotent menu upsert (mirrors _real-backend-helpers.ts upsertMenu).
@@ -667,9 +673,9 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     const detailBody = await detailResp.json();
     expect(detailBody?.code).toBe('0');
     expect(detailBody?.data?.run?.runId).toBe(RUN_OK);
-    expect(detailBody?.data?.actions?.length).toBeGreaterThanOrEqual(1);
-    expect(detailBody?.data?.childRuns?.length).toBeGreaterThanOrEqual(1);
-    expect(detailBody?.data?.interruptLog?.length).toBeGreaterThanOrEqual(1);
+    expect(detailBody?.data?.actions?.length).toBe(1);
+    expect(detailBody?.data?.childRuns?.length).toBe(1);
+    expect(detailBody?.data?.interruptLog?.length).toBe(1);
     expect(detailBody?.data?.bif?.intent).toBe(INTENT_TEXT);
     expect(detailBody?.data?.traceId).toBe(TRACE_ID);
     expect(detailBody?.data?.actions?.[0]?.resultContractId).toBe(RESULT_CONTRACT_ID);
@@ -679,7 +685,7 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     expect(detailBody?.data?.conversationTurn?.outboundMessageId).toBe(OUTBOUND_MESSAGE_ID);
     expect(detailBody?.data?.conversationTurn?.userMessage).toBe(TURN_USER_MESSAGE);
     expect(detailBody?.data?.conversationTurn?.finalResponse).toBe(TURN_FINAL_RESPONSE);
-    expect(detailBody?.data?.conversationTurn?.messages?.length).toBe(2);
+    expect(detailBody?.data?.conversationTurn?.messages?.length).toBe(3);
     expect(detailBody?.data?.conversationTurn?.resultContractIds).toContain(RESULT_CONTRACT_ID);
     expect(detailBody?.data?.resultContracts?.[0]?.contractId).toBe(RESULT_CONTRACT_ID);
     expect(detailBody?.data?.resultContracts?.[0]?.contract?.textSummary).toBe(ACTION_INTENT_TEXT);
@@ -757,15 +763,19 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     const conversationSection = page.locator('[data-testid="drawer-section-conversation"]');
     await expect(conversationSection).toBeVisible({ timeout: 3_000 });
     await expect(conversationSection).toContainText(TURN_ID);
-    await expect(conversationSection).toContainText(String(CONVERSATION_ID));
-    await expect(conversationSection).toContainText(TURN_USER_MESSAGE);
-    await expect(conversationSection).toContainText(TURN_FINAL_RESPONSE);
-    await expect(
-      page.locator(`[data-testid="conversation-message-${INBOUND_MESSAGE_ID}"]`),
-    ).toContainText('human');
-    await expect(
-      page.locator(`[data-testid="conversation-message-${OUTBOUND_MESSAGE_ID}"]`),
-    ).toContainText('e2e thinking trace');
+	    await expect(conversationSection).toContainText(String(CONVERSATION_ID));
+	    await expect(conversationSection).toContainText(TURN_USER_MESSAGE);
+	    await expect(conversationSection).toContainText(TURN_INTERMEDIATE_MESSAGE);
+	    await expect(conversationSection).toContainText(TURN_FINAL_RESPONSE);
+	    await expect(
+	      page.locator(`[data-testid="conversation-message-${INBOUND_MESSAGE_ID}"]`),
+	    ).toContainText('human');
+	    await expect(
+	      page.locator(`[data-testid="conversation-message-${INTERMEDIATE_MESSAGE_ID}"]`),
+	    ).toContainText('tool_result');
+	    await expect(
+	      page.locator(`[data-testid="conversation-message-${OUTBOUND_MESSAGE_ID}"]`),
+	    ).toContainText('e2e thinking trace');
 
     // Deep-link bridge: replay drawer -> trace detail -> related run link.
     const openTrace = page.locator('[data-testid="open-trace-link"]');
