@@ -32,7 +32,7 @@ export interface SchemaRuntimeConfig {
   globalState: GlobalState;
   scopeId?: string;
   navigate?: (path: string) => void;
-  showToast?: (message: string, level?: 'success' | 'error' | 'info') => void;
+  showToast?: (message: string, level?: 'success' | 'error' | 'info' | 'warning') => void;
   dataSourceManager: DataSourceManager; // P0-3: 必需 - 外部传入的 DataSourceManager (强制单例)
   disableAutoFetch?: boolean; // 可选:禁用所有数据源的 autoFetch
 }
@@ -48,7 +48,7 @@ export class SchemaRuntime {
   private dataSourceManager: DataSourceManager;
   private handlers: Map<string, any>;
   private navigate?: (path: string) => void;
-  private showToast?: (message: string, level?: 'success' | 'error' | 'info') => void;
+  private showToast?: (message: string, level?: 'success' | 'error' | 'info' | 'warning') => void;
   private flowRunner: FlowRunner;
   private linkageEngine: LinkageEngine | null = null;
   private readonly registeredDataSources = new Set<string>();

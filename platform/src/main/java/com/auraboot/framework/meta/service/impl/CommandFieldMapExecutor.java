@@ -85,6 +85,7 @@ public class CommandFieldMapExecutor {
                 }
             }
 
+            applyReferencePidCompanions(modelDef, data);
             convertModelFieldTypes(modelDef, data);
 
             // Merge JSONB virtual fields and map field codes to column names
@@ -228,6 +229,8 @@ public class CommandFieldMapExecutor {
                 }
             }
         }
+
+        applyReferencePidCompanions(modelDef, data);
 
         // Convert data types based on model field definitions (DATE, INTEGER, DECIMAL, etc.)
         convertModelFieldTypes(modelDef, data);
@@ -393,6 +396,30 @@ public class CommandFieldMapExecutor {
                 data.put(fieldCode, convertFieldValue(field.getDataType(), value));
             } catch (Exception e) {
                 log.warn("Type conversion failed for field {}: {}", fieldCode, e.getMessage());
+            }
+        }
+    }
+
+    private void applyReferencePidCompanions(ModelDefinition modelDef, Map<String, Object> data) {
+        if (modelDef == null || modelDef.getFields() == null || data == null || data.isEmpty()) {
+            return;
+        }
+        Set<String> fieldCodes = modelDef.getFields().stream()
+                .map(FieldDefinition::getCode)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        for (FieldDefinition field : modelDef.getFields()) {
+            String fieldCode = field.getCode();
+            if (!StringUtils.hasText(fieldCode)
+                    || !"reference".equalsIgnoreCase(field.getDataType())
+                    || !fieldCode.endsWith("_id")
+                    || data.containsKey(fieldCode)) {
+                continue;
+            }
+            String pidField = fieldCode.substring(0, fieldCode.length() - 3) + "_pid";
+            Object pidValue = data.get(pidField);
+            if (fieldCodes.contains(pidField) && pidValue != null && StringUtils.hasText(String.valueOf(pidValue))) {
+                data.put(fieldCode, pidValue);
             }
         }
     }

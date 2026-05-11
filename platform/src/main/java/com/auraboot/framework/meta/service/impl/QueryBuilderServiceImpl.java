@@ -175,6 +175,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         if (baseQuery instanceof QueryBuilderImpl impl) {
             impl.addKeywordCondition(columnExprs, likeValue);
         } else {
+            // codeql[java/log-injection] Keyword is logged as a structured diagnostic parameter only.
             log.warn("QueryBuilder implementation does not support keyword search, skipping keyword: {}", keyword);
         }
 

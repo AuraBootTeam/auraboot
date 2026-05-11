@@ -100,8 +100,9 @@ const DETAIL_RESPONSE = {
       actionCode: 'sales.query',
       actionType: 'tool_call',
       intentSummary: 'list sales',
-      targetModel: null,
-      targetRecordId: null,
+      targetModel: 'crm_account',
+      targetRecordId: 'REC-PID-001',
+      targetRecordPid: 'REC-PID-001',
       beforeSnapshot: null,
       afterSnapshot: null,
       fieldChanges: null,
@@ -185,6 +186,9 @@ describe('AgentRunsPage', () => {
       expect(screen.getByTestId('drawer-section-metadata')).toBeInTheDocument();
     });
     expect(screen.getByTestId('drawer-section-actions')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('action-toggle-ACT001'));
+    expect(screen.getByTestId('action-target-ACT001')).toHaveTextContent('Target PID');
+    expect(screen.getByTestId('action-target-ACT001')).toHaveTextContent('REC-PID-001');
     expect(screen.getByTestId('drawer-section-interrupts')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-section-child-runs')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-section-bif')).toBeInTheDocument();

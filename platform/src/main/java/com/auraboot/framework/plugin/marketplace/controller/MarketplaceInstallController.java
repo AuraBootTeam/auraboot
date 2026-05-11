@@ -34,6 +34,7 @@ public class MarketplaceInstallController {
         return ApiResponse.ok(installService.install(pluginId, request));
     }
 
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/installed")
     @Operation(summary = "Get installed plugins")
     public ApiResponse<List<MarketplacePluginDTO>> getInstalled() {

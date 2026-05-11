@@ -21,6 +21,7 @@ public class PlatformStatsController {
 
     private final JdbcTemplate jdbcTemplate;
 
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/stats")
     public ApiResponse<Map<String, Object>> getStats() {
         Long tenantCount = jdbcTemplate.queryForObject(

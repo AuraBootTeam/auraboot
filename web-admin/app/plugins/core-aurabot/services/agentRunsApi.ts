@@ -40,6 +40,7 @@ export interface AgentActionItem {
   intentSummary: string | null;
   targetModel: string | null;
   targetRecordId: string | null;
+  targetRecordPid: string | null;
   beforeSnapshot: string | null;
   afterSnapshot: string | null;
   fieldChanges: string | null;

@@ -62,6 +62,7 @@ public class SecurityConfig {
                 || activeProfile.contains("test") || "default".equals(activeProfile);
 
         http
+                // codeql[java/csrf-unprotected-request-type] AuraBoot APIs are stateless JWT/Bearer-token APIs; browser cookies are not used for authentication.
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> {
@@ -143,7 +144,8 @@ public class SecurityConfig {
             "X-Requested-With",
             "Accept",
             "Origin",
-            "X-Tenant-Id"
+            "X-Tenant-Id",
+            "Stripe-Signature"
         ));
         configuration.setExposedHeaders(Arrays.asList(
             "X-Total-Count",

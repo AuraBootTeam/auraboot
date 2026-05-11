@@ -98,8 +98,12 @@ export function InboxWidget({
   const handleItemClick = (item: InboxItem) => {
     if (item.deepLink) {
       window.location.href = item.deepLink;
-    } else if (item.modelCode && item.recordId) {
-      window.location.href = `/${item.modelCode}/${item.recordId}`;
+    } else if (item.sourceModel ?? item.modelCode) {
+      const modelCode = item.sourceModel ?? item.modelCode;
+      const recordPid = item.sourceRecordPid ?? item.sourceRecordId ?? (item.recordId != null ? String(item.recordId) : undefined);
+      if (recordPid) {
+        window.location.href = `/p/${modelCode}/view/${recordPid}`;
+      }
     }
   };
 

@@ -104,6 +104,46 @@ describe('SchemaRuntime', () => {
     actionRegistry.unregister(actionName);
   });
 
+  it('refreshes scoped form state between flow steps', async () => {
+    const manager = createManager();
+    const writeAction = '__test.write.form__';
+    const readAction = '__test.read.form__';
+    const readHandler = vi.fn();
+
+    actionRegistry.register(writeAction, async ({ stateManager, scopeId }) => {
+      stateManager.updateForm(scopeId, 'reason', 'operator reason');
+    });
+    actionRegistry.register(readAction, readHandler);
+
+    const schema: UnifiedSchema = {
+      ...minimalSchema,
+      handlers: {
+        testFlow: {
+          type: 'flow',
+          steps: [
+            { id: 'write', action: writeAction },
+            { id: 'read', action: readAction },
+          ],
+        },
+      },
+    };
+
+    const runtime = new SchemaRuntime({
+      schema,
+      globalState: createGlobalState(),
+      dataSourceManager: manager,
+      disableAutoFetch: true,
+    });
+
+    await runtime.executeHandler('testFlow');
+
+    expect(readHandler).toHaveBeenCalledTimes(1);
+    expect(readHandler.mock.calls[0][0].expressionContext.form.reason).toBe('operator reason');
+
+    actionRegistry.unregister(writeAction);
+    actionRegistry.unregister(readAction);
+  });
+
   it('initializes successfully with the final.v1.0 DSL sample', () => {
     const manager = createManager();
     const runtime = new SchemaRuntime({

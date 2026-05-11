@@ -19,6 +19,7 @@ public class SolutionBrowseController {
 
     private final SolutionBrowseService browseService;
 
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping
     @Operation(summary = "Search solutions")
     public ApiResponse<List<SolutionDTO>> search(
@@ -28,24 +29,28 @@ public class SolutionBrowseController {
         return ApiResponse.ok(browseService.search(keyword, industry, sort));
     }
 
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/{code}")
     @Operation(summary = "Get solution detail")
     public ApiResponse<SolutionDetailDTO> getDetail(@PathVariable String code) {
         return ApiResponse.ok(browseService.getDetail(code));
     }
 
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/featured")
     @Operation(summary = "Get featured solutions")
     public ApiResponse<List<SolutionDTO>> getFeatured() {
         return ApiResponse.ok(browseService.getFeatured());
     }
 
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/industries")
     @Operation(summary = "Get available industries")
     public ApiResponse<List<String>> getIndustries() {
         return ApiResponse.ok(browseService.getIndustries());
     }
 
+    // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/installed")
     @Operation(summary = "Get installed solutions for current tenant")
     public ApiResponse<List<SolutionDTO>> getInstalled() {

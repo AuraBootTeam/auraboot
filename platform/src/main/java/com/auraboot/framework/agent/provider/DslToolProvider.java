@@ -183,7 +183,7 @@ public class DslToolProvider implements ToolProvider {
             tools.add(ToolDefinition.builder()
                     .toolCode(PREFIX_GET + modelHint)
                     .toolName("Get " + modelHint)
-                    .description("Get a single " + modelHint + " record by ID. Params: recordId (required).")
+                    .description("Get a single " + modelHint + " record by pid. Params: recordPid (required); recordId is accepted for compatibility.")
                     .providerCode("dsl")
                     .toolType("dsl_query")
                     .sourceCode(modelHint)
@@ -210,8 +210,8 @@ public class DslToolProvider implements ToolProvider {
             Object type = executionConfig != null ? executionConfig.get("type") : null;
             if (type != null && "state_transition".equalsIgnoreCase(String.valueOf(type))) {
                 return objectSchema(
-                        Map.of("recordId", Map.of("type", "string", "description", "Record pid to transition")),
-                        List.of("recordId"));
+                        recordPidProperties("Record pid to transition"),
+                        List.of("recordPid"));
             }
             return objectSchema(Map.of(), List.of());
         }
@@ -272,9 +272,15 @@ public class DslToolProvider implements ToolProvider {
     }
 
     private Map<String, Object> getParameterSchema() {
-        return objectSchema(
-                Map.of("recordId", Map.of("type", "string", "description", "Record pid to fetch")),
-                List.of("recordId"));
+        return objectSchema(recordPidProperties("Record pid to fetch"), List.of("recordPid"));
+    }
+
+    private Map<String, Object> recordPidProperties(String description) {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("recordPid", Map.of("type", "string", "description", description));
+        properties.put("recordId", Map.of("type", "string", "description", "Compatibility alias for recordPid"));
+        properties.put("pid", Map.of("type", "string", "description", "Compatibility alias for recordPid"));
+        return properties;
     }
 
     @SuppressWarnings("unchecked")
@@ -501,7 +507,7 @@ public class DslToolProvider implements ToolProvider {
         if (recordId == null) {
             return ProviderExecutionResult.builder()
                     .success(false)
-                    .errorMessage("recordId is required for get: tool")
+                    .errorMessage("recordPid is required for get: tool")
                     .durationMs(System.currentTimeMillis() - start)
                     .build();
         }
@@ -516,7 +522,8 @@ public class DslToolProvider implements ToolProvider {
 
     private String extractRecordId(Map<String, Object> params) {
         if (params == null) return null;
-        Object recordId = params.get("recordId");
+        Object recordId = params.get("recordPid");
+        if (recordId == null) recordId = params.get("recordId");
         if (recordId == null) recordId = params.get("pid");
         if (recordId == null) recordId = params.get("id");
         return recordId != null ? String.valueOf(recordId) : null;
@@ -675,7 +682,7 @@ public class DslToolProvider implements ToolProvider {
         Map<String, Object> extra = new LinkedHashMap<>(params);
         extra.keySet().removeAll(List.of(
                 "pageNum", "page", "pageSize", "keyword", "search", "filters",
-                "sortField", "sortOrder", "sortFields", "recordId", "pid", "id"));
+                "sortField", "sortOrder", "sortFields", "recordPid", "recordId", "pid", "id"));
         return extra.isEmpty() ? Collections.emptyMap() : extra;
     }
 }

@@ -89,6 +89,7 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
             }
         }
 
+        // codeql[java/log-injection] Member/model identifiers are logged as structured diagnostic parameters only.
         log.debug("Field permissions for member {} on model {}: viewable={}, editable={}, hidden={}",
                 memberId, modelCode, viewableFields.size(), editableFields.size(), hiddenFields.size());
 

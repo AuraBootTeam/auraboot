@@ -32,6 +32,7 @@ public class WhiteList {
             "/api/reviews/summary",
 
             "/api/payment/webhook/**",
+            "/api/marketplace/paid/webhooks/stripe",
 
             // CRM public inbound endpoint (no auth — adapters perform their own verification)
             "/api/crm/inbound/**",

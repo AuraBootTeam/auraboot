@@ -117,6 +117,7 @@ public class TestFixtureController {
                 case "customers" -> createCustomersFixture(runId, request.getParams());
                 case "multiview" -> createMultiviewFixture(runId, request.getParams());
                 case "chat" -> createChatFixture(runId, request.getParams());
+                case "chat_agent" -> createChatAgentFixture(runId, request.getParams());
                 case "native_fields" -> createNativeFieldsFixture(runId, request.getParams());
                 default -> FixtureResult.builder()
                         .success(false)
@@ -754,10 +755,124 @@ public class TestFixtureController {
         }
     }
 
+    /**
+     * Fixture: "chat_agent"
+     * Creates a group conversation with one active AI employee using the stub LLM provider.
+     * Mobile E2E can then send a normal IM message with mentions=["agent:<agentId>"]
+     * and wait for the real group-agent event/turn/persist path to produce an ai_response.
+     */
+    private FixtureResult createChatAgentFixture(String runId, Map<String, Object> params) {
+        Object conversationService;
+        try {
+            conversationService = requireRuntimeBean(
+                    new String[]{"conversationService", "imConversationService", "imConversationServiceImpl"},
+                    new String[]{
+                            "com.auraboot.framework.im.service.ImConversationService",
+                            "com.auraboot.framework.im.service.impl.ImConversationServiceImpl"
+                    }
+            );
+        } catch (Exception e) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("chat_agent").testRunId(runId)
+                    .recordsCreated(0).recordIds(List.of())
+                    .metadata(Map.of("error", "IM module is not available: " + e.getMessage()))
+                    .build();
+        }
+
+        var tenant = tenantService.findByName("e2e_test");
+        var user = userService.findByEmail("e2e@test.local");
+        if (tenant == null || user == null) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("chat_agent").testRunId(runId)
+                    .recordsCreated(0).recordIds(List.of())
+                    .metadata(Map.of("error", "Cannot resolve tenant/user — call POST /api/test/seed first"))
+                    .build();
+        }
+
+        Long tenantId = tenant.getId();
+        Long userId = user.getId();
+        String agentCode = "e2e_flow_agent_" + runId.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_");
+        String groupName = "AI Group " + runId;
+        try {
+            Long agentId = jdbcTemplate.queryForObject("""
+                    INSERT INTO ab_agent_definition
+                        (pid, tenant_id, agent_code, name, description, agent_type, model,
+                         system_prompt, guardrails, auto_reply_mode, status, visibility,
+                         deleted_flag, created_at, updated_at, created_by, updated_by)
+                    VALUES
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, FALSE, NOW(), NOW(), ?, ?)
+                    RETURNING id
+                    """,
+                    Long.class,
+                    UniqueIdGenerator.generate(),
+                    tenantId,
+                    agentCode,
+                    "Flow Agent",
+                    "Deterministic mobile E2E group-chat agent",
+                    "assistant",
+                    "stub-model",
+                    "Reply briefly for mobile E2E verification.",
+                    "{\"provider\":\"stub\"}",
+                    "off",
+                    "active",
+                    "private",
+                    userId,
+                    userId);
+
+            Method createConv = findMethod(conversationService.getClass(), "create");
+            if (createConv == null) {
+                throw new IllegalStateException("conversationService.create method not found");
+            }
+            Object groupConv = invokeCreateConversation(
+                    createConv, conversationService, tenantId, "group", groupName,
+                    userId, List.of(userId), List.of(agentId));
+            String groupId = extractStringId(groupConv);
+            if (groupId == null || groupId.isBlank()) {
+                throw new IllegalStateException("Created group conversation did not expose an id");
+            }
+
+            return FixtureResult.builder()
+                    .success(true)
+                    .fixtureName("chat_agent")
+                    .testRunId(runId)
+                    .recordsCreated(1)
+                    .recordIds(List.of(groupId))
+                    .metadata(Map.of(
+                            "conversationId", groupId,
+                            "groupConvId", groupId,
+                            "groupName", groupName,
+                            "agentId", agentId,
+                            "agentCode", agentCode,
+                            "agentName", "Flow Agent",
+                            "tenantId", tenantId,
+                            "userId", userId
+                    ))
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to create chat_agent fixture: {}", e.getMessage(), e);
+            return FixtureResult.builder()
+                    .success(false)
+                    .fixtureName("chat_agent")
+                    .testRunId(runId)
+                    .recordsCreated(0)
+                    .recordIds(List.of())
+                    .metadata(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
     /** Invoke conversation creation reflectively using the enterprise DTO contract. */
     private Object invokeCreateConversation(Method method, Object service,
                                              Long tenantId, String type, String name,
                                              Long creatorId, List<Long> memberIds) throws Exception {
+        return invokeCreateConversation(method, service, tenantId, type, name, creatorId, memberIds, List.of());
+    }
+
+    /** Invoke conversation creation reflectively using the enterprise DTO contract. */
+    private Object invokeCreateConversation(Method method, Object service,
+                                             Long tenantId, String type, String name,
+                                             Long creatorId, List<Long> memberIds,
+                                             List<Long> agentIds) throws Exception {
         Class<?>[] paramTypes = method.getParameterTypes();
         if (paramTypes.length != 3) {
             throw new IllegalStateException("Unsupported conversation create signature");
@@ -768,6 +883,9 @@ public class TestFixtureController {
         setBeanProperty(request, "type", type);
         setBeanProperty(request, "name", name);
         setBeanProperty(request, "memberIds", memberIds);
+        if (agentIds != null && !agentIds.isEmpty()) {
+            setBeanProperty(request, "agentIds", agentIds);
+        }
 
         return method.invoke(service, request, creatorId, tenantId);
     }
