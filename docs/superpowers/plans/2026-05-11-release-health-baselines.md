@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: GHCR Pullability
+## Task 1: GHCR Pullability
 
 **Files:**
 - Update: GitHub issue `#147`
@@ -21,7 +21,7 @@
 - [x] Record blocker when package API or manifest inspection fails because current token lacks `read:packages`.
 - [ ] After a token with `read:packages` / `write:packages` is available, set package visibility to public if package settings are private.
 
-### Task 2: Performance Baseline Stack
+## Task 2: Performance Baseline Stack
 
 **Files:**
 - Update: GitHub issue `#150`
@@ -40,7 +40,7 @@
 - [x] Capture pass outcome and p95 summary.
 - [x] Tear down the isolated Docker Compose stack.
 
-### Task 3: Tracker Updates
+## Task 3: Tracker Updates
 
 **Files:**
 - Update: GitHub issue `#147`
@@ -51,7 +51,7 @@
 - [x] Comment Docker quickstart reproducibility fix on #152.
 - [x] Keep #150 open until stable baseline JSON numbers are captured from an agreed reference machine.
 
-### Task 4: Repository Change
+## Task 4: Repository Change
 
 **Files:**
 - Create: `docs/superpowers/plans/2026-05-11-release-health-baselines.md`
