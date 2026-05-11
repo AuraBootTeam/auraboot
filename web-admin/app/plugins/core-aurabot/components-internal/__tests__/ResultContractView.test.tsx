@@ -52,6 +52,25 @@ describe('ResultContractView', () => {
     expect(headers.map((h: HTMLElement) => h.textContent)).toEqual(['pid', 'name', 'total']);
   });
 
+  it('renders protocol metadata for operator inspection', () => {
+    const c: ResultContract = {
+      ...baseContract,
+      outputType: 'structured_result',
+      actionability: 'read_only',
+      renderHint: 'table',
+      table: [
+        { pid: '01REC1', name: 'Acme' },
+        { pid: '01REC2', name: 'Globex' },
+      ],
+    };
+    render(<ResultContractView contract={c} />);
+    const meta = screen.getByTestId('rc-protocol-meta');
+    expect(meta).toHaveTextContent('output: structured_result');
+    expect(meta).toHaveTextContent('action: read_only');
+    expect(meta).toHaveTextContent('render: table');
+    expect(meta).toHaveTextContent('rows: 2');
+  });
+
   it('falls back to data.records when table rows are nested there', () => {
     const c: ResultContract = {
       ...baseContract,
