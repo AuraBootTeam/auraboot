@@ -24,6 +24,16 @@ public class PluginValidationContext {
     /** The full manifest being validated. */
     private PluginManifestExtended manifest;
 
+    /**
+     * Whether reference-style validation should run.
+     *
+     * <p>When false, validators that need already-installed dependencies,
+     * command-handler registries, side-effect registries, or cross-plugin
+     * capability state are skipped. Structural DSL validators still run.
+     */
+    @Builder.Default
+    private Boolean validateReferences = true;
+
     /** Model codes that already exist in the tenant (installed by other plugins or manually). */
     private Set<String> installedModelCodes;
 
