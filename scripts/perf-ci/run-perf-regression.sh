@@ -138,32 +138,41 @@ compute_median_summary() {
     def median3(x; y; z):
       [x, y, z] | sort | .[1];
 
+    def duration(metric; key):
+      (metric[key] // metric.values[key]) // 0;
+
+    def rate(metric):
+      (metric.value // metric.values.rate // metric.rate) // 0;
+
+    def count(metric; key):
+      (metric[key] // metric.values[key]) // 0;
+
     def dur_metric(a; b; c):
       {
         type: "trend",
         contains: "time",
         values: {
-          avg: median3(a.metrics.http_req_duration.values.avg;
-                       b.metrics.http_req_duration.values.avg;
-                       c.metrics.http_req_duration.values.avg),
-          min: median3(a.metrics.http_req_duration.values.min;
-                       b.metrics.http_req_duration.values.min;
-                       c.metrics.http_req_duration.values.min),
-          med: median3(a.metrics.http_req_duration.values.med;
-                       b.metrics.http_req_duration.values.med;
-                       c.metrics.http_req_duration.values.med),
-          max: median3(a.metrics.http_req_duration.values.max;
-                       b.metrics.http_req_duration.values.max;
-                       c.metrics.http_req_duration.values.max),
-          "p(90)": median3(a.metrics.http_req_duration.values["p(90)"];
-                           b.metrics.http_req_duration.values["p(90)"];
-                           c.metrics.http_req_duration.values["p(90)"]),
-          "p(95)": median3(a.metrics.http_req_duration.values["p(95)"];
-                           b.metrics.http_req_duration.values["p(95)"];
-                           c.metrics.http_req_duration.values["p(95)"]),
-          "p(99)": median3(a.metrics.http_req_duration.values["p(99)"];
-                           b.metrics.http_req_duration.values["p(99)"];
-                           c.metrics.http_req_duration.values["p(99)"])
+          avg: median3(duration(a.metrics.http_req_duration; "avg");
+                       duration(b.metrics.http_req_duration; "avg");
+                       duration(c.metrics.http_req_duration; "avg")),
+          min: median3(duration(a.metrics.http_req_duration; "min");
+                       duration(b.metrics.http_req_duration; "min");
+                       duration(c.metrics.http_req_duration; "min")),
+          med: median3(duration(a.metrics.http_req_duration; "med");
+                       duration(b.metrics.http_req_duration; "med");
+                       duration(c.metrics.http_req_duration; "med")),
+          max: median3(duration(a.metrics.http_req_duration; "max");
+                       duration(b.metrics.http_req_duration; "max");
+                       duration(c.metrics.http_req_duration; "max")),
+          "p(90)": median3(duration(a.metrics.http_req_duration; "p(90)");
+                           duration(b.metrics.http_req_duration; "p(90)");
+                           duration(c.metrics.http_req_duration; "p(90)")),
+          "p(95)": median3(duration(a.metrics.http_req_duration; "p(95)");
+                           duration(b.metrics.http_req_duration; "p(95)");
+                           duration(c.metrics.http_req_duration; "p(95)")),
+          "p(99)": median3(duration(a.metrics.http_req_duration; "p(99)");
+                           duration(b.metrics.http_req_duration; "p(99)");
+                           duration(c.metrics.http_req_duration; "p(99)"))
         }
       };
 
@@ -172,15 +181,15 @@ compute_median_summary() {
         type: "rate",
         contains: "default",
         values: {
-          rate: median3(a.metrics.http_req_failed.values.rate;
-                        b.metrics.http_req_failed.values.rate;
-                        c.metrics.http_req_failed.values.rate),
-          passes: median3(a.metrics.http_req_failed.values.passes;
-                          b.metrics.http_req_failed.values.passes;
-                          c.metrics.http_req_failed.values.passes),
-          fails:  median3(a.metrics.http_req_failed.values.fails;
-                          b.metrics.http_req_failed.values.fails;
-                          c.metrics.http_req_failed.values.fails)
+          rate: median3(rate(a.metrics.http_req_failed);
+                        rate(b.metrics.http_req_failed);
+                        rate(c.metrics.http_req_failed)),
+          passes: median3(count(a.metrics.http_req_failed; "passes");
+                          count(b.metrics.http_req_failed; "passes");
+                          count(c.metrics.http_req_failed; "passes")),
+          fails:  median3(count(a.metrics.http_req_failed; "fails");
+                          count(b.metrics.http_req_failed; "fails");
+                          count(c.metrics.http_req_failed; "fails"))
         }
       };
 
