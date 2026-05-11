@@ -38,7 +38,6 @@ PLUGINS_TO_IMPORT=(
   crm-starter
   showcase
   agent-control-plane
-  acp-showcase
   workflow-demo
 )
 

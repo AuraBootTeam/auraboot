@@ -1604,7 +1604,7 @@ EOF
 **Closure (2026-05-07)**:由 PR #<N> ([链接](https://github.com/.../pull/N)) 落地,见 design `docs/plans/2026-05/2026-05-07-admin-guard-v2-and-followups-design.md`。
 ```
 
-#3 额外加注:
+### 3 额外加注:
 ```markdown
 *Note*:调研发现 `TimezoneMigrationController` 实际是单租户操作 `TenantPreference`(非"平台 ops 一次性迁移"),已重命名为 `TenantTimezoneController`,保留 `tenant_admin` gate。
 ```

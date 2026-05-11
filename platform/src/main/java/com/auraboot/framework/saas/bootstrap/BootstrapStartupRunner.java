@@ -73,9 +73,9 @@ public class BootstrapStartupRunner implements ApplicationRunner {
 
     /**
      * Phase 3: when {@code true}, the demo profile of built-in plugins
-     * (core-meta, core-bpm, core-aurabot, page-manager, crm-starter, showcase,
-     * agent-control-plane, acp-showcase, workflow-demo) is imported in addition
-     * to the always-on core profile (org-management, platform-admin).
+     * (crm-starter, showcase, agent-control-plane, workflow-demo) is imported in addition
+     * to the always-on core profile (core-meta, core-bpm, core-aurabot,
+     * page-manager, org-management, platform-admin).
      *
      * <p>Default {@code false} — prod-safe. Override via env
      * {@code AURABOOT_DEMO_SEED=true} or property

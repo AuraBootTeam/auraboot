@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -196,5 +197,46 @@ class BuiltinPluginImportServiceImplTest {
         service.importForTenant(100L, 1L);
 
         verify(pluginImportService, never()).execute(anyString(), any(ImportRequest.class));
+    }
+
+    @Test
+    @DisplayName("demo import ignores removed acp-showcase script-only directory")
+    void shouldNotImportRemovedAcpShowcaseDirectory(@TempDir Path tempDir) throws IOException {
+        String[] pluginDirs = {
+                "core-meta",
+                "core-bpm",
+                "core-aurabot",
+                "page-manager",
+                "org-management",
+                "platform-admin",
+                "crm-starter",
+                "showcase",
+                "agent-control-plane",
+                "workflow-demo",
+                "acp-showcase"
+        };
+        for (String pluginDir : pluginDirs) {
+            Files.createDirectories(tempDir.resolve(pluginDir));
+        }
+        ReflectionTestUtils.setField(service, "builtinPluginsDir", tempDir.toString());
+
+        ImportPreviewResult validPreview = ImportPreviewResult.builder()
+                .valid(true)
+                .importId("IMP")
+                .pluginId("any")
+                .version("1.0.0")
+                .build();
+        when(pluginImportService.parseDirectory(anyString())).thenReturn(validPreview);
+
+        PluginRecord upToDate = PluginRecord.builder()
+                .pluginId("any")
+                .version("1.0.0")
+                .build();
+        when(pluginRecordMapper.findByTenantAndPluginId(anyString())).thenReturn(upToDate);
+
+        service.importForTenant(100L, 1L, true);
+
+        verify(pluginImportService, never())
+                .parseDirectory(argThat(path -> path != null && path.endsWith("acp-showcase")));
     }
 }

@@ -28,12 +28,10 @@ services:
       - "7544:6443"
     volumes:
       - ./plugins:/app/plugins:ro
-      - ../auraboot-enterprise/plugins:/app/plugins-enterprise:ro
-      - ../auraboot-enterprise/build/plugin-jars:/app/plugin-jars:ro
     environment:
       FRONTEND_BASE_URL: http://localhost:6274
       CORS_ALLOWED_ORIGINS: "http://cleanup-batch-frontend:5173,http://cleanup-batch-frontend:3500,http://localhost:6274,http://127.0.0.1:6274,http://localhost:4601,http://127.0.0.1:4601,http://localhost:5173,http://localhost:3500"
-      AURA_PLUGINS_DIR: /app/plugin-jars
+      AURA_BUILTIN_PLUGINS_DIR: /app/plugins
 
   cleanup-batch-frontend:
     image: ${CLEANUP_BATCH_FRONTEND_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-noble}
