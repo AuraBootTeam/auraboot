@@ -43,9 +43,7 @@ jobs:
           # autobuild fails on multi-module Gradle layouts where the root is
           # in platform/ rather than the repo root.
           build-mode: ${{ matrix.language == 'java-kotlin' && 'manual' || 'none' }}
-          # security-extended pack for stricter coverage; drop back to
-          # default if false-positive volume becomes painful in beta.
-          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build (Java only — CodeQL build-mode=manual)
         if: matrix.language == 'java-kotlin'

@@ -340,4 +340,53 @@ describe('AgentRunDetailDrawer · Live Stream tab (E.1)', () => {
     expect(results).toHaveTextContent('platform.execute_sql');
     expect(screen.getByTestId('result-contract-item-rc-act-1')).toHaveClass('border-indigo-300');
   });
+
+  it('renders productized result-contract summary and selectable inspector', async () => {
+    getAgentRunDetailMock.mockResolvedValue(
+      buildDetail({
+        resultContracts: [
+          resultContractItem(),
+          {
+            contractId: 'rc-act-2',
+            actionPid: 'act-2',
+            source: 'ab_agent_action',
+            emittedAt: '2026-05-07T10:00:04Z',
+            contract: {
+              outputType: 'text',
+              renderHint: 'summary',
+              actionability: 'execute',
+              textSummary: 'Update failed',
+              skillCode: 'crm.account.update',
+              durationMs: 44,
+              status: 'failed',
+              data: {
+                actionPid: 'act-2',
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    render(<AgentRunDetailDrawer runId="RUN-results" onClose={() => {}} onSelectRun={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId('drawer-tab-results'));
+
+    const summary = await screen.findByTestId('result-contract-summary');
+    expect(summary).toHaveTextContent('Total');
+    expect(summary).toHaveTextContent('2');
+    expect(screen.getByTestId('result-contract-status-success')).toHaveTextContent('success: 1');
+    expect(screen.getByTestId('result-contract-status-failed')).toHaveTextContent('failed: 1');
+    expect(screen.getByTestId('result-contract-list')).toHaveTextContent('rc-act-1');
+    expect(screen.getByTestId('result-contract-list')).toHaveTextContent('rc-act-2');
+
+    fireEvent.click(screen.getByTestId('result-contract-select-rc-act-2'));
+
+    const selected = screen.getByTestId('result-contract-item-rc-act-2');
+    expect(selected).toHaveClass('border-indigo-300');
+    expect(selected).toHaveTextContent('Update failed');
+    expect(screen.getByTestId('result-contract-provenance')).toHaveTextContent('ab_agent_action');
+    expect(screen.getByTestId('rc-protocol-meta')).toHaveTextContent('output: text');
+    expect(screen.getByTestId('rc-protocol-meta')).toHaveTextContent('action: execute');
+  });
 });
