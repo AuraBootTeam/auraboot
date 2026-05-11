@@ -29,6 +29,8 @@ export interface UsePageRuntimeOptions {
   token?: string;
   /** Additional expression context (e.g., filters, form data) */
   additionalContext?: Record<string, any>;
+  /** Toast bridge for runtime actions */
+  showToast?: (message: string, level?: 'success' | 'error' | 'info' | 'warning') => void;
   /** Disable SchemaRuntime (some pages may not need it) */
   disableRuntime?: boolean;
 }
@@ -51,7 +53,7 @@ export function usePageRuntime(
   schema: UnifiedSchema | null,
   options?: UsePageRuntimeOptions,
 ): UsePageRuntimeResult {
-  const { additionalContext = {}, disableRuntime = false } = options || {};
+  const { additionalContext = {}, disableRuntime = false, showToast } = options || {};
 
   const navigate = useNavigate();
   const { t, locale } = useI18n();
@@ -95,6 +97,7 @@ export function usePageRuntime(
           schema,
           dataSourceManager,
           navigate,
+          showToast,
           locale,
           t,
           disableAutoFetch: true,

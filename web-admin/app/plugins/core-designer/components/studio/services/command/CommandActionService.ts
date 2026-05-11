@@ -53,13 +53,20 @@ export class CommandActionService {
     payload: Record<string, any>,
     options?: {
       clientRequestId?: string;
+      targetRecordPid?: string;
       targetRecordId?: string;
       operationType?: 'create' | 'update' | 'delete';
     },
   ): Promise<CommandExecuteResult> {
+    const normalizedOptions = options
+      ? {
+          ...options,
+          targetRecordId: options.targetRecordId ?? options.targetRecordPid,
+        }
+      : undefined;
     const result = await post<CommandExecuteResult>(`/api/meta/commands/execute/${commandCode}`, {
       payload,
-      ...options,
+      ...normalizedOptions,
     });
     if (!result?.data) {
       throw new Error('Command execution failed: no response');

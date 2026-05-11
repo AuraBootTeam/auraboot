@@ -412,7 +412,7 @@ public class AgentRunController {
             sql.append(")");
         }
         sql.append(" ORDER BY created_at ASC");
-        return jdbcTemplate.query(sql.toString(), APPROVAL_AUDIT_ROW_MAPPER, args.toArray());
+        return jdbcTemplate.query(sql.toString(), this::mapApprovalAuditRow, args.toArray());
     }
 
     private List<AgentInterruptItem> loadInterrupts(Long tenantId, String runId) {
@@ -641,6 +641,7 @@ public class AgentRunController {
         data.put("actionType", action.getActionType());
         data.put("targetModel", action.getTargetModel());
         data.put("targetRecordId", action.getTargetRecordId());
+        data.put("targetRecordPid", action.getTargetRecordPid());
         data.put("commandCode", action.getCommandCode());
         data.put("commandResult", action.getCommandResult());
         data.put("riskLevel", action.getRiskLevel());
@@ -819,6 +820,57 @@ public class AgentRunController {
                 .toList();
     }
 
+    private AgentApprovalAuditItem mapApprovalAuditRow(ResultSet rs, int rowNum) throws SQLException {
+        Timestamp createdAt = rs.getTimestamp("created_at");
+        Timestamp approvedAt = rs.getTimestamp("approved_at");
+        String requestData = rs.getString("request_data");
+        return AgentApprovalAuditItem.builder()
+                .pid(rs.getString("pid"))
+                .runId(rs.getString("run_id"))
+                .approvalType(rs.getString("approval_type"))
+                .approvalTitle(rs.getString("approval_title"))
+                .approvalDescription(rs.getString("approval_description"))
+                .requestData(requestData)
+                .targetPid(extractTargetPidFromApprovalData(requestData))
+                .approvalStatus(rs.getString("approval_status"))
+                .policyId(rs.getString("policy_id"))
+                .approverId(getLong(rs, "approver_id"))
+                .createdAt(createdAt == null ? null : createdAt.toInstant())
+                .approvedAt(approvedAt == null ? null : approvedAt.toInstant())
+                .build();
+    }
+
+    private String extractTargetPidFromApprovalData(String requestData) {
+        JsonNode node = parseJsonObject(requestData);
+        return extractTargetPid(node);
+    }
+
+    private String extractTargetPid(JsonNode node) {
+        if (node == null) {
+            return null;
+        }
+        String direct = firstNonBlank(
+                text(node, "targetPid"),
+                text(node, "targetRecordPid"),
+                text(node, "recordPid"),
+                text(node, "targetRecordId"),
+                text(node, "recordId"),
+                text(node, "pid"));
+        if (direct != null) {
+            return direct;
+        }
+        for (String container : List.of("args", "input", "payload", "parameters")) {
+            JsonNode nested = node.get(container);
+            if (nested != null && nested.isObject()) {
+                String nestedPid = extractTargetPid(nested);
+                if (nestedPid != null) {
+                    return nestedPid;
+                }
+            }
+        }
+        return null;
+    }
+
     private static String contractIdForAction(String actionPid) {
         return actionPid == null ? null : "rc-" + actionPid;
     }
@@ -878,6 +930,7 @@ public class AgentRunController {
                 .intentSummary(rs.getString("intent_summary"))
                 .targetModel(rs.getString("target_model"))
                 .targetRecordId(rs.getString("target_record_id"))
+                .targetRecordPid(rs.getString("target_record_id"))
                 .beforeSnapshot(rs.getString("before_snapshot"))
                 .afterSnapshot(rs.getString("after_snapshot"))
                 .fieldChanges(rs.getString("field_changes"))
@@ -938,24 +991,6 @@ public class AgentRunController {
                 .policyVersion(getInteger(rs, "policy_version"))
                 .decisionReason(rs.getString("decision_reason"))
                 .decisionAt(decisionAt == null ? null : decisionAt.toInstant())
-                .build();
-    };
-
-    private static final RowMapper<AgentApprovalAuditItem> APPROVAL_AUDIT_ROW_MAPPER = (rs, rowNum) -> {
-        Timestamp createdAt = rs.getTimestamp("created_at");
-        Timestamp approvedAt = rs.getTimestamp("approved_at");
-        return AgentApprovalAuditItem.builder()
-                .pid(rs.getString("pid"))
-                .runId(rs.getString("run_id"))
-                .approvalType(rs.getString("approval_type"))
-                .approvalTitle(rs.getString("approval_title"))
-                .approvalDescription(rs.getString("approval_description"))
-                .requestData(rs.getString("request_data"))
-                .approvalStatus(rs.getString("approval_status"))
-                .policyId(rs.getString("policy_id"))
-                .approverId(getLong(rs, "approver_id"))
-                .createdAt(createdAt == null ? null : createdAt.toInstant())
-                .approvedAt(approvedAt == null ? null : approvedAt.toInstant())
                 .build();
     };
 

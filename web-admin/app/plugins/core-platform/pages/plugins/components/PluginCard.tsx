@@ -40,6 +40,7 @@ export default function PluginCard({
 }: PluginCardProps) {
   const hasUpgrade =
     plugin.installed && plugin.installedVersion && plugin.installedVersion !== plugin.latestVersion;
+  const requiresLicense = Boolean(plugin.licenseMode && plugin.licenseMode !== 'free');
   return (
     <div
       className="group cursor-pointer rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
@@ -122,9 +123,16 @@ export default function PluginCard({
               e.stopPropagation();
               onInstall();
             }}
+            data-testid={requiresLicense ? 'marketplace-card-paid-cta' : 'marketplace-card-install'}
             className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-700"
           >
-            {locale === 'zh-CN' ? '安装' : 'Install'}
+            {requiresLicense
+              ? locale === 'zh-CN'
+                ? '购买'
+                : 'Buy'
+              : locale === 'zh-CN'
+                ? '安装'
+                : 'Install'}
           </button>
         )}
       </div>

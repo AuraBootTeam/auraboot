@@ -66,13 +66,20 @@ const TYPE_COPY: Record<string, { title: string; description: string }> = {
 type InboxCardPayload = {
   cardType?: string;
   modelCode?: string;
+  sourceModel?: string;
   recordId?: string;
+  sourceRecordId?: string;
+  sourceRecordPid?: string;
+  recordPid?: string;
   commandCode?: string;
   fromState?: string | null;
   toState?: string | null;
 };
 
 function parseCardPayload(item: InboxItem): InboxCardPayload | null {
+  if (item.cardData && typeof item.cardData === 'object') {
+    return item.cardData as InboxCardPayload;
+  }
   if (!item.cardPayload) return null;
   try {
     return JSON.parse(item.cardPayload) as InboxCardPayload;
@@ -109,9 +116,21 @@ function resolveWebDeepLink(item: InboxItem, payload: InboxCardPayload | null): 
       return `/p/${modelCode}/view/${recordId}`;
     }
   }
-  const modelCode = item.modelCode || payload?.modelCode;
-  const recordId = item.recordId != null ? String(item.recordId) : payload?.recordId;
+  const modelCode = item.sourceModel || item.modelCode || payload?.sourceModel || payload?.modelCode;
+  const recordId = resolveRecordPid(item, payload);
   return modelCode && recordId ? `/p/${modelCode}/view/${recordId}` : null;
+}
+
+function resolveRecordPid(item: InboxItem, payload: InboxCardPayload | null): string | undefined {
+  return (
+    item.sourceRecordPid ||
+    item.sourceRecordId ||
+    payload?.sourceRecordPid ||
+    payload?.recordPid ||
+    payload?.sourceRecordId ||
+    payload?.recordId ||
+    (item.recordId != null ? String(item.recordId) : undefined)
+  );
 }
 
 function getDisplayItem(item: InboxItem) {
@@ -125,13 +144,13 @@ function getDisplayItem(item: InboxItem) {
     const toState = payload?.toState ? humanizeCode(payload.toState) : '';
     const title =
       fromState && toState ? `${commandLabel}: ${fromState} → ${toState}` : commandLabel;
-    const recordId = item.recordId != null ? String(item.recordId) : payload?.recordId;
+    const recordId = resolveRecordPid(item, payload);
     return {
       title,
       subtitle: recordId
         ? `${modelLabel(item.modelCode || payload?.modelCode)} #${recordId}`
         : item.subtitle,
-      metaModelCode: item.modelCode || payload?.modelCode,
+      metaModelCode: item.sourceModel || item.modelCode || payload?.sourceModel || payload?.modelCode,
       metaRecordId: recordId,
       actionLabel: webLink ? 'Open' : 'View',
       actionHint: webLink ? 'Opens related record' : 'Marks item as read',
@@ -142,8 +161,8 @@ function getDisplayItem(item: InboxItem) {
   return {
     title: item.title,
     subtitle: item.subtitle,
-    metaModelCode: item.modelCode,
-    metaRecordId: item.recordId != null ? String(item.recordId) : undefined,
+    metaModelCode: item.sourceModel || item.modelCode,
+    metaRecordId: resolveRecordPid(item, payload),
     actionLabel: item.itemType === 'approval' ? 'Review' : webLink ? 'Open' : 'View',
     actionHint:
       item.itemType === 'approval'

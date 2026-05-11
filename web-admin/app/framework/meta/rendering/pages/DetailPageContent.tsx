@@ -43,6 +43,7 @@ import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments
 import { NbaSuggestionBar } from '~/framework/meta/rendering/blocks/NbaSuggestionBar';
 import { BpmPanelBlock } from '~/framework/meta/rendering/blocks/BpmPanelBlock';
 import { BlockRenderer } from '~/framework/meta/rendering/BlockRenderer';
+import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type {
   BlockConfig,
@@ -260,7 +261,7 @@ export function DetailPageContent(props: PageContentProps) {
 
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const showToast = useCallback(
-    (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
       switch (type) {
         case 'success':
           showSuccessToast(message);
@@ -284,6 +285,7 @@ export function DetailPageContent(props: PageContentProps) {
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
+    showToast,
     additionalContext: {
       record: recordData,
       $page: {
@@ -785,6 +787,8 @@ export function DetailPageContent(props: PageContentProps) {
           recordId={recordId}
         />
       )}
+
+      <FormDialog />
     </div>
   );
 }

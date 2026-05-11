@@ -260,7 +260,13 @@ export default function DiscoveryTab() {
                   plugin={plugin}
                   locale={locale}
                   onViewDetail={() => navigate(`/plugins/${encodeURIComponent(plugin.pluginId)}`)}
-                  onInstall={() => setInstallTarget(plugin)}
+                  onInstall={() => {
+                    if (plugin.licenseMode && plugin.licenseMode !== 'free') {
+                      navigate(`/plugins/${encodeURIComponent(plugin.pluginId)}`);
+                      return;
+                    }
+                    setInstallTarget(plugin);
+                  }}
                   onUpgrade={() => setUpgradeTarget(plugin)}
                 />
               ))}

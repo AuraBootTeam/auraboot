@@ -116,7 +116,10 @@ public class InboxEventListener {
         if (businessKey != null && businessKey.contains(":")) {
             String[] parts = businessKey.split(":", 2);
             card.put("modelCode", parts[0]);
+            card.put("sourceModel", parts[0]);
             card.put("recordId", parts[1]);
+            card.put("recordPid", parts[1]);
+            card.put("sourceRecordPid", parts[1]);
         }
 
         // Build human-readable title from enriched payload
@@ -349,7 +352,10 @@ public class InboxEventListener {
         Map<String, Object> card = new LinkedHashMap<>();
         card.put("cardType", "state_transition");
         card.put("modelCode", event.getModelCode());
+        card.put("sourceModel", event.getModelCode());
         card.put("recordId", event.getRecordId());
+        card.put("recordPid", event.getRecordId());
+        card.put("sourceRecordPid", event.getRecordId());
         card.put("commandCode", event.getCommandCode());
         card.put("fromState", fromState);
         card.put("toState", toState);

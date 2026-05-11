@@ -41,7 +41,7 @@ public class AiActionAuditService {
      * @param actionType      action type (copy, navigate, execute_command, create_task)
      * @param commandCode     command code for execute_command actions (nullable)
      * @param modelCode       target model code (nullable)
-     * @param recordId        target record ID (nullable)
+     * @param recordId        target record pid, stored in the legacy record_id column (nullable)
      * @param riskLevel       assessed risk level
      * @param userDecision    "confirmed" or "cancelled"
      * @param executionResult "success", "failed", or null if cancelled
@@ -102,11 +102,36 @@ public class AiActionAuditService {
                 "ORDER BY created_at DESC " +
                 "LIMIT #{params.limit} OFFSET #{params.offset}";
 
-        return dynamicDataMapper.selectByQuery(sql, Map.of(
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of(
                 "tenantId", tenantId,
                 "limit", pageSize,
                 "offset", offset
         ));
+        return rows.stream()
+                .map(AiActionAuditService::withTargetPidAlias)
+                .toList();
+    }
+
+    private static Map<String, Object> withTargetPidAlias(Map<String, Object> row) {
+        Map<String, Object> copy = new LinkedHashMap<>(row);
+        Object targetPid = firstValue(copy, "targetPid", "record_id", "recordId");
+        if (targetPid != null) {
+            copy.put("targetPid", targetPid);
+        }
+        return copy;
+    }
+
+    private static Object firstValue(Map<String, Object> row, String... keys) {
+        if (row == null || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            Object value = row.get(key);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     /**

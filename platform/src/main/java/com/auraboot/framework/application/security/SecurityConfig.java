@@ -143,7 +143,8 @@ public class SecurityConfig {
             "X-Requested-With",
             "Accept",
             "Origin",
-            "X-Tenant-Id"
+            "X-Tenant-Id",
+            "Stripe-Signature"
         ));
         configuration.setExposedHeaders(Arrays.asList(
             "X-Total-Count",
