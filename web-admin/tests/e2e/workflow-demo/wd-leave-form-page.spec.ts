@@ -5,7 +5,7 @@ import { loginAs, loginViaUI } from '../../helpers/wd-fixtures';
 import { BACKEND_URL } from '../../helpers/environments';
 
 const LICENSE_FILE = fileURLToPath(new URL('../../../../LICENSE.txt', import.meta.url));
-const BACKEND = process.env.BACKEND_URL ?? `http://localhost:${process.env.BE_PORT ?? '6443'}`;
+const BACKEND = BACKEND_URL;
 
 test.setTimeout(60_000);
 

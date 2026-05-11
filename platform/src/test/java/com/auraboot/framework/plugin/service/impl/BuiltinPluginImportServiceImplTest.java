@@ -7,6 +7,9 @@ import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.service.PluginImportService;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,9 +25,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,8 +44,18 @@ class BuiltinPluginImportServiceImplTest {
 
     @Mock private PluginImportService pluginImportService;
     @Mock private PluginRecordMapper pluginRecordMapper;
+    @Mock private UserService userService;
 
     @InjectMocks private BuiltinPluginImportServiceImpl service;
+
+    @BeforeEach
+    void setupImportUser() {
+        User user = new User();
+        user.setId(1L);
+        user.setPid("user-pid-1");
+        user.setEmail("admin@example.com");
+        lenient().when(userService.findByUserId(anyLong())).thenReturn(user);
+    }
 
     @AfterEach
     void teardown() {
@@ -132,6 +147,38 @@ class BuiltinPluginImportServiceImplTest {
 
         verify(pluginImportService, org.mockito.Mockito.atLeastOnce())
                 .execute(eq("IMP"), any(ImportRequest.class));
+    }
+
+    @Test
+    @DisplayName("importForTenant sets user pid in MetaContext during plugin execution")
+    void shouldSetUserPidInMetaContextDuringExecute(@TempDir Path tempDir) throws IOException {
+        Files.createDirectories(tempDir.resolve("org-management"));
+        ReflectionTestUtils.setField(service, "builtinPluginsDir", tempDir.toString());
+
+        ImportPreviewResult preview = ImportPreviewResult.builder()
+                .valid(true)
+                .importId("IMP")
+                .pluginId("com.auraboot.org-management")
+                .version("1.0.0")
+                .build();
+        when(pluginImportService.parseDirectory(anyString())).thenReturn(preview);
+        when(pluginRecordMapper.findByTenantAndPluginId(anyString())).thenReturn(null);
+        when(pluginImportService.execute(eq("IMP"), any(ImportRequest.class))).thenAnswer(invocation -> {
+            org.assertj.core.api.Assertions.assertThat(MetaContext.get().getUserPid())
+                    .isEqualTo("user-pid-1");
+            org.assertj.core.api.Assertions.assertThat(MetaContext.get().getUsername())
+                    .isEqualTo("admin@example.com");
+            return ImportExecuteResult.builder()
+                    .success(true)
+                    .importId("IMP")
+                    .pluginId("com.auraboot.org-management")
+                    .durationMs(50L)
+                    .build();
+        });
+
+        service.importForTenant(100L, 1L);
+
+        verify(pluginImportService).execute(eq("IMP"), any(ImportRequest.class));
     }
 
     @Test

@@ -81,6 +81,22 @@ api_post() {
     -d "$2"
 }
 
+command_exists() {
+  local command_code="$1"
+  local encoded_code="${command_code//:/%3A}"
+  local resp
+  resp=$(NO_PROXY=localhost curl -s "$API_BASE/api/meta/commands/by-code/$encoded_code" \
+    -H "Authorization: Bearer $JWT")
+  printf '%s' "$resp" | python3 -c "
+import sys, json
+try:
+    d = json.loads(sys.stdin.read())
+except Exception:
+    print('no'); sys.exit(0)
+print('yes' if d.get('code') == '0' and d.get('data') else 'no')
+"
+}
+
 # 2. Import each plugin via import-directory-sync.
 # The backend container mounts the host's `./plugins` at /app/plugins:ro,
 # so plugin paths inside the container are /app/plugins/<name>.
@@ -266,33 +282,45 @@ else
     echo "  WARNING: admin.json still missing — skipping seed (auth.setup failed)" >&2
   else
     seed_failures=()
-    for seed in data extended workflow ai arsenal supplement commercial; do
+    seed_names=(data extended workflow ai arsenal supplement)
+    case "${SHOWCASE_COMMERCIAL_SEED:-auto}" in
+      skip)
+        echo "  seed-showcase-commercial ... SKIP (SHOWCASE_COMMERCIAL_SEED=skip)"
+        ;;
+      required)
+        if [ "$(command_exists 'crm:create_quote')" != "yes" ] || [ "$(command_exists 'crm:create_complaint')" != "yes" ]; then
+          echo "  seed-showcase-commercial ... FAIL (full CRM quote/complaint commands are not imported)" >&2
+          seed_failures+=("commercial")
+        else
+          seed_names+=(commercial)
+        fi
+        ;;
+      auto|"")
+        if [ "$(command_exists 'crm:create_quote')" = "yes" ] && [ "$(command_exists 'crm:create_complaint')" = "yes" ]; then
+          seed_names+=(commercial)
+        else
+          echo "  seed-showcase-commercial ... SKIP (OSS crm-starter lacks full CRM quote/complaint commands)"
+        fi
+        ;;
+      *)
+        echo "  seed-showcase-commercial ... FAIL (SHOWCASE_COMMERCIAL_SEED must be auto|required|skip)" >&2
+        seed_failures+=("commercial")
+        ;;
+    esac
+    seed_names+=(invariants dashboard-default)
+
+    for seed in "${seed_names[@]}"; do
       printf '  seed-showcase-%s ... ' "$seed"
-      if PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 NO_PROXY=localhost,127.0.0.1 \
+      if SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
+           PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 NO_PROXY=localhost,127.0.0.1 \
            npx playwright test --config=playwright.seed.config.ts \
              -g "seed-showcase-$seed" --reporter=line \
              > "/tmp/ga-e2e-seed-$seed.log" 2>&1; then
         passed=$(grep -oE "[0-9]+ passed" "/tmp/ga-e2e-seed-$seed.log" | head -1)
         echo "OK ($passed)"
       else
-        # commercial currently has a pre-existing Quote model gap that fails
-        # one phase even on enterprise; do not block the bootstrap on it.
-        if [ "$seed" = "commercial" ]; then
-          echo "PARTIAL (Quote gap, see /tmp/ga-e2e-seed-$seed.log)"
-          # Surface the failing seed step + last error line so operators don't
-          # have to open the log file manually to know which phase failed.
-          failed_phase=$(grep -oE "seed-showcase-commercial[^[:space:]]*" \
-                          "/tmp/ga-e2e-seed-$seed.log" | head -1)
-          last_error=$(grep -E "Error:|FAIL|✘|×|expect\(" \
-                          "/tmp/ga-e2e-seed-$seed.log" | tail -1)
-          echo "    [ga-e2e-bootstrap] commercial PARTIAL detail:" >&2
-          echo "      phase: ${failed_phase:-unknown}" >&2
-          echo "      cause: ${last_error:-Quote model not seeded — see full log}" >&2
-          echo "      log:   /tmp/ga-e2e-seed-$seed.log" >&2
-        else
-          echo "FAIL (see /tmp/ga-e2e-seed-$seed.log)"
-          seed_failures+=("$seed")
-        fi
+        echo "FAIL (see /tmp/ga-e2e-seed-$seed.log)"
+        seed_failures+=("$seed")
       fi
     done
 
