@@ -281,8 +281,8 @@ public class PluginHotloadController {
         extensionRegistry.refreshPluginCache(pluginId);
         PluginExtensionRegistryBridge.BridgeResult result =
                 pluginExtensionRegistryBridge.bridgePluginCommandHandlers();
-        log.info("Plugin registries refreshed after plugin {}: {} command handlers registered, {} skipped",
-                pluginId, result.registered(), result.skipped());
+        log.info("Plugin registries refreshed: {} command handlers registered, {} skipped",
+                result.registered(), result.skipped());
     }
 
     // ========== Response DTOs ==========
