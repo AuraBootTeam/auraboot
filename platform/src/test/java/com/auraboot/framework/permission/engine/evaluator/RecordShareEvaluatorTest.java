@@ -15,6 +15,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +67,16 @@ class RecordShareEvaluatorTest {
         when(recordShareService.isShared(99L, "User", 7L, 1L)).thenReturn(true);
         EvaluationStep s = evaluator.evaluate(1L, "User", "view", Map.of("id", "7"));
         assertEquals(EvaluationVerdict.ALLOW, s.verdict());
+    }
+
+    @Test
+    void recordPidSharedReturnsAllow() {
+        when(recordShareService.isSharedByPid(99L, "User", "rec_7", 1L, "p")).thenReturn(true);
+
+        EvaluationStep s = evaluator.evaluate(1L, "User", "view", Map.of("pid", "rec_7"));
+
+        assertEquals(EvaluationVerdict.ALLOW, s.verdict());
+        verify(recordShareService, never()).isShared(anyLong(), anyString(), anyLong(), anyLong());
     }
 
     @Test

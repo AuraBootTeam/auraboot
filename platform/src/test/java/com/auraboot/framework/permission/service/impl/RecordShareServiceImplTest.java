@@ -62,6 +62,29 @@ class RecordShareServiceImplTest {
     }
 
     @Test
+    void shareRecordByPidStoresRecordAndSubjectPidAliases() {
+        Instant expires = Instant.now().plusSeconds(3600);
+
+        service.shareRecordByPid(100L, "model.user", "rec_10", "member", "mem_5", "read", expires);
+
+        ArgumentCaptor<RecordShare> captor = ArgumentCaptor.forClass(RecordShare.class);
+        verify(recordShareMapper).insert(captor.capture());
+
+        RecordShare share = captor.getValue();
+        assertThat(share.getTenantId()).isEqualTo(100L);
+        assertThat(share.getResourceCode()).isEqualTo("model.user");
+        assertThat(share.getRecordId()).isNull();
+        assertThat(share.getRecordPid()).isEqualTo("rec_10");
+        assertThat(share.getSubjectType()).isEqualTo("member");
+        assertThat(share.getSubjectId()).isNull();
+        assertThat(share.getSubjectPid()).isEqualTo("mem_5");
+        assertThat(share.getPermissionMask()).isEqualTo("read");
+        assertThat(share.getExpiresAt()).isEqualTo(expires);
+        assertThat(share.getPid()).isNotBlank();
+        assertThat(share.getCreatedAt()).isNotNull();
+    }
+
+    @Test
     void unshareRecordDelegatesToMapper() {
         when(recordShareMapper.deleteShare(100L, "model.user", 10L, "member", 5L)).thenReturn(1);
 
@@ -76,6 +99,18 @@ class RecordShareServiceImplTest {
                 .thenReturn(1);
 
         boolean result = service.isShared(100L, "model.user", 10L, 5L);
+
+        assertThat(result).isTrue();
+        verify(userRoleService, never()).getRoleIdsByMemberIdAndTenantId(anyLong(), anyLong());
+    }
+
+    @Test
+    void isSharedByPidReturnsTrueWhenDirectSubjectPidShareExists() {
+        when(recordShareMapper.countByRecordPidAndSubjectPid(
+                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), any()))
+                .thenReturn(1);
+
+        boolean result = service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5");
 
         assertThat(result).isTrue();
         verify(userRoleService, never()).getRoleIdsByMemberIdAndTenantId(anyLong(), anyLong());
@@ -137,6 +172,14 @@ class RecordShareServiceImplTest {
         when(recordShareMapper.findByRecord(eq(100L), eq("model.user"), eq(10L), any())).thenReturn(List.of(share));
 
         assertThat(service.listByRecord(100L, "model.user", 10L)).hasSize(1);
+    }
+
+    @Test
+    void listByRecordPidDelegatesToMapper() {
+        RecordShare share = new RecordShare();
+        when(recordShareMapper.findByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), any())).thenReturn(List.of(share));
+
+        assertThat(service.listByRecordPid(100L, "model.user", "rec_10")).hasSize(1);
     }
 
     @Test
