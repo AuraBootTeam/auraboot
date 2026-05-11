@@ -10,7 +10,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -57,14 +59,22 @@ public class AuditTrailEventListener {
 
         // Parse entity ID from recordId string
         Long entityId = parseLong(event.getRecordId());
+        String entityPid = entityId == null ? normalizePid(event.getRecordId()) : null;
 
         // Convert payload map to JsonNode for snapshot storage
         JsonNode afterSnapshot = objectMapper.valueToTree(event.getPayload());
 
         // Build metadata node from event metadata
-        JsonNode metadataNode = null;
+        Map<String, Object> metadata = new LinkedHashMap<>();
         if (eventMetadata != null && !eventMetadata.isEmpty()) {
-            metadataNode = objectMapper.valueToTree(eventMetadata);
+            metadata.putAll(eventMetadata);
+        }
+        if (StringUtils.hasText(entityPid)) {
+            metadata.put("entityPid", entityPid);
+        }
+        JsonNode metadataNode = null;
+        if (!metadata.isEmpty()) {
+            metadataNode = objectMapper.valueToTree(metadata);
         }
 
         return AuditTrailEvent.builder()
@@ -72,6 +82,7 @@ public class AuditTrailEventListener {
                 .eventType("command_executed")
                 .entityType(event.getModelCode())
                 .entityId(entityId)
+                .entityPid(entityPid)
                 .commandCode(event.getCommandCode())
                 .operationType(event.getOperationType())
                 .actorId(actorId != null ? actorId : 0L)
@@ -111,5 +122,9 @@ public class AuditTrailEventListener {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private String normalizePid(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 }

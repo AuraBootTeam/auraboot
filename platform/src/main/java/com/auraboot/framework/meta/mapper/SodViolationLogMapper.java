@@ -51,4 +51,15 @@ public interface SodViolationLogMapper extends BaseMapper<SodViolationLog> {
         """)
     List<SodViolationLog> findByEntity(@Param("entityType") String entityType,
                                         @Param("entityId") Long entityId);
+
+    /**
+     * Find violations by entity type and public entity PID.
+     */
+    @Select("""
+        SELECT * FROM ab_sod_violation_log
+        WHERE entity_type = #{entityType} AND entity_pid = #{entityPid}
+        ORDER BY created_at DESC
+        """)
+    List<SodViolationLog> findByEntityPid(@Param("entityType") String entityType,
+                                           @Param("entityPid") String entityPid);
 }

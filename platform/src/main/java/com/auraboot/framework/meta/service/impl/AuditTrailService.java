@@ -102,6 +102,7 @@ public class AuditTrailService {
         record.setEventType(event.getEventType());
         record.setEntityType(event.getEntityType());
         record.setEntityId(event.getEntityId());
+        record.setEntityPid(event.getEntityPid());
         record.setCommandCode(event.getCommandCode());
         record.setOperationType(event.getOperationType());
         record.setActorId(event.getActorId());
@@ -191,6 +192,13 @@ public class AuditTrailService {
     }
 
     /**
+     * Get the full audit trail for a specific entity PID.
+     */
+    public List<AuditTrail> getAuditTrailByPid(Long tenantId, String entityType, String entityPid) {
+        return auditTrailMapper.getByEntityPid(tenantId, entityType, entityPid);
+    }
+
+    /**
      * Get audit records for a specific actor within a time range.
      */
     public List<AuditTrail> getAuditByActor(Long tenantId, Long actorId,
@@ -229,8 +237,9 @@ public class AuditTrailService {
                 .count();
 
         long uniqueEntities = records.stream()
-                .filter(r -> r.getEntityType() != null && r.getEntityId() != null)
-                .map(r -> r.getEntityType() + ":" + r.getEntityId())
+                .filter(r -> r.getEntityType() != null && (r.getEntityId() != null || r.getEntityPid() != null))
+                .map(r -> r.getEntityType() + ":" +
+                        (r.getEntityPid() != null ? r.getEntityPid() : r.getEntityId()))
                 .distinct()
                 .count();
 
@@ -276,6 +285,10 @@ public class AuditTrailService {
         sb.append(nullSafe(record.getEntityType()));
         sb.append('|');
         sb.append(nullSafe(record.getEntityId()));
+        if (record.getEntityPid() != null && !record.getEntityPid().isBlank()) {
+            sb.append('|');
+            sb.append(record.getEntityPid());
+        }
         sb.append('|');
         sb.append(nullSafe(record.getCommandCode()));
         sb.append('|');
