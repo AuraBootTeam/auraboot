@@ -181,6 +181,63 @@ class PluginImportAsyncTaskExecutorTest {
     }
 
     @Test
+    @DisplayName("execute leaves optional booleans null when absent so manifest importOptions can apply")
+    void shouldLeaveOptionalBooleansNullWhenAbsent() {
+        ImportPreviewResult preview = ImportPreviewResult.builder()
+                .valid(true).importId("IMP-1").pluginId("p").version("1.0.0").build();
+        ImportExecuteResult exec = ImportExecuteResult.builder()
+                .success(true).importId("IMP-1").pluginId("p").pluginPid("PLG").version("1.0.0").build();
+        when(importService.parseDirectory(anyString())).thenReturn(preview);
+        when(importService.execute(anyString(), any(ImportRequest.class))).thenReturn(exec);
+
+        executor.execute(params(Map.of("conflictStrategy", "OVERWRITE")), callback);
+
+        ArgumentCaptor<ImportRequest> captor = ArgumentCaptor.forClass(ImportRequest.class);
+        verify(importService).execute(anyString(), captor.capture());
+        ImportRequest importRequest = captor.getValue();
+        assertThat(importRequest.getValidateReferences()).isNull();
+        assertThat(importRequest.getAutoDeployProcesses()).isNull();
+        assertThat(importRequest.getAutoPublishModels()).isNull();
+        assertThat(importRequest.getAutoPublishFields()).isNull();
+        assertThat(importRequest.getAutoPublishCommands()).isNull();
+        assertThat(importRequest.getAutoPublishPages()).isNull();
+        assertThat(importRequest.getCreateResourcePermissions()).isNull();
+    }
+
+    @Test
+    @DisplayName("execute forwards explicit boolean import options")
+    void shouldForwardExplicitBooleanImportOptions() {
+        ImportPreviewResult preview = ImportPreviewResult.builder()
+                .valid(true).importId("IMP-1").pluginId("p").version("1.0.0").build();
+        ImportExecuteResult exec = ImportExecuteResult.builder()
+                .success(true).importId("IMP-1").pluginId("p").pluginPid("PLG").version("1.0.0").build();
+        when(importService.parseDirectory(anyString())).thenReturn(preview);
+        when(importService.execute(anyString(), any(ImportRequest.class))).thenReturn(exec);
+
+        executor.execute(params(Map.of(
+                "conflictStrategy", "OVERWRITE",
+                "validateReferences", false,
+                "autoDeployProcesses", false,
+                "autoPublishModels", false,
+                "autoPublishFields", false,
+                "autoPublishCommands", false,
+                "autoPublishPages", false,
+                "createResourcePermissions", true
+        )), callback);
+
+        ArgumentCaptor<ImportRequest> captor = ArgumentCaptor.forClass(ImportRequest.class);
+        verify(importService).execute(anyString(), captor.capture());
+        ImportRequest importRequest = captor.getValue();
+        assertThat(importRequest.getValidateReferences()).isFalse();
+        assertThat(importRequest.getAutoDeployProcesses()).isFalse();
+        assertThat(importRequest.getAutoPublishModels()).isFalse();
+        assertThat(importRequest.getAutoPublishFields()).isFalse();
+        assertThat(importRequest.getAutoPublishCommands()).isFalse();
+        assertThat(importRequest.getAutoPublishPages()).isFalse();
+        assertThat(importRequest.getCreateResourcePermissions()).isTrue();
+    }
+
+    @Test
     @DisplayName("execute returns failure when underlying service throws")
     void shouldReturnFailureWhenServiceThrows() {
         when(importService.parseDirectory(anyString()))

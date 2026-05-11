@@ -32,12 +32,17 @@ public class PluginValidationPipeline {
      */
     public PluginValidationResult validate(PluginValidationContext ctx) {
         PluginValidationResult result = PluginValidationResult.empty();
+        boolean validateReferences = !Boolean.FALSE.equals(ctx.getValidateReferences());
 
         // Run semantic validators first, then governance
         List<PluginValidator> semanticValidators = validators.stream()
-                .filter(v -> "semantic".equals(v.category())).toList();
+                .filter(v -> "semantic".equals(v.category()))
+                .filter(v -> validateReferences || !v.requiresReferenceValidation())
+                .toList();
         List<PluginValidator> governanceValidators = validators.stream()
-                .filter(v -> "governance".equals(v.category())).toList();
+                .filter(v -> "governance".equals(v.category()))
+                .filter(v -> validateReferences || !v.requiresReferenceValidation())
+                .toList();
 
         // Layer 2: Semantic
         for (PluginValidator validator : semanticValidators) {
