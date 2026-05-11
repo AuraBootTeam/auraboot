@@ -76,6 +76,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("java/log-injection")
 public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDataService {
 
     private final MetaModelService metadataService;

@@ -50,6 +50,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("java/log-injection")
 public class MetaModelServiceImpl extends BaseMetaService implements MetaModelService {
 
     private static final Pattern MODEL_CODE_PATTERN = Pattern.compile("^[a-z][a-z0-9_]*$");

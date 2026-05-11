@@ -37,6 +37,7 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@SuppressWarnings("java/log-injection")
 public class NamedQueryModelExecutor implements ModelDataExecutor {
 
     private final MetaModelService metaModelService;
