@@ -46,8 +46,8 @@
 import { test, expect, type Page } from '../../fixtures';
 import { Client } from 'pg';
 import { randomUUID } from 'crypto';
+import { PG_CONN } from '../../helpers/environments';
 import { ADMIN_TENANT_ID } from './_real-backend-helpers';
-import { loadEnv } from '../../helpers/environments';
 
 // ---------------------------------------------------------------------------
 // Constants — pid prefixes are unique per spec so global teardown can target
@@ -103,15 +103,6 @@ const RUN_FAILED_COMPLETED_OFFSET_SEC = 1; // → 1000ms → "1.00s"
 // isolated frontend E2E image intentionally ships Node dependencies, not CLI
 // database clients.
 // ---------------------------------------------------------------------------
-
-const TEST_ENV = loadEnv();
-const PG_CONN = {
-  host: process.env.PGHOST ?? TEST_ENV.pg.host,
-  port: Number(process.env.PGPORT ?? TEST_ENV.pg.port),
-  user: process.env.PGUSER ?? TEST_ENV.pg.user,
-  database: process.env.PGDATABASE ?? TEST_ENV.pg.db,
-  password: process.env['PGPASSWORD'] ?? process.env['PG_PASSWORD'],
-};
 
 async function psql(sql: string): Promise<string> {
   return withPg(async (client) => {
