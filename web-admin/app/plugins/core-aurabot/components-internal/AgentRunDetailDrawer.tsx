@@ -330,6 +330,9 @@ function MessageRow({ message }: { message: AgentConversationMessageItem }) {
         <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-700">
           {message.senderType ?? 'unknown'}
         </span>
+        <span className="rounded bg-gray-50 px-1.5 py-0.5 text-gray-600">
+          {message.messageType ?? 'message'}
+        </span>
         <span className="font-mono text-gray-500">seq {message.seq ?? '-'}</span>
         <span className="font-mono text-gray-500">{message.clientMsgId ?? '-'}</span>
       </div>
@@ -411,10 +414,20 @@ function ConversationSection({ turn }: { turn: AgentConversationTurnReplay | nul
 function ResultContractsSection({
   contracts,
   selectedContractId,
+  onSelectContract,
 }: {
   contracts: AgentResultContractItem[];
   selectedContractId: string | null;
+  onSelectContract: (contractId: string) => void;
 }) {
+  const selectedContract =
+    contracts.find((item) => item.contractId === selectedContractId) ?? contracts[0] ?? null;
+  const statusCounts = contracts.reduce<Record<string, number>>((acc, item) => {
+    const status = item.contract?.status ?? 'unknown';
+    acc[status] = (acc[status] ?? 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <section data-testid="drawer-section-result-contracts" className="p-4">
       <h3 className="mb-3 text-sm font-semibold text-gray-700">
@@ -424,24 +437,92 @@ function ResultContractsSection({
         <div className="text-xs text-gray-500">No result contracts.</div>
       ) : (
         <div className="space-y-3">
-          {contracts.map((item) => {
-            const selected = selectedContractId === item.contractId;
-            return (
+          <div
+            className="grid grid-cols-2 gap-2 rounded border border-gray-200 bg-gray-50 p-3 text-xs"
+            data-testid="result-contract-summary"
+          >
+            <div>
+              <div className="text-gray-500">Total</div>
+              <div className="text-lg font-semibold text-gray-900">{contracts.length}</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              {Object.entries(statusCounts).map(([status, count]) => (
+                <span
+                  key={status}
+                  className="rounded border border-gray-200 bg-white px-2 py-1 font-medium text-gray-700"
+                  data-testid={`result-contract-status-${status}`}
+                >
+                  {status}: {count}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[minmax(0,14rem)_1fr]">
+            <div
+              className="space-y-2 rounded border border-gray-200 bg-white p-2"
+              data-testid="result-contract-list"
+            >
+              {contracts.map((item) => {
+                const selected = selectedContract?.contractId === item.contractId;
+                return (
+                  <button
+                    key={item.contractId}
+                    type="button"
+                    onClick={() => onSelectContract(item.contractId)}
+                    className={`w-full rounded border px-2 py-2 text-left text-xs ${
+                      selected
+                        ? 'border-indigo-300 bg-indigo-50 text-indigo-900'
+                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    data-testid={`result-contract-select-${item.contractId}`}
+                  >
+                    <div className="break-all font-mono">{item.contractId}</div>
+                    <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-gray-500">
+                      <span>{item.contract?.status ?? 'unknown'}</span>
+                      {item.actionPid && <span>Action {shortPid(item.actionPid)}</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {selectedContract && (
               <article
-                key={item.contractId}
-                className={`rounded border p-3 ${
-                  selected ? 'border-indigo-300 bg-indigo-50/50' : 'border-gray-200 bg-white'
-                }`}
-                data-testid={`result-contract-item-${item.contractId}`}
+                className="rounded border border-indigo-300 bg-indigo-50/50 p-3"
+                data-testid={`result-contract-item-${selectedContract.contractId}`}
               >
-                <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-                  <span className="font-mono text-gray-700">{item.contractId}</span>
-                  {item.actionPid && <span>Action {shortPid(item.actionPid)}</span>}
-                </div>
-                <ResultContractView contract={item.contract} />
+                <dl
+                  className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs"
+                  data-testid="result-contract-provenance"
+                >
+                  <div className="flex flex-col">
+                    <dt className="text-gray-500">Contract</dt>
+                    <dd className="break-all font-mono text-gray-900">
+                      {selectedContract.contractId}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-gray-500">Action</dt>
+                    <dd className="font-mono text-gray-900">
+                      {selectedContract.actionPid ?? '-'}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-gray-500">Source</dt>
+                    <dd className="text-gray-900">{selectedContract.source ?? '-'}</dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-gray-500">Emitted</dt>
+                    <dd className="text-gray-900">
+                      {selectedContract.emittedAt
+                        ? new Date(selectedContract.emittedAt).toLocaleString()
+                        : '-'}
+                    </dd>
+                  </div>
+                </dl>
+                <ResultContractView contract={selectedContract.contract} />
               </article>
-            );
-          })}
+            )}
+          </div>
         </div>
       )}
     </section>
@@ -619,6 +700,7 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
               <ResultContractsSection
                 contracts={detail.resultContracts ?? []}
                 selectedContractId={selectedResultContractId}
+                onSelectContract={setSelectedResultContractId}
               />
             )}
             {activeTab === 'live-stream' && showLiveStreamTab && (

@@ -22,6 +22,9 @@
 #   scripts/dev/start-isolated.sh --offset=5          # explicit offset (skips probe)
 #   scripts/dev/start-isolated.sh --rebuild           # force rebuild of backend image
 #   scripts/dev/start-isolated.sh --no-build          # (deprecated alias for default; kept for back-compat)
+#   scripts/dev/start-isolated.sh --quiet-build       # rebuild backend with quieter build output
+#   scripts/dev/start-isolated.sh --wait              # wait for backend + frontend health before returning
+#   scripts/dev/start-isolated.sh --skip-pull         # skip pre-pulling third-party images
 #   scripts/dev/start-isolated.sh --dry-run           # print plan, don't start
 #
 # Exit codes:
@@ -45,7 +48,11 @@ EXPLICIT_OFFSET=""
 # 2026-05-08 §1C: default is now --no-build (faster). Pass --rebuild to opt
 # in to a rebuild when you've changed Dockerfile.dev / build.gradle / source.
 COMPOSE_BUILD_FLAG=""
+QUIET_BUILD=0
+WAIT_FOR_HEALTH=0
+SKIP_PULL=0
 DRY_RUN=0
+IMAGE_PULL_TIMEOUT_SECONDS="${AURA_IMAGE_PULL_TIMEOUT_SECONDS:-900}"
 
 usage() {
     cat <<USAGE
@@ -57,6 +64,10 @@ Options:
   --rebuild        Force backend image rebuild (slow; opt in only when Dockerfile.dev /
                    build.gradle / src changed since last image)
   --no-build       (deprecated; kept for back-compat — same as default)
+  --quiet-build    With --rebuild, build the backend image first using quiet output,
+                   then start containers detached with --no-build
+  --wait           Wait for mapped backend and frontend health before returning
+  --skip-pull      Do not pre-pull postgres/redis/frontend images before compose up
   --dry-run        Print resolved plan and exit without starting docker
   --help           Show this message
 
@@ -65,6 +76,8 @@ Environment:
                               /app/plugins-enterprise. Defaults to an empty dir.
   ENTERPRISE_PLUGIN_JARS_DIR  Optional absolute/relative PF4J jar root to mount at
                               /app/plugin-jars. Defaults to an empty dir.
+  AURA_IMAGE_PULL_TIMEOUT_SECONDS
+                              Timeout for each pre-pulled image, default 900 seconds.
 
 Default behaviour (since 2026-05-08): --no-build. The first stack of a worktree
 populates the shared aura_gradle_cache + aura_m2_cache named volumes; later
@@ -79,6 +92,9 @@ for arg in "$@"; do
         --offset=*) EXPLICIT_OFFSET="${arg#--offset=}" ;;
         --rebuild) COMPOSE_BUILD_FLAG="--build" ;;
         --no-build) COMPOSE_BUILD_FLAG="" ;;  # deprecated alias for default
+        --quiet-build) QUIET_BUILD=1 ;;
+        --wait) WAIT_FOR_HEALTH=1 ;;
+        --skip-pull) SKIP_PULL=1 ;;
         --dry-run) DRY_RUN=1 ;;
         --help|-h) usage; exit 0 ;;
         *) echo "ERROR: unknown argument: $arg" >&2; usage; exit 2 ;;
@@ -270,11 +286,55 @@ export AURABOOT_BFF_ALLOWED_PORTS="$BFF_PORT,$VITE_PORT"
 
 cd "$PROJECT_ROOT"
 
+pre_pull_image() {
+    local image="$1"
+    if docker image inspect "$image" >/dev/null 2>&1; then
+        echo "Image cached: $image"
+        return 0
+    fi
+    echo "Pulling image: $image"
+    docker pull "$image" &
+    local pull_pid=$!
+    local elapsed=0
+    while kill -0 "$pull_pid" >/dev/null 2>&1; do
+        if [ "$IMAGE_PULL_TIMEOUT_SECONDS" -gt 0 ] && [ "$elapsed" -ge "$IMAGE_PULL_TIMEOUT_SECONDS" ]; then
+            echo "ERROR: timed out pulling image after ${IMAGE_PULL_TIMEOUT_SECONDS}s: $image" >&2
+            kill -TERM "$pull_pid" >/dev/null 2>&1 || true
+            wait "$pull_pid" >/dev/null 2>&1 || true
+            return 124
+        fi
+        sleep 5
+        elapsed=$((elapsed + 5))
+    done
+    wait "$pull_pid"
+}
+
+if [ "$SKIP_PULL" != "1" ]; then
+    pre_pull_image "pgvector/pgvector:pg16"
+    pre_pull_image "redis:7-alpine"
+    pre_pull_image "${ISOLATED_FRONTEND_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-noble}"
+fi
+
 if [ -z "$COMPOSE_BUILD_FLAG" ]; then
     echo "Bringing stack up (reusing cached image; pass --rebuild if Dockerfile.dev / build.gradle / src changed) …"
 else
     echo "Bringing stack up (--rebuild → forcing backend image rebuild) …"
 fi
+
+if [ -n "$COMPOSE_BUILD_FLAG" ] && [ "$QUIET_BUILD" = "1" ]; then
+    echo "Quietly rebuilding backend image before detached startup …"
+    if ! docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.isolated.yml \
+            --profile isolated \
+            --profile cache \
+            build --quiet backend; then
+        echo "ERROR: docker compose build failed." >&2
+        exit 4
+    fi
+    COMPOSE_BUILD_FLAG="--no-build"
+fi
+
 # `--profile cache` includes redis (in base file); `--profile isolated`
 # includes the backend + isolated-frontend services from the override.
 # shellcheck disable=SC2086
@@ -286,6 +346,38 @@ if ! docker compose \
         up -d $COMPOSE_BUILD_FLAG; then
     echo "ERROR: docker compose up failed." >&2
     exit 4
+fi
+
+wait_for_http() {
+    local name="$1"
+    local url="$2"
+    local attempts="$3"
+    local delay="$4"
+    local i
+    echo "Waiting for $name: $url"
+    for i in $(seq 1 "$attempts"); do
+        if curl -fsS "$url" >/dev/null 2>&1; then
+            echo "  $name healthy after ${i}×${delay}s"
+            return 0
+        fi
+        sleep "$delay"
+    done
+    echo "ERROR: $name did not become healthy: $url" >&2
+    docker compose -p "$PROJECT_NAME" \
+        -f docker-compose.yml \
+        -f docker-compose.isolated.yml ps || true
+    docker compose -p "$PROJECT_NAME" \
+        -f docker-compose.yml \
+        -f docker-compose.isolated.yml logs --tail 160 backend || true
+    docker compose -p "$PROJECT_NAME" \
+        -f docker-compose.yml \
+        -f docker-compose.isolated.yml logs --tail 160 isolated-frontend || true
+    exit 4
+}
+
+if [ "$WAIT_FOR_HEALTH" = "1" ]; then
+    wait_for_http "backend" "http://localhost:$BE_PORT/actuator/health" 120 5
+    wait_for_http "frontend" "http://localhost:$VITE_PORT/" 120 5
 fi
 
 echo ""
