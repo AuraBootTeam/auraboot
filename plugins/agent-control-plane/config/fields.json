@@ -785,7 +785,7 @@
     "code": "approver_id",
     "displayName:zh-CN": "审批人",
     "displayName:en": "Approver",
-    "dataType": "integer"
+    "dataType": "long"
   },
   {
     "code": "approved_at",

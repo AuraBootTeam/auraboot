@@ -21,6 +21,7 @@ import java.time.Instant;
 public class AgentActionItem {
 
     private String pid;
+    private String resultContractId;
     private Integer stepIndex;
     private Integer toolCallIndex;
 

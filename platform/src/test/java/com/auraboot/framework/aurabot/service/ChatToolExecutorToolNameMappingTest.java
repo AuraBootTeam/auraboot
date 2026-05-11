@@ -1,7 +1,9 @@
 package com.auraboot.framework.aurabot.service;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.port.GroundingPort;
 import com.auraboot.framework.agent.port.ToolDiscoveryPort;
+import com.auraboot.framework.agent.service.ToolLoopService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +12,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ChatToolExecutorToolNameMappingTest {
 
@@ -30,12 +38,6 @@ class ChatToolExecutorToolNameMappingTest {
                         true
                 ));
             }
-
-            @Override
-            public Map<String, Object> executeTool(Long tenantId, String toolCode, Map<String, Object> params) {
-                executedToolCode.set(toolCode);
-                return Map.of("success", true);
-            }
         };
         ChatToolResolver resolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
         MetaContext.setSystemTenantContext(1L);
@@ -44,7 +46,18 @@ class ChatToolExecutorToolNameMappingTest {
         } finally {
             MetaContext.clear();
         }
-        ChatToolExecutor executor = new ChatToolExecutor(toolDiscoveryPort, resolver, null,
+        ToolLoopService toolLoopService = mock(ToolLoopService.class);
+        when(toolLoopService.executeToolCall(eq(1L), eq("aurabot_chat"), isNull(), eq("aurabot"),
+                any(), eq(Map.of()), anyList(), isNull()))
+                .thenAnswer(invocation -> {
+                    executedToolCode.set(invocation.getArgument(4, String.class));
+                    @SuppressWarnings("unchecked")
+                    List<AgentToolDefinition> tools = invocation.getArgument(6, List.class);
+                    assertThat(tools).hasSize(1);
+                    assertThat(tools.get(0).getName()).isEqualTo("cmd:crm:list_leads");
+                    return "{\"success\":true}";
+                });
+        ChatToolExecutor executor = new ChatToolExecutor(toolLoopService, resolver,
                 new com.fasterxml.jackson.databind.ObjectMapper());
 
         MetaContext.setSystemTenantContext(1L);

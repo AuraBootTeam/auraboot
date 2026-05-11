@@ -94,6 +94,7 @@ const DETAIL_RESPONSE = {
   actions: [
     {
       pid: 'ACT001',
+      resultContractId: 'rc-ACT001',
       stepIndex: 1,
       toolCallIndex: null,
       actionCode: 'sales.query',
@@ -131,6 +132,9 @@ const DETAIL_RESPONSE = {
     dispatchedSkill: 'sales.list',
     channel: 'chat',
   },
+  traceId: null,
+  conversationTurn: null,
+  resultContracts: [],
 };
 
 function renderPage(initialEntries: string[] = ['/admin/agent-runs']) {

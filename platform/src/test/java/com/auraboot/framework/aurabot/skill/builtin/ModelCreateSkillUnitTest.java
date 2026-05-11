@@ -57,11 +57,11 @@ class ModelCreateSkillUnitTest {
     }
 
     @Test
-    @DisplayName("metadata: name=model:create, riskLevel=HIGH, perms include MODEL.CREATE")
+    @DisplayName("metadata: name=model:create, riskLevel=HIGH, perms include meta.model.update")
     void metadata_correct() {
         assertThat(skill.name()).isEqualTo("model:create");
         assertThat(skill.riskLevel()).isEqualTo(RiskLevel.HIGH);
-        assertThat(skill.requiredPermissions()).containsExactly("MODEL.CREATE");
+        assertThat(skill.requiredPermissions()).containsExactly("meta.model.update");
         assertThat(skill.supportsDryRun()).isTrue();
         assertThat(skill.supportsUndo()).isTrue();
         assertThat(skill.supportsStreaming()).isFalse();
