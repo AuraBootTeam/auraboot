@@ -26,6 +26,66 @@ each before upgrading.
 
 ---
 
+## [0.1.0-beta.1] - 2026-05-11
+
+First public beta of AuraBoot, a source-available AI-native business platform
+with a declarative DSL engine, plugin architecture, workflow runtime, and
+multi-tenant backend.
+
+### Highlights
+- DSL engine for JSON-defined models, generated Postgres tables, REST CRUD,
+  list/detail pages, and audit logging.
+- Configurable command pipeline for validation, permission checks, state
+  transitions, handlers, side effects, and audit.
+- AI-native core with AuraBot, Agent Control Plane, ChatBI/RAG components, and
+  a unified LLM provider layer.
+- SmartEngine-based BPMN workflow support with SLA handling and
+  workflow-designer integration.
+- PF4J backend plus Module Federation frontend plugin architecture, with 17
+  public first-party plugin packages in the OSS scope.
+
+### Added
+- Public release-readiness gates for OSS boundary checks, docs validation,
+  gitleaks scanning, CodeQL, Backend CI, Docker quickstart, and GHCR image
+  publishing.
+- Multi-arch GHCR backend images for `linux/amd64` and `linux/arm64`.
+- Reconciled OSS scope metadata and public plugin inventory.
+- Public community links, issue templates, CLA workflow handling, and Discord
+  invite updates.
+- Built-in plugin import cleanup so removed/internal demo directories are not
+  imported by default.
+
+### Changed
+- License and repository metadata use the source-available community release
+  framing.
+- Docker cleanup-batch override no longer references the enterprise
+  repository.
+- CodeQL Java build compiles classes directly instead of running `assemble`,
+  avoiding Gradle implicit dependency validation issues unrelated to CodeQL
+  analysis.
+- Docker quickstart smoke retries frontend startup and prints diagnostics on
+  failure.
+
+### Fixed
+- Backend integration-test compilation after `BootstrapRepairService`
+  constructor changes.
+- CLA workflow behavior when the signatures token is not configured.
+- Tag-triggered Gitee mirror workflow ref handling for detached checkouts.
+
+### Security
+- Gitleaks scan is green for the release commit.
+- OSS boundary check is green for the release commit.
+- CodeQL Java and JavaScript/TypeScript analyses are green for the release
+  commit.
+
+### Known issues
+- Mobile UI feature coverage trails desktop and should be treated as beta.
+- Page Designer is functional but still needs UX polish.
+- No managed cloud offering is available yet.
+- Public performance benchmark reporting is not yet part of this release.
+
+---
+
 <!--
 Template — copy this block when cutting a release.
 
