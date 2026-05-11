@@ -6,13 +6,13 @@ package com.auraboot.framework.plugin.service;
  * <p>Built-in plugins are shipped with the platform and grouped into two profiles
  * (Phase 3 of the bootstrap-unified plan):
  * <ul>
- *   <li><b>core</b> — always imported. Provides base RBAC / org / platform-admin
- *       capabilities required by every deployment ({@code org-management},
- *       {@code platform-admin}).</li>
+ *   <li><b>core</b> — always imported. Provides base meta, BPM, AI-center,
+ *       page-management, org, and platform-admin navigation required by every
+ *       deployment ({@code core-meta}, {@code core-bpm}, {@code core-aurabot},
+ *       {@code page-manager}, {@code org-management}, {@code platform-admin}).</li>
  *   <li><b>demo</b> — opt-in only. Provides showcase / demo plugins
- *       ({@code core-meta}, {@code core-bpm}, {@code core-aurabot},
- *       {@code page-manager}, {@code crm-starter}, {@code showcase},
- *       {@code agent-control-plane}, {@code acp-showcase}, {@code workflow-demo}).
+ *       ({@code crm-starter}, {@code showcase}, {@code agent-control-plane},
+ *       {@code workflow-demo}).
  *       Imported only when {@code includeDemoPlugins=true} (gated by the
  *       {@code AURABOOT_DEMO_SEED} env / {@code auraboot.bootstrap.demo-seed}
  *       property at startup, or {@code BootstrapRequest.seedDemoData=true} via
@@ -43,8 +43,8 @@ public interface BuiltinPluginImportService {
      *
      * @param tenantId          tenant ID
      * @param userId            creator user ID
-     * @param includeDemoPlugins if {@code true}, also import the 9 demo profile
-     *                          plugins; if {@code false}, only the 2 core plugins
+     * @param includeDemoPlugins if {@code true}, also import the 4 demo profile
+     *                           plugins; if {@code false}, only the 6 core plugins
      */
     void importForTenant(Long tenantId, Long userId, boolean includeDemoPlugins);
 }

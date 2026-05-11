@@ -133,7 +133,7 @@ seed 中途某条 Command 失败:
 | 执行路径 | Command replay(否决 DB direct) |
 | 幂等性 | skip-on-`idempotencyKey`,缺失报错 |
 | FK 解析 | `@<model>.<lookupField>:<value>`,lookupField 默认 `code`,manifest 可覆盖 |
-| 闸门 | manifest `seedProfile: demo|test|always`,继承既有 `AURA_ENV` / `IMPORT_TEST_FIXTURES` |
+| 闸门 | manifest `seedProfile: demo/test/always`, 继承既有 `AURA_ENV` / `IMPORT_TEST_FIXTURES` |
 | 事务 | 默认全事务,manifest `seedTransactional: false` 退化 best-effort |
 | 后处理 | manifest `postSeedTransitions` 声明 state-transition 序列 |
 
