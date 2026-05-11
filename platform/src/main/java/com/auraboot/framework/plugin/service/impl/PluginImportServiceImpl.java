@@ -615,11 +615,16 @@ public class PluginImportServiceImpl implements PluginImportService {
         List<ImportPreviewResult.ResourceConflict> conflicts = checkConflicts(manifest);
         result.setConflicts(conflicts);
 
+        boolean validateReferences = shouldValidateReferences(manifest);
+        if (!validateReferences) {
+            result.addWarning("Reference validation disabled by importOptions.validateReferences=false");
+        }
+
         // Analyze dependencies
         ImportPreviewResult.DependencyAnalysis depAnalysis = analyzeDependencies(manifest);
         result.setDependencyAnalysis(depAnalysis);
 
-        if (!depAnalysis.isSatisfied()) {
+        if (validateReferences && !depAnalysis.isSatisfied()) {
             for (String missing : depAnalysis.getMissingDependencies()) {
                 result.addError("Missing dependency: " + missing);
             }
@@ -628,7 +633,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Run extended validation pipeline (semantic + governance)
         if (result.isValid()) {
             try {
-                PluginValidationResult validationResult = runValidationPipeline(manifest);
+                PluginValidationResult validationResult = runValidationPipeline(manifest, validateReferences);
                 result.setValidationResult(validationResult);
                 // Promote validation errors to preview errors
                 validationResult.getMessages().stream()
@@ -1009,6 +1014,12 @@ public class PluginImportServiceImpl implements PluginImportService {
             return;
         }
         PluginManifestExtended.ImportOptions opts = manifest.getImportOptions();
+        if (request.getValidateReferences() == null && opts.getValidateReferences() != null) {
+            request.setValidateReferences(opts.getValidateReferences());
+        }
+        if (request.getCreateResourcePermissions() == null && opts.getCreateResourcePermissions() != null) {
+            request.setCreateResourcePermissions(opts.getCreateResourcePermissions());
+        }
         if (request.getAutoPublishModels() == null && opts.getAutoPublishModels() != null) {
             request.setAutoPublishModels(opts.getAutoPublishModels());
         }
@@ -1024,6 +1035,13 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (request.getAutoDeployProcesses() == null && opts.getAutoDeployProcesses() != null) {
             request.setAutoDeployProcesses(opts.getAutoDeployProcesses());
         }
+    }
+
+    private boolean shouldValidateReferences(PluginManifestExtended manifest) {
+        if (manifest == null || manifest.getImportOptions() == null) {
+            return true;
+        }
+        return !Boolean.FALSE.equals(manifest.getImportOptions().getValidateReferences());
     }
 
     /**
@@ -1110,10 +1128,12 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             // Compute plugin quality score
             try {
+                boolean validateReferences = shouldValidateReferences(manifest);
                 var validationCtx = PluginValidationContext.builder()
                         .pluginId(manifest.getPluginId())
                         .namespace(manifest.getNamespace())
                         .manifest(manifest)
+                        .validateReferences(validateReferences)
                         .build();
                 var validationResult = validationPipeline.validate(validationCtx);
                 history.setQualityScore(qualityScorer.computeScore(manifest, validationResult));
@@ -2588,7 +2608,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     /**
      * Build validation context and run the pre-flight pipeline.
      */
-    private PluginValidationResult runValidationPipeline(PluginManifestExtended manifest) {
+    private PluginValidationResult runValidationPipeline(PluginManifestExtended manifest, boolean validateReferences) {
         Long tenantId = MetaContext.getCurrentTenantId();
 
         // Collect installed plugin dependencies for cycle detection
@@ -2671,6 +2691,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 .pluginId(manifest.getPluginId())
                 .namespace(manifest.getNamespace())
                 .manifest(manifest)
+                .validateReferences(validateReferences)
                 .installedModelCodes(installedModelCodes)
                 .installedFieldCodes(installedFieldCodes)
                 .installedPermissionCodes(installedPermissionCodes)

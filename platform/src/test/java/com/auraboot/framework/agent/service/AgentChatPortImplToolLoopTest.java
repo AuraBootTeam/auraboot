@@ -324,6 +324,69 @@ class AgentChatPortImplToolLoopTest {
     }
 
     @Test
+    @DisplayName("explicit named query tool resolves by exact query code when it does not share a model-code prefix")
+    void explicitNamedQueryToolResolvesByExactCode() throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "agent_code", AGENT_CODE,
+                        "name", "PCBA Quality Analyst",
+                        "status", "active",
+                        "model", "test-model",
+                        "system_prompt", "Analyze quality defects.",
+                        "tools", "[\"nq:qc_quality_capa_context\"]",
+                        "guardrails", "{\"provider\":\"openai\"}")));
+        when(dynamicDataMapper.selectByQuery(contains("ab_meta_model"), anyMap()))
+                .thenReturn(List.of());
+        when(dynamicDataMapper.selectByQuery(contains("ab_named_query"), anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "code", "qc_quality_capa_context",
+                        "title", "PCBA CAPA Context",
+                        "purpose", "Read-only defect context query for CAPA draft preparation.",
+                        "from_sql", "SELECT * FROM mt_qc_defect_record WHERE tenant_id = #{params.tenantId} "
+                                + "AND pid = #{params.sourceRecordPid}")));
+        stubProvider();
+        stubGrounding("query", "webhook");
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
+        Map<String, Object> input = Map.of("sourceRecordPid", "DEFECT-1");
+        when(toolLoopService.executeToolCall(
+                eq(TENANT_ID),
+                anyString(),
+                isNull(),
+                eq(AGENT_CODE),
+                eq("nq_qc_quality_capa_context"),
+                eq(input),
+                anyList(),
+                isNull()))
+                .thenReturn("{\"success\":true,\"data\":{\"records\":[{\"source_record_pid\":\"DEFECT-1\"}]},\"durationMs\":7}");
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse("toolu-nq", "nq_qc_quality_capa_context", input))
+                .thenReturn(endTurnResponse("CAPA context loaded."));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Get CAPA context"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        verify(toolLoopService).executeToolCall(
+                eq(TENANT_ID),
+                anyString(),
+                isNull(),
+                eq(AGENT_CODE),
+                eq("nq_qc_quality_capa_context"),
+                eq(input),
+                anyList(),
+                isNull());
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(2)).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(requestCaptor.getAllValues().get(0).getTools())
+                .extracting(LlmChatRequest.Tool::getName)
+                .contains("nq_qc_quality_capa_context");
+        LlmChatRequest.Tool namedQueryTool = requestCaptor.getAllValues().get(0).getTools().stream()
+                .filter(tool -> "nq_qc_quality_capa_context".equals(tool.getName()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(String.valueOf(namedQueryTool.getInputSchema())).contains("sourceRecordPid");
+    }
+
+    @Test
     @DisplayName("unknown tool_use fails closed and is fed back without executing any tool")
     void unknownToolUseFailsClosedWithoutExecuting() throws Exception {
         stubAgentDefinition();
