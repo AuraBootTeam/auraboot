@@ -72,7 +72,7 @@ public abstract class BaseMetaService {
     protected void logOperation(String operation, String modelCode, Object... params) {
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
-        // lgtm[java/log-injection] Metadata identifiers are logged as structured parameters for operator diagnostics; logging backend handles escaping.
+        // codeql[java/log-injection] Metadata identifiers are logged as structured parameters for operator diagnostics; logging backend handles escaping.
         log.info("Meta operation: {} on model: {} by user: {} in tenant: {}, params: {}", 
                 operation, modelCode, userId, tenantId, params);
     }
