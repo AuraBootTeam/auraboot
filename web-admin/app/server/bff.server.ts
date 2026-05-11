@@ -88,32 +88,34 @@ const corsConfig = config.cors;
 // Dev-mode allowlist resolved once at boot. Set BFF_ALLOWED_PORTS=<csv> to
 // extend the default canonical ports (e.g. parallel worktrees on 5175/6445).
 const ALLOWED_DEV_PORTS = parseDevAllowedPorts(process.env.BFF_ALLOWED_PORTS);
+const CREDENTIAL_ALLOWED_ORIGIN_HEADERS = new Map(
+  corsConfig.allowedOrigins
+    .filter((allowed) => allowed !== '*')
+    .map((allowed) => [allowed, allowed] as const),
+);
+const DEV_ALLOWED_ORIGIN_HEADERS = new Map<string, string>(
+  Array.from(ALLOWED_DEV_PORTS).flatMap((port) => [
+    [`http://localhost:${port}`, `http://localhost:${port}`] as const,
+    [`http://127.0.0.1:${port}`, `http://127.0.0.1:${port}`] as const,
+  ]),
+);
 
 // CORS middleware with externalized configuration
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  const explicitAllowedOrigin = origin ? CREDENTIAL_ALLOWED_ORIGIN_HEADERS.get(origin) : undefined;
+  const devAllowedOrigin =
+    config.server.env === 'development' && origin ? DEV_ALLOWED_ORIGIN_HEADERS.get(origin) : undefined;
 
-  // Check if origin is in allowed list
-  if (origin && corsConfig.allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
+  if (explicitAllowedOrigin) {
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Origin', explicitAllowedOrigin);
     if (corsConfig.credentials) {
       res.header('Access-Control-Allow-Credentials', 'true');
     }
-  } else if (config.server.env === 'development' && origin) {
-    try {
-      const url = new URL(origin);
-      if (
-        (url.hostname === 'localhost' || url.hostname === '127.0.0.1') &&
-        ALLOWED_DEV_PORTS.has(url.port)
-      ) {
-        res.header('Access-Control-Allow-Origin', origin);
-        if (corsConfig.credentials) {
-          res.header('Access-Control-Allow-Credentials', 'true');
-        }
-      }
-    } catch (e) {
-      // Ignore invalid origin
-    }
+  } else if (devAllowedOrigin) {
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Origin', devAllowedOrigin);
   }
 
   res.header('Access-Control-Allow-Methods', corsConfig.allowedMethods.join(', '));

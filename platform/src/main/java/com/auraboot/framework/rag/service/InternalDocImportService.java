@@ -1,6 +1,7 @@
 package com.auraboot.framework.rag.service;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.rag.dto.CreateKnowledgeBaseRequest;
 import com.auraboot.framework.rag.dto.KnowledgeBaseDTO;
 import com.auraboot.framework.rag.entity.KbDocument;
@@ -51,10 +52,7 @@ public class InternalDocImportService {
      */
     @Transactional
     public ImportResult importDocs(Long tenantId, Long userId, String docsPath) {
-        Path basePath = Path.of(docsPath);
-        if (!Files.isDirectory(basePath)) {
-            throw new IllegalArgumentException("Not a directory: " + docsPath);
-        }
+        Path basePath = PathSafetyUtils.requireExistingDirectory(Path.of(docsPath), "internal docs path");
 
         // 1. Ensure dedicated KB exists
         KnowledgeBaseDTO kb = ensureInternalKb(tenantId, userId);

@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.plugin.dto.imports.*;
 import com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO;
 import com.auraboot.framework.plugin.exception.PluginException;
@@ -67,11 +68,16 @@ public class PluginDirectoryLoader {
      * @return extended manifest with all resources loaded
      */
     public PluginManifestExtended loadFromDirectory(Path pluginDir) {
+        try {
+            pluginDir = PathSafetyUtils.requireExistingDirectory(pluginDir, "plugin directory");
+        } catch (IllegalArgumentException e) {
+            throw new PluginException(e.getMessage(), e);
+        }
         if (!Files.isDirectory(pluginDir)) {
             throw new PluginException("Plugin path is not a directory: " + pluginDir);
         }
 
-        Path manifestPath = pluginDir.resolve("plugin.json");
+        Path manifestPath = PathSafetyUtils.requireSafeChild(pluginDir, "plugin.json", "plugin manifest path");
         if (!Files.exists(manifestPath)) {
             throw new PluginException("plugin.json not found in: " + pluginDir);
         }
@@ -134,7 +140,12 @@ public class PluginDirectoryLoader {
      * Check if a directory contains a valid plugin structure.
      */
     public boolean isValidPluginDirectory(Path pluginDir) {
-        return Files.exists(pluginDir.resolve("plugin.json"));
+        try {
+            Path manifestPath = PathSafetyUtils.requireSafeChild(pluginDir, "plugin.json", "plugin manifest path");
+            return Files.exists(manifestPath);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private void loadResourcesFromDirs(Path pluginDir, PluginManifestExtended manifest,
@@ -142,7 +153,7 @@ public class PluginDirectoryLoader {
         // Load models
         if (resourceDirs.containsKey("models")) {
             List<ModelDefinitionDTO> models = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("models")), ModelDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "models"), ModelDefinitionDTO.class);
             if (!models.isEmpty()) {
                 manifest.setModels(mergeList(manifest.getModels(), models));
             }
@@ -151,7 +162,7 @@ public class PluginDirectoryLoader {
         // Load fields
         if (resourceDirs.containsKey("fields")) {
             List<FieldDefinitionDTO> fields = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("fields")), FieldDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "fields"), FieldDefinitionDTO.class);
             if (!fields.isEmpty()) {
                 manifest.setFields(mergeList(manifest.getFields(), fields));
             }
@@ -161,7 +172,7 @@ public class PluginDirectoryLoader {
         String bindingsKey = resourceDirs.containsKey("modelFieldBindings") ? "modelFieldBindings" : "bindings";
         if (resourceDirs.containsKey(bindingsKey)) {
             List<ModelFieldBindingDTO> bindings = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get(bindingsKey)), ModelFieldBindingDTO.class);
+                    resourcePath(pluginDir, resourceDirs, bindingsKey), ModelFieldBindingDTO.class);
             if (!bindings.isEmpty()) {
                 manifest.setModelFieldBindings(mergeList(manifest.getModelFieldBindings(), bindings));
             }
@@ -170,7 +181,7 @@ public class PluginDirectoryLoader {
         // Load dicts
         if (resourceDirs.containsKey("dicts")) {
             List<DictDefinitionDTO> dicts = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("dicts")), DictDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "dicts"), DictDefinitionDTO.class);
             if (!dicts.isEmpty()) {
                 manifest.setDicts(mergeList(manifest.getDicts(), dicts));
             }
@@ -179,7 +190,7 @@ public class PluginDirectoryLoader {
         // Load commands
         if (resourceDirs.containsKey("commands")) {
             List<CommandDefinitionDTO> commands = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("commands")), CommandDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "commands"), CommandDefinitionDTO.class);
             if (!commands.isEmpty()) {
                 manifest.setCommands(mergeList(manifest.getCommands(), commands));
             }
@@ -188,7 +199,7 @@ public class PluginDirectoryLoader {
         // Load binding rules
         if (resourceDirs.containsKey("bindingRules")) {
             List<BindingRuleDTO> bindingRules = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("bindingRules")), BindingRuleDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "bindingRules"), BindingRuleDTO.class);
             if (!bindingRules.isEmpty()) {
                 manifest.setBindingRules(mergeList(manifest.getBindingRules(), bindingRules));
             }
@@ -197,7 +208,7 @@ public class PluginDirectoryLoader {
         // Load menus
         if (resourceDirs.containsKey("menus")) {
             List<MenuDefinitionDTO> menus = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("menus")), MenuDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "menus"), MenuDefinitionDTO.class);
             if (!menus.isEmpty()) {
                 manifest.setMenus(mergeList(manifest.getMenus(), menus));
             }
@@ -206,7 +217,7 @@ public class PluginDirectoryLoader {
         // Load permissions
         if (resourceDirs.containsKey("permissions")) {
             List<PermissionDefinitionDTO> permissions = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("permissions")), PermissionDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "permissions"), PermissionDefinitionDTO.class);
             if (!permissions.isEmpty()) {
                 manifest.setPermissions(mergeList(manifest.getPermissions(), permissions));
             }
@@ -215,7 +226,7 @@ public class PluginDirectoryLoader {
         // Load roles
         if (resourceDirs.containsKey("roles")) {
             List<RoleDefinitionDTO> roles = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("roles")), RoleDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "roles"), RoleDefinitionDTO.class);
             if (!roles.isEmpty()) {
                 manifest.setRoles(mergeList(manifest.getRoles(), roles));
             }
@@ -224,7 +235,7 @@ public class PluginDirectoryLoader {
         // Load pages
         if (resourceDirs.containsKey("pages")) {
             List<PageSchemaDTO> pages = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("pages")), PageSchemaDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "pages"), PageSchemaDTO.class);
             if (!pages.isEmpty()) {
                 List<PageSchemaDTO> convertedPages = pages.stream()
                         .map(this::convertPageDslIfNeeded)
@@ -236,7 +247,7 @@ public class PluginDirectoryLoader {
         // Load processes (if any)
         if (resourceDirs.containsKey("processes")) {
             List<ProcessDefinitionDTO> processes = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("processes")), ProcessDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "processes"), ProcessDefinitionDTO.class);
             if (!processes.isEmpty()) {
                 manifest.setProcesses(mergeList(manifest.getProcesses(), processes));
             }
@@ -245,7 +256,7 @@ public class PluginDirectoryLoader {
         // Load i18n resources
         if (resourceDirs.containsKey("i18n")) {
             List<I18nDefinitionDTO> i18n = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("i18n")), I18nDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "i18n"), I18nDefinitionDTO.class);
             if (!i18n.isEmpty()) {
                 manifest.setI18nResources(mergeList(manifest.getI18nResources(), i18n));
             }
@@ -254,7 +265,7 @@ public class PluginDirectoryLoader {
         // Load named queries
         if (resourceDirs.containsKey("namedQueries")) {
             List<NamedQueryDefinitionDTO> namedQueries = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("namedQueries")), NamedQueryDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "namedQueries"), NamedQueryDefinitionDTO.class);
             if (!namedQueries.isEmpty()) {
                 manifest.setNamedQueries(mergeList(manifest.getNamedQueries(), namedQueries));
             }
@@ -263,7 +274,7 @@ public class PluginDirectoryLoader {
         // Load agent definitions
         if (resourceDirs.containsKey("agentDefinitions")) {
             List<AgentDefinitionDTO> agentDefinitions = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("agentDefinitions")), AgentDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "agentDefinitions"), AgentDefinitionDTO.class);
             if (!agentDefinitions.isEmpty()) {
                 manifest.setAgentDefinitions(mergeList(manifest.getAgentDefinitions(), agentDefinitions));
             }
@@ -272,7 +283,7 @@ public class PluginDirectoryLoader {
         // Load saved views
         if (resourceDirs.containsKey("savedViews")) {
             List<SavedViewDefinitionDTO> savedViews = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("savedViews")), SavedViewDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "savedViews"), SavedViewDefinitionDTO.class);
             if (!savedViews.isEmpty()) {
                 manifest.setSavedViews(mergeList(manifest.getSavedViews(), savedViews));
             }
@@ -282,7 +293,7 @@ public class PluginDirectoryLoader {
         // Convention over configuration: scan `config/dashboards/` even if the
         // plugin didn't explicitly declare it in resourceDirs.
         String dashboardsPath = resourceDirs.getOrDefault("dashboards", "config/dashboards");
-        Path dashboardsDir = pluginDir.resolve(dashboardsPath);
+        Path dashboardsDir = PathSafetyUtils.requireSafeChild(pluginDir, dashboardsPath, "dashboards resourceDir");
         if (Files.exists(dashboardsDir) && Files.isDirectory(dashboardsDir)) {
             List<DashboardDefinitionDTO> dashboards = loadResourceList(
                     dashboardsDir, DashboardDefinitionDTO.class);
@@ -294,7 +305,7 @@ public class PluginDirectoryLoader {
         // Load rules (Drools)
         if (resourceDirs.containsKey("rules")) {
             List<BpmRuleDefinitionDTO> rules = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("rules")), BpmRuleDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "rules"), BpmRuleDefinitionDTO.class);
             if (!rules.isEmpty()) {
                 for (BpmRuleDefinitionDTO rule : rules) {
                     inlineDrlContent(pluginDir, rule);
@@ -306,11 +317,15 @@ public class PluginDirectoryLoader {
         // Load SLA configs
         if (resourceDirs.containsKey("sla")) {
             List<SlaConfigDefinitionDTO> slaConfigs = loadResourceList(
-                    pluginDir.resolve(resourceDirs.get("sla")), SlaConfigDefinitionDTO.class);
+                    resourcePath(pluginDir, resourceDirs, "sla"), SlaConfigDefinitionDTO.class);
             if (!slaConfigs.isEmpty()) {
                 manifest.setSlaConfigs(mergeList(manifest.getSlaConfigs(), slaConfigs));
             }
         }
+    }
+
+    private Path resourcePath(Path pluginDir, Map<String, String> resourceDirs, String key) {
+        return PathSafetyUtils.requireSafeChild(pluginDir, resourceDirs.get(key), key + " resourceDir");
     }
 
     private void loadAgentDefinitionsByConvention(Path pluginDir, PluginManifestExtended manifest,
@@ -321,7 +336,7 @@ public class PluginDirectoryLoader {
         String path = resourceDirs != null
                 ? resourceDirs.getOrDefault("agentDefinitions", "config/agent-definitions.json")
                 : "config/agent-definitions.json";
-        Path agentDefinitionsPath = pluginDir.resolve(path);
+        Path agentDefinitionsPath = PathSafetyUtils.requireSafeChild(pluginDir, path, "agentDefinitions resource path");
         if (!Files.exists(agentDefinitionsPath)) {
             return;
         }
@@ -346,11 +361,7 @@ public class PluginDirectoryLoader {
             throw new PluginException("Rule '" + rule.getRuleCode()
                     + "' declares both ruleContent and ruleContentFile — pick one");
         }
-        Path drlPath = pluginDir.resolve(relPath).normalize();
-        if (!drlPath.startsWith(pluginDir.normalize())) {
-            throw new PluginException("Rule '" + rule.getRuleCode()
-                    + "' ruleContentFile escapes plugin directory: " + relPath);
-        }
+        Path drlPath = PathSafetyUtils.requireSafeChild(pluginDir, relPath, "ruleContentFile");
         if (!Files.exists(drlPath)) {
             throw new PluginException("Rule '" + rule.getRuleCode()
                     + "' ruleContentFile not found: " + relPath);

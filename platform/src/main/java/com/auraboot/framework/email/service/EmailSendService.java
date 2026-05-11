@@ -220,7 +220,19 @@ public class EmailSendService {
         if (html == null) {
             return "";
         }
-        return html.replaceAll("<[^>]+>", "").trim();
+        StringBuilder plain = new StringBuilder(html.length());
+        boolean inTag = false;
+        for (int i = 0; i < html.length(); i++) {
+            char ch = html.charAt(i);
+            if (ch == '<') {
+                inTag = true;
+            } else if (ch == '>') {
+                inTag = false;
+            } else if (!inTag) {
+                plain.append(ch);
+            }
+        }
+        return plain.toString().trim();
     }
 
     private String toJson(List<String> list) {

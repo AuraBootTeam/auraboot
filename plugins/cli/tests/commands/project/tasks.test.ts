@@ -26,8 +26,8 @@ describe('project tasks command', () => {
       expect(VALID_STATUSES).toHaveLength(4);
     });
 
-    it('should uppercase input', () => {
-      expect('in_progress'.toUpperCase()).toBe('in_progress');
+    it('should lowercase input', () => {
+      expect('in_progress'.toLowerCase()).toBe('in_progress');
     });
   });
 

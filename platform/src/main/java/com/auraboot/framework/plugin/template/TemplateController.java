@@ -39,6 +39,7 @@ public class TemplateController {
      */
     @GetMapping
     @Operation(summary = "List templates", description = "List all available application templates")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ResponseEntity<ApiResponse<List<TemplateRegistry.TemplateDef>>> listTemplates() {
         return ResponseEntity.ok(ApiResponse.success(templateRegistry.listAll()));
     }
@@ -50,6 +51,7 @@ public class TemplateController {
     @GetMapping("/{templateId}/preview")
     @Operation(summary = "Preview template",
             description = "Parse template resources without installing. Returns models, fields, commands, pages that would be created.")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ResponseEntity<?> preview(
             @Parameter(description = "Template ID, e.g., 'crm-quick-start'")
             @PathVariable String templateId) {
@@ -72,6 +74,7 @@ public class TemplateController {
     @RequirePermission("plugin.plugin.manage")
     @Operation(summary = "Install template",
             description = "Install a template into the current tenant. Creates all models, fields, commands, pages, menus, and permissions.")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ResponseEntity<?> install(
             @Parameter(description = "Template ID, e.g., 'crm-quick-start'")
             @PathVariable String templateId,

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 
 export interface PluginManifest {
@@ -43,19 +43,19 @@ export function loadPlugin(dir: string): PluginFiles {
   const resourceFiles = new Map<string, any[]>();
 
   if (existsSync(configDir)) {
-    for (const file of readdirSync(configDir)) {
-      const filePath = join(configDir, file);
-      const stat = statSync(filePath);
+    for (const file of readdirSync(configDir, { withFileTypes: true })) {
+      const fileName = file.name;
+      const filePath = join(configDir, fileName);
 
-      if (stat.isFile() && file.endsWith('.json')) {
-        const resourceType = file.replace('.json', '');
+      if (file.isFile() && fileName.endsWith('.json')) {
+        const resourceType = fileName.replace('.json', '');
         try {
           const content = JSON.parse(readFileSync(filePath, 'utf-8'));
           resourceFiles.set(resourceType, Array.isArray(content) ? content : [content]);
         } catch (e) {
-          throw new Error(`Invalid JSON in ${file}: ${(e as Error).message}`);
+          throw new Error(`Invalid JSON in ${fileName}: ${(e as Error).message}`);
         }
-      } else if (stat.isDirectory()) {
+      } else if (file.isDirectory()) {
         // Directory mode: each file in the directory is a single resource
         const resources: any[] = [];
         for (const subFile of readdirSync(filePath)) {
@@ -68,12 +68,12 @@ export function loadPlugin(dir: string): PluginFiles {
                 resources.push(content);
               }
             } catch (e) {
-              throw new Error(`Invalid JSON in ${file}/${subFile}: ${(e as Error).message}`);
+              throw new Error(`Invalid JSON in ${fileName}/${subFile}: ${(e as Error).message}`);
             }
           }
         }
         if (resources.length > 0) {
-          resourceFiles.set(file, resources);
+          resourceFiles.set(fileName, resources);
         }
       }
     }

@@ -13,8 +13,6 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -118,7 +116,7 @@ public class FieldMaskServiceImpl implements FieldMaskService {
         }
         String rc = (replacementChar != null && !replacementChar.isEmpty()) ? replacementChar : "*";
 
-        switch (maskType.toUpperCase()) {
+        switch (maskType.toLowerCase(Locale.ROOT)) {
             case "phone":
                 return maskPhone(value, rc);
             case "email":
@@ -349,26 +347,24 @@ public class FieldMaskServiceImpl implements FieldMaskService {
     }
 
     /**
-     * Custom: regex-based replacement.
-     * Pattern is a regex; matched portions are replaced with replacement char.
+     * Custom: literal replacement. Regex execution is intentionally avoided
+     * because mask patterns are tenant-configured data.
      */
     private String maskCustom(String value, String pattern, String rc) {
         if (pattern == null || pattern.isEmpty()) {
             return value;
         }
-        try {
-            Pattern regex = Pattern.compile(pattern);
-            Matcher matcher = regex.matcher(value);
-            StringBuilder sb = new StringBuilder();
-            while (matcher.find()) {
-                String replacement = rc.repeat(matcher.group().length());
-                matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
-            }
-            matcher.appendTail(sb);
-            return sb.toString();
-        } catch (Exception e) {
-            log.warn("Failed to apply custom mask pattern '{}': {}", pattern, e.getMessage());
-            return value;
+        String replacement = rc.repeat(pattern.length());
+        StringBuilder masked = new StringBuilder(value.length());
+        int fromIndex = 0;
+        int matchIndex = value.indexOf(pattern, fromIndex);
+        while (matchIndex >= 0) {
+            masked.append(value, fromIndex, matchIndex);
+            masked.append(replacement);
+            fromIndex = matchIndex + pattern.length();
+            matchIndex = value.indexOf(pattern, fromIndex);
         }
+        masked.append(value, fromIndex, value.length());
+        return masked.toString();
     }
 }

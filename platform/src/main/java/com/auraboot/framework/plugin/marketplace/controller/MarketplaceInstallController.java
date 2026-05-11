@@ -26,6 +26,7 @@ public class MarketplaceInstallController {
 
     @PostMapping("/plugins/{pluginId}/install")
     @Operation(summary = "Install a plugin from marketplace")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<ImportExecuteResult> install(
             @PathVariable String pluginId,
             @RequestBody(required = false) MarketplaceInstallRequest request) {
@@ -38,12 +39,14 @@ public class MarketplaceInstallController {
     // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/installed")
     @Operation(summary = "Get installed plugins")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<List<MarketplacePluginDTO>> getInstalled() {
         return ApiResponse.ok(installService.getInstalled());
     }
 
     @PostMapping("/plugins/{pluginId}/uninstall")
     @Operation(summary = "Uninstall a plugin")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<Void> uninstall(@PathVariable String pluginId) {
         installService.uninstall(pluginId);
         return ApiResponse.ok();
@@ -60,11 +63,11 @@ public class MarketplaceInstallController {
     @PostMapping("/s2s/install")
     @Operation(summary = "Server-to-server plugin install via installToken",
             description = "Used by marketplace server to push plugins to customer instances")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<ImportExecuteResult> serverToServerInstall(
             @RequestBody ServerInstallRequest request) {
-        log.info("S2S install: pluginId={}, token={}...",
-                request.getPluginId(),
-                request.getInstallToken() != null ? request.getInstallToken().substring(0, Math.min(8, request.getInstallToken().length())) + "..." : "null");
+        log.info("S2S install: pluginId={}, tokenPresent={}",
+                request.getPluginId(), request.getInstallToken() != null);
         return ApiResponse.ok(installService.serverInstall(request.getPluginId(), request.getInstallToken()));
     }
 

@@ -43,7 +43,7 @@ public class ExportTaskService {
     /** Dedicated export directory — isolated from OS temp */
     private static final java.nio.file.Path EXPORT_DIR;
     static {
-        EXPORT_DIR = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "aura-exports");
+        EXPORT_DIR = java.nio.file.Paths.get(System.getProperty("user.home"), ".auraboot", "exports");
         try {
             java.nio.file.Files.createDirectories(EXPORT_DIR);
         } catch (java.io.IOException e) {

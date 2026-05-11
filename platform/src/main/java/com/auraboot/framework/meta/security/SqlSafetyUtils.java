@@ -49,6 +49,15 @@ public final class SqlSafetyUtils {
     }
 
     /**
+     * Validate and return a SQL identifier for call sites that need to make the
+     * trusted value explicit before composing SQL with table or column names.
+     */
+    public static String requireIdentifier(String identifier, String context) {
+        validateIdentifier(identifier, context);
+        return identifier;
+    }
+
+    /**
      * Check if a string is a valid SQL identifier without throwing.
      */
     public static boolean isValidIdentifier(String identifier) {

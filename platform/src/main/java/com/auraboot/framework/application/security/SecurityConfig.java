@@ -57,12 +57,16 @@ public class SecurityConfig {
     }
 
     @Bean
+    @SuppressWarnings("java/spring-disabled-csrf-protection")
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         boolean isDevOrTest = activeProfile.contains("dev") || activeProfile.contains("local")
                 || activeProfile.contains("test") || "default".equals(activeProfile);
 
         http
-                // codeql[java/csrf-unprotected-request-type] AuraBoot APIs are stateless JWT/Bearer-token APIs; browser cookies are not used for authentication.
+                // codeql[java/csrf-unprotected-request-type] AuraBoot API
+                // authentication is stateless and requires an Authorization:
+                // Bearer token; browser cookies are not an authentication
+                // channel here.
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> {

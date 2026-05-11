@@ -1,6 +1,7 @@
 package com.auraboot.framework.dashboard.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.dashboard.dto.*;
 import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -132,11 +133,13 @@ public class DashboardController {
         long total = allDashboards.size();
 
         // Apply pagination
-        int fromIndex = Math.min(page * size, allDashboards.size());
-        int toIndex = Math.min(fromIndex + size, allDashboards.size());
+        int safePage = PaginationSafetyUtils.zeroBasedPageNumber(page);
+        int safeSize = PaginationSafetyUtils.pageSize(size, 100);
+        int fromIndex = Math.min(PaginationSafetyUtils.zeroBasedOffset(safePage, safeSize, 100), allDashboards.size());
+        int toIndex = Math.min(Math.addExact(fromIndex, safeSize), allDashboards.size());
         List<DashboardDTO> paged = allDashboards.subList(fromIndex, toIndex);
 
-        PageResult<DashboardDTO> result = new PageResult<>(paged, total, (long) size, (long) (page + 1));
+        PageResult<DashboardDTO> result = new PageResult<>(paged, total, (long) safeSize, Math.addExact((long) safePage, 1L));
 
         log.info("Found {} dashboards (page {} of {})", total, page, result.getPages());
         return ApiResponse.success(result);
@@ -188,6 +191,7 @@ public class DashboardController {
     @Operation(summary = "Get or create workbench",
             description = "Get the personal workbench for current user, creating from template if needed")
     @RequirePermission(MetaPermission.DASHBOARD_READ)
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<DashboardDTO> getOrCreateWorkbench() {
         log.info("Getting workbench for current user");
         DashboardDTO workbench = dashboardService.getOrCreateWorkbench();

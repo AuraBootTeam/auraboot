@@ -269,7 +269,7 @@ public class PasswordManagementServiceImpl implements PasswordManagementService 
 
         emailSender.send(user.getEmail(), subject, htmlBody);
         log.info("Password reset email sent to user {}", user.getId());
-        log.debug("Password reset initiated for {} — token hash: {}", user.getEmail(), tokenHash);
+        log.debug("Password reset initiated for userId={}", user.getId());
     }
 
     private static String hashToken(String token) {

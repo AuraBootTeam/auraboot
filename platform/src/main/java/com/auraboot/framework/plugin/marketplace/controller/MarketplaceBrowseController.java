@@ -25,6 +25,7 @@ public class MarketplaceBrowseController {
     // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/plugins")
     @Operation(summary = "Search marketplace plugins")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<List<MarketplacePluginDTO>> searchPlugins(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
@@ -35,6 +36,7 @@ public class MarketplaceBrowseController {
     // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/plugins/{pluginId}")
     @Operation(summary = "Get plugin detail")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<MarketplacePluginDetailDTO> getPluginDetail(@PathVariable String pluginId) {
         return ApiResponse.ok(browseService.getDetail(pluginId));
     }
@@ -42,6 +44,7 @@ public class MarketplaceBrowseController {
     // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/plugins/{pluginId}/versions")
     @Operation(summary = "Get plugin versions")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<List<MarketplaceVersionDTO>> getVersions(@PathVariable String pluginId) {
         return ApiResponse.ok(browseService.getVersions(pluginId));
     }
@@ -49,6 +52,7 @@ public class MarketplaceBrowseController {
     // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/categories")
     @Operation(summary = "Get marketplace categories")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<List<MarketplaceCategory>> getCategories() {
         return ApiResponse.ok(browseService.getCategories());
     }
@@ -56,6 +60,7 @@ public class MarketplaceBrowseController {
     // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/featured")
     @Operation(summary = "Get featured plugins")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<List<MarketplacePluginDTO>> getFeatured() {
         return ApiResponse.ok(browseService.getFeatured());
     }

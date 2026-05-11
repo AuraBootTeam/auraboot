@@ -158,12 +158,25 @@ type AuraBotAction =
 // Reducer
 // ============================================================================
 
+let aurabotIdCounter = 0;
+
+function generateUniqueSuffix(): string {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === 'function') {
+    return cryptoApi.randomUUID();
+  }
+
+  const bytes = new Uint32Array(2);
+  cryptoApi?.getRandomValues?.(bytes);
+  return `${Date.now().toString(36)}_${bytes[0].toString(36)}${bytes[1].toString(36)}_${aurabotIdCounter++}`;
+}
+
 function generateSessionId(): string {
-  return `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  return `session_${generateUniqueSuffix()}`;
 }
 
 function generateMessageId(): string {
-  return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  return `msg_${generateUniqueSuffix()}`;
 }
 
 const LAST_CONVERSATION_KEY = 'aurabot.lastConversationId';
@@ -826,7 +839,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               dispatch({
                 type: 'add_tool_message',
                 payload: {
-                  id: `rc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  id: `rc-${generateUniqueSuffix()}`,
                   type: 'result_contract',
                   sender: 'bot',
                   timestamp: Date.now(),
@@ -844,7 +857,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               dispatch({
                 type: 'add_message',
                 payload: {
-                  id: `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  id: `thinking-${generateUniqueSuffix()}`,
                   type: 'thinking',
                   sender: 'bot',
                   timestamp: Date.now(),

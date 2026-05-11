@@ -38,7 +38,7 @@ export async function projectListCommand(options: ProjectListOptions): Promise<v
 
   const filters: FilterItem[] = [];
   if (options.status) {
-    filters.push({ fieldName: 'pm_project_status', operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: 'pm_project_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, 'pm_project', {

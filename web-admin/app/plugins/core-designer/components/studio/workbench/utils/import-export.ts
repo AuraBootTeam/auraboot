@@ -219,12 +219,20 @@ function convertToYaml(obj: any, indent: number = 0): string {
 function formatYamlValue(value: any): string {
   if (typeof value === 'string') {
     // 如果字符串包含特殊字符，需要加引号
-    if (value.includes('\n') || value.includes('"') || value.includes("'")) {
-      return `"${value.replace(/"/g, '\\"')}"`;
+    if (value.includes('\n') || value.includes('\\') || value.includes('"') || value.includes("'")) {
+      return `"${escapeYamlString(value)}"`;
     }
     return value;
   }
   return String(value);
+}
+
+function escapeYamlString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function unescapeYamlString(value: string): string {
+  return value.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
 }
 
 /**
@@ -320,7 +328,7 @@ function parseYamlValue(value: string): any {
 
   // 字符串
   if (value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1).replace(/\\"/g, '"');
+    return unescapeYamlString(value.slice(1, -1));
   }
 
   return value;
@@ -361,11 +369,11 @@ function parseXml(xmlStr: string): CanvasSchema {
  */
 function unescapeXml(str: string): string {
   return str
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
 }
 
 /**

@@ -76,6 +76,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.common.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -118,6 +119,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final NamedQueryService namedQueryService;
     private final DashboardService dashboardService;
     // env-layering PoC #16: resolve target env_id for plugin-imported page rows
+
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
     private final com.auraboot.framework.environment.service.EnvironmentService environmentService;
 
     // Infrastructure dependencies
@@ -182,7 +187,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // findByCode lacks a NotFoundException type today; any failure is treated as
             // "does not exist" so a re-import can proceed with create. Logged at debug
             // so a real DB/connectivity failure is still observable when troubleshooting.
-            log.debug("checkCommandExists treating exception as 'not exists' for code={}: {}", code, e.toString());
+            log.debug("checkCommandExists treating exception as 'not exists' for code={}: {}",
+                    logSafe(code), logSafe(e.toString()));
             return false;
         }
     }
@@ -193,7 +199,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             PermissionDTO perm = permissionService.findByCode(code);
             return perm != null;
         } catch (Exception e) {
-            log.debug("checkPermissionExists treating exception as 'not exists' for code={}: {}", code, e.toString());
+            log.debug("checkPermissionExists treating exception as 'not exists' for code={}: {}",
+                    logSafe(code), logSafe(e.toString()));
             return false;
         }
     }
@@ -238,7 +245,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             NamedQueryDTO query = namedQueryService.findByCode(code);
             return query != null;
         } catch (Exception e) {
-            log.debug("checkNamedQueryExists treating exception as 'not exists' for code={}: {}", code, e.toString());
+            log.debug("checkNamedQueryExists treating exception as 'not exists' for code={}: {}",
+                    logSafe(code), logSafe(e.toString()));
             return false;
         }
     }
@@ -259,7 +267,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             PluginResource pr = pluginResourceMapper.findByTypeAndCode(tenantId, type.code(), resourceCode);
             return pr != null && Boolean.TRUE.equals(pr.getUserModified());
         } catch (Exception e) {
-            log.debug("Failed to check user-modified status for {} {}: {}", type, resourceCode, e.getMessage());
+            log.debug("Failed to check user-modified status for {} {}: {}",
+                    type, logSafe(resourceCode), logSafe(e.getMessage()));
             return false;
         }
     }
@@ -293,7 +302,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             return Boolean.TRUE.equals(flag) || "true".equals(String.valueOf(flag));
         } catch (Exception e) {
             // Defensive: on lookup failure, do not bypass the user-modified guard.
-            log.debug("isAutoCreatedStubPage lookup failed for pageKey={}: {}", pageKey, e.getMessage());
+            log.debug("isAutoCreatedStubPage lookup failed for pageKey={}: {}",
+                    logSafe(pageKey), logSafe(e.getMessage()));
             return false;
         }
     }
@@ -316,7 +326,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.MODEL, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.MODEL, dto.getCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.MODEL, logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL,
                     null, null, dto.getCode(), dto.getEffectiveDisplayName(), ResourceAction.SKIP, null, null);
         }
@@ -366,7 +376,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 if (effectiveTableName != null) {
                     metaModelMapper.updateTableNameByPid(effectiveTableName, resurrectPid);
                 }
-                log.info("Resurrected soft-deleted model: code={}, pid={}", dto.getCode(), resurrectPid);
+                log.info("Resurrected soft-deleted model: code={}, pid={}",
+                        logSafe(dto.getCode()), logSafe(resurrectPid));
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL,
                         resurrectPid, null, dto.getCode(), dto.getEffectiveDisplayName(),
                         ResourceAction.CREATE, null, extension);
@@ -417,7 +428,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.FIELD, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.FIELD, dto.getCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.FIELD, logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.FIELD,
                     null, null, dto.getCode(), dto.getEffectiveDisplayName(), ResourceAction.SKIP, null, null);
         }
@@ -433,7 +444,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Check for soft-deleted record and resurrect if found
             String resurrectPid = resurrectSoftDeleted("ab_meta_field", "code", dto.getCode(), tenantId, pluginPid, extension);
             if (resurrectPid != null) {
-                log.info("Resurrected soft-deleted field: code={}, pid={}", dto.getCode(), resurrectPid);
+                log.info("Resurrected soft-deleted field: code={}, pid={}",
+                        logSafe(dto.getCode()), logSafe(resurrectPid));
                 result = createResourceRecord(pluginPid, importId, tenantId, ResourceType.FIELD,
                         resurrectPid, null, dto.getCode(), dto.getEffectiveDisplayName(),
                         ResourceAction.CREATE, null, extension);
@@ -449,12 +461,12 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             if (field != null && "draft".equalsIgnoreCase(field.getStatus())) {
                 try {
                     metaFieldService.publishVersion(field.getPid());
-                    log.info("Auto-published field after import: {}", dto.getCode());
+                    log.info("Auto-published field after import: {}", logSafe(dto.getCode()));
                 } catch (Exception e) {
                     // Auto-publish is best-effort: import succeeded, the field exists in
                     // draft state, an admin can publish manually later. Don't fail the
                     // whole import for a publish hiccup.
-                    log.warn("Failed to auto-publish field {}: {}", dto.getCode(), e.getMessage(), e);
+                    log.warn("Failed to auto-publish field {}: {}", logSafe(dto.getCode()), logSafe(e.getMessage()), e);
                 }
             }
         }
@@ -464,7 +476,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             MetaFieldDTO field = metaFieldService.findCurrentByCode(dto.getCode()).orElse(null);
             if (field != null) {
                 metaFieldService.bindDictionary(field.getPid(), dto.getDictCode());
-                log.info("Bound dictionary to field: fieldCode={}, dictCode={}", dto.getCode(), dto.getDictCode());
+                log.info("Bound dictionary to field: fieldCode={}, dictCode={}",
+                        logSafe(dto.getCode()), logSafe(dto.getDictCode()));
             }
         }
 
@@ -506,7 +519,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         syncPublishedModelsForUpdatedField(existingField, dto.getCode());
 
         log.info("Field updated in place for plugin reimport: code={}, pid={}",
-                 dto.getCode(), existingField.getPid());
+                 logSafe(dto.getCode()), logSafe(existingField.getPid()));
 
         // 5. Return resource record
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.FIELD,
@@ -719,7 +732,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.MODEL_FIELD_BINDING, bindingCode)) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.MODEL_FIELD_BINDING, bindingCode);
+            log.info("Skipping user-modified resource: {} {}", ResourceType.MODEL_FIELD_BINDING, logSafe(bindingCode));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL_FIELD_BINDING,
                     bindingPid, null, bindingCode, bindingCode, ResourceAction.SKIP, null, null);
         }
@@ -763,7 +776,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 }
 
                 bindingPid = fieldBindingMapper.getPidByModelAndField(modelId, fieldId);
-                log.info("Resurrected soft-deleted binding: {}", bindingCode);
+                log.info("Resurrected soft-deleted binding: {}", logSafe(bindingCode));
 
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL_FIELD_BINDING,
                         bindingPid, null, bindingCode, bindingCode, ResourceAction.CREATE, null, null);
@@ -794,7 +807,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     if (fieldEntity != null) {
                         fieldEntity.setStatus(StatusConstants.PUBLISHED);
                         metaFieldMapper.updateById(fieldEntity);
-                        log.info("Auto-published field {} (bound to published model {})", dto.getFieldCode(), dto.getModelCode());
+                        log.info("Auto-published field {} (bound to published model {})",
+                                logSafe(dto.getFieldCode()), logSafe(dto.getModelCode()));
                     }
                 }
 
@@ -823,7 +837,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             log.warn("Command '{}' has inline 'bindingRules' in commands.json — "
                     + "this field is ignored during import. "
                     + "Use a separate bindingRules.json file registered in plugin.json resourceDirs.bindingRules.",
-                    dto.getCode());
+                    logSafe(dto.getCode()));
         }
 
         boolean exists = checkCommandExists(tenantId, dto.getCode());
@@ -838,7 +852,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.COMMAND, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.COMMAND, dto.getCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.COMMAND, logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.COMMAND,
                     null, null, dto.getCode(), dto.getEffectiveDisplayName(), ResourceAction.SKIP, null, null);
         }
@@ -869,7 +883,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
             commandMetadataCache.evictAll();
             log.info("Command updated in place for plugin reimport: code={}, pid={}",
-                     dto.getCode(), existingCmd.getPid());
+                     logSafe(dto.getCode()), logSafe(existingCmd.getPid()));
 
             // Auto-publish if requested — skip if already PUBLISHED to avoid rollback-only tx
             if (Boolean.TRUE.equals(autoPublish) && !StatusConstants.PUBLISHED.equals(existingCmd.getStatus())) {
@@ -949,7 +963,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.BINDING_RULE, ruleCode)) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.BINDING_RULE, ruleCode);
+            log.info("Skipping user-modified resource: {} {}", ResourceType.BINDING_RULE, logSafe(ruleCode));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.BINDING_RULE,
                     null, null, ruleCode, dto.getRuleType(), ResourceAction.SKIP, null, null);
         }
@@ -999,7 +1013,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.PERMISSION, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.PERMISSION, dto.getCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.PERMISSION, logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PERMISSION,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -1025,7 +1039,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Check for soft-deleted permission and resurrect if found
             String resurrectPid = resurrectSoftDeleted("ab_permission", "code", dto.getCode(), tenantId, pluginPid, null);
             if (resurrectPid != null) {
-                log.info("Resurrected soft-deleted permission: code={}, pid={}", dto.getCode(), resurrectPid);
+                log.info("Resurrected soft-deleted permission: code={}, pid={}",
+                        logSafe(dto.getCode()), logSafe(resurrectPid));
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PERMISSION,
                         resurrectPid, null, dto.getCode(), dto.getEffectiveName(),
                         ResourceAction.CREATE, null, null);
@@ -1078,7 +1093,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.ROLE, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.ROLE, dto.getCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.ROLE, logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.ROLE,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -1142,7 +1157,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             try {
                 PermissionDTO perm = permissionService.findByCode(permCode);
                 if (perm == null) {
-                    log.warn("Permission not found for role binding: {}", permCode);
+                    log.warn("Permission not found for role binding: {}", logSafe(permCode));
                     continue;
                 }
 
@@ -1157,7 +1172,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 // Bind loop is per-permission best-effort: a single failed binding
                 // (missing perm, race with another import) must not block the rest
                 // of the role's permission set. Failure surfaced via warn log only.
-                log.warn("Failed to bind permission {} to role: {}", permCode, e.getMessage(), e);
+                log.warn("Failed to bind permission {} to role: {}", logSafe(permCode), logSafe(e.getMessage()), e);
             }
         }
     }
@@ -1186,7 +1201,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.MENU, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.MENU, dto.getCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.MENU, logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MENU,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -1200,7 +1215,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 // Strict lookup by code only.
                 parentId = menuMapper.findIdByCode(tenantId, dto.getParentCode());
                 if (parentId == null) {
-                    log.warn("Parent menu not found by code '{}'", dto.getParentCode());
+                    log.warn("Parent menu not found by code '{}'", logSafe(dto.getParentCode()));
                 }
             }
         }
@@ -1291,7 +1306,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.PROCESS, dto.getKey())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.PROCESS, dto.getKey());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.PROCESS, logSafe(dto.getKey()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PROCESS,
                     null, null, dto.getKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -1391,7 +1406,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 String bpmnXml = jsonToBpmnConverter.convertFromMap(designerJson);
                 return stampVersion(bpmnXml, version);
             } catch (Exception e) {
-                log.error("Failed to compile BPMN for {}: {}", dto.getKey(), e.getMessage(), e);
+                log.error("Failed to compile BPMN for {}: {}", logSafe(dto.getKey()), logSafe(e.getMessage()), e);
                 throw new PluginException("Failed to compile BPMN for " + dto.getKey() + ": " + e.getMessage(), e);
             }
         }
@@ -1454,11 +1469,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             try {
                 if (pageSchemaMapper.selectAnyByPageKey(pageKey) == null) {
                     log.warn("Process {} node {} declares formPageKey={} but no matching row in ab_page_schema; binding will be emitted anyway",
-                            dto.getKey(), nodeId, pageKey);
+                            logSafe(dto.getKey()), logSafe(nodeId), logSafe(pageKey));
                 }
             } catch (Exception e) {
                 log.warn("Failed to verify page_key={} for process {} node {}: {}",
-                        pageKey, dto.getKey(), nodeId, e.getMessage());
+                        logSafe(pageKey), logSafe(dto.getKey()), logSafe(nodeId), logSafe(e.getMessage()));
             }
 
             Map<String, Object> binding = new LinkedHashMap<>();
@@ -1474,9 +1489,17 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             return bpmnXml;
         }
         String versionStr = String.valueOf(version);
-        return bpmnXml.replaceFirst(
-                "(<process\\s+[^>]*)(>)",
-                "$1 version=\"" + versionStr + ".0.0\"$2");
+        int processStart = bpmnXml.indexOf("<process");
+        if (processStart < 0) {
+            return bpmnXml;
+        }
+        int tagEnd = bpmnXml.indexOf('>', processStart);
+        if (tagEnd < 0) {
+            return bpmnXml;
+        }
+        return bpmnXml.substring(0, tagEnd)
+                + " version=\"" + versionStr + ".0.0\""
+                + bpmnXml.substring(tagEnd);
     }
 
     /**
@@ -1488,7 +1511,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private void deployProcessToSmartEngine(ProcessDefinitionDTO dto, Long tenantId,
                                              Integer version, String bpmnXml) {
         if (bpmnXml == null || bpmnXml.isBlank()) {
-            log.info("Process {} has no BPMN content; skipping SmartEngine deploy", dto.getKey());
+            log.info("Process {} has no BPMN content; skipping SmartEngine deploy", logSafe(dto.getKey()));
             return;
         }
         try {
@@ -1499,9 +1522,10 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             smartEngine.getRepositoryCommandService()
                     .deployWithUTF8Content(bpmnXml, String.valueOf(tenantId));
             log.info("Deployed BPMN process to SmartEngine: tenantId={}, processKey={}, version={}",
-                    tenantId, dto.getKey(), version);
+                    tenantId, logSafe(dto.getKey()), version);
         } catch (Exception e) {
-            log.error("Failed to deploy BPMN process {} to SmartEngine: {}", dto.getKey(), e.getMessage(), e);
+            log.error("Failed to deploy BPMN process {} to SmartEngine: {}",
+                    logSafe(dto.getKey()), logSafe(e.getMessage()), e);
             throw new PluginException("Failed to deploy process " + dto.getKey() + ": " + e.getMessage(), e);
         }
     }
@@ -1528,11 +1552,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // publish and plugin import. They must never block plugin DSL overwrite, even if the
             // resource was somehow flagged user-modified earlier. Bypass the skip in that case.
             if (!isAutoCreatedStubPage(dto.getPageKey())) {
-                log.info("Skipping user-modified resource: {} {}", ResourceType.PAGE, dto.getPageKey());
+                log.info("Skipping user-modified resource: {} {}", ResourceType.PAGE, logSafe(dto.getPageKey()));
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                         null, null, dto.getPageKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
             }
-            log.info("Forcing overwrite of auto-created stub page: {}", dto.getPageKey());
+            log.info("Forcing overwrite of auto-created stub page: {}", logSafe(dto.getPageKey()));
         }
 
         // V2 flat format: kind/profile/title/layout/blocks directly on DTO
@@ -1605,7 +1629,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     @Override
     public PluginResource importDashboard(DashboardDefinitionDTO dto, String pluginPid, String importId,
                                           Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
-        log.info("Importing dashboard '{}' from config/dashboards/", dto.getCode());
+        log.info("Importing dashboard '{}' from config/dashboards/", logSafe(dto.getCode()));
 
         if (!dto.isValid()) {
             throw new PluginException(
@@ -1623,7 +1647,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
-            log.info("Dashboard '{}' already exists — skipping (SKIP strategy)", dto.getCode());
+            log.info("Dashboard '{}' already exists — skipping (SKIP strategy)", logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                     existing.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.SKIP, null, null);
@@ -1639,7 +1663,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             updateReq.setLayoutConfig(layoutConfigNode);
             updateReq.setWidgets(widgetsNode);
             dashboardService.update(existing.getPid(), updateReq);
-            log.info("Dashboard updated from config/dashboards/: code={}, pid={}", dto.getCode(), existing.getPid());
+            log.info("Dashboard updated from config/dashboards/: code={}, pid={}",
+                    logSafe(dto.getCode()), logSafe(existing.getPid()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                     existing.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.UPDATE, null, null);
@@ -1658,7 +1683,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             if (!"draft".equals(dto.getEffectiveStatus())) {
                 dashboardService.publish(created.getPid());
             }
-            log.info("Dashboard created from config/dashboards/: code={}, pid={}", dto.getCode(), created.getPid());
+            log.info("Dashboard created from config/dashboards/: code={}, pid={}",
+                    logSafe(dto.getCode()), logSafe(created.getPid()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
                     created.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.CREATE, null, null);
@@ -1697,7 +1723,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.DICT, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.DICT, dto.getCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.DICT, logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DICT,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -1742,7 +1768,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Check for soft-deleted record and resurrect if found
             String resurrectPid = resurrectSoftDeleted("ab_dict", "code", dto.getCode(), tenantId, pluginPid, null);
             if (resurrectPid != null) {
-                log.info("Resurrected soft-deleted dict: code={}, pid={}", dto.getCode(), resurrectPid);
+                log.info("Resurrected soft-deleted dict: code={}, pid={}",
+                        logSafe(dto.getCode()), logSafe(resurrectPid));
                 // Now update the resurrected dict with current data
                 DictDTO resurrected = dictService.findByCode(dto.getCode());
                 if (resurrected != null && dto.getItems() != null && !dto.getItems().isEmpty()) {
@@ -1820,7 +1847,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.NAMED_QUERY, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.NAMED_QUERY, dto.getCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.NAMED_QUERY, logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.NAMED_QUERY,
                     null, null, dto.getCode(), dto.getEffectiveTitle(), ResourceAction.SKIP, null, null);
         }
@@ -2042,7 +2069,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.AGENT_DEFINITION, dto.getAgentCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.AGENT_DEFINITION, dto.getAgentCode());
+            log.info("Skipping user-modified resource: {} {}", ResourceType.AGENT_DEFINITION, logSafe(dto.getAgentCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
                     null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
@@ -2188,7 +2215,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     try {
                         metaModelService.delete(resource.getResourcePid());
                     } catch (Exception e) {
-                        log.warn("Service delete failed for model {}: {}", resource.getResourcePid(), e.getMessage());
+                        log.warn("Service delete failed for model {}: {}",
+                                logSafe(resource.getResourcePid()), logSafe(e.getMessage()));
                         metaModelMapper.archiveByPid(resource.getResourcePid());
                     }
                 }
@@ -2198,7 +2226,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     try {
                         metaFieldService.delete(resource.getResourcePid());
                     } catch (Exception e) {
-                        log.warn("Service delete failed for field {}: {}", resource.getResourcePid(), e.getMessage());
+                        log.warn("Service delete failed for field {}: {}",
+                                logSafe(resource.getResourcePid()), logSafe(e.getMessage()));
                         metaFieldMapper.archiveByPid(resource.getResourcePid());
                     }
                 }
@@ -2208,7 +2237,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     try {
                         commandService.delete(resource.getResourcePid());
                     } catch (Exception e) {
-                        log.warn("Service delete failed for command {}: {}", resource.getResourcePid(), e.getMessage());
+                        log.warn("Service delete failed for command {}: {}",
+                                logSafe(resource.getResourcePid()), logSafe(e.getMessage()));
                         commandDefinitionMapper.archiveByPid(resource.getResourcePid());
                     }
                 }
@@ -2218,7 +2248,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     try {
                         permissionService.delete(resource.getResourceId());
                     } catch (Exception e) {
-                        log.warn("Service delete failed for permission {}: {}", resource.getResourceId(), e.getMessage());
+                        log.warn("Service delete failed for permission {}: {}",
+                                logSafe(resource.getResourceId()), logSafe(e.getMessage()));
                         permissionMapper.softDelete(resource.getResourceId());
                     }
                 }
@@ -2227,7 +2258,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 try {
                     roleMapper.softDeleteByPid(resource.getResourcePid());
                 } catch (Exception e) {
-                    log.warn("Failed to delete role {}: {}", resource.getResourcePid(), e.getMessage());
+                    log.warn("Failed to delete role {}: {}",
+                            logSafe(resource.getResourcePid()), logSafe(e.getMessage()));
                 }
             }
             case MENU -> {
@@ -2235,7 +2267,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     try {
                         menuService.deleteMenu(resource.getResourceId());
                     } catch (Exception e) {
-                        log.warn("Service delete failed for menu {}: {}", resource.getResourceId(), e.getMessage());
+                        log.warn("Service delete failed for menu {}: {}",
+                                logSafe(resource.getResourceId()), logSafe(e.getMessage()));
                         menuMapper.softDeleteById(resource.getResourceId());
                     }
                 }
@@ -2245,7 +2278,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     try {
                         pageSchemaService.delete(resource.getResourcePid());
                     } catch (Exception e) {
-                        log.warn("Service delete failed for page {}: {}", resource.getResourcePid(), e.getMessage());
+                        log.warn("Service delete failed for page {}: {}",
+                                logSafe(resource.getResourcePid()), logSafe(e.getMessage()));
                         pageSchemaMapper.archiveByPid(resource.getResourcePid());
                     }
                 }
@@ -2256,7 +2290,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                         dictService.delete(resource.getResourcePid());
                     } catch (Exception e) {
                         log.warn("Service delete failed for dict {}, using mapper fallback: {}",
-                                resource.getResourcePid(), e.getMessage());
+                                logSafe(resource.getResourcePid()), logSafe(e.getMessage()));
                         dictMapper.softDeleteByPid(resource.getResourcePid());
                     }
                 }
@@ -2266,7 +2300,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     try {
                         namedQueryService.delete(resource.getResourcePid());
                     } catch (Exception e) {
-                        log.warn("Failed to delete named query {}: {}", resource.getResourcePid(), e.getMessage());
+                        log.warn("Failed to delete named query {}: {}",
+                                logSafe(resource.getResourcePid()), logSafe(e.getMessage()));
                         namedQueryMapper.updateStatusByPid(resource.getResourcePid(), "archived");
                     }
                 }
@@ -2290,7 +2325,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (resource.getPreviousState() == null) {
             return;
         }
-        log.info("Restoring resource: {} ({})", resource.getResourceCode(), resource.getResourceType());
+        log.info("Restoring resource: {} ({})", logSafe(resource.getResourceCode()), resource.getResourceType());
     }
 
     // ==================== Helper Methods ====================

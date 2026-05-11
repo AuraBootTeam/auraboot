@@ -97,7 +97,7 @@ public class FieldEncryptionService {
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
             // IV + ciphertext (includes GCM tag appended by JCE)
-            ByteBuffer buffer = ByteBuffer.allocate(iv.length + ciphertext.length);
+            ByteBuffer buffer = ByteBuffer.allocate(Math.addExact(iv.length, ciphertext.length));
             buffer.put(iv);
             buffer.put(ciphertext);
 

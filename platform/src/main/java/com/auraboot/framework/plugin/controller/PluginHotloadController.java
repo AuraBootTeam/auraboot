@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.controller;
 
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
@@ -59,14 +60,16 @@ public class PluginHotloadController {
         }
 
         String filename = file.getOriginalFilename();
-        if (filename == null || !filename.endsWith(".jar")) {
+        try {
+            filename = PathSafetyUtils.requireSafeFileName(filename, ".jar", "plugin upload filename");
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(
                     HotloadResult.failure("Invalid file type", "Only JAR files are accepted"));
         }
 
         try {
             // Save file to plugins directory
-            Path targetPath = pluginManager.getPluginsRoot().resolve(filename);
+            Path targetPath = PathSafetyUtils.requireSafeChild(pluginManager.getPluginsRoot(), filename, "plugin upload target");
             Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
             log.info("Saved plugin JAR to: {}", targetPath);
 
