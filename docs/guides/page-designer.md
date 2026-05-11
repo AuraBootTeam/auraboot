@@ -1,6 +1,9 @@
-# Visual Page Builder (Page Designer)
+# Page Designer
 
-Build dynamic list, form, detail, and dashboard pages without writing code. The Page Designer provides a visual canvas where you drag blocks, configure properties, and publish pages -- all driven by your data models.
+Build dynamic list, form, and detail pages without writing code. Page Designer
+stores the same flat page DSL used by plugins and dynamic runtime pages.
+
+Dashboard pages use the separate Dashboard Designer at `/dashboard-designer`.
 
 ## Goal
 
@@ -18,7 +21,7 @@ AuraBoot pages use a **flat block-based DSL** stored in `ab_page_schema`:
 
 | Concept | Description | Values |
 |---------|-------------|--------|
-| `kind` | Page shape | `list`, `form`, `detail`, `dashboard` |
+| `kind` | Page shape | `list`, `form`, `detail` |
 | `blockType` | Content block inside a page | `table`, `filters`, `toolbar`, `form-section`, `chart`, `tabs`, `sub-table`, `stat-card`, `custom` |
 | `layout` | Arrangement strategy | `{ "type": "stack" }` or `{ "type": "grid", "cols": 12 }` |
 | `profile` | Rendering strategy | `admin`, `report` |
@@ -29,9 +32,12 @@ AuraBoot pages use a **flat block-based DSL** stored in `ab_page_schema`:
 
 ### 1. Open the Page Designer
 
-Navigate to **Settings > Page Designer** in the sidebar, or go directly to `/page-designer`.
+Navigate to **Settings > Page Designer** in the sidebar, or go directly to
+`/page-designer`.
 
-You will see a list of all existing page schemas. Click **Create Page** to start a new one.
+`/page-designer` redirects to the DSL-driven page schema list at
+`/p/page_schema`. From that list you can create a new page schema or open an
+existing row in the editor at `/page-designer/{pid}`.
 
 ### 2. Choose a Page Kind
 
@@ -40,13 +46,19 @@ Select the page kind from the dialog:
 - **List** -- Table view with filters, toolbar actions, and pagination
 - **Form** -- Create/edit form with field sections
 - **Detail** -- Read-only detail view with tabs and sub-tables
-- **Dashboard** -- Charts, stat cards, and data widgets
-
 For this example, select **List**.
 
-### 3. Understand the Canvas Layout
+### 3. Understand Editor Modes
 
-The Page Designer uses a **three-panel layout**:
+The editor mode depends on the page kind:
+
+| Page kind | Editor mode | Use it for |
+|-----------|-------------|------------|
+| `list` | Structured list configuration | Columns, filters, toolbar actions, row actions, saved views |
+| `detail` | Structured detail configuration | Header fields, sections, tabs, sub-tables, toolbar actions |
+| `form` | Block canvas | Form sections, field groups, custom blocks, preview layout |
+
+Form pages use the classic block canvas:
 
 ```
 +------------------+------------------------+-------------------+
@@ -65,19 +77,13 @@ The Page Designer uses a **three-panel layout**:
 +------------------+------------------------+-------------------+
 ```
 
-### 4. Add Blocks to the Canvas
+List and detail pages use focused configuration panels instead of the freeform
+block canvas. This keeps common CRUD setup faster and avoids requiring users to
+assemble the standard list shell by hand.
 
-Drag blocks from the **Block Palette** on the left onto the canvas:
+### 4. Configure List Columns
 
-1. **Filters block** -- Adds a filter bar at the top of the page
-2. **Toolbar block** -- Adds action buttons (Create, Export, Bulk Delete)
-3. **Table block** -- The main data table with columns
-
-A typical list page has all three blocks stacked vertically.
-
-### 5. Configure the Table Block
-
-Click the **Table** block on the canvas. The Property Panel on the right shows:
+Use the list editor's column configuration to map model fields to table columns.
 
 **Columns Configuration:**
 
@@ -110,9 +116,9 @@ Each column maps to a model field. Configure:
 }
 ```
 
-### 6. Configure the Toolbar Block
+### 5. Configure Toolbar Actions
 
-Click the **Toolbar** block to configure action buttons:
+Use the toolbar action configuration for page-level actions:
 
 ```json
 {
@@ -137,7 +143,7 @@ Click the **Toolbar** block to configure action buttons:
 
 > Action `type` must match the intended behavior: `navigate` for page navigation, `command` for executing a DSL command, `export` for data export.
 
-### 7. Configure the Filters Block
+### 6. Configure Filters
 
 ```json
 {
@@ -152,7 +158,7 @@ Click the **Toolbar** block to configure action buttons:
 }
 ```
 
-### 8. Page Settings
+### 7. Page Settings
 
 Click the **gear icon** in the toolbar to access page-level settings:
 
@@ -160,11 +166,15 @@ Click the **gear icon** in the toolbar to access page-level settings:
 - **Grid Configuration** -- Column count, row gap, column gap
 - **Multi-View Support** -- Enable `enableMultiView` for saved view tabs
 
-### 9. Preview and Publish
+### 8. Save, Preview, and Publish
 
 1. Click **Preview** in the toolbar to see a live rendering with real data
-2. If satisfied, click **Save** (auto-saves every few seconds)
-3. The page is accessible at `/p/{pageKey}` once the model is published
+2. Click **Save** to persist the current schema
+3. Click **Publish** when the page is ready for runtime users
+4. The page is accessible at `/p/{pageKey}` once it is published
+
+The editor may also show auto-save status. Treat **Publish** as the release step:
+runtime users should not rely on draft-only changes.
 
 ## Complete Example: List Page DSL
 
