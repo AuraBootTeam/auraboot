@@ -32,6 +32,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Default implementation of {@link AgentChatPort}.
@@ -60,6 +62,10 @@ import java.util.Set;
 public class AgentChatPortImpl implements AgentChatPort {
 
     private static final int MAX_TOOL_ROUNDS = 5;
+    private static final Pattern NAMED_QUERY_PARAM_PATTERN =
+            Pattern.compile("#\\{params\\.([A-Za-z0-9_]+)}");
+    private static final Set<String> NAMED_QUERY_SYSTEM_PARAMS =
+            Set.of("tenantId", "currentUserId", "currentUserPid", "page", "pageSize", "offset", "limit");
 
     /**
      * DC.2 (Q-DC.2=α): the caller-injected tool name that signals "hand off
@@ -555,10 +561,117 @@ public class AgentChatPortImpl implements AgentChatPort {
 
         for (String code : explicitCodes) {
             if (!byCode.containsKey(code)) {
-                log.warn("Explicit agent tool was not discoverable: agent={}, tool={}", agentCode, code);
+                ToolDefinition direct = loadDirectExplicitTool(tenantId, code);
+                if (direct != null) {
+                    byCode.putIfAbsent(code, direct);
+                } else {
+                    log.warn("Explicit agent tool was not discoverable: agent={}, tool={}", agentCode, code);
+                }
             }
         }
         return new ArrayList<>(byCode.values());
+    }
+
+    private ToolDefinition loadDirectExplicitTool(Long tenantId, String toolCode) {
+        if (toolCode == null || !toolCode.startsWith("nq:")) {
+            return null;
+        }
+        String queryCode = toolCode.substring("nq:".length());
+        try {
+            String sql = "SELECT code, title, description, purpose, from_sql, parameter_schema " +
+                    "FROM ab_named_query " +
+                    "WHERE tenant_id = #{params.tenantId} " +
+                    "AND code = #{params.queryCode} " +
+                    "AND status = 'published' " +
+                    "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
+                    "LIMIT 1";
+            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
+                    Map.of("tenantId", tenantId, "queryCode", queryCode));
+            if (rows == null || rows.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> row = rows.get(0);
+            String title = stringValue(row.get("title"));
+            String purpose = stringValue(row.get("purpose"));
+            String description = purpose != null ? purpose : stringValue(row.get("description"));
+            return ToolDefinition.builder()
+                    .toolCode(toolCode)
+                    .toolName(title != null ? title : queryCode)
+                    .description(description)
+                    .providerCode("dsl")
+                    .toolType("dsl_query")
+                    .sourceCode(queryCode)
+                    .riskLevel("L0")
+                    .confirmationPolicy("none")
+                    .requiresApproval(false)
+                    .requiresConfirmation(false)
+                    .parameterSchema(buildNamedQueryParameterSchema(
+                            row.get("parameter_schema"), row.get("from_sql")))
+                    .build();
+        } catch (Exception e) {
+            log.warn("Failed to load explicit named query tool {}: {}", queryCode, e.getMessage());
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> buildNamedQueryParameterSchema(Object rawParameterSchema, Object fromSql) {
+        Map<String, Object> parsed = parseJsonObject(rawParameterSchema);
+        if (isUsableObjectSchema(parsed)) {
+            return parsed;
+        }
+
+        Set<String> params = new LinkedHashSet<>();
+        if (fromSql != null) {
+            Matcher matcher = NAMED_QUERY_PARAM_PATTERN.matcher(String.valueOf(fromSql));
+            while (matcher.find()) {
+                String param = matcher.group(1);
+                if (!NAMED_QUERY_SYSTEM_PARAMS.contains(param)) {
+                    params.add(param);
+                }
+            }
+        }
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        for (String param : params) {
+            properties.put(param, Map.of("type", "string", "description", "NamedQuery parameter " + param));
+        }
+        return Map.of("type", "object", "properties", properties);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseJsonObject(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return (Map<String, Object>) map;
+        }
+        if (value == null) {
+            return Map.of();
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(text, Map.class);
+        } catch (Exception e) {
+            log.debug("Failed to parse explicit named query parameter schema: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private boolean isUsableObjectSchema(Map<String, Object> schema) {
+        Object properties = schema.get("properties");
+        return "object".equals(schema.get("type"))
+                && properties instanceof Map<?, ?> map
+                && !map.isEmpty();
+    }
+
+    private String stringValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value);
+        return text.isBlank() ? null : text;
     }
 
     private List<ToolDefinition> mergeExplicitTools(List<ToolDefinition> explicitTools,

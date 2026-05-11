@@ -20,4 +20,12 @@ public interface PluginValidator {
      * The category of this validator: "structural", "semantic", or "governance".
      */
     String category();
+
+    /**
+     * Whether this validator depends on external references such as installed
+     * plugins, command-handler registries, or cross-resource capability state.
+     */
+    default boolean requiresReferenceValidation() {
+        return false;
+    }
 }

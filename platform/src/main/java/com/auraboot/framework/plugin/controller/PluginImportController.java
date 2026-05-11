@@ -41,10 +41,12 @@ import com.auraboot.framework.common.constant.StatusConstants;
  * {
  *   "path": "/absolute/path/to/plugin-dir",
  *   "conflictStrategy": "overwrite",
+ *   "validateReferences": true,
  *   "autoPublishModels": true,
  *   "autoPublishFields": true,
  *   "autoPublishCommands": true,
- *   "autoPublishPages": true
+ *   "autoPublishPages": true,
+ *   "createResourcePermissions": true
  * }
  * }</pre>
  *
@@ -203,11 +205,13 @@ public class PluginImportController {
         inputParams.put("conflictStrategy",
                 request.getConflictStrategy() != null
                         ? request.getConflictStrategy().name() : "overwrite");
+        inputParams.put("validateReferences", request.getValidateReferences());
         inputParams.put("autoDeployProcesses", request.getAutoDeployProcesses());
         inputParams.put("autoPublishModels", request.getAutoPublishModels());
         inputParams.put("autoPublishFields", request.getAutoPublishFields());
         inputParams.put("autoPublishCommands", request.getAutoPublishCommands());
         inputParams.put("autoPublishPages", request.getAutoPublishPages());
+        inputParams.put("createResourcePermissions", request.getCreateResourcePermissions());
         inputParams.put("tenantId", ctx.getTenantId());
         inputParams.put("userId", ctx.getUserId());
         inputParams.put("userPid", ctx.getUserPid());
@@ -265,11 +269,13 @@ public class PluginImportController {
                 .conflictStrategy(request.getConflictStrategy() != null
                         ? request.getConflictStrategy()
                         : ImportRequest.ConflictStrategy.OVERWRITE)
+                .validateReferences(request.getValidateReferences())
                 .autoDeployProcesses(request.getAutoDeployProcesses())
                 .autoPublishModels(request.getAutoPublishModels())
                 .autoPublishFields(request.getAutoPublishFields())
                 .autoPublishCommands(request.getAutoPublishCommands())
                 .autoPublishPages(request.getAutoPublishPages())
+                .createResourcePermissions(request.getCreateResourcePermissions())
                 .build();
 
         ImportExecuteResult result = importService.execute(preview.getImportId(), importRequest);
@@ -287,11 +293,13 @@ public class PluginImportController {
         private String path;
         private ImportRequest.ConflictStrategy conflictStrategy;
         // Use Boolean wrappers so null = "not set by caller" (allows manifest defaults to apply)
+        private Boolean validateReferences;
         private Boolean autoDeployProcesses;
         private Boolean autoPublishModels;
         private Boolean autoPublishFields;
         private Boolean autoPublishCommands;
         private Boolean autoPublishPages;
+        private Boolean createResourcePermissions;
     }
 
     // ==================== Preview ====================

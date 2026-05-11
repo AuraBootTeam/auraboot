@@ -88,6 +88,17 @@ const CONTEXT_SUGGESTIONS: Record<string, Suggestion[]> = {
     },
   ],
 
+  // PCBA Quality
+  'list:qc_defect_record': [
+    {
+      icon: '⚠️',
+      label: 'Analyze anomalies',
+      labelZh: '生成质量异常分析',
+      prompt:
+        '请使用 qc_quality_anomaly_trend、qc_quality_batch_correlation 和 qc_quality_capa_context 分析近期 PCBA 质量异常趋势、批次关联和缺陷上下文，先给出证据表、根因假设和风险说明；只有我明确确认后，才生成 CAPA 草稿，不要自动放行、拒收、关闭或处置任何记录。',
+    },
+  ],
+
   // Project Management
   'detail:pm_project': [
     {
