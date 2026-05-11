@@ -1,9 +1,8 @@
 {
-  "version": "1.1",
-  "last_updated": "2026-04-19",
-  "_reconciliation_note": "AS OF 2026-05-10 the `plugins` array is OUT OF SYNC with the filesystem. plugins/ has 22 directories on FS but this manifest declares 6, only 2 of which exist. Tooling that consumes this file uses `test_paths[]` (oss-test.sh, playwright.oss.config.ts), so script behavior is unaffected — but `docs/community/oss-scope.md` references this manifest and any reader diffing it against the repo will catch the drift. PRE-LAUNCH OWNER ACTION: reconcile plugins[] against `ls plugins/`, decide which to declare as community-scope, bump version + last_updated.",
+  "version": "1.2",
+  "last_updated": "2026-05-10",
+  "_scope_note": "plugins[] lists distributable plugin packages that have plugin.json manifests and belong to the community source-available distribution. internal_test_plugins[] are tracked for automated test setup but excluded from default bootstrap and public demo/runtime profiles. tooling_dirs[] are directories under plugins/ that are not plugin packages.",
   "description": "Single source of truth for AuraBoot source-available scope. Defines which backend modules, plugins, and tests belong to the community distribution. Adjust this file when moving features between OSS and enterprise.",
-
   "platform_modules": [
     "application",
     "auth",
@@ -32,16 +31,34 @@
     "export",
     "observability"
   ],
-
   "plugins": [
-    "core-dashboard",
-    "core-auth",
-    "core-permission",
+    "agent-control-plane",
+    "asset-management",
+    "core-announcement",
+    "core-aurabot",
     "core-bpm",
-    "core-automation",
-    "page-manager"
+    "core-meta",
+    "crm-quick-start",
+    "crm-starter",
+    "golden-path",
+    "hr-essentials",
+    "org-management",
+    "page-manager",
+    "platform-admin",
+    "project-management",
+    "showcase",
+    "simple-inventory",
+    "workflow-demo"
   ],
-
+  "internal_test_plugins": [
+    "test-fixtures"
+  ],
+  "tooling_dirs": [
+    "acp-showcase",
+    "cli",
+    "schemas",
+    "scripts"
+  ],
   "test_paths": [
     "tests/e2e/auth/**",
     "tests/e2e/permission/**",
@@ -90,7 +107,6 @@
     "tests/e2e/agent-control-plane/**",
     "tests/e2e/showcase/**"
   ],
-
   "test_excludes": [
     "tests/e2e/dashboard/dashboard-designer.spec.ts",
     "tests/e2e/dashboard/dashboard-designer-deep.spec.ts",
@@ -113,19 +129,15 @@
     "tests/e2e/dashboard/dashboard.spec.ts",
     "tests/e2e/dashboard/dashboard-interactions.spec.ts",
     "tests/e2e/dashboard/dashboard-management.spec.ts",
-
     "tests/e2e/plugin/plugin-all-packages-smoke.spec.ts",
     "tests/e2e/organization/member-detail.spec.ts",
     "tests/e2e/organization/org-department.spec.ts",
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts",
     "tests/e2e/user/user-management.spec.ts",
-
     "tests/e2e/bpm/bpm-form-integration.spec.ts",
-
     "tests/e2e/aurabot/pcba-procurement-agent-entry.spec.ts",
     "tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts"
   ],
-
   "test_excludes_rationale": {
     "_note": "Explanations for each entry in test_excludes. Plain-string exclusion list is what the playwright.oss.config.ts runner consumes; this map is metadata only.",
     "tests/e2e/dashboard/dashboard-designer.spec.ts": "[A] enterprise Dashboard Designer",
@@ -135,14 +147,14 @@
     "tests/e2e/dashboard/dashboard-export.spec.ts": "[A] dashboard export enterprise",
     "tests/e2e/designer/dashboard-designer-deep.spec.ts": "[A] enterprise Dashboard Designer",
     "tests/e2e/designer/report-designer-deep.spec.ts": "[A] enterprise Report Designer",
-    "tests/e2e/plugin/pm-error-branches.spec.ts": "[A] project-management plugin (enterprise)",
-    "tests/e2e/plugin/pm-master-data.spec.ts": "[A] project-management plugin (enterprise)",
-    "tests/e2e/plugin/pm-member-management.spec.ts": "[A] project-management plugin (enterprise)",
-    "tests/e2e/plugin/pm-my-tasks.spec.ts": "[A] project-management plugin (enterprise)",
-    "tests/e2e/plugin/pm-project-lifecycle.spec.ts": "[A] project-management plugin (enterprise)",
-    "tests/e2e/plugin/pm-smoke.spec.ts": "[A] project-management plugin (enterprise)",
-    "tests/e2e/plugin/pm-task-associations.spec.ts": "[A] project-management plugin (enterprise)",
-    "tests/e2e/plugin/pm-workspace-interactions.spec.ts": "[A] project-management plugin (enterprise)",
+    "tests/e2e/plugin/pm-error-branches.spec.ts": "[A] full project-management plugin (enterprise; not the OSS tpm template)",
+    "tests/e2e/plugin/pm-master-data.spec.ts": "[A] full project-management plugin (enterprise; not the OSS tpm template)",
+    "tests/e2e/plugin/pm-member-management.spec.ts": "[A] full project-management plugin (enterprise; not the OSS tpm template)",
+    "tests/e2e/plugin/pm-my-tasks.spec.ts": "[A] full project-management plugin (enterprise; not the OSS tpm template)",
+    "tests/e2e/plugin/pm-project-lifecycle.spec.ts": "[A] full project-management plugin (enterprise; not the OSS tpm template)",
+    "tests/e2e/plugin/pm-smoke.spec.ts": "[A] full project-management plugin (enterprise; not the OSS tpm template)",
+    "tests/e2e/plugin/pm-task-associations.spec.ts": "[A] full project-management plugin (enterprise; not the OSS tpm template)",
+    "tests/e2e/plugin/pm-workspace-interactions.spec.ts": "[A] full project-management plugin (enterprise; not the OSS tpm template)",
     "tests/e2e/plugin/pcba-plugin.spec.ts": "[A] pcba-manufacturing plugin (enterprise)",
     "tests/e2e/aurabot/pcba-procurement-agent-entry.spec.ts": "[A] pcba-procurement plugin is enterprise (auraboot-enterprise/plugins/pcba-procurement) — spec navigates to PCBA ERP sidebar + /p/pe_procurement_comparison which only exist in enterprise overlay.",
     "tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts": "[A] same pcba-procurement enterprise plugin; create-draft / L3-approval / reject-draft flows all go through PCBA ERP nav and pe_procurement_comparison commands, none of which ship in OSS.",
@@ -151,26 +163,34 @@
     "tests/e2e/dashboard/dashboard.spec.ts": "[A] enterprise dashboard features",
     "tests/e2e/dashboard/dashboard-interactions.spec.ts": "[A] enterprise dashboard features",
     "tests/e2e/dashboard/dashboard-management.spec.ts": "[A] enterprise dashboard features",
-
     "tests/e2e/plugin/plugin-all-packages-smoke.spec.ts": "[A] asserts 14 enterprise plugins installed (annual-plan, dual-prevention, asset-management, crm non-starter, sales, procurement, inventory, finance, quality, pcba-manufacturing, pcba-solution, project-management, quarry-industry); only e2e-test-order overlaps OSS. All 13 cases fail in OSS.",
     "tests/e2e/organization/member-detail.spec.ts": "[A] references /dynamic/tenant-member route not shipped in OSS (all 3 cases fail).",
     "tests/e2e/organization/org-department.spec.ts": "[A] 1/5 cases (create-department-via-...) uses enterprise-only field; whole file excluded because playwright.oss.config.ts filter is file-path level only — 4 passing sibling cases lost. See per_case_excludes_todo.",
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts": "[A] CS-007 column-order persistence relies on enterprise wiring; whole file excluded (7 passing siblings lost). See per_case_excludes_todo.",
     "tests/e2e/user/user-management.spec.ts": "[A] UM-006/UM-007 role assignment/list are enterprise; whole file excluded (9 passing siblings lost). See per_case_excludes_todo.",
-
     "tests/e2e/bpm/bpm-form-integration.spec.ts": "[A] BFI-004 asserts /api/inbox endpoint; unified Inbox API lives in enterprise platform only. OSS backend has no /api/inbox controller."
   },
-
   "per_case_excludes_todo": {
     "_note": "The current playwright.oss.config.ts filter operates at file path level only. These are the specific failing cases we actually want to skip; their sibling cases in the same files currently pass but are excluded along with them. When scope filter gains per-title support, move the file back into test_paths and list individual case titles here.",
     "category_A_enterprise_only": [
-      { "file": "tests/e2e/organization/org-department.spec.ts", "case": "create-department-via-* (enterprise-only field)" },
-      { "file": "tests/e2e/saved-view/saved-view-column-settings.spec.ts", "case": "CS-007 column-order persistence" },
-      { "file": "tests/e2e/user/user-management.spec.ts", "case": "UM-006 role assignment" },
-      { "file": "tests/e2e/user/user-management.spec.ts", "case": "UM-007 role list" }
+      {
+        "file": "tests/e2e/organization/org-department.spec.ts",
+        "case": "create-department-via-* (enterprise-only field)"
+      },
+      {
+        "file": "tests/e2e/saved-view/saved-view-column-settings.spec.ts",
+        "case": "CS-007 column-order persistence"
+      },
+      {
+        "file": "tests/e2e/user/user-management.spec.ts",
+        "case": "UM-006 role assignment"
+      },
+      {
+        "file": "tests/e2e/user/user-management.spec.ts",
+        "case": "UM-007 role list"
+      }
     ]
   },
-
   "excluded_paths_examples": [
     "tests/e2e/crm/**",
     "tests/e2e/sales/**",

@@ -148,7 +148,7 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
         // have to corrupt the live DB to provoke an error. This proves the
         // ERROR-routing logic in BootstrapStartupRunner.run().
         BootstrapRepairService stub = new BootstrapRepairService(
-                null, null, null, null, null, null, null, null, null, null) {
+                null, null, null, null, null, null, null, null, null, null, null) {
             @Override
             public RepairReport repairAll(BootstrapRepairService.RepairOptions opts) {
                 return RepairReport.from(List.of(
@@ -168,7 +168,7 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
     @DisplayName("non-fatal builtin_plugins ERROR does NOT fail startup")
     void runner_onPluginOnlyError_continues() throws Exception {
         BootstrapRepairService stub = new BootstrapRepairService(
-                null, null, null, null, null, null, null, null, null, null) {
+                null, null, null, null, null, null, null, null, null, null, null) {
             @Override
             public RepairReport repairAll(BootstrapRepairService.RepairOptions opts) {
                 return RepairReport.from(List.of(
