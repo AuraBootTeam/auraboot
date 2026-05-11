@@ -186,6 +186,8 @@ public class MobileSearchController {
                 || normalized.equals("tenant_id")
                 || normalized.equals("created_at")
                 || normalized.equals("updated_at")
+                || normalized.equals("created_by")
+                || normalized.equals("updated_by")
                 || normalized.equals("deleted");
     }
 }
