@@ -1,5 +1,6 @@
 package com.auraboot.framework.aurabot.service;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.port.GroundingPort;
 import com.auraboot.framework.agent.port.ToolDiscoveryPort;
@@ -42,6 +43,7 @@ public class ChatToolResolver {
     private final SkillPackActivator skillPackActivator;
     private final Map<String, Boolean> discoveredToolReadOnlyByName = new ConcurrentHashMap<>();
     private final Map<String, String> discoveredProviderToolCodeByName = new ConcurrentHashMap<>();
+    private final Map<String, AgentToolDefinition> discoveredAgentToolByName = new ConcurrentHashMap<>();
 
     @Autowired
     public ChatToolResolver(
@@ -163,6 +165,15 @@ public class ChatToolResolver {
         return discoveredProviderToolCodeByName.get(toolName);
     }
 
+    /**
+     * Return the canonical tool definition for a sanitized LLM tool name.
+     * Execution callers pass this directly to ToolLoopService.
+     */
+    public AgentToolDefinition getAgentToolDefinition(String toolName) {
+        if (toolName == null) return null;
+        return discoveredAgentToolByName.get(toolName);
+    }
+
     // ==================== Platform Tool Injection ====================
 
     /** Platform form extraction should always be available regardless of grounding result. */
@@ -217,6 +228,8 @@ public class ChatToolResolver {
         if (!hasDomainReadTool(tools) && !existing.contains(PLATFORM_EXECUTE_SQL_TOOL.getName())) {
             tools.add(PLATFORM_EXECUTE_SQL_TOOL);
         }
+        cacheSyntheticPlatformTool(PLATFORM_FILL_FORM_TOOL, "platform.fill_form", true, "L1");
+        cacheSyntheticPlatformTool(PLATFORM_EXECUTE_SQL_TOOL, "platform.execute_sql", true, "L1");
     }
 
     private void removeSqlFallbackWhenDomainReadToolAvailable(List<LlmChatRequest.Tool> tools) {
@@ -246,6 +259,7 @@ public class ChatToolResolver {
         String llmName = toolDef.code().replace(':', '_').replace('.', '_');
         discoveredToolReadOnlyByName.put(llmName, toolDef.readOnly());
         discoveredProviderToolCodeByName.put(llmName, toolDef.code());
+        discoveredAgentToolByName.put(llmName, toAgentToolDefinition(toolDef));
         String desc = toolDef.description();
         if (toolDef.name() != null && !toolDef.name().isBlank() && !toolDef.name().equals(toolDef.code())) {
             desc = desc + " (" + toolDef.name() + ")";
@@ -255,5 +269,80 @@ public class ChatToolResolver {
                 .description(desc)
                 .inputSchema(toolDef.inputSchema())
                 .build();
+    }
+
+    private void cacheSyntheticPlatformTool(LlmChatRequest.Tool tool,
+                                            String providerToolCode,
+                                            boolean readOnly,
+                                            String riskLevel) {
+        discoveredToolReadOnlyByName.put(tool.getName(), readOnly);
+        discoveredProviderToolCodeByName.put(tool.getName(), providerToolCode);
+        discoveredAgentToolByName.put(tool.getName(), AgentToolDefinition.builder()
+                .name(providerToolCode)
+                .description(tool.getDescription())
+                .inputSchema(tool.getInputSchema())
+                .toolType("platform")
+                .sourceCode(providerToolCode)
+                .riskLevel(riskLevel)
+                .confirmationPolicy("none")
+                .requiresApproval(false)
+                .requiresConfirmation(false)
+                .build());
+    }
+
+    private AgentToolDefinition toAgentToolDefinition(ToolDiscoveryPort.ToolDef toolDef) {
+        String toolCode = toolDef.code();
+        String toolType = canonicalToolType(toolDef);
+        String sourceCode = canonicalSourceCode(toolDef, toolType);
+        return AgentToolDefinition.builder()
+                .name(toolCode)
+                .description(toolDef.description())
+                .inputSchema(toolDef.inputSchema())
+                .toolType(toolType)
+                .sourceCode(sourceCode)
+                .requiresApproval(toolDef.requiresApproval())
+                .requiresConfirmation(toolDef.requiresConfirmation())
+                .riskLevel(toolDef.riskLevel())
+                .confirmationPolicy(toolDef.confirmationPolicy())
+                .build();
+    }
+
+    private String canonicalToolType(ToolDiscoveryPort.ToolDef toolDef) {
+        String code = toolDef.code();
+        if (code != null && code.startsWith("aurabot:")) {
+            return "AURABOT_SKILL";
+        }
+        if (code != null && (code.startsWith("cmd:")
+                || code.startsWith("nq:")
+                || code.startsWith("list:")
+                || code.startsWith("get:"))) {
+            return "built_in";
+        }
+        if (toolDef.toolType() != null && !toolDef.toolType().isBlank()) {
+            return toolDef.toolType();
+        }
+        return inferProviderToolType(code);
+    }
+
+    private String canonicalSourceCode(ToolDiscoveryPort.ToolDef toolDef, String toolType) {
+        String code = toolDef.code();
+        if ("AURABOT_SKILL".equals(toolType) && code != null && code.startsWith("aurabot:")) {
+            return code.substring("aurabot:".length());
+        }
+        if ("built_in".equals(toolType)) {
+            return code;
+        }
+        if (toolDef.sourceCode() != null && !toolDef.sourceCode().isBlank()) {
+            return toolDef.sourceCode();
+        }
+        return code;
+    }
+
+    private String inferProviderToolType(String toolCode) {
+        if (toolCode == null) return "built_in";
+        if (toolCode.startsWith("platform.")) return "platform";
+        if (toolCode.startsWith("custom:")) return "custom";
+        if (toolCode.startsWith("mcp:")) return "mcp";
+        return "built_in";
     }
 }

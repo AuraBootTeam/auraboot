@@ -73,7 +73,7 @@ class AuraBotSkillToolProviderIntegrationTest extends BaseIntegrationTest {
         // Grant the union of perms required by all built-in skills so the full
         // catalog surfaces.
         currentPermissions.addAll(Set.of(
-                "MODEL.READ", "MODEL.CREATE", "MODEL.UPDATE", "FIELD.CREATE"));
+                "meta.model.read", "meta.model.update", "meta.field.update"));
 
         ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
                 .tenantId(getTestTenant().getId())
@@ -85,11 +85,11 @@ class AuraBotSkillToolProviderIntegrationTest extends BaseIntegrationTest {
         assertThat(tools).isNotEmpty();
         assertThat(tools).allMatch(t -> t.getToolCode().startsWith("aurabot:"));
         assertThat(tools).extracting(ToolDefinition::getToolName)
-                .contains("model:query"); // LOW skill, requires MODEL.READ
+                .contains("model:query"); // LOW skill, requires meta.model.read
     }
 
     @Test
-    @DisplayName("discover filters by user permissions — model:create absent without MODEL.CREATE")
+    @DisplayName("discover filters by user permissions — model:create absent without meta.model.update")
     void discover_filtersByPermission() {
         // Empty perms: model:create / field:add (which need extra perms) must NOT surface.
         // (echo / no-perm skills are still allowed; we only assert exclusions.)
@@ -110,7 +110,7 @@ class AuraBotSkillToolProviderIntegrationTest extends BaseIntegrationTest {
     @DisplayName("ToolDefinition risk + confirmation flags reflect skill metadata")
     void discover_riskMappingCorrect() {
         currentPermissions.addAll(Set.of(
-                "MODEL.READ", "MODEL.CREATE", "MODEL.UPDATE", "FIELD.CREATE"));
+                "meta.model.read", "meta.model.update", "meta.field.update"));
 
         ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
                 .tenantId(getTestTenant().getId()).userId(1L).build();

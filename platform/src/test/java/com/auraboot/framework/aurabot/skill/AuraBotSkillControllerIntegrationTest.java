@@ -182,7 +182,7 @@ class AuraBotSkillControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data").isArray())
                 // echo has no required perms → must surface
                 .andExpect(jsonPath("$.data[?(@.name=='echo')]").exists())
-                // model:query requires MODEL.READ which the user lacks → must NOT surface
+                // model:query requires meta.model.read which the user lacks → must NOT surface
                 .andExpect(jsonPath("$.data[?(@.name=='model:query')]").doesNotExist());
     }
 
@@ -290,9 +290,9 @@ class AuraBotSkillControllerIntegrationTest extends BaseIntegrationTest {
 
     // ─── Case 6 ──────────────────────────────────────────────────────────────
     @Test
-    @DisplayName("Case 6: POST /skill/execute model:query without MODEL.READ → 403 PERMISSION_DENIED")
+    @DisplayName("Case 6: POST /skill/execute model:query without meta.model.read → 403 PERMISSION_DENIED")
     void case6_modelQueryWithoutPermission_403() throws Exception {
-        currentPermissions.clear(); // no MODEL.READ
+        currentPermissions.clear(); // no meta.model.read
 
         ObjectNode params = objectMapper.createObjectNode()
                 .put("modelCode", "it-aurabot-some-model");

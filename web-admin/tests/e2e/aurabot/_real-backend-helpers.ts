@@ -2,7 +2,7 @@
  * Real-backend helpers for Learning Loop / Interrupt E2E (PR-64).
  *
  * These tests drive the live Spring Boot backend on :6443 instead of
- * stubbing API routes. They seed rows directly via `psql` (bypassing
+ * stubbing API routes. They seed rows directly via node-postgres (bypassing
  * auth token minting) and verify results by hitting the read endpoints
  * AND cross-checking DB state.
  *
@@ -11,8 +11,7 @@
  * by the tenant interceptor.
  */
 
-import { execSync } from 'node:child_process';
-import { PSQL_BASE } from '../../helpers/pg-env';
+import { execFileSync, execSync } from 'node:child_process';
 import { BACKEND_URL } from '../../helpers/playwright-env';
 
 // Admin primary tenant — matches the JWT issued by
@@ -30,8 +29,7 @@ function resolveAdminTenantId(): string {
     // Hardcoding :6443 made every docker-stack run silently fall back to
     // the host-DB tenant id, which then propagated into every menu /
     // seeded row insert and tripped FK violations on docker DB.
-    const backendUrl =
-      BACKEND_URL;
+    const backendUrl = BACKEND_URL;
     const out = execSync(
       `curl -s -X POST ${backendUrl}/api/auth/login -H 'Content-Type: application/json' ` +
         `-d '{"email":"admin@example.com","password":"Test2026x"}'`,
@@ -63,13 +61,7 @@ export const ADMIN_TENANT_ID = resolveAdminTenantId();
 function resolveAiCenterMenuId(): string {
   try {
     const sql = `SELECT DISTINCT parent_id FROM ab_menu WHERE tenant_id = ${ADMIN_TENANT_ID} AND path LIKE '/aurabot/%' AND parent_id IS NOT NULL LIMIT 1;`;
-    const id = execSync(`psql ${PG_FLAGS} -tA`, {
-      input: sql,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: PG_ENV,
-    })
-      .toString()
-      .trim();
+    const id = psql(sql);
     return id || '303848987541245952';
   } catch (e) {
     return '303848987541245952';
@@ -77,56 +69,88 @@ function resolveAiCenterMenuId(): string {
 }
 
 // ---------------------------------------------------------------------------
-// psql helpers — must be env-aware. Hardcoded `-h localhost -U ghj -d aura_boot`
+// SQL helpers — must be env-aware. Hardcoded `-h localhost -U ghj -d aura_boot`
 // works for host-mode dev (postgres on :5432) but fails on isolated docker
 // stacks (auraboot-ga-e2e on :5433 user auraboot, auraboot-r2 on :5434, etc.).
-// Read PGHOST/PGPORT/PGUSER/PGDATABASE env (the standard libpq vars) so the
+// Read PGHOST/PGPORT/PGUSER/PGDATABASE env (and AuraBoot PG_* aliases) so the
 // same helpers work across stacks. Defaults remain the host-dev shape so
 // historic local runs keep working without env setup.
+//
+// Use node-postgres through a tiny synchronous Node subprocess instead of the
+// `psql` CLI. The Playwright frontend container intentionally has Node
+// dependencies but no shell database client.
 // Canonical pattern documented in
 // `auraboot-enterprise/.../feedback_psql_helpers_must_be_env_aware.md`.
 // ---------------------------------------------------------------------------
 
-const PG_HOST = process.env.PGHOST || 'localhost';
-const PG_PORT = process.env.PGPORT || '5432';
-const PG_USER = process.env.PGUSER || 'ghj';
-const PG_DB = process.env.PGDATABASE || 'aura_boot';
-const PG_FLAGS = `-h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB} -P pager=off -v ON_ERROR_STOP=1`;
+const PG_HOST = process.env.PGHOST || process.env.PG_HOST || 'localhost';
+const PG_PORT = process.env.PGPORT || process.env.PG_PORT || '5432';
+const PG_USER = process.env.PGUSER || process.env.PG_USER || 'ghj';
+const PG_DB = process.env.PGDATABASE || process.env.PG_DB || 'aura_boot';
 // PGPASSWORD is the standard libpq env — pass it through if set so docker
 // stacks with non-trust auth can connect. Don't override if the operator
 // has already set it.
-const PG_ENV = process.env['PGPASSWORD']
-  ? { ...process.env, PGPASSWORD: process.env['PGPASSWORD'] }
-  : process.env;
+const PG_ENV = {
+  ...process.env,
+  PGHOST: PG_HOST,
+  PGPORT: PG_PORT,
+  PGUSER: PG_USER,
+  PGDATABASE: PG_DB,
+  PGPASSWORD: process.env.PGPASSWORD || process.env.PG_PASSWORD || '',
+};
 
 export const AI_CENTER_MENU_ID = resolveAiCenterMenuId();
 
 function psql(sql: string): string {
-  // Pipe the SQL via stdin so we can ship multi-line templates (contract_yaml
-  // needs real \n characters) without worrying about shell quoting. -tA keeps
-  // the output aligned-free and tuples-only so the caller can parse it.
-  return execSync(`psql ${PG_FLAGS} -tA`, {
-    input: sql,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: PG_ENV,
-  })
-    .toString()
-    .trim();
+  return runPgSync(sql);
 }
 
 /**
- * Like `psql` but adds -q to suppress command tags (BEGIN/COMMIT/INSERT
- * status lines) from stdout — required when running multi-statement
- * transactional batches whose only meaningful output is a SELECT tuple.
+ * Kept as a semantic alias for call sites that only need SELECT rows from a
+ * multi-statement transactional batch.
  */
 function psqlQuiet(sql: string): string {
-  return execSync(`psql ${PG_FLAGS} -qtA`, {
+  return runPgSync(sql);
+}
+
+function runPgSync(sql: string): string {
+  const runner = `
+const { Client } = require('pg');
+
+let sql = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => { sql += chunk; });
+process.stdin.on('end', async () => {
+  const client = new Client({
+    host: process.env.PGHOST || 'localhost',
+    port: Number(process.env.PGPORT || '5432'),
+    user: process.env.PGUSER || 'ghj',
+    database: process.env.PGDATABASE || 'aura_boot',
+    password: process.env.PGPASSWORD || undefined,
+  });
+  try {
+    await client.connect();
+    const result = await client.query(sql);
+    const rows = Array.isArray(result)
+      ? result.flatMap(item => item.rows || [])
+      : (result.rows || []);
+    const out = rows
+      .map(row => Object.values(row).map(value => value == null ? '' : String(value)).join('|'))
+      .join('\\n');
+    process.stdout.write(out);
+  } catch (error) {
+    console.error(error && error.stack ? error.stack : String(error));
+    process.exitCode = 1;
+  } finally {
+    await client.end().catch(() => {});
+  }
+});
+`;
+  return execFileSync(process.execPath, ['-e', runner], {
     input: sql,
-    stdio: ['pipe', 'pipe', 'pipe'],
+    encoding: 'utf8',
     env: PG_ENV,
-  })
-    .toString()
-    .trim();
+  }).trim();
 }
 
 function randomPid(prefix: string): string {
@@ -332,7 +356,7 @@ function upsertMenu(args: {
   // lock key; pg_advisory_xact_lock blocks any second worker trying to
   // upsert the same path until the first commits, after which the
   // second worker sees the row in `existing` and short-circuits.
-  // psql defaults to statement-level auto-commit, so wrap the batch in
+  // PostgreSQL defaults to statement-level auto-commit, so wrap the batch in
   // explicit BEGIN/COMMIT so the lock, check, and insert share one tx.
   const raw = psqlQuiet(
     `BEGIN;
@@ -359,7 +383,7 @@ function upsertMenu(args: {
      ) s;
      COMMIT;`,
   );
-  // psql -tA emits columns separated by '|'.
+  // runPgSync emits columns separated by '|'.
   const [id, origin] = raw.split('|');
   return { id, didInsert: origin === 'ins' };
 }
@@ -616,7 +640,7 @@ export function dbMemoryIsDeleted(memoryPid: string): boolean {
   const raw = psql(
     `SELECT deleted_flag FROM ab_agent_memory WHERE pid = '${memoryPid}';`,
   );
-  return raw === 't';
+  return raw === 't' || raw === 'true';
 }
 
 /** Delete seeded promotions + their back-linked memories by pid prefix. */

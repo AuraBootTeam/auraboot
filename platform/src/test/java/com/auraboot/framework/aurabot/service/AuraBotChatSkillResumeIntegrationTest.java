@@ -58,8 +58,8 @@ import static org.mockito.Mockito.when;
  *   <li>{@code lowSkill_endToEnd} — LOW skill via {@code aurabot:} prefix
  *       returns inline {@code {success:true, data:...}}, no PendingTool.</li>
  *   <li>{@code highSkill_happyPath} — HIGH skill suspends → resume(APPROVED)
- *       executes {@code SkillToolExecutor.confirm} and persists ab_meta_model
- *       row.</li>
+ *       confirms through the canonical ToolLoopService path and persists
+ *       ab_meta_model row.</li>
  *   <li>{@code highSkill_cancel} — resume(CANCELLED) short-circuits before
  *       touching the skill: ab_meta_model row never created.</li>
  *   <li>{@code expiredToken} — resume(APPROVED) with a forcibly-evicted
@@ -70,7 +70,8 @@ import static org.mockito.Mockito.when;
  * <p>Strategy B (per plan §Task 6 Step 4): we drive {@code resumeTurn}
  * directly rather than going through {@code POST /chat/stream}. The first-leg
  * suspension is covered by unit tests
- * ({@link ChatToolExecutorAuraBotBranchTest}); T6's contract is the resume
+ * ({@link com.auraboot.framework.agent.service.AgentChatPortImplToolLoopTest});
+ * T6's contract is the resume
  * pipeline. A {@link MockBean LlmProviderFactory} returns a stub provider so
  * the post-confirm continuation loop terminates with {@code end_turn} on the
  * very first call — we don't need a real LLM to verify the chokepoint.
@@ -129,7 +130,8 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
         LlmProvider stubProvider = new EndTurnStubProvider();
         when(llmProviderFactory.getProvider(anyString())).thenReturn(stubProvider);
 
-        testModelCode = "it_c5t6_" + UniqueIdGenerator.generate().toLowerCase().substring(0, 8);
+        String id = UniqueIdGenerator.generate().toLowerCase();
+        testModelCode = "it_c5t6_" + id.substring(Math.max(0, id.length() - 8));
     }
 
     @AfterEach
@@ -156,10 +158,10 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("LOW skill: aurabot:model:query executes inline through chat tool executor")
     void lowSkill_endToEnd_inlineExecute() {
-        currentPermissions.add("MODEL.READ");
+        currentPermissions.add("meta.model.read");
 
-        // T4 wired aurabot: prefix → SkillToolExecutor.dispatch. LOW returns
-        // EXECUTED, ChatToolExecutor packages as {success:true, data:...}.
+        // aurabot: prefix now resolves to an AuraBot skill ToolLoopService call.
+        // LOW returns EXECUTED and ChatToolExecutor packages {success:true, data:...}.
         // No suspend, no PendingTool — that's the contract.
         Map<String, Object> input = Map.of("keyword", "no-such-model-xyz");
         Map<String, Object> envelope = chatToolExecutor.execute(
@@ -174,11 +176,11 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
 
     // ─── Case 2: HIGH skill happy path — resume(APPROVED) confirms + writes ───
     @Test
-    @DisplayName("HIGH skill happy path: resume(APPROVED) calls confirm() and persists ab_meta_model")
+    @DisplayName("HIGH skill happy path: resume(APPROVED) confirms through ToolLoopService and persists ab_meta_model")
     void highSkill_happyPath_confirmAndPersist() {
-        currentPermissions.add("MODEL.CREATE");
+        currentPermissions.add("meta.model.update");
 
-        // 1) Suspend leg (simulate what T5 wiring does in the chat loop):
+        // 1) Suspend leg (simulate what canonical chat-loop wiring does):
         //    dispatch the HIGH skill to mint a real preview token, then seed a
         //    PendingTool carrying the _aurabot_skill marker.
         ObjectNode params = objectMapper.createObjectNode()
@@ -200,14 +202,14 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
         Map<String, Object> input = objectMapper.convertValue(params,
                 new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
 
-        String turnId = "turn-c5t6-happy-" + UniqueIdGenerator.generate();
+        String turnId = UniqueIdGenerator.generate();
         String toolId = "tool-" + UniqueIdGenerator.generate();
         seedPendingSkillTool(turnId, toolId, "model:create",
                 input, previewToken, "high", previewPayloadOf(pending));
 
         // 2) Resume(APPROVED) — chokepoint dispatches to
         //    AuraBotChatService.resumeApprovedTurnFromPending → executeResumeTool
-        //    → SkillToolExecutor.confirm with our token.
+        //    → ChatToolExecutor.confirmAuraBotSkill → ToolLoopService.confirmAuraBotSkill.
         CapturingSink sink = new CapturingSink();
         TurnOutcome outcome = turnService.resumeTurn(turnId, ConfirmDecision.APPROVED, sink);
 
@@ -242,7 +244,7 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("HIGH skill cancel: resume(CANCELLED) interrupts before confirm; no DDL")
     void highSkill_cancel_doesNotPersist() {
-        currentPermissions.add("MODEL.CREATE");
+        currentPermissions.add("meta.model.update");
 
         ObjectNode params = objectMapper.createObjectNode()
                 .put("code", testModelCode)
@@ -256,7 +258,7 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
 
         Map<String, Object> input = objectMapper.convertValue(params,
                 new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        String turnId = "turn-c5t6-cancel-" + UniqueIdGenerator.generate();
+        String turnId = UniqueIdGenerator.generate();
         String toolId = "tool-" + UniqueIdGenerator.generate();
         seedPendingSkillTool(turnId, toolId, "model:create",
                 input, previewToken, "high", previewPayloadOf(pending));
@@ -282,7 +284,7 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Expired token: resume(APPROVED) surfaces success=false envelope; no persist")
     void expiredToken_resumeYieldsErrorEnvelope() {
-        currentPermissions.add("MODEL.CREATE");
+        currentPermissions.add("meta.model.update");
 
         ObjectNode params = objectMapper.createObjectNode()
                 .put("code", testModelCode)
@@ -302,7 +304,7 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
         // which executeResumeTool catches and converts to {success:false,...}.
         redisTemplate.delete(PreviewTokenStore.KEY_PREFIX + previewToken);
 
-        String turnId = "turn-c5t6-expired-" + UniqueIdGenerator.generate();
+        String turnId = UniqueIdGenerator.generate();
         String toolId = "tool-" + UniqueIdGenerator.generate();
         seedPendingSkillTool(turnId, toolId, "model:create",
                 input, previewToken, "high", previewPayloadOf(pending));

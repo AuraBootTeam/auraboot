@@ -6,29 +6,13 @@
  *                 → registered as resource `aurabot.admin.runs` at /admin/agent-runs
  *                 (web-admin/app/plugins/core-aurabot/resources.ts)
  *
- * BLOCKER (PRODUCT BUG FOUND BY THIS SPEC, OUT OF T2 SCOPE TO FIX):
- *   AgentRunController.RUN_ROW_MAPPER (platform/.../AgentRunController.java:302)
- *   does `(Long) rs.getObject("duration_ms")` but ab_agent_run.duration_ms is
- *   INTEGER in schema.sql, so PostgreSQL JDBC returns Integer → crash. Any
- *   admin agent-runs query that hits even one row with non-null duration_ms
- *   returns 500 with `ClassCastException`. Workaround: this spec ALWAYS seeds
- *   duration_ms=NULL and relies on the controller's fallback derivation
- *   (Duration.between(createdAt, completedAt)). Fix is one line:
- *     -  Long storedDuration = (Long) rs.getObject("duration_ms");
- *     +  Number storedDuration = (Number) rs.getObject("duration_ms");
- *     -  durationMs = storedDuration;
- *     +  durationMs = storedDuration.longValue();
- *   Reported in the T2 deliverable's "Blockers" section so the controller can
- *   land a follow-up backend fix; this spec passes against the current source
- *   only because every seeded run avoids the buggy code branch.
- *
  * Why this spec exists:
  *   `94b97ad6` shipped the page + a vitest covering the React wiring
  *   (web-admin/app/plugins/core-aurabot/__tests__/AgentRunsPage.test.tsx),
  *   but no Playwright covered the sidebar→list→drawer→user-action chain
  *   end-to-end against a live backend. This spec drives the real Spring
  *   Boot REST endpoints on :6443 with rows seeded directly into
- *   ab_agent_run / ab_agent_action / ab_agent_bif via psql.
+ *   ab_agent_run / ab_agent_action / ab_agent_bif via node-postgres.
  *
  * 14-dimension coverage (per docs/standards/core/testing-e2e-web.md):
  *   D1 menu nav (sidebar click, NOT page.goto direct nav)
@@ -53,19 +37,16 @@
  *   - UI ops (page.click / locator.click) > page.request count
  *   - Specific value assertions, never "toBeVisible"-only on primary data
  *
- * Test data lifecycle: seed via psql in beforeAll; do NOT cleanup in
+ * Test data lifecycle: seed via node-postgres in beforeAll; do NOT cleanup in
  * afterAll (memory feedback_save_test_output / testing-e2e-web.md
  * "测试痕迹" rule). Centralised teardown in tests/global-teardown.ts
  * deletes E2EM_* / E2ELR_* / E2ELA_* / E2ELB_* prefixed rows.
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import { execSync } from 'node:child_process';
-import { PSQL_BASE } from '../../helpers/environments';
-import {
-  ADMIN_TENANT_ID,
-  AI_CENTER_MENU_ID,
-} from './_real-backend-helpers';
+import { Client } from 'pg';
+import { randomUUID } from 'crypto';
+import { ADMIN_TENANT_ID } from './_real-backend-helpers';
 
 // ---------------------------------------------------------------------------
 // Constants — pid prefixes are unique per spec so global teardown can target
@@ -76,7 +57,11 @@ const RUN_PREFIX = 'E2ELR'; // ab_agent_run
 const ACTION_PREFIX = 'E2ELA'; // ab_agent_action
 const BIF_PREFIX = 'E2ELB'; // ab_agent_bif
 const INTERRUPT_PREFIX = 'E2ELI'; // ab_agent_interrupt_log
+const TASK_PREFIX = 'E2ELT'; // ab_agent_task
+const TURN_PREFIX = 'E2ELU'; // conversation turn metadata
+const CONVERSATION_PREFIX = 'E2ELC'; // ab_im_conversation.name
 const MENU_PREFIX = 'E2EM_AR'; // ab_menu (caught by /^E2EM_/ teardown)
+const MENU_PARENT_PREFIX = 'E2EM_ARP';
 
 const RUN_OK = `${RUN_PREFIX}_OK_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
 const RUN_FAILED = `${RUN_PREFIX}_FL_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
@@ -86,12 +71,20 @@ const RUN_CHILD = `${RUN_PREFIX}_CH_${Date.now().toString(36).toUpperCase()}`.sl
 const ACTION_PID = `${ACTION_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
 const BIF_PID = `${BIF_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
 const INTERRUPT_PID = `${INTERRUPT_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
+const TRACE_ID = randomUUID();
 
-const TASK_ID = 'TASKE2EREPLAY01234567890XX'.slice(0, 26);
+const TASK_ID = `${TASK_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
+const TURN_ID = `${TURN_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
+const CONVERSATION_ID = Date.now() * 1000 + Math.floor(Math.random() * 900);
+const INBOUND_MESSAGE_ID = CONVERSATION_ID + 1;
+const OUTBOUND_MESSAGE_ID = CONVERSATION_ID + 2;
+const RESULT_CONTRACT_ID = `rc-${ACTION_PID}`;
 const AGENT_CODE = 'aurabot.replay.e2e';
 // ab_agent_bif.intent is VARCHAR(32). Use a short stable code, not free-form text.
 const INTENT_TEXT = 'replay_e2e_query';
 const ACTION_INTENT_TEXT = 'replay e2e action intent — sales.list';
+const TURN_USER_MESSAGE = '统计客户信息';
+const TURN_FINAL_RESPONSE = '客户信息统计完成';
 
 // Stable ground-truth values that MUST be reflected in the UI cells.
 // NOTE: ab_agent_run.total_cost is NUMERIC(10,2) — values seeded with more
@@ -99,33 +92,69 @@ const ACTION_INTENT_TEXT = 'replay e2e action intent — sales.list';
 // "API returned 0.12 but UI rendered $0.12 vs test expected $0.1235" drift.
 const RUN_OK_COST = 0.13;
 const RUN_FAILED_COST = 0.03;
-// Duration is derived by RUN_ROW_MAPPER from completed_at - created_at when
-// stored duration_ms is NULL. Seed timestamps with these exact deltas so the
-// derived value lands at a stable cell value the UI assertion can pin.
-// (Using 5_000ms / 1_000ms in clean integer seconds for predictability.)
+// Duration coverage exercises both branches: RUN_OK stores duration_ms
+// directly, RUN_FAILED derives it from completed_at - created_at.
 const RUN_OK_COMPLETED_OFFSET_SEC = 5; // → 5000ms → "5.00s"
 const RUN_FAILED_COMPLETED_OFFSET_SEC = 1; // → 1000ms → "1.00s"
 
 // ---------------------------------------------------------------------------
-// psql helpers — same dialect as _real-backend-helpers.ts
+// SQL helpers — keep this spec independent from a shell `psql` binary. The
+// isolated frontend E2E image intentionally ships Node dependencies, not CLI
+// database clients.
 // ---------------------------------------------------------------------------
 
-function psql(sql: string): string {
-  return execSync(
-    `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -v ON_ERROR_STOP=1 -tA`,
-    { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
-  )
-    .toString()
-    .trim();
+const PG_CONN = {
+  host: process.env.PGHOST ?? process.env.PG_HOST ?? 'localhost',
+  port: Number(process.env.PGPORT ?? process.env.PG_PORT ?? '5432'),
+  user: process.env.PGUSER ?? process.env.PG_USER ?? process.env.USER ?? 'ghj',
+  database: process.env.PGDATABASE ?? process.env.PG_DB ?? 'aura_boot',
+  password: process.env.PGPASSWORD ?? process.env.PG_PASSWORD,
+};
+
+async function psql(sql: string): Promise<string> {
+  return withPg(async (client) => {
+    const result = await client.query(sql);
+    const rows = Array.isArray(result)
+      ? result.flatMap((item) => item.rows ?? [])
+      : result.rows ?? [];
+    return rows
+      .map((row) => Object.values(row).map((value) => String(value)).join('|'))
+      .join('\n')
+      .trim();
+  });
 }
 
-function psqlQuiet(sql: string): string {
-  return execSync(
-    `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -v ON_ERROR_STOP=1 -qtA`,
-    { input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
-  )
-    .toString()
-    .trim();
+async function withPg<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client(PG_CONN);
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
+
+function sqlString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function sqlNullableString(value?: string | null): string {
+  return value ? sqlString(value) : 'NULL';
+}
+
+function sqlNullableNumber(value: number | null): string {
+  return value === null ? 'NULL' : value.toString();
+}
+
+function sqlExpression(value?: string | null, fallback = 'NOW()'): string {
+  return value === null ? 'NULL' : value ?? fallback;
+}
+
+function assertRow(raw: string, description: string): string {
+  if (!raw) {
+    throw new Error(`Expected SQL row for ${description}`);
+  }
+  return raw;
 }
 
 interface SeededAgentRun {
@@ -137,7 +166,7 @@ interface SeededAgentRun {
   parentRunId: string | null;
 }
 
-function seedAgentRun(args: {
+async function seedAgentRun(args: {
   pid: string;
   agentCode: string;
   status: string;
@@ -147,30 +176,24 @@ function seedAgentRun(args: {
   taskId?: string;
   createdAtSqlExpr?: string;
   completedAtSqlExpr?: string | null;
-}): SeededAgentRun {
-  // IMPORTANT: ab_agent_run.duration_ms is INTEGER in schema.sql, but
-  // AgentRunController.RUN_ROW_MAPPER (line 302) casts the result to Long
-  // unconditionally — see ClassCastException reported in this file's
-  // Blocker section. To avoid tripping that bug, this helper always seeds
-  // duration_ms = NULL and relies on the controller's fallback path
-  // (Duration.between(createdAt, completedAt).toMillis()) for derivation.
-  const cost = args.costUsd === null ? 'NULL' : args.costUsd.toString();
-  const parent = args.parentRunId ? `'${args.parentRunId}'` : 'NULL';
-  const subtaskOrigin = args.subtaskOrigin ? `'${args.subtaskOrigin}'` : 'NULL';
+  durationMs?: number | null;
+}): Promise<SeededAgentRun> {
+  const cost = sqlNullableNumber(args.costUsd);
+  const parent = sqlNullableString(args.parentRunId);
+  const subtaskOrigin = sqlNullableString(args.subtaskOrigin);
   const taskId = args.taskId ?? TASK_ID;
-  const completedAt =
-    args.completedAtSqlExpr === null
-      ? 'NULL'
-      : args.completedAtSqlExpr ?? 'NOW()';
+  const completedAt = sqlExpression(args.completedAtSqlExpr);
   const createdAt = args.createdAtSqlExpr ?? 'NOW()';
-  psql(`
+  const duration = sqlNullableNumber(args.durationMs ?? null);
+  await psql(`
     INSERT INTO ab_agent_run
       (pid, tenant_id, task_id, agent_id, run_status,
        total_cost, duration_ms, parent_run_id, subtask_origin,
        started_at, completed_at, created_at)
     VALUES
-      ('${args.pid}', ${ADMIN_TENANT_ID}, '${taskId}', '${args.agentCode}',
-       '${args.status}', ${cost}, NULL, ${parent}, ${subtaskOrigin},
+      (${sqlString(args.pid)}, ${ADMIN_TENANT_ID}, ${sqlString(taskId)},
+       ${sqlString(args.agentCode)}, ${sqlString(args.status)}, ${cost},
+       ${duration}, ${parent}, ${subtaskOrigin},
        ${createdAt}, ${completedAt}, ${createdAt});
   `);
   return {
@@ -178,91 +201,220 @@ function seedAgentRun(args: {
     agentCode: args.agentCode,
     status: args.status,
     costUsd: args.costUsd,
-    durationMs: null,
+    durationMs: args.durationMs ?? null,
     parentRunId: args.parentRunId ?? null,
   };
 }
 
-function seedAgentAction(args: {
+async function seedAgentAction(args: {
   pid: string;
   runId: string;
   actionCode: string;
   intentSummary: string;
-}): void {
-  psql(`
+}): Promise<void> {
+  await psql(`
     INSERT INTO ab_agent_action
       (pid, tenant_id, run_id, action_code, action_type,
        target_model, action_status, intent_summary, step_index,
        cost_usd, token_usage, executed_at)
     VALUES
-      ('${args.pid}', ${ADMIN_TENANT_ID}, '${args.runId}',
-       '${args.actionCode}', 'tool_call',
-       'replay_e2e', 'success', $$${args.intentSummary}$$, 1,
+      (${sqlString(args.pid)}, ${ADMIN_TENANT_ID}, ${sqlString(args.runId)},
+       ${sqlString(args.actionCode)}, 'tool_call',
+       'replay_e2e', 'success', ${sqlString(args.intentSummary)}, 1,
        0.001000, 100, NOW());
   `);
 }
 
-function seedAgentBif(args: { pid: string; runId: string; intent: string }): void {
-  psql(`
+async function seedAgentBif(args: { pid: string; runId: string; intent: string }): Promise<void> {
+  await psql(`
     INSERT INTO ab_agent_bif
       (pid, tenant_id, run_id, nl_input, intent, primary_object,
        confidence, risk_level, dispatched_skill, channel, created_at)
     VALUES
-      ('${args.pid}', ${ADMIN_TENANT_ID}, '${args.runId}',
-       'replay e2e nl input', $$${args.intent}$$, 'AgentRun',
+      (${sqlString(args.pid)}, ${ADMIN_TENANT_ID}, ${sqlString(args.runId)},
+       'replay e2e nl input', ${sqlString(args.intent)}, 'AgentRun',
        '{"score":0.9}'::jsonb, 'L0', 'replay.e2e.skill',
        'chat', NOW());
   `);
 }
 
-function seedInterruptForRun(args: {
+async function seedInterruptForRun(args: {
   pid: string;
   activeRunId: string;
   sessionId: string;
-}): void {
-  psql(`
+}): Promise<void> {
+  await psql(`
     INSERT INTO ab_agent_interrupt_log
       (pid, tenant_id, session_id, active_run_id, new_message_excerpt,
        sub_policy, classifier_tier, confidence, reason, action_taken, created_at)
     VALUES
-      ('${args.pid}', ${ADMIN_TENANT_ID}, '${args.sessionId}', '${args.activeRunId}',
+      (${sqlString(args.pid)}, ${ADMIN_TENANT_ID}, ${sqlString(args.sessionId)}, ${sqlString(args.activeRunId)},
        'replay e2e interrupt excerpt', 'replace_intent', 'keyword',
        0.91, 'replay e2e seeded', 'active_run_cancelled', NOW());
   `);
 }
 
+async function seedAiTraceForRun(args: { traceId: string; runId: string }): Promise<void> {
+  await psql(`
+    INSERT INTO ab_ai_trace
+      (trace_id, tenant_id, session_id, name, input, output, status,
+       metadata, start_time, end_time, duration_ms, total_input_tokens,
+       total_output_tokens, total_cost)
+    VALUES
+      (${sqlString(args.traceId)}, ${ADMIN_TENANT_ID}, ${sqlString(args.runId)},
+       'chat', 'replay e2e trace input', 'replay e2e trace output', 'success',
+       jsonb_build_object('agentCode', ${sqlString(AGENT_CODE)}, 'taskPid', ${sqlString(TASK_ID)}),
+       NOW() - INTERVAL '3 seconds', NOW(), 3000, 100, 50, 0.001000);
+  `);
+}
+
+async function seedAgentTaskForConversationTurn(): Promise<void> {
+  const inputData = {
+    turnId: TURN_ID,
+    conversationId: CONVERSATION_ID,
+    inboundMessageId: INBOUND_MESSAGE_ID,
+    triageBucket: 'acp_run',
+    userMessage: TURN_USER_MESSAGE,
+  };
+  const outputData = {
+    finalResponse: TURN_FINAL_RESPONSE,
+  };
+  await psql(`
+    INSERT INTO ab_agent_task
+      (pid, tenant_id, title, description, task_status, task_priority,
+       assignee_type, assignee_id, input_data, output_data,
+       created_at, updated_at, completed_at)
+    VALUES
+      (${sqlString(TASK_ID)}, ${ADMIN_TENANT_ID}, 'Replay E2E conversation turn',
+       ${sqlString(TURN_USER_MESSAGE)}, 'completed', 'normal',
+       'ai', ${sqlString(AGENT_CODE)}, ${sqlString(JSON.stringify(inputData))},
+       ${sqlString(JSON.stringify(outputData))},
+       NOW() - INTERVAL '10 seconds', NOW(), NOW() - INTERVAL '5 seconds');
+  `);
+}
+
+async function seedConversationTurnMessages(): Promise<void> {
+  await psql(`
+    INSERT INTO ab_im_conversation
+      (id, tenant_id, type, name, max_seq, created_at, updated_at)
+    VALUES
+      (${CONVERSATION_ID}, ${ADMIN_TENANT_ID}, 'BOT',
+       ${sqlString(`${CONVERSATION_PREFIX}_${RUN_OK}`)}, 2,
+       NOW() - INTERVAL '10 seconds', NOW());
+
+    INSERT INTO ab_im_message
+      (id, conversation_id, tenant_id, sender_id, sender_type, seq,
+       message_type, content, client_msg_id, triage_bucket,
+       triage_confidence, triage_reason_codes, created_at)
+    VALUES
+      (${INBOUND_MESSAGE_ID}, ${CONVERSATION_ID}, ${ADMIN_TENANT_ID},
+       1, 'human', 1, 'text', ${sqlString(TURN_USER_MESSAGE)},
+       ${sqlString(`in-${TURN_ID}`)}, 'acp_run', 0.92,
+       '["agent-runs-e2e"]'::jsonb, NOW() - INTERVAL '9 seconds');
+
+    INSERT INTO ab_im_message
+      (id, conversation_id, tenant_id, sender_id, sender_type, seq,
+       message_type, content, client_msg_id, thinking_content,
+       thinking_signature, created_at)
+    VALUES
+      (${OUTBOUND_MESSAGE_ID}, ${CONVERSATION_ID}, ${ADMIN_TENANT_ID},
+       2, 'agent', 2, 'ai_response', ${sqlString(TURN_FINAL_RESPONSE)},
+       ${sqlString(`out-${TURN_ID}`)}, 'e2e thinking trace',
+       'e2e-thinking-signature', NOW() - INTERVAL '5 seconds');
+  `);
+}
+
 // Idempotent menu upsert (mirrors _real-backend-helpers.ts upsertMenu).
-function upsertAdminAgentRunsMenu(): { menuId: string; ownedId: string | null } {
+async function upsertAdminAgentRunsMenu(): Promise<{ menuId: string; ownedId: string | null }> {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
   const menuPid = `${MENU_PREFIX}_${rand}`.slice(0, 26);
   const path = '/admin/agent-runs';
-  const raw = psqlQuiet(
-    `BEGIN;
-     SELECT pg_advisory_xact_lock(hashtext('ab_menu_upsert:${path}')::bigint);
-     WITH existing AS (
-       SELECT id FROM ab_menu
-        WHERE tenant_id = ${ADMIN_TENANT_ID} AND path = '${path}' AND deleted_flag = false
-        LIMIT 1
-     ),
-     inserted AS (
-       INSERT INTO ab_menu (id, pid, tenant_id, parent_id, code, name, path, type, permission_code, visible, order_no, status)
-       SELECT (EXTRACT(EPOCH FROM NOW())*1000 + floor(random()*1000000))::bigint,
-              '${menuPid}', ${ADMIN_TENANT_ID}, ${AI_CENTER_MENU_ID},
-              NULL, 'Agent 运行记录', '${path}', 1,
-              NULL, true, 100, 'active'
-        WHERE NOT EXISTS (SELECT 1 FROM existing)
-       RETURNING id
-     )
-     SELECT id || '|' || origin FROM (
-       SELECT id, 'ins' AS origin FROM inserted
-       UNION ALL
-       SELECT id, 'exi' AS origin FROM existing
-       LIMIT 1
-     ) s;
-     COMMIT;`,
+  return withPg(async (client) => {
+    await client.query('BEGIN');
+    try {
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtext($1)::bigint)',
+        [`ab_menu_upsert:${path}`],
+      );
+      const existing = await client.query<{ id: string }>(
+        `SELECT id
+           FROM ab_menu
+          WHERE tenant_id = $1 AND path = $2 AND deleted_flag = false
+          LIMIT 1`,
+        [ADMIN_TENANT_ID, path],
+      );
+      if (existing.rows[0]) {
+        await client.query('COMMIT');
+        return { menuId: String(existing.rows[0].id), ownedId: null };
+      }
+      const parentId = await resolveOrCreateAiCenterMenuId(client);
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO ab_menu
+           (id, pid, tenant_id, parent_id, code, name, path, type,
+            permission_code, visible, order_no, status)
+         VALUES
+           ((EXTRACT(EPOCH FROM NOW()) * 1000 + floor(random() * 1000000))::bigint,
+            $1, $2, $3, NULL, 'Agent 运行记录', $4, 1,
+            NULL, true, 100, 'active')
+         RETURNING id`,
+        [menuPid, ADMIN_TENANT_ID, parentId, path],
+      );
+      await client.query('COMMIT');
+      const id = String(assertRow(String(inserted.rows[0]?.id ?? ''), 'inserted menu id'));
+      return { menuId: id, ownedId: id };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
+  });
+}
+
+async function resolveOrCreateAiCenterMenuId(client: Client): Promise<string> {
+  const existing = await client.query<{ id: string }>(
+    `SELECT id
+       FROM ab_menu
+      WHERE tenant_id = $1
+        AND deleted_flag = false
+        AND (
+          code = 'ai_center'
+          OR name IN ('AI 中心', 'AI Center')
+          OR id IN (
+            SELECT parent_id
+              FROM ab_menu
+             WHERE tenant_id = $1
+               AND deleted_flag = false
+               AND path LIKE '/aurabot/%'
+               AND parent_id IS NOT NULL
+          )
+        )
+      ORDER BY CASE
+        WHEN code = 'ai_center' THEN 0
+        WHEN name = 'AI 中心' THEN 1
+        ELSE 2
+      END
+      LIMIT 1`,
+    [ADMIN_TENANT_ID],
   );
-  const [id, origin] = raw.split('|');
-  return { menuId: id, ownedId: origin === 'ins' ? id : null };
+  if (existing.rows[0]) {
+    return String(existing.rows[0].id);
+  }
+
+  const parentPid = `${MENU_PARENT_PREFIX}_${Math.random()
+    .toString(36)
+    .slice(2, 8)
+    .toUpperCase()}`.slice(0, 26);
+  const inserted = await client.query<{ id: string }>(
+    `INSERT INTO ab_menu
+       (id, pid, tenant_id, parent_id, code, name, path, icon, type,
+        permission_code, visible, order_no, status)
+     VALUES
+       ((EXTRACT(EPOCH FROM NOW()) * 1000 + floor(random() * 1000000))::bigint,
+        $1, $2, NULL, NULL, 'AI 中心', NULL, 'brain', 0,
+        NULL, true, 800, 'active')
+     RETURNING id`,
+    [parentPid, ADMIN_TENANT_ID],
+  );
+  return String(assertRow(String(inserted.rows[0]?.id ?? ''), 'AI Center menu id'));
 }
 
 // ---------------------------------------------------------------------------
@@ -277,13 +429,17 @@ async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
   const nav = page.locator('nav').first();
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
-  // Expand the parent group "AI 中心" / "AI Center"
-  const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center/ }).first();
-  await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
-  await aiCenter.evaluate((el: HTMLElement) => el.click());
+  // Expand the parent group "AI 中心" / "AI Center" only when needed. The
+  // sidebar persists expanded groups between tests, so a blind click would
+  // collapse an already-open group and unmount the leaf link.
+  const leaf = nav.locator('a[href="/admin/agent-runs"]').first();
+  if ((await leaf.count()) === 0 || !(await leaf.isVisible().catch(() => false))) {
+    const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center/ }).first();
+    await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
+    await aiCenter.evaluate((el: HTMLElement) => el.click());
+  }
 
   // Click the leaf "Agent 运行记录"
-  const leaf = nav.locator('a[href="/admin/agent-runs"]').first();
   await leaf.waitFor({ state: 'attached', timeout: 8_000 });
 
   const listResponsePromise = page.waitForResponse(
@@ -307,8 +463,8 @@ async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
 // the empty-state describe also reaches the seeded leaf via sidebar.
 // ---------------------------------------------------------------------------
 
-test.beforeAll(() => {
-  upsertAdminAgentRunsMenu();
+test.beforeAll(async () => {
+  await upsertAdminAgentRunsMenu();
 });
 
 // ---------------------------------------------------------------------------
@@ -320,22 +476,23 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(60_000);
 
-  test.beforeAll(() => {
+  test.beforeAll(async () => {
+    await seedAgentTaskForConversationTurn();
+    await seedConversationTurnMessages();
+
     // Order matters for "ORDER BY created_at DESC" — give RUN_OK the
     // newest timestamp so it lands on page 0 deterministically. Use
     // staggered NOW() expressions: succeeded > failed > running.
     //
-    // Duration is derived from completed_at − created_at by the controller's
-    // RUN_ROW_MAPPER fallback path (see seedAgentRun for why we never seed
-    // duration_ms directly — known controller bug, see Blocker note in
-    // header). Pin the timestamp deltas so cell text is stable.
+    // Pin duration values so the UI cell assertions are stable. RUN_OK uses
+    // stored duration_ms; RUN_FAILED exercises the API fallback derivation.
     //
     // NOTE: not seeding status='running' — the platform reaps orphaned
     // running runs to 'failed' on restart, which would flake assertions.
     // Use 'cancelled' (terminal) with completedAtSqlExpr=null so the
     // duration-derivation falls into the `else { 0L }` branch — UI shows
     // "0ms", exercising the no-completion rendering path.
-    seedAgentRun({
+    await seedAgentRun({
       pid: RUN_RUNNING,
       agentCode: 'aurabot.planner.e2e',
       status: 'cancelled',
@@ -343,7 +500,7 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
       completedAtSqlExpr: null,
       createdAtSqlExpr: `NOW() - INTERVAL '120 seconds'`,
     });
-    seedAgentRun({
+    await seedAgentRun({
       pid: RUN_FAILED,
       agentCode: AGENT_CODE,
       status: 'failed',
@@ -352,18 +509,19 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
       createdAtSqlExpr: `NOW() - INTERVAL '60 seconds'`,
       completedAtSqlExpr: `NOW() - INTERVAL '${60 - RUN_FAILED_COMPLETED_OFFSET_SEC} seconds'`,
     });
-    seedAgentRun({
+    await seedAgentRun({
       pid: RUN_OK,
       agentCode: AGENT_CODE,
       status: 'succeeded',
       costUsd: RUN_OK_COST,
-      // Created 10s ago, completed 5s ago → derived 5000ms → "5.00s".
+      durationMs: RUN_OK_COMPLETED_OFFSET_SEC * 1000,
+      // Stored duration_ms drives this row; timestamps stay coherent.
       createdAtSqlExpr: `NOW() - INTERVAL '10 seconds'`,
       completedAtSqlExpr: `NOW() - INTERVAL '${10 - RUN_OK_COMPLETED_OFFSET_SEC} seconds'`,
     });
 
     // Child run for RUN_OK (subtask_origin must satisfy chk_agent_run_subtask_origin).
-    seedAgentRun({
+    await seedAgentRun({
       pid: RUN_CHILD,
       agentCode: 'aurabot.child.e2e',
       status: 'succeeded',
@@ -377,21 +535,25 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     // One action + BIF + interrupt under RUN_OK so its drawer surfaces all
     // four sub-areas (metadata / actions / interrupts / child runs) with
     // concrete ids that the test can pin against.
-    seedAgentAction({
+    await seedAgentAction({
       pid: ACTION_PID,
       runId: RUN_OK,
       actionCode: 'sales.list',
       intentSummary: ACTION_INTENT_TEXT,
     });
-    seedAgentBif({
+    await seedAgentBif({
       pid: BIF_PID,
       runId: RUN_OK,
       intent: INTENT_TEXT,
     });
-    seedInterruptForRun({
+    await seedInterruptForRun({
       pid: INTERRUPT_PID,
       activeRunId: RUN_OK,
       sessionId: `e2e_replay_${Date.now()}`,
+    });
+    await seedAiTraceForRun({
+      traceId: TRACE_ID,
+      runId: RUN_OK,
     });
   });
 
@@ -516,6 +678,18 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     expect(detailBody?.data?.childRuns?.length).toBeGreaterThanOrEqual(1);
     expect(detailBody?.data?.interruptLog?.length).toBeGreaterThanOrEqual(1);
     expect(detailBody?.data?.bif?.intent).toBe(INTENT_TEXT);
+    expect(detailBody?.data?.traceId).toBe(TRACE_ID);
+    expect(detailBody?.data?.actions?.[0]?.resultContractId).toBe(RESULT_CONTRACT_ID);
+    expect(detailBody?.data?.conversationTurn?.turnId).toBe(TURN_ID);
+    expect(detailBody?.data?.conversationTurn?.conversationId).toBe(CONVERSATION_ID);
+    expect(detailBody?.data?.conversationTurn?.inboundMessageId).toBe(INBOUND_MESSAGE_ID);
+    expect(detailBody?.data?.conversationTurn?.outboundMessageId).toBe(OUTBOUND_MESSAGE_ID);
+    expect(detailBody?.data?.conversationTurn?.userMessage).toBe(TURN_USER_MESSAGE);
+    expect(detailBody?.data?.conversationTurn?.finalResponse).toBe(TURN_FINAL_RESPONSE);
+    expect(detailBody?.data?.conversationTurn?.messages?.length).toBe(2);
+    expect(detailBody?.data?.conversationTurn?.resultContractIds).toContain(RESULT_CONTRACT_ID);
+    expect(detailBody?.data?.resultContracts?.[0]?.contractId).toBe(RESULT_CONTRACT_ID);
+    expect(detailBody?.data?.resultContracts?.[0]?.contract?.textSummary).toBe(ACTION_INTENT_TEXT);
 
     const drawer = page.locator('[data-testid="agent-run-detail-drawer"]');
     await expect(drawer).toBeVisible({ timeout: 5_000 });
@@ -569,16 +743,54 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     await expect(bifSection).toContainText('replay.e2e.skill');
     await expect(bifSection).toContainText('AgentRun');
 
-    // Close drawer to keep state clean for AR-003 / AR-004.
-    await page.locator('[data-testid="drawer-close"]').click();
-    // Sticky page header overlaps the drawer's close button at default
-    // viewport — use evaluate(el.click()) to bypass the pointer-events
-    // hit-test (real users dismiss via Esc / backdrop click anyway).
-    await page
-      .locator('[data-testid="drawer-close"]')
-      .evaluate((el: HTMLElement) => el.click());
-    await expect(drawer).toBeHidden({ timeout: 5_000 });
-    expect(page.url()).not.toContain('runId=');
+    // [D7-6] ResultContract deep link: action row opens the selected
+    // contract derived from ab_agent_action, without a second runtime path.
+    await page.locator(`[data-testid="action-toggle-${ACTION_PID}"]`).click();
+    const actionDetail = page.locator(`[data-testid="action-detail-${ACTION_PID}"]`);
+    await expect(actionDetail).toBeVisible({ timeout: 3_000 });
+    await page.locator(`[data-testid="open-result-contract-${ACTION_PID}"]`).click();
+    const resultsSection = page.locator('[data-testid="drawer-section-result-contracts"]');
+    await expect(resultsSection).toBeVisible({ timeout: 3_000 });
+    await expect(resultsSection).toContainText(RESULT_CONTRACT_ID);
+    await expect(resultsSection).toContainText(ACTION_INTENT_TEXT);
+    await expect(resultsSection).toContainText('sales.list');
+    await expect(
+      page.locator(`[data-testid="result-contract-item-${RESULT_CONTRACT_ID}"]`),
+    ).toHaveClass(/border-indigo-300/);
+
+    // [D7-7] Conversation tab reconstructs the exact turn tape: inbound
+    // user message + outbound agent message by turn-scoped ids.
+    await page.locator('[data-testid="drawer-tab-conversation"]').click();
+    const conversationSection = page.locator('[data-testid="drawer-section-conversation"]');
+    await expect(conversationSection).toBeVisible({ timeout: 3_000 });
+    await expect(conversationSection).toContainText(TURN_ID);
+    await expect(conversationSection).toContainText(String(CONVERSATION_ID));
+    await expect(conversationSection).toContainText(TURN_USER_MESSAGE);
+    await expect(conversationSection).toContainText(TURN_FINAL_RESPONSE);
+    await expect(
+      page.locator(`[data-testid="conversation-message-${INBOUND_MESSAGE_ID}"]`),
+    ).toContainText('human');
+    await expect(
+      page.locator(`[data-testid="conversation-message-${OUTBOUND_MESSAGE_ID}"]`),
+    ).toContainText('e2e thinking trace');
+
+    // Deep-link bridge: replay drawer -> trace detail -> related run link.
+    const openTrace = page.locator('[data-testid="open-trace-link"]');
+    await expect(openTrace).toHaveAttribute('href', `/aurabot/traces/${TRACE_ID}`);
+    const traceResponsePromise = page.waitForResponse(
+      (r) => r.url().includes(`/api/ai/traces/${TRACE_ID}`) && r.status() === 200,
+      { timeout: 15_000 },
+    );
+    await openTrace.click();
+    await traceResponsePromise;
+    await expect(page).toHaveURL(new RegExp(`/aurabot/traces/${TRACE_ID}$`));
+    await expect(page.locator('[data-testid="trace-tab-timeline"]')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.locator('[data-testid="trace-related-run-link"]')).toHaveAttribute(
+      'href',
+      `/admin/agent-runs?runId=${RUN_OK}`,
+    );
   });
 
   // -------------------------------------------------------------------------
