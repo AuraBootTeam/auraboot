@@ -53,7 +53,7 @@ aura_env_load r2 "${1-}" || return $?
 # ---------- summary ----------
 
 cat <<SUMMARY
-✓ r2 stack env loaded (slug=${AURA_ENV_PROFILE:-r2})
+✓ r2 stack env loaded (slug=${AURA_ENV_SLUG:-${1:-r2}})
   BACKEND_URL          = $BACKEND_URL
   PLAYWRIGHT_BASE_URL  = $PLAYWRIGHT_BASE_URL
   BFF_URL              = $BFF_URL

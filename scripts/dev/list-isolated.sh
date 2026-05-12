@@ -90,29 +90,33 @@ fi
 
 # ---------- pretty-print ----------
 
-printf '%-26s %-12s %-8s %-7s %-7s %-7s %-9s %-7s\n' \
-    "STACK" "STATUS" "PG" "BE" "VITE" "BFF" "REDIS" "OFFSET"
-printf '%-26s %-12s %-8s %-7s %-7s %-7s %-9s %-7s\n' \
-    "--------------------------" "------------" "--------" "-------" "-------" "-------" "---------" "-------"
+printf '%-26s %-8s %-12s %-8s %-7s %-7s %-7s %-9s %-11s %-7s\n' \
+    "STACK" "MODE" "STATUS" "PG" "BE" "VITE" "BFF" "REDIS" "MINIO" "OFFSET"
+printf '%-26s %-8s %-12s %-8s %-7s %-7s %-7s %-9s %-11s %-7s\n' \
+    "--------------------------" "--------" "------------" "--------" "-------" "-------" "-------" "---------" "-----------" "-------"
 
 while IFS=$'\t' read -r project status; do
     slug="${project#auraboot-}"
-    pg="-" be="-" vite="-" bff="-" redis="-" offset="-"
+    mode="?" pg="-" be="-" vite="-" bff="-" redis="-" minio="-" offset="-"
     env_file="$STACK_DIR/${slug}.env"
     if [ -f "$env_file" ]; then
         # shellcheck disable=SC1090
         source "$env_file"
+        mode="${STACK_MODE:-full}"
         pg="${PG_PORT:-?}"
         be="${BE_PORT:-?}"
         vite="${VITE_PORT:-?}"
         bff="${BFF_PORT:-?}"
         redis="${REDIS_PORT:-?}"
+        if [ -n "${MINIO_API_PORT:-}" ]; then
+            minio="${MINIO_API_PORT:-?}/${MINIO_CONSOLE_PORT:-?}"
+        fi
         offset="${OFFSET:-?}"
         # Reset for next iteration so a missing file doesn't leak previous values.
-        unset PG_PORT BE_PORT VITE_PORT BFF_PORT REDIS_PORT OFFSET
+        unset STACK_MODE PG_PORT BE_PORT VITE_PORT BFF_PORT REDIS_PORT MINIO_API_PORT MINIO_CONSOLE_PORT OFFSET
     fi
     # Truncate status string to fit (first word usually carries the signal).
     short_status="${status%% *}"
-    printf '%-26s %-12s %-8s %-7s %-7s %-7s %-9s %-7s\n' \
-        "$slug" "$short_status" "$pg" "$be" "$vite" "$bff" "$redis" "$offset"
+    printf '%-26s %-8s %-12s %-8s %-7s %-7s %-7s %-9s %-11s %-7s\n' \
+        "$slug" "$mode" "$short_status" "$pg" "$be" "$vite" "$bff" "$redis" "$minio" "$offset"
 done <<< "$ROWS"
