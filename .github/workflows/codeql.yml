@@ -53,7 +53,16 @@ jobs:
           # CodeQL only needs compiled classes. `assemble` also runs bootJar,
           # which can race Gradle's implicit dependency validation for the
           # provider modules that compileOnly-depend on the root project.
-          ./gradlew clean classes -x test --no-daemon
+          # Disable Gradle's build cache so CodeQL observes javac execution
+          # instead of receiving an empty database from cache hits.
+          ./gradlew clean classes -x test --no-daemon --no-build-cache
+
+      # Java model pack note:
+      # .github/codeql/aura-java-models contains the local model pack used for
+      # local preflight with `codeql database analyze --model-packs ...`.
+      # GitHub CodeQL Action only accepts published model packs via init
+      # `packs:`. After publishing auraboot/aura-java-models@0.1.0 to GHCR,
+      # add it to the init step above, for Java only.
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

@@ -53,7 +53,7 @@ export async function projectTasksCommand(options: TaskOptions): Promise<void> {
 
   const filters: FilterItem[] = [];
   if (options.status) {
-    filters.push({ fieldName: 'pm_task_status', operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: 'pm_task_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
   if (options.assignee) {
     filters.push({ fieldName: 'pm_task_assignee', operator: 'like', value: options.assignee });

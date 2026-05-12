@@ -1,5 +1,6 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,14 +30,14 @@ public class DocGenerationService {
      * @return generation summary
      */
     public GenerationResult generate(String outputDir) throws IOException {
-        Path outPath = Path.of(outputDir);
+        Path outPath = PathSafetyUtils.normalizeAbsolute(Path.of(outputDir), "doc generation outputDir");
         Files.createDirectories(outPath);
 
         int modelCount = generateModelDictionary(outPath);
         int commandCount = generateCommandReference(outPath);
         int fieldSummary = generateFieldSummary(outPath);
 
-        GenerationResult result = new GenerationResult(modelCount, commandCount, fieldSummary, outputDir);
+        GenerationResult result = new GenerationResult(modelCount, commandCount, fieldSummary, outPath.toString());
         log.info("Doc generation complete: {}", result);
         return result;
     }
@@ -109,7 +110,7 @@ public class DocGenerationService {
             }
         }
 
-        Files.writeString(outPath.resolve("model-dictionary.md"), sb.toString());
+        Files.writeString(PathSafetyUtils.requireSafeChild(outPath, "model-dictionary.md", "model dictionary output"), sb.toString());
         return models.size();
     }
 
@@ -145,7 +146,7 @@ public class DocGenerationService {
               .append(" |\n");
         }
 
-        Files.writeString(outPath.resolve("command-reference.md"), sb.toString());
+        Files.writeString(PathSafetyUtils.requireSafeChild(outPath, "command-reference.md", "command reference output"), sb.toString());
         return commands.size();
     }
 
@@ -178,7 +179,7 @@ public class DocGenerationService {
               .append(" | ").append(row.get("cnt")).append(" |\n");
         }
 
-        Files.writeString(outPath.resolve("field-summary.md"), sb.toString());
+        Files.writeString(PathSafetyUtils.requireSafeChild(outPath, "field-summary.md", "field summary output"), sb.toString());
         return totalFields;
     }
 

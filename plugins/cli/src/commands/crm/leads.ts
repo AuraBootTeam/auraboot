@@ -38,10 +38,10 @@ export async function crmLeadsCommand(options: LeadOptions): Promise<void> {
 
   const filters: FilterItem[] = [];
   if (options.status) {
-    filters.push({ fieldName: 'crm_lead_status', operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: 'crm_lead_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
   if (options.source) {
-    filters.push({ fieldName: 'crm_lead_source', operator: 'EQ', value: options.source.toUpperCase() });
+    filters.push({ fieldName: 'crm_lead_source', operator: 'EQ', value: options.source.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, 'crm_lead', {

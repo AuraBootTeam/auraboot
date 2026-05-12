@@ -24,6 +24,11 @@ server:
 
 # 基础日志配置
 logging:
+  pattern:
+    # Central log-injection guard: normalize CR/LF/TAB in formatted log messages
+    # at the Logback layout layer so business code does not need per-call sanitizers.
+    console: '%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}){} %clr(${PID:-}){magenta} %clr(--- [%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
+    file: '%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:-} --- [%t] %-40.40logger{39} : %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
   level:
     org.apache.tomcat.util.net.jsse.JSSESupport: INFO
     org.apache.coyote: INFO

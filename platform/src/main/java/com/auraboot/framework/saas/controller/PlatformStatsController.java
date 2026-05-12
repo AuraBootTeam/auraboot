@@ -24,6 +24,7 @@ public class PlatformStatsController {
 
     // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.
     @GetMapping("/stats")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<Map<String, Object>> getStats() {
         Long tenantCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_tenant WHERE deleted_flag = FALSE AND name != 'System'", Long.class);
@@ -43,6 +44,7 @@ public class PlatformStatsController {
     }
 
     @GetMapping("/tenants")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<?> listTenants() {
         var tenants = jdbcTemplate.queryForList(
                 """

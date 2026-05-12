@@ -309,8 +309,17 @@ const FileIcon: React.FC<{ type: string }> = ({ type }) => {
   );
 };
 
+let fileUidCounter = 0;
+
 function generateUid(): string {
-  return `file_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === 'function') {
+    return `file_${cryptoApi.randomUUID()}`;
+  }
+
+  const bytes = new Uint32Array(2);
+  cryptoApi?.getRandomValues?.(bytes);
+  return `file_${Date.now()}_${bytes[0].toString(36)}${bytes[1].toString(36)}_${fileUidCounter++}`;
 }
 
 function formatSize(bytes: number): string {

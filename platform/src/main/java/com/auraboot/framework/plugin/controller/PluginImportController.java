@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.controller;
 
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.plugin.dto.imports.*;
 import com.auraboot.framework.plugin.service.PluginImportService;
@@ -168,21 +169,22 @@ public class PluginImportController {
             return ResponseEntity.badRequest().body(ApiResponse.error("path is required"));
         }
 
-        // Path traversal protection
-        Path normalizedPath = Path.of(request.getPath()).normalize();
-        if (!normalizedPath.isAbsolute() || normalizedPath.toString().contains("..")) {
+        Path normalizedPath;
+        try {
+            normalizedPath = PathSafetyUtils.requireExistingDirectory(Path.of(request.getPath()), "plugin import directory");
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(
-                    ApiResponse.error("Invalid directory path: must be absolute and cannot contain '..'"));
+                    ApiResponse.error("Invalid directory path: " + e.getMessage()));
         }
 
         // Quick check: directory exists and has plugin.json (no parsing, fast)
-        java.io.File dir = normalizedPath.toFile();
-        if (!dir.isDirectory()) {
+        if (!java.nio.file.Files.isDirectory(normalizedPath)) {
             return ResponseEntity.badRequest().body(
                     ApiResponse.error("Path is not a directory: " + normalizedPath));
         }
-        java.io.File pluginJson = new java.io.File(dir, "plugin.json");
-        if (!pluginJson.exists()) {
+        java.nio.file.Path pluginJson = PathSafetyUtils.requireSafeChild(
+                normalizedPath, "plugin.json", "plugin manifest path");
+        if (!java.nio.file.Files.exists(pluginJson)) {
             return ResponseEntity.badRequest().body(
                     ApiResponse.error("Directory does not contain plugin.json: " + normalizedPath));
         }

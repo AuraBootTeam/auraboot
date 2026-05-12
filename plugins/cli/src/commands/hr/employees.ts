@@ -37,7 +37,7 @@ export async function hrEmployeesCommand(options: EmployeeOptions): Promise<void
 
   const filters: FilterItem[] = [];
   if (options.status) {
-    filters.push({ fieldName: 'org_emp_status', operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: 'org_emp_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, 'org_employee', {

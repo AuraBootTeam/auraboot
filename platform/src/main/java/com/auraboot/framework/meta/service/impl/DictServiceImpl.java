@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
 
@@ -56,6 +57,10 @@ public class DictServiceImpl implements DictService {
 
     private final ApplicationEventPublisher eventPublisher;  // ✅ 新增: 用于发布 Release 事件
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
 
 
     // ==================== 基础CRUD操作 ====================
@@ -67,7 +72,7 @@ public class DictServiceImpl implements DictService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "创建请求不能为空");
         }
         
-        log.info("创建字典: {}", request.getCode());
+        log.info("创建字典: {}", logSafe(request.getCode()));
 
         return createDirectly(request);
 
@@ -78,7 +83,7 @@ public class DictServiceImpl implements DictService {
      * 直接创建字典(开发阶段保留)
      */
     private DictDTO createDirectly(DictCreateRequest request) {
-        log.info("直接创建字典(非Git-First): {}", request.getCode());
+        log.info("直接创建字典(非Git-First): {}", logSafe(request.getCode()));
 
         // 业务验证
         validateCreateRequest(request);
@@ -110,8 +115,8 @@ public class DictServiceImpl implements DictService {
             saveDictItems(dict.getId(), request.getItems());
         }
 
-        log.info("字典创建成功: {} (租户: {}), 字典项数量: {}", 
-                dict.getPid(), MetaContext.getCurrentTenantId(), 
+        log.info("字典创建成功: {} (租户: {}), 字典项数量: {}",
+                logSafe(dict.getPid()), MetaContext.getCurrentTenantId(),
                 request.getItems() != null ? request.getItems().size() : 0);
         return dictConverter.toDTO(dict);
     }
@@ -181,7 +186,7 @@ public class DictServiceImpl implements DictService {
     @Override
     @Transactional
     public DictDTO update(String pid, DictUpdateRequest request) {
-        log.info("更新字典: {}", pid);
+        log.info("更新字典: {}", logSafe(pid));
 
         // 验证租户上下文
           
@@ -199,7 +204,7 @@ public class DictServiceImpl implements DictService {
      * 直接更新字典(开发阶段保留)
      */
     private DictDTO updateDirectly(Dict existingDict, DictUpdateRequest request) {
-        log.info("直接更新字典(非Git-First): {}", existingDict.getCode());
+        log.info("直接更新字典(非Git-First): {}", logSafe(existingDict.getCode()));
         
         // 更新实体
         dictConverter.updateEntity(existingDict, request);
@@ -208,14 +213,14 @@ public class DictServiceImpl implements DictService {
         // 保存更新
         dictMapper.updateById(existingDict);
         
-        log.info("字典更新成功: {}", existingDict.getPid());
+        log.info("字典更新成功: {}", logSafe(existingDict.getPid()));
         return dictConverter.toDTO(existingDict);
     }
 
     @Override
     @Transactional
     public void delete(String pid) {
-        log.info("删除字典: {}", pid);
+        log.info("删除字典: {}", logSafe(pid));
 
         // 验证租户上下文
           
@@ -235,14 +240,14 @@ public class DictServiceImpl implements DictService {
      * 直接删除字典(开发阶段保留)
      */
     private void deleteDirectly(Dict dict) {
-        log.info("直接删除字典(非Git-First): {}", dict.getCode());
+        log.info("直接删除字典(非Git-First): {}", logSafe(dict.getCode()));
         
         // Soft delete by setting status to DISABLED
         dict.setStatus(Status.DISABLED.getCode());
         dict.setUpdatedAt(Instant.now());
         dictMapper.updateById(dict);
         
-        log.info("字典删除成功: {}", dict.getPid());
+        log.info("字典删除成功: {}", logSafe(dict.getPid()));
     }
 
     @Override
@@ -377,7 +382,7 @@ public class DictServiceImpl implements DictService {
     @Override
     @Transactional
     public DictDTO publish(String pid, String versionNote) {
-        log.info("发布字典: {}", pid);
+        log.info("发布字典: {}", logSafe(pid));
 
         // 验证租户上下文
         //todo check transiation
@@ -390,7 +395,7 @@ public class DictServiceImpl implements DictService {
         // Validate status transition is legal
         Status currentStatus = parseStatus(dict.getStatus());
         if (currentStatus == Status.PUBLISHED) {
-            log.info("字典已是发布状态，直接返回: {}", pid);
+            log.info("字典已是发布状态，直接返回: {}", logSafe(pid));
             return dictConverter.toDTO(dict);
         }
         if (currentStatus != Status.DRAFT && currentStatus != Status.DEPRECATED) {
@@ -405,14 +410,14 @@ public class DictServiceImpl implements DictService {
 
         dictMapper.updateById(dict);
 
-        log.info("字典发布成功: {} (租户: {})", pid, MetaContext.getCurrentTenantId());
+        log.info("字典发布成功: {} (租户: {})", logSafe(pid), MetaContext.getCurrentTenantId());
         return dictConverter.toDTO(dict);
     }
 
     @Override
     @Transactional
     public DictDTO unpublish(String pid) {
-        log.info("取消发布字典: {}", pid);
+        log.info("取消发布字典: {}", logSafe(pid));
 
         // 验证租户上下文
           
@@ -430,14 +435,14 @@ public class DictServiceImpl implements DictService {
 
         dictMapper.updateById(dict);
 
-        log.info("字典标记为废弃: {} (租户: {})", pid, MetaContext.getCurrentTenantId());
+        log.info("字典标记为废弃: {} (租户: {})", logSafe(pid), MetaContext.getCurrentTenantId());
         return dictConverter.toDTO(dict);
     }
 
     @Override
     @Transactional
     public DictDTO createVersion(String pid, String versionNote) {
-        log.info("创建字典版本: {}, 备注: {}", pid, versionNote);
+        log.info("创建字典版本: {}, 备注: {}", logSafe(pid), logSafe(versionNote));
 
         // 验证租户上下文
           
@@ -450,7 +455,7 @@ public class DictServiceImpl implements DictService {
         // 保存新版本
         dictMapper.insert(newVersion);
 
-        log.info("字典版本创建成功: {} (租户: {})", newVersion.getPid(), MetaContext.getCurrentTenantId());
+        log.info("字典版本创建成功: {} (租户: {})", logSafe(newVersion.getPid()), MetaContext.getCurrentTenantId());
         return dictConverter.toDTO(newVersion);
     }
 
@@ -534,7 +539,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     public DictValidationResult validateConfig(String pid) {
-        log.info("验证字典配置: {}", pid);
+        log.info("验证字典配置: {}", logSafe(pid));
 
         // 验证租户上下文
           
@@ -577,7 +582,7 @@ public class DictServiceImpl implements DictService {
     @Override
     @Transactional
     public int batchUpdateStatus(List<String> pids, String status) {
-        log.info("批量更新字典状态: pids={}, status={}", pids.size(), status);
+        log.info("批量更新字典状态: pids={}, status={}", pids.size(), logSafe(status));
 
         // 验证租户上下文
           
@@ -586,7 +591,7 @@ public class DictServiceImpl implements DictService {
         try {
             statusEnum = parseStatus(status);
         } catch (IllegalArgumentException e) {
-            log.warn("无效的状态值: {}", status);
+            log.warn("无效的状态值: {}", logSafe(status));
             return 0;
         }
 
@@ -600,7 +605,7 @@ public class DictServiceImpl implements DictService {
                 dictMapper.updateById(dict);
                 updateCount++;
             } catch (Exception e) {
-                log.warn("更新字典状态失败: pid={} (租户: {})", pid, MetaContext.getCurrentTenantId(), e);
+                log.warn("更新字典状态失败: pid={} (租户: {})", logSafe(pid), MetaContext.getCurrentTenantId(), e);
             }
         }
 
@@ -619,7 +624,7 @@ public class DictServiceImpl implements DictService {
                 delete(pid);
                 deleteCount++;
             } catch (Exception e) {
-                log.warn("删除字典失败: pid={}", pid, e);
+                log.warn("删除字典失败: pid={}", logSafe(pid), e);
             }
         }
         
@@ -634,8 +639,8 @@ public class DictServiceImpl implements DictService {
         // 验证租户上下文
           
 
-        log.info("导入字典: 租户={}, 命名空间={}, 环境={}, 数量={}",
-                MetaContext.getCurrentTenantId(),        dictData.size());
+        log.info("导入字典: 租户={}, 数量={}",
+                MetaContext.getCurrentTenantId(), dictData.size());
         
         DictImportResult result = new DictImportResult();
         long startTime = System.currentTimeMillis();
@@ -653,7 +658,7 @@ public class DictServiceImpl implements DictService {
                 result.addSuccessItem(dict);
                 
             } catch (Exception e) {
-                log.warn("导入字典失败: code={} (租户: {})", request.getCode(), MetaContext.getCurrentTenantId(), e);
+                log.warn("导入字典失败: code={} (租户: {})", logSafe(request.getCode()), MetaContext.getCurrentTenantId(), e);
                 result.addFailureItem(request.getCode(), request.getName(),
                                     "导入失败", e.getMessage());
             }
@@ -662,7 +667,7 @@ public class DictServiceImpl implements DictService {
         result.setDuration(System.currentTimeMillis() - startTime);
         result.generateSummary();
 
-        log.info("字典导入完成: {} (租户: {})", result.getSummary(), MetaContext.getCurrentTenantId());
+        log.info("字典导入完成: {} (租户: {})", logSafe(result.getSummary()), MetaContext.getCurrentTenantId());
         return result;
     }
 
@@ -686,7 +691,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     public List<DictItemData> getCascadeChildren(String parentPid, String parentValue) {
-        log.info("获取级联字典子字典: parentPid={}, parentValue={}", parentPid, parentValue);
+        log.info("获取级联字典子字典: parentPid={}, parentValue={}", logSafe(parentPid), logSafe(parentValue));
 
         try {
             // 验证租户上下文
@@ -694,21 +699,21 @@ public class DictServiceImpl implements DictService {
 
             Dict dict = findEntityByPid(parentPid);
             if (!"cascade".equals(dict.getDictType())) {
-                log.warn("字典类型不是级联字典: {} (租户: {})", parentPid, MetaContext.getCurrentTenantId());
+                log.warn("字典类型不是级联字典: {} (租户: {})", logSafe(parentPid), MetaContext.getCurrentTenantId());
                 return new ArrayList<>();
             }
 
             return dictCascadeService.getCascadeChildren(dict.getCode(), parentValue);
             
         } catch (Exception e) {
-            log.error("获取级联字典子字典失败: parentPid={}", parentPid, e);
+            log.error("获取级联字典子字典失败: parentPid={}", logSafe(parentPid), e);
             return new ArrayList<>();
         }
     }
 
     @Override
     public DictTreeNode buildCascadeTree(String rootPid) {
-        log.info("构建级联字典树: rootPid={}", rootPid);
+        log.info("构建级联字典树: rootPid={}", logSafe(rootPid));
 
         try {
             // 验证租户上下文
@@ -716,7 +721,7 @@ public class DictServiceImpl implements DictService {
 
             Dict dict = findEntityByPid(rootPid);
             if (!"cascade".equals(dict.getDictType()) && !"tree".equals(dict.getDictType())) {
-                log.warn("字典类型不是级联字典: {} (租户: {})", rootPid, MetaContext.getCurrentTenantId());
+                log.warn("字典类型不是级联字典: {} (租户: {})", logSafe(rootPid), MetaContext.getCurrentTenantId());
                 return new DictTreeNode();
             }
             
@@ -775,11 +780,11 @@ public class DictServiceImpl implements DictService {
             root.sortChildren();
 
             log.info("级联字典树构建成功: rootPid={}, nodeCount={} (租户: {})",
-                    rootPid, nodeMap.size(), MetaContext.getCurrentTenantId());
+                    logSafe(rootPid), nodeMap.size(), MetaContext.getCurrentTenantId());
             return root;
             
         } catch (Exception e) {
-            log.error("构建级联字典树失败: rootPid={}", rootPid, e);
+            log.error("构建级联字典树失败: rootPid={}", logSafe(rootPid), e);
             return new DictTreeNode();
         }
     }
@@ -789,7 +794,7 @@ public class DictServiceImpl implements DictService {
     @Override
     public DictDataResult loadDictData(String code, String versionStrategy, String pinnedVersion) {
         log.info("加载字典数据: code={}, versionStrategy={}, pinnedVersion={}",
-                code, versionStrategy, pinnedVersion);
+                logSafe(code), logSafe(versionStrategy), logSafe(pinnedVersion));
 
         // 验证租户上下文
           
@@ -988,7 +993,7 @@ public class DictServiceImpl implements DictService {
                 return String.format("%d.%d.%d", major, minor, patch + 1);
             }
         } catch (Exception e) {
-            log.warn("解析语义版本号失败: {}", currentSemver, e);
+            log.warn("解析语义版本号失败: {}", logSafe(currentSemver), e);
         }
         
         return "1.0.0";
@@ -999,7 +1004,7 @@ public class DictServiceImpl implements DictService {
     @Override
     @Transactional
     public DictDTO replaceItems(String dictPid, List<DictCreateRequest.DictItemCreateRequest> items) {
-        log.info("替换字典项: dictPid={}, itemCount={}", dictPid, items != null ? items.size() : 0);
+        log.info("替换字典项: dictPid={}, itemCount={}", logSafe(dictPid), items != null ? items.size() : 0);
 
         // 验证租户上下文并获取字典
         Dict dict = findEntityByPid(dictPid);
@@ -1021,14 +1026,14 @@ public class DictServiceImpl implements DictService {
             dictCascadeService.clearCascadeCache(dict.getCode());
         }
 
-        log.info("字典项替换成功: dictPid={}, newItemCount={}", dictPid, items != null ? items.size() : 0);
+        log.info("字典项替换成功: dictPid={}, newItemCount={}", logSafe(dictPid), items != null ? items.size() : 0);
         return dictConverter.toDTO(dict);
     }
 
     @Override
     @Transactional
     public DictDTO replacePluginItems(String dictPid, List<DictCreateRequest.DictItemCreateRequest> items) {
-        log.info("Replacing plugin-owned dict items: dictPid={}, itemCount={}", dictPid, items != null ? items.size() : 0);
+        log.info("Replacing plugin-owned dict items: dictPid={}, itemCount={}", logSafe(dictPid), items != null ? items.size() : 0);
 
         Dict dict = findEntityByPid(dictPid);
 
@@ -1048,7 +1053,7 @@ public class DictServiceImpl implements DictService {
             dictCascadeService.clearCascadeCache(dict.getCode());
         }
 
-        log.info("Plugin dict items replaced: dictPid={}, newItemCount={}", dictPid, items != null ? items.size() : 0);
+        log.info("Plugin dict items replaced: dictPid={}, newItemCount={}", logSafe(dictPid), items != null ? items.size() : 0);
         return dictConverter.toDTO(dict);
     }
 

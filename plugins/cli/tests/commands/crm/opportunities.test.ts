@@ -29,9 +29,9 @@ describe('crm opportunities command', () => {
       expect(VALID_STAGES).toContain('closed_won');
     });
 
-    it('should uppercase input', () => {
+    it('should lowercase input', () => {
       const input = 'negotiation';
-      expect(input.toUpperCase()).toBe('negotiation');
+      expect(input.toLowerCase()).toBe('negotiation');
     });
   });
 

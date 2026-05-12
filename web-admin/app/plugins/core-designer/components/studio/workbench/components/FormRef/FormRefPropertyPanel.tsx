@@ -30,6 +30,46 @@ interface FormRefPropertyPanelProps {
   readonly?: boolean;
 }
 
+const TOP_LEVEL_PROPERTY_PATHS = new Set<string>([
+  'formId',
+  'mode',
+  'id',
+  'disabled',
+  'readonly',
+  'initialValues',
+  'validateOnChange',
+  'validateOnBlur',
+  'showErrorsOnSubmit',
+  'validationDebounce',
+  'customValidator',
+  'className',
+  'style',
+  'styleOverrides',
+  'onSubmitSuccess',
+  'onSubmitError',
+  'onFieldChange',
+  'onFormLoad',
+  'debug',
+]);
+
+const DATA_SOURCE_PROPERTY_PATHS = new Set<string>([
+  'type',
+  'endpoint',
+  'method',
+  'headers',
+  'data',
+  'contextPath',
+]);
+
+function resolveDataSourcePath(path: string): string | null {
+  if (!path.startsWith('dataSource.')) {
+    return null;
+  }
+
+  const key = path.slice('dataSource.'.length);
+  return DATA_SOURCE_PROPERTY_PATHS.has(key) ? key : null;
+}
+
 /**
  * FormRef 属性配置面板组件
  */
@@ -49,19 +89,24 @@ export const FormRefPropertyPanel: React.FC<FormRefPropertyPanelProps> = ({
     (path: string, newValue: any) => {
       if (readonly) return;
 
-      const keys = path.split('.');
-      const updatedProps = { ...value };
-
-      let current = updatedProps as any;
-      for (let i = 0; i < keys.length - 1; i++) {
-        if (!current[keys[i]]) {
-          current[keys[i]] = {};
-        }
-        current = current[keys[i]];
+      const dataSourceKey = resolveDataSourcePath(path);
+      if (dataSourceKey) {
+        const currentValue = value as Record<string, any>;
+        const nextValue = {
+          ...value,
+          dataSource: {
+            ...currentValue.dataSource,
+            [dataSourceKey]: newValue,
+          },
+        } as Partial<FormRefProps>;
+        onChange(nextValue);
+        return;
       }
 
-      current[keys[keys.length - 1]] = newValue;
-      onChange(updatedProps);
+      if (!TOP_LEVEL_PROPERTY_PATHS.has(path)) {
+        return;
+      }
+      onChange({ ...value, [path]: newValue });
     },
     [value, onChange, readonly],
   );
@@ -69,18 +114,15 @@ export const FormRefPropertyPanel: React.FC<FormRefPropertyPanelProps> = ({
   // 获取嵌套属性值
   const getNestedValue = useCallback(
     (path: string, defaultValue: any = '') => {
-      const keys = path.split('.');
-      let current = value as any;
-
-      for (const key of keys) {
-        if (current && typeof current === 'object' && key in current) {
-          current = current[key];
-        } else {
-          return defaultValue;
-        }
+      const dataSourceKey = resolveDataSourcePath(path);
+      if (dataSourceKey) {
+        const currentValue = value as Record<string, any>;
+        return currentValue.dataSource?.[dataSourceKey] ?? defaultValue;
       }
 
-      return current !== undefined ? current : defaultValue;
+      if (!TOP_LEVEL_PROPERTY_PATHS.has(path)) return defaultValue;
+
+      return (value as Record<string, any>)[path] ?? defaultValue;
     },
     [value],
   );
@@ -99,7 +141,7 @@ export const FormRefPropertyPanel: React.FC<FormRefPropertyPanelProps> = ({
         const mockPreview = {
           id: formId,
           title: availableForms.find((f) => f.id === formId)?.title || 'Unknown Form',
-          fieldCount: Math.floor(Math.random() * 10) + 1,
+          fieldCount: 1,
           lastModified: new Date().toISOString(),
         };
         setFormPreview(mockPreview);

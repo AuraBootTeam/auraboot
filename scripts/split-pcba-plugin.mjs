@@ -379,13 +379,6 @@ function findI18nPlugin(entry) {
   }
   if (parts[0] === 'field' && parts[1]) {
     const fieldCode = parts[1];
-    // Match field prefix to model: pe_brand_code -> pe_brand
-    for (const model of allModelCodes) {
-      const prefix = model.replace('pe_', 'pe_');
-      if (fieldCode.startsWith(prefix.replace('pe_', ''))) {
-        // More precise: check binding files
-      }
-    }
     // Simpler: match by longest model code prefix
     for (const model of allModelCodes) {
       // field code like pe_brand_code -> starts with brand prefix

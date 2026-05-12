@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.util.DateUtil;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.QueryAuditLog;
 import com.auraboot.framework.meta.mapper.QueryAuditLogMapper;
@@ -56,6 +57,10 @@ public class QueryAuditServiceImpl implements QueryAuditService {
     private static final int MAX_EXPORT_BATCH_SIZE = 1000;
     private static final int MAX_ANOMALY_RESULTS = 100;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     // ==================== Audit Log Recording ====================
 
     @Override
@@ -63,7 +68,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
     public void logQueryExecution(SecureQueryRequest request, Object result, long executionTimeMs) {
         try {
             log.debug("Recording query execution: modelCode={}, userId={}, executionTime={}ms",
-                     request.getModelCode(), request.getUserId(), executionTimeMs);
+                     logSafe(request.getModelCode()), request.getUserId(), executionTimeMs);
 
             QueryAuditLog auditLog = new QueryAuditLog();
 
@@ -128,7 +133,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
 
         } catch (Exception e) {
             log.error("Failed to record query execution: modelCode={}, userId={}, error={}",
-                     request.getModelCode(), request.getUserId(), e.getMessage(), e);
+                     logSafe(request.getModelCode()), request.getUserId(), logSafe(e.getMessage()), e);
         }
     }
 
@@ -137,7 +142,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
     public void logQueryError(SecureQueryRequest request, Throwable error, long executionTimeMs) {
         try {
             log.debug("Recording query error: modelCode={}, userId={}, error={}",
-                     request.getModelCode(), request.getUserId(), error.getMessage());
+                     logSafe(request.getModelCode()), request.getUserId(), logSafe(error.getMessage()));
 
             QueryAuditLog auditLog = new QueryAuditLog();
 
@@ -171,7 +176,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
 
         } catch (Exception e) {
             log.error("Failed to record query error: modelCode={}, userId={}, error={}",
-                     request.getModelCode(), request.getUserId(), e.getMessage(), e);
+                     logSafe(request.getModelCode()), request.getUserId(), logSafe(e.getMessage()), e);
         }
     }
 
@@ -180,7 +185,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
     public void logPermissionCheck(SecureQueryRequest request, QueryAccessCheckResult permissionResult) {
         try {
             log.debug("Recording permission check: modelCode={}, userId={}, hasAccess={}",
-                     request.getModelCode(), request.getUserId(), permissionResult.getHasPermission());
+                     logSafe(request.getModelCode()), request.getUserId(), permissionResult.getHasPermission());
 
             // Record permission denial as a security audit event
             if (!permissionResult.getHasPermission()) {
@@ -203,12 +208,12 @@ public class QueryAuditServiceImpl implements QueryAuditService {
                 queryAuditLogMapper.insert(auditLog);
 
                 log.warn("Permission denial recorded: userId={}, model={}",
-                        request.getUserId(), request.getModelCode());
+                        request.getUserId(), logSafe(request.getModelCode()));
             }
 
         } catch (Exception e) {
             log.error("Failed to record permission check: modelCode={}, userId={}, error={}",
-                     request.getModelCode(), request.getUserId(), e.getMessage(), e);
+                     logSafe(request.getModelCode()), request.getUserId(), logSafe(e.getMessage()), e);
         }
     }
 
@@ -217,7 +222,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
     public void logSecurityValidation(SecureQueryRequest request, QuerySecurityValidationResult securityResult) {
         try {
             log.debug("Recording security validation: modelCode={}, userId={}, valid={}",
-                     request.getModelCode(), request.getUserId(), securityResult.getValid());
+                     logSafe(request.getModelCode()), request.getUserId(), securityResult.getValid());
 
             // Record security validation failures
             if (!securityResult.getValid()
@@ -259,12 +264,12 @@ public class QueryAuditServiceImpl implements QueryAuditService {
                 queryAuditLogMapper.insert(auditLog);
 
                 log.warn("Security validation failure recorded: userId={}, model={}, issues={}",
-                        request.getUserId(), request.getModelCode(), issues);
+                        request.getUserId(), logSafe(request.getModelCode()), logSafe(issues));
             }
 
         } catch (Exception e) {
             log.error("Failed to record security validation: modelCode={}, userId={}, error={}",
-                     request.getModelCode(), request.getUserId(), e.getMessage(), e);
+                     logSafe(request.getModelCode()), request.getUserId(), logSafe(e.getMessage()), e);
         }
     }
 
@@ -308,7 +313,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
 
     @Override
     public List<QueryAuditLogDTO> queryAuditLogsByModel(String modelCode, Long tenantId, Instant startTime, Instant endTime) {
-        log.debug("Querying audit logs by model: modelCode={}, tenantId={}", modelCode, tenantId);
+        log.debug("Querying audit logs by model: modelCode={}, tenantId={}", logSafe(modelCode), tenantId);
         List<QueryAuditLog> logs = queryAuditLogMapper.findByModelCode(tenantId, modelCode, startTime, endTime);
         return logs.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
@@ -494,7 +499,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
 
     @Override
     public ModelQueryStatistics getModelQueryStatistics(String modelCode, Long tenantId, Instant startTime, Instant endTime) {
-        log.debug("Generating model query statistics: modelCode={}, tenantId={}", modelCode, tenantId);
+        log.debug("Generating model query statistics: modelCode={}, tenantId={}", logSafe(modelCode), tenantId);
 
         Instant start = startTime != null ? startTime : Instant.now().minus(30, ChronoUnit.DAYS);
         Instant end = endTime != null ? endTime : Instant.now();
@@ -551,7 +556,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
                     .collect(Collectors.toList()));
         }
 
-        log.debug("Model statistics generated: modelCode={}, total={}", modelCode, stats.getTotalQueries());
+        log.debug("Model statistics generated: modelCode={}, total={}", logSafe(modelCode), stats.getTotalQueries());
         return stats;
     }
 
@@ -976,7 +981,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
 
     @Override
     public QueryAuditReport generateAuditReport(QueryAuditReportRequest request) {
-        log.debug("Generating audit report: tenantId={}, type={}", request.getTenantId(), request.getReportType());
+        log.debug("Generating audit report: tenantId={}, type={}", request.getTenantId(), logSafe(request.getReportType()));
 
         Long tenantId = request.getTenantId();
         Instant startTime = resolveStartTime(request.getPeriodStartTime());
@@ -1033,13 +1038,13 @@ public class QueryAuditServiceImpl implements QueryAuditService {
         reportConfig.setDetailLevel(request.getDetailLevel());
         report.setConfiguration(reportConfig);
 
-        log.debug("Audit report generated: reportId={}", report.getReportId());
+        log.debug("Audit report generated: reportId={}", logSafe(report.getReportId()));
         return report;
     }
 
     @Override
     public QueryAuditExportResult exportAuditLogs(QueryAuditExportRequest request) {
-        log.debug("Exporting audit logs: tenantId={}, format={}", request.getTenantId(), request.getExportFormat());
+        log.debug("Exporting audit logs: tenantId={}, format={}", request.getTenantId(), logSafe(request.getExportFormat()));
 
         Instant exportStart = Instant.now();
         Long tenantId = request.getTenantId();
@@ -1416,7 +1421,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
                 auditLog.setSessionId(sessionId);
             }
         } catch (Exception e) {
-            log.warn("Failed to set request info: {}", e.getMessage());
+            log.warn("Failed to set request info: {}", logSafe(e.getMessage()));
         }
     }
 
@@ -1441,7 +1446,7 @@ public class QueryAuditServiceImpl implements QueryAuditService {
         try {
             return objectMapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
-            log.warn("Failed to serialize to JSON: {}", e.getMessage());
+            log.warn("Failed to serialize to JSON: {}", logSafe(e.getMessage()));
             return null;
         }
     }

@@ -6,6 +6,7 @@ import com.auraboot.framework.bpm.audit.BpmAuditService;
 import com.auraboot.framework.bpm.converter.JsonToBpmnConverter;
 import com.auraboot.framework.bpm.entity.BpmNodeHook;
 import com.auraboot.framework.bpm.mapper.BpmNodeHookMapper;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
@@ -66,7 +67,9 @@ public class ProcessDeploymentService {
         Long tenantId = MetaContext.getCurrentTenantId();
 
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<BpmProcessDefinition> pageRequest =
-                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page + 1, size);
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
+                        Math.addExact((long) PaginationSafetyUtils.zeroBasedPageNumber(page), 1L),
+                        PaginationSafetyUtils.pageSize(size, 200));
 
         com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<BpmProcessDefinition> wrapper =
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<BpmProcessDefinition>()

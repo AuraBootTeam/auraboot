@@ -3,7 +3,7 @@ import { AuthApiClient } from '~/server/clients/AuthApiClient';
 import { ResultHelper } from '~/utils/type';
 import logger from '~/server/utils/logger';
 import { config } from '~/server/utils/config';
-import jwt from 'jsonwebtoken';
+import jwt, { type JwtPayload } from 'jsonwebtoken';
 
 /**
  * 静默刷新中间件
@@ -147,54 +147,42 @@ export class SilentRefreshMiddleware {
     userId?: string;
     username?: string;
   } {
-    try {
-      const decoded = jwt.decode(token) as any;
-      if (!decoded || !decoded.exp) {
-        return {
-          isValid: false,
-          expiresAt: null,
-          timeUntilExpiry: null,
-        };
-      }
-
-      const currentTime = Math.floor(Date.now() / 1000);
-      const timeUntilExpiry = decoded.exp - currentTime;
-      const expiresAt = new Date(decoded.exp * 1000).toISOString();
-
-      return {
-        isValid: timeUntilExpiry > 0,
-        expiresAt,
-        timeUntilExpiry,
-        userId: decoded.sub || decoded.userId,
-        username: decoded.username || decoded.name,
-      };
-    } catch (error) {
+    const decoded = this.verifyToken(token);
+    if (!decoded?.exp) {
       return {
         isValid: false,
         expiresAt: null,
         timeUntilExpiry: null,
       };
     }
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    const timeUntilExpiry = decoded.exp - currentTime;
+    const expiresAt = new Date(decoded.exp * 1000).toISOString();
+
+    return {
+      isValid: timeUntilExpiry > 0,
+      expiresAt,
+      timeUntilExpiry,
+      userId: decoded.sub || decoded.userId,
+      username: decoded.username || decoded.name,
+    };
   }
 
   /**
    * 检查token是否需要刷新
    */
   private shouldRefreshToken(token: string): boolean {
-    try {
-      const decoded = jwt.decode(token) as any;
-      if (!decoded || !decoded.exp) {
-        return false;
-      }
-
-      const currentTime = Math.floor(Date.now() / 1000);
-      const timeUntilExpiry = decoded.exp - currentTime;
-
-      // 如果token在5分钟内过期，则需要刷新
-      return timeUntilExpiry < 300;
-    } catch (error) {
+    const decoded = this.verifyToken(token);
+    if (!decoded?.exp) {
       return false;
     }
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    const timeUntilExpiry = decoded.exp - currentTime;
+
+    // 如果token在5分钟内过期，则需要刷新
+    return timeUntilExpiry < 300;
   }
 
   /**
@@ -335,12 +323,17 @@ export class SilentRefreshMiddleware {
    * 获取token过期时间
    */
   private getTokenExpiry(token: string): string | null {
+    const decoded = this.verifyToken(token);
+    if (decoded?.exp) {
+      return new Date(decoded.exp * 1000).toISOString();
+    }
+    return null;
+  }
+
+  private verifyToken(token: string): JwtPayload | null {
     try {
-      const decoded = jwt.decode(token) as any;
-      if (decoded && decoded.exp) {
-        return new Date(decoded.exp * 1000).toISOString();
-      }
-      return null;
+      const decoded = jwt.verify(token, this.jwtSecret);
+      return typeof decoded === 'string' ? null : decoded;
     } catch (error) {
       return null;
     }
