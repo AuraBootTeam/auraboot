@@ -36,7 +36,7 @@ test.describe('workflow-demo — R2 long leave HR approve', () => {
     // ------------------------------------------------------------------
     // 1. API setup: admin login, ensure role users, create applicant, seed balance
     // ------------------------------------------------------------------
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
     const { hrToken } = await ensureRoleUsers(request);
     const applicant = await createLeaveApplicant(request, adminToken, 'r2_long');
     await setLeaveBalance(request, adminToken, applicant.userId, 20);

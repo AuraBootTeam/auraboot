@@ -158,7 +158,7 @@ public class BootstrapStartupRunner implements ApplicationRunner {
                     SEED_CONFIG_RESOURCE, e.getMessage());
         }
         return BootstrapRepairService.RepairOptions.of(
-                "admin@example.com",
+                "admin@auraboot.com",
                 "Test2026x",
                 "Admin",
                 "AuraBoot Dev",

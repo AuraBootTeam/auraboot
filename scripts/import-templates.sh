@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEMPLATES_DIR="$ROOT_DIR/plugins/templates"
 API_BASE="${API_BASE:-http://localhost:6443}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@auraboot.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Test2026x}"
 OVERWRITE="${OVERWRITE:-true}"
 NO_PROXY_VALUE="${NO_PROXY_VALUE:-localhost,127.0.0.1}"

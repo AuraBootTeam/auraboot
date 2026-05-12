@@ -25,7 +25,7 @@ export async function diffCommand(dir: string, options: DiffOptions): Promise<vo
     log.blank();
 
     // Step 1: Authenticate
-    const email = options.user || process.env.AURA_USER || 'admin@example.com';
+    const email = options.user || process.env.AURA_USER || 'admin@auraboot.com';
     const password = options.password || process.env.AURA_PASSWORD || '';
 
     log.info(`Authenticating as ${email}...`);

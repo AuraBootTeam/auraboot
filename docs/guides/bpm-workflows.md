@@ -491,7 +491,7 @@ Process variables are key-value pairs passed when starting a process or completi
 ```
 days > 3
 amount > 10000 && department == 'Finance'
-applicant != 'admin@example.com'
+applicant != 'admin@auraboot.com'
 ```
 
 **Using variables in assignee expressions:**

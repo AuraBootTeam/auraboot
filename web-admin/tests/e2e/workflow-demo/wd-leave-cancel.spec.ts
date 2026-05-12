@@ -17,7 +17,7 @@ test.describe('workflow-demo — R5 applicant cancel', () => {
     browser,
     request,
   }) => {
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
     const { managerToken } = await ensureRoleUsers(request);
     const applicant = await createLeaveApplicant(request, adminToken, 'r5_cancel');
     await setLeaveBalance(request, adminToken, applicant.userId, 20);

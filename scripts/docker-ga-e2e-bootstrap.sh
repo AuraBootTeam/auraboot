@@ -2,7 +2,7 @@
 # Bootstrap the GA-E2E docker stack for OSS Playwright runs.
 #
 # What auto-bootstrap (AURABOOT_BOOTSTRAP_ENABLED=true on the backend) gives us:
-#   - admin@example.com user with TENANT_ADMIN role on a default tenant
+#   - admin@auraboot.com user with TENANT_ADMIN role on a default tenant
 # What it does NOT give us, but the OSS E2E suite needs:
 #   - The OSS plugins published into the tenant (model + page + binding rows)
 #   - operator / viewer test users that auth.setup expects
@@ -56,7 +56,7 @@ DEFAULT_PLUGINS=(
 PLUGINS=( ${PLUGINS:-${DEFAULT_PLUGINS[@]}} )
 
 API_BASE="http://localhost:6444"
-ADMIN_EMAIL="admin@example.com"
+ADMIN_EMAIL="admin@auraboot.com"
 ADMIN_PASSWORD="Test2026x"
 
 echo "[ga-e2e-bootstrap] target stack: $API_BASE"
@@ -160,7 +160,7 @@ echo "[ga-e2e-bootstrap] provisioning test users..."
 provision_user "e2e-operator@test.com" "Test2026x" "operator"
 provision_user "e2e-viewer@test.com"   "Test2026x" "viewer"
 
-# 3b. Ensure admin@example.com is a member of a "System" (platform) tenant.
+# 3b. Ensure admin@auraboot.com is a member of a "System" (platform) tenant.
 # The auraboot bootstrap only seeds a single business tenant ("AuraBoot Demo"),
 # but the space-selection E2E suite (and any UI flow that surfaces a Platform
 # Console toggle) requires admin to belong to BOTH a platform tenant (named
@@ -191,14 +191,14 @@ case "$sys_status" in
   *)       echo "  System tenant: provision failed ($sys_status)" >&2 ;;
 esac
 
-# 3c. Provision platform_admin role in System tenant + assign to admin@example.com.
+# 3c. Provision platform_admin role in System tenant + assign to admin@auraboot.com.
 #
 # Why this is needed: BootstrapEngineService.bootstrapSystemTenant() (step 8.5)
 # creates platform_admin only when /api/bootstrap/setup runs the full system-
 # tenant provisioning path. The lighter auto-bootstrap that the GA-E2E stack
 # uses (AURABOOT_BOOTSTRAP_ENABLED=true) creates the System tenant via
 # /api/tenant-selection/process action=create above (3b), which does NOT trigger
-# bootstrapSystemTenant. As a result admin@example.com is only tenant_admin
+# bootstrapSystemTenant. As a result admin@auraboot.com is only tenant_admin
 # in System and lacks platform_admin, causing 4 admin specs to fail with 409:
 #   - admin-guard-v2 AG-001 (GET /api/admin/infrastructure/status)
 #   - admin-guard-v2 AG-002 (path-scope check)
@@ -301,7 +301,7 @@ except Exception:
     print('parse-error')
 ")
       case "$assign_ok" in
-        ok) echo "  platform_admin: granted to admin@example.com (memberId=$MEMBER_ID)" ;;
+        ok) echo "  platform_admin: granted to admin@auraboot.com (memberId=$MEMBER_ID)" ;;
         *)  echo "  WARN: platform_admin grant failed: $assign_ok" >&2 ;;
       esac
     else

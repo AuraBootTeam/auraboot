@@ -71,7 +71,7 @@ class BootstrapRepairServiceTenantBootstrapTest {
         tenant.setId(7L);
         tenant.setName("Acme");
 
-        when(userService.findByEmail("admin@example.com")).thenReturn(admin);
+        when(userService.findByEmail("admin@auraboot.com")).thenReturn(admin);
         when(tenantService.findByName("Acme")).thenReturn(tenant);
         when(roleService.findByTenantId(7L)).thenReturn(List.of());
         when(tenantBootstrapService.bootstrapTenant(7L, 42L))
@@ -94,7 +94,7 @@ class BootstrapRepairServiceTenantBootstrapTest {
 
     private static BootstrapRepairService.RepairOptions options() {
         return BootstrapRepairService.RepairOptions.of(
-            "admin@example.com",
+            "admin@auraboot.com",
             "Test2026x",
             "Admin",
             "Acme",

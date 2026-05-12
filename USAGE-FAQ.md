@@ -142,7 +142,7 @@ Yes — the platform keeps audit forever by default, but `auraboot.audit.retenti
 ## Don't see your question?
 
 - GitHub Discussions: https://github.com/AuraBootTeam/auraboot/discussions
-- Discord: https://discord.gg/auraboot
+- Discord: https://discord.gg/p2fW5A2MW6
 - For commercial / partnership questions: license@auraboot.com
 
 We add new questions here whenever they come up more than twice.
