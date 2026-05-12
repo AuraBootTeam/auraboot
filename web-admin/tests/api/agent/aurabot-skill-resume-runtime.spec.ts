@@ -3,7 +3,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 import { Client } from 'pg';
 import { BACKEND_URL } from '../../helpers/environments';
 
-const TEST_ACCOUNT = { email: 'admin@example.com', password: 'Test2026x' };
+const TEST_ACCOUNT = { email: 'admin@auraboot.com', password: 'Test2026x' };
 const PG_HOST = process.env.PG_HOST ?? 'localhost';
 const PG_PORT = process.env.PG_PORT ?? '5432';
 const PG_USER = process.env.PG_USER ?? 'ghj';

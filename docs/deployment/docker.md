@@ -18,7 +18,7 @@ docker compose --profile full up --build -d
 open http://localhost:3000
 ```
 
-Default credentials: `admin@example.com` / `ChangeMeOnFirstLogin!`
+Default credentials: `admin@auraboot.com` / `ChangeMeOnFirstLogin!`
 
 ---
 
