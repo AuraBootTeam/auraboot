@@ -119,7 +119,7 @@ done
 echo "▶ Authenticating against docker backend..."
 LOGIN_RESP=$(curl -sf -X POST "$BACKEND_URL/api/auth/login" \
     -H "Content-Type: application/json" \
-    -d '{"email":"admin@example.com","password":"Test2026x"}')
+    -d '{"email":"admin@auraboot.com","password":"Test2026x"}')
 
 JWT=$(echo "$LOGIN_RESP" | jq -r '.data.jwt // empty')
 if [[ -z "$JWT" ]]; then

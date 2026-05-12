@@ -32,7 +32,7 @@ test.describe('BPM designer — notification-task', { tag: ['@bpm-regression'] }
   test('configure notification-task with eventCode + templateParamsVars — L1/L2/L3', async ({ page, request }) => {
     const ts = Date.now();
     const processKey = `e2e_designer_notify_${ts}`;
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     await openDesigner(page, { processKey, name: `Notify ${ts}` });
 

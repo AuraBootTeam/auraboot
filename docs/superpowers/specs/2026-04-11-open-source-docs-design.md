@@ -117,7 +117,7 @@ auraboot/docs/
 #### quick-start.md
 - Prerequisites: Docker, Git
 - 3-step setup: clone → docker compose up → open browser
-- First login (admin@example.com / default password)
+- First login (admin@auraboot.com / default password)
 - Explore the demo workspace (pre-loaded CRM data)
 - ~5 minutes end-to-end
 

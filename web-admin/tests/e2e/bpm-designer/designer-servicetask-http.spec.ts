@@ -34,7 +34,7 @@ test.describe('BPM designer — serviceTask http', { tag: ['@bpm-regression'] },
   test('serviceType=http with serviceUrl + method + responseVar + timeoutMs — L1/L2', async ({ page, request }) => {
     const ts = Date.now();
     const processKey = `e2e_designer_http_${ts}`;
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     await openDesigner(page, { processKey, name: `HTTP ${ts}` });
 

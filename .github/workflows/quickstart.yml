@@ -96,7 +96,7 @@ jobs:
         run: |
           response=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
             -H "Content-Type: application/json" \
-            -d '{"email":"admin@example.com","password":"Test2026x"}')
+            -d '{"email":"admin@auraboot.com","password":"Test2026x"}')
           echo "$response" | head -c 200
           echo
           echo "$response" | grep -q '"jwt"' || {
@@ -110,7 +110,7 @@ jobs:
         run: |
           token=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
             -H "Content-Type: application/json" \
-            -d '{"email":"admin@example.com","password":"Test2026x"}' \
+            -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
             | sed -n 's/.*"jwt":"\([^"]*\)".*/\1/p')
           [ -n "$token" ] || { echo "no token"; exit 1; }
           # Stick to endpoints that any authenticated user can hit without
