@@ -32,6 +32,9 @@ const skipWebServer = process.env.PW_SKIP_WEBSERVER === '1';
 const adminStorageState = process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json';
 const operatorStorageState = process.env.PW_OPERATOR_STORAGE_STATE || './tests/storage/operator.json';
 const viewerStorageState = process.env.PW_VIEWER_STORAGE_STATE || './tests/storage/viewer.json';
+const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
+const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
+const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
 
 /**
  * Playwright E2E Test Configuration
@@ -55,7 +58,7 @@ export default defineConfig({
   // imports the file and crashes with ERR_MODULE_NOT_FOUND before any test
   // runs, blocking auth.setup and the entire suite.
   testIgnore: ['**/mcp-cursor-demo.spec.ts'],
-  outputDir: './test-results/artifacts',
+  outputDir: artifactDir,
 
   // Global teardown only (login moved to 'auth' setup project)
   globalTeardown: './tests/global-teardown.ts',
@@ -75,8 +78,8 @@ export default defineConfig({
   reporter: process.env.CI
     ? [
         ['list'],
-        ['html', { open: 'never', outputFolder: './test-results/html-report' }],
-        ['json', { outputFile: './test-results/results.json' }],
+        ['html', { open: 'never', outputFolder: reportDir }],
+        ['json', { outputFile: resultsJson }],
       ]
     : [['line']],
 

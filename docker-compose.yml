@@ -89,6 +89,10 @@ services:
       AURA_BUILTIN_PLUGINS_DIR: /app/plugins
       AURA_PLUGINS_DIR: /app/pf4j-plugins
       MANAGEMENT_TRACING_ENABLED: "false"
+      # Docker Desktop/overlay filesystems can report 0 bytes available for
+      # /app, which makes actuator health flap DOWN even when DB/app are OK.
+      # Disk capacity is monitored separately by scripts/dev/doctor-disk.sh.
+      MANAGEMENT_HEALTH_DISKSPACE_ENABLED: "false"
     volumes:
       - backend_data:/app/data
       - ./plugins:/app/plugins:ro
