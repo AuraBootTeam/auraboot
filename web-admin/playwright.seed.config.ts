@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { BASE_URL } from './tests/helpers/playwright-env';
 
 const artifactDir = process.env.PW_SEED_ARTIFACT_DIR || process.env.PW_ARTIFACT_DIR || './test-results/seed';
 
@@ -16,7 +17,7 @@ export default defineConfig({
   reporter: [['line']],
   timeout: 600_000, // 10 min per test
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173',
+    baseURL: BASE_URL,
     storageState: process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json',
     ...devices['Desktop Chrome'],
   },
