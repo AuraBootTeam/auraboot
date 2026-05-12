@@ -80,7 +80,30 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                             + "use Anthropic (Claude 3.5+) for image input.");
         }
 
-        // Build OpenAI Chat Completions request
+        Map<String, Object> body = buildOpenAiRequestBody(request);
+
+        // Strip trailing /v1 or /v1/ from baseUrl to avoid double path segments
+        String normalizedBase = baseUrl;
+        if (normalizedBase.endsWith("/v1/")) {
+            normalizedBase = normalizedBase.substring(0, normalizedBase.length() - 4);
+        } else if (normalizedBase.endsWith("/v1")) {
+            normalizedBase = normalizedBase.substring(0, normalizedBase.length() - 3);
+        }
+
+        String responseBody = webClient.post()
+                .uri(normalizedBase + "/v1/chat/completions")
+                .header("Authorization", "Bearer " + apiKey)
+                .header("content-type", "application/json")
+                .bodyValue(objectMapper.writeValueAsString(body))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+        Map<String, Object> resp = objectMapper.readValue(responseBody, Map.class);
+        return convertResponse(resp);
+    }
+
+    Map<String, Object> buildOpenAiRequestBody(LlmChatRequest request) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", request.getModel());
         body.put("max_tokens", request.getMaxTokens());
@@ -117,29 +140,18 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                 }
             }
             body.put("tools", tools);
+            String toolChoice = request.getToolChoice();
+            if (toolChoice != null && !toolChoice.isBlank()) {
+                body.put("tool_choice", toolChoice);
+            }
         } else if (request.getTools() != null && !request.getTools().isEmpty()) {
+            if ("required".equals(request.getToolChoice())) {
+                throw new IllegalArgumentException(
+                        "tool_choice=required requested but tool payload is disabled for model: " + request.getModel());
+            }
             log.debug("Skipping tool payload for model '{}' because provider compatibility is disabled", request.getModel());
         }
-
-        // Strip trailing /v1 or /v1/ from baseUrl to avoid double path segments
-        String normalizedBase = baseUrl;
-        if (normalizedBase.endsWith("/v1/")) {
-            normalizedBase = normalizedBase.substring(0, normalizedBase.length() - 4);
-        } else if (normalizedBase.endsWith("/v1")) {
-            normalizedBase = normalizedBase.substring(0, normalizedBase.length() - 3);
-        }
-
-        String responseBody = webClient.post()
-                .uri(normalizedBase + "/v1/chat/completions")
-                .header("Authorization", "Bearer " + apiKey)
-                .header("content-type", "application/json")
-                .bodyValue(objectMapper.writeValueAsString(body))
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        Map<String, Object> resp = objectMapper.readValue(responseBody, Map.class);
-        return convertResponse(resp);
+        return body;
     }
 
     @Override

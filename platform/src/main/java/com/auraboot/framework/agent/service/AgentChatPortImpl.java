@@ -289,6 +289,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         } else {
             persistTape = true;
         }
+        boolean requireInitialToolCall = isEvidenceFirstAgent(agentDef);
 
         log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
                 agentCode, providerCode, model, tools.size(), overrides != null);
@@ -296,7 +297,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         // Run the tool loop
         return doAgentToolLoop(ctx, agentCode, provider, providerCode, config, model,
                 systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink,
-                persistTape);
+                persistTape, requireInitialToolCall);
     }
 
     // =========================================================================
@@ -311,13 +312,17 @@ public class AgentChatPortImpl implements AgentChatPort {
                                         List<LlmChatRequest.Tool> tools,
                                         List<ToolDefinition> toolDefs,
                                         String sessionId, ResponseSink sink,
-                                        boolean persistTape) {
+                                        boolean persistTape,
+                                        boolean requireInitialToolCall) {
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            String toolChoice = resolveToolChoiceForRound(provider, providerCode, tools, messages,
+                    requireInitialToolCall);
             LlmChatRequest req = LlmChatRequest.builder()
                     .model(model)
-                    .systemPrompt(systemPrompt)
+                    .systemPrompt(applyToolChoicePrompt(systemPrompt, toolChoice, tools))
                     .messages(new ArrayList<>(messages))
                     .tools(tools.isEmpty() ? null : tools)
+                    .toolChoice(toolChoice)
                     .maxTokens(maxTokens)
                     .build();
 
@@ -338,6 +343,11 @@ public class AgentChatPortImpl implements AgentChatPort {
             }
 
             String stopReason = response.getStopReason();
+            if ("required".equals(toolChoice) && !hasToolUse(response)) {
+                String msg = requiredToolCallMissingMessage(providerCode, stopReason, tools);
+                sink.onError(msg, null);
+                return new TurnOutcome.Failed(msg, null);
+            }
 
             if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null) {
                 // Persist the final assistant turn so subsequent turns see it as
@@ -480,6 +490,107 @@ public class AgentChatPortImpl implements AgentChatPort {
         String exhaustedMsg = "Agent tool loop exceeded maximum rounds (" + MAX_TOOL_ROUNDS + ")";
         sink.onError(exhaustedMsg, null);
         return new TurnOutcome.Failed(exhaustedMsg, null);
+    }
+
+    private String resolveToolChoiceForRound(LlmProvider provider, String providerCode, List<LlmChatRequest.Tool> tools,
+                                             List<LlmChatRequest.Message> messages,
+                                             boolean requireInitialToolCall) {
+        if (!requireInitialToolCall) {
+            return null;
+        }
+        String actualProviderCode = provider != null ? provider.getProviderCode() : null;
+        if (!"openai".equals(actualProviderCode) && !"openai".equals(providerCode)) {
+            return null;
+        }
+        if (tools == null || tools.isEmpty()) {
+            return null;
+        }
+        return latestMessageIsToolResult(messages) ? null : "required";
+    }
+
+    private boolean latestMessageIsToolResult(List<LlmChatRequest.Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return false;
+        }
+        LlmChatRequest.Message latest = messages.get(messages.size() - 1);
+        Object content = latest != null ? latest.getContent() : null;
+        if (!(content instanceof List<?> blocks)) {
+            return false;
+        }
+        for (Object block : blocks) {
+            if (block instanceof LlmChatRequest.ContentBlock cb && "tool_result".equals(cb.getType())) {
+                return true;
+            }
+            if (block instanceof Map<?, ?> raw && "tool_result".equals(String.valueOf(raw.get("type")))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String applyToolChoicePrompt(String systemPrompt, String toolChoice, List<LlmChatRequest.Tool> tools) {
+        if (!"required".equals(toolChoice)) {
+            return systemPrompt;
+        }
+        String base = systemPrompt == null ? "" : systemPrompt.stripTrailing();
+        String toolNames = tools.stream()
+                .map(LlmChatRequest.Tool::getName)
+                .limit(10)
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("<none>");
+        String directive = "Tool-use requirement: call one of the available tools before giving the final answer. "
+                + "Use the most relevant tool for the user's request. Available tools: " + toolNames + ".";
+        return base.isBlank() ? directive : base + "\n\n" + directive;
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean isEvidenceFirstAgent(Map<String, Object> agentDef) {
+        if (agentDef == null || agentDef.get("guardrails") == null) {
+            return false;
+        }
+        Object raw = agentDef.get("guardrails");
+        try {
+            Map<String, Object> guardrails;
+            if (raw instanceof Map<?, ?> map) {
+                guardrails = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (entry.getKey() != null) {
+                        guardrails.put(String.valueOf(entry.getKey()), entry.getValue());
+                    }
+                }
+            } else {
+                guardrails = objectMapper.readValue(String.valueOf(raw), Map.class);
+            }
+            return Boolean.TRUE.equals(guardrails.get("evidenceFirst"));
+        } catch (Exception e) {
+            log.debug("Failed to parse agent guardrails for evidenceFirst flag: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean hasToolUse(LlmChatResponse response) {
+        if (response == null || response.getContent() == null) {
+            return false;
+        }
+        for (LlmChatResponse.ContentBlock block : response.getContent()) {
+            if (block != null && "tool_use".equals(block.getType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String requiredToolCallMissingMessage(String providerCode, String stopReason,
+                                                  List<LlmChatRequest.Tool> tools) {
+        String available = tools == null || tools.isEmpty()
+                ? "<none>"
+                : tools.stream()
+                .map(LlmChatRequest.Tool::getName)
+                .limit(10)
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("<none>");
+        return "LLM provider " + providerCode + " returned " + (stopReason == null ? "<null>" : stopReason)
+                + " without a required tool call. tool_choice=required was sent. Available tools: " + available;
     }
 
     // =========================================================================

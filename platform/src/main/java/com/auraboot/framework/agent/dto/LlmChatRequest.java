@@ -38,6 +38,20 @@ public class LlmChatRequest {
 
     private List<Message> messages;
     private List<Tool> tools;
+
+    /**
+     * Optional provider-agnostic tool choice hint. OpenAI-compatible providers
+     * pass this through as {@code tool_choice}; Anthropic currently ignores it
+     * because the unified request only needs deterministic tool forcing for
+     * chat-completions models that otherwise may answer freely despite tools
+     * being attached.
+     *
+     * <p>Supported values today: {@code "auto"} and {@code "required"}.
+     * Callers should leave this null unless the current turn is a tool-mandatory
+     * round. The provider only emits it when a non-empty tools array is sent.
+     */
+    private String toolChoice;
+
     private int maxTokens;
 
     /**
