@@ -7,6 +7,7 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
@@ -60,6 +61,7 @@ public class PipelineImportServiceImpl implements PipelineImportService {
     private final PipelineMirrorWriter mirrorWriter;
     private final TransactionOperations transactionOperations;
 
+    @Autowired
     public PipelineImportServiceImpl(
             ObjectMapper objectMapper,
             DynamicDataService dynamicDataService,
