@@ -59,47 +59,6 @@ AURA_CACHE_ROOT="${AURA_CACHE_ROOT:-$HOME/.cache/auraboot}"
 AURA_CONTAINER_CACHE_KEY="${AURA_CONTAINER_CACHE_KEY:-linux}"
 AURA_CONTAINER_CACHE_ROOT="${AURA_CONTAINER_CACHE_ROOT:-$AURA_CACHE_ROOT/container-$AURA_CONTAINER_CACHE_KEY}"
 
-usage() {
-    cat <<USAGE
-Usage: $0 [--slug=<name>] [--offset=<N>] [--rebuild] [--dry-run] [--help]
-
-Options:
-  --slug=<name>    Override auto-derived slug (lowercase / dash separated, ≤ 24 chars)
-  --offset=<N>     Skip auto-probing; force port offset N (1-89)
-  --rebuild        Force backend image rebuild (slow; opt in only when Dockerfile /
-                   build.gradle / src changed since last image)
-  --no-build       (deprecated; kept for back-compat — same as default)
-  --quiet-build    With --rebuild, build the backend image first using quiet output,
-                   then start containers detached with --no-build
-  --wait           Wait for mapped backend and frontend health before returning
-  --skip-pull      Do not pre-pull postgres/redis/frontend images before compose up
-  --dry-run        Print resolved plan and exit without starting docker
-  --help           Show this message
-
-Environment:
-  ENTERPRISE_PLUGINS_DIR      Optional absolute/relative plugin root to mount at
-                              /app/plugins-enterprise. Defaults to an empty dir.
-  ENTERPRISE_PLUGIN_JARS_DIR  Optional absolute/relative PF4J jar root to mount at
-                              /app/plugin-jars. Defaults to an empty dir.
-  AURA_IMAGE_PULL_TIMEOUT_SECONDS
-                              Timeout for each pre-pulled image, default 900 seconds.
-  AURA_MIN_DOCKER_FREE_MB     Minimum Docker VM free space required before starting
-                              a full isolated stack. Default: 2048 MB.
-  AURA_SKIP_DOCKER_DISK_CHECK=1
-                              Skip the Docker VM free-space preflight.
-  AURA_CACHE_ROOT             Host directory for shared caches. Default:
-                              ~/.cache/auraboot.
-  AURA_CONTAINER_CACHE_KEY    Platform/cache namespace for container caches.
-                              Default: linux.
-  AURA_CONTAINER_CACHE_ROOT   Host directory mounted into containers for
-                              gradle, m2, pnpm store, and Playwright browsers.
-                              Default: \$AURA_CACHE_ROOT/container-linux.
-  ISOLATED_BACKEND_DOCKERFILE
-                              Backend Dockerfile override. Default is Dockerfile
-                              for production-style merge verification. Set to
-                              Dockerfile.dev only when you explicitly want a
-                              Docker dev backend.
-
 Default behaviour (since 2026-05-08): --no-build. Full stacks share host-backed
 dependency caches under AURA_CACHE_ROOT, keeping warm cache out of the Docker
 VM. Pass --rebuild to force a fresh image when Dockerfile, build.gradle, or
