@@ -80,6 +80,43 @@ class CloudConfigConnectionTesterTest {
     }
 
     @Test
+    void testConnection_llm_missingApiKey_returnsError() {
+        when(cloudConfigService.getByPidDecrypted("pid-1"))
+                .thenReturn(config("llm", "anthropic",
+                        "{\"apiFormat\":\"messages\",\"defaultModel\":\"claude-sonnet-4-6\"}"));
+
+        Map<String, Object> result = tester.testConnection("pid-1");
+
+        assertThat(result.get("status")).isEqualTo("error");
+        assertThat((String) result.get("message")).contains("apiKey");
+    }
+
+    @Test
+    void testConnection_llm_invalidApiFormat_returnsError() {
+        when(cloudConfigService.getByPidDecrypted("pid-1"))
+                .thenReturn(config("llm", "custom",
+                        "{\"apiKey\":\"sk-test\",\"apiFormat\":\"legacy_completion\",\"defaultModel\":\"m\"}"));
+
+        Map<String, Object> result = tester.testConnection("pid-1");
+
+        assertThat(result.get("status")).isEqualTo("error");
+        assertThat((String) result.get("message")).contains("apiFormat");
+    }
+
+    @Test
+    void testConnection_llm_openAiCompatibleConfig_returnsOk() {
+        when(cloudConfigService.getByPidDecrypted("pid-1"))
+                .thenReturn(config("llm", "deepseek",
+                        "{\"apiKey\":\"sk-test\",\"apiFormat\":\"chat_completions\","
+                                + "\"baseUrl\":\"https://api.deepseek.com\",\"defaultModel\":\"deepseek-chat\"}"));
+
+        Map<String, Object> result = tester.testConnection("pid-1");
+
+        assertThat(result.get("status")).isEqualTo("ok");
+        assertThat((String) result.get("message")).contains("LLM provider config validated");
+    }
+
+    @Test
     void testConnection_smsUnknownProvider_returnsOkWithMessage() {
         when(cloudConfigService.getByPidDecrypted("pid-1"))
                 .thenReturn(config("sms", "unknown_sms", "{}"));

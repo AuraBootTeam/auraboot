@@ -39,6 +39,7 @@ public class CloudConfigServiceImpl implements CloudConfigService {
 
     /** Sensitive field names that must be encrypted at rest and masked on read. */
     private static final Set<String> SENSITIVE_FIELDS = Set.of(
+            "apiKey",
             "secretId", "secretKey", "appSecret", "clientSecret",
             "privateKey", "password", "accessKey", "accessToken", "refreshToken"
     );
@@ -49,7 +50,7 @@ public class CloudConfigServiceImpl implements CloudConfigService {
 
     @Override
     public CloudConfig getEffectiveConfig(Long tenantId, String serviceType, String providerCode) {
-        CloudConfig config = cloudConfigMapper.getEffectiveConfig(tenantId, serviceType, providerCode);
+        CloudConfig config = cloudConfigMapper.getEffectiveConfig(tenantId, normalize(serviceType), providerCode);
         if (config != null) {
             config.setConfig(decryptConfigJson(config.getConfig()));
         }
