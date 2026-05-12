@@ -246,7 +246,7 @@ reviewer P1.6 戳出：v3 plan 里 A.7 比较 `/chat/stream` 与 `/chat/stream-v
 # A.2 commit 之后立刻跑（chatService 还没 split）
 TOKEN=$(curl -s -X POST http://localhost:6443/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"Test2026x"}' | jq -r '.data.jwt')
+  -d '{"email":"admin@auraboot.com","password":"Test2026x"}' | jq -r '.data.jwt')
 
 mkdir -p /tmp/sse-pre-refactor
 for SCENARIO in "trivial-greeting:你好" "explain-with-context:这个表单有哪些字段" "platform-query:查询本月销售" "tool-confirm:删除最后一条客户记录"; do
@@ -694,7 +694,7 @@ ps -ef | grep -E "MetaApplication|java.*platform" | grep -v grep | head -1 | gre
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:6443/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"Test2026x"}' | jq -r '.data.jwt')
+  -d '{"email":"admin@auraboot.com","password":"Test2026x"}' | jq -r '.data.jwt')
 
 mkdir -p /tmp/sse-after-refactor
 
@@ -870,7 +870,7 @@ ls -la ~/.m2/repository/com/auraboot/auraboot-core/1.0.0-SNAPSHOT/auraboot-core-
 # 3. 重录（用 v4 plan §5 A.2b 的脚本）
 TOKEN=$(curl -s -X POST http://localhost:6443/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"Test2026x"}' \
+  -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['jwt'])")
 
 mkdir -p /tmp/sse-pre-refactor

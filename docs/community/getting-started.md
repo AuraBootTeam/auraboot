@@ -59,7 +59,7 @@ This launches Vite + the BFF on `http://localhost:5173`.
 
 Open `http://localhost:5173` and sign in with:
 
-- Email: `admin@example.com`
+- Email: `admin@auraboot.com`
 - Password: `Test2026x`
 
 You will be prompted to rotate the password on first login.
@@ -79,7 +79,7 @@ A successful `UP` response means the database connection, Redis, and core subsys
 
 - Read [`docs/getting-started/first-app.md`](../getting-started/first-app.md) to build your first model and page.
 - Browse [`docs/core-concepts/`](../core-concepts/) for the DSL engine, commands, and permissions.
-- Join the conversation on [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) or [Discord](https://discord.gg/auraboot).
+- Join the conversation on [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) or [Discord](https://discord.gg/p2fW5A2MW6).
 
 ## Troubleshooting
 

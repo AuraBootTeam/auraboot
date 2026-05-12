@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const BACKEND_URL = 'http://127.0.0.1:6443';
-const TEST_USER = { email: 'admin@example.com', password: 'Test2026x' };
+const TEST_USER = { email: 'admin@auraboot.com', password: 'Test2026x' };
 
 type Filter = { fieldName: string; operator: string; value?: unknown; values?: unknown[] };
 

@@ -92,7 +92,7 @@ public class BootstrapAdminRepairController {
 
     private static RepairOptions defaults() {
         return RepairOptions.of(
-                "admin@example.com",
+                "admin@auraboot.com",
                 "Test2026x",
                 "Admin",
                 "AuraBoot Dev",

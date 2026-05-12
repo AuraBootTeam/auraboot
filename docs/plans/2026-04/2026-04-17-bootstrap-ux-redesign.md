@@ -442,7 +442,7 @@ Expected: 启动日志出现 `Bootstrap NOT INITIALIZED` 警示块
 ```bash
 NO_PROXY=localhost curl -sX POST http://localhost:6443/api/bootstrap/setup \
   -H 'Content-Type: application/json' \
-  -d '{"tenantName":"Default","adminEmail":"admin@example.com","adminPassword":"Test2026x"}'
+  -d '{"tenantName":"Default","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x"}'
 ```
 
 重启后端，确认警告不再出现。
@@ -874,7 +874,7 @@ test.describe('Bootstrap UX redesign', () => {
   test('after bootstrap, banner disappears', async ({ page }) => {
     await page.goto('/setup');
     await page.fill('[name="tenantName"]', 'Default');
-    await page.fill('[name="adminEmail"]', 'admin@example.com');
+    await page.fill('[name="adminEmail"]', 'admin@auraboot.com');
     await page.fill('[name="adminPassword"]', 'Test2026x');
     await page.click('button[type="submit"]');
     // 等待向导成功跳转

@@ -66,7 +66,7 @@ export async function publishCommand(dir: string, options: PublishOptions): Prom
     if (token) {
       log.info('Using AURA_TOKEN from environment');
     } else {
-      const email = options.user || process.env.AURA_USER || 'admin@example.com';
+      const email = options.user || process.env.AURA_USER || 'admin@auraboot.com';
       const password = options.password || process.env.AURA_PASSWORD || '';
 
       log.info(`Authenticating as ${email}...`);
