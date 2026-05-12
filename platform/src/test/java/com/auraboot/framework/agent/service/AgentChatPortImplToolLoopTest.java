@@ -112,7 +112,7 @@ class AgentChatPortImplToolLoopTest {
                 "status", "active",
                 "model", "test-model",
                 "system_prompt", "Compare suppliers.",
-                "guardrails", "{\"provider\":\"openai\"}")));
+                "guardrails", "{\"provider\":\"openai\",\"evidenceFirst\":true}")));
     }
 
     private void stubAgentDefinitionWithTools(String toolsJson) {
