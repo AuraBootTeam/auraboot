@@ -42,7 +42,7 @@ test.describe('workflow-demo — R1 short leave manager approve', () => {
     // ------------------------------------------------------------------
     // 1. API setup: admin login, ensure role users, create applicant, seed balance
     // ------------------------------------------------------------------
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
     const { managerToken: _managerToken } = await ensureRoleUsers(request);
     const applicant = await createLeaveApplicant(request, adminToken, 'r1_short');
     await setLeaveBalance(request, adminToken, applicant.userId, 20);

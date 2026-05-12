@@ -9,7 +9,7 @@
 #   BASE_URL=http://your-server:6443
 #   PERF_BASELINE_DIR=/path/to/scripts/perf-ci/baseline
 #   PERF_ALERT_WEBHOOK=https://hooks.slack.com/services/XXX/YYY/ZZZ
-#   USERNAME=admin@example.com
+#   USERNAME=admin@auraboot.com
 #   PASSWORD=Test2026x
 #
 # Replace /path/to with the absolute path to your AuraBoot checkout.

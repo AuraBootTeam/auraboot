@@ -19,7 +19,7 @@ The single startup runner + the new `BootstrapRepairService` must idempotently g
 | 1 | `system_config` row present (system.mode / system.platform_name / system.db_uuid / system.instance_url) | `ab_system_config` | `repairSystemConfig()` |
 | 2 | System Tenant exists (id=1, name="System") | `ab_tenant` where name='System' | `repairSystemTenant()` |
 | 3 | `platform_admin` role exists in System Tenant | `ab_role` where tenant_id=1 and code='platform_admin' | `repairPlatformAdminRole()` |
-| 4 | admin user exists (`admin@example.com`) | `ab_user` where email=ADMIN_EMAIL | `repairAdminUser()` |
+| 4 | admin user exists (`admin@auraboot.com`) | `ab_user` where email=ADMIN_EMAIL | `repairAdminUser()` |
 | 5 | admin → System Tenant membership | `ab_tenant_member` where tenant_id=1 and user_id=$admin | `repairAdminSystemMembership()` |
 | 6 | admin → `platform_admin` grant | `ab_member_role` where member_id=$adminMember and role_id=$platformAdmin | `repairAdminPlatformAdminGrant()` |
 | 7 | Business Tenant exists (default companyName) | `ab_tenant` where name=$company | `repairBusinessTenant()` |
@@ -39,7 +39,7 @@ public interface BootstrapRepairService {
   RepairStepResult repair(String stepName, RepairOptions opts);
 
   record RepairOptions(
-      String adminEmail,         // default admin@example.com
+      String adminEmail,         // default admin@auraboot.com
       String adminPassword,      // default Test2026x (only used if creating)
       String adminDisplayName,
       String companyName,        // default "AuraBoot Dev"

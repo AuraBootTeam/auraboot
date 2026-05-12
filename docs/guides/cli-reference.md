@@ -37,7 +37,7 @@ The JWT token is cached in `~/.aura/credentials.json` (mode 0600) and auto-renew
 ### Non-interactive login
 
 ```bash
-aura login -u admin@example.com -p Test2026x
+aura login -u admin@auraboot.com -p Test2026x
 ```
 
 ### Login to a specific tenant
@@ -594,7 +594,7 @@ AURA_AGENT_MODE=1 aura crm leads
 {
   "local": {
     "jwt": "eyJ...",
-    "email": "admin@example.com",
+    "email": "admin@auraboot.com",
     "expiresAt": "2026-04-12T08:00:00Z"
   }
 }
