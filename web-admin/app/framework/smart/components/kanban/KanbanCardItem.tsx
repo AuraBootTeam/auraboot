@@ -134,6 +134,7 @@ export function KanbanCardItem({
         isDragging && 'opacity-50',
         !draggable && 'cursor-default',
       )}
+      data-testid="kanban-card"
       data-card-id={card.id}
       data-card-terminal={terminal ?? ''}
       onClick={handleClick}
