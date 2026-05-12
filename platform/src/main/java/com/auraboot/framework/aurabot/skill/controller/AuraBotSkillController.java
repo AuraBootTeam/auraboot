@@ -393,16 +393,16 @@ public class AuraBotSkillController {
         return codes;
     }
 
-    /** SHA-1 of serialised meta list. Quote-wrapped per RFC 7232. */
+    /** SHA-256 of serialised meta list. Quote-wrapped per RFC 7232. */
     String computeEtag(List<SkillMeta> metas) {
         try {
             byte[] json = objectMapper.writeValueAsBytes(metas);
-            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] digest = md.digest(json);
             return "\"" + HexFormat.of().formatHex(digest) + "\"";
         } catch (NoSuchAlgorithmException e) {
-            // SHA-1 is mandatory in every JRE — propagate as unchecked.
-            throw new IllegalStateException("SHA-1 unavailable on this JVM", e);
+            // SHA-256 is mandatory in every JRE — propagate as unchecked.
+            throw new IllegalStateException("SHA-256 unavailable on this JVM", e);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to serialise SkillMeta list for ETag", e);
         }

@@ -10,6 +10,7 @@ import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.meta.service.MultiTenantIndexManager;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.common.util.DateUtil;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import lombok.RequiredArgsConstructor;
@@ -70,22 +71,26 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     private final MultiTenantIndexManager multiTenantIndexManager;
     private final DataSource dataSource;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     @Override
     @Transactional
     public SchemaOperationResult createTableByModel(String modelCode) {
-        log.info("Creating table for model: {}", modelCode);
+        log.info("Creating table for model: {}", logSafe(modelCode));
 
         try {
             // 1. 获取模型定义 (use getModelDefinitionFromDb to bypass cache)
             ModelDefinition model = metaModelService.getModelDefinitionFromDb(modelCode)
                     .orElseThrow(() -> new RuntimeException("Model not found: " + modelCode));
-            log.info("Creating table: model {} has {} fields", modelCode, model.getFields() != null ? model.getFields().size() : 0);
+            log.info("Creating table: model {} has {} fields", logSafe(modelCode), model.getFields() != null ? model.getFields().size() : 0);
             
             String tableName = model.getTableName();
             
             // 2. 检查表是否已存在
             if (tableMetadataService.tableExists(tableName)) {
-                log.warn("Table {} already exists for model: {}, syncing schema instead of skipping", tableName, modelCode);
+                log.warn("Table {} already exists for model: {}, syncing schema instead of skipping", logSafe(tableName), logSafe(modelCode));
                 return syncModelToTable(
                         modelCode,
                         SchemaSyncOptions.builder()
@@ -103,7 +108,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             int result = dynamicDataMapper.createTable(createTableDDL);
             
             if (result >= 0) { // MyBatis对DDL语句通常返回0或正数
-                log.info("Successfully created table {} for model: {}", tableName, modelCode);
+                log.info("Successfully created table {} for model: {}", logSafe(tableName), logSafe(modelCode));
                 
                 // 5. 创建索引（如果需要）
                 List<String> indexDDLs = filterExistingIndexes(tableName, generateIndexDDLs(model));
@@ -111,11 +116,11 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     try {
                         dynamicDataMapper.alterTable(indexDDL);
                         executedDDL.add(indexDDL);
-                        log.debug("Created index: {}", indexDDL);
+                        log.debug("Created index: {}", logSafe(indexDDL));
                     } catch (Exception e) {
                         // §P1 per-index tolerance: a single bad index DDL must not abort
                         // the whole table-create flow; the table itself is already created.
-                        log.warn("Failed to create index: {}, error: {}", indexDDL, e.getMessage(), e);
+                        log.warn("Failed to create index: {}, error: {}", logSafe(indexDDL), logSafe(e.getMessage()), e);
                     }
                 }
                 
@@ -138,7 +143,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         } catch (DuplicateKeyException e) {
             // Concurrent table creation race: another thread created the table first
             log.warn("Concurrent table creation detected for model {}, treating as success: {}",
-                    modelCode, e.getMessage());
+                    logSafe(modelCode), logSafe(e.getMessage()));
             return SchemaOperationResult.builder()
                     .success(true)
                     .operationType(SchemaOperationResult.SchemaOperationType.CREATE_TABLE)
@@ -147,7 +152,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .operationTime(DateUtil.getCurrentLocalDateTimeUtc())
                     .build();
         } catch (Exception e) {
-            log.error("Failed to create table for model {}: {}", modelCode, e.getMessage(), e);
+            log.error("Failed to create table for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.CREATE_TABLE)
@@ -267,7 +272,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
     @Override
     public SchemaOperationResult updateTableByModel(String modelCode) {
-        log.info("Updating table for model: {}", modelCode);
+        log.info("Updating table for model: {}", logSafe(modelCode));
         try {
             SchemaSyncOptions options = SchemaSyncOptions.builder()
                     .syncMode(SchemaSyncOptions.SyncMode.SAFE)
@@ -275,7 +280,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .build();
             return syncModelToTable(modelCode, options);
         } catch (Exception e) {
-            log.error("Failed to update table for model {}: {}", modelCode, e.getMessage(), e);
+            log.error("Failed to update table for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.UPDATE_TABLE)
@@ -289,7 +294,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
     @Override
     public SchemaOperationResult dropTableByModel(String modelCode) {
-        log.info("Dropping table for model: {}", modelCode);
+        log.info("Dropping table for model: {}", logSafe(modelCode));
         try {
             ModelDefinition model = metaModelService.getModelDefinition(modelCode)
                     .orElseThrow(() -> new RuntimeException("Model not found: " + modelCode));
@@ -319,7 +324,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .operationTime(DateUtil.getCurrentLocalDateTimeUtc())
                     .build();
         } catch (Exception e) {
-            log.error("Failed to drop table for model {}: {}", modelCode, e.getMessage(), e);
+            log.error("Failed to drop table for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.DROP_TABLE)
@@ -333,7 +338,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
     @Override
     public SchemaOperationResult syncModelToTable(String modelCode, SchemaSyncOptions syncOptions) {
-        log.info("Syncing model to table: {}", modelCode);
+        log.info("Syncing model to table: {}", logSafe(modelCode));
         SchemaSyncOptions options = syncOptions != null ? syncOptions : SchemaSyncOptions.builder().build();
 
         try {
@@ -386,7 +391,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                             .collect(Collectors.toList()))
                     .build();
         } catch (Exception e) {
-            log.error("Failed to sync model {}: {}", modelCode, e.getMessage(), e);
+            log.error("Failed to sync model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.SYNC_SCHEMA)
@@ -401,7 +406,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     @Override
     @Transactional
     public SchemaOperationResult addFieldToModel(String modelCode, String fieldCode) {
-        log.info("Adding field {} to model: {}", fieldCode, modelCode);
+        log.info("Adding field {} to model: {}", logSafe(fieldCode), logSafe(modelCode));
 
         try {
             // 1. 获取模型定义 — bypass cache so newly-bound fields are visible within the same transaction
@@ -424,7 +429,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             
             // 4. 检查列是否已存在
             if (tableMetadataService.columnExists(tableName, columnName)) {
-                log.warn("Column {} already exists in table {}", columnName, tableName);
+                log.warn("Column {} already exists in table {}", logSafe(columnName), logSafe(tableName));
                 return SchemaOperationResult.builder()
                         .success(true)
                         .operationType(SchemaOperationResult.SchemaOperationType.ADD_FIELD)
@@ -457,7 +462,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // 6. 执行DDL
             dynamicDataMapper.alterTable(ddl);
             
-            log.info("Successfully added field {} to model {}, table: {}", fieldCode, modelCode, tableName);
+            log.info("Successfully added field {} to model {}, table: {}", logSafe(fieldCode), logSafe(modelCode), logSafe(tableName));
             
             return SchemaOperationResult.builder()
                     .success(true)
@@ -471,7 +476,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .build();
             
         } catch (Exception e) {
-            log.error("Failed to add field {} to model {}: {}", fieldCode, modelCode, e.getMessage(), e);
+            log.error("Failed to add field {} to model {}: {}", logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.ADD_FIELD)
@@ -487,7 +492,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     @Override
     @Transactional
     public SchemaOperationResult removeFieldFromModel(String modelCode, String fieldCode) {
-        log.info("Removing field {} from model: {}", fieldCode, modelCode);
+        log.info("Removing field {} from model: {}", logSafe(fieldCode), logSafe(modelCode));
         
         try {
             // 1. 获取模型定义
@@ -510,7 +515,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             
             // 4. 检查列是否存在
             if (!tableMetadataService.columnExists(tableName, columnName)) {
-                log.warn("Column {} does not exist in table {}", columnName, tableName);
+                log.warn("Column {} does not exist in table {}", logSafe(columnName), logSafe(tableName));
                 return SchemaOperationResult.builder()
                         .success(true)
                         .operationType(SchemaOperationResult.SchemaOperationType.REMOVE_FIELD)
@@ -533,7 +538,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // 7. 执行DDL
             dynamicDataMapper.alterTable(ddl);
             
-            log.info("Successfully removed field {} from model {}, table: {}", fieldCode, modelCode, tableName);
+            log.info("Successfully removed field {} from model {}, table: {}", logSafe(fieldCode), logSafe(modelCode), logSafe(tableName));
             
             return SchemaOperationResult.builder()
                     .success(true)
@@ -547,7 +552,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .build();
             
         } catch (Exception e) {
-            log.error("Failed to remove field {} from model {}: {}", fieldCode, modelCode, e.getMessage(), e);
+            log.error("Failed to remove field {} from model {}: {}", logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.REMOVE_FIELD)
@@ -563,7 +568,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     @Override
     @Transactional
     public SchemaOperationResult updateModelField(String modelCode, String fieldCode) {
-        log.info("Updating field {} in model: {}", fieldCode, modelCode);
+        log.info("Updating field {} in model: {}", logSafe(fieldCode), logSafe(modelCode));
         
         try {
             // 1. 获取模型定义
@@ -634,12 +639,12 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                         // independently — one rejected by Postgres should not stop
                         // the others. The outer wrap-as-result still reports overall
                         // success or partial failure to the caller.
-                        log.warn("Failed to execute DDL: {}, error: {}", singleDdl, e.getMessage(), e);
+                        log.warn("Failed to execute DDL: {}, error: {}", logSafe(singleDdl), logSafe(e.getMessage()), e);
                     }
                 }
                 
                 log.info("Successfully updated field {} in model {}, table: {}", 
-                        fieldCode, modelCode, tableName);
+                        logSafe(fieldCode), logSafe(modelCode), logSafe(tableName));
                 
                 return SchemaOperationResult.builder()
                         .success(true)
@@ -660,7 +665,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 dynamicDataMapper.alterTable(ddl);
                 
                 log.info("Successfully updated field {} in model {}, table: {}", 
-                        fieldCode, modelCode, tableName);
+                        logSafe(fieldCode), logSafe(modelCode), logSafe(tableName));
                 
                 return SchemaOperationResult.builder()
                         .success(true)
@@ -675,7 +680,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             }
             
         } catch (Exception e) {
-            log.error("Failed to update field {} in model {}: {}", fieldCode, modelCode, e.getMessage(), e);
+            log.error("Failed to update field {} in model {}: {}", logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.UPDATE_FIELD)
@@ -691,7 +696,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     @Override
     @Transactional
     public SchemaOperationResult createFieldIndex(String modelCode, String fieldCode, IndexType indexType) {
-        log.info("Creating {} index for field {} in model: {}", indexType, fieldCode, modelCode);
+        log.info("Creating {} index for field {} in model: {}", indexType, logSafe(fieldCode), logSafe(modelCode));
         
         try {
             // 1. 获取模型定义
@@ -722,7 +727,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             
             // 6. 检查索引是否已存在
             if (tableMetadataService.indexExists(tableName, indexName)) {
-                log.warn("Index {} already exists on table {}", indexName, tableName);
+                log.warn("Index {} already exists on table {}", logSafe(indexName), logSafe(tableName));
                 return SchemaOperationResult.builder()
                         .success(true)
                         .operationType(SchemaOperationResult.SchemaOperationType.CREATE_INDEX)
@@ -740,8 +745,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // 8. 执行DDL
             dynamicDataMapper.alterTable(ddl);
             
-            log.info("Successfully created {} index {} for field {} in model {}", 
-                    indexType, indexName, fieldCode, modelCode);
+            log.info("Successfully created {} index {} for field {} in model {}",
+                    indexType, logSafe(indexName), logSafe(fieldCode), logSafe(modelCode));
             
             return SchemaOperationResult.builder()
                     .success(true)
@@ -755,8 +760,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .build();
             
         } catch (Exception e) {
-            log.error("Failed to create index for field {} in model {}: {}", 
-                    fieldCode, modelCode, e.getMessage(), e);
+            log.error("Failed to create index for field {} in model {}: {}",
+                    logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.CREATE_INDEX)
@@ -799,7 +804,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     @Override
     @Transactional
     public SchemaOperationResult dropFieldIndex(String modelCode, String fieldCode) {
-        log.info("Dropping index for field {} in model: {}", fieldCode, modelCode);
+        log.info("Dropping index for field {} in model: {}", logSafe(fieldCode), logSafe(modelCode));
         
         try {
             // 1. 获取模型定义
@@ -824,7 +829,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             List<IndexInfo> indexes = metaModelService.getFieldIndexes(modelCode, fieldCode);
             
             if (indexes == null || indexes.isEmpty()) {
-                log.warn("No indexes found for field {} in model {}", fieldCode, modelCode);
+                log.warn("No indexes found for field {} in model {}", logSafe(fieldCode), logSafe(modelCode));
                 return SchemaOperationResult.builder()
                         .success(true)
                         .operationType(SchemaOperationResult.SchemaOperationType.DROP_INDEX)
@@ -843,7 +848,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 
                 // 跳过主键索引 (通过索引类型判断)
                 if ("primary".equalsIgnoreCase(indexInfo.getIndexType())) {
-                    log.debug("Skipping primary key index: {}", indexName);
+                    log.debug("Skipping primary key index: {}", logSafe(indexName));
                     continue;
                 }
                 
@@ -853,11 +858,11 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 try {
                     dynamicDataMapper.alterTable(ddl);
                     executedDDLs.add(ddl);
-                    log.debug("Dropped index: {}", indexName);
+                    log.debug("Dropped index: {}", logSafe(indexName));
                 } catch (Exception e) {
                     // §P1 per-index tolerance: a single index that no longer exists
                     // (manual drop, restored backup) should not stop dropping others.
-                    log.warn("Failed to drop index {}: {}", indexName, e.getMessage(), e);
+                    log.warn("Failed to drop index {}: {}", logSafe(indexName), logSafe(e.getMessage()), e);
                 }
             }
             
@@ -873,8 +878,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                         .build();
             }
             
-            log.info("Successfully dropped {} index(es) for field {} in model {}", 
-                    executedDDLs.size(), fieldCode, modelCode);
+            log.info("Successfully dropped {} index(es) for field {} in model {}",
+                    executedDDLs.size(), logSafe(fieldCode), logSafe(modelCode));
             
             return SchemaOperationResult.builder()
                     .success(true)
@@ -888,8 +893,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .build();
             
         } catch (Exception e) {
-            log.error("Failed to drop index for field {} in model {}: {}", 
-                    fieldCode, modelCode, e.getMessage(), e);
+            log.error("Failed to drop index for field {} in model {}: {}",
+                    logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaOperationResult.builder()
                     .success(false)
                     .operationType(SchemaOperationResult.SchemaOperationType.DROP_INDEX)
@@ -919,7 +924,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
     @Override
     public SchemaDiffResult compareModelWithTable(String modelCode) {
-        log.info("Comparing model with table: {}", modelCode);
+        log.info("Comparing model with table: {}", logSafe(modelCode));
         
         try {
             // 1. 获取模型定义
@@ -1010,7 +1015,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .build();
             
         } catch (Exception e) {
-            log.error("Failed to compare model {} with table: {}", modelCode, e.getMessage(), e);
+            log.error("Failed to compare model {} with table: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             return SchemaDiffResult.builder()
                     .hasDifferences(false)
                     .modelCode(modelCode)
@@ -1020,7 +1025,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
     @Override
     public TableInfo getTableInfoByModel(String modelCode) {
-        log.warn("getTableInfoByModel is not yet implemented: {}", modelCode);
+        log.warn("getTableInfoByModel is not yet implemented: {}", logSafe(modelCode));
         throw new UnsupportedOperationException(
             "Table info retrieval from database is not yet implemented. " +
             "This feature requires database metadata inspection permissions.");
@@ -1028,7 +1033,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
     @Override
     public ModelValidationResult validateModel(String modelCode) {
-        log.warn("validateModel is not yet implemented: {}", modelCode);
+        log.warn("validateModel is not yet implemented: {}", logSafe(modelCode));
         throw new UnsupportedOperationException(
             "Model validation is not yet implemented. " +
             "This feature requires comparing model definition with actual database schema.");
@@ -1036,7 +1041,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
     @Override
     public BatchSchemaOperationResult batchSyncModels(List<String> modelCodes, SchemaSyncOptions syncOptions) {
-        log.warn("batchSyncModels is not yet implemented: {}", modelCodes);
+        log.warn("batchSyncModels is not yet implemented: {}", logSafe(modelCodes));
         throw new UnsupportedOperationException(
             "Batch model synchronization is not yet implemented. " +
             "Please use syncModelToTable() for individual model sync.");
@@ -1044,7 +1049,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
     @Override
     public DDLPreviewResult previewModelChanges(String modelCode) {
-        log.info("Previewing model changes: {}", modelCode);
+        log.info("Previewing model changes: {}", logSafe(modelCode));
         SchemaSyncOptions options = SchemaSyncOptions.builder()
                 .syncMode(SchemaSyncOptions.SyncMode.DRY_RUN)
                 .createIndexes(true)
@@ -1053,7 +1058,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // Use getModelDefinitionFromDb to bypass cache and get fresh data
             ModelDefinition model = metaModelService.getModelDefinitionFromDb(modelCode)
                     .orElseThrow(() -> new RuntimeException("Model not found: " + modelCode));
-            log.info("Preview: model {} has {} fields", modelCode, model.getFields() != null ? model.getFields().size() : 0);
+            log.info("Preview: model {} has {} fields", logSafe(modelCode), model.getFields() != null ? model.getFields().size() : 0);
             List<String> ddlStatements = buildSyncDdls(model, options);
             return DDLPreviewResult.builder()
                     .modelCode(modelCode)
@@ -1061,7 +1066,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     .operationType("preview")
                     .build();
         } catch (Exception e) {
-            log.error("Failed to preview model changes for {}: {}", modelCode, e.getMessage(), e);
+            log.error("Failed to preview model changes for {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             return DDLPreviewResult.builder()
                     .modelCode(modelCode)
                     .ddlStatements(List.of())
@@ -1197,7 +1202,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // pool member) does not invalidate the DDL just executed; stale plans
             // would self-evict on next prepare. Logged at warn so a recurring
             // failure can be picked up by ops.
-            log.warn("Failed to clear PostgreSQL prepared plans after DDL: {}", e.getMessage(), e);
+            log.warn("Failed to clear PostgreSQL prepared plans after DDL: {}", logSafe(e.getMessage()), e);
         }
     }
 

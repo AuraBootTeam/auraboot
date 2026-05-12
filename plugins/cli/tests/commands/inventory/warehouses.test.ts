@@ -24,7 +24,7 @@ describe('inventory warehouses command', () => {
   describe('filter options', () => {
     it('should build status filter', () => {
       const status = 'enabled';
-      const filter = { fieldName: 'inv_warehouse_status', operator: 'EQ', value: status.toUpperCase() };
+      const filter = { fieldName: 'inv_warehouse_status', operator: 'EQ', value: status.toLowerCase() };
       expect(filter.value).toBe('enabled');
     });
 

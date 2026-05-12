@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -91,8 +92,9 @@ public class AiActionAuditService {
      * @return list of audit log entries
      */
     public List<Map<String, Object>> queryLogs(Long tenantId, int pageNum, int pageSize) {
-        pageSize = Math.min(pageSize, 100);
-        int offset = (pageNum - 1) * pageSize;
+        pageNum = PaginationSafetyUtils.pageNumber(pageNum);
+        pageSize = PaginationSafetyUtils.pageSize(pageSize, 100);
+        int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 100);
 
         String sql = "SELECT id, tenant_id, user_id, conversation_id, message_id, " +
                 "action_type, command_code, model_code, record_id, risk_level, " +

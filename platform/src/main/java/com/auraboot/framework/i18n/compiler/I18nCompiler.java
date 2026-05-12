@@ -1,5 +1,6 @@
 package com.auraboot.framework.i18n.compiler;
 
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -139,13 +140,13 @@ public class I18nCompiler {
      * @return Output file path
      */
     private String writeToFile(String lang, Map<String, Object> data) throws IOException {
-        Path dirPath = Paths.get(outputDir);
+        Path dirPath = PathSafetyUtils.normalizeAbsolute(Paths.get(outputDir), "i18n outputDir");
         if (!Files.exists(dirPath)) {
             Files.createDirectories(dirPath);
         }
 
         String fileName = "i18n." + lang + ".json";
-        Path filePath = dirPath.resolve(fileName);
+        Path filePath = PathSafetyUtils.requireSafeChild(dirPath, fileName, "i18n output file");
 
         ObjectMapper mapper = objectMapper.copy();
         if (prettyPrint) {

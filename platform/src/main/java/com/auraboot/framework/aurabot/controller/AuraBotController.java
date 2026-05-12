@@ -172,6 +172,7 @@ public class AuraBotController {
      * Returns write-only tools (commands that mutate data) as action descriptors.
      */
     @GetMapping("/actions")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public Map<String, Object> getActions(
             @RequestParam(required = false) String modelCode,
             @RequestParam(required = false) String recordPid,

@@ -15,6 +15,19 @@ import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/ui/ui/field-base';
 import { FilePreviewModal } from '~/framework/smart/components/common/FilePreviewModal';
 
+let uploadUidCounter = 0;
+
+function generateUploadUid(): string {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === 'function') {
+    return `upload-${cryptoApi.randomUUID()}`;
+  }
+
+  const bytes = new Uint32Array(2);
+  cryptoApi?.getRandomValues?.(bytes);
+  return `upload-${Date.now()}-${bytes[0].toString(36)}${bytes[1].toString(36)}-${uploadUidCounter++}`;
+}
+
 const Upload: React.FC<UploadProps> = ({
   name,
   label,
@@ -85,9 +98,6 @@ const Upload: React.FC<UploadProps> = ({
   const fileListRef = useRef<UploadFile[]>(fileList);
   fileListRef.current = fileList;
 
-  // Generate unique ID
-  const generateUid = () => `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
   // Format file size
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -145,7 +155,7 @@ const Upload: React.FC<UploadProps> = ({
 
         // Create upload file object
         const uploadFile: UploadFile = {
-          uid: generateUid(),
+          uid: generateUploadUid(),
           name: file.name,
           size: file.size,
           type: file.type,

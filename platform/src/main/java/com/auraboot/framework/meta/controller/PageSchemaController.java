@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.PageSchemaCreateRequest;
 import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.dto.PageSchemaListDTO;
@@ -53,6 +54,10 @@ public class PageSchemaController {
     @Autowired
     private PluginResourceTracker pluginResourceTracker;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     /**
      * 分页查询页面配置列表
      *
@@ -73,7 +78,7 @@ public class PageSchemaController {
             @RequestParam(required = false) String keyword,
             @Parameter(description = "分页请求参数") @Valid PaginationRequest request) {
         log.info("分页查询页面配置: kind={}, isTemplate={}, isPublished={}, keyword={}, request={}",
-                kind, isTemplate, isPublished, keyword, request);
+                logSafe(kind), isTemplate, isPublished, logSafe(keyword), logSafe(request));
         // isPublished param is kept for API compatibility; internally maps to status filter
         PaginationResult<PageSchemaListDTO> result = pageSchemaService.findPageWithConditions(
                 kind, isTemplate, isPublished, keyword, request);
@@ -91,7 +96,7 @@ public class PageSchemaController {
     @RequirePermission("page.page.read")
     public ApiResponse<PageSchemaDTO> getByPid(
             @Parameter(description = "页面配置PID") @PathVariable String pid) {
-        log.info("查询页面配置详情，PID：{}", pid);
+        log.info("查询页面配置详情，PID：{}", logSafe(pid));
         PageSchemaDTO result = pageSchemaService.findByPid(pid);
         return ApiResponse.success(result);
     }
@@ -108,7 +113,7 @@ public class PageSchemaController {
     @RequirePermission("page.page.read")
     public ApiResponse<PageSchemaVersionDTO> getLatestVersion(
             @Parameter(description = "页面PID") @PathVariable String pagePid) {
-        log.info("查询最新版本页面配置: pagePid={}", pagePid);
+        log.info("查询最新版本页面配置: pagePid={}", logSafe(pagePid));
         PageSchemaVersionDTO result = pageSchemaVersionService.getLatestVersion(pagePid);
         return ApiResponse.success(result);
     }
@@ -127,7 +132,7 @@ public class PageSchemaController {
     public ApiResponse<PageSchemaDTO> create(
             @Parameter(description = "创建请求参数") @Valid @RequestBody PageSchemaCreateRequest request,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
-        log.info("创建页面配置，参数：{}，用户ID：{}", request, userId);
+        log.info("创建页面配置，参数：{}，用户ID：{}", logSafe(request), userId);
         PageSchemaDTO result = pageSchemaService.create(request);
         return ApiResponse.success(result);
     }
@@ -148,7 +153,7 @@ public class PageSchemaController {
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(description = "更新请求参数") @Valid @RequestBody PageSchemaUpdateRequest request,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
-        log.info("更新页面配置，PID：{}，参数：{}，用户ID：{}", pid, request, userId);
+        log.info("更新页面配置，PID：{}，参数：{}，用户ID：{}", logSafe(pid), logSafe(request), userId);
         PageSchemaDTO result = pageSchemaService.update(pid, request);
         pluginResourceTracker.markAsUserModified(ResourceType.PAGE, result.getPageKey());
         return ApiResponse.success(result);
@@ -168,7 +173,7 @@ public class PageSchemaController {
     public ApiResponse<PageSchemaDTO> publish(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
-        log.info("发布页面配置，PID：{}，用户ID：{}", pid, userId);
+        log.info("发布页面配置，PID：{}，用户ID：{}", logSafe(pid), userId);
         PageSchemaDTO result = pageSchemaService.publish(pid);
         return ApiResponse.success(result);
     }
@@ -186,7 +191,7 @@ public class PageSchemaController {
     public ApiResponse<PageSchemaDTO> unpublish(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
-        log.info("取消发布页面配置，PID：{}，用户ID：{}", pid, userId);
+        log.info("取消发布页面配置，PID：{}，用户ID：{}", logSafe(pid), userId);
         PageSchemaDTO result = pageSchemaService.unpublish(pid);
         return ApiResponse.success(result);
     }
@@ -204,7 +209,7 @@ public class PageSchemaController {
     public ApiResponse<Void> delete(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
-        log.info("删除页面配置，PID：{}，用户ID：{}", pid, userId);
+        log.info("删除页面配置，PID：{}，用户ID：{}", logSafe(pid), userId);
         PageSchemaDTO existing = pageSchemaService.findByPid(pid);
         if (existing != null) {
             pluginResourceTracker.markAsUserModified(ResourceType.PAGE, existing.getPageKey());
@@ -224,7 +229,7 @@ public class PageSchemaController {
     @RequirePermission("page.page.read")
     public ApiResponse<List<PageSchemaVersionDTO>> getVersionHistory(
             @Parameter(description = "页面配置PID") @PathVariable String pid) {
-        log.info("查询版本历史: pid={}", pid);
+        log.info("查询版本历史: pid={}", logSafe(pid));
         List<PageSchemaVersionDTO> result = pageSchemaVersionService.getVersionHistory(pid);
         return ApiResponse.success(result);
     }
@@ -244,7 +249,7 @@ public class PageSchemaController {
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(description = "创建版本请求") @RequestBody PageSchemaVersionCreateRequest request,
             @CurrentUserId String currentUserId) {
-        log.info("创建页面版本: pid={}, request={}, userId={}", pid, request, currentUserId);
+        log.info("创建页面版本: pid={}, request={}, userId={}", logSafe(pid), logSafe(request), logSafe(currentUserId));
         String operation = request.getOperation() != null ? request.getOperation() : "update";
         String description = request.getDescription() != null ? request.getDescription() : "Version created";
         PageSchemaVersionDTO result = pageSchemaVersionService.createVersion(pid, operation, currentUserId, description);
@@ -268,7 +273,7 @@ public class PageSchemaController {
             @Parameter(description = "历史版本ID") @PathVariable Long historyId,
             @Parameter(description = "回滚原因") @RequestParam String reason,
             @CurrentUserId String currentUserId) {
-        log.info("版本回滚: pid={}, historyId={}, reason={}, userId={}", pid, historyId, reason, currentUserId);
+        log.info("版本回滚: pid={}, historyId={}, reason={}, userId={}", logSafe(pid), historyId, logSafe(reason), logSafe(currentUserId));
         PageSchemaVersionDTO result = pageSchemaVersionService.rollbackToVersion(pid, historyId, currentUserId, reason);
         return ApiResponse.success(result);
     }
@@ -288,7 +293,7 @@ public class PageSchemaController {
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(description = "源版本历史ID") @PathVariable Long fromHistoryId,
             @Parameter(description = "目标版本历史ID") @PathVariable Long toHistoryId) {
-        log.info("比较页面配置版本差异: pid={}, fromHistoryId={}, toHistoryId={}", pid, fromHistoryId, toHistoryId);
+        log.info("比较页面配置版本差异: pid={}, fromHistoryId={}, toHistoryId={}", logSafe(pid), fromHistoryId, toHistoryId);
         PageSchemaVersionComparisonDTO result = pageSchemaVersionService.compareVersions(fromHistoryId, toHistoryId);
         return ApiResponse.success(result);
     }
@@ -304,7 +309,7 @@ public class PageSchemaController {
     @RequirePermission("page.page.read")
     public ApiResponse<PageSchemaDTO> findByName(
             @Parameter(description = "页面名称") @RequestParam String name) {
-        log.info("根据名称查询页面配置: name={}", name);
+        log.info("根据名称查询页面配置: name={}", logSafe(name));
         PageSchemaDTO result = pageSchemaService.findByName(name);
         return ApiResponse.success(result);
     }
@@ -320,7 +325,7 @@ public class PageSchemaController {
     @RequirePermission("page.page.read")
     public ApiResponse<List<PageSchemaDTO>> findByKind(
             @Parameter(description = "页面类型") @PathVariable String kind) {
-        log.info("根据类型查询页面配置: kind={}", kind);
+        log.info("根据类型查询页面配置: kind={}", logSafe(kind));
         List<PageSchemaDTO> result = pageSchemaService.findByKind(kind);
         return ApiResponse.success(result);
     }
@@ -349,7 +354,7 @@ public class PageSchemaController {
     @RequirePermission("page.page.read")
     public ApiResponse<List<PageSchemaDTO>> findTemplates(
             @Parameter(description = "模板分类") @RequestParam(required = false) String templateCategory) {
-        log.info("查询模板页面配置: templateCategory={}", templateCategory);
+        log.info("查询模板页面配置: templateCategory={}", logSafe(templateCategory));
         List<PageSchemaDTO> result = pageSchemaService.findTemplateSchemas(templateCategory);
         return ApiResponse.success(result);
     }
@@ -409,7 +414,7 @@ public class PageSchemaController {
     public ApiResponse<Boolean> isNameUnique(
             @Parameter(description = "页面名称") @RequestParam String name,
             @Parameter(description = "排除的PID") @RequestParam(required = false) String excludePid) {
-        log.info("验证页面名称唯一性，名称：{}，排除PID：{}", name, excludePid);
+        log.info("验证页面名称唯一性，名称：{}，排除PID：{}", logSafe(name), logSafe(excludePid));
         Boolean result = pageSchemaService.isNameUnique(name, excludePid);
         return ApiResponse.success(result);
     }
@@ -432,7 +437,7 @@ public class PageSchemaController {
     @RequirePermission("page.page.read")
     public ApiResponse<PageSchemaDTO> getByPageKey(
             @Parameter(description = "页面唯一标识，如 device_list, dashboard_main") @PathVariable String pageKey) {
-        log.info("获取页面Schema: pageKey={}", pageKey);
+        log.info("获取页面Schema: pageKey={}", logSafe(pageKey));
         PageSchemaDTO schema = pageSchemaService.findByPageKey(pageKey);
         if (schema == null) {
             return ApiResponse.error("Page not found: " + pageKey);

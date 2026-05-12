@@ -208,8 +208,12 @@ export function useInlineRowEdit({
 
         // Resolve threshold value
         let threshold: number;
-        if (typeof rule.value === 'string' && rule.value.startsWith('${record.')) {
-          const fieldName = rule.value.replace('${record.', '').replace('}', '');
+        const recordFieldMatch =
+          typeof rule.value === 'string'
+            ? rule.value.match(/^\$\{record\.([A-Za-z0-9_.-]+)\}$/)
+            : null;
+        if (recordFieldMatch) {
+          const fieldName = recordFieldMatch[1];
           threshold = Number(parentRecordData?.[fieldName]) || 0;
         } else {
           threshold = Number(rule.value) || 0;

@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelCapabilities;
@@ -48,6 +49,10 @@ public class ModelCapabilitiesController {
 
     private final MetaModelService metaModelService;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     /**
      * Returns the capabilities block for the model identified by {@code code}.
      *
@@ -67,7 +72,7 @@ public class ModelCapabilitiesController {
             @Parameter(description = "Model code, e.g. crm_opportunity")
             @PathVariable String code) {
 
-        log.debug("Model capabilities request: code={}", code);
+        log.debug("Model capabilities request: code={}", logSafe(code));
 
         ModelDefinition def = metaModelService.getDefinitionByCode(code);
         if (def == null) {

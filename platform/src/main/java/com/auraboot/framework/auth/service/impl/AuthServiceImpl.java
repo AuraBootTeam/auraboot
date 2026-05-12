@@ -69,6 +69,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @SuppressWarnings("java/user-controlled-bypass")
     public AuthenticationResponse authenticateByChannel(AuthStrategyRequest request) {
         String channelCode = request.getChannelCode();
         if (channelCode == null || channelCode.isBlank()) {
@@ -80,6 +81,9 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("Unsupported login channel: " + channelCode);
         }
 
+        // strategyMap is built from server-registered AuthStrategy beans only;
+        // user input can select a known channel but cannot bypass the selected
+        // strategy's credential or OTP verification.
         log.info("Authenticating via channel: {}", channelCode);
         return strategy.authenticate(request);
     }

@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.security.SqlInjectionProtector;
@@ -32,6 +33,10 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     private final QueryBuilderService queryBuilderService;
     private final MetaModelService metaModelService;
     private final UserPermissionService userPermissionService;
@@ -46,7 +51,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
     @Observed(name = "secure_query.execute", contextualName = "secure-query-executor")
     public <T> PaginationResult<T> executeSecureQuery(SecureQueryRequest request) {
         log.info("执行安全查询: modelCode={}, queryType={}, userId={}", 
-                request.getModelCode(), request.getQueryType(), request.getUserId());
+                logSafe(request.getModelCode()), logSafe(request.getQueryType()), request.getUserId());
         
         long startTime = System.currentTimeMillis();
         
@@ -73,7 +78,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
             if (Boolean.TRUE.equals(request.getEnableCache())) {
                 PaginationResult<T> cachedResult = getQueryCache(request);
                 if (cachedResult != null) {
-                    log.debug("返回缓存结果: modelCode={}", request.getModelCode());
+                    log.debug("返回缓存结果: modelCode={}", logSafe(request.getModelCode()));
                     return cachedResult;
                 }
             }
@@ -104,7 +109,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
             }
             
             log.info("安全查询执行完成: modelCode={}, resultCount={}, executionTime={}ms", 
-                    request.getModelCode(), result.getTotal(), executionTime);
+                    logSafe(request.getModelCode()), result.getTotal(), executionTime);
             
             return result;
             
@@ -135,7 +140,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     @Override
     public Long executeSecureCount(SecureQueryRequest request) {
-        log.debug("执行安全计数查询: modelCode={}", request.getModelCode());
+        log.debug("执行安全计数查询: modelCode={}", logSafe(request.getModelCode()));
         
         // 创建计数查询请求
         SecureQueryRequest countRequest = new SecureQueryRequest();
@@ -162,7 +167,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     @Override
     public Map<String, Object> executeSecureAggregate(SecureQueryRequest request) {
-        log.debug("执行安全聚合查询: modelCode={}", request.getModelCode());
+        log.debug("执行安全聚合查询: modelCode={}", logSafe(request.getModelCode()));
         
         if (request.getAggregateRequest() == null) {
             throw new IllegalArgumentException("聚合查询请求不能为空");
@@ -181,7 +186,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     @Override
     public QuerySecurityValidationResult validateQuerySecurity(SecureQueryRequest request) {
-        log.debug("验证查询安全性: modelCode={}", request.getModelCode());
+        log.debug("验证查询安全性: modelCode={}", logSafe(request.getModelCode()));
         
         // 使用SQL注入防护器验证查询条件
         return sqlInjectionProtector.validateQueryConditions(request.getConditions());
@@ -189,7 +194,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     @Override
     public QueryAccessCheckResult checkQueryPermissions(SecureQueryRequest request) {
-        log.debug("检查查询权限: modelCode={}, userId={}", request.getModelCode(), request.getUserId());
+        log.debug("检查查询权限: modelCode={}, userId={}", logSafe(request.getModelCode()), request.getUserId());
         
         QueryAccessCheckResult result = new QueryAccessCheckResult();
         result.setDetails(new ArrayList<>());
@@ -252,12 +257,12 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
             }
             
             log.debug("权限检查完成: modelCode={}, userId={}, hasAccess={}, deniedFields={}, deniedOperations={}", 
-                     request.getModelCode(), request.getUserId(), result.getHasAccess(), 
+                     logSafe(request.getModelCode()), request.getUserId(), result.getHasAccess(),
                      deniedFields.size(), deniedOperations.size());
             
         } catch (Exception e) {
             log.error("权限检查失败: modelCode={}, userId={}, error={}", 
-                     request.getModelCode(), request.getUserId(), e.getMessage(), e);
+                     logSafe(request.getModelCode()), request.getUserId(), logSafe(e.getMessage()), e);
             result.setHasAccess(false);
             
             QueryAccessCheckResult.AccessCheckDetail errorDetail = 
@@ -295,7 +300,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
         if (!hasPermission) {
             log.warn("用户无权访问模型: modelCode={}, userId={}, permissionCode={}",
-                request.getModelCode(), request.getUserId(), permissionCode);
+                logSafe(request.getModelCode()), request.getUserId(), logSafe(permissionCode));
         }
 
         return hasPermission;
@@ -327,7 +332,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
                 String modelReadPermission = "model." + request.getModelCode() + ".read";
                 if (!userPermissionService.hasPermission(request.getUserId(), modelReadPermission)) {
                     deniedFields.add(fieldCode);
-                    log.debug("用户无权访问字段: fieldCode={}, userId={}", fieldCode, request.getUserId());
+                    log.debug("用户无权访问字段: fieldCode={}, userId={}", logSafe(fieldCode), request.getUserId());
                 }
             }
         }
@@ -357,7 +362,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
         if (!hasPermission) {
             deniedOperations.add(requiredAction);
             log.debug("用户无权执行操作: modelCode={}, userId={}, action={}",
-                request.getModelCode(), request.getUserId(), requiredAction);
+                logSafe(request.getModelCode()), request.getUserId(), logSafe(requiredAction));
         }
 
         result.getAccessContext().put("operationPermissionCheck", "permission");
@@ -406,7 +411,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
                 auditData.put("reason", reason);
                 auditData.put("timestamp", System.currentTimeMillis());
                 
-                log.warn("查询权限被拒绝: {}", auditData);
+                log.warn("查询权限被拒绝: {}", logSafe(auditData));
                 
                 // 调用审计服务记录权限拒绝事件
                 QueryAccessCheckResult permissionResult = new QueryAccessCheckResult();
@@ -428,7 +433,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
                 queryAuditService.logPermissionCheck(request, permissionResult);
             }
         } catch (Exception e) {
-            log.error("记录权限拒绝日志失败: {}", e.getMessage(), e);
+            log.error("记录权限拒绝日志失败: {}", logSafe(e.getMessage()), e);
         }
     }
     
@@ -446,17 +451,17 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
                 auditData.put("error", error.getMessage());
                 auditData.put("timestamp", System.currentTimeMillis());
                 
-                log.error("查询权限检查错误: {}", auditData, error);
+                log.error("查询权限检查错误: {}", logSafe(auditData), error);
                 // TODO: 调用审计服务记录权限检查错误
             }
         } catch (Exception e) {
-            log.error("记录权限检查错误日志失败: {}", e.getMessage(), e);
+            log.error("记录权限检查错误日志失败: {}", logSafe(e.getMessage()), e);
         }
     }
 
     @Override
     public QueryComplexityValidationResult validateQueryComplexity(SecureQueryRequest request) {
-        log.debug("验证查询复杂度: modelCode={}", request.getModelCode());
+        log.debug("验证查询复杂度: modelCode={}", logSafe(request.getModelCode()));
         
         QueryComplexityValidationResult result = new QueryComplexityValidationResult();
         result.setValid(true);
@@ -498,7 +503,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     @Override
     public QueryLimitCheckResult checkQueryLimits(SecureQueryRequest request) {
-        log.debug("检查查询限制: modelCode={}", request.getModelCode());
+        log.debug("检查查询限制: modelCode={}", logSafe(request.getModelCode()));
         
         QueryLimitCheckResult result = new QueryLimitCheckResult();
         result.setValid(true);
@@ -523,7 +528,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     @Override
     public QueryBuilderService.QueryBuilder buildSecureQuery(SecureQueryRequest request) {
-        log.debug("构建安全查询: modelCode={}", request.getModelCode());
+        log.debug("构建安全查询: modelCode={}", logSafe(request.getModelCode()));
         
         // 获取模型定义
         Optional<ModelDefinition> modelDefOpt = metaModelService.getModelDefinition(request.getModelCode());
@@ -572,7 +577,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
     @Override
     public QueryBuilderService.QueryBuilder applyPermissionFilters(QueryBuilderService.QueryBuilder queryBuilder,
                                                                   SecureQueryRequest request) {
-        log.debug("应用权限过滤: modelCode={}, userId={}", request.getModelCode(), request.getUserId());
+        log.debug("应用权限过滤: modelCode={}, userId={}", logSafe(request.getModelCode()), request.getUserId());
 
         // 1. Tenant isolation
         queryBuilder.addCondition("tenant_id", "=", request.getTenantId());
@@ -596,7 +601,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
                 queryBuilder.addCondition("created_by", "=", request.getUserId());
             } else if (!condition.isBlank()) {
                 // For custom expressions, fall back to created_by as safety net
-                log.debug("Custom data permission expression applied: {}", condition);
+                log.debug("Custom data permission expression applied: {}", logSafe(condition));
                 queryBuilder.addCondition("created_by", "=", request.getUserId());
             }
         }
@@ -607,7 +612,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T applyDataMasking(T data, SecureQueryRequest request) {
-        log.debug("应用数据脱敏: modelCode={}", request.getModelCode());
+        log.debug("应用数据脱敏: modelCode={}", logSafe(request.getModelCode()));
 
         List<FieldMaskRule> rules = dataPermissionEngine.getFieldMaskRules(
                 request.getTenantId(), request.getModelCode(), request.getUserId());
@@ -636,7 +641,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     @Override
     public <T> T applyFieldPermissionFilter(T data, SecureQueryRequest request) {
-        log.debug("应用字段权限过滤: modelCode={}", request.getModelCode());
+        log.debug("应用字段权限过滤: modelCode={}", logSafe(request.getModelCode()));
         
         if (data == null) {
             return null;
@@ -652,13 +657,13 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
                 return (T) filterMap((Map<String, Object>) data, request);
             } else {
                 // 对于其他类型,尝试转换为Map后过滤
-                log.debug("不支持的数据类型,跳过字段权限过滤: {}", data.getClass().getName());
+                log.debug("不支持的数据类型,跳过字段权限过滤: {}", logSafe(data.getClass().getName()));
                 return data;
             }
             
         } catch (Exception e) {
             log.error("应用字段权限过滤失败: modelCode={}, error={}", 
-                     request.getModelCode(), e.getMessage(), e);
+                     logSafe(request.getModelCode()), logSafe(e.getMessage()), e);
             // 过滤失败时返回原数据,避免影响业务流程
             return data;
         }
@@ -720,7 +725,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
             if (hasFieldPermission(fieldCode, request, action)) {
                 filteredMap.put(fieldCode, entry.getValue());
             } else {
-                log.debug("字段被过滤: fieldCode={}", fieldCode);
+                log.debug("字段被过滤: fieldCode={}", logSafe(fieldCode));
                 // 可选: 添加占位符表示字段被过滤
                 // filteredMap.put(fieldCode, "[FILTERED]");
             }
@@ -746,7 +751,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
         boolean hasPermission = userPermissionService.hasPermission(request.getUserId(), modelReadPermission);
 
         if (!hasPermission) {
-            log.debug("用户无权访问字段: fieldCode={}, userId={}, action={}", fieldCode, request.getUserId(), action);
+            log.debug("用户无权访问字段: fieldCode={}, userId={}, action={}", logSafe(fieldCode), request.getUserId(), logSafe(action));
         }
 
         return hasPermission;
@@ -764,12 +769,12 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
     @Override
     public <T> void setQueryCache(SecureQueryRequest request, T result) {
         // Spring Cache会自动处理缓存设置
-        log.debug("设置查询缓存: queryId={}", request.getQueryId());
+        log.debug("设置查询缓存: queryId={}", logSafe(request.getQueryId()));
     }
 
     @Override
     public void clearQueryCache(SecureQueryRequest request) {
-        log.debug("清除查询缓存: queryId={}", request.getQueryId());
+        log.debug("清除查询缓存: queryId={}", logSafe(request.getQueryId()));
         // TODO: 实现缓存清除逻辑
     }
 
@@ -799,7 +804,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
         try {
             queryAuditService.logQueryExecution(request, result, executionTimeMs);
         } catch (Exception e) {
-            log.error("记录查询审计日志失败: {}", e.getMessage(), e);
+            log.error("记录查询审计日志失败: {}", logSafe(e.getMessage()), e);
         }
     }
 
@@ -808,7 +813,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
         try {
             queryAuditService.logQueryError(request, error, executionTimeMs);
         } catch (Exception e) {
-            log.error("记录查询错误日志失败: {}", e.getMessage(), e);
+            log.error("记录查询错误日志失败: {}", logSafe(e.getMessage()), e);
         }
     }
 
@@ -845,8 +850,8 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
             Map<String, Object> params = queryBuilder.getParameterMap();
             Integer timeoutMs = request.getTimeoutMs();
 
-            log.debug("执行SQL查询: {}", sql);
-            log.debug("查询参数: {}", params);
+            log.debug("执行SQL查询: {}", logSafe(sql));
+            log.debug("查询参数: {}", logSafe(params));
 
             // 执行查询获取数据
             List<Map<String, Object>> records = executeWithTimeout(
@@ -880,7 +885,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
             return result;
 
         } catch (Exception e) {
-            log.error("执行查询失败: modelCode={}, error={}", request.getModelCode(), e.getMessage(), e);
+            log.error("执行查询失败: modelCode={}, error={}", logSafe(request.getModelCode()), logSafe(e.getMessage()), e);
             throw new MetaServiceException("Query execution failed: " + e.getMessage(), e);
         }
     }

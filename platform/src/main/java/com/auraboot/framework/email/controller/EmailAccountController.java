@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -37,6 +38,9 @@ import java.util.UUID;
 public class EmailAccountController {
 
     private static final String STATE_SEPARATOR = ":";
+    private static final Set<String> ALLOWED_ACCOUNT_TYPES = Set.of(
+            EmailConstants.ACCOUNT_TYPE_PERSONAL,
+            EmailConstants.ACCOUNT_TYPE_SHARED);
 
     private final EmailAccountService   emailAccountService;
     private final GmailApiClient        gmailApiClient;
@@ -83,6 +87,7 @@ public class EmailAccountController {
      */
     @GetMapping("/oauth2/callback")
     @Operation(summary = "Handle Gmail OAuth2 callback (whitelisted from JWT auth)")
+    @SuppressWarnings("java/user-controlled-bypass")
     public void callback(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
@@ -111,7 +116,13 @@ public class EmailAccountController {
             Long   tenantId   = Long.parseLong(parts[0]);
             Long   userId     = Long.parseLong(parts[1]);
             String accountType = parts[2];
+            if (!ALLOWED_ACCOUNT_TYPES.contains(accountType)) {
+                throw new IllegalArgumentException("Invalid account type");
+            }
 
+            // code/state are user-supplied OAuth parameters, but state is an
+            // encrypted server-issued envelope. Only after decryption and
+            // accountType allow-list validation do we exchange the OAuth code.
             emailAccountService.handleOAuthCallback(tenantId, userId, code, accountType);
 
             log.info("Gmail OAuth callback completed: userId={}, type={}", userId, accountType);

@@ -55,7 +55,8 @@ public class BackwardStrategy implements SchedulingStrategy {
             int setupTime = calculateSetupTime(request.getSetupTimes(),
                 lastProductOnResource.get(selectedResource.getId()), job.getProductId());
 
-            LocalDateTime startTime = endTime.minusMinutes(job.getProcessingTimeMin() + setupTime);
+            long durationMinutes = Math.addExact(Math.max(0L, job.getProcessingTimeMin()), Math.max(0L, setupTime));
+            LocalDateTime startTime = endTime.minusMinutes(durationMinutes);
 
             // Check if start is before now
             if (startTime.isBefore(now)) {
@@ -63,11 +64,11 @@ public class BackwardStrategy implements SchedulingStrategy {
                     .jobId(job.getId())
                     .reason("Cannot start in time")
                     .requestedBy(job.getDueDate())
-                    .achievableBy(now.plusMinutes(job.getProcessingTimeMin() + setupTime))
+                    .achievableBy(now.plusMinutes(durationMinutes))
                     .build());
                 // Still schedule at now (forward from now)
                 startTime = now;
-                endTime = startTime.plusMinutes(job.getProcessingTimeMin() + setupTime);
+                endTime = startTime.plusMinutes(durationMinutes);
             }
 
             operations.add(ScheduledOperation.builder()
@@ -128,7 +129,7 @@ public class BackwardStrategy implements SchedulingStrategy {
         for (ResourceInfo res : request.getResources()) {
             long busyMinutes = operations.stream()
                 .filter(op -> op.getResourceId().equals(res.getId()))
-                .mapToLong(op -> op.getSetupTimeMin() + op.getProcessingTimeMin())
+                .mapToLong(op -> Math.addExact(Math.max(0L, op.getSetupTimeMin()), Math.max(0L, op.getProcessingTimeMin())))
                 .sum();
             utilization.put(res.getId(), Math.round(busyMinutes * 1000.0 / totalMinutes) / 10.0);
         }

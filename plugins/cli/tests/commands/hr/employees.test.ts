@@ -25,13 +25,13 @@ describe('hr employees command', () => {
   describe('filter options', () => {
     it('should build status filter', () => {
       const status = 'active';
-      const filter = { fieldName: 'org_emp_status', operator: 'EQ', value: status.toUpperCase() };
+      const filter = { fieldName: 'org_emp_status', operator: 'EQ', value: status.toLowerCase() };
       expect(filter.value).toBe('active');
     });
 
-    it('should uppercase RESIGNED status', () => {
+    it('should lowercase RESIGNED status', () => {
       const status = 'resigned';
-      const filter = { fieldName: 'org_emp_status', operator: 'EQ', value: status.toUpperCase() };
+      const filter = { fieldName: 'org_emp_status', operator: 'EQ', value: status.toLowerCase() };
       expect(filter.value).toBe('resigned');
     });
 

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -147,7 +148,7 @@ class AutomationSchedulerTest {
 
         when(automationMapper.findEnabledInactivity()).thenReturn(List.of(a));
         when(metaModelService.getTableName("Order")).thenReturn("ab_dyn_order");
-        when(jdbcTemplate.queryForList(anyString())).thenReturn(List.of(
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
                 Map.of("pid", "r1"),
                 Map.of("pid", "r2")));
 
@@ -157,12 +158,50 @@ class AutomationSchedulerTest {
     }
 
     @Test
+    void checkInactivity_usesWhitelistedIdentifiersAndBoundParameters() {
+        Automation a = automation("a1", null, null);
+        TriggerConfig tc = a.getTriggerConfig();
+        tc.setInactivityHours(24);
+        tc.setInactivityField("last_seen");
+        tc.setInactivityStates(List.of("open", "pending"));
+        tc.setStateField("status");
+
+        when(automationMapper.findEnabledInactivity()).thenReturn(List.of(a));
+        when(metaModelService.getTableName("Order")).thenReturn("ab_dyn_order");
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(Collections.emptyList());
+
+        scheduler.checkInactivityAutomations();
+
+        verify(jdbcTemplate).queryForList(
+                eq("SELECT pid FROM ab_dyn_order WHERE tenant_id = ? AND last_seen < NOW() - (? * INTERVAL '1 hour') AND status IN (?, ?) LIMIT 100"),
+                eq(7L),
+                eq(24),
+                eq("open"),
+                eq("pending"));
+    }
+
+    @Test
+    void checkInactivity_rejectsUnsafeSqlIdentifiersBeforeQuerying() {
+        Automation a = automation("a1", null, null);
+        a.getTriggerConfig().setInactivityHours(24);
+        a.getTriggerConfig().setInactivityField("updated_at; drop table users");
+
+        when(automationMapper.findEnabledInactivity()).thenReturn(List.of(a));
+        when(metaModelService.getTableName("Order")).thenReturn("ab_dyn_order");
+
+        scheduler.checkInactivityAutomations();
+
+        verifyNoInteractions(jdbcTemplate);
+        verifyNoInteractions(automationTriggerService);
+    }
+
+    @Test
     void checkInactivity_emptyResultDoesNotInvokeTrigger() {
         Automation a = automation("a1", null, null);
         a.getTriggerConfig().setInactivityHours(24);
         when(automationMapper.findEnabledInactivity()).thenReturn(List.of(a));
         when(metaModelService.getTableName("Order")).thenReturn("ab_dyn_order");
-        when(jdbcTemplate.queryForList(anyString())).thenReturn(Collections.emptyList());
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(Collections.emptyList());
         scheduler.checkInactivityAutomations();
         verify(automationTriggerService, never()).executeAutomation(any(), any(), any());
     }
@@ -173,7 +212,7 @@ class AutomationSchedulerTest {
         a.getTriggerConfig().setInactivityHours(24);
         when(automationMapper.findEnabledInactivity()).thenReturn(List.of(a));
         when(metaModelService.getTableName("Order")).thenReturn("ab_dyn_order");
-        when(jdbcTemplate.queryForList(anyString())).thenReturn(List.of(Map.of("pid", "r1")));
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of("pid", "r1")));
         when(automationTriggerService.executeAutomation(any(), any(), any())).thenThrow(new RuntimeException("x"));
         scheduler.checkInactivityAutomations();
         verify(automationTriggerService).executeAutomation(any(), any(), any());

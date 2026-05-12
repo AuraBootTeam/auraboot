@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.PageResult;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
 
@@ -11,6 +12,7 @@ import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.FieldDictBinding;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
+import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.common.util.DateUtil;
@@ -69,6 +71,10 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
 
 
 
@@ -82,7 +88,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "创建请求不能为空");
         }
         
-        log.info("创建字段定义: code={}, dataType={}", request.getCode(), request.getDataType());
+        log.info("创建字段定义: code={}, dataType={}", logSafe(request.getCode()), logSafe(request.getDataType()));
 
        return createDirectly(request);
     }
@@ -92,7 +98,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
      * 直接创建字段(开发阶段保留)
      */
     private MetaFieldDTO createDirectly(MetaFieldCreateRequest request) {
-        log.info("直接创建字段(非Git-First): {}", request.getCode());
+        log.info("直接创建字段(非Git-First): {}", logSafe(request.getCode()));
 
         // 业务验证
         validateCreateRequest(request);
@@ -140,7 +146,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         metaFieldMapper.insert(entity);
 
         log.info("字段定义创建成功: pid={}, code={}, version={} (租户: {})",
-                entity.getPid(), entity.getCode(), entity.getVersion(), MetaContext.getCurrentTenantId());
+                logSafe(entity.getPid()), logSafe(entity.getCode()), entity.getVersion(), MetaContext.getCurrentTenantId());
 
         // Auto-bind to model if modelPid is provided
         if (StringUtils.hasText(request.getModelPid())) {
@@ -157,7 +163,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             return null;
         }
 
-        log.debug("根据PID查找字段: pid={}", pid);
+        log.debug("根据PID查找字段: pid={}", logSafe(pid));
 
         // Query directly without throwing exception if not found
         Field entity = metaFieldMapper.selectByPidWithContext(
@@ -198,7 +204,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "更新请求不能为空");
         }
 
-        log.info("更新字段定义: pid={}", pid);
+        log.info("更新字段定义: pid={}", logSafe(pid));
 
         // 验证租户上下文
           
@@ -214,7 +220,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     }
 
     private MetaFieldDTO updateDirectly(Field existingEntity, MetaFieldUpdateRequest request) {
-        log.info("直接更新字段(非Git-First): {}", existingEntity.getCode());
+        log.info("直接更新字段(非Git-First): {}", logSafe(existingEntity.getCode()));
         
         // 创建新版本的创建请求
         MetaFieldCreateRequest createRequest = new MetaFieldCreateRequest();
@@ -244,7 +250,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "PID不能为空");
         }
         
-        log.info("删除字段定义: pid={}", pid);
+        log.info("删除字段定义: pid={}", logSafe(pid));
 
         // 验证租户上下文
           
@@ -265,19 +271,19 @@ public class MetaFieldServiceImpl implements MetaFieldService {
      * 直接删除字段(开发阶段保留)
      */
     private void deleteDirectly(Field entity) {
-        log.info("直接删除字段(非Git-First): {}", entity.getCode());
+        log.info("直接删除字段(非Git-First): {}", logSafe(entity.getCode()));
         
         // 软删除
         metaFieldMapper.deleteById(entity.getId());
         
-        log.info("字段定义删除成功: pid={}, code={}", entity.getPid(), entity.getCode());
+        log.info("字段定义删除成功: pid={}, code={}", logSafe(entity.getPid()), logSafe(entity.getCode()));
     }
 
     @Override
     public PageResult<MetaFieldDTO> listFields(Integer page, Integer size, String code, 
                                               String dataType, String status,   Boolean currentOnly) {
         log.debug("分页查询字段列表: page={}, size={}, code={}, dataType={}, status={}", 
-                 page, size, code, dataType, status);
+                 page, size, logSafe(code), logSafe(dataType), logSafe(status));
         
         Page<Field> pageRequest = new Page<>(page, size);
         IPage<Field> pageResult = metaFieldMapper.selectPageList(
@@ -303,7 +309,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     public Optional<MetaFieldDTO> findCurrentByCode(String code) {
-        log.debug("根据字段键查询当前版本字段: code={}", code);
+        log.debug("根据字段键查询当前版本字段: code={}", logSafe(code));
 
         Field entity = metaFieldMapper.findCurrentByCode(code);
         return Optional.ofNullable(entity).map(this::convertToDTO);
@@ -311,7 +317,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override 
     public Optional<MetaFieldDTO> findByCodeAndVersion(String code, Integer version) {
-        log.debug("根据字段键和版本查询字段: code={}, version={}", code, version);
+        log.debug("根据字段键和版本查询字段: code={}, version={}", logSafe(code), version);
 
               
               
@@ -333,7 +339,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     public List<MetaFieldDTO> findAllVersionsByCode(String code) {
-        log.debug("查询字段的所有版本: code={}", code);
+        log.debug("查询字段的所有版本: code={}", logSafe(code));
 
               
               
@@ -344,7 +350,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     public List<MetaFieldDTO> findByDataType(String dataType) {
-        log.debug("根据数据类型查询字段: dataType={}", dataType);
+        log.debug("根据数据类型查询字段: dataType={}", logSafe(dataType));
 
               
               
@@ -363,7 +369,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     public List<MetaFieldDTO> findByStatus(String status) {
-        log.debug("根据状态查询字段: status={}", status);
+        log.debug("根据状态查询字段: status={}", logSafe(status));
 
               
               
@@ -376,7 +382,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     public boolean isCodeUnique(String code, String excludePid) {
-        log.debug("检查字段键唯一性: code={}, excludePid={}", code, excludePid);
+        log.debug("检查字段键唯一性: code={}, excludePid={}", logSafe(code), logSafe(excludePid));
 
         Long tenantId = MetaContext.getCurrentTenantId();
               
@@ -396,14 +402,14 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     public boolean isFieldExists(String code) {
-        log.debug("检查字段是否存在: code={}", code);
+        log.debug("检查字段是否存在: code={}", logSafe(code));
         
         return findCurrentByCode(code).isPresent();
     }
 
     @Override
     public MetaFieldValidationResult validateField(String code) {
-        log.debug("验证字段定义: code={}", code);
+        log.debug("验证字段定义: code={}", logSafe(code));
         
         // ✅ 实现字段验证逻辑
         MetaFieldValidationResult result = MetaFieldValidationResult.builder()
@@ -446,7 +452,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             }
             
         } catch (Exception e) {
-            log.error("Failed to validate field: code={}, error={}", code, e.getMessage(), e);
+            log.error("Failed to validate field: code={}, error={}", logSafe(code), logSafe(e.getMessage()), e);
             result.addError("validation", "error", 
                 "Validation failed: " + e.getMessage());
         }
@@ -459,7 +465,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Override
     @Transactional
     public boolean bindDictionary(String fieldPid, String dictCode) {
-        log.info("绑定字典到字段: fieldPid={}, dictCode={}", fieldPid, dictCode);
+        log.info("绑定字典到字段: fieldPid={}, dictCode={}", logSafe(fieldPid), logSafe(dictCode));
         
         // ✅ 实现字典绑定逻辑
         
@@ -502,7 +508,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             existingBinding.setUpdatedAt(Instant.now());
             fieldDictBindingMapper.updateById(existingBinding);
             
-            log.info("更新字典绑定: fieldPid={}, dictCode={}", fieldPid, dictCode);
+            log.info("更新字典绑定: fieldPid={}, dictCode={}", logSafe(fieldPid), logSafe(dictCode));
         } else {
             // 创建新绑定
             FieldDictBinding binding =
@@ -520,7 +526,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             
             fieldDictBindingMapper.insert(binding);
             
-            log.info("创建字典绑定: fieldPid={}, dictCode={}", fieldPid, dictCode);
+            log.info("创建字典绑定: fieldPid={}, dictCode={}", logSafe(fieldPid), logSafe(dictCode));
         }
         
         return true;
@@ -529,7 +535,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Override
     @Transactional
     public boolean unbindDictionary(String fieldPid) {
-        log.info("解绑字段的字典: fieldPid={}", fieldPid);
+        log.info("解绑字段的字典: fieldPid={}", logSafe(fieldPid));
         
         // ✅ 实现字典解绑逻辑
         
@@ -544,24 +550,24 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             fieldDictBindingMapper.findByFieldPid(fieldPid, tenantId);
 
         if (binding == null) {
-            log.warn("字段没有绑定字典: fieldPid={}", fieldPid);
+            log.warn("字段没有绑定字典: fieldPid={}", logSafe(fieldPid));
             return false;
         }
 
         // 3. 软删除绑定（按字段维度删除，避免残留记录）
         int deletedCount = fieldDictBindingMapper.deleteByFieldPid(fieldPid, tenantId);
         if (deletedCount <= 0) {
-            log.warn("字典解绑未生效: fieldPid={}", fieldPid);
+            log.warn("字典解绑未生效: fieldPid={}", logSafe(fieldPid));
             return false;
         }
 
-        log.info("解绑字典成功: fieldPid={}, dictCode={}", fieldPid, binding.getDictCode());
+        log.info("解绑字典成功: fieldPid={}, dictCode={}", logSafe(fieldPid), logSafe(binding.getDictCode()));
         return true;
     }
 
     @Override
     public Optional<DictDTO> getBoundDictionary(String fieldPid) {
-        log.debug("获取字段绑定的字典: fieldPid={}", fieldPid);
+        log.debug("获取字段绑定的字典: fieldPid={}", logSafe(fieldPid));
         
         // ✅ 实现获取绑定字典逻辑
         
@@ -590,7 +596,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Override
     @Transactional
     public MetaFieldDTO publishVersion(String pid) {
-        log.info("发布字段版本: pid={}", pid);
+        log.info("发布字段版本: pid={}", logSafe(pid));
         
         Field entity = metaFieldMapper.findByPid(pid);
         if (entity == null) {
@@ -609,7 +615,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Override
     @Transactional
     public MetaFieldDTO rollbackToVersion(String code, Integer version) {
-        log.info("回滚字段到指定版本: code={}, version={}", code, version);
+        log.info("回滚字段到指定版本: code={}, version={}", logSafe(code), version);
 
               
               
@@ -634,7 +640,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     public Integer getNextVersion(String code) {
-        log.debug("获取字段的下一个版本号: code={}", code);
+        log.debug("获取字段的下一个版本号: code={}", logSafe(code));
 
               
               
@@ -647,7 +653,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Override
     @CacheEvict(value = {"metaField", "metaFieldByKey"}, key = "#code + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()")
     public void refreshFieldCache(String code) {
-        log.info("刷新字段缓存: code={}", code);
+        log.info("刷新字段缓存: code={}", logSafe(code));
     }
 
     @Override
@@ -752,7 +758,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 .map(error -> String.format("%s: %s", error.getField(), error.getMessage()))
                 .collect(Collectors.joining("; "));
             
-            log.warn("Field validation failed: code={}, errors={}", request.getCode(), errorMessages);
+            log.warn("Field validation failed: code={}, errors={}", logSafe(request.getCode()), logSafe(errorMessages));
             throw new ValidationException(ResponseCode.CommonValidationFailed, 
                 "字段验证失败: " + errorMessages);
         }
@@ -762,7 +768,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             String warningMessages = validationResult.getWarnings().stream()
                 .map(warning -> String.format("%s: %s", warning.getField(), warning.getMessage()))
                 .collect(Collectors.joining("; "));
-            log.warn("Field validation warnings: code={}, warnings={}", request.getCode(), warningMessages);
+            log.warn("Field validation warnings: code={}, warnings={}", logSafe(request.getCode()), logSafe(warningMessages));
         }
     }
     
@@ -781,7 +787,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 .map(error -> String.format("%s: %s", error.getField(), error.getMessage()))
                 .collect(Collectors.joining("; "));
 
-            log.warn("Field update validation failed: errors={}", errorMessages);
+            log.warn("Field update validation failed: errors={}", logSafe(errorMessages));
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                 "Field update validation failed: " + errorMessages);
         }
@@ -790,7 +796,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
             String warningMessages = validationResult.getWarnings().stream()
                 .map(warning -> String.format("%s: %s", warning.getField(), warning.getMessage()))
                 .collect(Collectors.joining("; "));
-            log.warn("Field update validation warnings: {}", warningMessages);
+            log.warn("Field update validation warnings: {}", logSafe(warningMessages));
         }
     }
 
@@ -846,7 +852,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
      * @param fieldCode Field code
      */
     private void bindFieldToModelAfterCreation(String modelPid, String fieldCode) {
-        log.info("Binding field to model after creation: modelPid={}, fieldCode={}", modelPid, fieldCode);
+        log.info("Binding field to model after creation: modelPid={}, fieldCode={}", logSafe(modelPid), logSafe(fieldCode));
         
         // 查找刚创建的字段 - 使用   code 和最新版本
               
@@ -855,14 +861,14 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         // 获取最新版本号 (getNextVersion 返回下一个版本，所以减1得到当前最新版本)
         Integer nextVersion = metaFieldMapper.getNextVersion(  fieldCode);
         if (nextVersion == null || nextVersion <= 1) {
-            log.warn("Field not found for binding: code={}", fieldCode);
+            log.warn("Field not found for binding: code={}", logSafe(fieldCode));
             return;
         }
         Integer latestVersion = nextVersion - 1;
         
         Field field = metaFieldMapper.findByCodeAndVersion(  fieldCode, latestVersion);
         if (field == null) {
-            log.warn("Field not found for binding: code={}, version={}", fieldCode, latestVersion);
+            log.warn("Field not found for binding: code={}, version={}", logSafe(fieldCode), latestVersion);
             return;
         }
         
@@ -876,10 +882,10 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 false, // isReadonly
                 true   // isVisible
             );
-            log.info("Field bound to model successfully: modelPid={}, fieldPid={}", modelPid, field.getPid());
+            log.info("Field bound to model successfully: modelPid={}, fieldPid={}", logSafe(modelPid), logSafe(field.getPid()));
         } catch (Exception e) {
             log.warn("Failed to bind field to model: modelPid={}, fieldPid={}, error={}",
-                modelPid, field.getPid(), e.getMessage());
+                logSafe(modelPid), logSafe(field.getPid()), logSafe(e.getMessage()));
             // 不抛出异常，字段创建成功但绑定失败
         }
     }
@@ -1104,10 +1110,15 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                     "ab_meta_field row not found for code=" + fieldCode);
         }
 
-        String columnName = StringUtils.hasText(fieldDef.getColumnName())
-                ? fieldDef.getColumnName()
-                : fieldCode;
-        String tableName = metaModelService.getTableName(modelCode);
+        String columnName = fieldDef.getColumnName();
+        if (!StringUtils.hasText(columnName)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "field columnName is missing: model=" + modelCode + ", code=" + fieldCode);
+        }
+        String tableName = SqlSafetyUtils.requireIdentifier(
+                metaModelService.getTableName(modelCode),
+                "removeFromModel tableName");
+        columnName = SqlSafetyUtils.requireIdentifier(columnName, "removeFromModel columnName");
 
         // 3) Optional data probe (refuseIfDataExists)
         if (request.isRefuseIfDataExists()) {
@@ -1124,7 +1135,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 // F-7 mitigation: if table or column is missing (race / partial state),
                 // treat as empty and continue with cleanup. Log for diagnostics.
                 log.warn("removeFromModel data probe skipped (table/column may not exist): "
-                        + "table={}, column={}, error={}", tableName, columnName, dae.getMessage());
+                        + "table={}, column={}, error={}", logSafe(tableName), logSafe(columnName), logSafe(dae.getMessage()));
             }
             if (hasData) {
                 throw new ColumnHasDataException(
@@ -1180,7 +1191,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         }
 
         log.info("removeFromModel done: model={}, field={}, table={}, column={}",
-                modelCode, fieldCode, tableName, columnName);
+                logSafe(modelCode), logSafe(fieldCode), logSafe(tableName), logSafe(columnName));
     }
 
     /**
