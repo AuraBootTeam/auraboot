@@ -33,7 +33,7 @@ dependencies {
     compileOnly 'org.springframework:spring-context:6.2.6'
 
     // SLF4J for @Slf4j
-    compileOnly 'org.slf4j:slf4j-api:2.0.12'
+    compileOnly 'org.slf4j:slf4j-api:2.0.17'
 
     // Test — platform classes and Spring needed at test runtime too
     testImplementation(project(':')) {
