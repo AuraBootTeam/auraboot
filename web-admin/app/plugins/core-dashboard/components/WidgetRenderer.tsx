@@ -11,6 +11,11 @@ import type { Widget, WidgetType } from '../types';
 import type { FilterConfig } from '~/framework/smart/types/chart';
 import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
 import { useI18n } from '~/contexts/I18nContext';
+import {
+  getLocalizedText,
+  type LocalizedText,
+  type TranslateFunction,
+} from '~/framework/meta/runtime/expression/i18n-renderer';
 
 /**
  * Recursively resolve $i18n:* prefixed strings in a value tree using the supplied
@@ -25,7 +30,18 @@ import { useI18n } from '~/contexts/I18nContext';
 // just keys that occupy a whole config string.
 const I18N_KEY_PATTERN = /\$i18n:([a-zA-Z_][a-zA-Z0-9_.]*)/g;
 
-function resolveI18nDeep<T>(value: T, t: (key: string) => string): T {
+const KNOWN_LOCALE_KEYS = new Set(['zh-CN', 'zh', 'en-US', 'en', 'ja-JP', 'ja', 'ko-KR', 'ko']);
+const REGION_LOCALE_PATTERN = /^[a-z]{2,3}-[A-Z]{2}$/;
+
+function isLocalizedTextRecord(value: unknown): value is LocalizedText {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) return false;
+  const hasLocaleKey = entries.some(([key]) => KNOWN_LOCALE_KEYS.has(key) || REGION_LOCALE_PATTERN.test(key));
+  return hasLocaleKey && entries.every(([, v]) => v === undefined || typeof v === 'string');
+}
+
+function resolveI18nDeep<T>(value: T, locale: string, t: TranslateFunction): T {
   if (typeof value === 'string') {
     if (!value.includes('$i18n:')) return value;
     // Whole-string shortcut
@@ -35,13 +51,16 @@ function resolveI18nDeep<T>(value: T, t: (key: string) => string): T {
     // Embedded substitution (e.g. inside HTML content)
     return value.replace(I18N_KEY_PATTERN, (_match, key) => t(key)) as unknown as T;
   }
+  if (isLocalizedTextRecord(value)) {
+    return getLocalizedText(value, locale, t) as unknown as T;
+  }
   if (Array.isArray(value)) {
-    return value.map((v) => resolveI18nDeep(v, t)) as unknown as T;
+    return value.map((v) => resolveI18nDeep(v, locale, t)) as unknown as T;
   }
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = resolveI18nDeep(v, t);
+      out[k] = resolveI18nDeep(v, locale, t);
     }
     return out as T;
   }
@@ -78,7 +97,7 @@ function RenderedWidget({
   onLinkageEmit,
   onDrillDown,
 }: WidgetRenderProps): React.ReactElement {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const chartType = normalizeChartType(widget.type);
   const Component = getChartComponent(chartType);
 
@@ -90,7 +109,7 @@ function RenderedWidget({
     );
   }
 
-  const config = resolveI18nDeep(widget.config, t);
+  const config = resolveI18nDeep(widget.config, locale, t);
 
   // Spread the entire (i18n-resolved) config so widgets receive every key —
   // title, content, shortcuts, columns, metricField, prefix, suffix,

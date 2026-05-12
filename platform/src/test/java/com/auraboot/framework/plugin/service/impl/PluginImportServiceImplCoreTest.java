@@ -18,6 +18,7 @@ import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.dto.PluginManifest;
+import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
@@ -55,6 +56,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -136,6 +140,24 @@ class PluginImportServiceImplCoreTest {
         return m;
     }
 
+    @SuppressWarnings("unchecked")
+    private void invokeLoadResourcesFromZip(PluginManifestExtended manifest, Map<String, byte[]> files) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "loadResourcesFromZipFiles", PluginManifestExtended.class, Map.class);
+            method.setAccessible(true);
+            method.invoke(service, manifest, files);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     // ---------- validateManifest deeper branches ----------
 
     @Test
@@ -185,6 +207,50 @@ class PluginImportServiceImplCoreTest {
         // no min/max
         service.validateManifest(m);
         verify(platformVersionChecker, never()).check(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("ZIP resourceDirs loads bindingRules from nested JSON files")
+    void zipResourceDirs_loadsBindingRules() {
+        PluginManifestExtended m = baseManifest();
+        m.setResourceDirs(Map.of("bindingRules", "config/binding-rules"));
+        Map<String, byte[]> files = Map.of(
+                "config/binding-rules/rules.json",
+                """
+                [
+                  {
+                    "commandCode": "demo:approve",
+                    "ruleType": "field_map",
+                    "sequence": 10,
+                    "targetModel": "demo_order",
+                    "targetField": "status",
+                    "sourceField": "approvalStatus"
+                  }
+                ]
+                """.getBytes(StandardCharsets.UTF_8)
+        );
+
+        invokeLoadResourcesFromZip(m, files);
+
+        assertThat(m.getBindingRules())
+                .extracting(BindingRuleDTO::getCommandCode)
+                .containsExactly("demo:approve");
+    }
+
+    @Test
+    @DisplayName("ZIP resourceDirs bindingRules fail fast when declared resource JSON is invalid")
+    void zipResourceDirs_bindingRulesInvalidJsonFailsFast() {
+        PluginManifestExtended m = baseManifest();
+        m.setResourceDirs(Map.of("bindingRules", "config/binding-rules"));
+        Map<String, byte[]> files = Map.of(
+                "config/binding-rules/rules.json",
+                "{not-json".getBytes(StandardCharsets.UTF_8)
+        );
+
+        assertThatThrownBy(() -> invokeLoadResourcesFromZip(m, files))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("Failed to parse ZIP resource file")
+                .hasMessageContaining("config/binding-rules/rules.json");
     }
 
     @Test

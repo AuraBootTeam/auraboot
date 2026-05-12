@@ -5,6 +5,7 @@
 
 import type {
   Dashboard,
+  DashboardText,
   Widget,
   WidgetType,
   DashboardCreateRequest,
@@ -14,18 +15,32 @@ import type {
 
 const API_BASE = '/api/dashboards';
 
-function normalizeLocalizedText(value: unknown): string {
+const KNOWN_LOCALE_KEYS = new Set(['zh-CN', 'zh', 'en-US', 'en', 'ja-JP', 'ja', 'ko-KR', 'ko']);
+const REGION_LOCALE_PATTERN = /^[a-z]{2,3}-[A-Z]{2}$/;
+
+function isLocalizedTextRecord(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) return false;
+  const hasLocaleKey = entries.some(([key]) => KNOWN_LOCALE_KEYS.has(key) || REGION_LOCALE_PATTERN.test(key));
+  return hasLocaleKey && entries.every(([, item]) => item === undefined || typeof item === 'string');
+}
+
+function normalizeLocalizedText(value: unknown): DashboardText | '' {
   if (typeof value === 'string') return value;
-  if (value && typeof value === 'object') {
-    const localized = value as Record<string, unknown>;
-    const candidates = [
-      localized['zh-CN'],
-      localized.zh,
-      localized['en-US'],
-      localized.en,
-    ];
-    const resolved = candidates.find((item) => typeof item === 'string' && item.trim().length > 0);
-    if (typeof resolved === 'string') return resolved;
+  if (isLocalizedTextRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).filter(([, item]) => typeof item === 'string'),
+    ) as DashboardText;
+  }
+  return '';
+}
+
+function normalizeLocalizedTextToString(value: unknown): string {
+  const normalized = normalizeLocalizedText(value);
+  if (typeof normalized === 'string') return normalized;
+  if (normalized) {
+    return normalized['zh-CN'] || normalized.zh || normalized['en-US'] || normalized.en || '';
   }
   return '';
 }
@@ -541,7 +556,7 @@ function buildStaticDataSource(type: WidgetType, config: Record<string, unknown>
 export function normalizeDashboard(raw: Dashboard): Dashboard {
   return {
     ...raw,
-    title: normalizeLocalizedText(raw.title),
+    title: normalizeLocalizedTextToString(raw.title),
     widgets: (raw.widgets || []).map((w, i) => normalizeWidget(w as unknown as Record<string, unknown>, i)),
   };
 }

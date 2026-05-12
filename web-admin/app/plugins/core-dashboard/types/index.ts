@@ -9,6 +9,7 @@ import type {
   ValidationResult as SharedValidationResult,
   ValidationError as SharedValidationError,
 } from '~/shared/designer';
+import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 /**
  * Dashboard scope
@@ -19,6 +20,8 @@ export type DashboardScope = 'personal' | 'team' | 'global';
  * Dashboard status
  */
 export type DashboardStatus = 'draft' | 'published';
+
+export type DashboardText = string | LocalizedText;
 
 /**
  * Widget type
@@ -147,7 +150,7 @@ export interface StyleSettings {
  * Widget configuration
  */
 export interface WidgetConfig {
-  title: string;
+  title: DashboardText;
   dataSource?: DataSourceConfig;
   visualization?: Record<string, unknown>;
   style?: StyleSettings;
