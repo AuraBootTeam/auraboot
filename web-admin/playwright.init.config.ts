@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
+const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
+const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 
 /**
  * Playwright Configuration for Environment Initialization
@@ -11,7 +13,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
 export default defineConfig({
   testDir: './tests',
   testMatch: ['**/api/setup/init-env.spec.ts'],
-  outputDir: './test-results/artifacts',
+  outputDir: artifactDir,
 
   // No global setup - we're creating the user in the test
   // globalSetup: undefined,
@@ -22,7 +24,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
 
-  reporter: [['list'], ['html', { open: 'never', outputFolder: './test-results/html-report' }]],
+  reporter: [['list'], ['html', { open: 'never', outputFolder: reportDir }]],
 
   use: {
     baseURL,

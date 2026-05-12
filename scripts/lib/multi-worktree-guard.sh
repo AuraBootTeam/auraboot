@@ -6,7 +6,8 @@
 # Purpose:
 #   Refuse to run destructive / shared-singleton operations (reset-db.sh,
 #   oss-reset-and-init.sh, publishToMavenLocal, bootRun, pnpm dev:full,
-#   full Playwright E2E) when ≥ 2 git worktrees of this repo are active.
+#   full Playwright E2E) when ≥ 2 git worktrees of this repo are present and
+#   the current command is still targeting the shared host runtime.
 #
 # Why:
 #   Triggered by 2026-05-07 incident — feat/env-layering-poc worktree ran
@@ -18,6 +19,10 @@
 #
 # Decision:
 #   Default: refuse with message pointing at isolated docker stack workflow.
+#   Allow: commands that already target an isolated runtime (PG_PORT != 5432
+#          or AURA_ENV_PROFILE=r2) pass, because they are not writing the
+#          shared host DB. publishToMavenLocal has a matching Gradle-side
+#          allow path when -Dmaven.repo.local points outside ~/.m2/repository.
 #   Escape: FORCE_HOST=1 bypasses the guard but appends one line to
 #           ~/.aura/host-override.log so owner can audit which scenarios
 #           rely on the escape hatch.
@@ -40,6 +45,14 @@ aura_multi_worktree_guard() {
         # Single-worktree case — host stack is safe.
         return 0
     fi
+
+    case "$operation_name" in
+        reset-db.sh|oss-reset-and-init.sh)
+            if [ "${AURA_ENV_PROFILE:-}" = "r2" ] || [ "${PG_PORT:-5432}" != "5432" ] || [ -n "${COMPOSE_PROJECT_NAME:-}" ]; then
+                return 0
+            fi
+            ;;
+    esac
 
     if [ "${FORCE_HOST:-}" = "1" ]; then
         # Escape hatch: caller has explicitly opted in. Log + warn + pass.
@@ -71,18 +84,20 @@ aura_multi_worktree_guard() {
 
 ERROR: refusing to run '$operation_name' — detected $worktree_count active git worktrees.
 
-Multi-worktree mode requires an isolated Docker stack so shared singletons
-(Postgres / m2 / :6443 / :5174:3501 / Redis) don't collide.
+Multi-worktree mode requires an isolated runtime so shared singletons
+(Postgres / m2 publish output / :6443 / :5174:3501 / Redis) don't collide.
 
 Options:
-  1) Use the isolated stack workflow:
-       aura dev start --isolated
-     (or whichever P0 wrapper is available — see
-      docs/plans/2026-05/2026-05-07-docker-per-worktree-isolation-design.md §4.1)
+  1) Use isolated infra for daily host-mode development:
+       scripts/dev/start-dev-infra.sh --slug=<topic>
+       source scripts/dev/r2-env-export.sh <topic>
 
-  2) Stop the other worktrees' host stacks first, then re-run.
+  2) Use the full isolated stack for E2E / merge verification:
+       scripts/dev/start-isolated.sh --slug=<topic>
 
-  3) Override (only if you know other worktrees are dormant):
+  3) Stop the other worktrees' host stacks first, then re-run.
+
+  4) Override (only if you know other worktrees are dormant):
        FORCE_HOST=1 $operation_name
      This appends one audit line to ~/.aura/host-override.log.
 
