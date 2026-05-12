@@ -357,6 +357,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
         'flex flex-col rounded-lg border border-gray-200 bg-white',
         className,
       )}
+      data-testid="kanban-board"
       // Cap the board to the viewport so each column's internal
       // `overflow-y-auto` actually scrolls instead of letting the whole page
       // grow unboundedly. Without this cap, column bodies render at their

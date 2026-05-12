@@ -11,7 +11,7 @@
  * so we can identify which of (Mouse|Pointer)Sensor produced it.
  */
 import React from 'react';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Track every useSensor invocation so we can correlate the descriptor objects
@@ -40,7 +40,14 @@ vi.mock('@dnd-kit/core', async () => {
 
 vi.mock('~/framework/smart/hooks/useKanbanData', () => ({
   useKanbanData: () => ({
-    columns: [{ id: 'todo', title: 'Todo', count: 0, cards: [] }],
+    columns: [
+      {
+        id: 'todo',
+        title: 'Todo',
+        count: 1,
+        cards: [{ id: 'card-1', title: 'Demo Card', status: 'todo' }],
+      },
+    ],
     loading: false,
     error: null,
     moveCard: vi.fn(),
@@ -106,5 +113,13 @@ describe('SmartKanban sensor swap based on __AURA_E2E_MODE__', () => {
     render(<SmartKanban {...baseProps} />);
 
     expect(activeSensorClass()).toBe(PointerSensor);
+  });
+
+  it('renders stable kanban board and card test hooks', () => {
+    render(<SmartKanban {...baseProps} />);
+
+    expect(screen.getByTestId('kanban-board')).toBeTruthy();
+    expect(screen.getByTestId('kanban-card')).toHaveTextContent('Demo Card');
+    expect(screen.getByTestId('kanban-column-header')).toHaveAttribute('data-column-id', 'todo');
   });
 });
