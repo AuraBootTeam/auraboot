@@ -76,7 +76,7 @@ POST /api/bootstrap/setup
 Content-Type: application/json
 
 {
-  "adminEmail": "admin@example.com",
+  "adminEmail": "admin@auraboot.com",
   "adminPassword": "SecurePassword123",
   "companyName": "Acme Corporation",
   "systemMode": "MULTI"

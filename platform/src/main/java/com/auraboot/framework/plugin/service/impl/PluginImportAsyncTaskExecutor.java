@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
  *   "tenantId": 123456,
  *   "userId": 789,
  *   "userPid": "01ABC...",
- *   "username": "admin@example.com"
+ *   "username": "admin@auraboot.com"
  * }
  * </pre>
  */

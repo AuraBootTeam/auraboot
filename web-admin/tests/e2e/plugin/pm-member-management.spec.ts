@@ -83,7 +83,7 @@ test.describe('PM Member Management', () => {
       for (const member of tenantMembers) {
         if (
           member?.status === 'pending' &&
-          member?.user_email !== 'admin@example.com' &&
+          member?.user_email !== 'admin@auraboot.com' &&
           !reservedEmails.includes(member?.user_email)
         ) {
           await page.request

@@ -36,7 +36,7 @@ test.describe('workflow-demo — R3 SLA escalation', () => {
       // -----------------------------------------------------------------------
       // 1. Admin API setup — reuse the same pattern as R1 / R2
       // -----------------------------------------------------------------------
-      const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+      const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
       await ensureRoleUsers(request);
       const applicant = await createLeaveApplicant(request, adminToken, 'r3_sla');
       await setLeaveBalance(request, adminToken, applicant.userId, 20);

@@ -253,7 +253,7 @@ test.describe('BPM designer — gateway conditions', { tag: ['@bpm-regression'] 
   test.setTimeout(240_000);
 
   test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
-    adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
   });
 
   // ==========================================================================

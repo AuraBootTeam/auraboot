@@ -74,7 +74,7 @@ Use the default admin credentials:
 
 | Field | Value |
 |---|---|
-| Email | `admin@example.com` |
+| Email | `admin@auraboot.com` |
 | Password | `ChangeMeOnFirstLogin!` |
 
 After login, you land on the workspace dashboard.
