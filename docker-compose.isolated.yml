@@ -13,6 +13,11 @@
 #     see docker-compose.ga-e2e.override.yml when running E2E inside a stack).
 #   - Frontend service kept as `isolated-frontend` so compose doesn't merge
 #     this block into the base file's `frontend.build:` block.
+#   - Keeps node_modules per stack, but uses host-backed, platform-scoped
+#     dependency caches to avoid multi-worktree Docker VM disk blowups.
+#   - Keeps the Playwright image out of the default frontend service. Use the
+#     optional `playwright-runner` profile when CI-like browser verification
+#     must run inside Linux.
 #
 # Usage:
 #   scripts/dev/start-isolated.sh                 # auto slug from branch
@@ -54,6 +59,17 @@ services:
           cpus: '${REDIS_CPUS:-0.25}'
           memory: ${REDIS_MEM:-256m}
 
+  minio:
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-minio
+    ports: !override
+      - "${MINIO_API_PORT:-9002}:9000"
+      - "${MINIO_CONSOLE_PORT:-9003}:9001"
+    deploy:
+      resources:
+        limits:
+          cpus: '${MINIO_CPUS:-0.5}'
+          memory: ${MINIO_MEM:-512m}
+
   backend:
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-backend
     profiles:
@@ -81,11 +97,10 @@ services:
       # command handlers before resource import, so handler jars must be loaded
       # at backend startup rather than discovered from JSON plugin directories.
       - ${ENTERPRISE_PLUGIN_JARS_DIR:-./.aura-stack/empty-enterprise-plugin-jars}:/app/plugin-jars:ro
-      # Cross-stack shared caches — first stack populates, all others reuse.
-      # See Dockerfile.dev (GRADLE_USER_HOME=/gradle-cache, MAVEN_HOME=/m2-cache)
-      # and docs/plans/2026-05/2026-05-08-docker-warm-stack-and-suite-r2.md §1A/§1B.
-      - aura_gradle_cache:/gradle-cache
-      - aura_m2_cache:/m2-cache
+      # Host-backed cross-stack caches. Keep dependency caches out of the
+      # Docker VM so full isolated stacks don't consume VM disk for warm cache.
+      - ${AURA_CONTAINER_CACHE_ROOT:-${HOME}/.cache/auraboot/container-linux}/gradle:/gradle-cache
+      - ${AURA_CONTAINER_CACHE_ROOT:-${HOME}/.cache/auraboot/container-linux}/m2:/m2-cache
     environment:
       # Talk to the redis container by service name (works because both are
       # in the same compose project network).
@@ -120,12 +135,16 @@ services:
       # variants. Frontend host ports are env-var driven for parity.
       FRONTEND_BASE_URL: http://localhost:${VITE_PORT:-5174}
       CORS_ALLOWED_ORIGINS: "http://isolated-frontend:5173,http://isolated-frontend:3500,http://localhost:${VITE_PORT:-5174},http://127.0.0.1:${VITE_PORT:-5174},http://localhost:${BFF_PORT:-3501},http://127.0.0.1:${BFF_PORT:-3501}"
+      # Keep Docker health tied to service readiness. Disk capacity is checked
+      # at host/Docker level by scripts/dev/doctor-disk.sh; Spring's diskspace
+      # health can false-negative on Docker Desktop overlay filesystems.
+      MANAGEMENT_HEALTH_DISKSPACE_ENABLED: "false"
 
   # Vite + BFF dev server. Distinct service name (`isolated-frontend`,
   # not `frontend`) so compose doesn't merge the base file's `frontend.build:`
   # block into us — we want dev mode (pnpm dev:full), not the prod build.
   isolated-frontend:
-    image: ${ISOLATED_FRONTEND_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-noble}
+    image: ${ISOLATED_FRONTEND_IMAGE:-node:22-bookworm-slim}
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-frontend
     user: root
     profiles:
@@ -153,6 +172,7 @@ services:
       HOST: "0.0.0.0"
       CI: "true"
       NODE_ENV: development
+      PNPM_STORE_DIR: /pnpm-store
       # SSR fetch base URL — without this, http-client falls back to the
       # incoming origin (the host port, unreachable from inside the container)
       # and SSR /login submits fail with ECONNREFUSED. 127.0.0.1 (not
@@ -163,8 +183,11 @@ services:
       ENTERPRISE_PLUGIN_ROOT: /app/plugins-enterprise
     volumes:
       - ./:/repo:cached
+      # Keep Linux node_modules project-local for correctness, but share the
+      # content-addressed package store and browser cache across stacks.
       - isolated_node_modules:/repo/node_modules
       - isolated_web_admin_node_modules:/repo/web-admin/node_modules
+      - ${AURA_CONTAINER_CACHE_ROOT:-${HOME}/.cache/auraboot/container-linux}/pnpm-store:/pnpm-store
     depends_on:
       backend:
         condition: service_healthy
@@ -185,23 +208,117 @@ services:
       pnpm exec concurrently --names 'web,bff' --prefix-colors 'cyan,green' --restart-tries 5 --restart-after 2000 'pnpm dev:web' 'pnpm dev:bff'
       "
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5173 >/dev/null 2>&1 && wget -q -O- http://127.0.0.1:3500/health >/dev/null 2>&1 || wget -q -O- http://127.0.0.1:3500 >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "node -e \"Promise.all([fetch('http://127.0.0.1:5173'), fetch('http://127.0.0.1:3500/health').catch(() => fetch('http://127.0.0.1:3500'))]).then(r => process.exit(r.every(x => x.ok || x.status < 500) ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 30
       start_period: 5m
+
+  # Production-like frontend for B2 pre-merge validation. This is separate
+  # from the default Vite+BFF dev surface so daily full-stack smoke stays
+  # lightweight; enable the `production-like` profile only when validating
+  # the built React app + production BFF runtime path.
+  isolated-prod-frontend:
+    build:
+      context: .
+      dockerfile: web-admin/Dockerfile
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-prod-frontend
+    profiles:
+      - production-like
+    deploy:
+      resources:
+        limits:
+          cpus: '${PROD_FE_CPUS:-2.0}'
+          memory: ${PROD_FE_MEM:-2g}
+    ports:
+      - "${PROD_FRONTEND_PORT:-3001}:3000"
+    environment:
+      NODE_ENV: production
+      BFF_PORT: "3000"
+      SPRING_BOOT_URL: http://backend:6443
+      CORS_ALLOWED_ORIGINS: "http://localhost:${PROD_FRONTEND_PORT:-3001},http://127.0.0.1:${PROD_FRONTEND_PORT:-3001}"
+      SESSION_SECRET: ${SESSION_SECRET:-isolated-dev-session-secret}
+      NO_PROXY: "localhost,127.0.0.1,backend"
+      no_proxy: "localhost,127.0.0.1,backend"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/health').catch(() => fetch('http://127.0.0.1:3000/')).then(r => process.exit(r.ok || r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 2m
+
+  # Optional Linux Playwright runner. This service is intentionally not part
+  # of the default isolated stack; run it only when CI-like browser validation
+  # is needed:
+  #   docker compose -p <project> -f docker-compose.yml -f docker-compose.isolated.yml \
+  #     --profile isolated --profile cache --profile playwright-runner \
+  #     run --rm playwright-runner
+  playwright-runner:
+    image: ${PLAYWRIGHT_RUNNER_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-noble}
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-playwright-runner
+    profiles:
+      - playwright-runner
+    working_dir: /repo/web-admin
+    environment:
+      CI: "true"
+      NODE_ENV: test
+      PNPM_STORE_DIR: /pnpm-store
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      PLAYWRIGHT_BASE_URL: http://isolated-frontend:5173
+      BASE_URL: http://isolated-frontend:5173
+      BACKEND_URL: http://backend:6443
+      BFF_URL: http://isolated-frontend:3500
+      PW_SKIP_WEBSERVER: "1"
+      PW_E2E_RUN_ID: ${PW_E2E_RUN_ID:-docker}
+      PW_E2E_RUN_ROOT: ${PW_E2E_RUN_ROOT:-test-results/runs/isolated/docker}
+      PW_ARTIFACT_DIR: ${PW_ARTIFACT_DIR:-test-results/runs/isolated/docker/artifacts}
+      PW_REPORT_DIR: ${PW_REPORT_DIR:-test-results/runs/isolated/docker/html-report}
+      PW_RESULTS_JSON: ${PW_RESULTS_JSON:-test-results/runs/isolated/docker/results.json}
+      PW_STORAGE_DIR: ${PW_STORAGE_DIR:-tests/storage/isolated/docker}
+      PW_ADMIN_STORAGE_STATE: ${PW_ADMIN_STORAGE_STATE:-${PW_STORAGE_DIR:-tests/storage/isolated/docker}/admin.json}
+      PW_OPERATOR_STORAGE_STATE: ${PW_OPERATOR_STORAGE_STATE:-${PW_STORAGE_DIR:-tests/storage/isolated/docker}/operator.json}
+      PW_VIEWER_STORAGE_STATE: ${PW_VIEWER_STORAGE_STATE:-${PW_STORAGE_DIR:-tests/storage/isolated/docker}/viewer.json}
+      NO_PROXY: "localhost,127.0.0.1,isolated-frontend,backend"
+      no_proxy: "localhost,127.0.0.1,isolated-frontend,backend"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+    volumes:
+      - ./:/repo:cached
+      - runner_node_modules:/repo/node_modules
+      - runner_web_admin_node_modules:/repo/web-admin/node_modules
+      - ${AURA_CONTAINER_CACHE_ROOT:-${HOME}/.cache/auraboot/container-linux}/pnpm-store:/pnpm-store
+      - ${AURA_CONTAINER_CACHE_ROOT:-${HOME}/.cache/auraboot/container-linux}/ms-playwright:/ms-playwright
+    depends_on:
+      backend:
+        condition: service_healthy
+      isolated-frontend:
+        condition: service_healthy
+    command: >-
+      sh -c "
+      set -e;
+      if command -v pnpm >/dev/null 2>&1; then
+        pnpm --version;
+      else
+        corepack enable;
+        corepack prepare pnpm@9 --activate;
+      fi;
+      cd /repo;
+      pnpm install --no-frozen-lockfile --prefer-offline;
+      cd web-admin;
+      mkdir -p \"$$PW_ARTIFACT_DIR\" \"$$PW_REPORT_DIR\" \"$$(dirname \"$$PW_RESULTS_JSON\")\" \"$$PW_STORAGE_DIR\";
+      pnpm exec playwright install chromium;
+      sh -c \"${PLAYWRIGHT_RUNNER_COMMAND:-pnpm exec playwright test -c playwright.noweb.config.ts --reporter=line}\"
+      "
 
 volumes:
   # Each compose project gets its own isolated volume namespace already
   # (docker prefixes volumes with project name), so no manual suffixing here.
   isolated_node_modules:
   isolated_web_admin_node_modules:
-  # Shared volumes across all isolated stacks (NOT per-project) — gradle
-  # and m2 are content-addressed, so concurrent reads are safe and
-  # cross-worktree reuse cuts cold backend builds 5-10 min → 30-90 s.
-  aura_gradle_cache:
-    name: aura_gradle_cache
-    external: false
-  aura_m2_cache:
-    name: aura_m2_cache
-    external: false
+  runner_node_modules:
+  runner_web_admin_node_modules:

@@ -8,9 +8,9 @@
 #   aura_env_load <profile> [slug]
 #       Export BE_PORT / VITE_PORT / BFF_PORT / PG_PORT / REDIS_PORT /
 #       PG_HOST / PG_USER / PG_DB / BACKEND_URL / PLAYWRIGHT_BASE_URL /
-#       BFF_URL based on the named profile. process-env wins over defaults
-#       (so a previously-sourced env stays in effect — same contract as
-#       loadEnv() in TypeScript).
+#       BFF_URL / PW_* artifact paths based on the named profile. process-env
+#       wins over defaults (so a previously-sourced env stays in effect — same
+#       contract as loadEnv() in TypeScript).
 #       Profiles: host | r2 | ga-e2e | ci | enterprise.
 #       For r2, an optional `slug` reads `.aura-stack/<slug>.env`.
 #
@@ -114,6 +114,7 @@ aura_env_load() {
         fi
         # shellcheck disable=SC1090
         . "$env_file"
+        export AURA_ENV_SLUG="${SLUG:-$slug}"
     fi
 
     export BE_PORT="${BE_PORT:-$__AURA_BE_PORT_DEF}"
@@ -130,6 +131,15 @@ aura_env_load() {
     export BFF_URL="${BFF_URL:-http://localhost:$BFF_PORT}"
 
     export AURA_ENV_PROFILE="$profile"
+    export AURA_ENV_SLUG="${AURA_ENV_SLUG:-$slug}"
+    if [ -n "${AURA_ENV_SLUG:-}" ]; then
+        export PW_E2E_RUN_ID="${PW_E2E_RUN_ID:-$(date -u +"%Y%m%dT%H%M%SZ")}"
+        export PW_E2E_RUN_ROOT="${PW_E2E_RUN_ROOT:-test-results/runs/$AURA_ENV_SLUG/$PW_E2E_RUN_ID}"
+        export PW_ARTIFACT_DIR="${PW_ARTIFACT_DIR:-$PW_E2E_RUN_ROOT/artifacts}"
+        export PW_REPORT_DIR="${PW_REPORT_DIR:-$PW_E2E_RUN_ROOT/html-report}"
+        export PW_RESULTS_JSON="${PW_RESULTS_JSON:-$PW_E2E_RUN_ROOT/results.json}"
+        export PW_STORAGE_DIR="${PW_STORAGE_DIR:-tests/storage/$AURA_ENV_SLUG/$PW_E2E_RUN_ID}"
+    fi
 
     unset __AURA_BE_PORT_DEF __AURA_VITE_PORT_DEF __AURA_BFF_PORT_DEF \
         __AURA_PG_PORT_DEF __AURA_REDIS_PORT_DEF \
@@ -138,6 +148,6 @@ aura_env_load() {
 
 aura_env_to_json() {
     cat <<JSON
-{"profile":"${AURA_ENV_PROFILE:-unset}","ports":{"be":"${BE_PORT:-}","vite":"${VITE_PORT:-}","bff":"${BFF_PORT:-}","pg":"${PG_PORT:-}","redis":"${REDIS_PORT:-}"},"urls":{"backend":"${BACKEND_URL:-}","base":"${PLAYWRIGHT_BASE_URL:-}","bff":"${BFF_URL:-}"},"pg":{"host":"${PG_HOST:-}","port":"${PG_PORT:-}","user":"${PG_USER:-}","db":"${PG_DB:-}"}}
+{"profile":"${AURA_ENV_PROFILE:-unset}","slug":"${AURA_ENV_SLUG:-}","ports":{"be":"${BE_PORT:-}","vite":"${VITE_PORT:-}","bff":"${BFF_PORT:-}","pg":"${PG_PORT:-}","redis":"${REDIS_PORT:-}"},"urls":{"backend":"${BACKEND_URL:-}","base":"${PLAYWRIGHT_BASE_URL:-}","bff":"${BFF_URL:-}"},"pg":{"host":"${PG_HOST:-}","port":"${PG_PORT:-}","user":"${PG_USER:-}","db":"${PG_DB:-}"},"playwright":{"runRoot":"${PW_E2E_RUN_ROOT:-}","artifacts":"${PW_ARTIFACT_DIR:-}","report":"${PW_REPORT_DIR:-}","results":"${PW_RESULTS_JSON:-}","storage":"${PW_STORAGE_DIR:-}"}}
 JSON
 }
