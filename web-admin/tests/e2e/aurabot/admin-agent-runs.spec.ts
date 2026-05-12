@@ -751,7 +751,9 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     await page.locator(`[data-testid="action-toggle-${ACTION_PID}"]`).click();
     const actionDetail = page.locator(`[data-testid="action-detail-${ACTION_PID}"]`);
     await expect(actionDetail).toBeVisible({ timeout: 3_000 });
-    await page.locator(`[data-testid="open-result-contract-${ACTION_PID}"]`).click();
+    const openResultContract = page.locator(`[data-testid="open-result-contract-${ACTION_PID}"]`);
+    await openResultContract.scrollIntoViewIfNeeded();
+    await openResultContract.click({ force: true });
     const resultsSection = page.locator('[data-testid="drawer-section-result-contracts"]');
     await expect(resultsSection).toBeVisible({ timeout: 3_000 });
     await expect(resultsSection).toContainText(RESULT_CONTRACT_ID);
