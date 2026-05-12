@@ -144,6 +144,32 @@ else
 fi
 echo "==> Logs: $LOG_DIR"
 
+capture_stack_logs() {
+    local phase="$1"
+    local prefix="$LOG_DIR/${RUN_STAMP}-${SLUG}-${phase}"
+
+    echo "==> Capturing isolated stack diagnostics for failed phase: $phase" >&2
+    docker compose \
+        -p "$COMPOSE_PROJECT_NAME" \
+        -f docker-compose.yml \
+        -f docker-compose.isolated.yml \
+        --profile isolated \
+        --profile cache \
+        --profile playwright-runner \
+        ps > "${prefix}-docker-ps.log" 2>&1 || true
+
+    docker compose \
+        -p "$COMPOSE_PROJECT_NAME" \
+        -f docker-compose.yml \
+        -f docker-compose.isolated.yml \
+        --profile isolated \
+        --profile cache \
+        --profile playwright-runner \
+        logs --no-color --timestamps --tail=500 \
+        backend frontend playwright-runner postgres redis \
+        > "${prefix}-docker-logs.log" 2>&1 || true
+}
+
 run_frontend_phase() {
     local phase="$1"
     local command="$2"
@@ -192,6 +218,7 @@ run_frontend_phase() {
     local exit_code=${PIPESTATUS[0]}
     set -e
     if [ "$exit_code" -ne 0 ]; then
+        capture_stack_logs "$phase"
         echo "ERROR: phase failed: $phase (exit=$exit_code, log=$log)" >&2
         exit "$exit_code"
     fi
