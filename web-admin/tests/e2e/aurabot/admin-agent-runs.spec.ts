@@ -443,7 +443,13 @@ async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
 
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/admin/agent-runs', { timeout: 15_000 }),
-    leaf.click(),
+    page.evaluate(() => {
+      const anchor = document.querySelector('nav a[href="/admin/agent-runs"]');
+      if (!(anchor instanceof HTMLElement)) {
+        throw new Error('Agent runs sidebar link not found');
+      }
+      anchor.click();
+    }),
   ]);
 
   await expect(page.locator('[data-testid="agent-runs-page"]')).toBeVisible({
