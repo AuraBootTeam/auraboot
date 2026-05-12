@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# Stop a per-worktree isolated docker dev stack.
+# Stop a per-worktree Docker dev stack.
 #
 # Implements P0 #3 of docs/plans/2026-05/2026-05-07-docker-per-worktree-isolation-design.md.
 #
+# Works for both full isolated stacks and infra-only daily-dev stacks.
 # By default just stops containers (volumes preserved so the next start is fast);
 # pass --purge to also drop named volumes (force-clean for slug reuse).
 #
@@ -110,6 +111,9 @@ if ! docker compose \
         -f docker-compose.isolated.yml \
         --profile isolated \
         --profile cache \
+        --profile storage \
+        --profile playwright-runner \
+        --profile production-like \
         down $DOWN_FLAGS; then
     echo "ERROR: docker compose down failed." >&2
     exit 3

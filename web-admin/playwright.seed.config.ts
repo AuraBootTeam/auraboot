@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const artifactDir = process.env.PW_SEED_ARTIFACT_DIR || process.env.PW_ARTIFACT_DIR || './test-results/seed';
+
 /**
  * Playwright config for running seed scripts.
  * Usage: npx playwright test --config=playwright.seed.config.ts
@@ -7,7 +9,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   testMatch: ['**/seed-showcase-*.spec.ts', '**/e2e/showcase/**/*.spec.ts'],
-  outputDir: './test-results/seed',
+  outputDir: artifactDir,
   fullyParallel: false,
   retries: 0,
   workers: 1,
