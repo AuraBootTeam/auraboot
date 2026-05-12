@@ -35,14 +35,24 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Initialize CodeQL
+      - name: Initialize CodeQL (Java)
+        if: matrix.language == 'java-kotlin'
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           # build-mode: manual lets us provide the build command explicitly.
           # autobuild fails on multi-module Gradle layouts where the root is
           # in platform/ rather than the repo root.
-          build-mode: ${{ matrix.language == 'java-kotlin' && 'manual' || 'none' }}
+          build-mode: manual
+          config-file: ./.github/codeql/codeql-config.yml
+          packs: aurabootteam/aura-java-models@0.1.0
+
+      - name: Initialize CodeQL (JavaScript/TypeScript)
+        if: matrix.language == 'javascript-typescript'
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build (Java only — CodeQL build-mode=manual)
@@ -56,13 +66,6 @@ jobs:
           # Disable Gradle's build cache so CodeQL observes javac execution
           # instead of receiving an empty database from cache hits.
           ./gradlew clean classes -x test --no-daemon --no-build-cache
-
-      # Java model pack note:
-      # .github/codeql/aura-java-models contains the local model pack used for
-      # local preflight with `codeql database analyze --model-packs ...`.
-      # GitHub CodeQL Action only accepts published model packs via init
-      # `packs:`. After publishing aurabootteam/aura-java-models@0.1.0 to GHCR,
-      # add it to the init step above, for Java only.
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
