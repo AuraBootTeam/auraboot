@@ -698,7 +698,7 @@ Expected: PASS (5 tests)
 # Prerequisite: backend running, workflow-demo imported
 TOKEN=$(curl -s -X POST http://localhost:6443/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"Test2026x"}' \
+  -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['jwt'])")
 
 # Start a process then attempt withdraw — replace TASK_ID with a real task from the newly started instance
@@ -2719,7 +2719,7 @@ NO_PROXY=localhost npx playwright test tests/e2e/workflow-demo/ 2>&1 | tee "$LOG
 ```
 
 手动验证（最小 D-14 维度）：
-- 登录 admin@example.com
+- 登录 admin@auraboot.com
 - 浏览器打开 workflow-demo 列表页，确认"提交审批"按钮可见
 - 点击提交审批，确认 toast 出现、详情页刷新、`bpm-panel` 渲染完整 4 section
 - 在审批人账号下审批、抄送、撤回，确认操作反馈 toast、审计历史追加

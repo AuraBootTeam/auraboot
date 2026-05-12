@@ -2,7 +2,7 @@ import http from 'http';
 import fs from 'fs';
 
 // Credentials must match tests/helpers/test-accounts.ts (DEFAULT_TEST_ACCOUNT)
-const data = JSON.stringify({ email: 'admin@example.com', password: 'Test2026x' });
+const data = JSON.stringify({ email: 'admin@auraboot.com', password: 'Test2026x' });
 const options = {
   hostname: 'localhost',
   port: 5173,

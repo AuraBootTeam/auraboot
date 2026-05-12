@@ -144,7 +144,7 @@ Templates define the content and recipients for each notification type.
 | `field_value` | User ID from a record field | `pm_task_assignee_user_id` |
 | `role_on_record` | Users with a specific role | `current_approver` |
 | `role` | All users with a system role | `TENANT_ADMIN` |
-| `fixed` | Hardcoded user IDs or emails | `["admin@example.com"]` |
+| `fixed` | Hardcoded user IDs or emails | `["admin@auraboot.com"]` |
 
 ---
 

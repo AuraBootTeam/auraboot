@@ -2,7 +2,7 @@
 # Bootstrap the GA-E2E docker stack for OSS Playwright runs.
 #
 # What auto-bootstrap (AURABOOT_BOOTSTRAP_ENABLED=true on the backend) gives us:
-#   - admin@example.com user with TENANT_ADMIN role on a default tenant
+#   - admin@auraboot.com user with TENANT_ADMIN role on a default tenant
 # What it does NOT give us, but the OSS E2E suite needs:
 #   - The OSS plugins published into the tenant (model + page + binding rows)
 #   - operator / viewer test users that auth.setup expects
@@ -56,7 +56,7 @@ DEFAULT_PLUGINS=(
 PLUGINS=( ${PLUGINS:-${DEFAULT_PLUGINS[@]}} )
 
 API_BASE="http://localhost:6444"
-ADMIN_EMAIL="admin@example.com"
+ADMIN_EMAIL="admin@auraboot.com"
 ADMIN_PASSWORD="Test2026x"
 
 echo "[ga-e2e-bootstrap] target stack: $API_BASE"
@@ -160,7 +160,7 @@ echo "[ga-e2e-bootstrap] provisioning test users..."
 provision_user "e2e-operator@test.com" "Test2026x" "operator"
 provision_user "e2e-viewer@test.com"   "Test2026x" "viewer"
 
-# 3b. Ensure admin@example.com is a member of a "System" (platform) tenant.
+# 3b. Ensure admin@auraboot.com is a member of a "System" (platform) tenant.
 # The auraboot bootstrap only seeds a single business tenant ("AuraBoot Demo"),
 # but the space-selection E2E suite (and any UI flow that surfaces a Platform
 # Console toggle) requires admin to belong to BOTH a platform tenant (named
@@ -191,7 +191,7 @@ case "$sys_status" in
   *)       echo "  System tenant: provision failed ($sys_status)" >&2 ;;
 esac
 
-# 3c. Verify admin@example.com holds platform_admin in the System tenant.
+# 3c. Verify admin@auraboot.com holds platform_admin in the System tenant.
 #
 # BootstrapStartupRunner now owns the platform_admin bootstrap invariant through
 # BootstrapRepairService.repairAll(): role creation, System membership, and admin
@@ -238,9 +238,9 @@ roles = permissions.get('roles') if isinstance(permissions, dict) else []
 print('yes' if any(r.get('code') == 'platform_admin' for r in roles if isinstance(r, dict)) else 'no')
 ")
     if [ "$PLATFORM_ADMIN_OK" = "yes" ]; then
-      echo "  platform_admin: verified for admin@example.com in System tenant (tenantId=$SYS_TID)"
+      echo "  platform_admin: verified for admin@auraboot.com in System tenant (tenantId=$SYS_TID)"
     else
-      echo "  ERROR: admin@example.com lacks platform_admin in System tenant — bootstrap invariant failed" >&2
+      echo "  ERROR: admin@auraboot.com lacks platform_admin in System tenant — bootstrap invariant failed" >&2
       exit 1
     fi
   fi

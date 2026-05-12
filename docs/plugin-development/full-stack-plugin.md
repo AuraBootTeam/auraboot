@@ -730,7 +730,7 @@ aura dsl show da_document
 # Create a test document
 aura exec da:create_document \
   --set da_title="Q1 Report" \
-  --set da_author="admin@example.com" \
+  --set da_author="admin@auraboot.com" \
   --set da_content="<p>Quarterly results...</p>"
 
 # Submit for approval
