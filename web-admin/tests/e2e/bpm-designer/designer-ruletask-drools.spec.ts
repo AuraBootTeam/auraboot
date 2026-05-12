@@ -278,7 +278,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     // -------------------------------------------------------------------------
     // Admin session preloaded via storageState (tests/storage/admin.json).
 
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     // -------------------------------------------------------------------------
     // D4: Designer UI — build the rule-task flow via window.__bpmDesigner hook
@@ -506,7 +506,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     // Auth: API token (admin session preloaded via storageState)
     // Admin session preloaded via storageState (tests/storage/admin.json).
 
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     // Provision + deploy via API helper
     const pid = await createAndDeployRuleProcess(request, adminToken, processKey);

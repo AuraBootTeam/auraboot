@@ -7,7 +7,7 @@ describe('login command', () => {
       const envUser = 'env@test.com';
       const envPass = 'env-pass';
 
-      const email = opts.user || envUser || 'admin@example.com';
+      const email = opts.user || envUser || 'admin@auraboot.com';
       const password = opts.password || envPass || '';
 
       expect(email).toBe('cli@test.com');
@@ -19,7 +19,7 @@ describe('login command', () => {
       const envUser = 'env@test.com';
       const envPass = 'env-pass';
 
-      const email = opts.user || envUser || 'admin@example.com';
+      const email = opts.user || envUser || 'admin@auraboot.com';
       const password = opts.password || envPass || '';
 
       expect(email).toBe('env@test.com');
@@ -31,22 +31,22 @@ describe('login command', () => {
       const envUser = undefined;
       const envPass = undefined;
 
-      const email = opts.user || envUser || 'admin@example.com';
+      const email = opts.user || envUser || 'admin@auraboot.com';
       const password = opts.password || envPass || '';
 
-      expect(email).toBe('admin@example.com');
+      expect(email).toBe('admin@auraboot.com');
       expect(password).toBe('');
     });
   });
 
   describe('login request', () => {
     it('should construct correct login body', () => {
-      const email = 'admin@example.com';
+      const email = 'admin@auraboot.com';
       const password = 'test-password';
       const body = JSON.stringify({ email, password });
 
       const parsed = JSON.parse(body);
-      expect(parsed.email).toBe('admin@example.com');
+      expect(parsed.email).toBe('admin@auraboot.com');
       expect(parsed.password).toBe('test-password');
     });
   });

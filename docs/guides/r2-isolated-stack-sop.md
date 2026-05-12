@@ -37,7 +37,7 @@ for p in core-meta core-bpm core-aurabot page-manager platform-admin \
          acp-showcase workflow-demo test-fixtures; do
   [ -d "plugins/$p" ] && aura plugin publish "plugins/$p" \
       --target "$BACKEND_URL" \
-      --user admin@example.com --password Test2026x --yes
+      --user admin@auraboot.com --password Test2026x --yes
 done
 
 # 5. Platform-level seeds. Env is already in scope from step 3.

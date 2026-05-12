@@ -51,7 +51,7 @@ test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => 
     // -------------------------------------------------------------------------
     // Auth: API token (admin session preloaded via storageState)
     // -------------------------------------------------------------------------
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     // -------------------------------------------------------------------------
     // Build the minimal userTask flow
@@ -165,7 +165,7 @@ test.describe('D1 — designer: userTask formBinding + fieldPermissions', () => 
   test(
     'L3-extended: runtime GET /api/bpm/forms/task/{taskId} returns fieldPermissions',
     async ({ request }) => {
-      const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+      const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
       // Re-use any deployed e2e_designer_ut process — look up the latest
       const listResp = await request.get(`${BACKEND}/api/bpm/process-definitions?pageNum=1&pageSize=20`, {

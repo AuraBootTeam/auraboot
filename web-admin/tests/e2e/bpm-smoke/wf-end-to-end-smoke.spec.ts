@@ -39,7 +39,7 @@ test.describe('BPM end-to-end smoke', () => {
 
     // Admin session is preloaded via storageState (see playwright.config.ts:
     // [chromium] project → tests/storage/admin.json). No UI login needed.
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     // -------------------------------------------------------------------------
     // Build the tiny flow via designer DSL

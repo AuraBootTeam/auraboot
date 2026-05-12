@@ -255,7 +255,7 @@ async function openLeaveDetail(page: Page, recordId: string): Promise<void> {
 async function ensureAdminSession(page: Page): Promise<void> {
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   if (/\/login(?:$|\?)/.test(page.url())) {
-    await loginViaUI(page, 'admin@example.com', 'Test2026x');
+    await loginViaUI(page, 'admin@auraboot.com', 'Test2026x');
   }
 }
 
@@ -431,7 +431,7 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
     page,
     request,
   }) => {
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
     const { managerToken, hrToken } = await ensureRoleUsers(request);
 
     const draftApplicant = await createLeaveApplicant(request, adminToken, 'wd_detail_draft');

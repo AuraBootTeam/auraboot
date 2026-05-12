@@ -37,7 +37,7 @@
  *          are independent.
  *
  * Multi-tenant credential strategy:
- *   - Tenant A is the default `admin@example.com` workspace ("AuraBoot Dev").
+ *   - Tenant A is the default `admin@auraboot.com` workspace ("AuraBoot Dev").
  *   - Tenant B is provisioned at test setup via `seedSecondTenant()`:
  *       1. Insert a fresh `ab_tenant` row.
  *       2. Add admin's `userId` as an active member of that tenant
@@ -65,7 +65,7 @@ import { Client as PgClient } from 'pg';
 import { uniqueId } from '../../e2e/helpers/index';
 
 // ── Tenant A = default admin tenant ─────────────────────────────────
-const ADMIN_EMAIL = 'admin@example.com';
+const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
 const PG_CONN = {
   host: 'localhost',

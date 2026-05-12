@@ -12,7 +12,7 @@
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>
   <a href="#"><img src="https://img.shields.io/badge/PostgreSQL-16-336791.svg" alt="PostgreSQL"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/stargazers"><img src="https://img.shields.io/github/stars/AuraBootTeam/auraboot?style=social" alt="GitHub Stars"></a>
-  <a href="https://discord.gg/auraboot"><img src="https://img.shields.io/badge/Discord-Join-7289da?logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://discord.gg/p2fW5A2MW6"><img src="https://img.shields.io/badge/Discord-Join-7289da?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center">
@@ -78,7 +78,7 @@ The `full` profile builds and starts PostgreSQL + the Spring Boot backend + the 
 
 | | |
 |---|---|
-| **Email** | `admin@example.com` |
+| **Email** | `admin@auraboot.com` |
 | **Password** | `Test2026x` (change immediately on first login) |
 
 ### Manual Setup
@@ -286,7 +286,7 @@ For enterprise licensing, contact [license@auraboot.com](mailto:license@auraboot
 
 - [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — Ask questions and share ideas
 - [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — Report bugs or request features
-- [Discord](https://discord.gg/auraboot) — Join the community chat
+- [Discord](https://discord.gg/p2fW5A2MW6) — Join the community chat
 
 ## Contributing
 

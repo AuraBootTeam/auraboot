@@ -12,7 +12,7 @@
 #
 # Env vars:
 #   BACKEND_URL           default: http://localhost:16443
-#   ADMIN_EMAIL           default: admin@example.com
+#   ADMIN_EMAIL           default: admin@auraboot.com
 #   ADMIN_PASSWORD        default: Test2026x
 #   IMPORT_TEST_FIXTURES  default: false  (set to "true" to also import test-fixtures)
 
@@ -20,7 +20,7 @@ set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 BACKEND_URL="${BACKEND_URL:-http://localhost:16443}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@auraboot.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Test2026x}"
 IMPORT_TEST_FIXTURES="${IMPORT_TEST_FIXTURES:-false}"
 

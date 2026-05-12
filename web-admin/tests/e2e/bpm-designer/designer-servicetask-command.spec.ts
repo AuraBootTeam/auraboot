@@ -76,7 +76,7 @@ test.describe('D3 — designer: serviceTask + command binding', () => {
     // Admin session preloaded via storageState (tests/storage/admin.json).
 
     // API token for backend assertions
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
 
     // -------------------------------------------------------------------------
     // Build the minimal serviceTask flow: start → svc → end
