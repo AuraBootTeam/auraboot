@@ -2,6 +2,7 @@ package com.auraboot.framework.im.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
@@ -98,6 +99,15 @@ public class ImConversationController {
         Boolean muted = body.containsKey("muted") ? (Boolean) body.get("muted") : null;
         Boolean pinned = body.containsKey("pinned") ? (Boolean) body.get("pinned") : null;
         conversationService.updateMemberSettings(id, userId, tenantId, muted, pinned);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/{id}/agent-settings")
+    public ApiResponse<Void> updateAgentSettings(@PathVariable Long id,
+                                                 @RequestBody ConversationAgentSettingsRequest request) {
+        Long userId = MetaContext.getCurrentUserId();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        conversationService.updateAgentSettings(id, request, userId, tenantId);
         return ApiResponse.success(null);
     }
 

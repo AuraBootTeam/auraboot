@@ -21,6 +21,9 @@ public class ConversationListItem {
     private Integer memberCount;
     private String boundModelCode;
     private Long boundRecordId;
+    private Long conductorAgentId;
+    private Integer aiContextWindow;
+    private Boolean aiEnabled;
 
     @Data
     @Builder
