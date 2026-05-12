@@ -422,9 +422,9 @@ async function resolveOrCreateAiCenterMenuId(client: Client): Promise<string> {
 // ---------------------------------------------------------------------------
 
 async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/home');
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForURL((url) => !url.pathname.includes('/login') && url.pathname !== '/', { timeout: 20_000 });
+  await page.waitForURL((url) => url.pathname === '/home', { timeout: 20_000 });
 
   const nav = page.locator('nav').first();
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
@@ -448,7 +448,7 @@ async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
   );
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/admin/agent-runs', { timeout: 15_000 }),
-    leaf.click(),
+    leaf.click({ noWaitAfter: true }),
     listResponsePromise,
   ]);
 
