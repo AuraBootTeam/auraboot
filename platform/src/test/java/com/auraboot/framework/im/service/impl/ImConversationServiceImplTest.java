@@ -2,6 +2,7 @@ package com.auraboot.framework.im.service.impl;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
@@ -33,6 +34,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -177,8 +180,8 @@ class ImConversationServiceImplTest {
 
         service.create(r, USER_ID, TENANT_ID);
 
-        verify(imMessageService).sendSystemMessage(anyLong(), eq(TENANT_ID),
-                eq("system"), anyString(), any(), anyString());
+        verify(imMessageService).sendSystemMessage(nullable(Long.class), eq(TENANT_ID),
+                eq("system"), anyString(), isNull(), anyString());
     }
 
     // =================== listByUser ===================
@@ -270,6 +273,8 @@ class ImConversationServiceImplTest {
     void getByIdAsListItem_buildsResponse() {
         ImConversation c = conv(CONV_ID, ImConstants.TYPE_GROUP, USER_ID);
         c.setMaxSeq(5L);
+        c.setConductorAgentId(88L);
+        c.setAiContextWindow(24);
         when(conversationMapper.selectOne(any())).thenReturn(c);
         ImConversationMember mem = new ImConversationMember();
         mem.setLastReadSeq(2L);
@@ -284,6 +289,9 @@ class ImConversationServiceImplTest {
         assertThat(item.getUnreadCount()).isEqualTo(3L);
         assertThat(item.getMuted()).isTrue();
         assertThat(item.getMemberCount()).isEqualTo(2);
+        assertThat(item.getConductorAgentId()).isEqualTo(88L);
+        assertThat(item.getAiContextWindow()).isEqualTo(24);
+        assertThat(item.getAiEnabled()).isTrue();
     }
 
     // =================== addMembers / addAgentMembers ===================
@@ -426,6 +434,79 @@ class ImConversationServiceImplTest {
         verify(memberMapper).update(captor.capture(), any());
         assertThat(captor.getValue().getMuted()).isTrue();
         assertThat(captor.getValue().getPinned()).isFalse();
+    }
+
+    // =================== updateAgentSettings ===================
+
+    @Test
+    void updateAgentSettings_setsConductorAndContextWindow() {
+        when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
+                .thenReturn(new ImConversationMember());
+        when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_AGENT, 9L, TENANT_ID))
+                .thenReturn(new ImConversationMember());
+        ImConversation c = conv(CONV_ID, ImConstants.TYPE_GROUP, USER_ID);
+        when(conversationMapper.selectOne(any())).thenReturn(c);
+
+        ConversationAgentSettingsRequest request = new ConversationAgentSettingsRequest();
+        request.setConductorAgentId(9L);
+        request.setAiContextWindow(24);
+        request.setAiEnabled(true);
+
+        service.updateAgentSettings(CONV_ID, request, USER_ID, TENANT_ID);
+
+        ArgumentCaptor<ImConversation> captor = ArgumentCaptor.forClass(ImConversation.class);
+        verify(conversationMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getConductorAgentId()).isEqualTo(9L);
+        assertThat(captor.getValue().getAiContextWindow()).isEqualTo(24);
+        assertThat(captor.getValue().getUpdatedAt()).isNotNull();
+    }
+
+    @Test
+    void updateAgentSettings_disablesAiByClearingConductor() {
+        when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
+                .thenReturn(new ImConversationMember());
+        ImConversation c = conv(CONV_ID, ImConstants.TYPE_GROUP, USER_ID);
+        c.setConductorAgentId(9L);
+        when(conversationMapper.selectOne(any())).thenReturn(c);
+
+        ConversationAgentSettingsRequest request = new ConversationAgentSettingsRequest();
+        request.setAiEnabled(false);
+
+        service.updateAgentSettings(CONV_ID, request, USER_ID, TENANT_ID);
+
+        ArgumentCaptor<ImConversation> captor = ArgumentCaptor.forClass(ImConversation.class);
+        verify(conversationMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getConductorAgentId()).isNull();
+    }
+
+    @Test
+    void updateAgentSettings_rejectsNonGroup() {
+        when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
+                .thenReturn(new ImConversationMember());
+        when(conversationMapper.selectOne(any())).thenReturn(conv(CONV_ID, ImConstants.TYPE_PRIVATE, USER_ID));
+
+        assertThatThrownBy(() -> service.updateAgentSettings(CONV_ID,
+                new ConversationAgentSettingsRequest(), USER_ID, TENANT_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("group");
+        verify(conversationMapper, never()).updateById(any(ImConversation.class));
+    }
+
+    @Test
+    void updateAgentSettings_rejectsMissingAgentMember() {
+        when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
+                .thenReturn(new ImConversationMember());
+        when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_AGENT, 9L, TENANT_ID))
+                .thenReturn(null);
+        when(conversationMapper.selectOne(any())).thenReturn(conv(CONV_ID, ImConstants.TYPE_GROUP, USER_ID));
+
+        ConversationAgentSettingsRequest request = new ConversationAgentSettingsRequest();
+        request.setConductorAgentId(9L);
+
+        assertThatThrownBy(() -> service.updateAgentSettings(CONV_ID, request, USER_ID, TENANT_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Conductor agent");
+        verify(conversationMapper, never()).updateById(any(ImConversation.class));
     }
 
     // =================== dissolveGroup ===================

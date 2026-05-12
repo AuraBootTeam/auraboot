@@ -87,6 +87,17 @@ public interface ImMessageService {
     ImMessage recallMessage(Long messageId, Long senderId, Long tenantId);
 
     /**
+     * Mark a confirmation-card message as confirmed or rejected.
+     * This persists the user's decision in card_payload; command execution is handled elsewhere.
+     */
+    ImMessage settleConfirmationMessage(Long messageId, Long userId, Long tenantId, String decision);
+
+    /**
+     * Parse a persisted JSON card payload for REST responses.
+     */
+    Object parseCardPayload(String cardPayload);
+
+    /**
      * Search messages by keyword across conversations the user is a member of.
      * If conversationId is provided, searches only within that conversation.
      */
