@@ -2,6 +2,8 @@
  * Plugin system type definitions for Module Federation hot-loading.
  */
 
+import type { RuntimeProfile } from '~/framework/runtime';
+
 // ========== Plugin States ==========
 
 export type PluginState = 'loading' | 'loaded' | 'error' | 'unloaded';
@@ -22,8 +24,14 @@ export interface PluginManifest {
 
 export interface PluginClientConfig {
   remoteEntry?: string;
+  runtimeProfiles?: RuntimeProfile[];
+  routeGroup?: RuntimeProfile;
   exposedModules?: ExposedModule[];
   slots?: SlotContribution[];
+  storefrontSlots?: SlotContribution[];
+  checkoutExtensions?: CheckoutExtensionContribution[];
+  themeBlocks?: ThemeBlockContribution[];
+  commerceEvents?: CommerceEventSubscription[];
   routes?: RouteContribution[];
   menuItems?: MenuContribution[];
 }
@@ -36,6 +44,7 @@ export interface ExposedModule {
 export interface SlotContribution {
   slotId: string;
   componentName: string;
+  runtimeProfiles?: RuntimeProfile[];
   priority?: number;
   props?: Record<string, unknown>;
 }
@@ -53,6 +62,41 @@ export interface MenuContribution {
   path: string;
   order?: number;
   parent?: string;
+}
+
+// ========== Commerce Runtime Extension Contracts ==========
+
+export type CommerceEventCode =
+  | 'cart.updated'
+  | 'checkout.created'
+  | 'payment.authorized'
+  | 'payment.captured'
+  | 'order.created'
+  | 'inventory.reserved'
+  | 'fulfillment.created'
+  | 'refund.created'
+  | (string & {});
+
+export interface CheckoutExtensionContribution {
+  extensionPoint: 'checkout:contact' | 'checkout:shipping' | 'checkout:payment' | 'checkout:review' | 'checkout:thank-you' | (string & {});
+  componentName: string;
+  priority?: number;
+  props?: Record<string, unknown>;
+}
+
+export interface ThemeBlockContribution {
+  type: string;
+  componentName: string;
+  label?: string | Record<string, string>;
+  schema?: Record<string, unknown>;
+  previewImage?: string;
+}
+
+export interface CommerceEventSubscription {
+  event: CommerceEventCode;
+  handlerName: string;
+  delivery?: 'frontend' | 'backend' | 'webhook';
+  priority?: number;
 }
 
 // ========== Remote Plugin ==========
@@ -171,6 +215,7 @@ export interface SlotComponentProps {
 // ========== Federation Manager State ==========
 
 export interface FederationState {
+  runtimeProfile: RuntimeProfile;
   plugins: Map<string, RemotePlugin>;
   slots: Map<SlotId, SlotContributionWithComponent[]>;
   isInitialized: boolean;
@@ -184,6 +229,7 @@ export interface FederationActions {
   loadModule: (pluginId: string, moduleName: string) => Promise<React.ComponentType<unknown> | null>;
   getSlotContributions: (slotId: SlotId) => SlotContributionWithComponent[];
   refreshPlugins: () => Promise<void>;
+  setRuntimeProfile: (runtimeProfile: RuntimeProfile) => void;
   setError: (error: string | null) => void;
 }
 

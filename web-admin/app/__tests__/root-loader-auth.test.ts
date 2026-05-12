@@ -138,6 +138,43 @@ describe('root loader authentication guard', () => {
       menus: [],
       i18n: {},
       locale: 'zh-CN',
+      runtimeProfile: 'admin',
+    });
+    expect(mocks.getUserInfo).not.toHaveBeenCalled();
+    expect(mocks.getUserMenus).not.toHaveBeenCalled();
+  });
+
+  it('keeps storefront runtime public even when an admin token exists', async () => {
+    mocks.getTokenFromRequest.mockResolvedValue('admin-token');
+
+    const { loader } = await import('~/root');
+    const result = await loader({
+      request: new Request('http://localhost/s/demo/products/sample-product'),
+    } as any);
+
+    expect(result).toMatchObject({
+      user: null,
+      menus: [],
+      i18n: {},
+      locale: 'zh-CN',
+      runtimeProfile: 'storefront',
+    });
+    expect(mocks.getUserInfo).not.toHaveBeenCalled();
+    expect(mocks.getUserMenus).not.toHaveBeenCalled();
+  });
+
+  it('keeps checkout runtime public and isolated from admin menus', async () => {
+    mocks.getTokenFromRequest.mockResolvedValue(null);
+
+    const { loader } = await import('~/root');
+    const result = await loader({
+      request: new Request('http://localhost/checkout/chk_123/payment'),
+    } as any);
+
+    expect(result).toMatchObject({
+      user: null,
+      menus: [],
+      runtimeProfile: 'checkout',
     });
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();

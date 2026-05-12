@@ -2,6 +2,7 @@ import { redirect, type MiddlewareFunction } from 'react-router';
 import { sessionStorage } from '~/shared/services/session.js';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { PLUGIN_PUBLIC_ROUTES } from '~/plugins/_public-routes';
+import { isPublicRuntimePathname } from '~/framework/runtime';
 
 // Routes that never require authentication
 const PUBLIC_ROUTES = [
@@ -36,11 +37,13 @@ export const PUBLIC_API_ROUTES = [
  */
 // Static asset extensions served from /public must bypass auth so that
 // unauthenticated pages (login / landing) can render brand assets, PWA icons, etc.
-const STATIC_ASSET_EXT = /\.(png|jpe?g|gif|svg|webp|avif|ico|webmanifest|json|txt|xml|map|js|mjs|css|woff2?|ttf|otf|mp4|webm)$/i;
+const STATIC_ASSET_EXT =
+  /\.(png|jpe?g|gif|svg|webp|avif|ico|webmanifest|json|txt|xml|map|js|mjs|css|woff2?|ttf|otf|mp4|webm)$/i;
 
 export function isPublicRoute(pathname: string): boolean {
   if (pathname === '/') return true;
   if (STATIC_ASSET_EXT.test(pathname)) return true;
+  if (isPublicRuntimePathname(pathname)) return true;
   return PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
