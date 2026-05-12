@@ -20,8 +20,17 @@ import { TimezoneProvider } from '~/contexts/TimezoneContext';
 import { ConfirmDialogProvider } from '~/contexts/ConfirmDialogContext';
 import { getI18nData } from '~/shared/services/form';
 import { getUserMenus } from '~/shared/services/menu';
+import {
+  RuntimeProfileProvider,
+  getRuntimeProfileFromPathname,
+  isAnonymousRuntimeProfile,
+  shouldBootCorePlugins,
+  type RuntimeProfile,
+} from '~/framework/runtime';
+import { useFederationStore } from '~/plugins/FederationManager';
 
 export interface RootLoaderData {
+  runtimeProfile: RuntimeProfile;
   user: any;
   permissions: any;
   preferences: any;
@@ -44,7 +53,11 @@ import '~/plugins/core-designer/components/studio/workbench/styles/drag.css';
 
 import { getUserInfo } from '~/shared/services/userService';
 import { isPublicRoute } from '~/middleware/sessionMiddlewareFactory';
-import { getSessionFromRequest, getTokenFromRequest, sessionStorage } from '~/shared/services/session';
+import {
+  getSessionFromRequest,
+  getTokenFromRequest,
+  sessionStorage,
+} from '~/shared/services/session';
 import { AuthProvider } from '~/contexts/AuthContext';
 import { EntitlementProvider } from '~/contexts/EntitlementContext';
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
@@ -84,45 +97,46 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
   const { pathname } = new URL(request.url);
+  const runtimeProfile = getRuntimeProfileFromPathname(pathname);
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
   const token = await getTokenFromRequest(request);
 
-  // Public marketing: skip user/menu fetch for anonymous visitors
-  if (isPublicRoute(pathname)) {
-    if (!token) {
-      // SSR cache: public routes without auth produce identical loader data
-      // for the same pathname + locale combination. Cache for 30s to reduce
-      // redundant i18n fetches and backend bootstrap-status checks.
-      // Known staleness window: bootstrapStatus is captured at cache time;
-      // after a successful POST /api/bootstrap/setup, the banner may persist on
-      // public routes (login, register) for up to 30s. Acceptable tradeoff —
-      // banner has no functional side effect, only visual.
-      const cacheKey = ssrCacheKey(pathname, locale);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cached = ssrLoaderCache.get(cacheKey) as any;
-      if (cached) {
-        return cached as RootLoaderData;
-      }
-
-      const i18nData = await getI18nData(locale, request);
-      const edition = process.env.EDITION || 'enterprise';
-      const result = {
-        user: null,
-        permissions: [],
-        preferences: null,
-        menus: [],
-        i18n: i18nData,
-        locale,
-        initialTimezone: initialTimezone ?? undefined,
-        edition,
-        spaces: [],
-        bootstrapStatus,
-      };
-      ssrLoaderCache.set(cacheKey, result);
-      return result;
+  // Public runtime shells must never load admin user, permissions, or menus.
+  // This includes logged-in browser sessions visiting a storefront or checkout
+  // URL; buyer/customer identity is a separate commerce concern.
+  if (isAnonymousRuntimeProfile(runtimeProfile) || (isPublicRoute(pathname) && !token)) {
+    // SSR cache: public routes produce identical loader data for the same
+    // pathname + locale combination. Cache for 30s to reduce redundant i18n
+    // fetches and backend bootstrap-status checks.
+    // Known staleness window: bootstrapStatus is captured at cache time; after
+    // setup, the banner may persist on public routes for up to 30s. Acceptable
+    // tradeoff — banner has no functional side effect, only visual.
+    const cacheKey = ssrCacheKey(pathname, locale);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cached = ssrLoaderCache.get(cacheKey) as any;
+    if (cached) {
+      return cached as RootLoaderData;
     }
+
+    const i18nData = await getI18nData(locale, request);
+    const edition = process.env.EDITION || 'enterprise';
+    const result: RootLoaderData = {
+      runtimeProfile,
+      user: null,
+      permissions: [],
+      preferences: null,
+      menus: [],
+      i18n: i18nData,
+      locale,
+      initialTimezone: initialTimezone ?? undefined,
+      edition,
+      spaces: [],
+      bootstrapStatus,
+    };
+    ssrLoaderCache.set(cacheKey, result);
+    return result;
   }
 
   if (!token && !isPublicRoute(pathname)) {
@@ -179,7 +193,19 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   }
 
   const edition = process.env.EDITION || 'enterprise';
-  return { user, permissions, preferences, menus, i18n: i18nData, locale, initialTimezone: initialTimezone ?? undefined, edition, spaces, bootstrapStatus };
+  return {
+    runtimeProfile,
+    user,
+    permissions,
+    preferences,
+    menus,
+    i18n: i18nData,
+    locale,
+    initialTimezone: initialTimezone ?? undefined,
+    edition,
+    spaces,
+    bootstrapStatus,
+  };
 }
 
 export function useRootLoaderData(): RootLoaderData | undefined {
@@ -222,43 +248,62 @@ function AppDirectionSync({ locale }: { locale: string }) {
 
 export default function App() {
   const data = useLoaderData<typeof loader>() as RootLoaderData;
+  const setFederationRuntimeProfile = useFederationStore((state) => state.setRuntimeProfile);
+  const bootCoreRuntime = shouldBootCorePlugins(data.runtimeProfile);
 
   // M3.7 — boot kernel + activate core plugins once on mount. Plugin
   // setup() registers NavigationResources, widgets, etc. into the kernel
   // singleton so menu / breadcrumb / widget resolution can derive from a
   // single source. See app/framework/boot-plugins.ts.
   useEffect(() => {
-    void import('~/framework/boot-plugins').then(({ bootCorePlugins }) =>
-      bootCorePlugins(),
-    );
-  }, []);
+    if (!bootCoreRuntime) {
+      return;
+    }
+    void import('~/framework/boot-plugins').then(({ bootCorePlugins }) => bootCorePlugins());
+  }, [bootCoreRuntime]);
+
+  useEffect(() => {
+    setFederationRuntimeProfile(data.runtimeProfile);
+  }, [data.runtimeProfile, setFederationRuntimeProfile]);
+
+  const appFrame = (
+    <>
+      {data.bootstrapStatus && !data.bootstrapStatus.initialized && (
+        <BootstrapBanner status={data.bootstrapStatus} />
+      )}
+      <div className={data.bootstrapStatus && !data.bootstrapStatus.initialized ? 'pt-10' : ''}>
+        <Outlet />
+      </div>
+    </>
+  );
+
+  const sharedProviders = (
+    <RuntimeProfileProvider value={data.runtimeProfile}>
+      <I18nProvider initialData={data.i18n || {}} initialLocale={data.locale}>
+        <AppDirectionSync locale={data.locale} />
+        <TimezoneProvider initialTimezone={data.initialTimezone}>
+          <ToastProvider>
+            <ConfirmDialogProvider>
+              {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
+            </ConfirmDialogProvider>
+          </ToastProvider>
+        </TimezoneProvider>
+      </I18nProvider>
+    </RuntimeProfileProvider>
+  );
 
   return (
     <QueryProvider>
       <ThemeProvider>
-        <AuthProvider>
-          <EntitlementProvider>
-            <DslRegistryProvider>
-              <I18nProvider initialData={data.i18n || {}} initialLocale={data.locale}>
-                <AppDirectionSync locale={data.locale} />
-                <TimezoneProvider initialTimezone={data.initialTimezone}>
-                  <ToastProvider>
-                    <ConfirmDialogProvider>
-                      <AuraBotProvider>
-                        {data.bootstrapStatus && !data.bootstrapStatus.initialized && (
-                          <BootstrapBanner status={data.bootstrapStatus} />
-                        )}
-                        <div className={data.bootstrapStatus && !data.bootstrapStatus.initialized ? 'pt-10' : ''}>
-                          <Outlet />
-                        </div>
-                      </AuraBotProvider>
-                    </ConfirmDialogProvider>
-                  </ToastProvider>
-                </TimezoneProvider>
-              </I18nProvider>
-            </DslRegistryProvider>
-          </EntitlementProvider>
-        </AuthProvider>
+        {bootCoreRuntime ? (
+          <AuthProvider>
+            <EntitlementProvider>
+              <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
+            </EntitlementProvider>
+          </AuthProvider>
+        ) : (
+          sharedProviders
+        )}
       </ThemeProvider>
     </QueryProvider>
   );

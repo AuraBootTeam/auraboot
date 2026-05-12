@@ -28,10 +28,10 @@ import { opsRoutes } from '../../app/plugins/core-ops/routes';
 import { dashboardRoutes } from '../../app/plugins/core-dashboard/routes';
 
 /**
- * Core routes — included in ALL editions (community, enterprise, website).
+ * Admin feature routes — included in the authenticated platform shell.
  * File paths are relative to the app/ directory.
  */
-export function coreRoutes() {
+export function adminFeatureRoutes() {
   return [
     // Feature plugins (M3 migration).
     ...designerRoutes(),
@@ -47,7 +47,14 @@ export function coreRoutes() {
     ...adminRoutes(),
     ...opsRoutes(),
     ...dashboardRoutes(),
+  ];
+}
 
+/**
+ * Runtime-engine routes that are still scoped to the authenticated admin shell.
+ */
+export function adminRuntimeEngineRoutes() {
+  return [
     // Legacy unified inbox route remains static during Task Center migration.
     // Old links still deep-link with ?task=... and should not fall through to
     // the menu-driven catch-all route.
@@ -67,10 +74,41 @@ export function coreRoutes() {
     route('/dynamic/:tableName', './routes/dynamic.$tableName.tsx'),
     route('/dynamic/:tableName/new', './routes/dynamic.$tableName.new.tsx'),
     route('/dynamic/:tableName/view/:recordId', './routes/dynamic.$tableName.view.tsx'),
-    route('/dynamic/:tableName/:recordId/edit', './routes/dynamic.$tableName.edit.tsx', { id: 'dynamic-edit-legacy' }),
-    route('/dynamic/:tableName/edit/:recordId', './routes/dynamic.$tableName.edit.tsx', { id: 'dynamic-edit-new' }),
+    route('/dynamic/:tableName/:recordId/edit', './routes/dynamic.$tableName.edit.tsx', {
+      id: 'dynamic-edit-legacy',
+    }),
+    route('/dynamic/:tableName/edit/:recordId', './routes/dynamic.$tableName.edit.tsx', {
+      id: 'dynamic-edit-new',
+    }),
 
     // Wildcard route — handles plugin-defined custom paths
     route('/*', './routes/$.tsx'),
   ];
+}
+
+export function adminRuntimeRoutes() {
+  return [...adminFeatureRoutes(), ...adminRuntimeEngineRoutes()];
+}
+
+export function merchantRuntimeRoutes() {
+  return [];
+}
+
+export function storefrontRuntimeRoutes() {
+  return [];
+}
+
+export function checkoutRuntimeRoutes() {
+  return [];
+}
+
+export function themePreviewRuntimeRoutes() {
+  return [];
+}
+
+/**
+ * Backward-compatible alias used by existing OSS and enterprise route overlays.
+ */
+export function coreRoutes() {
+  return adminRuntimeRoutes();
 }

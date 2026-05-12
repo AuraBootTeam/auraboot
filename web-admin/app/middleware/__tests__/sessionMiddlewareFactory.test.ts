@@ -71,4 +71,40 @@ describe('createSessionMiddleware', () => {
       status: 302,
     });
   });
+
+  it('allows anonymous storefront runtime routes', async () => {
+    getSessionMock.mockResolvedValue({ get: vi.fn() });
+
+    const { createSessionMiddleware } = await import('~/middleware/sessionMiddlewareFactory');
+    const middleware = createSessionMiddleware();
+
+    const response = (await middleware(
+      {
+        request: new Request('http://localhost/s/demo/products/sample-product'),
+      } as any,
+      async () => new Response('storefront', { status: 200 }),
+    )) as Response;
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('storefront');
+  });
+
+  it('keeps theme preview protected by admin authentication', async () => {
+    getSessionMock.mockResolvedValue({ get: vi.fn() });
+
+    const { createSessionMiddleware } = await import('~/middleware/sessionMiddlewareFactory');
+    const middleware = createSessionMiddleware();
+
+    await expect(
+      middleware(
+        {
+          request: new Request('http://localhost/theme-preview/main'),
+        } as any,
+        async () => new Response('should not reach next', { status: 200 }),
+      ),
+    ).rejects.toMatchObject({
+      url: '/login?redirectTo=%2Ftheme-preview%2Fmain',
+      status: 302,
+    });
+  });
 });
