@@ -1,0 +1,12 @@
+---
+library: true
+warnOnImplicitThis: false
+name: aurabootteam/aura-java-models
+version: 0.1.0
+buildMetadata:
+  cliVersion: 2.25.4
+dependencies: {}
+extensionTargets:
+  codeql/java-all: '*'
+dataExtensions:
+ - models/**/*.yml
