@@ -1,0 +1,110 @@
+name: Agent Runtime Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform/**'
+      - 'web-admin/**'
+      - 'plugins/**'
+      - 'packages/**'
+      - 'scripts/dev/**'
+      - 'docker-compose*.yml'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/workflows/agent-runtime-gate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform/**'
+      - 'web-admin/**'
+      - 'plugins/**'
+      - 'packages/**'
+      - 'scripts/dev/**'
+      - 'docker-compose*.yml'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/workflows/agent-runtime-gate.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: agent-runtime-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.59.1-noble
+  PLAYWRIGHT_IMAGE_CACHE_DIR: /tmp/aura-docker-image-cache
+  PLAYWRIGHT_IMAGE_CACHE_FILE: /tmp/aura-docker-image-cache/playwright-v1.59.1-noble.tar.zst
+  AGENT_RUNTIME_GATE_LOG_DIR: ${{ github.workspace }}/agent-runtime-gate-logs
+
+jobs:
+  agent-runtime-target-gate:
+    name: Agent Runtime Target Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare Docker image cache directory
+        run: mkdir -p "$PLAYWRIGHT_IMAGE_CACHE_DIR"
+
+      - name: Restore Playwright Docker image cache
+        id: playwright-image-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_IMAGE_CACHE_DIR }}
+          key: ${{ runner.os }}-docker-playwright-v1.59.1-noble
+
+      - name: Load cached Playwright Docker image
+        if: steps.playwright-image-cache.outputs.cache-hit == 'true'
+        run: zstd -dc "$PLAYWRIGHT_IMAGE_CACHE_FILE" | docker load
+
+      - name: Pull and cache Playwright Docker image
+        if: steps.playwright-image-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          docker pull "$PLAYWRIGHT_IMAGE"
+          docker save "$PLAYWRIGHT_IMAGE" | zstd -T0 -10 -o "$PLAYWRIGHT_IMAGE_CACHE_FILE"
+
+      - name: Save Playwright Docker image cache
+        if: steps.playwright-image-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: ${{ env.PLAYWRIGHT_IMAGE_CACHE_DIR }}
+          key: ${{ runner.os }}-docker-playwright-v1.59.1-noble
+
+      - name: Run agent-runtime target gate
+        env:
+          AURA_IMAGE_PULL_TIMEOUT_SECONDS: '1200'
+        run: |
+          set -euo pipefail
+          chmod +x scripts/dev/*.sh
+          scripts/dev/run-agent-runtime-full-gate-docker.sh \
+            --slug=ci-agent-runtime \
+            --rebuild
+
+      - name: Upload gate logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-runtime-gate-logs
+          path: ${{ env.AGENT_RUNTIME_GATE_LOG_DIR }}
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Cleanup isolated stack
+        if: always()
+        run: scripts/dev/stop-isolated.sh --slug=ci-agent-runtime --purge || true
