@@ -59,6 +59,20 @@ AURA_CACHE_ROOT="${AURA_CACHE_ROOT:-$HOME/.cache/auraboot}"
 AURA_CONTAINER_CACHE_KEY="${AURA_CONTAINER_CACHE_KEY:-linux}"
 AURA_CONTAINER_CACHE_ROOT="${AURA_CONTAINER_CACHE_ROOT:-$AURA_CACHE_ROOT/container-$AURA_CONTAINER_CACHE_KEY}"
 
+usage() {
+    cat <<USAGE
+Usage: scripts/dev/start-isolated.sh [options]
+
+Options:
+  --slug=<name>      Explicit stack slug.
+  --offset=<n>       Explicit port offset.
+  --rebuild          Rebuild backend image before starting.
+  --no-build         Deprecated alias for the default.
+  --quiet-build      Rebuild backend with quieter Gradle output.
+  --wait             Wait for backend and frontend health checks.
+  --skip-pull        Skip pre-pulling third-party images.
+  --dry-run          Print the resolved plan without starting containers.
+
 Default behaviour (since 2026-05-08): --no-build. Full stacks share host-backed
 dependency caches under AURA_CACHE_ROOT, keeping warm cache out of the Docker
 VM. Pass --rebuild to force a fresh image when Dockerfile, build.gradle, or
