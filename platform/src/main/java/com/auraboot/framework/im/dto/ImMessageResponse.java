@@ -43,4 +43,5 @@ public class ImMessageResponse {
     private List<String> mentions;
     private Boolean recalled;
     private Long forwardedFromId;
+    private Object cardPayload;
 }
