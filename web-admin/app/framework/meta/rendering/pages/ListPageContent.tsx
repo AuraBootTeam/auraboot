@@ -439,6 +439,11 @@ export function ListPageContent(props: PageContentProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedViews, viewsLoading]); // Run when views finish loading
 
+  useEffect(() => {
+    if (!currentView) return;
+    setActiveViewType((currentView.viewType as ViewType) || 'table');
+  }, [currentView?.pid, currentView?.viewType]);
+
   // Apply SavedView viewConfig (pagination + filters) when view changes
   useEffect(() => {
     if (!currentView?.viewConfig) return;
