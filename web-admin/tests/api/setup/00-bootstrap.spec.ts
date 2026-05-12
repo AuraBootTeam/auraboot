@@ -76,7 +76,7 @@ process.stdin.on('end', async () => {
     port: Number(process.env.PGPORT || '5432'),
     user: process.env.PGUSER || process.env.USER || 'ghj',
     database: process.env.PGDATABASE || 'aura_boot',
-    password: process.env.PGPASSWORD || undefined,
+    password: process.env['PGPASSWORD'] || undefined,
   });
   try {
     await client.connect();
