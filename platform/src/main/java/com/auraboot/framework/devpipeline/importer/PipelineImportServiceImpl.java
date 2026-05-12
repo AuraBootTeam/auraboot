@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -155,8 +156,8 @@ public class PipelineImportServiceImpl implements PipelineImportService {
             );
         }
 
-        Map<String, Object> runRecord = firstRunRecord(packet);
-        Map<String, Object> createdRun = dynamicDataService.create("dpl_pipeline_run", new LinkedHashMap<>(runRecord));
+        Map<String, Object> runRecord = normalizeJsonFields(firstRunRecord(packet));
+        Map<String, Object> createdRun = dynamicDataService.create("dpl_pipeline_run", runRecord);
         String runPid = requirePid(createdRun, "dpl_pipeline_run");
         Map<String, Integer> importedCounts = new LinkedHashMap<>();
         importedCounts.put("dpl_pipeline_run", 1);
@@ -164,7 +165,10 @@ public class PipelineImportServiceImpl implements PipelineImportService {
         for (String modelCode : IMPORT_ORDER) {
             List<Map<String, Object>> rows = packet.records().getOrDefault(modelCode, List.of());
             for (Map<String, Object> row : rows) {
-                dynamicDataService.create(modelCode, resolveReferences(modelCode, row, packet.runId(), runPid));
+                dynamicDataService.create(
+                        modelCode,
+                        normalizeJsonFields(resolveReferences(modelCode, row, packet.runId(), runPid))
+                );
             }
             if (!rows.isEmpty()) {
                 importedCounts.put(modelCode, rows.size());
@@ -260,6 +264,22 @@ public class PipelineImportServiceImpl implements PipelineImportService {
             resolved.put("dpl_schedule_related_run_id", runPid);
         }
         return resolved;
+    }
+
+    private Map<String, Object> normalizeJsonFields(Map<String, Object> row) {
+        Map<String, Object> normalized = new LinkedHashMap<>(row);
+        for (Map.Entry<String, Object> entry : normalized.entrySet()) {
+            Object value = entry.getValue();
+            if (!entry.getKey().endsWith("_json") || value == null || value instanceof String) {
+                continue;
+            }
+            try {
+                entry.setValue(objectMapper.writeValueAsString(value));
+            } catch (JsonProcessingException e) {
+                throw new IllegalArgumentException("Failed to serialize JSON field: " + entry.getKey(), e);
+            }
+        }
+        return normalized;
     }
 
     private Map<String, Integer> countRecords(Map<String, List<Map<String, Object>>> records) {

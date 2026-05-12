@@ -5,6 +5,7 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
@@ -95,6 +96,55 @@ class PipelineImportServiceImplTest {
 
         assertThat(storyWrites).hasSize(1);
         assertThat(storyWrites.get(0)).containsEntry("dpl_story_run_id", "dpl-run-pid-001");
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void importFromPacket_serializesJsonFieldsBeforeDynamicCreate() throws Exception {
+        Path packetPath = writePacket(Map.of(
+                "dpl_pipeline_run", List.of(Map.of(
+                        "dpl_run_id", "feat-20260512-importer",
+                        "dpl_run_title", "Importer",
+                        "dpl_run_status", "merge_gate",
+                        "dpl_metadata_json", Map.of("approvals", List.of("spec"))
+                )),
+                "dpl_change_artifact", List.of(Map.of(
+                        "dpl_artifact_run_id", "feat-20260512-importer",
+                        "dpl_delivery_mode", "commit",
+                        "dpl_artifact_branch", "agent/importer",
+                        "dpl_artifact_status", "DRAFT",
+                        "dpl_artifact_risk", "L1",
+                        "dpl_change_summary_json", Map.of("items", List.of("summary")),
+                        "dpl_write_set_json", List.of(Map.of("path", "platform/src/Main.java")),
+                        "dpl_acceptance_json", List.of("acceptance"),
+                        "dpl_review_index_json", List.of()
+                ))
+        ));
+        when(dynamicDataService.list(eq("dpl_pipeline_run"), any(DynamicQueryRequest.class)))
+                .thenReturn(PaginationResult.empty(1, 1));
+        when(dynamicDataService.create(eq("dpl_pipeline_run"), any()))
+                .thenReturn(Map.of("pid", "dpl-run-pid-001"));
+        when(dynamicDataService.create(eq("dpl_change_artifact"), any()))
+                .thenReturn(Map.of("pid", "artifact-pid-001"));
+        PipelineImportServiceImpl service = service();
+
+        service.importFromPacket(new PipelineImportRequest(
+                packetPath, false, ConflictStrategy.ERROR, false, "owner"));
+
+        ArgumentCaptor<Map> runCaptor = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Map> artifactCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataService).create(eq("dpl_pipeline_run"), runCaptor.capture());
+        verify(dynamicDataService).create(eq("dpl_change_artifact"), artifactCaptor.capture());
+        assertThat(runCaptor.getValue().get("dpl_metadata_json"))
+                .isEqualTo("{\"approvals\":[\"spec\"]}");
+        assertThat(artifactCaptor.getValue().get("dpl_change_summary_json"))
+                .isEqualTo("{\"items\":[\"summary\"]}");
+        assertThat(artifactCaptor.getValue().get("dpl_write_set_json"))
+                .isEqualTo("[{\"path\":\"platform/src/Main.java\"}]");
+        assertThat(artifactCaptor.getValue().get("dpl_acceptance_json"))
+                .isEqualTo("[\"acceptance\"]");
+        assertThat(artifactCaptor.getValue().get("dpl_review_index_json"))
+                .isEqualTo("[]");
     }
 
     @Test
