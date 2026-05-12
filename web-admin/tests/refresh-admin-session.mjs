@@ -17,7 +17,7 @@ function resolvePort() {
 }
 
 const port = resolvePort();
-const data = 'email=admin@example.com&password=Test2026x&remember=on&redirectTo=/';
+const data = 'email=admin@auraboot.com&password=Test2026x&remember=on&redirectTo=/';
 const req = http.request({
   hostname: '127.0.0.1',
   port,

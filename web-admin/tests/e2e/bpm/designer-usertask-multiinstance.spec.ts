@@ -322,7 +322,7 @@ test.describe(
       // /tasks/todo filters by). We look it up directly from the login
       // response shape: { data: { userPid, userId, username, ... } }.
       const loginResp = await request.post('/api/auth/login', {
-        data: { email: 'admin@example.com', password: 'Test2026x' },
+        data: { email: 'admin@auraboot.com', password: 'Test2026x' },
         headers: { 'Content-Type': 'application/json' },
       });
       const body = await loginResp.json();

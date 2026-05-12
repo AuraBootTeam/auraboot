@@ -36,7 +36,7 @@ if [[ "$MODE" != "--offline" ]]; then
 
     TOKEN_RESPONSE=$(curl -s -X POST "$BACKEND_URL/api/auth/login" \
       -H "Content-Type: application/json" \
-      -d '{"email":"admin@example.com","password":"Test2026x"}' 2>/dev/null || echo "")
+      -d '{"email":"admin@auraboot.com","password":"Test2026x"}' 2>/dev/null || echo "")
 
     JWT=$(echo "$TOKEN_RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('data',{}).get('jwt',''))" 2>/dev/null || echo "")
 

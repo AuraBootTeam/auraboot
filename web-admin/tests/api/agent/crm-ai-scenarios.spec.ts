@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { expect, test, type TestInfo } from '@playwright/test';
 
 const BACKEND_URL = 'http://127.0.0.1:6443';
-const TEST_USER = { email: 'admin@example.com', password: 'Test2026x' };
+const TEST_USER = { email: 'admin@auraboot.com', password: 'Test2026x' };
 const LLM_TIMEOUT = 90_000;
 const LLM_TRANSPORT_ATTEMPTS = 3;
 const EVIDENCE_DIR = 'test-results/agent-evidence';

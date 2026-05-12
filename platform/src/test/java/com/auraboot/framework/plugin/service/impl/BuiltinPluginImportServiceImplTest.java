@@ -53,7 +53,7 @@ class BuiltinPluginImportServiceImplTest {
         User user = new User();
         user.setId(1L);
         user.setPid("user-pid-1");
-        user.setEmail("admin@example.com");
+        user.setEmail("admin@auraboot.com");
         lenient().when(userService.findByUserId(anyLong())).thenReturn(user);
     }
 
@@ -167,7 +167,7 @@ class BuiltinPluginImportServiceImplTest {
             org.assertj.core.api.Assertions.assertThat(MetaContext.get().getUserPid())
                     .isEqualTo("user-pid-1");
             org.assertj.core.api.Assertions.assertThat(MetaContext.get().getUsername())
-                    .isEqualTo("admin@example.com");
+                    .isEqualTo("admin@auraboot.com");
             return ImportExecuteResult.builder()
                     .success(true)
                     .importId("IMP")

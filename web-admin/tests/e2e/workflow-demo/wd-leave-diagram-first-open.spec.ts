@@ -112,10 +112,10 @@ test.describe('workflow-demo — workflow diagram first open', () => {
     page,
     request,
   }) => {
-    const adminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const adminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
     const submitted = await createSubmittedLeave(request, adminToken);
 
-    await loginViaUI(page, 'admin@example.com', 'Test2026x');
+    await loginViaUI(page, 'admin@auraboot.com', 'Test2026x');
     await navigateToLeaveRequestList(page);
 
     const row = page.locator('table tbody tr').filter({ hasText: submitted.code }).first();

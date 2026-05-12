@@ -59,7 +59,7 @@ This launches Vite + the BFF on `http://localhost:5173`.
 
 Open `http://localhost:5173` and sign in with:
 
-- Email: `admin@example.com`
+- Email: `admin@auraboot.com`
 - Password: `Test2026x`
 
 You will be prompted to rotate the password on first login.

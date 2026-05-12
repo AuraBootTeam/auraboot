@@ -78,7 +78,7 @@ The `full` profile builds and starts PostgreSQL + the Spring Boot backend + the 
 
 | | |
 |---|---|
-| **Email** | `admin@example.com` |
+| **Email** | `admin@auraboot.com` |
 | **Password** | `Test2026x` (change immediately on first login) |
 
 ### Manual Setup

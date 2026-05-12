@@ -93,7 +93,7 @@ step "6/8 Login API contract (via BFF proxy)"
 # Frontend BFF proxies /api/* to backend; we go through it to mirror real user flow.
 LOGIN_RESPONSE=$(curl -fsS -m 5 -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"Test2026x"}' 2>/dev/null || echo "FAIL")
+  -d '{"email":"admin@auraboot.com","password":"Test2026x"}' 2>/dev/null || echo "FAIL")
 # AuraBoot wraps responses as ApiResponse<AuthenticationResponse> → JWT is at $.data.jwt.
 if echo "$LOGIN_RESPONSE" | grep -q '"jwt"'; then
   ok "login returns JWT (data.jwt)"

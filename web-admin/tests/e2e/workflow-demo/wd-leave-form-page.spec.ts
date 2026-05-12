@@ -88,7 +88,7 @@ async function pickMemberInField(
 async function createAdminSession(browser: any) {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
-  await loginViaUI(page, 'admin@example.com', 'Test2026x');
+  await loginViaUI(page, 'admin@auraboot.com', 'Test2026x');
   return { context, page };
 }
 
@@ -96,7 +96,7 @@ test.describe('workflow-demo — leave request form page', () => {
   test('validation UX + submit new request + detail roundtrip', async ({ browser, request }) => {
     const { context, page } = await createAdminSession(browser);
 
-    const ccAdminToken = await loginAs(request, 'admin@example.com', 'Test2026x');
+    const ccAdminToken = await loginAs(request, 'admin@auraboot.com', 'Test2026x');
     const meResp = await request.get(`${BACKEND}/api/auth/me`, {
       headers: { Authorization: `Bearer ${ccAdminToken}` },
     });

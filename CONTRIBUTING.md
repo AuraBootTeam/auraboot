@@ -40,7 +40,7 @@ cd web-admin && pnpm install && pnpm dev:full
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-**Test account:** `admin@example.com` / `Test2026x`
+**Test account:** `admin@auraboot.com` / `Test2026x`
 
 ### Verifying Your Setup
 
