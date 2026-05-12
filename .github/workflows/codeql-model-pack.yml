@@ -26,9 +26,11 @@ jobs:
           languages: java-kotlin
 
       - name: Validate model pack
-        run: codeql pack install .github/codeql/aura-java-models
+        run: |
+          "${CODEQL_DIST}/codeql" version
+          "${CODEQL_DIST}/codeql" pack install .github/codeql/aura-java-models
 
       - name: Publish model pack
-        run: echo "${GITHUB_TOKEN}" | codeql pack publish .github/codeql/aura-java-models --github-auth-stdin
+        run: echo "${GITHUB_TOKEN}" | "${CODEQL_DIST}/codeql" pack publish .github/codeql/aura-java-models --github-auth-stdin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
