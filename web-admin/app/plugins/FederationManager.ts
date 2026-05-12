@@ -5,9 +5,33 @@ import type {
   RemotePlugin,
   RemoteModule,
   SlotId,
+  SlotContribution,
   SlotContributionWithComponent,
   SlotComponentProps,
 } from './types';
+import {
+  DEFAULT_RUNTIME_PROFILE,
+  getDefaultPluginRuntimeProfiles,
+  type RuntimeProfile,
+} from '~/framework/runtime';
+
+export function isPluginEnabledForRuntime(
+  manifest: PluginManifest,
+  runtimeProfile: RuntimeProfile,
+): boolean {
+  const runtimeProfiles = manifest.clientConfig?.runtimeProfiles ?? getDefaultPluginRuntimeProfiles();
+  return runtimeProfiles.includes(runtimeProfile);
+}
+
+export function isSlotEnabledForRuntime(
+  slot: SlotContribution,
+  runtimeProfile: RuntimeProfile,
+): boolean {
+  if (!slot.runtimeProfiles || slot.runtimeProfiles.length === 0) {
+    return true;
+  }
+  return slot.runtimeProfiles.includes(runtimeProfile);
+}
 
 /**
  * Dynamic import for federated modules.
@@ -60,6 +84,7 @@ async function getRemoteModule(
  */
 export const useFederationStore = create<FederationStore>((set, get) => ({
   // Initial state
+  runtimeProfile: DEFAULT_RUNTIME_PROFILE,
   plugins: new Map(),
   slots: new Map(),
   isInitialized: false,
@@ -68,6 +93,14 @@ export const useFederationStore = create<FederationStore>((set, get) => ({
   // Actions
   loadPlugin: async (manifest: PluginManifest) => {
     const { pluginId, namespace, version, displayName, clientConfig } = manifest;
+    const runtimeProfile = get().runtimeProfile;
+
+    if (!isPluginEnabledForRuntime(manifest, runtimeProfile)) {
+      console.info(
+        `[Federation] Plugin ${pluginId} is not enabled for runtime profile ${runtimeProfile}, skipping`,
+      );
+      return;
+    }
 
     if (!clientConfig?.remoteEntry) {
       console.warn(`[Federation] Plugin ${pluginId} has no remoteEntry, skipping`);
@@ -106,6 +139,10 @@ export const useFederationStore = create<FederationStore>((set, get) => ({
       // Process slot contributions
       if (clientConfig.slots) {
         for (const slot of clientConfig.slots) {
+          if (!isSlotEnabledForRuntime(slot, runtimeProfile)) {
+            continue;
+          }
+
           // Load the component for this slot
           const component = await get().loadModule(pluginId, slot.componentName);
           if (component) {
@@ -247,6 +284,15 @@ export const useFederationStore = create<FederationStore>((set, get) => ({
     // This would typically fetch enabled plugins from the backend
     // and load any new ones / unload disabled ones
     set({ isInitialized: true });
+  },
+
+  setRuntimeProfile: (runtimeProfile: RuntimeProfile) => {
+    set((state) => {
+      if (state.runtimeProfile === runtimeProfile) {
+        return state;
+      }
+      return { runtimeProfile };
+    });
   },
 
   setError: (error: string | null) => {
