@@ -61,7 +61,7 @@ jobs:
       # .github/codeql/aura-java-models contains the local model pack used for
       # local preflight with `codeql database analyze --model-packs ...`.
       # GitHub CodeQL Action only accepts published model packs via init
-      # `packs:`. After publishing auraboot/aura-java-models@0.1.0 to GHCR,
+      # `packs:`. After publishing aurabootteam/aura-java-models@0.1.0 to GHCR,
       # add it to the init step above, for Java only.
 
       - name: Perform CodeQL Analysis
