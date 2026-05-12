@@ -210,7 +210,7 @@ function evaluateTextExpression(text: string, context: ExpressionContext): strin
  * 检查对象是否为 LocalizedText
  */
 function hasLocaleKeys(obj: any): boolean {
-  const localeKeys = ['zh-CN', 'en-US', 'ja-JP', 'ko-KR'];
+  const localeKeys = ['zh-CN', 'zh', 'en-US', 'en', 'ja-JP', 'ja', 'ko-KR', 'ko'];
   return Object.keys(obj).some((key) => localeKeys.includes(key));
 }
 
@@ -226,14 +226,25 @@ function getLocalizedTextFromObject(
     return obj[locale] as string;
   }
 
+  const language = locale.split('-')[0];
+  if (language && obj[language]) {
+    return obj[language] as string;
+  }
+
   // 回退到中文
   if (obj['zh-CN']) {
     return obj['zh-CN'];
+  }
+  if (obj.zh) {
+    return obj.zh;
   }
 
   // 回退到英文
   if (obj['en-US']) {
     return obj['en-US'];
+  }
+  if (obj.en) {
+    return obj.en;
   }
 
   // 返回第一个可用值

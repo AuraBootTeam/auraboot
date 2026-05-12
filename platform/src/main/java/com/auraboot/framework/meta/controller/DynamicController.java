@@ -903,11 +903,12 @@ public class DynamicController {
                     .build();
         }
 
-        boolean canRead   = userPermissionService.hasPermission(userId, "model." + pageKey + ".read");
-        boolean canCreate = userPermissionService.hasPermission(userId, "model." + pageKey + ".create");
-        boolean canUpdate = userPermissionService.hasPermission(userId, "model." + pageKey + ".update");
-        boolean canDelete = userPermissionService.hasPermission(userId, "model." + pageKey + ".delete");
-        boolean canExport = userPermissionService.hasPermission(userId, "model." + pageKey + ".export");
+        String permissionModelCode = PageKeyConverter.toModelCode(pageKey);
+        boolean canRead   = userPermissionService.hasPermission(userId, "model." + permissionModelCode + ".read");
+        boolean canCreate = userPermissionService.hasPermission(userId, "model." + permissionModelCode + ".create");
+        boolean canUpdate = userPermissionService.hasPermission(userId, "model." + permissionModelCode + ".update");
+        boolean canDelete = userPermissionService.hasPermission(userId, "model." + permissionModelCode + ".delete");
+        boolean canExport = userPermissionService.hasPermission(userId, "model." + permissionModelCode + ".export");
 
         return PageMetaResponse.Permissions.builder()
                 .canCreate(canCreate)

@@ -89,6 +89,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Objects;
 import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
@@ -932,12 +933,12 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             throw new PluginException("Command not found: " + dto.getCommandCode(), e);
         }
 
-        String ruleCode = dto.getCommandCode() + ":" + dto.getRuleType();
+        String ruleCode = buildBindingRuleCode(dto);
 
-        // Check if binding rule already exists for this command + ruleType
+        // Check if this exact binding rule already exists for the command.
         List<com.auraboot.framework.meta.dto.BindingRuleDTO> existingRules = commandService.getBindingRules(command.getPid());
         boolean exists = existingRules.stream()
-                .anyMatch(r -> dto.getRuleType().equals(r.getRuleType()));
+                .anyMatch(r -> sameBindingRule(dto, r));
 
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Binding rule already exists: " + ruleCode);
@@ -955,9 +956,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
 
         if (exists) {
-            // OVERWRITE: delete existing rules with same ruleType, then recreate
+            // OVERWRITE: delete the matching rule identity, then recreate.
             existingRules.stream()
-                    .filter(r -> dto.getRuleType().equals(r.getRuleType()))
+                    .filter(r -> sameBindingRule(dto, r))
                     .forEach(r -> commandService.removeBindingRule(r.getPid()));
         }
 
@@ -982,6 +983,42 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.BINDING_RULE,
                 created.getPid(), null, ruleCode, dto.getRuleType(),
                 exists ? ResourceAction.UPDATE : ResourceAction.CREATE, null, null);
+    }
+
+    private String buildBindingRuleCode(BindingRuleDTO dto) {
+        return String.join(":",
+                safePart(dto.getCommandCode()),
+                safePart(dto.getRuleType()),
+                safePart(dto.getSequence()),
+                safePart(dto.getTargetModel()),
+                safePart(dto.getTargetField()),
+                safePart(dto.getSourceField()),
+                safePart(dto.getHandlerClass()),
+                safePart(dto.getEventType()));
+    }
+
+    private boolean sameBindingRule(
+            BindingRuleDTO dto,
+            com.auraboot.framework.meta.dto.BindingRuleDTO existing) {
+        return Objects.equals(dto.getRuleType(), existing.getRuleType())
+                && Objects.equals(dto.getSequence(), existing.getSequence())
+                && Objects.equals(normalizeRulePart(dto.getTargetModel()), normalizeRulePart(existing.getTargetModel()))
+                && Objects.equals(normalizeRulePart(dto.getTargetField()), normalizeRulePart(existing.getTargetField()))
+                && Objects.equals(normalizeRulePart(dto.getSourceField()), normalizeRulePart(existing.getSourceField()))
+                && Objects.equals(normalizeRulePart(dto.getHandlerClass()), normalizeRulePart(existing.getHandlerClass()))
+                && Objects.equals(normalizeRulePart(dto.getEventType()), normalizeRulePart(existing.getEventType()));
+    }
+
+    private String normalizeRulePart(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String safePart(Object value) {
+        if (value == null) {
+            return "-";
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? "-" : text.replace(':', '_');
     }
 
     @Override

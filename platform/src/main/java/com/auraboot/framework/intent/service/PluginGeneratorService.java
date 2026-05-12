@@ -131,7 +131,7 @@ public class PluginGeneratorService {
 
     private String mapFieldType(String type) {
         if (type == null) return "string";
-        return switch (type.toUpperCase()) {
+        return switch (type.toLowerCase(Locale.ROOT)) {
             case "string" -> "string";
             case "integer" -> "integer";
             case "decimal" -> "decimal";

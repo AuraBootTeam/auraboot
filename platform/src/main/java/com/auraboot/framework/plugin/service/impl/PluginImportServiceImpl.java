@@ -370,6 +370,15 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
 
+            // Load binding rules
+            if (resourceDirs.containsKey("bindingRules")) {
+                List<BindingRuleDTO> bindingRules = loadRequiredResourceListFromZip(
+                        files, resourceDirs.get("bindingRules"), BindingRuleDTO.class);
+                if (!bindingRules.isEmpty()) {
+                    manifest.setBindingRules(mergeResourceList(manifest.getBindingRules(), bindingRules));
+                }
+            }
+
             // Load menus
             if (resourceDirs.containsKey("menus")) {
                 List<MenuDefinitionDTO> menus = loadResourceListFromZip(files, resourceDirs.get("menus"), MenuDefinitionDTO.class);
@@ -452,6 +461,8 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             log.info("Loaded resources from ZIP resourceDirs: {}", manifest.getResourceCounts());
 
+        } catch (PluginException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("Failed to load some resources from ZIP: {}", e.getMessage());
         }
@@ -517,6 +528,53 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
         }
         return resources;
+    }
+
+    /**
+     * Strict ZIP resource loader for first-class declared resourceDirs where
+     * silently dropping an invalid file would create a broken plugin import.
+     */
+    private <T> List<T> loadRequiredResourceListFromZip(Map<String, byte[]> files, String path, Class<T> clazz) {
+        byte[] content = files.get(path);
+        if (content != null) {
+            return parseZipResourceFile(path, content, clazz);
+        }
+
+        String prefix = path.endsWith("/") ? path : path + "/";
+        List<String> children = files.keySet().stream()
+                .filter(k -> k.startsWith(prefix) && k.endsWith(".json")
+                        && k.indexOf('/', prefix.length()) < 0)
+                .sorted()
+                .toList();
+        if (children.isEmpty()) {
+            throw new PluginException("Declared ZIP resource path not found: " + path);
+        }
+
+        List<T> resources = new ArrayList<>();
+        for (String child : children) {
+            resources.addAll(parseZipResourceFile(child, files.get(child), clazz));
+        }
+        return resources;
+    }
+
+    private <T> List<T> parseZipResourceFile(String entryName, byte[] content, Class<T> clazz) {
+        try {
+            com.fasterxml.jackson.databind.JavaType listType = objectMapper.getTypeFactory()
+                    .constructCollectionType(List.class, clazz);
+            var node = objectMapper.readTree(new String(content, StandardCharsets.UTF_8));
+            if (node == null || node.isNull()) {
+                return List.of();
+            }
+            if (node.isArray()) {
+                return objectMapper.convertValue(node, listType);
+            }
+            return List.of(objectMapper.convertValue(node, clazz));
+        } catch (Exception e) {
+            PluginException exception = new PluginException(
+                    "Failed to parse ZIP resource file " + entryName + ": " + e.getMessage());
+            exception.initCause(e);
+            throw exception;
+        }
     }
 
     /**
