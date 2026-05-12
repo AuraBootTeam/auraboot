@@ -10,6 +10,8 @@ import React, { useState, useCallback } from 'react';
 import { TableCellsIcon } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { Widget } from '../types';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 interface DashboardExportExcelProps {
   widgets: Widget[];
@@ -22,6 +24,7 @@ export const DashboardExportExcel: React.FC<DashboardExportExcelProps> = ({
 }) => {
   const [exporting, setExporting] = useState(false);
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const { locale, t } = useI18n();
 
   const handleExport = useCallback(async () => {
     setExporting(true);
@@ -35,7 +38,7 @@ export const DashboardExportExcel: React.FC<DashboardExportExcelProps> = ({
         const ds = widget.config?.dataSource;
         if (!ds) continue;
 
-        const title = widget.config?.title || `Widget_${widget.id}`;
+        const title = getLocalizedText(widget.config?.title, locale, t) || `Widget_${widget.id}`;
         // Sanitize sheet name (max 31 chars, no special chars)
         const sheetName = title.replace(/[\\/*?[\]:]/g, '_').slice(0, 31);
 

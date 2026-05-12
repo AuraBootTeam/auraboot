@@ -54,7 +54,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -335,11 +338,17 @@ class PluginResourceImporterImplCoreTest {
         com.auraboot.framework.meta.dto.BindingRuleDTO existing =
                 new com.auraboot.framework.meta.dto.BindingRuleDTO();
         existing.setRuleType("PRE_VALIDATE");
+        existing.setSequence(10);
+        existing.setTargetModel("demo_order");
+        existing.setTargetField("status");
         when(commandService.getBindingRules("cmd-pid")).thenReturn(java.util.List.of(existing));
 
         BindingRuleDTO dto = BindingRuleDTO.builder()
                 .commandCode("foo.cmd")
                 .ruleType("PRE_VALIDATE")
+                .sequence(10)
+                .targetModel("demo_order")
+                .targetField("status")
                 .build();
 
         assertThatThrownBy(() -> importer.importBindingRule(dto, "plugin-1", "imp-1", 1L,
@@ -358,11 +367,17 @@ class PluginResourceImporterImplCoreTest {
         com.auraboot.framework.meta.dto.BindingRuleDTO existing =
                 new com.auraboot.framework.meta.dto.BindingRuleDTO();
         existing.setRuleType("PRE_VALIDATE");
+        existing.setSequence(10);
+        existing.setTargetModel("demo_order");
+        existing.setTargetField("status");
         when(commandService.getBindingRules("cmd-pid")).thenReturn(java.util.List.of(existing));
 
         BindingRuleDTO dto = BindingRuleDTO.builder()
                 .commandCode("foo.cmd")
                 .ruleType("PRE_VALIDATE")
+                .sequence(10)
+                .targetModel("demo_order")
+                .targetField("status")
                 .build();
 
         PluginResource result = importer.importBindingRule(dto, "plugin-1", "imp-1", 1L,
@@ -370,7 +385,46 @@ class PluginResourceImporterImplCoreTest {
 
         assertThat(result.getAction()).isEqualTo(ResourceAction.SKIP.code());
         assertThat(result.getResourceType()).isEqualTo(ResourceType.BINDING_RULE.code());
-        assertThat(result.getResourceCode()).isEqualTo("foo.cmd:PRE_VALIDATE");
+        assertThat(result.getResourceCode()).contains("foo.cmd:PRE_VALIDATE");
+    }
+
+    @Test
+    @DisplayName("importBindingRule allows multiple same-type field maps when rule identity differs")
+    void importBindingRule_allowsMultipleFieldMapsWithDifferentIdentity() {
+        CommandDefinitionDTO command = new CommandDefinitionDTO();
+        command.setPid("cmd-pid");
+        when(commandService.findByCode("foo.cmd")).thenReturn(command);
+
+        com.auraboot.framework.meta.dto.BindingRuleDTO existing =
+                new com.auraboot.framework.meta.dto.BindingRuleDTO();
+        existing.setPid("existing-rule");
+        existing.setRuleType("field_map");
+        existing.setSequence(10);
+        existing.setTargetModel("demo_order");
+        existing.setTargetField("status");
+        existing.setSourceField("approvalStatus");
+        when(commandService.getBindingRules("cmd-pid")).thenReturn(java.util.List.of(existing));
+
+        com.auraboot.framework.meta.dto.BindingRuleDTO created =
+                new com.auraboot.framework.meta.dto.BindingRuleDTO();
+        created.setPid("new-rule");
+        when(commandService.addBindingRule(eq("cmd-pid"), any())).thenReturn(created);
+
+        BindingRuleDTO dto = BindingRuleDTO.builder()
+                .commandCode("foo.cmd")
+                .ruleType("field_map")
+                .sequence(20)
+                .targetModel("demo_order")
+                .targetField("comment")
+                .sourceField("approvalComment")
+                .build();
+
+        PluginResource result = importer.importBindingRule(dto, "plugin-1", "imp-1", 1L,
+                ImportRequest.ConflictStrategy.ERROR);
+
+        assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
+        verify(commandService, never()).removeBindingRule("existing-rule");
+        verify(commandService).addBindingRule(eq("cmd-pid"), any());
     }
 
     // ==================== clearMenuCodeMap ====================

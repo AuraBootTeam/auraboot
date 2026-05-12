@@ -452,6 +452,11 @@ test {
     testLogging {
         events "passed", "skipped", "failed"
     }
+    // classDumpDir is append-only across invocations; stale Spring CGLIB proxy
+    // dumps can share one internal class name and break JaCoCo report creation.
+    doFirst {
+        delete file("${buildDir}/jacoco-classdump")
+    }
     finalizedBy jacocoTestReport
     // Exclude CCJSqlParserTokenManager from JaCoCo instrumentation:
     // The class exceeds JVM method size limits after instrumentation, causing

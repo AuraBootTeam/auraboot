@@ -36,6 +36,10 @@ describe('dashboardService.normalizeDashboard', () => {
     );
 
     expect(dashboard.widgets[0].config.modelCode).toBe('crm_opportunity');
+    expect(dashboard.widgets[0].config.title).toEqual({
+      'zh-CN': '最新商机',
+      en: 'Recent Opportunities',
+    });
     expect(dashboard.widgets[0].config.table).toBeTruthy();
     expect(dashboard.widgets[0].config.dataSource).toBeUndefined();
   });
