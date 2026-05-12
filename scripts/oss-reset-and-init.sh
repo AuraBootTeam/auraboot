@@ -267,7 +267,7 @@ else
             -H "Content-Type: application/json" \
             -d '{
                 "companyName": "AuraBoot Dev",
-                "adminEmail": "admin@example.com",
+                "adminEmail": "admin@auraboot.com",
                 "adminPassword": "Test2026x",
                 "adminDisplayName": "Admin User",
                 "systemMode": "single",
@@ -296,7 +296,7 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
     echo "   Verifying admin login..."
     LOGIN_RESP=$(NO_PROXY=localhost curl -s -X POST ${AURA_BE_BASE}/api/auth/login \
         -H "Content-Type: application/json" \
-        -d '{"email":"admin@example.com","password":"Test2026x"}' 2>/dev/null)
+        -d '{"email":"admin@auraboot.com","password":"Test2026x"}' 2>/dev/null)
 
     LOGIN_JWT=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('jwt',''))" 2>/dev/null || echo "")
     LOGIN_TENANT=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('tenantId',''))" 2>/dev/null || echo "")
@@ -417,7 +417,7 @@ if [ "$NO_BOOTSTRAP" != "1" ]; then
     # Login via BFF to get session cookie, then save storage state
     BFF_LOGIN_RESP=$(NO_PROXY=localhost curl -s -D - -o /dev/null -X POST ${AURA_VITE_BASE}/login \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "email=admin@example.com&password=Test2026x&remember=on&redirectTo=/" 2>/dev/null)
+        -d "email=admin@auraboot.com&password=Test2026x&remember=on&redirectTo=/" 2>/dev/null)
     SESSION_COOKIE=$(echo "$BFF_LOGIN_RESP" | grep -i "set-cookie.*__session" | sed 's/.*__session=\([^;]*\).*/\1/' | head -1)
 
     if [ -n "$SESSION_COOKIE" ]; then
@@ -443,10 +443,10 @@ STORAGEJSON
     DB_HOST="${POSTGRES_HOST:-localhost}"
     BOOTSTRAP_CHECK=$(psql_run -P pager=off -t -A -F',' -c "
 SELECT
-  (SELECT COUNT(*) FROM ab_user WHERE email='admin@example.com' AND (deleted_flag=FALSE OR deleted_flag IS NULL)) AS admin_users,
+  (SELECT COUNT(*) FROM ab_user WHERE email='admin@auraboot.com' AND (deleted_flag=FALSE OR deleted_flag IS NULL)) AS admin_users,
   (SELECT COUNT(*) FROM ab_tenant WHERE (deleted_flag=FALSE OR deleted_flag IS NULL)) AS tenants,
   (SELECT COUNT(*) FROM ab_tenant_member tm JOIN ab_user u ON u.id=tm.user_id
-    WHERE u.email='admin@example.com' AND (tm.deleted_flag=FALSE OR tm.deleted_flag IS NULL)) AS admin_memberships;
+    WHERE u.email='admin@auraboot.com' AND (tm.deleted_flag=FALSE OR tm.deleted_flag IS NULL)) AS admin_memberships;
 ")
     IFS=',' read -r ADMIN_USERS TENANT_COUNT ADMIN_MEMBERSHIPS <<< "$BOOTSTRAP_CHECK"
 
@@ -494,7 +494,7 @@ JOIN ab_role r
     ON r.code = 'platform_admin'
     AND r.tenant_id = tm.tenant_id
     AND (r.deleted_flag = FALSE OR r.deleted_flag IS NULL)
-WHERE u.email = 'admin@example.com'
+WHERE u.email = 'admin@auraboot.com'
   AND (u.deleted_flag = FALSE OR u.deleted_flag IS NULL)
   AND NOT EXISTS (
       SELECT 1 FROM ab_user_role ur2
@@ -593,7 +593,7 @@ else
     echo -e "${BLUE}=== Initialization Complete ===${NC}"
     echo ""
     echo -e "${GREEN}Environment is ready with:${NC}"
-    echo "  - User: admin@example.com / Test2026x"
+    echo "  - User: admin@auraboot.com / Test2026x"
     echo "  - Tenant: AuraBoot Dev"
 fi
 echo ""

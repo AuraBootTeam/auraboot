@@ -37,7 +37,7 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
 import { Client as PgClient } from 'pg';
 import { uniqueId } from '../helpers/index';
 
-const ADMIN_EMAIL = 'admin@example.com';
+const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
 const PG_CONN = {
   host: process.env.PGHOST ?? 'localhost',

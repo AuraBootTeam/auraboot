@@ -40,7 +40,7 @@ cd web-admin && pnpm install && pnpm dev:full
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-**Test account:** `admin@example.com` / `Test2026x`
+**Test account:** `admin@auraboot.com` / `Test2026x`
 
 ### Verifying Your Setup
 
@@ -202,7 +202,7 @@ For organizations, a Corporate CLA may be required if your employer holds rights
 - [License FAQ](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md) — questions about commercial use, modifications, SaaS boundaries
 - [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — open-ended questions and ideas
 - [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — bug reports and feature requests
-- [Discord](https://discord.gg/auraboot) — real-time community chat
+- [Discord](https://discord.gg/p2fW5A2MW6) — real-time community chat
 - [Security](SECURITY.md) — vulnerability disclosure (don't open a public issue)
 - [Telemetry](TELEMETRY.md) — what AuraBoot does and doesn't send across the network
 

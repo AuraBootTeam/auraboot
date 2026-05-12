@@ -65,7 +65,7 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
         // Verify the 9 bootstrap invariants now hold by re-running repairAll() with
         // the seed-config defaults — every step must be PRESENT (no creates).
         var opts = BootstrapRepairService.RepairOptions.of(
-                "admin@example.com", "Test2026x", "Admin",
+                "admin@auraboot.com", "Test2026x", "Admin",
                 "AuraBoot Dev", "single", "http://localhost:6443");
         RepairReport second = repair.repairAll(opts);
 
@@ -79,7 +79,7 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
         // No duplicate admin / tenants.
         Integer adminUsers = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_user WHERE email = ?",
-                Integer.class, "admin@example.com");
+                Integer.class, "admin@auraboot.com");
         assertThat(adminUsers).isEqualTo(1);
 
         Integer systemTenants = jdbc.queryForObject(
@@ -97,7 +97,7 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
         runner.run(null);
         Integer adminCountAfterFirst = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_user WHERE email = ?",
-                Integer.class, "admin@example.com");
+                Integer.class, "admin@auraboot.com");
         assertThat(adminCountAfterFirst).isEqualTo(1);
 
         // Second invocation must not duplicate anything and must not throw.
@@ -105,7 +105,7 @@ class BootstrapStartupRunnerIT extends IntegrationTestBase {
 
         Integer adminCountAfterSecond = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ab_user WHERE email = ?",
-                Integer.class, "admin@example.com");
+                Integer.class, "admin@auraboot.com");
         assertThat(adminCountAfterSecond)
                 .as("admin user must not be duplicated across restarts")
                 .isEqualTo(1);

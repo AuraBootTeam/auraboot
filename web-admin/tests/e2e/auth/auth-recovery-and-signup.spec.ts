@@ -72,7 +72,7 @@ test.describe('Auth Recovery & Signup Deep', () => {
       { timeout: 30000 },
     );
 
-    await page.locator('input[type="email"]').first().fill('admin@example.com');
+    await page.locator('input[type="email"]').first().fill('admin@auraboot.com');
     await page.getByRole('button', { name: /send reset link/i }).click();
     const resp = await submitResp;
     expect(resp.ok()).toBe(true);

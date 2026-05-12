@@ -68,11 +68,11 @@ class EmailPasswordAuthStrategyTest {
 
     @Test
     void authenticate_lockedAccount_throwsRootUnCheckedException() {
-        User lockedUser = buildUser("admin@example.com");
+        User lockedUser = buildUser("admin@auraboot.com");
         when(userMapper.selectOne(any())).thenReturn(lockedUser);
         when(passwordManagementService.isAccountLocked(lockedUser)).thenReturn(true);
 
-        AuthStrategyRequest request = buildRequest("admin@example.com", "pass");
+        AuthStrategyRequest request = buildRequest("admin@auraboot.com", "pass");
 
         assertThatThrownBy(() -> strategy.authenticate(request))
                 .isInstanceOf(RootUnCheckedException.class)

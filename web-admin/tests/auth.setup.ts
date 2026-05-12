@@ -270,7 +270,7 @@ async function loginViaApi(
           // overrides that JWT with one explicitly bound to AuraBoot Demo.
           // Errors are non-fatal — the original cookie remains usable as
           // a fallback.
-          if (user.email === 'admin@example.com') {
+          if (user.email === 'admin@auraboot.com') {
             await autoSelectSpace(page, baseURL).catch(() => false);
           } else {
             const location = resp.headers()['location'] || '';

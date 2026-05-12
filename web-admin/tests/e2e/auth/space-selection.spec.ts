@@ -12,7 +12,7 @@
  * so users never see the space selection page.
  *
  * Prerequisites:
- *   - admin@example.com belongs to both System Tenant and a Business Tenant
+ *   - admin@auraboot.com belongs to both System Tenant and a Business Tenant
  *   - This is the default state after reset-and-init.sh
  */
 
@@ -155,7 +155,7 @@ test.describe('Tenant Switch in Avatar Menu', () => {
     await expect(dropdown).toBeVisible({ timeout: 5_000 });
 
     // Should show user email
-    await expect(dropdown.locator('text=admin@example.com')).toBeVisible();
+    await expect(dropdown.locator('text=admin@auraboot.com')).toBeVisible();
 
     // Should show workspace section with at least one tenant
     await expect(dropdown.locator('button[data-testid^="tenant-switch-"]').first()).toBeVisible();
