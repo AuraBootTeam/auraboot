@@ -424,6 +424,7 @@ async function resolveOrCreateAiCenterMenuId(client: Client): Promise<string> {
 async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
+  await page.waitForURL((url) => !url.pathname.includes('/login') && url.pathname !== '/', { timeout: 20_000 });
 
   const nav = page.locator('nav').first();
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
@@ -435,18 +436,21 @@ async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
   if ((await leaf.count()) === 0 || !(await leaf.isVisible().catch(() => false))) {
     const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center/ }).first();
     await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
-    await aiCenter.evaluate((el: HTMLElement) => el.click());
+    await aiCenter.click();
   }
 
   // Click the leaf "Agent 运行记录"
-  await leaf.waitFor({ state: 'attached', timeout: 8_000 });
+  await leaf.waitFor({ state: 'visible', timeout: 8_000 });
 
   const listResponsePromise = page.waitForResponse(
     (r) => r.url().includes('/api/admin/agent-runs') && !/\/[A-Z0-9]{20,}/.test(r.url()) && r.status() === 200,
     { timeout: 20_000 },
   );
-  await leaf.evaluate((el: HTMLElement) => el.click());
-  await listResponsePromise;
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === '/admin/agent-runs', { timeout: 15_000 }),
+    leaf.click(),
+    listResponsePromise,
+  ]);
 
   await expect(page.locator('[data-testid="agent-runs-page"]')).toBeVisible({
     timeout: 10_000,
