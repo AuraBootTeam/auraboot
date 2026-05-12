@@ -64,6 +64,20 @@ def runGitCommand = { String[] cmd ->
 }
 
 def multiWorktreeGuardCheck = { String operationName ->
+    def explicitMavenRepo = System.getProperty('maven.repo.local')
+    if (explicitMavenRepo) {
+        def explicitRepoFile = new File(explicitMavenRepo)
+        if (!explicitRepoFile.isAbsolute()) {
+            explicitRepoFile = new File(guardProjectDir, explicitMavenRepo)
+        }
+        def explicitRepoPath = explicitRepoFile.canonicalPath
+        def defaultRepoPath = new File(System.getProperty('user.home'), '.m2/repository').canonicalPath
+        if (explicitRepoPath != defaultRepoPath) {
+            guardLogger.lifecycle("multi-worktree guard: using isolated maven.repo.local=${explicitRepoPath}; shared ~/.m2 publish guard bypassed.")
+            return
+        }
+    }
+
     def listResult = runGitCommand(['git', 'worktree', 'list'] as String[])
     if (listResult.exit != 0) {
         return  // Not a git repo (or git missing); skip guard silently.
@@ -93,16 +107,18 @@ def multiWorktreeGuardCheck = { String operationName ->
 
 ERROR: refusing to run '${operationName}' — detected ${worktreeCount} active git worktrees.
 
-Multi-worktree mode requires an isolated Docker stack so shared singletons
-(Postgres / m2 / :6443 / :5174:3501 / Redis) don't collide. Concurrent
-publishes to ~/.m2 silently overwrite each other.
+Multi-worktree mode requires isolated runtime state and isolated Maven publish
+output so shared singletons (Postgres / ~/.m2 publish output / :6443 /
+:5174:3501 / Redis) don't collide. Concurrent publishes to ~/.m2 silently
+overwrite each other.
 
 Options:
-  1) Use the isolated stack workflow (P0 #1-4):
-       scripts/dev/start-isolated.sh
-     The stack builds m2 inside the container, fully isolating from host.
+  1) Publish to a per-worktree Maven repo:
+       ./gradlew ${operationName} -Dmaven.repo.local=\$PWD/.m2/repository
+     Then build downstream repos with the same -Dmaven.repo.local path.
 
-  2) Stop other worktrees' host-mode dev stacks first, then re-run.
+  2) Use the full isolated stack workflow:
+       scripts/dev/start-isolated.sh
 
   3) Override (only if you know other worktrees are dormant):
        FORCE_HOST=1 ./gradlew ${operationName}
