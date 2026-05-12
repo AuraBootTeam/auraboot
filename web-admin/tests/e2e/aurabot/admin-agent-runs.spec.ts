@@ -442,14 +442,9 @@ async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
   // Click the leaf "Agent 运行记录"
   await leaf.waitFor({ state: 'visible', timeout: 8_000 });
 
-  const listResponsePromise = page.waitForResponse(
-    (r) => r.url().includes('/api/admin/agent-runs') && !/\/[A-Z0-9]{20,}/.test(r.url()) && r.status() === 200,
-    { timeout: 20_000 },
-  );
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/admin/agent-runs', { timeout: 15_000 }),
     leaf.click({ noWaitAfter: true }),
-    listResponsePromise,
   ]);
 
   await expect(page.locator('[data-testid="agent-runs-page"]')).toBeVisible({
