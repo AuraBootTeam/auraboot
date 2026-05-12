@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
@@ -48,7 +49,11 @@ public class CloudConfigConnectionTester {
 
         try {
             JsonNode cfg = objectMapper.readTree(config.getConfig());
-            return switch (config.getServiceType()) {
+            String serviceType = config.getServiceType() == null
+                    ? ""
+                    : config.getServiceType().toLowerCase(Locale.ROOT);
+            return switch (serviceType) {
+                case "llm" -> testLlm(cfg);
                 case "sms" -> testSms(config.getProviderCode(), cfg);
                 case "email" -> testEmail(cfg);
                 case "oauth" -> testOAuth(config.getProviderCode(), cfg);
@@ -59,6 +64,41 @@ public class CloudConfigConnectionTester {
             log.error("Connection test failed for pid={}", pid, e);
             return Map.of("status", "error", "message", e.getMessage());
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // LLM Test
+    // -------------------------------------------------------------------------
+
+    private Map<String, Object> testLlm(JsonNode cfg) {
+        String apiKey = cfg.path("apiKey").asText("");
+        if (apiKey.isBlank()) {
+            return Map.of("status", "error", "message", "Missing required field: apiKey");
+        }
+
+        String apiFormat = cfg.path("apiFormat").asText("chat_completions");
+        if (!"messages".equals(apiFormat) && !"chat_completions".equals(apiFormat)) {
+            return Map.of("status", "error",
+                    "message", "Unsupported apiFormat: " + apiFormat
+                            + " (expected messages or chat_completions)");
+        }
+
+        JsonNode maxTokens = cfg.path("maxTokens");
+        if (maxTokens.isNumber() && maxTokens.asInt() <= 0) {
+            return Map.of("status", "error", "message", "maxTokens must be greater than zero");
+        }
+
+        String baseUrl = cfg.path("baseUrl").asText("");
+        if (!baseUrl.isBlank()) {
+            try {
+                URI.create(baseUrl);
+            } catch (IllegalArgumentException e) {
+                return Map.of("status", "error", "message", "Invalid baseUrl: " + e.getMessage());
+            }
+        }
+
+        return Map.of("status", "ok",
+                "message", "LLM provider config validated for apiFormat=" + apiFormat);
     }
 
     // -------------------------------------------------------------------------

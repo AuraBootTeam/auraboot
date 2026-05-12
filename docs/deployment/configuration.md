@@ -58,7 +58,9 @@ When `REDIS_HOST` is not set, AuraBoot runs in single-instance mode with JVM-loc
 | `OPENAI_API_KEY` | *(empty)* | OpenAI API key |
 | `GATEWAY_SECRET` | `your-secret-key-here` | AI gateway shared secret |
 
-At least one LLM provider key is required to use AuraBot, ChatBI, and RAG features. Without any key, AI features are disabled but the platform functions normally.
+CloudConfig is the preferred runtime source for LLM providers. Store rows in `ab_cloud_config` with `service_type='llm'`, `provider_code` such as `anthropic` or `deepseek`, and `config.apiFormat` set to `messages` or `chat_completions`. The `config.apiKey` field is encrypted at rest and masked in admin reads. `ANTHROPIC_API_KEY` remains a backward-compatible Anthropic fallback.
+
+At least one tenant-effective LLM provider key is required to use AuraBot, ChatBI, and RAG features. Without any key, AI features are disabled with an explicit provider-not-configured error while the platform functions normally.
 
 ### File Storage
 

@@ -37,6 +37,9 @@ By the end of this guide you will understand AuraBoot's AI feature set and be ab
 ## 1. LLM Provider Configuration
 
 All AI features share a single provider configuration stored in `ab_cloud_config`.
+Use lower-case `config_level` / `service_type` values (`platform`, `tenant`, `llm`).
+The admin API normalizes `serviceType` on lookup, but stored rows and examples should stay lower-case.
+LLM `apiKey` values are encrypted at rest and masked in admin responses.
 
 ### Supported Providers
 
@@ -71,8 +74,19 @@ Any OpenAI Chat Completions-compatible provider can be added as a custom provide
 ```sql
 INSERT INTO ab_cloud_config (pid, config_level, service_type, provider_code, config, enabled)
 VALUES (
-  '01EXAMPLE', 'PLATFORM', 'LLM', 'anthropic',
-  '{"apiKey": "sk-ant-xxx", "baseUrl": "https://api.anthropic.com", "defaultModel": "claude-sonnet-4-6", "maxTokens": 4096}',
+  '01EXAMPLE', 'platform', 'llm', 'anthropic',
+  '{"apiKey": "sk-ant-xxx", "apiFormat": "messages", "baseUrl": "https://api.anthropic.com", "defaultModel": "claude-sonnet-4-6", "maxTokens": 4096}',
+  true
+);
+```
+
+OpenAI-compatible providers use `apiFormat: "chat_completions"`:
+
+```sql
+INSERT INTO ab_cloud_config (pid, config_level, service_type, provider_code, config, enabled)
+VALUES (
+  '01EXAMPLE2', 'tenant', 'llm', 'deepseek',
+  '{"apiKey": "sk-xxx", "apiFormat": "chat_completions", "baseUrl": "https://api.deepseek.com", "defaultModel": "deepseek-chat", "maxTokens": 4096}',
   true
 );
 ```
@@ -91,7 +105,7 @@ agent:
 ### Resolution Priority
 
 ```
-1. CloudConfig (ab_cloud_config, service_type='LLM')
+1. CloudConfig (ab_cloud_config, service_type='llm')
    |
    v (not found)
 2. application.yml (agent.anthropic.*, Anthropic only)
@@ -112,6 +126,23 @@ When an Agent definition specifies a model name, the system auto-detects the pro
 | `qwen` | `qianwen` |
 | `glm` | `zhipu` |
 | `moonshot` | `moonshot` |
+
+### Validate Provider Configuration
+
+The cloud-config test endpoint validates LLM config shape without making a paid model call:
+
+```bash
+curl -X POST "$BASE_URL/api/admin/cloud-config/$PID/test" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Expected response for a structurally valid provider:
+
+```json
+{"code":"0","data":{"status":"ok","message":"LLM provider config validated for apiFormat=messages"}}
+```
+
+For live smoke, configure a real key, open AuraBot, send a short prompt, and confirm `/api/agent/providers/configured` lists the tenant provider. Missing keys should return an explicit "LLM provider not configured" error instead of falling back silently.
 
 ## 2. AuraBot -- In-App AI Copilot
 
