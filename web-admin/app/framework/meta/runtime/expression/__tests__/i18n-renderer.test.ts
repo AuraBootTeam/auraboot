@@ -40,6 +40,15 @@ describe('i18n-renderer', () => {
       };
       expect(renderText(text, context)).toBe('你好');
     });
+
+    it('应该在 en-US locale 下兼容 en 简写', () => {
+      const context = createContext('en-US');
+      const text = {
+        'zh-CN': '收入',
+        en: 'Revenue',
+      };
+      expect(renderText(text, context)).toBe('Revenue');
+    });
   });
 
   describe('$i18n: 简写语法', () => {

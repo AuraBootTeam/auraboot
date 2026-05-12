@@ -2,11 +2,17 @@ package com.auraboot.framework.plugin.dto.imports;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +64,7 @@ public class DashboardDefinitionDTO {
      * Dashboard title (display name). Can be a plain string.
      * Required.
      */
+    @JsonDeserialize(using = LocalizedTitleDeserializer.class)
     private String title;
 
     /**
@@ -116,6 +123,36 @@ public class DashboardDefinitionDTO {
             unknownFields = new HashMap<>();
         }
         unknownFields.put(key, value);
+    }
+
+    public static class LocalizedTitleDeserializer extends JsonDeserializer<String> {
+        @Override
+        public String deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+            return resolveLocalizedTitle(parser.readValueAsTree());
+        }
+    }
+
+    private static String resolveLocalizedTitle(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (value.isTextual()) {
+            return value.asText();
+        }
+        if (value.isObject()) {
+            for (String key : List.of("zh-CN", "zh", "en-US", "en")) {
+                JsonNode candidate = value.get(key);
+                if (candidate != null && candidate.isTextual() && !candidate.asText().isBlank()) {
+                    return candidate.asText();
+                }
+            }
+            for (JsonNode candidate : value) {
+                if (candidate.isTextual() && !candidate.asText().isBlank()) {
+                    return candidate.asText();
+                }
+            }
+        }
+        return null;
     }
 
     /**

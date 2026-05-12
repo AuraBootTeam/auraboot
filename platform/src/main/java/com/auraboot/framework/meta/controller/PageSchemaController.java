@@ -16,6 +16,7 @@ import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.PageSchemaVersionService;
 import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.service.PluginResourceTracker;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,7 +71,7 @@ public class PageSchemaController {
      */
     @GetMapping
     @Operation(summary = "分页查询页面配置", description = "根据条件分页查询页面配置列表（不包含 blocks）")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PaginationResult<PageSchemaListDTO>> list(
             @RequestParam(required = false) String kind,
             @RequestParam(required = false) Boolean isTemplate,
@@ -93,7 +94,7 @@ public class PageSchemaController {
      */
     @GetMapping("/{pid}")
     @Operation(summary = "查询页面配置详情", description = "根据PID查询页面配置的详细信息")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PageSchemaDTO> getByPid(
             @Parameter(description = "页面配置PID") @PathVariable String pid) {
         log.info("查询页面配置详情，PID：{}", logSafe(pid));
@@ -110,7 +111,7 @@ public class PageSchemaController {
      */
     @GetMapping("/latest/{pagePid}")
     @Operation(summary = "查询最新版本", description = "根据页面PID查询最新版本的页面配置")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PageSchemaVersionDTO> getLatestVersion(
             @Parameter(description = "页面PID") @PathVariable String pagePid) {
         log.info("查询最新版本页面配置: pagePid={}", logSafe(pagePid));
@@ -226,7 +227,7 @@ public class PageSchemaController {
      */
     @GetMapping("/{pid}/versions")
     @Operation(summary = "查询版本历史", description = "查询页面配置的版本历史记录")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<List<PageSchemaVersionDTO>> getVersionHistory(
             @Parameter(description = "页面配置PID") @PathVariable String pid) {
         log.info("查询版本历史: pid={}", logSafe(pid));
@@ -288,7 +289,7 @@ public class PageSchemaController {
      */
     @GetMapping("/{pid}/versions/{fromHistoryId}/compare/{toHistoryId}")
     @Operation(summary = "比较版本差异", description = "比较两个版本之间的差异")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PageSchemaVersionComparisonDTO> compareVersions(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(description = "源版本历史ID") @PathVariable Long fromHistoryId,
@@ -306,7 +307,7 @@ public class PageSchemaController {
      */
     @GetMapping("/by-name")
     @Operation(summary = "根据名称查询", description = "根据页面名称查询页面配置")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PageSchemaDTO> findByName(
             @Parameter(description = "页面名称") @RequestParam String name) {
         log.info("根据名称查询页面配置: name={}", logSafe(name));
@@ -322,7 +323,7 @@ public class PageSchemaController {
      */
     @GetMapping("/by-kind/{kind}")
     @Operation(summary = "根据类型查询", description = "根据页面类型查询配置信息")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<List<PageSchemaDTO>> findByKind(
             @Parameter(description = "页面类型") @PathVariable String kind) {
         log.info("根据类型查询页面配置: kind={}", logSafe(kind));
@@ -337,7 +338,7 @@ public class PageSchemaController {
      */
     @GetMapping("/published")
     @Operation(summary = "查询已发布配置", description = "查询所有已发布的页面配置")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<List<PageSchemaDTO>> findPublished() {
         log.info("查询已发布的页面配置");
         List<PageSchemaDTO> result = pageSchemaService.findPublishedSchemas();
@@ -351,7 +352,7 @@ public class PageSchemaController {
      */
     @GetMapping("/templates")
     @Operation(summary = "查询模板配置", description = "查询所有模板页面配置")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<List<PageSchemaDTO>> findTemplates(
             @Parameter(description = "模板分类") @RequestParam(required = false) String templateCategory) {
         log.info("查询模板页面配置: templateCategory={}", logSafe(templateCategory));
@@ -366,7 +367,7 @@ public class PageSchemaController {
      */
     @GetMapping("/count/total")
     @Operation(summary = "统计配置总数", description = "统计所有页面配置的总数量")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<Long> countTotal() {
         log.info("统计页面配置总数");
         Long result = pageSchemaService.countTotal();
@@ -380,7 +381,7 @@ public class PageSchemaController {
      */
     @GetMapping("/count/published")
     @Operation(summary = "统计已发布配置数", description = "统计已发布页面配置的数量")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<Long> countPublished() {
         log.info("统计已发布页面配置数量");
         Long result = pageSchemaService.countPublished();
@@ -394,7 +395,7 @@ public class PageSchemaController {
      */
     @GetMapping("/count/templates")
     @Operation(summary = "统计模板配置数", description = "统计模板类型页面配置的数量")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<Long> countTemplates() {
         log.info("统计模板页面配置数量");
         Long result = pageSchemaService.countTemplates();
@@ -410,7 +411,7 @@ public class PageSchemaController {
      */
     @GetMapping("/validate/name-unique")
     @Operation(summary = "验证名称唯一性", description = "验证页面名称是否已存在")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<Boolean> isNameUnique(
             @Parameter(description = "页面名称") @RequestParam String name,
             @Parameter(description = "排除的PID") @RequestParam(required = false) String excludePid) {
@@ -434,7 +435,7 @@ public class PageSchemaController {
     @GetMapping("/key/{pageKey}")
     @Operation(summary = "根据页面键获取Schema",
                description = "统一的页面获取端点。Model相关页面使用 {modelCode}_{kind} 格式，如 device_list；独立页面使用自定义 key，如 dashboard_main")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PageSchemaDTO> getByPageKey(
             @Parameter(description = "页面唯一标识，如 device_list, dashboard_main") @PathVariable String pageKey) {
         log.info("获取页面Schema: pageKey={}", logSafe(pageKey));
@@ -457,7 +458,7 @@ public class PageSchemaController {
     @GetMapping("/versions")
     @Operation(summary = "Get schema versions since timestamp",
                description = "Returns lightweight version metadata for schemas updated after the given timestamp. Used by mobile clients for incremental sync.")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<List<PageSchemaSyncVersionDTO>> getVersionsSince(
             @Parameter(description = "ISO-8601 timestamp, e.g. 2026-03-25T00:00:00Z")
             @RequestParam(required = false) Instant since) {
@@ -477,7 +478,7 @@ public class PageSchemaController {
     @PostMapping("/batch")
     @Operation(summary = "Batch fetch schemas by page keys",
                description = "Fetch multiple published schemas in a single request. Body: {\"pageKeys\": [\"key1\", \"key2\"]}")
-    @RequirePermission("page.page.read")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<List<PageSchemaDTO>> batchGetByKeys(
             @RequestBody Map<String, List<String>> body) {
         List<String> pageKeys = body.getOrDefault("pageKeys", List.of());

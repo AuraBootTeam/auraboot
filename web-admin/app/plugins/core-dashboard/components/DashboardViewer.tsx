@@ -18,6 +18,7 @@ import { DashboardExportExcel } from './DashboardExportExcel';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
 
@@ -38,7 +39,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
   title = 'dashboard',
   showExport = false,
 }) => {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [linkageFilters, setLinkageFilters] = useState<LinkageFiltersMap>({});
@@ -90,6 +91,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
     const linkageConfig = widget.config.linkage;
     const drillDownConfig = widget.config.drillDown;
     const groupId = linkageConfig?.groupId || 'default';
+    const widgetTitle = getLocalizedText(widget.config.title, locale, t);
 
     const widgetLinkageFilters = linkageConfig?.receiveFilter ? linkageFilters[groupId] : undefined;
 
@@ -115,7 +117,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
 
     return (
       <ChartWidgetWrapper
-        title={widget.config.title}
+        title={widgetTitle}
         dataSource={
           widget.config.dataSource as unknown as import('~/framework/smart/types/chart').ChartDataSource
         }
