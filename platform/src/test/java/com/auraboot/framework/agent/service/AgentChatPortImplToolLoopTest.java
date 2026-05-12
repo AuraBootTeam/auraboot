@@ -112,7 +112,7 @@ class AgentChatPortImplToolLoopTest {
                 "status", "active",
                 "model", "test-model",
                 "system_prompt", "Compare suppliers.",
-                "guardrails", "{\"provider\":\"openai\"}")));
+                "guardrails", "{\"provider\":\"openai\",\"evidenceFirst\":true}")));
     }
 
     private void stubAgentDefinitionWithTools(String toolsJson) {
@@ -312,7 +312,9 @@ class AgentChatPortImplToolLoopTest {
         assertThat(requestCaptor.getAllValues().get(0).getTools())
                 .extracting(LlmChatRequest.Tool::getName)
                 .containsExactly("nq_pe_procurement_comparison_supplier_options");
+        assertThat(requestCaptor.getAllValues().get(0).getToolChoice()).isEqualTo("required");
         LlmChatRequest secondRound = requestCaptor.getAllValues().get(1);
+        assertThat(secondRound.getToolChoice()).isNull();
         // The second round must carry the assistant tool_use + user tool_result blocks.
         assertThat(secondRound.getMessages()).hasSizeGreaterThanOrEqualTo(3);
         assertThat(String.valueOf(secondRound.getMessages()))
@@ -321,6 +323,35 @@ class AgentChatPortImplToolLoopTest {
                 .doesNotContain("Tool executed");
         // No confirm_required on a read-only tool.
         verify(sink, never()).onConfirmRequired(any(), any(), any(), anyMap(), any());
+    }
+
+    @Test
+    @DisplayName("OpenAI-compatible first tool round fails with diagnostic when provider ignores required tool_choice")
+    void requiredToolChoiceIgnoredByProviderFailsDiagnostic() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(readOnlyTool()));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(endTurnResponse("I can compare suppliers without data."));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers for P-100"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        TurnOutcome.Failed failed = (TurnOutcome.Failed) outcome;
+        assertThat(failed.errorMessage())
+                .contains("required tool call")
+                .contains("openai")
+                .contains("nq_pe_procurement_comparison_supplier_options");
+        verify(sink).onError(contains("required tool call"), eq(null));
+        verify(sink, never()).onTextChunk(anyString());
+        verify(sink, never()).onDone(anyString(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(requestCaptor.getValue().getToolChoice()).isEqualTo("required");
     }
 
     @Test
