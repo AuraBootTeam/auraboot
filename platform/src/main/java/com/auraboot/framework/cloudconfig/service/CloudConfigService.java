@@ -22,7 +22,7 @@ public interface CloudConfigService {
      * Config JSON is auto-decrypted before returning.
      *
      * @param tenantId     the tenant ID
-     * @param serviceType  SMS, EMAIL, OAUTH, STORAGE, CDN
+     * @param serviceType  sms, email, oauth, storage, cdn, llm
      * @param providerCode provider identifier (e.g., tencent_sms, google)
      * @return the effective config with decrypted JSON, or null if none found
      */
@@ -33,7 +33,7 @@ public interface CloudConfigService {
      * Config JSON is auto-decrypted.
      *
      * @param tenantId    the tenant ID
-     * @param serviceType SMS, EMAIL, OAUTH, STORAGE, CDN
+     * @param serviceType sms, email, oauth, storage, cdn, llm
      * @return list of enabled configs, ordered by level (TENANT first) and priority
      */
     List<CloudConfig> getEnabledProviders(Long tenantId, String serviceType);
@@ -73,7 +73,7 @@ public interface CloudConfigService {
      * Get all enabled configs for a service type across all tenants and platform level.
      * Used for provider discovery (e.g., listing all known LLM providers).
      *
-     * @param serviceType SMS, EMAIL, OAUTH, STORAGE, CDN, LLM
+     * @param serviceType sms, email, oauth, storage, cdn, llm
      * @return list of enabled configs ordered by priority
      */
     List<CloudConfig> getAllByServiceType(String serviceType);

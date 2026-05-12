@@ -16,11 +16,11 @@ public class CloudConfigSaveRequest {
     @NotBlank(message = "configLevel is required")
     private String configLevel;
 
-    /** SMS | EMAIL | OAUTH | STORAGE | CDN */
+    /** sms | email | oauth | storage | cdn | llm */
     @NotBlank(message = "serviceType is required")
     private String serviceType;
 
-    /** Provider identifier: tencent_sms, aliyun_sms, google, apple, wechat_web, smtp, etc. */
+    /** Provider identifier: tencent_sms, aliyun_sms, google, apple, anthropic, openai, etc. */
     @NotBlank(message = "providerCode is required")
     private String providerCode;
 

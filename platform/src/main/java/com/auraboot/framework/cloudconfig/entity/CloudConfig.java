@@ -31,11 +31,11 @@ public class CloudConfig {
     @TableField("tenant_id")
     private Long tenantId;
 
-    /** SMS | EMAIL | OAUTH | STORAGE | CDN */
+    /** sms | email | oauth | storage | cdn | llm */
     @TableField("service_type")
     private String serviceType;
 
-    /** Provider identifier: tencent_sms, aliyun_sms, google, apple, wechat_web, smtp, etc. */
+    /** Provider identifier: tencent_sms, aliyun_sms, google, apple, anthropic, openai, etc. */
     @TableField("provider_code")
     private String providerCode;
 

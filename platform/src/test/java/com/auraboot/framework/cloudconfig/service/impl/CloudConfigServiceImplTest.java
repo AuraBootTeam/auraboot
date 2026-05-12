@@ -1,5 +1,6 @@
 package com.auraboot.framework.cloudconfig.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.cloudconfig.dto.CloudConfigResponse;
 import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.entity.CloudConfig;
@@ -7,17 +8,19 @@ import com.auraboot.framework.cloudconfig.mapper.CloudConfigMapper;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -59,6 +62,11 @@ class CloudConfigServiceImplTest {
         sampleConfig.setUpdatedAt(Instant.now());
     }
 
+    @AfterEach
+    void clearMetaContext() {
+        MetaContext.clear();
+    }
+
     // =========================================================
     // getEffectiveConfig
     // =========================================================
@@ -73,6 +81,18 @@ class CloudConfigServiceImplTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getPid()).isEqualTo("test-pid-001");
+    }
+
+    @Test
+    void getEffectiveConfig_normalizesServiceTypeBeforeLookup() {
+        when(cloudConfigMapper.getEffectiveConfig(100L, "llm", "anthropic"))
+                .thenReturn(sampleConfig);
+        when(fieldEncryptionService.isEncrypted(anyString())).thenReturn(false);
+
+        CloudConfig result = cloudConfigService.getEffectiveConfig(100L, "LLM", "anthropic");
+
+        assertThat(result).isNotNull();
+        verify(cloudConfigMapper).getEffectiveConfig(100L, "llm", "anthropic");
     }
 
     @Test
@@ -122,6 +142,24 @@ class CloudConfigServiceImplTest {
         assertThat(result.getProviderCode()).isEqualTo("tencent_sms");
         assertThat(result.getEnabled()).isTrue();
         assertThat(result.getPriority()).isEqualTo(10);
+    }
+
+    @Test
+    void getConfigMasked_masksLlmApiKey() {
+        sampleConfig.setServiceType("llm");
+        sampleConfig.setProviderCode("anthropic");
+        sampleConfig.setConfig("{\"apiKey\":\"sk-live-secret\",\"baseUrl\":\"https://api.anthropic.com\"}");
+        when(cloudConfigMapper.findByPid("test-pid-001")).thenReturn(sampleConfig);
+        when(fieldEncryptionService.maskJsonFields(anyString(), anySet()))
+                .thenReturn("{\"apiKey\":\"****cret\"}");
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ArgumentCaptor<Set<String>> fieldsCaptor = ArgumentCaptor.forClass((Class) Set.class);
+
+        CloudConfigResponse result = cloudConfigService.getConfigMasked("test-pid-001");
+
+        assertThat(result.getConfig()).contains("****");
+        verify(fieldEncryptionService).maskJsonFields(anyString(), fieldsCaptor.capture());
+        assertThat(fieldsCaptor.getValue()).contains("apiKey");
     }
 
     @Test
@@ -234,5 +272,26 @@ class CloudConfigServiceImplTest {
         } catch (Exception e) {
             // MetaContext might fail — that's expected in unit test
         }
+    }
+
+    @Test
+    void saveConfig_encryptsLlmApiKey() {
+        CloudConfigSaveRequest request = new CloudConfigSaveRequest();
+        request.setServiceType("llm");
+        request.setProviderCode("anthropic");
+        request.setConfigLevel("platform");
+        request.setConfig("{\"apiKey\":\"sk-live-secret\",\"baseUrl\":\"https://api.anthropic.com\"}");
+        request.setEnabled(true);
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        when(fieldEncryptionService.encrypt("sk-live-secret")).thenReturn("ENC:api-key");
+        ArgumentCaptor<CloudConfig> configCaptor = ArgumentCaptor.forClass(CloudConfig.class);
+
+        cloudConfigService.saveConfig(request);
+
+        verify(fieldEncryptionService).encrypt("sk-live-secret");
+        verify(cloudConfigMapper).insert(configCaptor.capture());
+        assertThat(configCaptor.getValue().getConfig())
+                .contains("ENC:api-key")
+                .doesNotContain("sk-live-secret");
     }
 }
