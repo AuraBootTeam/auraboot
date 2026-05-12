@@ -143,4 +143,44 @@ class OpenAiCompatibleLlmProviderTest {
                 .contains("\"success\":true")
                 .contains("\"supplier\":\"Acme\"");
     }
+
+    @Test
+    void buildRequestBodyIncludesRequiredToolChoiceWhenToolsArePresent() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model("gpt-4o")
+                .maxTokens(256)
+                .systemPrompt("Use tools before answering.")
+                .messages(List.of(LlmChatRequest.Message.text("user", "Compare suppliers.")))
+                .tools(List.of(LlmChatRequest.Tool.builder()
+                        .name("nq_supplier_options")
+                        .description("Supplier options")
+                        .inputSchema(Map.of("type", "object", "properties", Map.of()))
+                        .build()))
+                .toolChoice("required")
+                .build();
+
+        Map<String, Object> body = provider.buildOpenAiRequestBody(request);
+
+        assertThat(body).containsEntry("tool_choice", "required");
+        assertThat(body).containsKey("tools");
+    }
+
+    @Test
+    void buildRequestBodyOmitsToolChoiceWhenNoToolsAreSent() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model("gpt-4o")
+                .maxTokens(256)
+                .messages(List.of(LlmChatRequest.Message.text("user", "Hello.")))
+                .toolChoice("required")
+                .build();
+
+        Map<String, Object> body = provider.buildOpenAiRequestBody(request);
+
+        assertThat(body).doesNotContainKey("tool_choice");
+        assertThat(body).doesNotContainKey("tools");
+    }
 }
