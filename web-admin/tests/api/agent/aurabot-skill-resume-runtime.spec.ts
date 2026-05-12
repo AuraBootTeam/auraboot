@@ -4,14 +4,6 @@ import { Client } from 'pg';
 import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
 
 const TEST_ACCOUNT = { email: 'admin@auraboot.com', password: 'Test2026x' };
-<<<<<<< HEAD
-=======
-const PG_HOST = process.env.PG_HOST ?? 'localhost';
-const PG_PORT = process.env.PG_PORT ?? '5432';
-const PG_USER = process.env.PG_USER ?? 'ghj';
-const PG_DB = process.env.PG_DB ?? 'aura_boot';
-const PG_PASSWORD = process.env.PGPASSWORD ?? process.env.PG_PASSWORD;
->>>>>>> codex/agent-runtime-main-sync
 const STUB_TOOL_USE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
 
 type AuthContext = {
