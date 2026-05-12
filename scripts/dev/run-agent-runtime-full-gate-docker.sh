@@ -140,9 +140,35 @@ echo "==> Frontend container: $FRONTEND_CONTAINER"
 if [ "$HOST_RUNNER" = "1" ]; then
     echo "==> Runner: host Playwright -> isolated ports"
 else
-    echo "==> Runner: isolated frontend container"
+    echo "==> Runner: isolated Playwright runner container"
 fi
 echo "==> Logs: $LOG_DIR"
+
+capture_stack_logs() {
+    local phase="$1"
+    local prefix="$LOG_DIR/${RUN_STAMP}-${SLUG}-${phase}"
+
+    echo "==> Capturing isolated stack diagnostics for failed phase: $phase" >&2
+    docker compose \
+        -p "$COMPOSE_PROJECT_NAME" \
+        -f docker-compose.yml \
+        -f docker-compose.isolated.yml \
+        --profile isolated \
+        --profile cache \
+        --profile playwright-runner \
+        ps > "${prefix}-docker-ps.log" 2>&1 || true
+
+    docker compose \
+        -p "$COMPOSE_PROJECT_NAME" \
+        -f docker-compose.yml \
+        -f docker-compose.isolated.yml \
+        --profile isolated \
+        --profile cache \
+        --profile playwright-runner \
+        logs --no-color --timestamps --tail=500 \
+        backend frontend playwright-runner postgres redis \
+        > "${prefix}-docker-logs.log" 2>&1 || true
+}
 
 run_frontend_phase() {
     local phase="$1"
@@ -179,34 +205,20 @@ run_frontend_phase() {
                 bash -lc "$command"
         ) 2>&1 | tee "$log"
     else
-        docker exec \
-            -e BACKEND_URL=http://backend:6443 \
-            -e BE_PORT=6443 \
-            -e SPRING_BOOT_URL=http://backend:6443 \
-            -e PLAYWRIGHT_BASE_URL=http://isolated-frontend:5173 \
-            -e BFF_URL=http://127.0.0.1:3500 \
-            -e PW_SKIP_WEBSERVER=1 \
-            -e PW_PROFILE=full \
-            -e PW_WORKERS=1 \
-            -e NO_PROXY=localhost,127.0.0.1,backend,isolated-frontend \
-            -e PGHOST=postgres \
-            -e PGPORT=5432 \
-            -e PGUSER=auraboot \
-            -e PGPASSWORD=auraboot_dev \
-            -e PGDATABASE=aura_boot \
-            -e PG_HOST=postgres \
-            -e PG_PORT=5432 \
-            -e PG_USER=auraboot \
-            -e PG_PASSWORD=auraboot_dev \
-            -e PG_DB=aura_boot \
-            -e OSS_PLUGIN_ROOT=/app/plugins \
-            -e ENTERPRISE_PLUGIN_ROOT=/app/plugins-enterprise \
-            "$FRONTEND_CONTAINER" \
-            bash -lc "cd /repo/web-admin && $command" 2>&1 | tee "$log"
+        PLAYWRIGHT_RUNNER_COMMAND="$command" \
+            docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.yml \
+            -f docker-compose.isolated.yml \
+            --profile isolated \
+            --profile cache \
+            --profile playwright-runner \
+            run --rm --no-deps playwright-runner 2>&1 | tee "$log"
     fi
     local exit_code=${PIPESTATUS[0]}
     set -e
     if [ "$exit_code" -ne 0 ]; then
+        capture_stack_logs "$phase"
         echo "ERROR: phase failed: $phase (exit=$exit_code, log=$log)" >&2
         exit "$exit_code"
     fi

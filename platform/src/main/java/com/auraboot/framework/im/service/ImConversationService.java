@@ -1,6 +1,7 @@
 package com.auraboot.framework.im.service;
 
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
+import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
 import com.auraboot.framework.im.dto.ConversationUpdateRequest;
@@ -66,6 +67,11 @@ public interface ImConversationService {
      * Update mute/pin settings for a user's membership in a conversation.
      */
     void updateMemberSettings(Long conversationId, Long userId, Long tenantId, Boolean muted, Boolean pinned);
+
+    /**
+     * Update AI agent settings for a group conversation.
+     */
+    void updateAgentSettings(Long conversationId, ConversationAgentSettingsRequest request, Long userId, Long tenantId);
 
     /**
      * Dissolve a group. Only the owner can dissolve.

@@ -274,6 +274,20 @@ services:
       BACKEND_URL: http://backend:6443
       BFF_URL: http://isolated-frontend:3500
       PW_SKIP_WEBSERVER: "1"
+      PW_PROFILE: full
+      PW_WORKERS: "1"
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: auraboot
+      PGPASSWORD: auraboot_dev
+      PGDATABASE: aura_boot
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_USER: auraboot
+      PG_PASSWORD: auraboot_dev
+      PG_DB: aura_boot
+      OSS_PLUGIN_ROOT: /app/plugins
+      ENTERPRISE_PLUGIN_ROOT: /app/plugins-enterprise
       PW_E2E_RUN_ID: ${PW_E2E_RUN_ID:-docker}
       PW_E2E_RUN_ROOT: ${PW_E2E_RUN_ROOT:-test-results/runs/isolated/docker}
       PW_ARTIFACT_DIR: ${PW_ARTIFACT_DIR:-test-results/runs/isolated/docker/artifacts}
@@ -293,6 +307,8 @@ services:
       - runner_web_admin_node_modules:/repo/web-admin/node_modules
       - ${AURA_CONTAINER_CACHE_ROOT:-${HOME}/.cache/auraboot/container-linux}/pnpm-store:/pnpm-store
       - ${AURA_CONTAINER_CACHE_ROOT:-${HOME}/.cache/auraboot/container-linux}/ms-playwright:/ms-playwright
+      - ./plugins:/app/plugins:ro
+      - ${ENTERPRISE_PLUGINS_DIR:-./.aura-stack/empty-enterprise-plugins}:/app/plugins-enterprise:ro
     depends_on:
       backend:
         condition: service_healthy
