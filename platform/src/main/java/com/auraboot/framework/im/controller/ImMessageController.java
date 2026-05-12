@@ -63,6 +63,24 @@ public class ImMessageController {
         return ApiResponse.success(toResponse(recalled, senderMap));
     }
 
+    @PostMapping("/messages/{messageId}/confirm")
+    public ApiResponse<ImMessageResponse> confirmMessage(@PathVariable Long messageId) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        ImMessage message = messageService.settleConfirmationMessage(messageId, userId, tenantId, "confirmed");
+        Map<Long, ConversationMemberInfo> senderMap = buildSenderMap(message.getConversationId(), tenantId);
+        return ApiResponse.success(toResponse(message, senderMap));
+    }
+
+    @PostMapping("/messages/{messageId}/reject")
+    public ApiResponse<ImMessageResponse> rejectMessage(@PathVariable Long messageId) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        ImMessage message = messageService.settleConfirmationMessage(messageId, userId, tenantId, "rejected");
+        Map<Long, ConversationMemberInfo> senderMap = buildSenderMap(message.getConversationId(), tenantId);
+        return ApiResponse.success(toResponse(message, senderMap));
+    }
+
     @GetMapping("/conversations/{id}/messages")
     public ApiResponse<List<ImMessageResponse>> getMessages(
             @PathVariable Long id,
@@ -185,6 +203,7 @@ public class ImMessageController {
                 .replyToId(msg.getReplyToId())
                 .recalled(msg.getRecalled())
                 .forwardedFromId(msg.getForwardedFromId())
+                .cardPayload(messageService.parseCardPayload(msg.getCardPayload()))
                 .build();
     }
 }

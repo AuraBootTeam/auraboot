@@ -26,6 +26,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -327,14 +328,16 @@ public class AgentReplyTask {
             Object handoffTo = success.meta().get("_handoff_to");
             if (handoffTo != null) {
                 String targetCode = String.valueOf(handoffTo);
-                Long targetAgentId = resolveAgentIdByCode(tenantId, conversationId, targetCode);
-                if (targetAgentId == null) {
+                AgentMemberDto targetAgent = resolveAgentByCode(tenantId, conversationId, targetCode);
+                if (targetAgent == null || targetAgent.getAgentId() == null) {
                     log.warn("Handoff target agentCode '{}' not resolvable for tenant {}; stopping chain",
                             targetCode, tenantId);
                     return;
                 }
+                Long targetAgentId = targetAgent.getAgentId();
                 Object handoffContext = success.meta().get("_handoff_context");
                 String childTrigger = handoffContext != null ? String.valueOf(handoffContext) : "";
+                publishHandoffFrame(humanMemberIds, conversationId, agent, targetAgent, childTrigger);
                 Object upstreamTaskPid = success.meta().get("_taskPid");
                 String parentTaskPidForChild = upstreamTaskPid != null ? String.valueOf(upstreamTaskPid) : null;
                 // Child's triggeringSeq is the parent's persisted reply seq if
@@ -353,17 +356,35 @@ public class AgentReplyTask {
         // Success / Interrupted / PendingConfirmation → no further action here.
     }
 
+    private void publishHandoffFrame(List<Long> humanMemberIds, Long conversationId,
+                                     AgentDefinition fromAgent, AgentMemberDto toAgent,
+                                     String reason) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("conversationId", conversationId);
+        data.put("fromAgentId", fromAgent.getId());
+        data.put("fromAgentName", fromAgent.getName() != null ? fromAgent.getName() : "AI");
+        data.put("toAgentId", toAgent.getAgentId());
+        data.put("toAgentName", toAgent.getName() != null ? toAgent.getName() : "AI");
+        if (reason != null && !reason.isBlank()) {
+            data.put("reason", reason);
+        }
+        broadcaster.publish(humanMemberIds, WsFrame.builder()
+                .type("handoff")
+                .data(data)
+                .build());
+    }
+
     /**
      * Resolve an agent's id from its code, using the conversation's agent
      * roster (already known to the conversation) so we don't need a generic
      * by-code lookup on AgentDefinitionMapper.
      */
-    private Long resolveAgentIdByCode(Long tenantId, Long conversationId, String agentCode) {
+    private AgentMemberDto resolveAgentByCode(Long tenantId, Long conversationId, String agentCode) {
         if (agentCode == null) return null;
         List<AgentMemberDto> roster = messagePort.getAgentMembers(conversationId, tenantId);
         for (AgentMemberDto member : roster) {
             if (agentCode.equals(member.getAgentCode())) {
-                return member.getAgentId();
+                return member;
             }
         }
         return null;

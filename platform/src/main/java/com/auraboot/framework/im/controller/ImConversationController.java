@@ -2,6 +2,7 @@ package com.auraboot.framework.im.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
@@ -10,9 +11,11 @@ import com.auraboot.framework.im.model.ImConstants;
 import com.auraboot.framework.im.model.ImConversation;
 import com.auraboot.framework.im.service.ImConversationService;
 import com.auraboot.framework.im.websocket.ImWebSocketHandler;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -76,9 +79,12 @@ public class ImConversationController {
     }
 
     @PostMapping("/{id}/members")
-    public ApiResponse<Void> addMembers(@PathVariable Long id, @RequestBody List<Long> memberIds) {
+    public ApiResponse<Void> addMembers(@PathVariable Long id, @RequestBody JsonNode body) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        List<Long> memberIds = readIdList(body, "memberIds", body.isArray());
+        List<Long> agentIds = readIdList(body, "agentIds", false);
         conversationService.addMembers(id, memberIds, tenantId);
+        conversationService.addAgentMembers(id, agentIds, tenantId);
         return ApiResponse.success(null);
     }
 
@@ -98,6 +104,15 @@ public class ImConversationController {
         Boolean muted = body.containsKey("muted") ? (Boolean) body.get("muted") : null;
         Boolean pinned = body.containsKey("pinned") ? (Boolean) body.get("pinned") : null;
         conversationService.updateMemberSettings(id, userId, tenantId, muted, pinned);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/{id}/agent-settings")
+    public ApiResponse<Void> updateAgentSettings(@PathVariable Long id,
+                                                 @RequestBody ConversationAgentSettingsRequest request) {
+        Long userId = MetaContext.getCurrentUserId();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        conversationService.updateAgentSettings(id, request, userId, tenantId);
         return ApiResponse.success(null);
     }
 
@@ -154,5 +169,22 @@ public class ImConversationController {
                     Map.of("conversationId", id, "name", request.getName()));
         }
         return ApiResponse.success(null);
+    }
+
+    private List<Long> readIdList(JsonNode body, String fieldName, boolean readRootArray) {
+        if (body == null) {
+            return List.of();
+        }
+        JsonNode source = readRootArray ? body : body.get(fieldName);
+        List<Long> ids = new ArrayList<>();
+        if (source == null || !source.isArray()) {
+            return ids;
+        }
+        source.forEach(node -> {
+            if (node.canConvertToLong()) {
+                ids.add(node.asLong());
+            }
+        });
+        return ids;
     }
 }
