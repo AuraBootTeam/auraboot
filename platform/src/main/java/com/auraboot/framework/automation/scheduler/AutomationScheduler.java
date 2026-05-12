@@ -5,6 +5,7 @@ import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.TriggerConfig;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
+import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.MetaModelService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -119,22 +121,29 @@ public class AutomationScheduler {
 
         String timeField = config.getInactivityField() != null ? config.getInactivityField() : "updated_at";
         int hours = config.getInactivityHours();
+        SqlSafetyUtils.validateIdentifier(tableName, "inactivity automation tableName");
+        SqlSafetyUtils.validateIdentifier(timeField, "inactivity automation timeField");
+        List<Object> queryArgs = new ArrayList<>();
+        queryArgs.add(automation.getTenantId());
+        queryArgs.add(hours);
 
         // Build query for inactive records
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT pid FROM ").append(tableName);
-        sql.append(" WHERE tenant_id = ").append(automation.getTenantId());
-        sql.append(" AND ").append(timeField).append(" < NOW() - INTERVAL '").append(hours).append(" hours'");
+        sql.append(" WHERE tenant_id = ?");
+        sql.append(" AND ").append(timeField).append(" < NOW() - (? * INTERVAL '1 hour')");
 
         // Optional state filter
         List<String> states = config.getInactivityStates();
         if (states != null && !states.isEmpty()) {
             // Find the status field — use the model's statusField or the stateField from config
             String stateField = config.getStateField() != null ? config.getStateField() : "status";
+            SqlSafetyUtils.validateIdentifier(stateField, "inactivity automation stateField");
             sql.append(" AND ").append(stateField).append(" IN (");
             for (int i = 0; i < states.size(); i++) {
                 if (i > 0) sql.append(", ");
-                sql.append("'").append(states.get(i).replace("'", "''")).append("'");
+                sql.append("?");
+                queryArgs.add(states.get(i));
             }
             sql.append(")");
         }
@@ -142,7 +151,7 @@ public class AutomationScheduler {
         // Limit to avoid overwhelming the system
         sql.append(" LIMIT 100");
 
-        List<Map<String, Object>> inactiveRecords = jdbcTemplate.queryForList(sql.toString());
+        List<Map<String, Object>> inactiveRecords = jdbcTemplate.queryForList(sql.toString(), queryArgs.toArray());
 
         if (inactiveRecords.isEmpty()) {
             return;

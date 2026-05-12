@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { loadPlugin } from '../../utils/plugin-loader.js';
 import { buildResourceIndex } from '../../utils/resource-index.js';
@@ -482,12 +482,10 @@ export async function scaffoldCommand(
     for (const f of filesToWrite) {
       const filePath = join(dir, f.path);
       let existing: any[] = [];
-      if (existsSync(filePath)) {
-        try {
-          const content = JSON.parse(require('fs').readFileSync(filePath, 'utf-8'));
-          existing = Array.isArray(content) ? content : [content];
-        } catch { /* ignore parse errors */ }
-      }
+      try {
+        const content = JSON.parse(readFileSync(filePath, 'utf-8'));
+        existing = Array.isArray(content) ? content : [content];
+      } catch { /* ignore missing files and parse errors */ }
       const merged = [...existing, ...f.data];
       writeFileSync(filePath, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
       generated.push({ path: f.path, resourceType: f.resourceType, itemCount: f.data.length, action: existing.length > 0 ? 'append' : 'create' });
@@ -536,9 +534,9 @@ export async function scaffoldCommand(
     // Append to commands.json
     const cmdPath = join(dir, 'config', 'commands.json');
     let existing: any[] = [];
-    if (existsSync(cmdPath)) {
-      existing = JSON.parse(require('fs').readFileSync(cmdPath, 'utf-8'));
-    }
+    try {
+      existing = JSON.parse(readFileSync(cmdPath, 'utf-8'));
+    } catch { /* ignore missing files and parse errors */ }
     writeFileSync(cmdPath, JSON.stringify([...existing, ...commands], null, 2) + '\n', 'utf-8');
 
     const output = successOutput('dsl.scaffold', {
@@ -583,9 +581,9 @@ export async function scaffoldCommand(
     // Append to pages.json
     const pagesPath = join(dir, 'config', 'pages.json');
     let existing: any[] = [];
-    if (existsSync(pagesPath)) {
-      existing = JSON.parse(require('fs').readFileSync(pagesPath, 'utf-8'));
-    }
+    try {
+      existing = JSON.parse(readFileSync(pagesPath, 'utf-8'));
+    } catch { /* ignore missing files and parse errors */ }
     writeFileSync(pagesPath, JSON.stringify([...existing, ...pages], null, 2) + '\n', 'utf-8');
 
     const output = successOutput('dsl.scaffold', {

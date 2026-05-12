@@ -41,10 +41,10 @@ export async function financePaymentsCommand(options: PaymentOptions): Promise<v
 
   const filters: FilterItem[] = [];
   if (options.type) {
-    filters.push({ fieldName: 'fin_pay_type', operator: 'EQ', value: options.type.toUpperCase() });
+    filters.push({ fieldName: 'fin_pay_type', operator: 'EQ', value: options.type.toLowerCase() });
   }
   if (options.status) {
-    filters.push({ fieldName: 'fin_pay_status', operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: 'fin_pay_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, 'fin_payment', {

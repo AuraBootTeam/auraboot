@@ -2,6 +2,7 @@ package com.auraboot.framework.rbac.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.organization.service.OrganizationService;
@@ -63,11 +64,13 @@ public class RoleMemberServiceImpl implements RoleMemberService {
 
         // 4. Paginate
         long total = assignedMembers.size();
-        int fromIndex = (pageNum - 1) * pageSize;
+        int safePageNum = PaginationSafetyUtils.pageNumber(pageNum);
+        int safePageSize = PaginationSafetyUtils.pageSize(pageSize, 200);
+        int fromIndex = PaginationSafetyUtils.offset(safePageNum, safePageSize, 200);
         if (fromIndex >= total) {
-            return PaginationResult.empty(pageNum, pageSize);
+            return PaginationResult.empty(safePageNum, safePageSize);
         }
-        int toIndex = Math.min(fromIndex + pageSize, (int) total);
+        int toIndex = Math.min(Math.addExact(fromIndex, safePageSize), (int) total);
         List<TenantMember> pageMembers = assignedMembers.subList(fromIndex, toIndex);
 
         // 5. Batch pre-fetch users and employees for this page
@@ -93,7 +96,7 @@ public class RoleMemberServiceImpl implements RoleMemberService {
             .map(member -> buildRoleMemberDTO(member, memberIdToUserRole.get(member.getId()), userMap, empMap))
             .collect(Collectors.toList());
 
-        return PaginationResult.of(dtos, total, pageNum, pageSize);
+        return PaginationResult.of(dtos, total, safePageNum, safePageSize);
     }
 
     @Override

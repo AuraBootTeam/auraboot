@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.ReconciliationItem;
 import com.auraboot.framework.meta.entity.ReconciliationProfile;
@@ -234,7 +235,9 @@ public class ReconciliationService extends BaseMetaService {
 
     public PaginationResult<ReconciliationRunDTO> listRuns(int pageNum, int pageSize) {
         Long tenantId = getCurrentTenantId();
-        int offset = (pageNum - 1) * pageSize;
+        pageNum = PaginationSafetyUtils.pageNumber(pageNum);
+        pageSize = PaginationSafetyUtils.pageSize(pageSize, 200);
+        int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 200);
 
         QueryWrapper<ReconciliationRun> qw = new QueryWrapper<>();
         qw.eq("tenant_id", tenantId);
@@ -266,7 +269,9 @@ public class ReconciliationService extends BaseMetaService {
             throw new MetaServiceException("Run not found: " + runCode);
         }
 
-        int offset = (pageNum - 1) * pageSize;
+        pageNum = PaginationSafetyUtils.pageNumber(pageNum);
+        pageSize = PaginationSafetyUtils.pageSize(pageSize, 200);
+        int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 200);
         List<ReconciliationItem> items;
         long total;
 

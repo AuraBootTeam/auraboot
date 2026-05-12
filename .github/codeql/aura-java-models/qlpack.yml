@@ -1,0 +1,7 @@
+name: aurabootteam/aura-java-models
+version: 0.1.0
+library: true
+extensionTargets:
+  codeql/java-all: '*'
+dataExtensions:
+  - models/**/*.yml

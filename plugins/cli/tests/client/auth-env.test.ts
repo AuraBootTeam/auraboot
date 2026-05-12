@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { resolveToken, resolveBaseUrl } from '../../src/client/auth.js';
+import { normalizeBaseUrl, resolveToken, resolveBaseUrl } from '../../src/client/auth.js';
 
 /**
  * Integration test for env-var auth resolution.
@@ -68,6 +68,16 @@ describe('auth env-var resolution', () => {
       // user's config, just assert we got a URL back (not the empty string).
       const url = resolveBaseUrl();
       expect(url).toMatch(/^https?:\/\//);
+    });
+  });
+
+  describe('normalizeBaseUrl', () => {
+    it('rejects non-http protocols', () => {
+      expect(() => normalizeBaseUrl('file:///tmp/aura.sock')).toThrow(/Unsupported/);
+    });
+
+    it('rejects embedded credentials', () => {
+      expect(() => normalizeBaseUrl('https://user:pass@example.com')).toThrow(/credentials/);
     });
   });
 });

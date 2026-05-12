@@ -75,6 +75,10 @@ public final class PinnedHttpRequests {
      *               will be pinned at connect time
      * @return a builder ready to customize with method and body
      */
+    // CodeQL cannot infer that ValidatedTarget is produced by SsrfValidator.validate(),
+    // which rejects unsafe schemes, blocked ports, and private/link-local/loopback
+    // DNS answers before this builder accepts the URI.
+    @SuppressWarnings("java/ssrf")
     public static HttpRequest.Builder newPinnedRequestBuilder(SsrfValidator.ValidatedTarget target) {
         if (target == null) {
             throw new IllegalArgumentException("ValidatedTarget must not be null");

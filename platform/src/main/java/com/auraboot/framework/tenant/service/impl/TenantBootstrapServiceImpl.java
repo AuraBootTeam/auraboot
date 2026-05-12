@@ -1,6 +1,7 @@
 package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.permission.enums.RolePermissionTemplate;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
@@ -57,6 +58,10 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Service
 @RequiredArgsConstructor
 public class TenantBootstrapServiceImpl implements TenantBootstrapService {
+
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
     
     private final ResourceLoader resourceLoader;
     private final ObjectMapper objectMapper;
@@ -84,7 +89,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             
             // 1. 加载模板
             TenantBootstrapTemplate template = loadTemplate("default-bootstrap");
-            log.info("模板加载成功: {}", template.getName());
+            log.info("模板加载成功: {}", logSafe(template.getName()));
             
             // 2. 验证模板
             validateTemplate(template);
@@ -148,7 +153,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
     @Override
     public TenantBootstrapTemplate loadTemplate(String templateName) {
         try {
-            log.info("开始加载模板: {}", templateName);
+            log.info("开始加载模板: {}", logSafe(templateName));
             
             // 构建模板文件路径
             String templatePath = "classpath:tenant-templates/" + templateName + ".json";
@@ -178,8 +183,8 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             );
             
             log.info("模板加载成功: name={}, version={}, roles={}, menus={}",
-                template.getName(),
-                template.getVersion(),
+                logSafe(template.getName()),
+                logSafe(template.getVersion()),
                 template.getRoles() != null ? template.getRoles().size() : 0,
                 template.getMenus() != null ? template.getMenus().size() : 0
             );
@@ -187,7 +192,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             return template;
             
         } catch (IOException e) {
-            log.error("模板解析失败: {}", templateName, e);
+            log.error("模板解析失败: {}", logSafe(templateName), e);
             throw new TemplateParseException(
                 "模板解析失败: " + templateName,
                 e
@@ -197,7 +202,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
     
     @Override
     public void validateTemplate(TenantBootstrapTemplate template) {
-        log.info("开始验证模板: {}", template.getName());
+        log.info("开始验证模板: {}", logSafe(template.getName()));
         
         // 验证模板基本信息
         if (template.getName() == null || template.getName().trim().isEmpty()) {
@@ -250,7 +255,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             throw new TemplateValidationException("Template must contain at least one role-permission binding");
         }
         
-        log.info("模板验证通过: {}", template.getName());
+        log.info("模板验证通过: {}", logSafe(template.getName()));
     }
     
     /**
@@ -273,7 +278,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             
             Permission existing = permissionMapper.findByCode(code);
             if (existing != null) {
-                log.debug("模板Permission已存在,跳过: code={}, id={}", code, existing.getId());
+                log.debug("模板Permission已存在,跳过: code={}, id={}", logSafe(code), existing.getId());
                 continue;
             }
             
@@ -299,7 +304,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             created.add(permission);
             
             log.debug("创建模板Permission: code={}, id={}, pid={}", 
-                permission.getCode(), permission.getId(), permission.getPid());
+                logSafe(permission.getCode()), permission.getId(), logSafe(permission.getPid()));
         }
         
         return created;
@@ -404,8 +409,8 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             roles.add(role);
             
             log.info("角色创建成功: code={}, name={}, priority={}, isDeletable={}",
-                role.getCode(),
-                role.getName(),
+                logSafe(role.getCode()),
+                logSafe(role.getName()),
                 role.getPriority(),
                 template.getIsDeletable()
             );
@@ -476,9 +481,9 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             menuCodeMap.put(template.getCode(), menu);
             
             log.debug("菜单创建成功: code={}, name={}, path={}",
-                template.getCode(),
-                menu.getName(),
-                menu.getPath()
+                logSafe(template.getCode()),
+                logSafe(menu.getName()),
+                logSafe(menu.getPath())
             );
         }
         
@@ -490,8 +495,8 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
                 
                 if (parentMenu == null) {
                     log.warn("父菜单不存在: parentCode={}, menuCode={}",
-                        template.getParentCode(),
-                        template.getCode()
+                        logSafe(template.getParentCode()),
+                        logSafe(template.getCode())
                     );
                     continue;
                 }
@@ -501,8 +506,8 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
                 menuService.updateById(menu);
                 
                 log.debug("菜单父子关系设置成功: child={}, parent={}",
-                    template.getCode(),
-                    template.getParentCode()
+                    logSafe(template.getCode()),
+                    logSafe(template.getParentCode())
                 );
             }
         }
@@ -583,7 +588,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             String roleCode = entry.getKey();
             RolePermissionTemplate template = RolePermissionTemplate.findByRoleCode(roleCode);
             if (template == null) {
-                log.debug("No template for role: {}", roleCode);
+                log.debug("No template for role: {}", logSafe(roleCode));
                 continue;
             }
 
@@ -598,7 +603,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             if (!filteredIds.isEmpty()) {
                 rolePermissionService.assignPermissionsToRole(role.getId(), filteredIds);
                 totalAssigned += filteredIds.size();
-                log.info("{}角色Permission分配完成: count={}", roleCode, filteredIds.size());
+                log.info("{}角色Permission分配完成: count={}", logSafe(roleCode), filteredIds.size());
             }
         }
 
@@ -643,7 +648,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
         for (com.auraboot.framework.tenant.dto.bootstrap.RolePermissionBinding binding : bindings) {
             Role role = roleMap.get(binding.getRoleCode());
             if (role == null) {
-                log.warn("Role not found for binding: {}", binding.getRoleCode());
+                log.warn("Role not found for binding: {}", logSafe(binding.getRoleCode()));
                 continue;
             }
 
@@ -663,7 +668,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
                 rolePermissionService.assignPermissionsToRole(role.getId(), permissionIds);
                 totalAssigned += permissionIds.size();
                 log.info("Assigned {} template permissions to role {}",
-                    permissionIds.size(), binding.getRoleCode());
+                    permissionIds.size(), logSafe(binding.getRoleCode()));
             }
         }
 
@@ -679,7 +684,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
      * @param roleMap 角色映射（code -> Role）
      */
     private void assignUserRole(Long userId, String roleCode, Long tenantId, Map<String, Role> roleMap) {
-        log.info("开始分配用户角色: userId={}, roleCode={}, tenantId={}", userId, roleCode, tenantId);
+        log.info("开始分配用户角色: userId={}, roleCode={}, tenantId={}", userId, logSafe(roleCode), tenantId);
         
         // 获取角色
         Role role = roleMap.get(roleCode);
@@ -723,7 +728,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
         
         log.info("用户角色分配成功: userId={}, roleCode={}, roleId={}",
             userId,
-            roleCode,
+            logSafe(roleCode),
             role.getId()
         );
     }

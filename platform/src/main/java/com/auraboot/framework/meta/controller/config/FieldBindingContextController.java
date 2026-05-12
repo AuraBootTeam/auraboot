@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.controller.config;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.BindingConfigRequest;
 import com.auraboot.framework.meta.dto.BindingConfiguration;
 import com.auraboot.framework.meta.dto.MetaFieldDTO;
@@ -27,6 +28,10 @@ public class FieldBindingContextController {
     private final FieldBindingContextService bindingContextService;
     private final MetaFieldService metaFieldService;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     /**
      * Configure field binding context
      * POST /api/meta/models/{modelPid}/field-bindings/{fieldPid}/configure
@@ -43,7 +48,7 @@ public class FieldBindingContextController {
             @PathVariable String fieldPid,
             @RequestBody BindingConfigRequest request) {
         
-        log.info("Configuring field binding: modelPid={}, fieldPid={}", modelPid, fieldPid);
+        log.info("Configuring field binding: modelPid={}, fieldPid={}", logSafe(modelPid), logSafe(fieldPid));
         
         BindingConfiguration binding = bindingContextService.configureBinding(modelPid, fieldPid, request);
         
@@ -64,7 +69,7 @@ public class FieldBindingContextController {
             @PathVariable String modelPid,
             @PathVariable String fieldPid) {
         
-        log.info("Getting binding configuration: modelPid={}, fieldPid={}", modelPid, fieldPid);
+        log.info("Getting binding configuration: modelPid={}, fieldPid={}", logSafe(modelPid), logSafe(fieldPid));
         
         return bindingContextService.getBindingConfiguration(modelPid, fieldPid)
             .map(ApiResponse::success)
@@ -87,7 +92,7 @@ public class FieldBindingContextController {
             @PathVariable Long bindingId,
             @RequestBody BindingConfigRequest request) {
         
-        log.info("Updating binding configuration: modelPid={}, bindingId={}", modelPid, bindingId);
+        log.info("Updating binding configuration: modelPid={}, bindingId={}", logSafe(modelPid), bindingId);
         
         BindingConfiguration binding = bindingContextService.updateBindingConfiguration(bindingId, request);
         
@@ -108,7 +113,7 @@ public class FieldBindingContextController {
             @PathVariable String modelPid,
             @PathVariable String fieldPid) {
         
-        log.info("Getting default binding configuration: modelPid={}, fieldPid={}", modelPid, fieldPid);
+        log.info("Getting default binding configuration: modelPid={}, fieldPid={}", logSafe(modelPid), logSafe(fieldPid));
         
         MetaFieldDTO field = metaFieldService.findByPid(fieldPid);
         if (field == null) {

@@ -45,6 +45,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -125,6 +126,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         mapper.registerModule(new JavaTimeModule());
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         return mapper;
+    }
+
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
     }
 
     private static int parseEnvInt(String name, int defaultValue) {
@@ -370,12 +375,21 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
 
+            // Load binding rules
+            if (resourceDirs.containsKey("bindingRules")) {
+                List<BindingRuleDTO> bindingRules = loadRequiredResourceListFromZip(
+                        files, resourceDirs.get("bindingRules"), BindingRuleDTO.class);
+                if (!bindingRules.isEmpty()) {
+                    manifest.setBindingRules(mergeResourceList(manifest.getBindingRules(), bindingRules));
+                }
+            }
+
             // Load menus
             if (resourceDirs.containsKey("menus")) {
                 List<MenuDefinitionDTO> menus = loadResourceListFromZip(files, resourceDirs.get("menus"), MenuDefinitionDTO.class);
                 if (!menus.isEmpty()) {
                     manifest.setMenus(mergeResourceList(manifest.getMenus(), menus));
-                    log.debug("Loaded {} menus from ZIP: {}", menus.size(), resourceDirs.get("menus"));
+                    log.debug("Loaded {} menus from ZIP: {}", menus.size(), logSafe(resourceDirs.get("menus")));
                 }
             }
 
@@ -450,10 +464,12 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             loadAgentDefinitionsFromZipByConvention(manifest, files, resourceDirs);
 
-            log.info("Loaded resources from ZIP resourceDirs: {}", manifest.getResourceCounts());
+            log.info("Loaded resources from ZIP resourceDirs: {}", logSafe(manifest.getResourceCounts()));
 
+        } catch (PluginException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("Failed to load some resources from ZIP: {}", e.getMessage());
+            log.warn("Failed to load some resources from ZIP: {}", logSafe(e.getMessage()));
         }
     }
 
@@ -482,7 +498,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                         .constructCollectionType(List.class, clazz);
                 return objectMapper.readValue(new String(content, StandardCharsets.UTF_8), listType);
             } catch (Exception e) {
-                log.warn("Failed to parse resource file {}: {}", path, e.getMessage());
+                log.warn("Failed to parse resource file {}: {}", logSafe(path), logSafe(e.getMessage()));
                 return List.of();
             }
         }
@@ -496,7 +512,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 .sorted()
                 .toList();
         if (children.isEmpty()) {
-            log.debug("Resource path not found in ZIP (file or directory): {}", path);
+            log.debug("Resource path not found in ZIP (file or directory): {}", logSafe(path));
             return List.of();
         }
 
@@ -513,10 +529,57 @@ public class PluginImportServiceImpl implements PluginImportService {
                     resources.add(objectMapper.convertValue(node, clazz));
                 }
             } catch (Exception e) {
-                log.warn("Failed to parse resource file {}: {}", child, e.getMessage());
+                log.warn("Failed to parse resource file {}: {}", logSafe(child), logSafe(e.getMessage()));
             }
         }
         return resources;
+    }
+
+    /**
+     * Strict ZIP resource loader for first-class declared resourceDirs where
+     * silently dropping an invalid file would create a broken plugin import.
+     */
+    private <T> List<T> loadRequiredResourceListFromZip(Map<String, byte[]> files, String path, Class<T> clazz) {
+        byte[] content = files.get(path);
+        if (content != null) {
+            return parseZipResourceFile(path, content, clazz);
+        }
+
+        String prefix = path.endsWith("/") ? path : path + "/";
+        List<String> children = files.keySet().stream()
+                .filter(k -> k.startsWith(prefix) && k.endsWith(".json")
+                        && k.indexOf('/', prefix.length()) < 0)
+                .sorted()
+                .toList();
+        if (children.isEmpty()) {
+            throw new PluginException("Declared ZIP resource path not found: " + path);
+        }
+
+        List<T> resources = new ArrayList<>();
+        for (String child : children) {
+            resources.addAll(parseZipResourceFile(child, files.get(child), clazz));
+        }
+        return resources;
+    }
+
+    private <T> List<T> parseZipResourceFile(String entryName, byte[] content, Class<T> clazz) {
+        try {
+            com.fasterxml.jackson.databind.JavaType listType = objectMapper.getTypeFactory()
+                    .constructCollectionType(List.class, clazz);
+            var node = objectMapper.readTree(new String(content, StandardCharsets.UTF_8));
+            if (node == null || node.isNull()) {
+                return List.of();
+            }
+            if (node.isArray()) {
+                return objectMapper.convertValue(node, listType);
+            }
+            return List.of(objectMapper.convertValue(node, clazz));
+        } catch (Exception e) {
+            PluginException exception = new PluginException(
+                    "Failed to parse ZIP resource file " + entryName + ": " + e.getMessage());
+            exception.initCause(e);
+            throw exception;
+        }
     }
 
     /**
@@ -644,7 +707,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                         .filter(m -> m.isWarning())
                         .forEach(m -> result.addWarning("[" + m.getCode() + "] " + m.getMessage()));
             } catch (Exception e) {
-                log.warn("Validation pipeline error (non-blocking): {}", e.getMessage());
+                log.warn("Validation pipeline error (non-blocking): {}", logSafe(e.getMessage()));
                 result.addWarning("Validation pipeline error: " + e.getMessage());
             }
         }
@@ -872,7 +935,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             } catch (Exception e) {
                 log.debug("Failed to check user-modified status for {} {}: {}",
-                        type, resourceCode, e.getMessage());
+                        type, logSafe(resourceCode), logSafe(e.getMessage()));
             }
         }
         return change;
@@ -994,7 +1057,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             throw e;
         } catch (UnexpectedRollbackException e) {
             log.error("Plugin import rolled back unexpectedly: importId={}, pluginId={}, message={}",
-                    importId, pluginId, e.getMessage(), e);
+                    logSafe(importId), logSafe(pluginId), logSafe(e.getMessage()), e);
             markImportFailedInNewTransaction(importId, e);
             throw new PluginException("Import failed: " + rootErrorMessage(e), e);
         } catch (RuntimeException e) {
@@ -1066,7 +1129,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         for (PluginImportHistory stale : staleImports) {
             if (stale.getUpdatedAt() != null && stale.getUpdatedAt().isBefore(staleThreshold)) {
                 log.warn("Marking stale import as FAILED: importId={}, pluginId={}, status={}, updatedAt={}",
-                        stale.getImportId(), pluginId, stale.getStatus(), stale.getUpdatedAt());
+                        logSafe(stale.getImportId()), logSafe(pluginId), logSafe(stale.getStatus()), stale.getUpdatedAt());
                 importHistoryMapper.markFailed(stale.getImportId(),
                         "Import timed out (stale record in " + stale.getStatus() + " status)",
                         null);
@@ -1138,19 +1201,19 @@ public class PluginImportServiceImpl implements PluginImportService {
                 var validationResult = validationPipeline.validate(validationCtx);
                 history.setQualityScore(qualityScorer.computeScore(manifest, validationResult));
             } catch (Exception ex) {
-                log.warn("Failed to compute quality score for plugin {}: {}", manifest.getPluginId(), ex.getMessage());
+                log.warn("Failed to compute quality score for plugin {}: {}", logSafe(manifest.getPluginId()), logSafe(ex.getMessage()));
             }
 
             importHistoryMapper.updateById(history);
 
-            log.info("Plugin import successful: {} v{}", manifest.getPluginId(), manifest.getVersion());
+            log.info("Plugin import successful: {} v{}", logSafe(manifest.getPluginId()), logSafe(manifest.getVersion()));
 
             applicationEventPublisher.publishEvent(
                 new PluginImportCompletedEvent(this, tenantId, manifest.getNamespace())
             );
 
         } catch (Exception e) {
-            log.error("Plugin import failed: {}", e.getMessage(), e);
+            log.error("Plugin import failed: {}", logSafe(e.getMessage()), e);
 
             result.setSuccess(false);
             result.setStatus(ImportStatus.FAILED);
@@ -1178,7 +1241,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                     importHistoryMapper.markFailed(importId, errorMsg, errorDetail));
         } catch (Exception markEx) {
             log.error("Failed to mark import history as FAILED: importId={}, error={}",
-                    importId, markEx.getMessage(), markEx);
+                    logSafe(importId), logSafe(markEx.getMessage()), markEx);
         }
     }
 
@@ -1324,7 +1387,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
             long elapsedMs = (System.nanoTime() - typeStartNanos) / 1_000_000;
             log.info("Plugin import stage completed: pluginId={}, type={}, elapsedMs={}",
-                    manifest.getPluginId(), type, elapsedMs);
+                    logSafe(manifest.getPluginId()), type, elapsedMs);
         }
 
         // Import Drools rules and SLA configs (extension resources — not tracked via
@@ -1347,7 +1410,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                             metaFieldService.publishVersion(field.getPid());
                             fieldCount++;
                         } catch (Exception e) {
-                            log.warn("Failed to auto-publish field {}: {}", field.getCode(), e.getMessage());
+                            log.warn("Failed to auto-publish field {}: {}", logSafe(field.getCode()), logSafe(e.getMessage()));
                         }
                     }
                 }
@@ -1365,7 +1428,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                             commandService.publish(cmd.getPid());
                             cmdCount++;
                         } catch (Exception e) {
-                            log.warn("Failed to auto-publish command {}: {}", cmd.getCode(), e.getMessage());
+                            log.warn("Failed to auto-publish command {}: {}", logSafe(cmd.getCode()), logSafe(e.getMessage()));
                         }
                     }
                 }
@@ -1393,26 +1456,26 @@ public class PluginImportServiceImpl implements PluginImportService {
         for (String modelCode : modelCodes) {
             MetaModelDTO model = metaModelService.findByCode(modelCode);
             if (model == null) {
-                log.warn("Model not found for post-processing: {}", modelCode);
+                log.warn("Model not found for post-processing: {}", logSafe(modelCode));
                 continue;
             }
 
             if (model.isDraft()) {
                 // Publish DRAFT model. VIEW models are also published here to enable runtime permissions/routes.
-                log.info("Auto-publishing DRAFT model: {}", modelCode);
+                log.info("Auto-publishing DRAFT model: {}", logSafe(modelCode));
                 metaModelService.publish(model.getPid(), "Auto-published during plugin import");
             } else if (model.isPublished() && !"view".equals(model.getModelType())) {
                 // Sync schema for PUBLISHED ENTITY model → adds any new columns
-                log.info("Syncing schema for PUBLISHED model: {}", modelCode);
+                log.info("Syncing schema for PUBLISHED model: {}", logSafe(modelCode));
                 SchemaOperationResult syncResult = schemaManagementService.syncModelToTable(
                         modelCode, SchemaSyncOptions.builder()
                                 .syncMode(SchemaSyncOptions.SyncMode.SAFE)
                                 .createIndexes(true)
                                 .build());
                 if (syncResult.isSuccess()) {
-                    log.info("Schema sync for {}: {}", modelCode, syncResult.getMessage());
+                    log.info("Schema sync for {}: {}", logSafe(modelCode), logSafe(syncResult.getMessage()));
                 } else {
-                    log.warn("Schema sync failed for {}: {}", modelCode, syncResult.getErrorMessage());
+                    log.warn("Schema sync failed for {}: {}", logSafe(modelCode), logSafe(syncResult.getErrorMessage()));
                 }
 
                 // Ensure hierarchical permissions exist (idempotent — skips if already created)
@@ -1428,7 +1491,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private void linkMenusToPages(String pluginPid, Long tenantId) {
         int linkedCount = menuMapper.linkMenusToPagesByPageKey(tenantId, pluginPid);
         if (linkedCount > 0) {
-            log.info("Auto-linked {} menus to pages by pageKey for plugin {}", linkedCount, pluginPid);
+            log.info("Auto-linked {} menus to pages by pageKey for plugin {}", linkedCount, logSafe(pluginPid));
         }
     }
 
@@ -1569,13 +1632,13 @@ public class PluginImportServiceImpl implements PluginImportService {
             try {
                 PermissionDTO permissionDTO = permissionService.findByCode(permission.getCode());
                 if (permissionDTO == null) {
-                    log.warn("Imported permission not found after import: code={}", permission.getCode());
+                    log.warn("Imported permission not found after import: code={}", logSafe(permission.getCode()));
                     continue;
                 }
 
                 //todo check logic
                 if (boundPermissionIds.contains(permissionDTO.getId())) {
-                    log.warn("Duplicated permission  found: code={}", permission.getCode());
+                    log.warn("Duplicated permission found: code={}", logSafe(permission.getCode()));
 
                     continue;
                 }
@@ -1595,7 +1658,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             } catch (Exception e) {
                 // Duplicate bind and stale edge cases should not fail plugin import.
                 log.debug("Skip binding permission to tenant_admin: code={}, reason={}",
-                        permission.getCode(), e.getMessage());
+                        logSafe(permission.getCode()), logSafe(e.getMessage()));
             }
         }
         userPermissionService.evictRoleUsers(tenantAdminRole.getId());
@@ -1766,16 +1829,16 @@ public class PluginImportServiceImpl implements PluginImportService {
                 if (!existingCodes.contains(cmd.getCode())) {
                     generated.add(cmd);
                     existingCodes.add(cmd.getCode());
-                    log.debug("Document template generated command: {}", cmd.getCode());
+                    log.debug("Document template generated command: {}", logSafe(cmd.getCode()));
                 } else {
-                    log.debug("Document template skipped (plugin-defined): {}", cmd.getCode());
+                    log.debug("Document template skipped (plugin-defined): {}", logSafe(cmd.getCode()));
                 }
             }
         }
 
         if (!generated.isEmpty()) {
             log.info("Document template generated {} commands for {} plugin",
-                    generated.size(), manifest.getPluginId());
+                    generated.size(), logSafe(manifest.getPluginId()));
             if (manifest.getCommands() == null) {
                 manifest.setCommands(new ArrayList<>(generated));
             } else {
@@ -1858,7 +1921,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         for (com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO dto : manifest.getDashboards()) {
             if (!dto.isValid()) {
-                log.warn("Skipping invalid dashboard definition: code={}", dto.getCode());
+                log.warn("Skipping invalid dashboard definition: code={}", logSafe(dto.getCode()));
                 continue;
             }
             PluginResource resource = resourceImporter.importDashboard(dto, pluginPid, importId, tenantId,
@@ -1960,14 +2023,14 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
             if (dto.getRuleContent() == null || dto.getRuleContent().isBlank()) {
                 log.warn("Skipping rule '{}' — no ruleContent or resolved ruleContentFile",
-                        dto.getRuleCode());
+                        logSafe(dto.getRuleCode()));
                 continue;
             }
             droolsRuleService.importRule(dto);
             created++;
         }
         if (created > 0) {
-            log.info("Imported {} Drools rule(s) for plugin {}", created, manifest.getPluginId());
+            log.info("Imported {} Drools rule(s) for plugin {}", created, logSafe(manifest.getPluginId()));
         }
     }
 
@@ -1984,7 +2047,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             created++;
         }
         if (created > 0) {
-            log.info("Imported {} SLA config(s) for plugin {}", created, manifest.getPluginId());
+            log.info("Imported {} SLA config(s) for plugin {}", created, logSafe(manifest.getPluginId()));
         }
     }
 
@@ -2025,7 +2088,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         for (SavedViewDefinitionDTO dto : manifest.getSavedViews()) {
             if (!dto.isValid()) {
-                log.warn("Skipping invalid saved view: {}", dto.getName());
+                log.warn("Skipping invalid saved view: {}", logSafe(dto.getName()));
                 continue;
             }
 
@@ -2049,7 +2112,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 if (dto.getSortOrder() != null) existingView.setSortOrder(dto.getSortOrder());
                 savedViewMapper.updateSavedView(existingView);
                 result.incrementResourceCount(ResourceType.SAVED_VIEW, ResourceAction.UPDATE);
-                log.info("Updated saved view: {} ({})", dto.getName(), dto.getViewType());
+                log.info("Updated saved view: {} ({})", logSafe(dto.getName()), logSafe(dto.getViewType()));
             } else {
                 // Create new saved view
                 SavedView savedView = new SavedView();
@@ -2070,7 +2133,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 savedView.setUpdatedAt(Instant.now());
                 savedViewMapper.insertSavedView(savedView);
                 result.incrementResourceCount(ResourceType.SAVED_VIEW, ResourceAction.CREATE);
-                log.info("Created saved view: {} ({})", dto.getName(), dto.getViewType());
+                log.info("Created saved view: {} ({})", logSafe(dto.getName()), logSafe(dto.getViewType()));
             }
         }
     }
@@ -2591,7 +2654,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             try {
                 return Boolean.TRUE.equals(loader.apply(k));
             } catch (Exception ex) {
-                log.debug("Tenant existence check failed: key={}, message={}", k, ex.getMessage());
+                log.debug("Tenant existence check failed: key={}, message={}", logSafe(k), logSafe(ex.getMessage()));
                 return false;
             }
         });
@@ -2624,7 +2687,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
         } catch (Exception e) {
-            log.debug("Could not load installed plugins for validation: {}", e.getMessage());
+            log.debug("Could not load installed plugins for validation: {}", logSafe(e.getMessage()));
         }
 
         // Load installed resource codes from DB for cross-plugin reference validation
@@ -2684,7 +2747,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
         } catch (Exception e) {
-            log.debug("Could not load installed resources for validation: {}", e.getMessage());
+            log.debug("Could not load installed resources for validation: {}", logSafe(e.getMessage()));
         }
 
         PluginValidationContext ctx = PluginValidationContext.builder()
@@ -2766,7 +2829,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             } catch (Exception ex) {
                 // Conflict preview must be best-effort; duplicated historical rows should not block import.
                 log.warn("Skip conflict check for {} {} due to lookup error: {}",
-                        resourceType, code, ex.getMessage());
+                        resourceType, logSafe(code), logSafe(ex.getMessage()));
                 continue;
             }
             if (existing == null) {
@@ -2943,7 +3006,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                         new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
                 resource.setImportSnapshot(snapshot);
             } catch (Exception e) {
-                log.warn("Failed to capture import snapshot for {}: {}", resource.getResourceCode(), e.getMessage());
+                log.warn("Failed to capture import snapshot for {}: {}", logSafe(resource.getResourceCode()), logSafe(e.getMessage()));
             }
         }
     }

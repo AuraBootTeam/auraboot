@@ -102,7 +102,7 @@ public class PreviewTokenStore {
         }
 
         redisTemplate.opsForValue().set(buildKey(token), json, TTL);
-        log.debug("Preview token minted token={} tenant={} skill={}", token, tenantId, skillName);
+        log.debug("Preview token minted tokenHash={} tenant={} skill={}", tokenFingerprint(token), tenantId, skillName);
         return token;
     }
 
@@ -124,7 +124,7 @@ public class PreviewTokenStore {
         String key = buildKey(token);
         String json = redisTemplate.opsForValue().getAndDelete(key);
         if (json == null) {
-            log.debug("Preview token miss token={}", token);
+            log.debug("Preview token miss tokenHash={}", tokenFingerprint(token));
             return Optional.empty();
         }
 
@@ -135,7 +135,7 @@ public class PreviewTokenStore {
             // Stored value is corrupt — log and treat as miss. Do not throw:
             // the token has already been deleted; surfacing a 500 here would
             // be more misleading than the 422 the validator produces on empty.
-            log.warn("Preview token envelope corrupt token={} err={}", token, e.getMessage());
+            log.warn("Preview token envelope corrupt tokenHash={} err={}", tokenFingerprint(token), e.getMessage());
             return Optional.empty();
         }
 
@@ -145,17 +145,17 @@ public class PreviewTokenStore {
         JsonNode payload = envelope.path("payload");
 
         if (storedSkill == null || !storedSkill.equals(expectedSkill)) {
-            log.debug("Preview token skill mismatch token={} stored={} expected={}",
-                    token, storedSkill, expectedSkill);
+            log.debug("Preview token skill mismatch tokenHash={} stored={} expected={}",
+                    tokenFingerprint(token), storedSkill, expectedSkill);
             return Optional.empty();
         }
         String expectedHash = hashParams(expectedParams);
         if (storedHash == null || !storedHash.equals(expectedHash)) {
-            log.debug("Preview token paramsHash mismatch token={} skill={}", token, expectedSkill);
+            log.debug("Preview token paramsHash mismatch tokenHash={} skill={}", tokenFingerprint(token), expectedSkill);
             return Optional.empty();
         }
 
-        log.debug("Preview token consumed token={} tenant={} skill={}", token, tenantId, expectedSkill);
+        log.debug("Preview token consumed tokenHash={} tenant={} skill={}", tokenFingerprint(token), tenantId, expectedSkill);
         return Optional.of(new PreviewPayload(tenantId, expectedSkill, payload));
     }
 
@@ -174,6 +174,19 @@ public class PreviewTokenStore {
             return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException e) {
             // SHA-256 is mandatory in every JRE — propagate as unchecked.
+            throw new IllegalStateException("SHA-256 unavailable on this JVM", e);
+        }
+    }
+
+    private String tokenFingerprint(String token) {
+        if (token == null) {
+            return "null";
+        }
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            byte[] digest = sha.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 16);
+        } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 unavailable on this JVM", e);
         }
     }

@@ -61,7 +61,7 @@ public class SmsCodeAuthStrategy implements AuthStrategy {
 
         // Auto-register if user not found
         if (user == null) {
-            log.info("Auto-registering new user with mobile: {}", mobile);
+            log.info("Auto-registering new user via SMS OTP");
             user = autoRegisterByMobile(mobile);
         }
 
@@ -76,6 +76,8 @@ public class SmsCodeAuthStrategy implements AuthStrategy {
             userMapper.updateById(user);
         }
 
+        // CodeQL cannot infer the prior OTP verification gate; completeLogin is
+        // reached only after VerificationCodeService accepts the SMS code.
         return loginCompletionHelper.completeLogin(user, request.getIpAddress(), request.getUserAgent());
     }
 

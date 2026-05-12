@@ -1,6 +1,7 @@
 package com.auraboot.framework.aurabot.service;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
@@ -86,18 +87,19 @@ public class ChatSessionStore {
                 String json = objectMapper.writeValueAsString(pendingTool);
                 redisTemplate.opsForValue().set(key, json, PENDING_TTL_MINUTES, TimeUnit.MINUTES);
                 log.debug("Stored pending tool [{}] for turn [{}] in Redis (TTL={}min)",
-                        pendingTool.getToolId(), turnId, PENDING_TTL_MINUTES);
+                        LogSanitizer.safe(pendingTool.getToolId()), LogSanitizer.safe(turnId), PENDING_TTL_MINUTES);
                 return;
             } catch (JsonProcessingException e) {
                 log.error("Failed to serialize PendingTool to JSON, falling back to in-memory", e);
             } catch (Exception e) {
                 log.error("Redis write failed for pending tool [{}], falling back to in-memory",
-                        pendingTool.getToolId(), e);
+                        LogSanitizer.safe(pendingTool.getToolId()), e);
             }
         }
         // Fallback: in-memory keyed by turnId
         inMemoryFallback.put(turnId, pendingTool);
-        log.debug("Stored pending tool [{}] for turn [{}] in memory", pendingTool.getToolId(), turnId);
+        log.debug("Stored pending tool [{}] for turn [{}] in memory",
+                LogSanitizer.safe(pendingTool.getToolId()), LogSanitizer.safe(turnId));
     }
 
     /**
@@ -112,17 +114,18 @@ public class ChatSessionStore {
                 String key = pendingKey(turnId);
                 String json = redisTemplate.opsForValue().getAndDelete(key);
                 if (json == null) {
-                    log.debug("No pending tool for turn [{}] (not found or expired)", turnId);
+                    log.debug("No pending tool for turn [{}] (not found or expired)", LogSanitizer.safe(turnId));
                     return null;
                 }
                 PendingTool tool = objectMapper.readValue(json, PendingTool.class);
-                log.debug("Consumed pending tool [{}] for turn [{}] via Redis", tool.getToolId(), turnId);
+                log.debug("Consumed pending tool [{}] for turn [{}] via Redis",
+                        LogSanitizer.safe(tool.getToolId()), LogSanitizer.safe(turnId));
                 return tool;
             } catch (JsonProcessingException e) {
                 log.error("Failed to deserialize PendingTool from Redis", e);
                 return null;
             } catch (Exception e) {
-                log.error("Redis read failed for turn [{}], trying in-memory fallback", turnId, e);
+                log.error("Redis read failed for turn [{}], trying in-memory fallback", LogSanitizer.safe(turnId), e);
             }
         }
         // Fallback: in-memory with manual TTL check
@@ -131,10 +134,11 @@ public class ChatSessionStore {
             return null;
         }
         if (Instant.now().toEpochMilli() - tool.getCreatedAt() > IN_MEMORY_TTL_MILLIS) {
-            log.debug("Pending tool for turn [{}] has expired (in-memory)", turnId);
+            log.debug("Pending tool for turn [{}] has expired (in-memory)", LogSanitizer.safe(turnId));
             return null;
         }
-        log.debug("Consumed pending tool [{}] for turn [{}] via in-memory fallback", tool.getToolId(), turnId);
+        log.debug("Consumed pending tool [{}] for turn [{}] via in-memory fallback",
+                LogSanitizer.safe(tool.getToolId()), LogSanitizer.safe(turnId));
         return tool;
     }
 
@@ -162,17 +166,18 @@ public class ChatSessionStore {
                 String json = objectMapper.writeValueAsString(messages);
                 redisTemplate.opsForValue().set(messagesKey(sessionId), json, MESSAGES_TTL_MINUTES, TimeUnit.MINUTES);
                 log.debug("Stored {} conversation messages for session [{}] in Redis (TTL={}min)",
-                        messages.size(), sessionId, MESSAGES_TTL_MINUTES);
+                        messages.size(), LogSanitizer.safe(sessionId), MESSAGES_TTL_MINUTES);
                 return;
             } catch (JsonProcessingException e) {
                 log.error("Failed to serialize conversation messages, falling back to in-memory", e);
             } catch (Exception e) {
                 log.error("Redis write failed for conversation messages [{}], falling back to in-memory",
-                        sessionId, e);
+                        LogSanitizer.safe(sessionId), e);
             }
         }
         inMemoryMessagesFallback.put(sessionId, new StoredMessages(messages));
-        log.debug("Stored {} conversation messages for session [{}] in memory", messages.size(), sessionId);
+        log.debug("Stored {} conversation messages for session [{}] in memory",
+                messages.size(), LogSanitizer.safe(sessionId));
     }
 
     /**
@@ -193,7 +198,8 @@ public class ChatSessionStore {
                 log.error("Failed to deserialize conversation messages from Redis", e);
                 return List.of();
             } catch (Exception e) {
-                log.error("Redis read failed for conversation messages [{}], trying in-memory fallback", sessionId, e);
+                log.error("Redis read failed for conversation messages [{}], trying in-memory fallback",
+                        LogSanitizer.safe(sessionId), e);
             }
         }
         StoredMessages stored = inMemoryMessagesFallback.get(sessionId);

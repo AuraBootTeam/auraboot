@@ -25,13 +25,13 @@ describe('inventory outbound command', () => {
   describe('filter options', () => {
     it('should build status filter', () => {
       const status = 'confirmed';
-      const filter = { fieldName: 'inv_out_status', operator: 'EQ', value: status.toUpperCase() };
+      const filter = { fieldName: 'inv_out_status', operator: 'EQ', value: status.toLowerCase() };
       expect(filter.value).toBe('confirmed');
     });
 
     it('should build type filter', () => {
       const type = 'sales';
-      const filter = { fieldName: 'inv_out_type', operator: 'EQ', value: type.toUpperCase() };
+      const filter = { fieldName: 'inv_out_type', operator: 'EQ', value: type.toLowerCase() };
       expect(filter.value).toBe('sales');
     });
 

@@ -3,6 +3,7 @@ import axios, { type AxiosResponse } from 'axios';
 import * as http from 'http';
 import * as https from 'https';
 import { config } from '~/server/utils/config';
+import { parseCookieHeader } from '~/server/utils/cookie-security';
 import logger from '~/server/utils/logger';
 import { sessionStorage } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
@@ -616,7 +617,7 @@ export class BffProxyService {
 
     // 2. 从Cookie中获取
     const cookies = this.parseCookies(req.headers.cookie || '');
-    const localeCookie = cookies['locale'];
+    const localeCookie = cookies.get('locale');
     if (localeCookie) {
       logger.debug(`从Cookie获取locale: ${localeCookie}`);
       return localeCookie;
@@ -653,7 +654,7 @@ export class BffProxyService {
 
       // 解析cookie以便调试
       const cookies = this.parseCookies(cookieHeader);
-      const cookieNames = Object.keys(cookies);
+      const cookieNames = Array.from(cookies.keys());
 
       logger.debug(`🍪 Found cookies: [${cookieNames.join(', ')}] for ${requestUrl}`);
 
@@ -695,17 +696,8 @@ export class BffProxyService {
   /**
    * 解析Cookie字符串
    */
-  private parseCookies(cookieHeader: string): Record<string, string> {
-    const cookies: Record<string, string> = {};
-
-    cookieHeader.split(';').forEach((cookie) => {
-      const [name, ...rest] = cookie.trim().split('=');
-      if (name && rest.length > 0) {
-        cookies[name] = decodeURIComponent(rest.join('='));
-      }
-    });
-
-    return cookies;
+  private parseCookies(cookieHeader: string): Map<string, string> {
+    return parseCookieHeader(cookieHeader);
   }
 
   /**

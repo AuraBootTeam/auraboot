@@ -54,6 +54,7 @@ public class UserSoulProfileAdminController {
     // =========================================================================
 
     @GetMapping
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<List<Map<String, Object>>> list(
             @RequestParam(required = false, defaultValue = "50") int limit) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -85,6 +86,7 @@ public class UserSoulProfileAdminController {
     // =========================================================================
 
     @GetMapping("/stats")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
     public ApiResponse<Map<String, Object>> stats() {
         Long tenantId = MetaContext.getCurrentTenantId();
 

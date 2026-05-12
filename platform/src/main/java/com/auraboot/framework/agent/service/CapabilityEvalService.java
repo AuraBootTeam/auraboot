@@ -8,6 +8,7 @@ import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.entity.AbCapabilityEvalRun;
 import com.auraboot.framework.agent.mapper.AbCapabilityEvalRunMapper;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -55,7 +56,8 @@ public class CapabilityEvalService {
         if (modelCode != null && !modelCode.isBlank()) {
             capabilities = capabilityViewService.listByModel(tenantId, modelCode);
         } else {
-            capabilities = capabilityViewService.listAll(tenantId, maxCases * 2, 0);
+            int safeMaxCases = PaginationSafetyUtils.pageSize(maxCases, 500);
+            capabilities = capabilityViewService.listAll(tenantId, Math.multiplyExact(safeMaxCases, 2), 0);
         }
 
         List<CapabilityEvalCase> cases = new ArrayList<>();

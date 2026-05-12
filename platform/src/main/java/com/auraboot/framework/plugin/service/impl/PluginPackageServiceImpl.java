@@ -22,6 +22,7 @@ import com.auraboot.framework.plugin.service.PluginResourceService;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.common.util.UlidGenerator;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -130,6 +131,7 @@ public class PluginPackageServiceImpl implements PluginPackageService {
 
     @Override
     public PackageParseResult parsePackageFromPath(Path path) {
+        path = PathSafetyUtils.normalizeAbsolute(path, "plugin package path");
         if (Files.isDirectory(path)) {
             return parsePackageFromDirectory(path);
         }
@@ -139,13 +141,18 @@ public class PluginPackageServiceImpl implements PluginPackageService {
         try {
             Path extractPath = createTempDirectory(packageId);
 
-            String fileName = path.getFileName().toString().toLowerCase();
-            if (fileName.endsWith(".zip")) {
+            String fileName = path.getFileName().toString();
+            String fileNameLower = fileName.toLowerCase();
+            if (fileNameLower.endsWith(".zip")) {
+                PathSafetyUtils.requireSafeFileName(fileName, ".zip", "plugin package filename");
                 try (InputStream is = Files.newInputStream(path)) {
                     extractZip(is, extractPath);
                 }
-            } else if (fileName.endsWith(".json")) {
-                Files.copy(path, extractPath.resolve("plugin.json"));
+            } else if (fileNameLower.endsWith(".json")) {
+                PathSafetyUtils.requireSafeFileName(fileName, ".json", "plugin package filename");
+                try (InputStream is = Files.newInputStream(path)) {
+                    Files.copy(is, PathSafetyUtils.requireSafeChild(extractPath, "plugin.json", "plugin manifest copy target"));
+                }
             } else {
                 return PackageParseResult.failure(packageId, "Unsupported file format");
             }
@@ -169,7 +176,8 @@ public class PluginPackageServiceImpl implements PluginPackageService {
             if (fileNameLower.endsWith(".zip")) {
                 extractZip(inputStream, extractPath);
             } else if (fileNameLower.endsWith(".json")) {
-                Files.copy(inputStream, extractPath.resolve("plugin.json"));
+                PathSafetyUtils.requireSafeFileName(filename, ".json", "plugin package filename");
+                Files.copy(inputStream, PathSafetyUtils.requireSafeChild(extractPath, "plugin.json", "plugin manifest copy target"));
             } else {
                 return PackageParseResult.failure(packageId, "Unsupported file format. Use .zip or .json");
             }
@@ -184,12 +192,13 @@ public class PluginPackageServiceImpl implements PluginPackageService {
 
     @Override
     public PackageParseResult parsePackageFromDirectory(Path directoryPath) {
+        directoryPath = PathSafetyUtils.requireExistingDirectory(directoryPath, "plugin package directory");
         String packageId = UlidGenerator.generate();
         Long tenantId = MetaContext.getCurrentTenantId();
 
         try {
             // Find and parse plugin.json
-            Path manifestPath = directoryPath.resolve("plugin.json");
+            Path manifestPath = PathSafetyUtils.requireSafeChild(directoryPath, "plugin.json", "plugin package manifest");
             if (!Files.exists(manifestPath)) {
                 return PackageParseResult.failure(packageId, "Missing plugin.json manifest");
             }
@@ -475,13 +484,14 @@ public class PluginPackageServiceImpl implements PluginPackageService {
         PackageInstallResult.ComponentResult result = new PackageInstallResult.ComponentResult();
 
         try {
-            Path jarPath = Paths.get(context.getDetected().getBackendJarPath());
+            Path jarPath = PathSafetyUtils.requireWithinBase(
+                    context.getExtractPath(), Paths.get(context.getDetected().getBackendJarPath()), "backend jar path");
             if (!Files.exists(jarPath)) {
                 throw new PluginException("Backend JAR not found: " + jarPath);
             }
 
             // Copy JAR to plugins directory
-            Path targetPath = getPluginsPath().resolve(jarPath.getFileName());
+            Path targetPath = PathSafetyUtils.requireSafeChild(getPluginsPath(), jarPath.getFileName(), "backend deploy path");
             Files.copy(jarPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
             result.setDeployedAssets(List.of(targetPath.toString()));
 
@@ -525,14 +535,16 @@ public class PluginPackageServiceImpl implements PluginPackageService {
 
         try {
             PackageManifest manifest = context.getManifest();
-            Path frontendPath = Paths.get(context.getDetected().getFrontendPath());
+            Path frontendPath = PathSafetyUtils.requireWithinBase(
+                    context.getExtractPath(), Paths.get(context.getDetected().getFrontendPath()), "frontend component path");
 
             if (!Files.exists(frontendPath)) {
                 throw new PluginException("Frontend path not found: " + frontendPath);
             }
 
             // Determine deployment path
-            Path deployPath = getFrontendPluginsPath().resolve(manifest.getNamespace());
+            String namespaceDir = PathSafetyUtils.requireSafeFileName(manifest.getNamespace(), null, "frontend namespace");
+            Path deployPath = PathSafetyUtils.requireSafeChild(getFrontendPluginsPath(), namespaceDir, "frontend deploy path");
             Files.createDirectories(deployPath);
 
             // Copy frontend assets
@@ -540,7 +552,7 @@ public class PluginPackageServiceImpl implements PluginPackageService {
             try (Stream<Path> files = Files.walk(frontendPath)) {
                 for (Path source : files.filter(Files::isRegularFile).toList()) {
                     Path relative = frontendPath.relativize(source);
-                    Path target = deployPath.resolve(relative);
+                    Path target = PathSafetyUtils.requireSafeChild(deployPath, relative, "frontend asset target");
                     Files.createDirectories(target.getParent());
                     Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
                     deployedAssets.add(target.toString());
@@ -895,7 +907,8 @@ public class PluginPackageServiceImpl implements PluginPackageService {
     // ==================== Helper Methods ====================
 
     private Path createTempDirectory(String packageId) throws IOException {
-        Path tempPath = Paths.get(tempDir, packageId);
+        String safePackageId = PathSafetyUtils.requireSafeFileName(packageId, null, "package id");
+        Path tempPath = PathSafetyUtils.requireSafeChild(Paths.get(tempDir), safePackageId, "plugin package temp directory");
         Files.createDirectories(tempPath);
         return tempPath;
     }
@@ -904,12 +917,7 @@ public class PluginPackageServiceImpl implements PluginPackageService {
         try (ZipInputStream zis = new ZipInputStream(inputStream)) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                Path entryPath = targetPath.resolve(entry.getName());
-
-                // Security check - prevent zip slip attack
-                if (!entryPath.normalize().startsWith(targetPath.normalize())) {
-                    throw new IOException("Invalid zip entry: " + entry.getName());
-                }
+                Path entryPath = PathSafetyUtils.requireSafeChild(targetPath, entry.getName(), "zip entry");
 
                 if (entry.isDirectory()) {
                     Files.createDirectories(entryPath);
@@ -942,7 +950,7 @@ public class PluginPackageServiceImpl implements PluginPackageService {
         PackageParseResult.DetectedComponents detected = new PackageParseResult.DetectedComponents();
 
         // Check config component
-        Path configPath = directoryPath.resolve("config");
+        Path configPath = PathSafetyUtils.requireSafeChild(directoryPath, "config", "config component path");
         if (!Files.exists(configPath)) {
             configPath = directoryPath; // Config might be in root
         }
@@ -950,12 +958,12 @@ public class PluginPackageServiceImpl implements PluginPackageService {
         // Check for resourceDirs (JSON files) or directory-based resources
         boolean hasConfigResources = manifest.hasAnyResources() ||
                 (manifest.getResourceDirs() != null && !manifest.getResourceDirs().isEmpty()) ||
-                Files.exists(configPath.resolve("models.json")) ||
-                Files.exists(configPath.resolve("fields.json")) ||
-                Files.exists(configPath.resolve("pages.json")) ||
-                Files.exists(configPath.resolve("models")) ||
-                Files.exists(configPath.resolve("fields")) ||
-                Files.exists(configPath.resolve("pages"));
+                Files.exists(PathSafetyUtils.requireSafeChild(configPath, "models.json", "models resource path")) ||
+                Files.exists(PathSafetyUtils.requireSafeChild(configPath, "fields.json", "fields resource path")) ||
+                Files.exists(PathSafetyUtils.requireSafeChild(configPath, "pages.json", "pages resource path")) ||
+                Files.exists(PathSafetyUtils.requireSafeChild(configPath, "models", "models directory path")) ||
+                Files.exists(PathSafetyUtils.requireSafeChild(configPath, "fields", "fields directory path")) ||
+                Files.exists(PathSafetyUtils.requireSafeChild(configPath, "pages", "pages directory path"));
 
         if (hasConfigResources || (manifest.getComponents() != null &&
                 manifest.getComponents().getConfig() != null &&
@@ -969,7 +977,7 @@ public class PluginPackageServiceImpl implements PluginPackageService {
         }
 
         // Check backend component
-        Path backendPath = directoryPath.resolve("backend");
+        Path backendPath = PathSafetyUtils.requireSafeChild(directoryPath, "backend", "backend component path");
         Path backendJar = null;
         if (Files.exists(backendPath)) {
             try (Stream<Path> files = Files.list(backendPath)) {
@@ -986,14 +994,15 @@ public class PluginPackageServiceImpl implements PluginPackageService {
             if (backendJar != null) {
                 detected.setBackendJarPath(backendJar.toString());
             } else if (manifest.getComponents() != null && manifest.getComponents().getBackend() != null) {
-                detected.setBackendJarPath(directoryPath.resolve(
-                        manifest.getComponents().getBackend().getPath()).toString());
+                detected.setBackendJarPath(PathSafetyUtils.requireSafeChild(
+                        directoryPath, manifest.getComponents().getBackend().getPath(), "backend component manifest path").toString());
             }
         }
 
         // Check frontend component
-        Path frontendPath = directoryPath.resolve("frontend");
-        boolean hasFrontend = Files.exists(frontendPath) && Files.exists(frontendPath.resolve("remoteEntry.js"));
+        Path frontendPath = PathSafetyUtils.requireSafeChild(directoryPath, "frontend", "frontend component path");
+        boolean hasFrontend = Files.exists(frontendPath)
+                && Files.exists(PathSafetyUtils.requireSafeChild(frontendPath, "remoteEntry.js", "frontend remoteEntry path"));
 
         if (hasFrontend || (manifest.getComponents() != null &&
                 manifest.getComponents().getFrontend() != null &&

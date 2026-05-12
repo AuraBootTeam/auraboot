@@ -13,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +31,13 @@ import java.util.Map;
 public class PluginPackageController {
 
     private final PluginPackageService packageService;
+
+    private static final String LOCAL_PATH_API_DISABLED =
+            "Parsing server-local paths through the REST API is disabled. Upload the package file instead.";
+    private static final String LOCAL_DIRECTORY_API_DISABLED =
+            "Parsing server-local directories through the REST API is disabled. Upload the package file instead.";
+    private static final String LOCAL_INSTALL_PATH_API_DISABLED =
+            "Installing server-local paths through the REST API is disabled. Upload the package file instead.";
 
     // ==================== Upload & Parse ====================
 
@@ -79,22 +85,8 @@ public class PluginPackageController {
             @Parameter(description = "Path to the plugin package")
             @RequestBody Map<String, String> request) {
 
-        String pathStr = request.get("path");
-        if (pathStr == null || pathStr.isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(PackageParseResult.failure(null, "path is required"));
-        }
-
-        // Path traversal protection: normalize and reject directory traversal
-        Path path = Paths.get(pathStr).normalize();
-        if (!path.isAbsolute() || path.toString().contains("..")) {
-            return ResponseEntity.badRequest()
-                    .body(PackageParseResult.failure(null, "Invalid path: must be absolute and cannot contain '..'"));
-        }
-
-        log.info("Parsing plugin package from path: {}", path);
-        PackageParseResult result = packageService.parsePackageFromPath(path);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.badRequest()
+                .body(PackageParseResult.failure(null, LOCAL_PATH_API_DISABLED));
     }
 
     @PostMapping("/parse-directory")
@@ -104,22 +96,8 @@ public class PluginPackageController {
             @Parameter(description = "Directory path")
             @RequestBody Map<String, String> request) {
 
-        String pathStr = request.get("path");
-        if (pathStr == null || pathStr.isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(PackageParseResult.failure(null, "path is required"));
-        }
-
-        // Path traversal protection: normalize and reject directory traversal
-        Path path = Paths.get(pathStr).normalize();
-        if (!path.isAbsolute() || path.toString().contains("..")) {
-            return ResponseEntity.badRequest()
-                    .body(PackageParseResult.failure(null, "Invalid path: must be absolute and cannot contain '..'"));
-        }
-
-        log.info("Parsing plugin package from directory: {}", path);
-        PackageParseResult result = packageService.parsePackageFromDirectory(path);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.badRequest()
+                .body(PackageParseResult.failure(null, LOCAL_DIRECTORY_API_DISABLED));
     }
 
     // ==================== Installation ====================
@@ -228,26 +206,8 @@ public class PluginPackageController {
             @Parameter(description = "Path and installation options")
             @RequestBody InstallFromPathRequest request) {
 
-        if (request.getPath() == null || request.getPath().isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(PackageInstallResult.failure(null, "path is required"));
-        }
-
-        // Path traversal protection: normalize and reject directory traversal
-        Path path = Paths.get(request.getPath()).normalize();
-        if (!path.isAbsolute() || path.toString().contains("..")) {
-            return ResponseEntity.badRequest()
-                    .body(PackageInstallResult.failure(null, "Invalid path: must be absolute and cannot contain '..'"));
-        }
-
-        log.info("Installing plugin package from path: {}", path);
-
-        PackageInstallOptions options = request.getOptions() != null
-                ? request.getOptions()
-                : new PackageInstallOptions();
-
-        PackageInstallResult result = packageService.installFromPath(path, options);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.badRequest()
+                .body(PackageInstallResult.failure(null, LOCAL_INSTALL_PATH_API_DISABLED));
     }
 
     // ==================== Uninstallation ====================

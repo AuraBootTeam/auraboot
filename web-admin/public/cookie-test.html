@@ -377,9 +377,13 @@
         // 显示状态消息
         function showStatus(message, type = 'info') {
             const statusDiv = document.getElementById('status');
-            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+            const safeTypes = new Set(['info', 'success', 'warning', 'error']);
+            const statusMessage = document.createElement('div');
+            statusMessage.className = `status ${safeTypes.has(type) ? type : 'info'}`;
+            statusMessage.textContent = message;
+            statusDiv.replaceChildren(statusMessage);
             setTimeout(() => {
-                statusDiv.innerHTML = '';
+                statusDiv.replaceChildren();
             }, 5000);
         }
 
