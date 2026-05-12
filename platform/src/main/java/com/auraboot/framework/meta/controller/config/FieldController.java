@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.controller.config;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.MetaFieldService;
@@ -44,6 +45,10 @@ public class FieldController {
     private final MetaFieldService metaFieldService;
     private final PluginResourceTracker pluginResourceTracker;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     // ==================== 基础CRUD操作 ====================
 
     @PostMapping
@@ -51,7 +56,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_MANAGE)
     public ApiResponse<MetaFieldDTO> createField(
             @Valid @RequestBody MetaFieldCreateRequest request) {
-        log.info("创建字段: code={}, dataType={}", request.getCode(), request.getDataType());
+        log.info("创建字段: code={}, dataType={}", logSafe(request.getCode()), logSafe(request.getDataType()));
 
         // 检查字段键唯一性
         if (!metaFieldService.isCodeUnique(request.getCode(), null)) {
@@ -61,7 +66,7 @@ public class FieldController {
         // 创建字段
         MetaFieldDTO result = metaFieldService.create(request);
         
-        log.info("字段创建成功: pid={}, code={}", result.getPid(), result.getCode());
+        log.info("字段创建成功: pid={}, code={}", logSafe(result.getPid()), logSafe(result.getCode()));
         return ApiResponse.success("字段创建成功", result);
     }
 
@@ -70,7 +75,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_READ)
     public ApiResponse<MetaFieldDTO> getField(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String pid) {
-        log.info("获取字段详情: pid={}", pid);
+        log.info("获取字段详情: pid={}", logSafe(pid));
         
         MetaFieldDTO field = metaFieldService.findByPid(pid);
         if (field == null) {
@@ -86,7 +91,7 @@ public class FieldController {
     public ApiResponse<MetaFieldDTO> updateField(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String pid,
             @Valid @RequestBody MetaFieldUpdateRequest request) {
-        log.info("更新字段: pid={}, dataType={}", pid, request.getDataType());
+        log.info("更新字段: pid={}, dataType={}", logSafe(pid), logSafe(request.getDataType()));
         
         // 检查字段是否存在
         MetaFieldDTO existingField = metaFieldService.findByPid(pid);
@@ -98,7 +103,7 @@ public class FieldController {
         MetaFieldDTO result = metaFieldService.update(pid, request);
         pluginResourceTracker.markAsUserModified(ResourceType.FIELD, existingField.getCode());
 
-        log.info("字段更新成功: pid={}, newVersion={}", pid, result.getVersion());
+        log.info("字段更新成功: pid={}, newVersion={}", logSafe(pid), result.getVersion());
         return ApiResponse.success("字段更新成功", result);
     }
 
@@ -107,7 +112,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_MANAGE)
     public ApiResponse<Void> deleteField(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String pid) {
-        log.info("删除字段: pid={}", pid);
+        log.info("删除字段: pid={}", logSafe(pid));
         
         // 检查字段是否存在
         MetaFieldDTO existingField = metaFieldService.findByPid(pid);
@@ -119,7 +124,7 @@ public class FieldController {
         pluginResourceTracker.markAsUserModified(ResourceType.FIELD, existingField.getCode());
         metaFieldService.delete(pid);
 
-        log.info("字段删除成功: pid={}", pid);
+        log.info("字段删除成功: pid={}", logSafe(pid));
         return ApiResponse.<Void>success("字段删除成功", null);
     }
 
@@ -135,8 +140,8 @@ public class FieldController {
 
             @Parameter(description = "是否只查询当前版本") @RequestParam(defaultValue = "true") Boolean currentOnly) {
         
-        log.info("查询字段列表: page={}, size={}, code={}, dataType={}, status={}", 
-                page, size, code, dataType, status);
+        log.info("查询字段列表: page={}, size={}, code={}, dataType={}, status={}",
+                page, size, logSafe(code), logSafe(dataType), logSafe(status));
         
         PageResult<MetaFieldDTO> result = metaFieldService.listFields(
             page, size, code, dataType, status,   currentOnly);
@@ -152,7 +157,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_READ)
     public ApiResponse<MetaFieldDTO> getFieldByKey(
             @Parameter(description = "字段键") @PathVariable @NotBlank String code) {
-        log.info("根据字段键获取字段: code={}", code);
+        log.info("根据字段键获取字段: code={}", logSafe(code));
         
         Optional<MetaFieldDTO> field = metaFieldService.findCurrentByCode(code);
         if (field.isEmpty()) {
@@ -167,7 +172,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_READ)
     public ApiResponse<List<MetaFieldDTO>> getFieldVersions(
             @Parameter(description = "字段键") @PathVariable @NotBlank String code) {
-        log.info("获取字段的所有版本: code={}", code);
+        log.info("获取字段的所有版本: code={}", logSafe(code));
         
         List<MetaFieldDTO> versions = metaFieldService.findAllVersionsByCode(code);
         
@@ -180,7 +185,7 @@ public class FieldController {
     public ApiResponse<MetaFieldDTO> getFieldByVersion(
             @Parameter(description = "字段键") @PathVariable @NotBlank String code,
             @Parameter(description = "版本号") @PathVariable Integer version) {
-        log.info("获取字段的指定版本: code={}, version={}", code, version);
+        log.info("获取字段的指定版本: code={}, version={}", logSafe(code), version);
         
         Optional<MetaFieldDTO> field = metaFieldService.findByCodeAndVersion(code, version);
         if (field.isEmpty()) {
@@ -195,7 +200,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_READ)
     public ApiResponse<List<MetaFieldDTO>> getFieldsByDataType(
             @Parameter(description = "数据类型") @PathVariable @NotBlank String dataType) {
-        log.info("根据数据类型查询字段: dataType={}", dataType);
+        log.info("根据数据类型查询字段: dataType={}", logSafe(dataType));
         
         List<MetaFieldDTO> fields = metaFieldService.findByDataType(dataType);
         
@@ -221,7 +226,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_READ)
     public ApiResponse<Boolean> checkFieldExists(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String pid) {
-        log.info("检查字段是否存在: pid={}", pid);
+        log.info("检查字段是否存在: pid={}", logSafe(pid));
         
         MetaFieldDTO field = metaFieldService.findByPid(pid);
         boolean exists = field != null;
@@ -235,7 +240,7 @@ public class FieldController {
     public ApiResponse<Boolean> checkCodeUnique(
             @Parameter(description = "字段键") @PathVariable @NotBlank String code,
             @Parameter(description = "排除的PID（用于更新时检查）") @RequestParam(required = false) String excludePid) {
-        log.info("检查字段键唯一性: code={}, excludePid={}", code, excludePid);
+        log.info("检查字段键唯一性: code={}, excludePid={}", logSafe(code), logSafe(excludePid));
         
         boolean isUnique = metaFieldService.isCodeUnique(code, excludePid);
         
@@ -247,7 +252,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_READ)
     public ApiResponse<MetaFieldValidationResult> validateField(
             @Parameter(description = "字段键") @PathVariable @NotBlank String code) {
-        log.info("验证字段定义: code={}", code);
+        log.info("验证字段定义: code={}", logSafe(code));
         
         MetaFieldValidationResult result = metaFieldService.validateField(code);
         
@@ -262,7 +267,7 @@ public class FieldController {
     public ApiResponse<Void> bindDictionary(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String fieldId,
             @Valid @RequestBody DictBindRequest request) {
-        log.info("绑定字典到字段: fieldId={}, dictCode={}", fieldId, request.getDictCode());
+        log.info("绑定字典到字段: fieldId={}, dictCode={}", logSafe(fieldId), logSafe(request.getDictCode()));
         
         // 检查字段是否存在
         MetaFieldDTO field = metaFieldService.findByPid(fieldId);
@@ -276,7 +281,7 @@ public class FieldController {
             return ApiResponse.failure("绑定字典失败");
         }
         
-        log.info("字典绑定成功: fieldId={}, dictCode={}", fieldId, request.getDictCode());
+        log.info("字典绑定成功: fieldId={}, dictCode={}", logSafe(fieldId), logSafe(request.getDictCode()));
         return ApiResponse.<Void>success("字典绑定成功", null);
     }
 
@@ -285,7 +290,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_MANAGE)
     public ApiResponse<Void> unbindDictionary(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String fieldId) {
-        log.info("解绑字段的字典: fieldId={}", fieldId);
+        log.info("解绑字段的字典: fieldId={}", logSafe(fieldId));
         
         // 检查字段是否存在
         MetaFieldDTO field = metaFieldService.findByPid(fieldId);
@@ -299,7 +304,7 @@ public class FieldController {
             return ApiResponse.failure("解绑字典失败");
         }
         
-        log.info("字典解绑成功: fieldId={}", fieldId);
+        log.info("字典解绑成功: fieldId={}", logSafe(fieldId));
         return ApiResponse.<Void>success("字典解绑成功", null);
     }
 
@@ -308,7 +313,7 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_READ)
     public ApiResponse<DictDTO> getBoundDictionary(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String fieldId) {
-        log.info("获取字段绑定的字典: fieldId={}", fieldId);
+        log.info("获取字段绑定的字典: fieldId={}", logSafe(fieldId));
         
         Optional<DictDTO> dict = metaFieldService.getBoundDictionary(fieldId);
         if (dict.isEmpty()) {
@@ -325,11 +330,11 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_MANAGE)
     public ApiResponse<MetaFieldDTO> publishVersion(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String pid) {
-        log.info("发布字段版本: pid={}", pid);
+        log.info("发布字段版本: pid={}", logSafe(pid));
         
         MetaFieldDTO result = metaFieldService.publishVersion(pid);
         
-        log.info("字段版本发布成功: pid={}, version={}", pid, result.getVersion());
+        log.info("字段版本发布成功: pid={}, version={}", logSafe(pid), result.getVersion());
         return ApiResponse.success("字段版本发布成功", result);
     }
 
@@ -339,11 +344,11 @@ public class FieldController {
     public ApiResponse<MetaFieldDTO> rollbackToVersion(
             @Parameter(description = "字段键") @PathVariable @NotBlank String code,
             @Parameter(description = "目标版本") @PathVariable Integer version) {
-        log.info("回滚字段版本: code={}, version={}", code, version);
+        log.info("回滚字段版本: code={}, version={}", logSafe(code), version);
         
         MetaFieldDTO result = metaFieldService.rollbackToVersion(code, version);
         
-        log.info("字段版本回滚成功: code={}, version={}", code, version);
+        log.info("字段版本回滚成功: code={}, version={}", logSafe(code), version);
         return ApiResponse.success("字段版本回滚成功", result);
     }
 
@@ -354,11 +359,11 @@ public class FieldController {
     @RequirePermission(MetaPermission.FIELD_MANAGE)
     public ApiResponse<Void> refreshFieldCache(
             @Parameter(description = "字段键") @PathVariable @NotBlank String code) {
-        log.info("刷新字段缓存: code={}", code);
+        log.info("刷新字段缓存: code={}", logSafe(code));
         
         metaFieldService.refreshFieldCache(code);
         
-        log.info("字段缓存刷新成功: code={}", code);
+        log.info("字段缓存刷新成功: code={}", logSafe(code));
         return ApiResponse.<Void>success("字段缓存刷新成功", null);
     }
 

@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.service;
 
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.plugin.exception.PluginSignatureException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -89,7 +90,8 @@ public class PluginSignatureVerifier {
      * @throws PluginSignatureException if verification fails and enforcement is enabled
      */
     public void verify(Path packageDir) {
-        Path sigFile = packageDir.resolve(SIGNATURE_FILE);
+        packageDir = PathSafetyUtils.requireExistingDirectory(packageDir, "plugin package directory");
+        Path sigFile = PathSafetyUtils.requireSafeChild(packageDir, SIGNATURE_FILE, "signature file");
 
         if (!Files.exists(sigFile)) {
             if (enforceSignature) {
@@ -176,7 +178,7 @@ public class PluginSignatureVerifier {
             return;
         }
 
-        Path keysPath = Path.of(externalKeysDir);
+        Path keysPath = PathSafetyUtils.normalizeAbsolute(Path.of(externalKeysDir), "external keys directory");
         if (!Files.isDirectory(keysPath)) {
             log.warn("External keys directory does not exist: {}", externalKeysDir);
             return;
@@ -204,12 +206,12 @@ public class PluginSignatureVerifier {
     }
 
     private Path resolvePayloadFile(Path packageDir) {
-        Path zipFile = packageDir.resolve(PLUGIN_ZIP_FILE);
+        Path zipFile = PathSafetyUtils.requireSafeChild(packageDir, PLUGIN_ZIP_FILE, "plugin payload zip");
         if (Files.exists(zipFile)) {
             return zipFile;
         }
 
-        Path jsonFile = packageDir.resolve(PLUGIN_JSON_FILE);
+        Path jsonFile = PathSafetyUtils.requireSafeChild(packageDir, PLUGIN_JSON_FILE, "plugin payload manifest");
         if (Files.exists(jsonFile)) {
             return jsonFile;
         }

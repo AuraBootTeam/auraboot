@@ -62,7 +62,7 @@ export async function financeInvoicesCommand(options: InvoiceOptions): Promise<v
 
   const filters: FilterItem[] = [];
   if (options.status) {
-    filters.push({ fieldName: statusField, operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: statusField, operator: 'EQ', value: options.status.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, pageKey, {

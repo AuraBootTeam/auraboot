@@ -99,10 +99,10 @@ public class EmailAccountService {
 
         if (account.getId() == null) {
             emailAccountMapper.insert(account);
-            log.info("Created new email account: id={}, email={}, type={}", account.getId(), email, accountType);
+            log.info("Created new email account: id={}, type={}", account.getId(), accountType);
         } else {
             emailAccountMapper.updateById(account);
-            log.info("Updated email account: id={}, email={}, type={}", account.getId(), email, accountType);
+            log.info("Updated email account: id={}, type={}", account.getId(), accountType);
         }
 
         // For shared accounts, ensure the connecting user is recorded as owner

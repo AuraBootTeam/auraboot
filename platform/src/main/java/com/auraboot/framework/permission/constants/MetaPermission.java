@@ -49,6 +49,15 @@ public final class MetaPermission {
     public static final String PAGE_READ = "meta.page.read";
 
     /**
+     * Legacy page schema read permission used by PageSchema APIs.
+     *
+     * <p>Keep this separate from {@link #PAGE_READ}: existing tenants and
+     * plugin roles grant {@code page.page.read}, while {@code meta.page.read}
+     * is the newer meta-module permission code.
+     */
+    public static final String PAGE_SCHEMA_READ = "page.page.read";
+
+    /**
      * Page designer management permission
      */
     public static final String PAGE_DESIGNER_MANAGE = "meta.designer.update";

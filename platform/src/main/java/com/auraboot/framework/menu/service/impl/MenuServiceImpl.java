@@ -288,14 +288,25 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         // Convert to lowercase
         code = code.toLowerCase();
 
-        // Remove invalid characters (keep only a-z, 0-9, _)
-        code = code.replaceAll("[^a-z0-9_]", "");
-
-        // Remove consecutive underscores
-        code = code.replaceAll("_+", "_");
-
-        // Remove leading/trailing underscores
-        code = code.replaceAll("^_+|_+$", "");
+        StringBuilder cleaned = new StringBuilder(code.length());
+        boolean previousUnderscore = false;
+        for (int i = 0; i < code.length(); i++) {
+            char ch = code.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) {
+                cleaned.append(ch);
+                previousUnderscore = false;
+            } else if (ch == '_' && !previousUnderscore) {
+                cleaned.append(ch);
+                previousUnderscore = true;
+            }
+        }
+        code = cleaned.toString();
+        while (code.startsWith("_")) {
+            code = code.substring(1);
+        }
+        while (code.endsWith("_")) {
+            code = code.substring(0, code.length() - 1);
+        }
 
         // Validate: must start with letter and not be empty
         if (code.isEmpty() || !Character.isLetter(code.charAt(0))) {

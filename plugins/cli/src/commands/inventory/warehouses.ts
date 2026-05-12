@@ -35,7 +35,7 @@ export async function inventoryWarehousesCommand(options: WarehouseOptions): Pro
 
   const filters: FilterItem[] = [];
   if (options.status) {
-    filters.push({ fieldName: 'inv_warehouse_status', operator: 'EQ', value: options.status.toUpperCase() });
+    filters.push({ fieldName: 'inv_warehouse_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, 'inv_warehouse', {

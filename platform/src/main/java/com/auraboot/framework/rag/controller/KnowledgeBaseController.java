@@ -1,6 +1,7 @@
 package com.auraboot.framework.rag.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
@@ -171,10 +172,7 @@ public class KnowledgeBaseController {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
         String docsPath = request.getOrDefault("path", "docs/system-reference");
-        java.nio.file.Path resolved = java.nio.file.Path.of(docsPath);
-        if (!resolved.isAbsolute()) {
-            resolved = java.nio.file.Path.of(System.getProperty("user.dir")).resolve(docsPath);
-        }
+        java.nio.file.Path resolved = resolveWorkspacePath(docsPath, "internal docs path");
         return ApiResponse.success(internalDocImportService.importDocs(tenantId, userId, resolved.toString()));
     }
 
@@ -186,10 +184,7 @@ public class KnowledgeBaseController {
     public ApiResponse<DocGenerationService.GenerationResult> generateDocs(
             @RequestBody Map<String, String> request) throws Exception {
         String outputDir = request.getOrDefault("outputDir", "docs/auto-generated");
-        java.nio.file.Path resolved = java.nio.file.Path.of(outputDir);
-        if (!resolved.isAbsolute()) {
-            resolved = java.nio.file.Path.of(System.getProperty("user.dir")).resolve(outputDir);
-        }
+        java.nio.file.Path resolved = resolveWorkspacePath(outputDir, "generated docs output path");
         return ApiResponse.success(docGenerationService.generate(resolved.toString()));
     }
 
@@ -208,5 +203,10 @@ public class KnowledgeBaseController {
             case "html", "htm" -> "html";
             default -> null;
         };
+    }
+
+    private java.nio.file.Path resolveWorkspacePath(String path, String context) {
+        java.nio.file.Path workspaceRoot = java.nio.file.Path.of(System.getProperty("user.dir"));
+        return PathSafetyUtils.requireWithinBase(workspaceRoot, java.nio.file.Path.of(path), context);
     }
 }

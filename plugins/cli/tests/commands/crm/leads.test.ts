@@ -25,13 +25,13 @@ describe('crm leads command', () => {
   describe('filter options', () => {
     it('should build status filter', () => {
       const status = 'qualified';
-      const filter = { fieldName: 'crm_lead_status', operator: 'EQ', value: status.toUpperCase() };
+      const filter = { fieldName: 'crm_lead_status', operator: 'EQ', value: status.toLowerCase() };
       expect(filter.value).toBe('qualified');
     });
 
     it('should build source filter', () => {
       const source = 'website';
-      const filter = { fieldName: 'crm_lead_source', operator: 'EQ', value: source.toUpperCase() };
+      const filter = { fieldName: 'crm_lead_source', operator: 'EQ', value: source.toLowerCase() };
       expect(filter.value).toBe('website');
     });
 

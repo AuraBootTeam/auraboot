@@ -1,0 +1,14 @@
+extensions:
+  - addsTo:
+      pack: codeql/java-all
+      extensible: barrierModel
+    data:
+      - ["com.auraboot.framework.common.util", "PathSafetyUtils", true, "normalizeAbsolute", "(Path,String)", "", "ReturnValue", "path-injection", "manual"]
+      - ["com.auraboot.framework.common.util", "PathSafetyUtils", true, "requireExistingDirectory", "(Path,String)", "", "ReturnValue", "path-injection", "manual"]
+      - ["com.auraboot.framework.common.util", "PathSafetyUtils", true, "requireSafeChild", "(Path,String,String)", "", "ReturnValue", "path-injection", "manual"]
+      - ["com.auraboot.framework.common.util", "PathSafetyUtils", true, "requireSafeChild", "(Path,Path,String)", "", "ReturnValue", "path-injection", "manual"]
+      - ["com.auraboot.framework.common.util", "PathSafetyUtils", true, "requireWithinBase", "(Path,Path,String)", "", "ReturnValue", "path-injection", "manual"]
+      - ["com.auraboot.framework.common.util", "PathSafetyUtils", true, "requireSafeFileName", "(String,String,String)", "", "ReturnValue", "path-injection", "manual"]
+      - ["com.auraboot.framework.common.util", "SsrfValidator", true, "validate", "(String)", "", "ReturnValue", "request-forgery", "manual"]
+      - ["com.auraboot.framework.common.util", "SsrfValidator$ValidatedTarget", true, "originalUri", "()", "", "ReturnValue", "request-forgery", "manual"]
+      - ["com.auraboot.framework.meta.security", "SqlSafetyUtils", true, "requireIdentifier", "(String,String)", "", "ReturnValue", "sql-injection", "manual"]

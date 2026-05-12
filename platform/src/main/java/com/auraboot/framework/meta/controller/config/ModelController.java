@@ -5,6 +5,7 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.DDLPreviewResult;
 import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
@@ -58,6 +59,10 @@ public class ModelController {
     private final ModelExportService modelExportService;
     private final SchemaManagementService schemaManagementService;
 
+    private static String logSafe(Object value) {
+        return LogSanitizer.safe(value);
+    }
+
     // ==================== 基础CRUD操作 ====================
 
     @PostMapping
@@ -65,7 +70,7 @@ public class ModelController {
 //    @RequirePermission(MetaPermissions.MODEL_CREATE) todo
     public ApiResponse<MetaModelDTO> createModel(
             @Valid @RequestBody MetaModelCreateRequest request) {
-        log.info("创建模型: code={}, displayName={}", request.getCode(), request.getDisplayName());
+        log.info("创建模型: code={}, displayName={}", logSafe(request.getCode()), logSafe(request.getDisplayName()));
         
         // 设置租户信息
         if (request.getTenantId() == null) {
@@ -114,7 +119,7 @@ public class ModelController {
             }
         }
 
-        log.info("模型创建成功: pid={}, code={}", result.getPid(), result.getCode());
+        log.info("模型创建成功: pid={}, code={}", logSafe(result.getPid()), logSafe(result.getCode()));
         return ApiResponse.success("模型创建成功", result);
     }
 
@@ -123,7 +128,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<MetaModelDTO> getModel(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("获取模型详情: pid={}", pid);
+        log.info("获取模型详情: pid={}", logSafe(pid));
         
         MetaModelDTO model = metaModelService.findByPid(pid);
         if (model == null) {
@@ -139,7 +144,7 @@ public class ModelController {
     public ApiResponse<MetaModelDTO> updateModel(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid,
             @Valid @RequestBody MetaModelUpdateRequest request) {
-        log.info("更新模型: pid={}, displayName={}", pid, request.getDisplayName());
+        log.info("更新模型: pid={}, displayName={}", logSafe(pid), logSafe(request.getDisplayName()));
         
         // 检查模型是否存在
         MetaModelDTO existingModel = metaModelService.findByPid(pid);
@@ -181,7 +186,7 @@ public class ModelController {
         MetaModelDTO result = metaModelService.findByPid(pid);
         pluginResourceTracker.markAsUserModified(ResourceType.MODEL, existingModel.getCode());
 
-        log.info("模型更新成功: pid={}, version={}", pid, result != null ? result.getVersion() : null);
+        log.info("模型更新成功: pid={}, version={}", logSafe(pid), result != null ? result.getVersion() : null);
         return ApiResponse.success("模型更新成功", result);
     }
 
@@ -190,7 +195,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<Void> deleteModel(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("删除模型: pid={}", pid);
+        log.info("删除模型: pid={}", logSafe(pid));
         
         // 检查模型是否存在
         MetaModelDTO existingModel = metaModelService.findByPid(pid);
@@ -202,7 +207,7 @@ public class ModelController {
         pluginResourceTracker.markAsUserModified(ResourceType.MODEL, existingModel.getCode());
         metaModelService.delete(pid);
 
-        log.info("模型删除成功: pid={}", pid);
+        log.info("模型删除成功: pid={}", logSafe(pid));
         return ApiResponse.<Void>success("模型删除成功", null);
     }
 
@@ -225,7 +230,8 @@ public class ModelController {
 
         log.info(
                 "查询模型列表: page={}, size={}, keyword={}, code={}, displayName={}, modelType={}, status={}, sourceType={}, sortField={}, sortOrder={}",
-                page, size, keyword, code, displayName, modelType, status, sourceType, sortField, sortOrder
+                page, size, logSafe(keyword), logSafe(code), logSafe(displayName), logSafe(modelType),
+                logSafe(status), logSafe(sourceType), logSafe(sortField), logSafe(sortOrder)
         );
 
         PageResult<MetaModelDTO> result = metaModelService.searchModels(
@@ -243,7 +249,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<Boolean> checkModelExists(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("检查模型是否存在: pid={}", pid);
+        log.info("检查模型是否存在: pid={}", logSafe(pid));
         
         MetaModelDTO model = metaModelService.findByPid(pid);
         boolean exists = model != null;
@@ -257,7 +263,7 @@ public class ModelController {
     public ApiResponse<Boolean> checkCodeUnique(
             @Parameter(description = "模型编码") @PathVariable @NotBlank String code,
             @Parameter(description = "排除的PID（用于更新时检查）") @RequestParam(required = false) String excludePid) {
-        log.info("检查模型编码唯一性: code={}, excludePid={}", code, excludePid);
+        log.info("检查模型编码唯一性: code={}, excludePid={}", logSafe(code), logSafe(excludePid));
         
         boolean isUnique = metaModelService.isCodeUnique(code, excludePid);
         
@@ -269,7 +275,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<Void> refreshModelCache(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("刷新模型缓存: pid={}", pid);
+        log.info("刷新模型缓存: pid={}", logSafe(pid));
         
         // 先获取模型信息以获取模型编码
         MetaModelDTO model = metaModelService.findByPid(pid);
@@ -280,7 +286,7 @@ public class ModelController {
         // 刷新缓存
         metaModelService.refreshModelCache(model.getCode());
         
-        log.info("模型缓存刷新成功: pid={}, code={}", pid, model.getCode());
+        log.info("模型缓存刷新成功: pid={}, code={}", logSafe(pid), logSafe(model.getCode()));
         return ApiResponse.<Void>success("模型缓存刷新成功", null);
     }
 
@@ -303,11 +309,11 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<List<MetaModelDTO>> getVersionHistory(
             @Parameter(description = "模型编码") @PathVariable @NotBlank String code) {
-        log.info("获取模型版本历史: code={}", code);
+        log.info("获取模型版本历史: code={}", logSafe(code));
         
         List<MetaModelDTO> versions = metaModelService.getVersionHistory(code);
         
-        log.info("模型版本历史查询完成: code={}, count={}", code, versions.size());
+        log.info("模型版本历史查询完成: code={}, count={}", logSafe(code), versions.size());
         return ApiResponse.success(versions);
     }
 
@@ -317,11 +323,11 @@ public class ModelController {
     public ApiResponse<MetaModelDTO> getVersionDetail(
             @Parameter(description = "模型编码") @PathVariable @NotBlank String code,
             @Parameter(description = "版本号") @PathVariable Integer version) {
-        log.info("获取模型版本详情: code={}, version={}", code, version);
+        log.info("获取模型版本详情: code={}, version={}", logSafe(code), version);
         
         MetaModelDTO model = metaModelService.getVersionDetail(code, version);
         
-        log.info("模型版本详情查询完成: code={}, version={}", code, version);
+        log.info("模型版本详情查询完成: code={}, version={}", logSafe(code), version);
         return ApiResponse.success(model);
     }
 
@@ -333,11 +339,11 @@ public class ModelController {
             @Parameter(description = "版本1和版本2") @RequestBody Map<String, Integer> request) {
         Integer v1 = request.get("v1");
         Integer v2 = request.get("v2");
-        log.info("对比模型版本: code={}, v1={}, v2={}", code, v1, v2);
+        log.info("对比模型版本: code={}, v1={}, v2={}", logSafe(code), v1, v2);
 
         Map<String, Object> diff = metaModelService.compareVersions(code, v1, v2);
         
-        log.info("模型版本对比完成: code={}", code);
+        log.info("模型版本对比完成: code={}", logSafe(code));
         return ApiResponse.success(diff);
     }
 
@@ -348,17 +354,17 @@ public class ModelController {
             @Parameter(description = "模型编码") @PathVariable @NotBlank String code,
             @Parameter(description = "目标版本号") @RequestBody Map<String, Integer> request) {
         Integer version = request.get("version");
-        log.info("回滚模型版本: code={}, targetVersion={}", code, version);
+        log.info("回滚模型版本: code={}, targetVersion={}", logSafe(code), version);
 
         try {
             MetaModelDTO result = metaModelService.rollbackToVersion(code, version);
-            log.info("模型版本回滚成功: code={}, version={}", code, version);
+            log.info("模型版本回滚成功: code={}, version={}", logSafe(code), version);
             return ApiResponse.success("版本回滚成功", result);
         } catch (IllegalArgumentException e) {
-            log.error("回滚失败: {}", e.getMessage());
+            log.error("回滚失败: {}", logSafe(e.getMessage()));
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
-            log.error("回滚失败: code={}, version={}, error={}", code, version, e.getMessage(), e);
+            log.error("回滚失败: code={}, version={}, error={}", logSafe(code), version, logSafe(e.getMessage()), e);
             return ApiResponse.error("回滚失败: " + e.getMessage());
         }
     }
@@ -386,7 +392,7 @@ public class ModelController {
                 metaModelService.delete(pid);
                 successCount++;
             } catch (Exception e) {
-                log.error("删除模型失败: pid={}, error={}", pid, e.getMessage());
+                log.error("删除模型失败: pid={}, error={}", logSafe(pid), logSafe(e.getMessage()));
                 failureCount++;
                 failedPids.add(pid);
             }
@@ -412,7 +418,7 @@ public class ModelController {
     @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, Object>> exportModels(
             @RequestBody Map<String, Object> exportRequest) {
-        log.info("导出模型: request={}", exportRequest);
+        log.info("导出模型: request={}", logSafe(exportRequest));
 
         Object raw = exportRequest.get("modelCodes");
         if (!(raw instanceof List<?> list) || list.isEmpty()) {
@@ -429,7 +435,7 @@ public class ModelController {
             result.put("exportedBy", null);
         }
 
-        log.info("模型导出完成: modelCodes={}", modelCodes);
+        log.info("模型导出完成: modelCodes={}", logSafe(modelCodes));
         return ApiResponse.success(result);
     }
 
@@ -469,7 +475,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<Map<String, Object>> getReleaseInfo(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("获取模型Release信息: pid={}", pid);
+        log.info("获取模型Release信息: pid={}", logSafe(pid));
         
         MetaModelDTO model = metaModelService.findByPid(pid);
         if (model == null) {
@@ -485,7 +491,7 @@ public class ModelController {
             "status", model.getStatus() != null ? model.getStatus() : "unknown"
         );
         
-        log.info("模型Release信息查询完成: pid={}", pid);
+        log.info("模型Release信息查询完成: pid={}", logSafe(pid));
         return ApiResponse.success(releaseInfo);
     }
 
@@ -497,7 +503,7 @@ public class ModelController {
     public ApiResponse<MetaModelDTO> publishModel(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid,
             @Parameter(description = "版本说明") @RequestParam(required = false) String versionNote) {
-        log.info("发布模型: pid={}, versionNote={}", pid, versionNote);
+        log.info("发布模型: pid={}, versionNote={}", logSafe(pid), logSafe(versionNote));
 
         MetaModelDTO result = metaModelService.publish(pid, versionNote);
         return ApiResponse.success(result);
@@ -508,7 +514,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<MetaModelDTO> unpublishModel(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("取消发布模型: pid={}", pid);
+        log.info("取消发布模型: pid={}", logSafe(pid));
 
         MetaModelDTO result = metaModelService.unpublish(pid);
         return ApiResponse.success(result);
@@ -519,7 +525,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<SchemaOperationResult> syncModelSchema(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("同步模型表结构: pid={}", pid);
+        log.info("同步模型表结构: pid={}", logSafe(pid));
 
         MetaModelDTO model = metaModelService.findByPid(pid);
         if (model == null) {
@@ -543,7 +549,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<DDLPreviewResult> previewPublishDDL(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("预览模型发布DDL: pid={}", pid);
+        log.info("预览模型发布DDL: pid={}", logSafe(pid));
 
         DDLPreviewResult result = metaModelService.previewPublishDDL(pid);
         return ApiResponse.success(result);
@@ -559,7 +565,7 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<List<PageSchemaDTO>> getRelatedPages(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
-        log.info("获取模型关联页面: pid={}", pid);
+        log.info("获取模型关联页面: pid={}", logSafe(pid));
 
         MetaModelDTO model = metaModelService.findByPid(pid);
         if (model == null) {
@@ -569,7 +575,8 @@ public class ModelController {
         // 根据模型编码查询关联页面
         List<PageSchemaDTO> pages = pageSchemaService.findByModelCode(model.getCode());
 
-        log.info("模型关联页面查询完成: pid={}, modelCode={}, count={}", pid, model.getCode(), pages.size());
+        log.info("模型关联页面查询完成: pid={}, modelCode={}, count={}",
+                logSafe(pid), logSafe(model.getCode()), pages.size());
         return ApiResponse.success(pages);
     }
 
@@ -578,11 +585,11 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<MetaModelDTO> getModelByCode(
             @Parameter(description = "模型编码") @PathVariable @NotBlank String code) {
-        log.info("根据编码获取模型详情: code={}", code);
+        log.info("根据编码获取模型详情: code={}", logSafe(code));
         
         MetaModelDTO model = metaModelService.findByCode(code);
         
-        log.info("根据编码查询模型完成: code={}", code);
+        log.info("根据编码查询模型完成: code={}", logSafe(code));
         return ApiResponse.success(model);
     }
 }

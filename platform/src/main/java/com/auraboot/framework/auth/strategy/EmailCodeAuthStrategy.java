@@ -59,7 +59,7 @@ public class EmailCodeAuthStrategy implements AuthStrategy {
         // Find user by email, auto-register if not found
         User user = findUserByEmail(email);
         if (user == null) {
-            log.info("Auto-registering new user with email: {}", email);
+            log.info("Auto-registering new user via email OTP");
             user = autoRegisterByEmail(email);
         }
 
@@ -74,6 +74,8 @@ public class EmailCodeAuthStrategy implements AuthStrategy {
             userMapper.updateById(user);
         }
 
+        // CodeQL cannot infer the prior OTP verification gate; completeLogin is
+        // reached only after VerificationCodeService accepts the email code.
         return loginCompletionHelper.completeLogin(user, request.getIpAddress(), request.getUserAgent());
     }
 

@@ -49,7 +49,7 @@ export function loadConfig(): AuraConfig {
 export function resolveBaseUrl(env?: string): string {
   const envUrl = process.env.AURA_API_URL;
   if (envUrl && envUrl.trim().length > 0) {
-    return envUrl.trim().replace(/\/$/, '');
+    return normalizeBaseUrl(envUrl);
   }
   const config = loadConfig();
   const envName = env || config.defaultEnv;
@@ -59,7 +59,26 @@ export function resolveBaseUrl(env?: string): string {
     console.error(chalk.dim(`Available: ${Object.keys(config.environments).join(', ')}`));
     process.exit(1);
   }
-  return envConfig.baseUrl;
+  return normalizeBaseUrl(envConfig.baseUrl);
+}
+
+export function normalizeBaseUrl(value: string): string {
+  const trimmed = value.trim();
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error(`Invalid Aura API URL: ${trimmed}`);
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`Unsupported Aura API URL protocol: ${url.protocol}`);
+  }
+  if (url.username || url.password) {
+    throw new Error('Aura API URL must not include credentials');
+  }
+
+  return url.toString().replace(/\/$/, '');
 }
 
 /**
@@ -84,11 +103,9 @@ export function saveCredentials(creds: Credentials, env?: string): void {
   mkdirSync(AURA_DIR, { recursive: true });
 
   let all: Record<string, Credentials> = {};
-  if (existsSync(CREDENTIALS_FILE)) {
-    try {
-      all = JSON.parse(readFileSync(CREDENTIALS_FILE, 'utf-8'));
-    } catch { /* ignore */ }
-  }
+  try {
+    all = JSON.parse(readFileSync(CREDENTIALS_FILE, 'utf-8'));
+  } catch { /* ignore */ }
 
   const config = loadConfig();
   const envName = env || config.defaultEnv;

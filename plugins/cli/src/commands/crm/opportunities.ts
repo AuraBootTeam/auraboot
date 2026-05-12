@@ -37,7 +37,7 @@ export async function crmOpportunitiesCommand(options: OppOptions): Promise<void
 
   const filters: FilterItem[] = [];
   if (options.stage) {
-    filters.push({ fieldName: 'crm_opp_stage', operator: 'EQ', value: options.stage.toUpperCase() });
+    filters.push({ fieldName: 'crm_opp_stage', operator: 'EQ', value: options.stage.toLowerCase() });
   }
 
   const records = await queryDynamicList(client, 'crm_opportunity', {

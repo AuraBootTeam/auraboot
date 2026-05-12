@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.executor;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.ModelCapabilities;
 import com.auraboot.framework.meta.dto.ModelDefinition;
@@ -72,9 +73,9 @@ public class SqlViewModelExecutor implements ModelDataExecutor {
         ModelDefinition def = requireDefinition(modelCode);
         String viewName = validateIdentifier(def.getSourceRef(), "view name");
 
-        int pageNum = (request.getPageNum() != null && request.getPageNum() > 0) ? request.getPageNum() : 1;
+        int pageNum = PaginationSafetyUtils.pageNumber(request.getPageNum() != null ? request.getPageNum() : 1);
         int pageSize = resolvePageSize(request.getPageSize());
-        int offset = (pageNum - 1) * pageSize;
+        int offset = PaginationSafetyUtils.offset(pageNum, pageSize, MAX_PAGE_SIZE);
 
         ModelCapabilities caps = def.getCapabilities() != null
             ? def.getCapabilities() : ModelCapabilities.empty();
