@@ -14,6 +14,7 @@ import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.service.ImConversationService;
 import com.auraboot.framework.im.service.ImMessageService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ImMessageServiceImpl implements ImMessageService {
@@ -148,6 +151,40 @@ public class ImMessageServiceImpl implements ImMessageService {
             throw new IllegalArgumentException("Message not found, already recalled, or not authorized");
         }
         return messageMapper.selectById(messageId);
+    }
+
+    @Override
+    @Transactional
+    public ImMessage settleConfirmationMessage(Long messageId, Long userId, Long tenantId, String decision) {
+        if (!"confirmed".equals(decision) && !"rejected".equals(decision)) {
+            throw new IllegalArgumentException("Unsupported confirmation decision");
+        }
+        ImMessage message = messageMapper.selectById(messageId);
+        if (message == null || !tenantId.equals(message.getTenantId())) {
+            throw new IllegalArgumentException("Message not found");
+        }
+        if (!conversationService.isMember(message.getConversationId(), userId, tenantId)) {
+            throw new IllegalArgumentException("Not a member of this conversation");
+        }
+        if (!"confirmation_card".equalsIgnoreCase(message.getMessageType())) {
+            throw new IllegalArgumentException("Message is not a confirmation card");
+        }
+        if (Boolean.TRUE.equals(message.getRecalled())) {
+            throw new IllegalArgumentException("Message has been recalled");
+        }
+
+        Map<String, Object> payload = parseCardPayloadMap(message.getCardPayload());
+        Object existingStatus = payload.get("status");
+        if ("confirmed".equals(existingStatus) || "rejected".equals(existingStatus)) {
+            throw new IllegalArgumentException("Confirmation card has already been settled");
+        }
+        payload.put("status", decision);
+        payload.put("decision", decision);
+        payload.put("decidedBy", userId);
+        payload.put("decidedAt", Instant.now().toString());
+        message.setCardPayload(toJson(payload));
+        messageMapper.updateById(message);
+        return message;
     }
 
     @Override
@@ -322,6 +359,25 @@ public class ImMessageServiceImpl implements ImMessageService {
         } catch (JsonProcessingException e) {
             log.warn("Failed to serialize to JSON", e);
             return null;
+        }
+    }
+
+    @Override
+    public Object parseCardPayload(String cardPayload) {
+        if (cardPayload == null || cardPayload.isBlank()) {
+            return null;
+        }
+        return parseCardPayloadMap(cardPayload);
+    }
+
+    private Map<String, Object> parseCardPayloadMap(String cardPayload) {
+        if (cardPayload == null || cardPayload.isBlank()) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            return objectMapper.readValue(cardPayload, new TypeReference<LinkedHashMap<String, Object>>() {});
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Invalid card payload JSON", e);
         }
     }
 }

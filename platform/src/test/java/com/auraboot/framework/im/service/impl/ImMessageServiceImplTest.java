@@ -227,6 +227,75 @@ class ImMessageServiceImplTest {
         assertThat(result.getRecalled()).isTrue();
     }
 
+    // ============== confirmation cards ==============
+
+    @Test
+    void settleConfirmationMessage_confirmsAndPersistsDecision() {
+        ImMessage message = new ImMessage();
+        message.setId(5L);
+        message.setTenantId(TENANT_ID);
+        message.setConversationId(CONV_ID);
+        message.setMessageType("confirmation_card");
+        message.setCardPayload("{\"operationType\":\"create\",\"title\":\"Create record\"}");
+        when(messageMapper.selectById(5L)).thenReturn(message);
+        when(conversationService.isMember(CONV_ID, USER_ID, TENANT_ID)).thenReturn(true);
+
+        ImMessage result = service.settleConfirmationMessage(5L, USER_ID, TENANT_ID, "confirmed");
+
+        ArgumentCaptor<ImMessage> captor = ArgumentCaptor.forClass(ImMessage.class);
+        verify(messageMapper).updateById(captor.capture());
+        assertThat(result).isSameAs(message);
+        assertThat(captor.getValue().getCardPayload()).contains("\"operationType\":\"create\"");
+        assertThat(captor.getValue().getCardPayload()).contains("\"status\":\"confirmed\"");
+        assertThat(captor.getValue().getCardPayload()).contains("\"decision\":\"confirmed\"");
+        assertThat(captor.getValue().getCardPayload()).contains("\"decidedBy\":200");
+        assertThat(captor.getValue().getCardPayload()).contains("\"decidedAt\"");
+    }
+
+    @Test
+    void settleConfirmationMessage_rejectsNonConfirmationMessage() {
+        ImMessage message = new ImMessage();
+        message.setId(5L);
+        message.setTenantId(TENANT_ID);
+        message.setConversationId(CONV_ID);
+        message.setMessageType("text");
+        when(messageMapper.selectById(5L)).thenReturn(message);
+        when(conversationService.isMember(CONV_ID, USER_ID, TENANT_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.settleConfirmationMessage(5L, USER_ID, TENANT_ID, "confirmed"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("confirmation card");
+        verify(messageMapper, never()).updateById(any(ImMessage.class));
+    }
+
+    @Test
+    void settleConfirmationMessage_rejectsAlreadySettledCard() {
+        ImMessage message = new ImMessage();
+        message.setId(5L);
+        message.setTenantId(TENANT_ID);
+        message.setConversationId(CONV_ID);
+        message.setMessageType("confirmation_card");
+        message.setCardPayload("{\"status\":\"rejected\"}");
+        when(messageMapper.selectById(5L)).thenReturn(message);
+        when(conversationService.isMember(CONV_ID, USER_ID, TENANT_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.settleConfirmationMessage(5L, USER_ID, TENANT_ID, "confirmed"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("already");
+        verify(messageMapper, never()).updateById(any(ImMessage.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void parseCardPayload_returnsMapForRestResponse() {
+        Object payload = service.parseCardPayload("{\"status\":\"pending\",\"risk\":3}");
+
+        assertThat(payload).isInstanceOf(Map.class);
+        Map<String, Object> map = (Map<String, Object>) payload;
+        assertThat(map).containsEntry("status", "pending");
+        assertThat(map).containsEntry("risk", 3);
+    }
+
     // ============== sendSystemMessage ==============
 
     @Test
