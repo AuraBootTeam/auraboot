@@ -46,11 +46,17 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
 
 const MODEL_CODE = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const DETAIL_URL_RE = new RegExp(`/p/${MODEL_CODE}/view/[^/?#]+`);
 const DETAIL_PAGE_KEY = `${MODEL_CODE}_detail`;
+const SAVED_VIEW_PAGE_KEY = MODEL_CODE;
 
 interface SeededRecord {
   pid: string;
@@ -69,6 +75,7 @@ interface DetailPageSnapshot {
 
 const createdPids: string[] = [];
 let detailSnapshot: DetailPageSnapshot | null = null;
+let defaultTableView: DefaultTableViewState | null = null;
 
 async function seedRecord(request: APIRequestContext): Promise<SeededRecord> {
   const ts = Date.now();
@@ -268,6 +275,20 @@ function buildTabsBlock(innerBlocks: any[], tabKey = 'd_tab') {
 test.describe('D — Detail-kind block coverage (bpm-panel / activity / comments)', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(90_000);
+
+  test.beforeAll(async ({ request }) => {
+    defaultTableView = await createDefaultTableView(
+      request,
+      MODEL_CODE,
+      SAVED_VIEW_PAGE_KEY,
+      'detail blocks',
+    );
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
 
   test.afterEach(async ({ request }) => {
     if (detailSnapshot) {

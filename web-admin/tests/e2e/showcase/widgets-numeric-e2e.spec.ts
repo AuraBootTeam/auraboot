@@ -203,7 +203,10 @@ async function selectFieldInBlock(
   blockTitle: string,
   fieldCode: string,
 ): Promise<void> {
-  const block = page.getByTestId('sortable-block').filter({ hasText: blockTitle }).first();
+  const block = page
+    .getByTestId('sortable-block')
+    .filter({ hasText: blockTitle === 'Section Title' ? /Section Title|区段标题/ : blockTitle })
+    .first();
   await expect(block).toBeVisible({ timeout: 5_000 });
   const fieldLabel = block.locator(`label:has-text("${fieldCode}")`).first();
   await expect(fieldLabel).toBeVisible({ timeout: 5_000 });
@@ -597,7 +600,7 @@ test.describe('GA B2 — numeric widget configuration chain', () => {
 
       // Select newly-added section via outline so we can add fields.
       await page.getByTestId('designer-tab-outline').click();
-      const outlineButtons = page.locator('button:has-text("Section Title")');
+      const outlineButtons = page.locator('button:has-text("Section Title"), button:has-text("区段标题")');
       await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
       await outlineButtons.first().click();
       await addFieldsToSelectedBlock(page, [c.field]);

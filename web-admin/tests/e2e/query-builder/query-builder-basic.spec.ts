@@ -12,6 +12,7 @@
 
 import { test, expect } from '../../fixtures';
 import { Client as PgClient } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
 
 // Seed at least one e2et_record row with status='failed' so QB-07 (which
 // asserts data-rows >= 1 after filtering by status=failed) and QB-08 (which
@@ -21,14 +22,6 @@ import { Client as PgClient } from 'pg';
 // `model.e2et_record.create` which the default admin role doesn't grant in
 // the OSS smoke stack (see test-fixtures plugin permissions). Bypass the API
 // and write the row through the same data path the QB-execute SELECT reads.
-const PG_CONN = {
-  host: process.env.PGHOST ?? 'localhost',
-  port: Number(process.env.PGPORT ?? 5432),
-  database: process.env.PGDATABASE ?? 'aura_boot',
-  user: process.env.PGUSER ?? 'auraboot',
-  password: process.env['PGPASSWORD'] ?? 'auraboot_dev',
-};
-
 async function seedE2etRecord(): Promise<void> {
   const client = new PgClient(PG_CONN);
   await client.connect();

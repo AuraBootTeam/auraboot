@@ -11,8 +11,17 @@
  */
 
 import { test, expect } from '@playwright/test';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
 
 const SHOWCASE_LIST_URL = '/p/showcase_all_fields';
+const MODEL_CODE = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields';
+
+let defaultTableView: DefaultTableViewState | null = null;
 
 /** Navigate to showcase list and wait for table to render with data. */
 async function gotoShowcaseList(page: import('@playwright/test').Page) {
@@ -42,6 +51,15 @@ async function clearActiveSorts(page: import('@playwright/test').Page) {
 
 test.describe('List Page UX Features', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  test.beforeAll(async ({ request }) => {
+    defaultTableView = await createDefaultTableView(request, MODEL_CODE, PAGE_KEY, 'list ux');
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
 
   test('Sort Popover opens, adds a rule, and shows badge count', async ({ page }) => {
     test.setTimeout(60_000);

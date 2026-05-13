@@ -44,6 +44,11 @@ import {
   waitForDynamicPageLoad,
   queryFilteredList,
 } from '../helpers/index';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from '../showcase/helpers/default-table-view';
 
 // ---------------------------------------------------------------------------
 // Serial mode — tests share state (created records flow through lifecycle)
@@ -62,6 +67,8 @@ const RECORD_NAME_EDITED = `Edited Showcase ${UID}`;
 const DESCRIPTION = `Showcase test description ${UID}`;
 const START_DATE = dateOffsetStr(7);
 const END_DATE = dateOffsetStr(14);
+const MODEL_CODE = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields';
 
 // ---------------------------------------------------------------------------
 // Navigation helper — MUST use sidebar menu, NOT page.goto  [D1]
@@ -174,6 +181,7 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
   let recordPidC: string;
   let uiCreatedPid: string;
   let uiCreatedCode: string;
+  let defaultTableView: DefaultTableViewState | null = null;
 
   // =========================================================================
   // beforeAll: seed 3 draft records via API for list testing
@@ -182,6 +190,13 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
     const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
+      defaultTableView = await createDefaultTableView(
+        page.request,
+        MODEL_CODE,
+        PAGE_KEY,
+        'showcase lifecycle',
+      );
+
       // Record A: draft, priority=low, category=electronics, qty=100, price=99.99
       const resultA = await executeCommandViaApi(
         page,
@@ -262,6 +277,11 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
     } finally {
       await ctx.close();
     }
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
   });
 
   // =========================================================================

@@ -258,6 +258,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
   }) => {
     test.setTimeout(90_000);
 
+    await createDefaultTableView(request, 'Kanban Base');
     await navigateToShowcaseListViaMenu(page);
     const { pid, configValues } = await createConfiguredView(page, 'kanban');
 
@@ -289,6 +290,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
   }) => {
     test.setTimeout(90_000);
 
+    await createDefaultTableView(request, 'Calendar Base');
     await navigateToShowcaseListViaMenu(page);
     const { pid, configValues } = await createConfiguredView(page, 'calendar');
 
@@ -319,6 +321,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
   }) => {
     test.setTimeout(90_000);
 
+    await createDefaultTableView(request, 'Gallery Base');
     await navigateToShowcaseListViaMenu(page);
     const { pid, configValues } = await createConfiguredView(page, 'gallery');
 

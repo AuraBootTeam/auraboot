@@ -134,6 +134,8 @@
     "tests/e2e/organization/org-department.spec.ts",
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts",
     "tests/e2e/user/user-management.spec.ts",
+    "tests/e2e/aurabot/pcba-quality-agent-entry.spec.ts",
+    "tests/e2e/aurabot/pcba-quality-agent-write.spec.ts",
     "tests/e2e/bpm/bpm-form-integration.spec.ts",
     "tests/e2e/aurabot/pcba-procurement-agent-entry.spec.ts",
     "tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts"
@@ -168,6 +170,8 @@
     "tests/e2e/organization/org-department.spec.ts": "[A] 1/5 cases (create-department-via-...) uses enterprise-only field; whole file excluded because playwright.oss.config.ts filter is file-path level only — 4 passing sibling cases lost. See per_case_excludes_todo.",
     "tests/e2e/saved-view/saved-view-column-settings.spec.ts": "[A] CS-007 column-order persistence relies on enterprise wiring; whole file excluded (7 passing siblings lost). See per_case_excludes_todo.",
     "tests/e2e/user/user-management.spec.ts": "[A] UM-006/UM-007 role assignment/list are enterprise; whole file excluded (9 passing siblings lost). See per_case_excludes_todo.",
+    "tests/e2e/aurabot/pcba-quality-agent-entry.spec.ts": "[A] pcba quality flow depends on enterprise quality/product-catalog plugins and Quality sidebar menus; OSS stack does not ship /p/qc_* pages.",
+    "tests/e2e/aurabot/pcba-quality-agent-write.spec.ts": "[A] same pcba quality enterprise flow; imports /app/plugins-enterprise/product-catalog and navigates Quality/CAPA pages absent from OSS.",
     "tests/e2e/bpm/bpm-form-integration.spec.ts": "[A] BFI-004 asserts /api/inbox endpoint; unified Inbox API lives in enterprise platform only. OSS backend has no /api/inbox controller."
   },
   "per_case_excludes_todo": {

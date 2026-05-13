@@ -29,12 +29,19 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
 
 const MODEL_CODE = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const FORM_NEW_URL_RE = new RegExp(`/p/${MODEL_CODE}/new(?:$|\\?)`);
 
 const createdPids: string[] = [];
+let defaultTableView: DefaultTableViewState | null = null;
 
 async function deleteRecord(request: APIRequestContext, pid: string): Promise<void> {
   await request
@@ -97,6 +104,15 @@ async function openCreateForm(page: Page): Promise<void> {
 
 test.describe('D8 — showcase_all_fields validation runtime', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  test.beforeAll(async ({ request }) => {
+    defaultTableView = await createDefaultTableView(request, MODEL_CODE, PAGE_KEY, 'validation');
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
 
   test.afterEach(async ({ request }) => {
     while (createdPids.length > 0) {

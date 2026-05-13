@@ -60,7 +60,7 @@ export default function EnvironmentManagement() {
   const { t } = useI18n();
 
   const [environments, setEnvironments] = useState<EnvironmentData[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingEnv, setEditingEnv] = useState<EnvironmentData | null>(null);
   const [showDiff, setShowDiff] = useState(false);
@@ -95,7 +95,6 @@ export default function EnvironmentManagement() {
     try {
       const result = await fetchResult<EnvironmentData[]>('/api/admin/environments', {
         method: 'get',
-        token: token ?? undefined,
       });
       if (result.success && result.data) {
         setEnvironments(result.data);
@@ -107,12 +106,10 @@ export default function EnvironmentManagement() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
-    if (token) {
-      fetchEnvironments();
-    }
+    fetchEnvironments();
   }, [token, fetchEnvironments]);
 
   // Reset form
@@ -188,7 +185,6 @@ export default function EnvironmentManagement() {
       const result = await fetchResult<EnvironmentData>(url, {
         method,
         params: payload,
-        token: token ?? undefined,
       });
 
       if (result.success) {
@@ -212,9 +208,9 @@ export default function EnvironmentManagement() {
     try {
       const result = await fetchResult<void>(`/api/admin/environments/${env.pid}`, {
         method: 'delete',
-        token: token ?? undefined,
       });
       if (result.success) {
+        setEnvironments((current) => current.filter((item) => item.pid !== env.pid));
         fetchEnvironments();
       } else {
         setError('Delete failed');

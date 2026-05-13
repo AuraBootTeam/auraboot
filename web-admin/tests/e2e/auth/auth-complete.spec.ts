@@ -387,14 +387,13 @@ test.describe('Login — Email/Password', () => {
 
   test('LN-003: should show styled error banner with wrong password', async ({ page }) => {
     await loginViaUI(page, ADMIN.email, 'wrong-password-123');
-    // The exact localized copy may differ, but the page must surface a visible login error.
-    const errorBanner = page
-      .locator('[role="alert"], [data-testid="login-error"], .text-red-500, .bg-red-50')
-      .filter({
-        hasText: /邮箱或密码错误|请重试|Invalid email or password|invalid credentials/i,
-      })
-      .first();
-    await expect(errorBanner).toBeVisible({ timeout: 5000 });
+    // The exact localized copy may differ, but the page must surface the
+    // styled login error emitted by Login.tsx after the form action returns.
+    const errorBanner = page.getByTestId('login-error');
+    await expect(errorBanner).toBeVisible({ timeout: 15_000 });
+    await expect(errorBanner).toContainText(
+      /邮箱或密码错误|请重试|Invalid email or password|invalid credentials/i,
+    );
     const onLogin = page.url().includes('/login');
     expect(onLogin).toBe(true);
   });

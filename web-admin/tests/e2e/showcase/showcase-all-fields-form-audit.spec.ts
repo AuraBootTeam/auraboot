@@ -7,10 +7,16 @@ import {
   dateOffsetStr,
   uniqueId,
 } from '../helpers/index';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
 
 test.describe.configure({ mode: 'serial' });
 
 const MODEL_CODE = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 
 const ALL_FIELD_CODES = [
@@ -106,6 +112,7 @@ const DATE_RANGE_END = dateOffsetStr(12);
 
 let recordPid = '';
 let seedUserId = '';
+let defaultTableView: DefaultTableViewState | null = null;
 
 async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
@@ -256,6 +263,12 @@ test.describe('showcase_all_fields form audit', () => {
     const ctx = await browser.newContext({ storageState: adminStorageState });
     const page = await ctx.newPage();
     try {
+      defaultTableView = await createDefaultTableView(
+        page.request,
+        MODEL_CODE,
+        PAGE_KEY,
+        'form audit',
+      );
       seedUserId = await resolveSeedUserId(page);
       recordPid = await seedAuditRecord(page);
     } finally {
@@ -264,11 +277,14 @@ test.describe('showcase_all_fields form audit', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    if (!recordPid) return;
     const ctx = await browser.newContext({ storageState: adminStorageState });
     const page = await ctx.newPage();
     try {
-      await deleteRecord(page.request, recordPid);
+      if (recordPid) {
+        await deleteRecord(page.request, recordPid);
+      }
+      await restoreDefaultTableView(page.request, defaultTableView);
+      defaultTableView = null;
     } finally {
       await ctx.close();
     }

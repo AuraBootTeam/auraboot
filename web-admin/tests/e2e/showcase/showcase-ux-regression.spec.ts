@@ -7,6 +7,15 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { executeCommandViaApi } from '../helpers';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
+
+const SHOWCASE_MODEL_CODE = 'showcase_all_fields';
+const SHOWCASE_PAGE_KEY = 'showcase_all_fields';
+let defaultTableView: DefaultTableViewState | null = null;
 
 async function getAccountWithLinkedContact(
   page: Page,
@@ -101,6 +110,20 @@ async function navigateToListViaMenu(
 test.describe('Showcase UX Regression', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(60_000);
+
+  test.beforeAll(async ({ request }) => {
+    defaultTableView = await createDefaultTableView(
+      request,
+      SHOWCASE_MODEL_CODE,
+      SHOWCASE_PAGE_KEY,
+      'showcase ux',
+    );
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
 
   test('A0: Showcase sidebar hides widget dashboard entry', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});

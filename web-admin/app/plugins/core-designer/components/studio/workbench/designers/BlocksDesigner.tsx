@@ -159,7 +159,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
           break;
         case 'form-section':
         case 'detail-section':
-          newBlock.title = l('区段标题', 'Section Title');
+          newBlock.title = { 'zh-CN': '区段标题', 'en-US': 'Section Title' };
           newBlock.fields = [];
           break;
         case 'table':

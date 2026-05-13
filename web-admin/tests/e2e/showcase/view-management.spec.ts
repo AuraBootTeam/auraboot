@@ -19,6 +19,11 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers/index';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
 
 // ---------------------------------------------------------------------------
 // Serial mode — tests share state (created views flow through lifecycle)
@@ -29,11 +34,14 @@ test.describe.configure({ mode: 'serial' });
 // Constants
 // ---------------------------------------------------------------------------
 const SHOWCASE_LIST_URL = '/p/showcase_all_fields';
+const MODEL_CODE = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields';
 const UID = uniqueId('VW');
 
 // Track created view names for later tests
 let createdTableViewName = '';
 let createdKanbanViewName = '';
+let defaultTableView: DefaultTableViewState | null = null;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -83,6 +91,15 @@ async function openTypePicker(page: Page) {
 
 test.describe('View Management Panel', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  test.beforeAll(async ({ request }) => {
+    defaultTableView = await createDefaultTableView(request, MODEL_CODE, PAGE_KEY, 'view management');
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
 
   test('Panel opens with View Management heading and shows existing views', async ({ page }) => {
     test.setTimeout(60_000);
