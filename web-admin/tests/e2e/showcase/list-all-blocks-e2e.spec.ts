@@ -43,10 +43,16 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
 
 const MODEL_CODE = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const LIST_PAGE_KEY = `${MODEL_CODE}_list`;
+const SAVED_VIEW_PAGE_KEY = MODEL_CODE;
 
 interface ListPageSnapshot {
   pid: string;
@@ -128,9 +134,24 @@ async function gotoShowcaseListViaMenu(page: Page): Promise<void> {
 }
 
 let listSnapshot: ListPageSnapshot | null = null;
+let defaultTableView: DefaultTableViewState | null = null;
 
 test.describe('D — List-kind block coverage (filters standalone)', () => {
   test.setTimeout(60_000);
+
+  test.beforeAll(async ({ request }) => {
+    defaultTableView = await createDefaultTableView(
+      request,
+      MODEL_CODE,
+      SAVED_VIEW_PAGE_KEY,
+      'list blocks',
+    );
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
 
   test.afterEach(async ({ request }) => {
     if (listSnapshot) {

@@ -487,27 +487,21 @@ test.describe('Data Tools Deep — Export API', () => {
    * DT-015: Export order list as XLSX via API
    */
   test('DT-015: export order list as XLSX', async ({ page }) => {
-    const resp = await page.request.get('/api/meta/excel/export/e2et_order');
+    const resp = await page.request.post(`/api/dynamic/${ORDER_PAGE_KEY}/export`, {
+      data: { format: 'excel' },
+    });
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel export API not available'));
+      throw new Error(String('Dynamic Excel export API not available'));
       return;
     }
 
+    expect(resp.status(), `Order export returned server error ${resp.status()}`).toBeLessThan(500);
     if (resp.ok()) {
-      const contentType = resp.headers()['content-type'] || '';
-      const isExcel =
-        contentType.includes('spreadsheet') ||
-        contentType.includes('octet-stream') ||
-        contentType.includes('xlsx');
-
-      if (isExcel) {
-        const buffer = await resp.body();
-        expect(buffer.length).toBeGreaterThan(0);
-      } else {
-        const body = await resp.json().catch(() => null);
-        expect(body).toBeTruthy();
-      }
+      const body = await resp.json().catch(() => null);
+      const data = body?.data ?? body;
+      expect(data?.downloadUrl, `Order export missing downloadUrl: ${JSON.stringify(body)}`).toBeTruthy();
+      expect(Number.isFinite(data?.recordCount), `Order export invalid recordCount: ${JSON.stringify(body)}`).toBe(true);
     }
   });
 
@@ -515,21 +509,21 @@ test.describe('Data Tools Deep — Export API', () => {
    * DT-016: Export customer list as XLSX via API
    */
   test('DT-016: export customer list as XLSX', async ({ page }) => {
-    const resp = await page.request.get('/api/meta/excel/export/e2et_customer');
+    const resp = await page.request.post(`/api/dynamic/${CUSTOMER_PAGE_KEY}/export`, {
+      data: { format: 'excel' },
+    });
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel export API not available for customer'));
+      throw new Error(String('Dynamic Excel export API not available for customer'));
       return;
     }
 
+    expect(resp.status(), `Customer export returned server error ${resp.status()}`).toBeLessThan(500);
     if (resp.ok()) {
-      const contentType = resp.headers()['content-type'] || '';
-      const isExcel = contentType.includes('spreadsheet') || contentType.includes('octet-stream');
-
-      if (isExcel) {
-        const buffer = await resp.body();
-        expect(buffer.length).toBeGreaterThan(0);
-      }
+      const body = await resp.json().catch(() => null);
+      const data = body?.data ?? body;
+      expect(data?.downloadUrl, `Customer export missing downloadUrl: ${JSON.stringify(body)}`).toBeTruthy();
+      expect(Number.isFinite(data?.recordCount), `Customer export invalid recordCount: ${JSON.stringify(body)}`).toBe(true);
     }
   });
 });

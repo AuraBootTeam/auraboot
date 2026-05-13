@@ -495,7 +495,7 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
 
     // Click the newly-added section in the outline and add all 5 fields.
     await page.getByTestId('designer-tab-outline').click();
-    const outlineButtons = page.locator('button:has-text("Section Title")');
+    const outlineButtons = page.locator('button:has-text("Section Title"), button:has-text("区段标题")');
     await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
     await outlineButtons.nth(0).click();
     await addFieldsToSelectedBlock(page, WIDGETS.map((w) => w.field));

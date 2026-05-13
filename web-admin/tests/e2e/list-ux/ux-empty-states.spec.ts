@@ -64,6 +64,30 @@ async function navigateViaMenu(
   await listResponsePromise;
 }
 
+async function ensureDefaultTableView(page: Page): Promise<void> {
+  if (await page.locator('tbody').first().isVisible({ timeout: 2_000 }).catch(() => false)) {
+    return;
+  }
+
+  const viewSelector = page.locator('button[aria-haspopup="listbox"]').first();
+  await viewSelector.waitFor({ state: 'visible', timeout: 10_000 });
+  await viewSelector.click();
+
+  const panel = page.locator('[role="dialog"]').first();
+  await panel.waitFor({ state: 'visible', timeout: 5_000 });
+
+  const tableView = panel.getByText('Default View', { exact: false }).first();
+  await tableView.waitFor({ state: 'visible', timeout: 5_000 });
+  await tableView.click();
+
+  const closeBtn = panel.locator('button[aria-label="Close panel"]').first();
+  if (await closeBtn.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    await closeBtn.click();
+  }
+  await panel.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => null);
+  await expect(page.locator('tbody').first()).toBeVisible({ timeout: 10_000 });
+}
+
 // ---------------------------------------------------------------------------
 // Helper: apply a keyword search that guarantees no matches
 // ---------------------------------------------------------------------------
@@ -174,6 +198,7 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
 
     // Layer 1 (Render): page loaded successfully
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 12_000 });
+    await ensureDefaultTableView(page);
 
     // Apply no-match search to manufacture empty state
     await applyNoMatchSearch(page, 'crm_lead');

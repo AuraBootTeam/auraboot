@@ -36,18 +36,10 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
 import { Client as PgClient } from 'pg';
 import { uniqueId } from '../helpers/index';
-import { BACKEND_URL } from '../../helpers/environments';
+import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
-const PG_CONN = {
-  host: process.env.PGHOST ?? 'localhost',
-  port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
-  database: process.env.PGDATABASE ?? 'aura_boot',
-  user: process.env.PGUSER ?? 'ghj',
-  password: process.env['PGPASSWORD'],
-};
-
 const UID = uniqueId('TENUI');
 const PROCESS_KEY_A = `tenui_a_${UID}`;
 const PROCESS_NAME_A = `Tenant A only UI ${UID}`;
