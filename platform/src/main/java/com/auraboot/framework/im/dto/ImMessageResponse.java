@@ -44,4 +44,6 @@ public class ImMessageResponse {
     private Boolean recalled;
     private Long forwardedFromId;
     private Object cardPayload;
+    private Boolean isStreaming;
+    private String status;
 }

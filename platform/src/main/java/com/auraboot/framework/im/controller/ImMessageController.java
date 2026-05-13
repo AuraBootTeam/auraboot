@@ -184,6 +184,20 @@ public class ImMessageController {
         String agentName = sender != null && "agent".equals(sender.getMemberType()) ? sender.getDisplayName() : null;
         String employeeTitle = sender != null ? sender.getEmployeeTitle() : null;
 
+        Object parsedCardPayload = messageService.parseCardPayload(msg.getCardPayload());
+        Boolean isStreaming = null;
+        String status = null;
+        if (parsedCardPayload instanceof Map<?, ?> cardMap) {
+            Object streamingValue = cardMap.get("isStreaming");
+            if (streamingValue instanceof Boolean value) {
+                isStreaming = value;
+            }
+            Object statusValue = cardMap.get("status");
+            if (statusValue != null && !String.valueOf(statusValue).isBlank()) {
+                status = String.valueOf(statusValue);
+            }
+        }
+
         return ImMessageResponse.builder()
                 .id(msg.getId())
                 .pid(msg.getId() != null ? msg.getId().toString() : null)
@@ -203,7 +217,9 @@ public class ImMessageController {
                 .replyToId(msg.getReplyToId())
                 .recalled(msg.getRecalled())
                 .forwardedFromId(msg.getForwardedFromId())
-                .cardPayload(messageService.parseCardPayload(msg.getCardPayload()))
+                .cardPayload(parsedCardPayload)
+                .isStreaming(isStreaming)
+                .status(status)
                 .build();
     }
 }

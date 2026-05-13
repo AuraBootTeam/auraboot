@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
 
 /**
  * Stub LLM provider used as a no-op fallback when no real LLM API key is
@@ -109,7 +110,10 @@ public class StubLlmProvider implements LlmProvider {
         // (mirroring Anthropic's wire shape) stay byte-compatible.
         LlmChunk deltaChunk = LlmChunk.delta(0L, STUB_RESPONSE_TEXT);
         LlmChunk doneChunk = LlmChunk.done(1L, aggregate);
-        return Flux.just(deltaChunk, doneChunk);
+        Flux<LlmChunk> stream = Flux.just(deltaChunk, doneChunk);
+        return shouldSlowVisualStream(request)
+                ? stream.delayElements(Duration.ofMillis(1500))
+                : stream;
     }
 
     @Override
@@ -336,6 +340,21 @@ public class StubLlmProvider implements LlmProvider {
             }
         }
         return null;
+    }
+
+    private boolean shouldSlowVisualStream(LlmChatRequest request) {
+        if (request == null || request.getMessages() == null) {
+            return false;
+        }
+        for (int i = request.getMessages().size() - 1; i >= 0; i--) {
+            LlmChatRequest.Message message = request.getMessages().get(i);
+            if (message == null || !"user".equals(message.getRole())) continue;
+            String text = userText(message);
+            if (text != null && text.contains("WS001 visual stream")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private record ToolUseDirective(int messageIndex, String json) {}

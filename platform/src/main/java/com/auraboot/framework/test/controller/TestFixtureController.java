@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.im.service.ImMessageService;
 import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.test.dto.FixtureRequest;
 import com.auraboot.framework.test.dto.FixtureResult;
@@ -994,6 +995,7 @@ public class TestFixtureController {
      * and wait for the real group-agent event/turn/persist path to produce an ai_response.
      */
     private FixtureResult createChatAgentFixture(String runId, Map<String, Object> params) {
+        Map<String, Object> safeParams = params != null ? params : Map.of();
         Object conversationService;
         try {
             conversationService = requireRuntimeBean(
@@ -1063,22 +1065,46 @@ public class TestFixtureController {
                 throw new IllegalStateException("Created group conversation did not expose an id");
             }
 
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put("conversationId", groupId);
+            metadata.put("groupConvId", groupId);
+            metadata.put("groupName", groupName);
+            metadata.put("agentId", agentId);
+            metadata.put("agentCode", agentCode);
+            metadata.put("agentName", "Flow Agent");
+            metadata.put("tenantId", tenantId);
+            metadata.put("userId", userId);
+
+            if (Boolean.TRUE.equals(safeParams.get("visualStates"))) {
+                ImMessageService messageService = applicationContext.getBean(ImMessageService.class);
+                String agentContent = "WS001 visual agent bubble " + runId;
+                String systemContent = "Flow Agent transferred control to Review Agent: WS001 visual handoff " + runId;
+                var agentMessage = messageService.sendAgentMessage(
+                        Long.valueOf(groupId), tenantId, agentId, "ai_response", agentContent,
+                        null, "ws001-agent-visual-" + runId);
+                var systemMessage = messageService.sendSystemMessage(
+                        Long.valueOf(groupId), tenantId, "system", systemContent,
+                        null, "ws001-system-visual-" + runId);
+                String streamingContent = "WS001 visual stream in progress " + runId;
+                var streamingMessage = messageService.sendAgentMessage(
+                        Long.valueOf(groupId), tenantId, agentId, "ai_response", streamingContent,
+                        "{\"isStreaming\":true,\"status\":\"sending\"}",
+                        "ws001-streaming-visual-" + runId);
+                metadata.put("agentVisualContent", agentContent);
+                metadata.put("agentVisualMessageId", agentMessage.getId());
+                metadata.put("systemVisualContent", systemContent);
+                metadata.put("systemVisualMessageId", systemMessage.getId());
+                metadata.put("streamingVisualContent", streamingContent);
+                metadata.put("streamingVisualMessageId", streamingMessage.getId());
+            }
+
             return FixtureResult.builder()
                     .success(true)
                     .fixtureName("chat_agent")
                     .testRunId(runId)
                     .recordsCreated(1)
                     .recordIds(List.of(groupId))
-                    .metadata(Map.of(
-                            "conversationId", groupId,
-                            "groupConvId", groupId,
-                            "groupName", groupName,
-                            "agentId", agentId,
-                            "agentCode", agentCode,
-                            "agentName", "Flow Agent",
-                            "tenantId", tenantId,
-                            "userId", userId
-                    ))
+                    .metadata(metadata)
                     .build();
         } catch (Exception e) {
             log.error("Failed to create chat_agent fixture: {}", e.getMessage(), e);
