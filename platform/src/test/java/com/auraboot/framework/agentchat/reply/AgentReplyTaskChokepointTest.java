@@ -177,6 +177,22 @@ class AgentReplyTaskChokepointTest {
         assertThat(all.get(1).agentCode()).isEqualTo("agent_beta");
         assertThat(all.get(1).parentTaskPid()).isEqualTo("TASK_ALPHA");
         assertThat(all.get(1).userMessage()).isEqualTo("needs sales follow-up");
+
+        ArgumentCaptor<WsFrame> frameCaptor = ArgumentCaptor.forClass(WsFrame.class);
+        verify(broadcaster, org.mockito.Mockito.atLeastOnce()).publish(any(), frameCaptor.capture());
+        WsFrame handoffFrame = frameCaptor.getAllValues().stream()
+                .filter(f -> "handoff".equals(f.getType()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("expected a handoff frame"));
+        assertThat(handoffFrame.getData()).isInstanceOf(Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) handoffFrame.getData();
+        assertThat(data).containsEntry("conversationId", CONV_ID);
+        assertThat(data).containsEntry("fromAgentId", ALPHA_ID);
+        assertThat(data).containsEntry("fromAgentName", "Alpha");
+        assertThat(data).containsEntry("toAgentId", BETA_ID);
+        assertThat(data).containsEntry("toAgentName", "Beta");
+        assertThat(data).containsEntry("reason", "needs sales follow-up");
     }
 
     @Test

@@ -2,7 +2,8 @@
  * Setup Phase 0 — Bootstrap (Phase 2.4 contract test).
  *
  * Drives /api/bootstrap/setup if the backend is not yet initialized, then
- * verifies all 9 bootstrap invariants are present in the database via psql.
+ * verifies all 9 bootstrap invariants are present in the database via
+ * node-postgres.
  * Idempotent: repeated runs short-circuit at the "already initialized" branch
  * and re-verify the invariants.
  *
@@ -31,7 +32,7 @@
  * because:
  *   - Test data prep is the test suite's responsibility, not infra.
  *   - Same code runs against host stack OR isolated docker stack — the
- *     setup uses BACKEND_URL / PSQL_BASE so it points at whichever
+ *     setup uses BACKEND_URL / PG* env so it points at whichever
  *     vite/BFF/postgres the runner was launched against.
  *   - Wired as the first project in playwright.oss.config.ts so all
  *     downstream projects (auth, chromium, chromium-deep) inherit a
@@ -39,12 +40,12 @@
  *
  * Pre-conditions:
  *   - Backend is up and `/actuator/health` returns 200.
- *   - Postgres reachable via PSQL_BASE.
+ *   - Postgres reachable via PGHOST/PGPORT/PGUSER/PGDATABASE.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { BACKEND_URL, PSQL_BASE } from '../../helpers/environments';
+import { BACKEND_URL, PG_ENV } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
@@ -58,13 +59,48 @@ const BUILTIN_PLUGIN_IDS = [
 ];
 
 /**
- * Run a psql query against the configured stack and return scalar / row.
- *
- * Uses `-tA` (tuples-only, unaligned) so the output is the raw cell value(s).
+ * Run a SQL query against the configured stack and return scalar / row.
+ * Uses node-postgres so the isolated frontend E2E image does not need a shell
+ * database client installed.
  */
 function psql(query: string): string {
-  const cmd = `${PSQL_BASE} -tA -P pager=off -c "${query.replace(/"/g, '\\"')}"`;
-  return execSync(cmd, { encoding: 'utf8' }).trim();
+  const runner = `
+const { Client } = require('pg');
+
+let sql = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => { sql += chunk; });
+process.stdin.on('end', async () => {
+  const client = new Client({
+    host: process.env.PGHOST || 'localhost',
+    port: Number(process.env.PGPORT || '5432'),
+    user: process.env.PGUSER || process.env.USER || 'ghj',
+    database: process.env.PGDATABASE || 'aura_boot',
+    password: process.env['PGPASSWORD'] || undefined,
+  });
+  try {
+    await client.connect();
+    const result = await client.query(sql);
+    const rows = Array.isArray(result)
+      ? result.flatMap(item => item.rows || [])
+      : (result.rows || []);
+    const out = rows
+      .map(row => Object.values(row).map(value => value == null ? '' : String(value)).join('|'))
+      .join('\\n');
+    process.stdout.write(out);
+  } catch (error) {
+    console.error(error && error.stack ? error.stack : String(error));
+    process.exitCode = 1;
+  } finally {
+    await client.end().catch(() => {});
+  }
+});
+`;
+  return execFileSync(process.execPath, ['-e', runner], {
+    input: query,
+    encoding: 'utf8',
+    env: PG_ENV,
+  }).trim();
 }
 
 function psqlInt(query: string): number {

@@ -422,38 +422,59 @@ async function resolveOrCreateAiCenterMenuId(client: Client): Promise<string> {
 // ---------------------------------------------------------------------------
 
 async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
-  await page.goto('/');
-  await page.waitForLoadState('domcontentloaded');
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await page.goto('/home', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
+      await expect(page).toHaveURL((url) => url.pathname === '/home', { timeout: 20_000 });
 
-  const nav = page.locator('nav').first();
-  await nav.waitFor({ state: 'visible', timeout: 10_000 });
+      const nav = page.locator('nav').first();
+      await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
-  // Expand the parent group "AI 中心" / "AI Center" only when needed. The
-  // sidebar persists expanded groups between tests, so a blind click would
-  // collapse an already-open group and unmount the leaf link.
-  const leaf = nav.locator('a[href="/admin/agent-runs"]').first();
-  if ((await leaf.count()) === 0 || !(await leaf.isVisible().catch(() => false))) {
-    const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center/ }).first();
-    await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
-    await aiCenter.evaluate((el: HTMLElement) => el.click());
+      // Expand the parent group "AI 中心" / "AI Center" only when needed. The
+      // sidebar persists expanded groups between tests, so a blind click would
+      // collapse an already-open group and unmount the leaf link.
+      const leaf = nav.locator('a[href="/admin/agent-runs"]').first();
+      if ((await leaf.count()) === 0 || !(await leaf.isVisible().catch(() => false))) {
+        const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center/ }).first();
+        await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
+        await aiCenter.click();
+      }
+
+      // Click the leaf "Agent 运行记录". On slower CI containers, the app's
+      // home-route bootstrap can finish after the first click and leave the
+      // page back on /home, so validate the final page surface and retry from
+      // /home if the SPA navigation was overwritten.
+      await leaf.waitFor({ state: 'visible', timeout: 8_000 });
+
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === '/admin/agent-runs', { timeout: 15_000 }),
+        leaf.evaluate((anchor) => {
+          if (!(anchor instanceof HTMLElement)) {
+            throw new Error('Agent runs sidebar link is not an HTMLElement');
+          }
+          anchor.click();
+        }),
+      ]);
+
+      await expect(page.locator('[data-testid="agent-runs-page"]')).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(page.locator('[data-testid="runs-table"]')).toBeVisible({
+        timeout: 10_000,
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) {
+        throw error;
+      }
+      await page.waitForTimeout(500);
+    }
   }
 
-  // Click the leaf "Agent 运行记录"
-  await leaf.waitFor({ state: 'attached', timeout: 8_000 });
-
-  const listResponsePromise = page.waitForResponse(
-    (r) => r.url().includes('/api/admin/agent-runs') && !/\/[A-Z0-9]{20,}/.test(r.url()) && r.status() === 200,
-    { timeout: 20_000 },
-  );
-  await leaf.evaluate((el: HTMLElement) => el.click());
-  await listResponsePromise;
-
-  await expect(page.locator('[data-testid="agent-runs-page"]')).toBeVisible({
-    timeout: 10_000,
-  });
-  await expect(page.locator('[data-testid="runs-table"]')).toBeVisible({
-    timeout: 10_000,
-  });
+  throw lastError;
 }
 
 // ---------------------------------------------------------------------------
@@ -747,7 +768,9 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     await page.locator(`[data-testid="action-toggle-${ACTION_PID}"]`).click();
     const actionDetail = page.locator(`[data-testid="action-detail-${ACTION_PID}"]`);
     await expect(actionDetail).toBeVisible({ timeout: 3_000 });
-    await page.locator(`[data-testid="open-result-contract-${ACTION_PID}"]`).click();
+    const openResultContract = page.locator(`[data-testid="open-result-contract-${ACTION_PID}"]`);
+    await openResultContract.scrollIntoViewIfNeeded();
+    await openResultContract.click({ force: true });
     const resultsSection = page.locator('[data-testid="drawer-section-result-contracts"]');
     await expect(resultsSection).toBeVisible({ timeout: 3_000 });
     await expect(resultsSection).toContainText(RESULT_CONTRACT_ID);

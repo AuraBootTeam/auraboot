@@ -2,6 +2,7 @@ package com.auraboot.framework.im.service.impl;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
@@ -152,6 +153,9 @@ public class ImConversationServiceImpl implements ImConversationService {
                     .avatarUrl(conv.getAvatarUrl())
                     .boundModelCode(conv.getBoundModelCode())
                     .boundRecordId(conv.getBoundRecordId())
+                    .conductorAgentId(conv.getConductorAgentId())
+                    .aiContextWindow(conv.getAiContextWindow())
+                    .aiEnabled(conv.getConductorAgentId() != null)
                     .lastMessage(lastMsg)
                     .unreadCount(Math.max(0, unread))
                     .pinned(membership != null ? membership.getPinned() : false)
@@ -181,6 +185,9 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .avatarUrl(conv.getAvatarUrl())
                 .boundModelCode(conv.getBoundModelCode())
                 .boundRecordId(conv.getBoundRecordId())
+                .conductorAgentId(conv.getConductorAgentId())
+                .aiContextWindow(conv.getAiContextWindow())
+                .aiEnabled(conv.getConductorAgentId() != null)
                 .unreadCount(0L)
                 .pinned(false)
                 .muted(false)
@@ -224,6 +231,9 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .avatarUrl(conv.getAvatarUrl())
                 .boundModelCode(conv.getBoundModelCode())
                 .boundRecordId(conv.getBoundRecordId())
+                .conductorAgentId(conv.getConductorAgentId())
+                .aiContextWindow(conv.getAiContextWindow())
+                .aiEnabled(conv.getConductorAgentId() != null)
                 .lastMessage(lastMsg)
                 .unreadCount(unread)
                 .pinned(membership != null ? membership.getPinned() : false)
@@ -422,6 +432,42 @@ public class ImConversationServiceImpl implements ImConversationService {
                         .eq("member_type", ImConstants.MEMBER_TYPE_HUMAN)
                         .eq("member_id", userId)
                         .eq("tenant_id", tenantId));
+    }
+
+    @Override
+    @Transactional
+    public void updateAgentSettings(Long conversationId, ConversationAgentSettingsRequest request,
+                                    Long userId, Long tenantId) {
+        if (!isMember(conversationId, userId, tenantId)) {
+            throw new IllegalArgumentException("User is not a member of this conversation");
+        }
+        ImConversation conv = getById(conversationId, tenantId);
+        if (conv == null) {
+            throw new IllegalArgumentException("Conversation not found");
+        }
+        if (!ImConstants.TYPE_GROUP.equals(conv.getType())) {
+            throw new IllegalArgumentException("Only group conversations support AI agent settings");
+        }
+
+        if (request.getAiContextWindow() != null) {
+            int window = request.getAiContextWindow();
+            if (window < 1 || window > 200) {
+                throw new IllegalArgumentException("aiContextWindow must be between 1 and 200");
+            }
+            conv.setAiContextWindow(window);
+        }
+        if (Boolean.FALSE.equals(request.getAiEnabled())) {
+            conv.setConductorAgentId(null);
+        } else if (request.getConductorAgentId() != null) {
+            Long agentId = request.getConductorAgentId();
+            if (!isMember(conversationId, ImConstants.MEMBER_TYPE_AGENT, agentId, tenantId)) {
+                throw new IllegalArgumentException("Conductor agent must be a member of this conversation");
+            }
+            conv.setConductorAgentId(agentId);
+        }
+
+        conv.setUpdatedAt(Instant.now());
+        conversationMapper.updateById(conv);
     }
 
     @Override
