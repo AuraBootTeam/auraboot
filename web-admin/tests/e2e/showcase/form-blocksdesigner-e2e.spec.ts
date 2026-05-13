@@ -219,7 +219,7 @@ async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promi
 async function selectBlockByTitle(page: Page, title: string): Promise<void> {
   const block = page
     .getByTestId('sortable-block')
-    .filter({ hasText: title })
+    .filter({ hasText: title === 'Section Title' ? /Section Title|区段标题/ : title })
     .first();
   await expect(block).toBeVisible({ timeout: 5_000 });
   await block.click({ position: { x: 10, y: 10 } });
@@ -236,7 +236,7 @@ async function selectFieldInBlock(
 ): Promise<void> {
   const block = page
     .getByTestId('sortable-block')
-    .filter({ hasText: blockTitle })
+    .filter({ hasText: blockTitle === 'Section Title' ? /Section Title|区段标题/ : blockTitle })
     .first();
   await expect(block).toBeVisible({ timeout: 5_000 });
   // The FormSectionPreview renders each field with a <label> containing the
@@ -376,8 +376,8 @@ async function configureFormButtons(page: Page): Promise<void> {
   // added through the "添加操作..." <select> dropdown.
   const panel = page.getByTestId('designer-properties-panel');
 
-  // Wait for the ActionsEditor's "Actions" section to render (header text).
-  await expect(panel.locator('text="Actions"').first()).toBeVisible({ timeout: 5_000 });
+  // Wait for the ActionsEditor section to render (current locale can be zh-CN).
+  await expect(panel.getByText(/Actions|操作/).first()).toBeVisible({ timeout: 5_000 });
 
   // The "添加操作..." dropdown is a <select> with that placeholder option.
   // There may be multiple selects; pick the one whose first option text
@@ -512,7 +512,7 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
     // Add fields to the first section. Selecting it via the outline tab is
     // more deterministic than clicking the canvas (which can collide with drag).
     await page.getByTestId('designer-tab-outline').click();
-    const outlineButtons = page.locator('button:has-text("Section Title")');
+    const outlineButtons = page.locator('button:has-text("Section Title"), button:has-text("区段标题")');
     await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
 
     // Section #1 → 3 fields
@@ -589,7 +589,7 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
     // resolved dataType). We pick a different widget for each field so we
     // can prove distinct values persist correctly.
     await page.getByTestId('designer-tab-outline').click();
-    await page.locator('button:has-text("Section Title")').first().click();
+    await page.locator('button:has-text("Section Title"), button:has-text("区段标题")').first().click();
     const fieldCodes = [
       'sc_color',
       'sc_name',
@@ -685,7 +685,7 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
 
     await addBlockViaPalette(page, 'form-section');
     await page.getByTestId('designer-tab-outline').click();
-    await page.locator('button:has-text("Section Title")').first().click();
+    await page.locator('button:has-text("Section Title"), button:has-text("区段标题")').first().click();
     await addFieldsToSelectedBlock(page, ['sc_name', 'sc_remark']);
 
     // Configure sc_name: required = true, visible expression
@@ -846,7 +846,7 @@ test.describe('Phase 4 — Form BlocksDesigner E2E (widget config chain)', () =>
     // Add fields to each section. Outline button order: blocks[0]=Placeholder,
     // blocks[1]=Section Title (first added), blocks[2]=Section Title (second).
     await page.getByTestId('designer-tab-outline').click();
-    const outlineButtons = page.locator('button:has-text("Section Title")');
+    const outlineButtons = page.locator('button:has-text("Section Title"), button:has-text("区段标题")');
     await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
 
     for (let s = 0; s < 2; s++) {

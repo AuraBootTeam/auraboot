@@ -327,7 +327,7 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
     await addBlockViaPalette(page, 'form-section');
 
     await page.getByTestId('designer-tab-outline').click();
-    const outlineButtons = page.locator('button:has-text("Section Title")');
+    const outlineButtons = page.locator('button:has-text("Section Title"), button:has-text("区段标题")');
     await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
 
     // Section 1: 7 fields (within 8-field canvas cap)

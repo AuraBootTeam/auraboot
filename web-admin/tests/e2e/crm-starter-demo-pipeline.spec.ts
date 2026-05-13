@@ -166,6 +166,30 @@ async function selectPipelineBoardKanban(page: Page): Promise<void> {
   ).toHaveCount(6, { timeout: 15_000 });
 }
 
+async function selectDefaultTableView(page: Page): Promise<void> {
+  if (await page.locator('tbody tr').first().isVisible({ timeout: 2_000 }).catch(() => false)) {
+    return;
+  }
+
+  const viewSelector = page.locator('button[aria-haspopup="listbox"]').first();
+  await viewSelector.waitFor({ state: 'visible', timeout: 10_000 });
+  await viewSelector.click();
+
+  const panel = page.locator('[role="dialog"]').first();
+  await panel.waitFor({ state: 'visible', timeout: 5_000 });
+
+  const tableView = panel.getByText('Default View', { exact: false }).first();
+  await tableView.waitFor({ state: 'visible', timeout: 5_000 });
+  await tableView.click();
+
+  const closeBtn = panel.locator('button[aria-label="Close panel"]').first();
+  if (await closeBtn.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    await closeBtn.click();
+  }
+  await panel.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => null);
+  await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 10_000 });
+}
+
 // ---------------------------------------------------------------------------
 // Suite — serial because tests share the seeded opportunity record
 // ---------------------------------------------------------------------------
@@ -254,6 +278,7 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
   }) => {
     await gotoOpportunityListViaSidebar(page);
     await expect(page).toHaveURL(/\/p\/crm_opportunity(?:\?.*)?$/);
+    await selectDefaultTableView(page);
 
     // D2: list rendered with at least one row (we seeded one)
     const tableRows = page.locator('tbody tr');

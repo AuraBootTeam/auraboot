@@ -36,8 +36,14 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
 
 const MODEL_CODE = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const DETAIL_URL_RE = new RegExp(`/p/${MODEL_CODE}/view/[^/?#]+`);
 
@@ -283,10 +289,20 @@ async function openDetailViaListRow(page: Page, recordPid: string): Promise<void
 
 const DETAIL_PAGE_KEY = `${MODEL_CODE}_detail`;
 let detailSnapshot: DetailPageSnapshot | null = null;
+let defaultTableView: DefaultTableViewState | null = null;
 
 test.describe('D5 — Sub-table block: 3 data-source modes', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(60_000);
+
+  test.beforeAll(async ({ request }) => {
+    defaultTableView = await createDefaultTableView(request, MODEL_CODE, PAGE_KEY, 'subtable');
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
 
   test.afterEach(async ({ request }) => {
     // Restore the original detail page schema so other tests are unaffected.

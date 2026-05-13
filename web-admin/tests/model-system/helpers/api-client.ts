@@ -129,6 +129,7 @@ export class ApiClient {
   async createModel(data: ModelTestData): Promise<ApiResponse<ModelResponse>> {
     const response = await this.request.post(`/api/meta/models`, {
       data,
+      timeout: 15_000,
     });
     return response.json();
   }

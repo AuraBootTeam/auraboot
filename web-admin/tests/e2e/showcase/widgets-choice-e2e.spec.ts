@@ -328,7 +328,7 @@ test.describe('GA-B3 — Choice-bucket widget E2E (6 widgets × showcase)', () =
     await addBlockViaPalette(page, 'form-section');
 
     await page.getByTestId('designer-tab-outline').click();
-    await page.locator('button:has-text("Section Title")').first().click();
+    await page.locator('button:has-text("Section Title"), button:has-text("区段标题")').first().click();
     // sc_status (select), sc_priority (radio-group), sc_category (checkbox-group)
     // sc_category is also enum + dict-backed per the showcase fields file.
     await addFieldsToSelectedBlock(page, ['sc_status', 'sc_priority', 'sc_category']);
@@ -430,7 +430,7 @@ test.describe('GA-B3 — Choice-bucket widget E2E (6 widgets × showcase)', () =
     await addBlockViaPalette(page, 'form-section');
 
     await page.getByTestId('designer-tab-outline').click();
-    await page.locator('button:has-text("Section Title")').first().click();
+    await page.locator('button:has-text("Section Title"), button:has-text("区段标题")').first().click();
     await addFieldsToSelectedBlock(page, ['sc_tags', 'sc_cascade_category', 'sc_tree_node']);
 
     const plan: Array<{ field: string; widget: string }> = [
@@ -590,7 +590,7 @@ test.describe('GA-B3 — Choice-bucket widget E2E (6 widgets × showcase)', () =
     await navigateToDesignerViaMenu(page, pid, pageKey);
     await addBlockViaPalette(page, 'form-section');
     await page.getByTestId('designer-tab-outline').click();
-    await page.locator('button:has-text("Section Title")').first().click();
+    await page.locator('button:has-text("Section Title"), button:has-text("区段标题")').first().click();
     await addFieldsToSelectedBlock(page, ['sc_status', 'sc_priority']);
 
     // sc_status: required=true, visible="true" (trivial, validates the expr

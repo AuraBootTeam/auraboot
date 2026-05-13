@@ -86,6 +86,25 @@ async function dismissError(page: Page) {
   }
 }
 
+async function deleteEnvironmentViaUi(page: Page, code: string) {
+  const card = envCard(page, code);
+  await expect(card).toBeVisible({ timeout: 10_000 });
+
+  const dialogPromise = page.waitForEvent('dialog', { timeout: 5_000 });
+  const clickPromise = card.locator('button[title="Delete"]').click({ timeout: 5_000 });
+  const dialog = await dialogPromise;
+  const responsePromise = page.waitForResponse(
+    (r) =>
+      r.url().includes('/api/admin/environments/') && r.request().method() === 'DELETE',
+    { timeout: 10_000 },
+  );
+  await dialog.accept();
+  await clickPromise;
+  const response = await responsePromise;
+  expect(response.ok(), `DELETE ${code} should return 2xx`).toBeTruthy();
+  await expect(envCard(page, code)).toHaveCount(0, { timeout: 10_000 });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -222,18 +241,12 @@ test.describe('Env-layering happy path', () => {
   });
 
   test('EL-007 cleanup: delete the test envs (D11)', async ({ page }) => {
-    page.on('dialog', (d) => d.accept());
-
     // Delete staging first (no dependency)
-    await envCard(page, STAGING_CODE)
-      .locator('button[title="Delete"]')
-      .click();
-    await expect(envCard(page, STAGING_CODE)).toHaveCount(0, { timeout: 5000 });
+    await deleteEnvironmentViaUi(page, STAGING_CODE);
 
     await dismissError(page);
 
     // Delete dev
-    await envCard(page, DEV_CODE).locator('button[title="Delete"]').click();
-    await expect(envCard(page, DEV_CODE)).toHaveCount(0, { timeout: 5000 });
+    await deleteEnvironmentViaUi(page, DEV_CODE);
   });
 });

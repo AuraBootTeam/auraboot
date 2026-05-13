@@ -702,7 +702,7 @@ test.describe('Task B1 — Text-bucket widget full coverage', () => {
       // --- Add form-section + target field ---
       await addBlockViaPalette(page, 'form-section');
       await page.getByTestId('designer-tab-outline').click();
-      const outlineButtons = page.locator('button:has-text("Section Title")');
+      const outlineButtons = page.locator('button:has-text("Section Title"), button:has-text("区段标题")');
       await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
       await outlineButtons.first().click();
       await addFieldsToSelectedBlock(page, [wc.field]);
