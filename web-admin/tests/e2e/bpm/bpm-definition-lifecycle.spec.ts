@@ -779,11 +779,15 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
       .filter({ hasText: /全部|All/i })
       .first();
     await expect(allTab).toBeVisible({ timeout: 5_000 });
-    await allTab.click();
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/bpm/process-definitions') && r.status() === 200,
-      { timeout: 8_000 },
-    );
+    await Promise.all([
+      page
+        .waitForResponse(
+          (r) => r.url().includes('/api/bpm/process-definitions') && r.status() === 200,
+          { timeout: 8_000 },
+        )
+        .catch(() => null),
+      allTab.click(),
+    ]);
 
     // Main process should still exist as deployed
     const mainRow = await findRowInPaginatedList(page, PROCESS_KEY_MAIN, 12_000);

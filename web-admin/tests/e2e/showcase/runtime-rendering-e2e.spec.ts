@@ -22,18 +22,25 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+import {
+  createDefaultTableView,
+  restoreDefaultTableView,
+  type DefaultTableViewState,
+} from './helpers/default-table-view';
 
 // ---------------------------------------------------------------------------
 // Constants & helpers
 // ---------------------------------------------------------------------------
 
 const MODEL_CODE = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const FORM_NEW_URL_RE = new RegExp(`/p/${MODEL_CODE}/new(?:$|\\?)`);
 const DETAIL_URL_RE = new RegExp(`/p/${MODEL_CODE}/view/[^/?#]+`);
 
 // Track every record we create so afterEach can delete unconditionally.
 const createdPids: string[] = [];
+let defaultTableView: DefaultTableViewState | null = null;
 
 interface SeedFields {
   sc_name?: string;
@@ -135,6 +142,15 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
 
 test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+  test.beforeAll(async ({ request }) => {
+    defaultTableView = await createDefaultTableView(request, MODEL_CODE, PAGE_KEY, 'runtime');
+  });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
 
   test.afterEach(async ({ request }) => {
     while (createdPids.length > 0) {

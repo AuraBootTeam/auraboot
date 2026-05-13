@@ -132,7 +132,7 @@ export default function PromotionManagement() {
     try {
       const result = await fetchResult<Array<EnvironmentLite & { id?: number }>>(
         '/api/admin/environments',
-        { method: 'get', token: token ?? undefined },
+        { method: 'get' },
       );
       if (result.success && result.data) {
         setEnvironments(result.data);
@@ -140,7 +140,7 @@ export default function PromotionManagement() {
     } catch {
       // soft-fail; create form will be empty
     }
-  }, [token]);
+  }, []);
 
   // Fetch promotions
   const fetchPromotions = useCallback(async () => {
@@ -152,7 +152,6 @@ export default function PromotionManagement() {
         : '/api/admin/promotions';
       const result = await fetchResult<PromotionResponse[]>(url, {
         method: 'get',
-        token: token ?? undefined,
       });
       if (result.success && result.data) {
         setPromotions(result.data);
@@ -164,13 +163,11 @@ export default function PromotionManagement() {
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter]);
+  }, [statusFilter]);
 
   useEffect(() => {
-    if (token) {
-      fetchEnvs();
-      fetchPromotions();
-    }
+    fetchEnvs();
+    fetchPromotions();
   }, [token, fetchEnvs, fetchPromotions]);
 
   const selected = useMemo(

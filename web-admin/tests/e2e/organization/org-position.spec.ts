@@ -122,9 +122,9 @@ test.describe('Organization Position', () => {
 
     // Fill position level if visible
     const levelInput = page.locator(
-      '[data-testid="form-field-org_pos_level"] input, ' +
-      'input[name*="pos_level"], ' +
-      'input[name*="level"]'
+      '[data-testid="form-field-org_pos_level"] input:not([type="hidden"]), ' +
+      'input[name*="pos_level"]:not([type="hidden"]), ' +
+      'input[name*="level"]:not([type="hidden"])'
     ).first();
     const hasLevelInput = await levelInput.isVisible({ timeout: 3000 }).catch(() => false);
     if (hasLevelInput) {

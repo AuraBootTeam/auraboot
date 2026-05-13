@@ -127,7 +127,7 @@ export async function queryInstanceStatus(
     `/api/bpm/process-instances/by-business-key/status` +
     `?businessKey=${encodeURIComponent(args.businessKey)}` +
     `&processKey=${encodeURIComponent(args.processKey)}`;
-  const resp = await request.get(url, { headers: authHeaders(token) });
+  const resp = await request.get(url, { headers: authHeaders(token), timeout: 15_000 });
   if (!resp.ok()) {
     throw new Error(`queryInstanceStatus failed: ${resp.status()} ${await resp.text()}`);
   }

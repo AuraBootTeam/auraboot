@@ -487,7 +487,7 @@ async function configureFieldOverride(
 
 async function configureFormButtons(page: Page, buttons: any[]): Promise<void> {
   const panel = page.getByTestId('designer-properties-panel');
-  await expect(panel.locator('text="Actions"').first()).toBeVisible({ timeout: 5_000 });
+  await expect(panel.getByText(/Actions|操作/).first()).toBeVisible({ timeout: 5_000 });
 
   const addSelect = panel
     .locator('select')

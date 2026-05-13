@@ -10,7 +10,6 @@ import {
   CodeBracketIcon,
 } from '@heroicons/react/24/outline';
 import { fetchResult } from '~/shared/services/http-client/HttpClient';
-import { useToken as useAuthToken } from '~/contexts/AuthContext';
 
 // ---------- Types ----------
 
@@ -123,7 +122,6 @@ const extractTargets = (diff: SemanticDiffEntry[]): Array<{ type: 'FIELD' | 'MOD
 // ---------- Component ----------
 
 export default function DiffViewer() {
-  const token = useAuthToken();
   const [params] = useSearchParams();
   const promotionPid = params.get('promotion');
   const conflictIndexStr = params.get('conflict') ?? '0';
@@ -148,7 +146,7 @@ export default function DiffViewer() {
     try {
       const result = await fetchResult<PromotionResponse>(
         `/api/admin/promotions/${promotionPid}`,
-        { method: 'get', token: token ?? undefined },
+        { method: 'get' },
       );
       if (result.success && result.data) {
         setPromotion(result.data);
@@ -160,11 +158,11 @@ export default function DiffViewer() {
     } finally {
       setLoading(false);
     }
-  }, [promotionPid, token]);
+  }, [promotionPid]);
 
   useEffect(() => {
-    if (token) fetchPromotion();
-  }, [token, fetchPromotion]);
+    fetchPromotion();
+  }, [fetchPromotion]);
 
   const conflict = useMemo<Conflict | null>(() => {
     if (!promotion?.dryRunResult?.conflicts) return null;
@@ -173,7 +171,7 @@ export default function DiffViewer() {
 
   // Fetch impact data for each FIELD/MODEL touched by the diff
   useEffect(() => {
-    if (!conflict?.diff?.length || !token) return;
+    if (!conflict?.diff?.length) return;
     const targets = extractTargets(conflict.diff);
     if (targets.length === 0) return;
 
@@ -185,7 +183,7 @@ export default function DiffViewer() {
         try {
           const result = await fetchResult<ResourceReference[]>(
             `/api/admin/references/impact?type=${target.type}&code=${encodeURIComponent(target.code)}`,
-            { method: 'get', token: token ?? undefined },
+            { method: 'get' },
           );
           if (!cancelled && result.success && Array.isArray(result.data)) {
             next[`${target.type}:${target.code}`] = result.data;
@@ -202,7 +200,7 @@ export default function DiffViewer() {
     return () => {
       cancelled = true;
     };
-  }, [conflict, token]);
+  }, [conflict]);
 
   // ---------- Render ----------
 

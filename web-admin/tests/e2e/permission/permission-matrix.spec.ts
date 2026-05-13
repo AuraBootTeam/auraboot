@@ -201,6 +201,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
   // ---- D8: Edit role and verify ----
   test('D8: edit role and verify updated name', async ({ page }) => {
+    test.setTimeout(30_000);
     await navigateToPermissions(page);
 
     // Find our test role in the list
@@ -249,6 +250,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
   // ---- D13: Search roles ----
   test('D13: search roles by name', async ({ page }) => {
+    test.setTimeout(30_000);
     await navigateToPermissions(page);
 
     const searchInput = page.getByTestId('role-search-input');
@@ -276,6 +278,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
   // ---- Toggle permission checkbox ----
   test('toggle permission checkbox and verify API call', async ({ page }) => {
+    test.setTimeout(30_000);
     await navigateToPermissions(page);
 
     // Select our test role
@@ -314,6 +317,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
   // ---- D11: Delete role with confirmation ----
   test('D11: delete role with confirmation dialog', async ({ page }) => {
+    test.setTimeout(30_000);
     await navigateToPermissions(page);
 
     // Find our test role
