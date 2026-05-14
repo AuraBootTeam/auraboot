@@ -12,6 +12,136 @@
   "layout": {
     "type": "stack"
   },
+  "mobileUx": {
+    "detail": {
+      "header": {
+        "icon": {
+          "field": "sc_category",
+          "renderer": "objectIcon"
+        },
+        "title": {
+          "field": "sc_name"
+        },
+        "subtitle": {
+          "template": "{{sc_code}} · {{sc_category}}"
+        },
+        "badges": [
+          {
+            "field": "sc_status",
+            "renderer": "statusBadge"
+          },
+          {
+            "field": "sc_priority",
+            "renderer": "priorityBadge"
+          },
+          {
+            "field": "sc_is_active",
+            "renderer": "booleanStatus"
+          }
+        ]
+      },
+      "tabs": [
+        {
+          "id": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en": "Overview"
+          }
+        },
+        {
+          "id": "activity",
+          "label": {
+            "zh-CN": "时间线",
+            "en": "Timeline"
+          }
+        },
+        {
+          "id": "related",
+          "label": {
+            "zh-CN": "关联",
+            "en": "Related"
+          }
+        },
+        {
+          "id": "discussion",
+          "label": {
+            "zh-CN": "讨论",
+            "en": "Discussion"
+          }
+        }
+      ],
+      "sections": [
+        {
+          "id": "snapshot",
+          "title": {
+            "zh-CN": "摘要",
+            "en": "Snapshot"
+          },
+          "type": "fieldGrid",
+          "fields": [
+            "sc_status",
+            "sc_priority",
+            "sc_is_active",
+            "sc_category"
+          ]
+        },
+        {
+          "id": "description",
+          "title": {
+            "zh-CN": "描述",
+            "en": "Description"
+          },
+          "type": "description",
+          "field": "sc_description"
+        },
+        {
+          "id": "attachments",
+          "title": {
+            "zh-CN": "附件",
+            "en": "Attachments"
+          },
+          "type": "attachmentList",
+          "field": "sc_attachment"
+        },
+        {
+          "id": "time",
+          "title": {
+            "zh-CN": "时间",
+            "en": "Time"
+          },
+          "type": "fieldGrid",
+          "fields": [
+            "sc_created_at",
+            "sc_end_date"
+          ]
+        },
+        {
+          "id": "moreFields",
+          "title": {
+            "zh-CN": "更多字段",
+            "en": "More fields"
+          },
+          "type": "collapsedFields",
+          "exclude": [
+            "sc_name",
+            "sc_code",
+            "sc_status",
+            "sc_priority",
+            "sc_is_active",
+            "sc_category",
+            "sc_description",
+            "sc_attachment",
+            "sc_created_at",
+            "sc_end_date"
+          ]
+        }
+      ],
+      "bottomActions": {
+        "source": "capabilities",
+        "maxPrimary": 2
+      }
+    }
+  },
   "blocks": [
     {
       "id": "sc_detail_tabs",
