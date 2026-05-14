@@ -227,6 +227,22 @@ class DashboardServiceImplBranchTest {
     }
 
     @Test
+    @DisplayName("publish accepts localized widget title objects")
+    void publishLocalizedWidgetTitle() throws Exception {
+        Dashboard d = fixture("p1", "personal", "u-1");
+        d.setWidgets(objectMapper.readTree("""
+                [{
+                  "id": "w1",
+                  "title": { "zh-CN": "关键指标", "en": "Key Metrics" },
+                  "config": { "dataSource": { "type": "namedQuery", "queryCode": "demo" } }
+                }]
+                """));
+        when(dashboardMapper.findByPid("p1")).thenReturn(d);
+        service.publish("p1");
+        assertEquals(StatusConstants.PUBLISHED, d.getStatus());
+    }
+
+    @Test
     @DisplayName("publishRejectsBadWidgets uses 'i' as widgetId fallback when 'id' absent")
     void publishWidgetIdFromIField() throws Exception {
         Dashboard d = fixture("p1", "personal", "u-1");
