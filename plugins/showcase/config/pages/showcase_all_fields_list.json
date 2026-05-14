@@ -9,6 +9,100 @@
     "type": "grid",
     "cols": 12
   },
+  "mobileUx": {
+    "list": {
+      "views": [
+        {
+          "id": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          }
+        },
+        {
+          "id": "high_priority",
+          "label": {
+            "zh-CN": "高优先",
+            "en": "High priority"
+          }
+        },
+        {
+          "id": "due_soon",
+          "label": {
+            "zh-CN": "即将到期",
+            "en": "Due soon"
+          }
+        },
+        {
+          "id": "archived",
+          "label": {
+            "zh-CN": "已归档",
+            "en": "Archived"
+          }
+        }
+      ],
+      "card": {
+        "leading": {
+          "field": "sc_category",
+          "renderer": "objectIcon"
+        },
+        "title": {
+          "field": "sc_name"
+        },
+        "subtitle": {
+          "template": "{{sc_code}} · {{sc_category}}"
+        },
+        "badges": [
+          {
+            "field": "sc_status",
+            "renderer": "statusBadge"
+          },
+          {
+            "field": "sc_priority",
+            "renderer": "priorityBadge"
+          }
+        ],
+        "summary": {
+          "field": "sc_description",
+          "maxLines": 1
+        },
+        "facts": [
+          {
+            "field": "sc_is_active",
+            "label": {
+              "zh-CN": "有效",
+              "en": "Active"
+            },
+            "renderer": "booleanText"
+          },
+          {
+            "field": "sc_end_date",
+            "label": {
+              "zh-CN": "截止",
+              "en": "End"
+            },
+            "renderer": "dateShort"
+          },
+          {
+            "field": "sc_attachment",
+            "label": {
+              "zh-CN": "附件",
+              "en": "Files"
+            },
+            "renderer": "attachmentCount"
+          },
+          {
+            "field": "sc_created_at",
+            "renderer": "relativeTime"
+          }
+        ],
+        "actions": [
+          "favorite",
+          "more"
+        ]
+      }
+    }
+  },
   "blocks": [
     {
       "id": "sc_list_tabs",
