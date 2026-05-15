@@ -3,10 +3,51 @@ import {
   normalizeCommandPayloadValue,
   normalizePayloadValue,
   parseValidationSummaryMessages,
+  resolveFormButtonContent,
 } from '../FormPageContent';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 
 describe('normalizePayloadValue', () => {
+  it('resolves form button localized label before falling back to code', () => {
+    const t = (key: string) => key;
+
+    expect(
+      resolveFormButtonContent(
+        {
+          code: 'save',
+          label: { 'zh-CN': '保存', en: 'Save' },
+        },
+        'zh-CN',
+        t,
+      ),
+    ).toBe('保存');
+
+    expect(
+      resolveFormButtonContent(
+        {
+          code: 'cancel',
+          label: { 'zh-CN': '取消', en: 'Cancel' },
+        },
+        'en',
+        t,
+      ),
+    ).toBe('Cancel');
+  });
+
+  it('keeps content precedence over label for form button text', () => {
+    expect(
+      resolveFormButtonContent(
+        {
+          code: 'save',
+          content: 'Explicit Save',
+          label: { 'zh-CN': '保存', en: 'Save' },
+        },
+        'en',
+        (key) => key,
+      ),
+    ).toBe('Explicit Save');
+  });
+
   it('serializes file fields to persisted JSON and drops non-done upload entries', () => {
     const value = normalizePayloadValue(
       [
