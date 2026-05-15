@@ -49,7 +49,7 @@ import { BACKEND_URL, PG_ENV } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
-const AUTO_BOOTSTRAP_WAIT_MS = Number(process.env.AURA_AUTO_BOOTSTRAP_WAIT_MS ?? '90000');
+const AUTO_BOOTSTRAP_WAIT_MS = Number(process.env.AURA_AUTO_BOOTSTRAP_WAIT_MS ?? '0');
 const BOOTSTRAP_POLL_MS = 2000;
 
 /** Built-in plugin pluginIds imported by the platform on bootstrap (canonical: BuiltinPluginImportServiceImpl). */
@@ -126,6 +126,7 @@ async function readBootstrapStatus(request: APIRequestContext): Promise<{
 }
 
 async function waitForAutoBootstrap(request: APIRequestContext): Promise<boolean> {
+  if (AUTO_BOOTSTRAP_WAIT_MS <= 0) return false;
   const deadline = Date.now() + AUTO_BOOTSTRAP_WAIT_MS;
   do {
     const status = await readBootstrapStatus(request);
@@ -146,10 +147,9 @@ test('00-bootstrap: ensure system is initialized via /api/bootstrap/setup', asyn
   }
 
   if (!initialized) {
-    // Phase 2.4: backend's BootstrapStartupRunner now auto-bootstraps on
-    // first start. Health can be reachable while startup repair is still
-    // finalizing; wait before falling back to the wizard to avoid racing the
-    // runner and creating duplicate bootstrap roles.
+    // Startup-time repair/bootstrap writes are intentionally disabled. Use the
+    // explicit setup API as the single initialization owner; AUTO_BOOTSTRAP_WAIT_MS
+    // remains available only for externally pre-bootstrapped stacks.
     const setup = await request.post(`${BACKEND_URL}/api/bootstrap/setup`, {
       data: {
         companyName: COMPANY_NAME,
