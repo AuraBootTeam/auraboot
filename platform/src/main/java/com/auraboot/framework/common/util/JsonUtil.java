@@ -8,18 +8,24 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.util.Map;
 
 public class JsonUtil {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private static final ObjectMapper OBJECT_MAPPER = configureBaseMapper(new ObjectMapper());
 
-    private static final ObjectMapper SORTED_MAPPER = new ObjectMapper()
+    private static final ObjectMapper SORTED_MAPPER = configureBaseMapper(new ObjectMapper())
             .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-            .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+
+    private static ObjectMapper configureBaseMapper(ObjectMapper mapper) {
+        return mapper
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
 
     public static ObjectMapper getObjectMapper() {
         return OBJECT_MAPPER;

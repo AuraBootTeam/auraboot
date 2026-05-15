@@ -2228,8 +2228,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String columnName = codeToColumn.get(key);
             if (columnName != null) {
                 Object value = entry.getValue();
-                // Serialize Map values for JSONB host columns
-                if (hostColumns.contains(columnName) && value instanceof Map) {
+                // Serialize structured values for JSON/JSONB host columns.
+                if (hostColumns.contains(columnName) && JsonbFieldHelper.shouldSerializeJsonValue(value)) {
                     columnData.put(columnName, JsonbFieldHelper.toJsonString(value));
                 } else {
                     columnData.put(columnName, value);
@@ -2239,7 +2239,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Could be a JSONB host column from mergeJsonbFields (key is already a column name)
             if (hostColumns.contains(key)) {
                 Object value = entry.getValue();
-                columnData.put(key, value instanceof Map ? JsonbFieldHelper.toJsonString(value) : value);
+                columnData.put(key, JsonbFieldHelper.shouldSerializeJsonValue(value) ? JsonbFieldHelper.toJsonString(value) : value);
                 continue;
             }
             throw new MetaServiceException("Unknown field for model " + model.getCode() + ": " + key);
@@ -2275,7 +2275,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String columnName = codeToColumn.get(key);
             if (columnName != null) {
                 Object value = entry.getValue();
-                if (hostColumns.contains(columnName) && value instanceof Map) {
+                if (hostColumns.contains(columnName) && JsonbFieldHelper.shouldSerializeJsonValue(value)) {
                     columnData.put(columnName, JsonbFieldHelper.toJsonString(value));
                 } else {
                     columnData.put(columnName, value);
@@ -2284,7 +2284,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
             if (hostColumns.contains(key)) {
                 Object value = entry.getValue();
-                columnData.put(key, value instanceof Map ? JsonbFieldHelper.toJsonString(value) : value);
+                columnData.put(key, JsonbFieldHelper.shouldSerializeJsonValue(value) ? JsonbFieldHelper.toJsonString(value) : value);
                 continue;
             }
             throw new MetaServiceException("Unknown field for model " + model.getCode() + ": " + key);
