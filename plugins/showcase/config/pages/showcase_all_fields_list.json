@@ -20,10 +20,27 @@
           }
         },
         {
+          "id": "my_pending",
+          "label": {
+            "zh-CN": "我的待处理",
+            "en": "My pending"
+          },
+          "filter": {
+            "field": "sc_status",
+            "op": "EQ",
+            "value": "review"
+          }
+        },
+        {
           "id": "high_priority",
           "label": {
             "zh-CN": "高优先",
             "en": "High priority"
+          },
+          "filter": {
+            "field": "sc_priority",
+            "op": "EQ",
+            "value": "high"
           }
         },
         {
@@ -31,6 +48,11 @@
           "label": {
             "zh-CN": "即将到期",
             "en": "Due soon"
+          },
+          "filter": {
+            "field": "sc_end_date",
+            "op": "LE",
+            "value": "$today+30d"
           }
         },
         {
@@ -38,7 +60,18 @@
           "label": {
             "zh-CN": "已归档",
             "en": "Archived"
+          },
+          "filter": {
+            "field": "sc_status",
+            "op": "EQ",
+            "value": "archived"
           }
+        }
+      ],
+      "defaultSort": [
+        {
+          "field": "sc_created_at",
+          "direction": "ASC"
         }
       ],
       "card": {
