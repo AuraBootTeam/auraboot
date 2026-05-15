@@ -34,9 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code ab_plugin} empty, and we only assert the negative core/demo split (no
  * demo-only rows appearing on the {@code includeDemo=false} path).
  *
- * <p>The {@code repairBuiltinPlugins} step is documented as non-fatal in the
- * {@link BootstrapStartupRunner} (status may be {@code REPAIRED}, {@code PRESENT},
- * or {@code ERROR}); we tolerate {@code ERROR} here for the same reason.
+ * <p>The {@code repairBuiltinPlugins} step remains non-fatal in explicit setup
+ * flows (status may be {@code REPAIRED}, {@code PRESENT}, or {@code ERROR}); we
+ * tolerate {@code ERROR} here for the same reason.
  */
 class BuiltinPluginProfileIT extends IntegrationTestBase {
 
