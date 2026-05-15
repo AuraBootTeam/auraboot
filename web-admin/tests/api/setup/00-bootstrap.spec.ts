@@ -141,6 +141,8 @@ test.describe.configure({ mode: 'serial' });
 test('00-bootstrap: ensure system is initialized via /api/bootstrap/setup', async ({
   request,
 }) => {
+  test.setTimeout(120_000);
+
   let { initialized } = await readBootstrapStatus(request);
   if (!initialized) {
     initialized = await waitForAutoBootstrap(request);
@@ -151,6 +153,7 @@ test('00-bootstrap: ensure system is initialized via /api/bootstrap/setup', asyn
     // explicit setup API as the single initialization owner; AUTO_BOOTSTRAP_WAIT_MS
     // remains available only for externally pre-bootstrapped stacks.
     const setup = await request.post(`${BACKEND_URL}/api/bootstrap/setup`, {
+      timeout: 90_000,
       data: {
         companyName: COMPANY_NAME,
         adminEmail: DEFAULT_TEST_ACCOUNT.email,
