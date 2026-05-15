@@ -4,8 +4,10 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import org.junit.jupiter.api.Test;
 
-import java.util.LinkedHashMap;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -153,6 +155,25 @@ class JsonbFieldHelperTest {
         assertNotNull(json);
         assertTrue(json.contains("\"duration\""));
         assertTrue(json.contains("30"));
+    }
+
+    @Test
+    void toJsonString_serializesJavaTimeValuesAsIsoStrings() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("dueDate", LocalDate.parse("2026-05-15"));
+        map.put("startTime", Instant.parse("2026-05-15T02:00:00Z"));
+
+        String json = JsonbFieldHelper.toJsonString(map);
+
+        assertTrue(json.contains("\"dueDate\":\"2026-05-15\""));
+        assertTrue(json.contains("\"startTime\":\"2026-05-15T02:00:00Z\""));
+    }
+
+    @Test
+    void shouldSerializeJsonValue_recognizesCollections() {
+        assertTrue(JsonbFieldHelper.shouldSerializeJsonValue(List.of("a", "b")));
+        assertTrue(JsonbFieldHelper.shouldSerializeJsonValue(Map.of("a", 1)));
+        assertFalse(JsonbFieldHelper.shouldSerializeJsonValue("{\"a\":1}"));
     }
 
     @Test
