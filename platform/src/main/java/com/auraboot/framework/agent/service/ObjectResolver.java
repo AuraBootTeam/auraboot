@@ -68,7 +68,7 @@ public class ObjectResolver {
 
         // Layer 1: Load from ab_object_alias (tenant_id = -1 for platform built-in)
         try {
-            String sql = "SELECT alias, model_code FROM ab_object_alias WHERE tenant_id = -1 ORDER BY priority DESC";
+            String sql = "SELECT alias, model_code FROM ab_object_alias WHERE tenant_id = -1 ORDER BY acp_priority DESC";
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of());
             for (Map<String, Object> row : rows) {
                 String alias = (String) row.get("alias");
@@ -344,7 +344,7 @@ public class ObjectResolver {
 
             // Load tenant-specific aliases
             String sql = "SELECT alias, model_code FROM ab_object_alias " +
-                    "WHERE tenant_id = #{params.tenantId} ORDER BY priority DESC";
+                    "WHERE tenant_id = #{params.tenantId} ORDER BY acp_priority DESC";
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("tenantId", tenantId));
             for (Map<String, Object> row : rows) {
                 String alias = (String) row.get("alias");

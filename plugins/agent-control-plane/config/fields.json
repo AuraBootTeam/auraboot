@@ -215,7 +215,7 @@
     }
   },
   {
-    "code": "priority",
+    "code": "acp_priority",
     "displayName:zh-CN": "优先级",
     "displayName:en": "Priority",
     "dataType": "integer",

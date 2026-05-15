@@ -43,7 +43,7 @@
       "descriptionField": "description",
       "idField": "pid",
       "cardFields": [
-        { "field": "mission_priority", "label": "Priority", "type": "tag" },
+        { "field": "acp_priority", "label": "Priority", "type": "tag" },
         { "field": "owner_id", "label": "Owner", "type": "text" },
         { "field": "target_date", "label": "Target", "type": "date" }
       ],

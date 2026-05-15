@@ -104,11 +104,18 @@ PCBA_AGENT_PLUGINS=(
   inventory
   finance
   sales
-  procurement
   quality
+  procurement
   pcba-base
-  pcba-procurement
+  pcba-crm
   pcba-solution
+  pcba-industry
+  pcba-procurement
+  pcba-sales
+  pcba-manufacturing
+  pcba-warehouse
+  pcba-finance
+  pcba-compliance
 )
 
 if [ "${#PLUGINS[@]}" -eq 0 ]; then
