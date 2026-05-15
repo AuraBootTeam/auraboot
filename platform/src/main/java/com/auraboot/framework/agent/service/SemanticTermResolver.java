@@ -63,7 +63,7 @@ public class SemanticTermResolver {
     @SuppressWarnings("unchecked")
     private void loadCache() {
         try {
-            String sql = "SELECT term, model_code, term_type, resolution, description, priority " +
+            String sql = "SELECT term, model_code, term_type, resolution, description, acp_priority AS priority " +
                     "FROM ab_semantic_term WHERE tenant_id = -1";
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of());
             for (Map<String, Object> row : rows) {
