@@ -97,6 +97,45 @@ const FIELD_LABELS: Record<string, RegExp> = {
   sc_remark: /备注|Remark/i,
 };
 
+const FIELD_SELECTORS: Record<string, string> = {
+  sc_name: '[data-testid="field-sc_name"]',
+  sc_code: '[data-testid="field-sc_code"]',
+  sc_description: '[data-testid="field-sc_description"]',
+  sc_quantity: '[data-testid="field-sc_quantity"]',
+  sc_price: '[data-testid="field-sc_price"]',
+  sc_budget: '[data-testid="field-sc_budget"]',
+  sc_progress: '[data-testid="field-sc_progress"]',
+  sc_rating: '[data-testid="field-sc_rating"]',
+  sc_status: '[data-testid="field-sc_status"]',
+  sc_priority: '[data-testid="field-sc_priority"]',
+  sc_category: '[data-testid="field-sc_category"]',
+  sc_tags: '[data-testid="field-sc_tags"]',
+  sc_is_active: '[data-testid="field-sc_is_active"]',
+  sc_advanced_settings: '[data-testid="field-sc_advanced_settings"]',
+  sc_start_date: '[data-testid="field-sc_start_date"]',
+  sc_end_date: '[data-testid="field-sc_end_date"]',
+  sc_created_at: '[data-testid="field-sc_created_at"]',
+  sc_time_slot: '[data-testid="field-sc_time_slot"]',
+  sc_date_range: '[data-testid="field-sc_date_range"]',
+  sc_working_hours: '[data-testid="field-sc_working_hours"]',
+  sc_cascade_category: '[data-testid="field-sc_cascade_category"]',
+  sc_tree_node: '[data-testid="field-sc_tree_node"]',
+  sc_assignee: '[data-testid="field-sc_assignee"]',
+  sc_team_members: '[data-testid="field-sc_team_members"]',
+  sc_department: '[data-testid="field-sc_department"]',
+  sc_owner_user: '[data-testid="field-sc_owner_user"]',
+  sc_address: '[data-testid="field-sc_address"]',
+  sc_website: '[data-testid="field-sc_website"]',
+  sc_email: '[data-testid="field-sc_email"]',
+  sc_phone: '[data-testid="field-sc_phone"]',
+  sc_color: '[data-testid="field-sc_color"]',
+  sc_richtext_content: '[data-testid="field-sc_richtext_content"]',
+  sc_attachment: '[data-testid="field-sc_attachment"]',
+  sc_attachment_file: '[data-testid="field-sc_attachment_file"]',
+  sc_ai_summary: '[data-testid="field-sc_ai_summary"]',
+  sc_remark: '[data-testid="field-sc_remark"]',
+};
+
 const UID = uniqueId('all_fields_audit');
 const RECORD_NAME = `All Fields Audit ${UID}`;
 const RECORD_DESC = `Full form audit ${UID}`;
@@ -144,6 +183,11 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
 }
 
 async function deleteRecord(request: APIRequestContext, pid: string): Promise<void> {
+  await request
+    .post('/api/meta/commands/execute/sc:archive_showcase', {
+      data: { payload: {}, operationType: 'update', targetRecordId: pid },
+    })
+    .catch(() => null);
   await request
     .post('/api/meta/commands/execute/sc:delete_showcase', {
       data: { operationType: 'delete', targetRecordId: pid },
@@ -247,10 +291,31 @@ async function openEditForm(page: Page, name: string): Promise<void> {
   await clickRowActionByLocator(page, row, 'edit', '编辑');
   await page.waitForURL(new RegExp(`/p/${MODEL_CODE}/edit/.+`), { timeout: 10_000 });
   await waitForFormReady(page, 15_000);
+  await expect(page.locator(`${field('sc_name')} input`).first()).toHaveValue(name, {
+    timeout: 15_000,
+  });
+}
+
+async function openDetailFromList(page: Page, name: string, pid = recordPid): Promise<void> {
+  await navigateToShowcaseListViaMenu(page);
+  const row = await findRowInPaginatedList(page, name);
+  const detailDataLoaded = page
+    .waitForResponse(
+      (r) =>
+        r.url().includes(`/api/dynamic/${MODEL_CODE}/${pid}`) &&
+        r.status() === 200,
+      { timeout: 15_000 },
+    )
+    .catch(() => null);
+  await clickRowActionByLocator(page, row, 'view', '详情');
+  await page.waitForURL(new RegExp(`/p/${MODEL_CODE}/view/.+`), { timeout: 10_000 });
+  await detailDataLoaded;
+  await expect(page.locator('body')).toContainText(name, { timeout: 15_000 });
+  await expect(page.locator('body')).toContainText(/编号|Code/i, { timeout: 15_000 });
 }
 
 function field(code: string) {
-  return `[data-testid="field-${code}"]`;
+  return FIELD_SELECTORS[code] ?? `[data-testid="field-${code}"]`;
 }
 
 test.describe('showcase_all_fields form audit', () => {
@@ -291,7 +356,7 @@ test.describe('showcase_all_fields form audit', () => {
   });
 
   test('renders showcase_all_fields detail view without record-load errors', async ({ page }) => {
-    await page.goto(`/p/${MODEL_CODE}/view/${recordPid}`, { waitUntil: 'domcontentloaded' });
+    await openDetailFromList(page, RECORD_NAME, recordPid);
 
     await expect(page.locator('body')).not.toContainText(/Access forbidden|Page not found/i, {
       timeout: 5_000,
@@ -303,9 +368,9 @@ test.describe('showcase_all_fields form audit', () => {
     await expect(page.locator('body')).toContainText(RECORD_NAME, {
       timeout: 10_000,
     });
-    await expect(page.locator('body')).toContainText(/名称|Name/i);
-    await expect(page.locator('body')).toContainText(/预算金额|Budget/i);
-    await expect(page.locator('body')).toContainText(/AI 摘要|AI Summary/i);
+    await expect(page.locator('body')).toContainText(/名称|Name/i, { timeout: 15_000 });
+    await expect(page.locator('body')).toContainText(/预算金额|Budget/i, { timeout: 15_000 });
+    await expect(page.locator('body')).toContainText(/AI 摘要|AI Summary/i, { timeout: 15_000 });
   });
 
   test('renders every showcase_all_fields form field on edit, saves updates, and cancel returns to list', async ({
@@ -365,6 +430,21 @@ test.describe('showcase_all_fields form audit', () => {
     await expect(
       page.locator(`${field('sc_address')} textarea[aria-label="detail-address"]`),
     ).toHaveValue('文三路 90 号');
+    await expect(page.locator(`${field('sc_website')} input`).first()).toHaveValue(
+      'https://example.com/all-fields-audit',
+    );
+    await expect(
+      page.locator(`${field('sc_color')} input[type="hidden"][name="sc_color"]`).first(),
+    ).toHaveValue('#22c55e');
+    const richTextField = page.locator(field('sc_richtext_content')).first();
+    await expect(richTextField).not.toContainText(/Loading richtext/i, { timeout: 15_000 });
+    await expect(richTextField).toContainText(
+      'All field audit rich text',
+      { timeout: 10_000 },
+    );
+    await expect(page.locator(field('sc_attachment')).first()).toContainText(
+      'audit-attachment.pdf',
+    );
     await expect(page.locator(field('sc_attachment_file')).first()).toContainText(
       'audit-upload.txt',
     );
@@ -379,6 +459,13 @@ test.describe('showcase_all_fields form audit', () => {
     await ownerTrigger.scrollIntoViewIfNeeded();
     await expect(ownerTrigger).toBeVisible({ timeout: 5_000 });
     await expect(ownerTrigger).not.toContainText(/^请选择$/);
+
+    const assigneeTrigger = page
+      .locator(`${field('sc_assignee')} [data-testid="user-select-trigger-sc_assignee"]`)
+      .first();
+    await assigneeTrigger.scrollIntoViewIfNeeded();
+    await expect(assigneeTrigger).toBeVisible({ timeout: 5_000 });
+    await expect(assigneeTrigger).not.toContainText(/^请选择$/);
 
     const nameInput = page.locator(`${field('sc_name')} input`).first();
     await nameInput.fill(UPDATED_RECORD_NAME);
