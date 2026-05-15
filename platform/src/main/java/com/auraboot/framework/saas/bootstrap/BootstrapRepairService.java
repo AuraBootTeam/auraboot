@@ -475,8 +475,7 @@ public class BootstrapRepairService {
     }
 
     /**
-     * Run a single named step. Used by the upcoming Phase 2.4
-     * {@code /api/admin/bootstrap/repair} endpoint.
+     * Run a single named step for the explicit bootstrap/setup flow.
      */
     public RepairStepResult repair(String stepName, RepairOptions opts) {
         return switch (stepName) {
