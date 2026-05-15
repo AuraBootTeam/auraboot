@@ -19,7 +19,7 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
         INSERT INTO ab_command_definition
         (pid, tenant_id, code, display_name, description, model_code,
          input_schema, target_models, execution_config, extension,
-         cmd_risk_level,
+         cmd_risk_level, plugin_pid,
          version, semver, is_current, row_version, status, deleted_flag,
          created_at, updated_at)
         VALUES
@@ -28,7 +28,7 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
          #{targetModels, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{executionConfig, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
          #{extension, typeHandler=com.auraboot.framework.application.database.mybatis.ExtensionTypeHandler},
-         #{cmdRiskLevel},
+         #{cmdRiskLevel}, #{pluginPid},
          #{version}, #{semver}, #{isCurrent}, #{rowVersion}, #{status}, #{deletedFlag},
          #{createdAt}, #{updatedAt})
         ON CONFLICT (tenant_id, code, version) DO NOTHING
