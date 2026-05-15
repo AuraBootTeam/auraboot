@@ -123,6 +123,12 @@ public class PageSchemaDTO {
     private Map<String, Object> extension;
 
     /**
+     * Mobile UX profile. Stored under extension.mobileUx during import so the
+     * existing page schema table can carry the profile without a schema change.
+     */
+    private Map<String, Object> mobileUx;
+
+    /**
      * Captures all "name:*" localized name entries from JSON beyond the hardcoded nameZhCN/nameEn.
      */
     @JsonIgnore

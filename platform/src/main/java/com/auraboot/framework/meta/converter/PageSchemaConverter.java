@@ -54,10 +54,24 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "schemaVersion", source = "schemaVersion")
     @Mapping(target = "modelCategory", ignore = true) // enriched at query time
     @Mapping(target = "extension", source = "extension", qualifiedByName = "extensionBeanToMap")
+    @Mapping(target = "mobileUx", ignore = true)
     @Mapping(target = "deletedFlag", source = "deletedFlag")
     @Mapping(target = "createdAt", source = "createdAt")
     @Mapping(target = "updatedAt", source = "updatedAt")
     public abstract PageSchemaDTO toDTO(PageSchema entity);
+
+    @AfterMapping
+    protected void exposeMobileUx(@MappingTarget PageSchemaDTO dto) {
+        if (dto.getExtension() == null || dto.getMobileUx() != null) {
+            return;
+        }
+        Object mobileUx = dto.getExtension().get("mobileUx");
+        if (mobileUx instanceof Map<?, ?> map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> typed = (Map<String, Object>) map;
+            dto.setMobileUx(typed);
+        }
+    }
 
     // ── CreateRequest → Entity ────────────────────────────────────
 

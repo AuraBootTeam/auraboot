@@ -1602,8 +1602,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         String titleJson = dto.getTitle() != null ? toJson(dto.getTitle()) : null;
         String layoutJson = dto.getLayout() != null ? toJson(dto.getLayout()) : null;
         String blocksJson = dto.getBlocks() != null ? toJson(dto.getBlocks()) : "[]";
-        String extensionJson = dto.getExtension() != null && !dto.getExtension().isEmpty()
-                ? toJson(dto.getExtension()) : "{}";
+        String extensionJson = toJson(mergePageExtension(dto));
         String titleDisplay = dto.getEffectiveName();
         boolean isTemplate = dto.getIsTemplate() != null && dto.getIsTemplate();
         int sortWeight = dto.getSortWeight() != null ? dto.getSortWeight() : 0;
@@ -1651,6 +1650,17 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     pid, null, dto.getPageKey(), dto.getEffectiveName(),
                     ResourceAction.CREATE, null, null);
         }
+    }
+
+    private Map<String, Object> mergePageExtension(PageSchemaDTO dto) {
+        Map<String, Object> extension = new LinkedHashMap<>();
+        if (dto.getExtension() != null) {
+            extension.putAll(dto.getExtension());
+        }
+        if (dto.getMobileUx() != null && !dto.getMobileUx().isEmpty()) {
+            extension.put("mobileUx", dto.getMobileUx());
+        }
+        return extension;
     }
 
     /**
