@@ -157,6 +157,12 @@ public class PageSchemaDTO extends AbstractResponse {
     @JsonProperty("extension")
     private Map<String, Object> extension;
 
+    /**
+     * Mobile UX profile consumed by native mobile clients.
+     */
+    @JsonProperty("mobileUx")
+    private Map<String, Object> mobileUx;
+
     // 状态字段已在父类 AbstractResponse 中定义，无需重复声明
 
     /**
