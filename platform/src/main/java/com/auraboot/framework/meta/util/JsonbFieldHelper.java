@@ -184,4 +184,14 @@ public class JsonbFieldHelper {
         if (value instanceof String) return (String) value;
         return JsonUtil.toJson(value);
     }
+
+    /**
+     * Return whether a JSON/JSONB field value should be converted to JSON text
+     * before binding into SQL. Strings are treated as already-encoded JSON.
+     */
+    public static boolean shouldSerializeJsonValue(Object value) {
+        return value instanceof Map<?, ?>
+                || value instanceof Collection<?>
+                || (value != null && value.getClass().isArray());
+    }
 }
