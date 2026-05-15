@@ -30,7 +30,7 @@
     "displayName:en": "Create Mission",
     "type": "create",
     "modelCode": "mission",
-    "inputFields": ["title", "description", "mission_status", "owner_id", "priority", "target_date", "kpis", "tags"]
+    "inputFields": ["title", "description", "mission_status", "owner_id", "acp_priority", "target_date", "kpis", "tags"]
   },
   {
     "code": "acp:update_mission",
@@ -38,7 +38,7 @@
     "displayName:en": "Update Mission",
     "type": "update",
     "modelCode": "mission",
-    "inputFields": ["title", "description", "mission_status", "owner_id", "priority", "target_date", "kpis", "tags"]
+    "inputFields": ["title", "description", "mission_status", "owner_id", "acp_priority", "target_date", "kpis", "tags"]
   },
   {
     "code": "acp:delete_mission",
@@ -405,7 +405,7 @@
     "displayName:en": "Create Object Alias",
     "type": "create",
     "modelCode": "object_alias",
-    "inputFields": ["model_code", "alias", "language", "priority"]
+    "inputFields": ["model_code", "alias", "language", "acp_priority"]
   },
   {
     "code": "acp:update_object_alias",
@@ -413,7 +413,7 @@
     "displayName:en": "Update Object Alias",
     "type": "update",
     "modelCode": "object_alias",
-    "inputFields": ["model_code", "alias", "language", "priority"]
+    "inputFields": ["model_code", "alias", "language", "acp_priority"]
   },
   {
     "code": "acp:delete_object_alias",
@@ -430,7 +430,7 @@
     "displayName:en": "Create Semantic Term",
     "type": "create",
     "modelCode": "semantic_term",
-    "inputFields": ["term", "model_code", "language", "term_type", "resolution", "description", "priority"]
+    "inputFields": ["term", "model_code", "language", "term_type", "resolution", "description", "acp_priority"]
   },
   {
     "code": "acp:update_semantic_term",
@@ -438,7 +438,7 @@
     "displayName:en": "Update Semantic Term",
     "type": "update",
     "modelCode": "semantic_term",
-    "inputFields": ["term", "model_code", "language", "term_type", "resolution", "description", "priority"]
+    "inputFields": ["term", "model_code", "language", "term_type", "resolution", "description", "acp_priority"]
   },
   {
     "code": "acp:delete_semantic_term",

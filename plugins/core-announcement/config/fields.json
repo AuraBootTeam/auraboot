@@ -15,7 +15,7 @@
     "extension": { "multiline": true }
   },
   {
-    "code": "priority",
+    "code": "announcement_priority",
     "displayName:zh-CN": "优先级",
     "displayName:en": "Priority",
     "dataType": "enum",

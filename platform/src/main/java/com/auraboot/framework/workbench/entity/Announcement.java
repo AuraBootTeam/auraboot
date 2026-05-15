@@ -26,8 +26,16 @@ public class Announcement {
     @TableField("content")
     private String content;
 
-    @TableField("priority")
-    private String priority;
+    @TableField("announcement_priority")
+    private String announcementPriority;
+
+    public String getPriority() {
+        return announcementPriority;
+    }
+
+    public void setPriority(String priority) {
+        this.announcementPriority = priority;
+    }
 
     @TableField("status")
     private String status;

@@ -32,7 +32,7 @@
         "fields": [
           { "field": "title" },
           { "field": "status" },
-          { "field": "priority" }
+          { "field": "announcement_priority" }
         ]
       },
       {
@@ -45,7 +45,7 @@
             "sortable": true
           },
           {
-            "field": "priority",
+            "field": "announcement_priority",
             "width": 100,
             "renderType": "tag"
           },
@@ -160,7 +160,7 @@
         },
         "fields": [
           { "field": "title", "colSpan": 12 },
-          { "field": "priority", "colSpan": 6 },
+          { "field": "announcement_priority", "colSpan": 6 },
           { "field": "pinned", "colSpan": 6 },
           { "field": "expires_at", "colSpan": 6 },
           { "field": "content", "colSpan": 12 }
@@ -209,7 +209,7 @@
         "readOnly": true,
         "fields": [
           { "field": "title", "colSpan": 12 },
-          { "field": "priority", "colSpan": 4 },
+          { "field": "announcement_priority", "colSpan": 4 },
           { "field": "status", "colSpan": 4 },
           { "field": "pinned", "colSpan": 4 },
           { "field": "published_by", "colSpan": 6 },

@@ -5,7 +5,7 @@
     "displayName:en": "Create Announcement",
     "type": "create",
     "modelCode": "ab_announcement",
-    "inputFields": ["title", "content", "priority", "pinned", "expires_at"],
+    "inputFields": ["title", "content", "announcement_priority", "pinned", "expires_at"],
     "autoSetFields": {
       "status": { "strategy": "fixed_value", "value": "draft" }
     }
@@ -16,7 +16,7 @@
     "displayName:en": "Update Announcement",
     "type": "update",
     "modelCode": "ab_announcement",
-    "inputFields": ["title", "content", "priority", "pinned", "expires_at"]
+    "inputFields": ["title", "content", "announcement_priority", "pinned", "expires_at"]
   },
   {
     "code": "announcement:delete_announcement",

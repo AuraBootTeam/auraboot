@@ -1,7 +1,7 @@
 [
   { "modelCode": "ab_announcement", "fieldCode": "title", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
   { "modelCode": "ab_announcement", "fieldCode": "content", "sequence": 2, "required": false, "visible": false, "editable": true },
-  { "modelCode": "ab_announcement", "fieldCode": "priority", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "ab_announcement", "fieldCode": "announcement_priority", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
   { "modelCode": "ab_announcement", "fieldCode": "status", "sequence": 4, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
   { "modelCode": "ab_announcement", "fieldCode": "pinned", "sequence": 5, "required": false, "visible": true, "editable": true },
   { "modelCode": "ab_announcement", "fieldCode": "published_by", "sequence": 6, "required": false, "visible": true, "editable": false },
