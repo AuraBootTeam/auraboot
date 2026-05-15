@@ -21,6 +21,15 @@ import java.util.List;
  */
 @Mapper
 public interface PageSchemaMapper extends BaseMapper<PageSchema> {
+    /**
+     * Keep PageSchema mapper reads off SELECT * so PostgreSQL prepared plans do
+     * not become invalid when bootstrap/setup evolves ab_page_schema columns.
+     */
+    String PAGE_SCHEMA_COLUMNS = "id, pid, tenant_id, env_id, is_current, status, extension, "
+            + "page_key, model_code, name, description, kind, schema_version, "
+            + "profile, title, layout, blocks, meta_info, is_template, "
+            + "template_category, sort_weight, published_at, tags, plugin_pid, "
+            + "version, semver, row_version, created_at, updated_at, deleted_flag";
 
     // ==================== 幂等INSERT方法（统一使用） ====================
 
@@ -131,7 +140,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param pid 业务主键
      * @return 页面Schema
      */
-    @Select("SELECT * FROM ab_page_schema WHERE pid = #{pid} AND deleted_flag = false")
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE pid = #{pid} AND deleted_flag = false")
     PageSchema selectByPid(@Param("pid") String pid);
 
     /**
@@ -148,7 +157,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param name 名称
      * @return 页面Schema
      */
-    @Select("SELECT * FROM ab_page_schema WHERE name = #{name} AND deleted_flag = false")
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE name = #{name} AND deleted_flag = false")
     PageSchema selectByName(@Param("name") String name);
 
     /**
@@ -156,14 +165,14 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param kind 页面kind
      * @return 页面Schema列表
      */
-    @Select("SELECT * FROM ab_page_schema WHERE kind = #{kind} AND deleted_flag = false ORDER BY sort_weight ASC")
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE kind = #{kind} AND deleted_flag = false ORDER BY sort_weight ASC")
     List<PageSchema> selectByKind(@Param("kind") String kind);
 
     /**
      * 查询已发布的页面Schema列表
      * @return 页面Schema列表
      */
-    @Select("SELECT * FROM ab_page_schema WHERE status = 'published' AND deleted_flag = false ORDER BY published_at DESC")
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE status = 'published' AND deleted_flag = false ORDER BY published_at DESC")
     List<PageSchema> selectPublishedSchemas();
 
     /**
@@ -171,17 +180,16 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param templateCategory 模板分类（可选）
      * @return 页面Schema列表
      */
-    @Select("""
-        <script>
-        SELECT * FROM ab_page_schema
-        WHERE is_template = true
-          AND deleted_flag = false
-        <if test="templateCategory != null and templateCategory != ''">
-          AND template_category = #{templateCategory}
-        </if>
-        ORDER BY sort_weight ASC
-        </script>
-        """)
+    @Select("<script>"
+            + " SELECT " + PAGE_SCHEMA_COLUMNS
+            + " FROM ab_page_schema"
+            + " WHERE is_template = true"
+            + " AND deleted_flag = false"
+            + " <if test=\"templateCategory != null and templateCategory != ''\">"
+            + " AND template_category = #{templateCategory}"
+            + " </if>"
+            + " ORDER BY sort_weight ASC"
+            + " </script>")
     List<PageSchema> selectTemplateSchemas(@Param("templateCategory") String templateCategory);
 
     /**
@@ -189,18 +197,17 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param keyword 关键词
      * @return 页面Schema列表
      */
-    @Select("""
-        <script>
-        SELECT * FROM ab_page_schema
-        WHERE deleted_flag = false
-        <if test="keyword != null and keyword != ''">
-          AND (name LIKE CONCAT('%', #{keyword}, '%')
-            OR title::text LIKE CONCAT('%', #{keyword}, '%')
-            OR description LIKE CONCAT('%', #{keyword}, '%'))
-        </if>
-        ORDER BY updated_at DESC
-        </script>
-        """)
+    @Select("<script>"
+            + " SELECT " + PAGE_SCHEMA_COLUMNS
+            + " FROM ab_page_schema"
+            + " WHERE deleted_flag = false"
+            + " <if test=\"keyword != null and keyword != ''\">"
+            + " AND (name LIKE CONCAT('%', #{keyword}, '%')"
+            + " OR title::text LIKE CONCAT('%', #{keyword}, '%')"
+            + " OR description LIKE CONCAT('%', #{keyword}, '%'))"
+            + " </if>"
+            + " ORDER BY updated_at DESC"
+            + " </script>")
     List<PageSchema> selectByKeyword(@Param("keyword") String keyword);
 
     /**
@@ -286,7 +293,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param name 页面名称
      * @return 版本历史列表
      */
-    @Select("SELECT * FROM ab_page_schema WHERE name = #{name} AND deleted_flag = false ORDER BY version DESC")
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE name = #{name} AND deleted_flag = false ORDER BY version DESC")
     List<PageSchema> selectVersionsByName(@Param("name") String name);
 
     /**
@@ -333,7 +340,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param pageKey 页面唯一标识，如 "device_list", "dashboard_main"
      * @return 页面Schema
      */
-    @Select("SELECT * FROM ab_page_schema WHERE page_key = #{pageKey} AND status = 'published' AND deleted_flag = false")
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE page_key = #{pageKey} AND status = 'published' AND deleted_flag = false")
     PageSchema selectByPageKey(@Param("pageKey") String pageKey);
 
     /**
@@ -341,7 +348,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param pageKey 页面唯一标识
      * @return 页面Schema（无论是否发布）
      */
-    @Select("SELECT * FROM ab_page_schema WHERE page_key = #{pageKey} AND deleted_flag = false LIMIT 1")
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE page_key = #{pageKey} AND deleted_flag = false LIMIT 1")
     PageSchema selectAnyByPageKey(@Param("pageKey") String pageKey);
 
     /**
@@ -349,7 +356,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param modelCode 模型编码
      * @return 页面Schema列表
      */
-    @Select("SELECT * FROM ab_page_schema WHERE model_code = #{modelCode} AND status = 'published' AND deleted_flag = false ORDER BY kind")
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE model_code = #{modelCode} AND status = 'published' AND deleted_flag = false ORDER BY kind")
     List<PageSchema> selectByModelCode(@Param("modelCode") String modelCode);
 
     /**
@@ -517,16 +524,15 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param keys list of page keys
      * @return full PageSchema entities
      */
-    @Select("""
-        <script>
-        SELECT * FROM ab_page_schema
-        WHERE page_key IN
-        <foreach collection="keys" item="key" open="(" separator="," close=")">
-            #{key}
-        </foreach>
-        AND status = 'published'
-        AND (deleted_flag = FALSE OR deleted_flag IS NULL)
-        </script>
-        """)
+    @Select("<script>"
+            + " SELECT " + PAGE_SCHEMA_COLUMNS
+            + " FROM ab_page_schema"
+            + " WHERE page_key IN"
+            + " <foreach collection=\"keys\" item=\"key\" open=\"(\" separator=\",\" close=\")\">"
+            + " #{key}"
+            + " </foreach>"
+            + " AND status = 'published'"
+            + " AND (deleted_flag = FALSE OR deleted_flag IS NULL)"
+            + " </script>")
     List<PageSchema> selectBatchByKeys(@Param("keys") List<String> keys);
 }
