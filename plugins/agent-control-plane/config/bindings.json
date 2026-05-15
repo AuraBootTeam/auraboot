@@ -21,7 +21,7 @@
   { "modelCode": "mission", "fieldCode": "description", "sequence": 2, "required": false, "visible": true, "editable": true },
   { "modelCode": "mission", "fieldCode": "mission_status", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
   { "modelCode": "mission", "fieldCode": "owner_id", "sequence": 4, "required": false, "visible": true, "editable": true },
-  { "modelCode": "mission", "fieldCode": "priority", "sequence": 5, "required": false, "visible": true, "editable": true },
+  { "modelCode": "mission", "fieldCode": "acp_priority", "sequence": 5, "required": false, "visible": true, "editable": true },
   { "modelCode": "mission", "fieldCode": "target_date", "sequence": 6, "required": false, "visible": true, "editable": true },
   { "modelCode": "mission", "fieldCode": "kpis", "sequence": 7, "required": false, "visible": false, "editable": true },
   { "modelCode": "mission", "fieldCode": "tags", "sequence": 8, "required": false, "visible": false, "editable": true },
@@ -176,7 +176,7 @@
   { "modelCode": "object_alias", "fieldCode": "model_code", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
   { "modelCode": "object_alias", "fieldCode": "alias", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
   { "modelCode": "object_alias", "fieldCode": "language", "sequence": 3, "required": false, "visible": true, "editable": true },
-  { "modelCode": "object_alias", "fieldCode": "priority", "sequence": 4, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "object_alias", "fieldCode": "acp_priority", "sequence": 4, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
 
   { "modelCode": "semantic_term", "fieldCode": "term", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
   { "modelCode": "semantic_term", "fieldCode": "model_code", "sequence": 2, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
@@ -184,7 +184,7 @@
   { "modelCode": "semantic_term", "fieldCode": "term_type", "sequence": 4, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
   { "modelCode": "semantic_term", "fieldCode": "resolution", "sequence": 5, "required": false, "visible": false, "editable": true },
   { "modelCode": "semantic_term", "fieldCode": "description", "sequence": 6, "required": false, "visible": true, "editable": true },
-  { "modelCode": "semantic_term", "fieldCode": "priority", "sequence": 7, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "semantic_term", "fieldCode": "acp_priority", "sequence": 7, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
 
   { "modelCode": "mcp_server", "fieldCode": "server_name", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
   { "modelCode": "mcp_server", "fieldCode": "server_url", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },

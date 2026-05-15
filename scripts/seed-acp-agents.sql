@@ -543,7 +543,7 @@ VALUES (
 -- MISSION
 -- ============================================================
 
-INSERT INTO ab_mission (pid, tenant_id, title, description, mission_status, priority,
+INSERT INTO ab_mission (pid, tenant_id, title, description, mission_status, acp_priority,
     target_date, kpis, tags, created_at, updated_at)
 VALUES (
     'mission_acp_demo_001', current_setting('app.seed_tenant_id')::BIGINT,
@@ -554,7 +554,7 @@ VALUES (
     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 ) ON CONFLICT (pid) DO NOTHING;
 
-INSERT INTO ab_mission (pid, tenant_id, title, description, mission_status, priority,
+INSERT INTO ab_mission (pid, tenant_id, title, description, mission_status, acp_priority,
     target_date, kpis, tags, created_at, updated_at)
 VALUES (
     'mission_intel_ops_001', current_setting('app.seed_tenant_id')::BIGINT,

@@ -46,7 +46,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         entity.setTenantId(tenantId);
         entity.setTitle(request.getTitle());
         entity.setContent(request.getContent());
-        entity.setPriority(request.getPriority() != null ? request.getPriority() : PRIORITY_NORMAL);
+        entity.setAnnouncementPriority(request.getPriority() != null ? request.getPriority() : PRIORITY_NORMAL);
         entity.setStatus(request.getStatus() != null ? request.getStatus() : STATUS_DRAFT);
         entity.setPinned(request.getPinned() != null ? request.getPinned() : false);
         entity.setExpiresAt(request.getExpiresAt());
@@ -78,7 +78,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
             entity.setContent(request.getContent());
         }
         if (request.getPriority() != null) {
-            entity.setPriority(request.getPriority());
+            entity.setAnnouncementPriority(request.getPriority());
         }
         if (request.getPinned() != null) {
             entity.setPinned(request.getPinned());
@@ -113,7 +113,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         dto.setId(entity.getId());
         dto.setTitle(entity.getTitle());
         dto.setContent(entity.getContent());
-        dto.setPriority(entity.getPriority());
+        dto.setPriority(entity.getAnnouncementPriority());
         dto.setStatus(entity.getStatus());
         dto.setPinned(entity.getPinned());
         dto.setPublishedBy(entity.getPublishedBy());

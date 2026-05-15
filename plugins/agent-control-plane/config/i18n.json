@@ -30,7 +30,7 @@
   { "key": "model.mission.description.label", "zh-CN": "描述", "en-US": "Description", "source": "import", "refType": "field" },
   { "key": "model.mission.mission_status.label", "zh-CN": "使命状态", "en-US": "Status", "source": "import", "refType": "field" },
   { "key": "model.mission.owner_id.label", "zh-CN": "负责人", "en-US": "Owner", "source": "import", "refType": "field" },
-  { "key": "model.mission.priority.label", "zh-CN": "优先级", "en-US": "Priority", "source": "import", "refType": "field" },
+  { "key": "model.mission.acp_priority.label", "zh-CN": "优先级", "en-US": "Priority", "source": "import", "refType": "field" },
   { "key": "model.mission.target_date.label", "zh-CN": "目标日期", "en-US": "Target Date", "source": "import", "refType": "field" },
   { "key": "model.mission.kpis.label", "zh-CN": "KPI 指标", "en-US": "KPIs", "source": "import", "refType": "field" },
   { "key": "model.mission.tags.label", "zh-CN": "标签", "en-US": "Tags", "source": "import", "refType": "field" },
@@ -284,7 +284,7 @@
   { "key": "model.object_alias.model_code.label", "zh-CN": "模型编码", "en-US": "Model Code", "source": "import", "refType": "field" },
   { "key": "model.object_alias.alias.label", "zh-CN": "别名", "en-US": "Alias", "source": "import", "refType": "field" },
   { "key": "model.object_alias.language.label", "zh-CN": "语言", "en-US": "Language", "source": "import", "refType": "field" },
-  { "key": "model.object_alias.priority.label", "zh-CN": "优先级", "en-US": "Priority", "source": "import", "refType": "field" },
+  { "key": "model.object_alias.acp_priority.label", "zh-CN": "优先级", "en-US": "Priority", "source": "import", "refType": "field" },
 
   { "key": "model.semantic_term._meta.label", "zh-CN": "语义术语", "en-US": "Semantic Term", "source": "import", "refType": "model" },
   { "key": "model.semantic_term.term.label", "zh-CN": "术语", "en-US": "Term", "source": "import", "refType": "field" },
@@ -293,7 +293,7 @@
   { "key": "model.semantic_term.term_type.label", "zh-CN": "术语类型", "en-US": "Term Type", "source": "import", "refType": "field" },
   { "key": "model.semantic_term.resolution.label", "zh-CN": "解析结果", "en-US": "Resolution", "source": "import", "refType": "field" },
   { "key": "model.semantic_term.description.label", "zh-CN": "描述", "en-US": "Description", "source": "import", "refType": "field" },
-  { "key": "model.semantic_term.priority.label", "zh-CN": "优先级", "en-US": "Priority", "source": "import", "refType": "field" },
+  { "key": "model.semantic_term.acp_priority.label", "zh-CN": "优先级", "en-US": "Priority", "source": "import", "refType": "field" },
 
   { "key": "menu.acp_actions", "zh-CN": "Agent 动作", "en-US": "Agent Actions", "source": "import", "refType": "menu" },
   { "key": "menu.acp_object_aliases", "zh-CN": "对象别名", "en-US": "Object Aliases", "source": "import", "refType": "menu" },
