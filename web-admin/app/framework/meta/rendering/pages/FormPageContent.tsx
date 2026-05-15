@@ -113,6 +113,18 @@ export function parseValidationSummaryMessages(message?: string | null): string[
     .filter((item, index, arr) => arr.indexOf(item) === index);
 }
 
+export function resolveFormButtonContent(
+  button: Record<string, any>,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  return (
+    getLocalizedText(button.content || button.label, locale, t) ||
+    (typeof button.action === 'string' ? t(`action.${button.action}`) : undefined) ||
+    button.code
+  );
+}
+
 export function normalizeCommandPayloadValue(rawValue: any, dataType?: string): any {
   if (Array.isArray(rawValue) && String(dataType || '').toLowerCase() === 'string') {
     const path = rawValue.filter((item) => typeof item === 'string' && item !== '');
@@ -1630,11 +1642,7 @@ export function FormPageContent(props: PageContentProps) {
                         {loading && button.code === 'submit' && (
                           <span className="loading loading-spinner loading-sm mr-2"></span>
                         )}
-                        {getLocalizedText(button.content, locale, t) ||
-                          (typeof button.action === 'string'
-                            ? t(`action.${button.action}`)
-                            : undefined) ||
-                          button.code}
+                        {resolveFormButtonContent(button, locale, t)}
                       </button>
                     );
                   })}
