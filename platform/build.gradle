@@ -366,7 +366,7 @@ dependencies {
     testImplementation 'org.testcontainers:junit-jupiter'
 
     // Awaitility — async assertion polling (used by AdminAuditServiceIntegrationTest)
-    testImplementation 'org.awaitility:awaitility:4.2.0'
+    testImplementation 'org.awaitility:awaitility:4.3.0'
 
     // JUnit 5 Platform
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
