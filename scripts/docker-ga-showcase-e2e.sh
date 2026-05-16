@@ -105,19 +105,11 @@ runner_command() {
           exit 1;
           ;;
       esac;
-      seeds+=(invariants dashboard-default);
-      for seed in "${seeds[@]}"; do
-        echo "[ga-showcase-docker] seed-showcase-${seed}";
-        if SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
-          npx playwright test --config=playwright.seed.config.ts \
-          -g "seed-showcase-${seed}" --reporter=line \
-          --output="test-results/ga-docker-seed-${seed}"; then
-          echo "[ga-showcase-docker] seed-showcase-${seed} OK";
-        else
-          echo "[ga-showcase-docker] seed-showcase-${seed} FAILED" >&2;
-          exit 1;
-        fi
-      done;
+      seeds+=(dashboard-default invariants);
+      SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
+        NO_PROXY="${NO_PROXY:-localhost,127.0.0.1}" \
+        node scripts/run-showcase-seed-sequence.mjs \
+          --output-prefix=test-results/ga-docker-seed "${seeds[@]}";
     '
   elif [[ "$phase" = "all" ]]; then
     seed_block='echo "[ga-showcase-docker] GA_E2E_SKIP_SEED=1 - skipping showcase seeds";'
