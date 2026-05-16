@@ -8,7 +8,7 @@
  * 4. BPM process instances (approval flow data for Inbox)
  *
  * Run AFTER all other seed scripts:
- *   npx playwright test seed-showcase-supplement --config=playwright.seed.config.ts
+ *   node scripts/run-showcase-seed-sequence.mjs supplement
  */
 
 import { test, expect } from '@playwright/test';

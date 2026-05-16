@@ -33,6 +33,86 @@ async function cmd(
   return result.recordId;
 }
 
+const KNOWLEDGE_BASE_NAME = '鑫然科技产品知识库';
+
+async function findDynamicRecordByField(
+  page: any,
+  modelCode: string,
+  fieldName: string,
+  value: string,
+): Promise<any | null> {
+  const filters = encodeURIComponent(JSON.stringify([{ fieldName, operator: 'eq', value }]));
+  const resp = await page.request.get(
+    `/api/dynamic/${modelCode}/list?pageNum=1&pageSize=1&filters=${filters}`,
+  );
+  const body = await resp.json().catch(() => ({}));
+  expect(body?.code, JSON.stringify(body).slice(0, 200)).toBe('0');
+  return body?.data?.records?.[0] ?? null;
+}
+
+async function ensureAgentDefinition(page: any, agent: Record<string, unknown>): Promise<string> {
+  const existing = await findDynamicRecordByField(
+    page,
+    'agent_definition',
+    'agent_code',
+    String(agent.agent_code),
+  );
+  if (existing?.pid || existing?.id) {
+    console.log(`  Ensured existing agent: ${agent.name}`);
+    return String(existing.pid || existing.id);
+  }
+
+  const id = await cmd(page, 'acp:create_agent_definition', agent);
+  console.log(`  Created agent: ${agent.name}`);
+  return id;
+}
+
+async function expectApiSuccess(resp: any, context: string): Promise<any> {
+  const body = await resp.json().catch(() => ({}));
+  expect(resp.ok(), `${context}: ${JSON.stringify(body).slice(0, 300)}`).toBeTruthy();
+  expect(body?.code, `${context}: ${JSON.stringify(body).slice(0, 300)}`).toBe('0');
+  return body;
+}
+
+async function listKnowledgeBases(page: any): Promise<any[]> {
+  const resp = await page.request.get('/api/ai/knowledge');
+  const body = await expectApiSuccess(resp, 'List knowledge bases');
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
+async function ensureKnowledgeBase(page: any): Promise<string> {
+  const existing = (await listKnowledgeBases(page)).find(
+    (kb: any) => kb?.name === KNOWLEDGE_BASE_NAME,
+  );
+  if (existing?.pid) {
+    console.log(`  Ensured existing knowledge base: ${KNOWLEDGE_BASE_NAME} (${existing.pid})`);
+    return existing.pid;
+  }
+
+  const kbResp = await page.request.post('/api/ai/knowledge', {
+    data: {
+      name: KNOWLEDGE_BASE_NAME,
+      description:
+        '包含 PCBA 工艺规范、产品参数手册、常见问题解答等技术文档。供 AuraBot 和客服 Agent 引用。',
+      embeddingProvider: 'openai',
+      embeddingModel: 'text-embedding-3-small',
+      chunkSize: 300,
+      chunkOverlap: 30,
+    },
+  });
+  const kbBody = await expectApiSuccess(kbResp, 'Create knowledge base');
+  const kbPid = kbBody.data?.pid;
+  expect(kbPid, JSON.stringify(kbBody).slice(0, 200)).toBeTruthy();
+  console.log(`  Created knowledge base: ${KNOWLEDGE_BASE_NAME} (${kbPid})`);
+  return kbPid;
+}
+
+async function listKnowledgeDocuments(page: any, kbPid: string): Promise<any[]> {
+  const resp = await page.request.get(`/api/ai/knowledge/${kbPid}/documents`);
+  const body = await expectApiSuccess(resp, `List knowledge documents for ${kbPid}`);
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
 test.describe.serial('Showcase Seed — AI & ACP', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(120_000);
@@ -77,16 +157,12 @@ test.describe.serial('Showcase Seed — AI & ACP', () => {
       },
     ];
 
+    let ensured = 0;
     for (const agent of agents) {
-      try {
-        const id = await cmd(page, 'acp:create_agent_definition', agent);
-        console.log(`  Created agent: ${agent.name}`);
-      } catch (e) {
-        console.warn(
-          `  Agent creation failed for ${agent.name}: ${(e as Error).message.slice(0, 120)}`,
-        );
-      }
+      await ensureAgentDefinition(page, agent);
+      ensured++;
     }
+    expect(ensured).toBe(agents.length);
   });
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -94,25 +170,15 @@ test.describe.serial('Showcase Seed — AI & ACP', () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   test('Phase AI2: Knowledge Base — Create KB and Documents', async ({ page }) => {
-    // Create knowledge base
-    const kbResp = await page.request.post('/api/ai/knowledge-base', {
-      data: {
-        name: '鑫然科技产品知识库',
-        description:
-          '包含 PCBA 工艺规范、产品参数手册、常见问题解答等技术文档。供 AuraBot 和客服 Agent 引用。',
-      },
-    });
-    const kbBody = await kbResp.json().catch(() => ({}));
+    const kbPid = await ensureKnowledgeBase(page);
+    const existingDocNames = new Set(
+      (await listKnowledgeDocuments(page, kbPid)).map((doc: any) => doc?.docName),
+    );
 
-    if (kbBody?.code === '0') {
-      const kbPid = kbBody.data?.pid || kbBody.data?.id;
-      console.log(`  Created knowledge base: 鑫然科技产品知识库 (${kbPid})`);
-
-      // Add inline text documents (no file upload needed)
-      const docs = [
-        {
-          title: 'PCBA 工艺规范 v2.0',
-          content: `# PCBA 工艺规范
+    const docs = [
+      {
+        title: 'PCBA 工艺规范 v2.0',
+        content: `# PCBA 工艺规范
 
 ## 1. SMT 贴片工艺
 - 回流焊温度曲线：预热区 150-200°C，均温区 200-220°C，峰值 235-245°C
@@ -134,10 +200,10 @@ test.describe.serial('Showcase Seed — AI & ACP', () => {
 - IPC-A-610 Class 2（标准级）/ Class 3（高可靠性级）
 - AEC-Q100（汽车电子）
 - 不良率目标：≤ 200 PPM`,
-        },
-        {
-          title: '常见技术问题 FAQ',
-          content: `# 技术 FAQ
+      },
+      {
+        title: '常见技术问题 FAQ',
+        content: `# 技术 FAQ
 
 ## Q1: 你们支持哪些 PCB 材质？
 A: FR-4（标准）、铝基板（LED）、Rogers（高频）、陶瓷基板（高温）
@@ -156,10 +222,10 @@ A: 48 小时内响应 → 技术分析 → 出具 8D 报告 → 补货/返工 �
 
 ## Q6: 账期和付款方式？
 A: 新客户预付 50%，老客户月结 30-60 天。支持银行转账、承兑汇票。`,
-        },
-        {
-          title: '产品参数速查手册',
-          content: `# 产品参数速查
+      },
+      {
+        title: '产品参数速查手册',
+        content: `# 产品参数速查
 
 ## 1. 电阻系列
 | 型号 | 封装 | 阻值范围 | 精度 | 功率 |
@@ -181,32 +247,33 @@ A: 新客户预付 50%，老客户月结 30-60 天。支持银行转账、承兑
 | FPC05 | FPC | 0.5mm | 4-60P | 0.5A |
 | PH20 | 线对板 | 2.0mm | 2-16P | 2A |
 | XH25 | 线对板 | 2.5mm | 2-20P | 3A |`,
-        },
-      ];
+      },
+    ];
 
-      for (const doc of docs) {
-        // Try to create document with inline content
-        const docResp = await page.request.post(`/api/ai/knowledge-base/${kbPid}/documents`, {
-          data: {
-            title: doc.title,
-            content: doc.content,
-            documentType: 'markdown',
-          },
-        });
-        const docBody = await docResp.json().catch(() => ({}));
-        if (docBody?.code === '0') {
-          console.log(`  Created KB doc: ${doc.title}`);
-        } else {
-          console.warn(
-            `  KB doc creation failed: ${doc.title} — ${docBody?.message?.slice(0, 80) || 'unknown'}`,
-          );
-        }
+    let ensuredDocs = 0;
+    for (const doc of docs) {
+      const filename = `${doc.title}.md`;
+      if (existingDocNames.has(filename)) {
+        ensuredDocs++;
+        console.log(`  Ensured existing KB doc: ${doc.title}`);
+        continue;
       }
-    } else {
-      console.warn(
-        `  Knowledge base creation failed: ${kbBody?.message?.slice(0, 100) || 'unknown'}`,
-      );
+
+      const docResp = await page.request.post(`/api/ai/knowledge/${kbPid}/documents/upload`, {
+        multipart: {
+          file: {
+            name: filename,
+            mimeType: 'text/markdown',
+            buffer: Buffer.from(doc.content, 'utf-8'),
+          },
+        },
+      });
+      await expectApiSuccess(docResp, `Upload KB doc ${doc.title}`);
+      ensuredDocs++;
+      console.log(`  Uploaded KB doc: ${doc.title}`);
     }
+
+    expect(ensuredDocs).toBe(docs.length);
   });
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -222,12 +289,24 @@ A: 新客户预付 50%，老客户月结 30-60 天。支持银行转账、承兑
     const agentResp = await page.request.get('/api/dynamic/agent_definition/list?pageSize=1');
     const agentBody = await agentResp.json().catch(() => ({}));
     console.log(`  Agent Definitions: ${agentBody?.data?.total ?? '?'}`);
+    for (const agentCode of ['sales_agent', 'data_analyst', 'support_agent']) {
+      const record = await findDynamicRecordByField(
+        page,
+        'agent_definition',
+        'agent_code',
+        agentCode,
+      );
+      expect(record, `Missing seeded agent_definition ${agentCode}`).toBeTruthy();
+    }
 
     // Check knowledge bases
-    const kbResp = await page.request.get('/api/ai/knowledge-base');
-    const kbBody = await kbResp.json().catch(() => ({}));
-    const kbCount = Array.isArray(kbBody?.data) ? kbBody.data.length : (kbBody?.data?.total ?? '?');
-    console.log(`  Knowledge Bases:   ${kbCount}`);
+    const knowledgeBases = await listKnowledgeBases(page);
+    const knowledgeBase = knowledgeBases.find((kb: any) => kb?.name === KNOWLEDGE_BASE_NAME);
+    expect(knowledgeBase, `Missing knowledge base ${KNOWLEDGE_BASE_NAME}`).toBeTruthy();
+    const documents = await listKnowledgeDocuments(page, knowledgeBase.pid);
+    expect(documents.length).toBeGreaterThanOrEqual(3);
+    console.log(`  Knowledge Bases:   ${knowledgeBases.length}`);
+    console.log(`  Knowledge Docs:    ${documents.length}`);
 
     console.log('═══════════════════════════════════════\n');
   });

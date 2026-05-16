@@ -35,6 +35,8 @@
     "test:ga:showcase:chromium": "bash ../scripts/ga-showcase-e2e.sh chromium",
     "test:ga:showcase:deep": "bash ../scripts/ga-showcase-e2e.sh deep",
     "test:ga:showcase:docker": "bash ../scripts/docker-ga-showcase-e2e.sh",
+    "seed:showcase": "node scripts/run-showcase-seed-sequence.mjs",
+    "test:seed-runner": "node scripts/run-showcase-seed-sequence.test.mjs",
     "test:templates": "NO_PROXY=localhost PW_PROFILE=full PW_ROLE_PROJECTS=1 playwright test tests/e2e/templates",
     "test:templates:smoke": "NO_PROXY=localhost PW_PROFILE=smoke playwright test tests/e2e/templates",
     "test:page-designer": "NO_PROXY=localhost playwright test tests/e2e/page-designer/load-existing-page.spec.ts tests/e2e/page-designer/field-properties.spec.ts tests/e2e/page-designer/smart-components.spec.ts tests/e2e/page-designer/page-designer-full-lifecycle.spec.ts tests/e2e/page-designer/designer-deep-operations.spec.ts tests/e2e/page-designer/custom-page-designer.spec.ts tests/e2e/page-designer/designer-toolbar-permissions.spec.ts tests/e2e/studio/ai-page-gen.spec.ts",

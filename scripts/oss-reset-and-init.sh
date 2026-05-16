@@ -652,23 +652,7 @@ GRANT_SQL
         SEED_CONFIG="playwright.seed.config.ts"
         SEED_LOG_DIR="$WEB_ADMIN_DIR/test-results/seed/reset-and-init"
 
-        run_seed_step "Core seed (org + CRM accounts/leads/opportunities)" "$SEED_LOG_DIR/seed-showcase-data.log" \
-            npx playwright test seed-showcase-data --config="$SEED_CONFIG" --reporter=line
-
-        run_seed_step "Extended seed (bulk accounts/leads/activities)" "$SEED_LOG_DIR/seed-showcase-extended.log" \
-            npx playwright test seed-showcase-extended --config="$SEED_CONFIG" --reporter=line
-
-        run_seed_step "Workflow seed (BPMN/automation/webhook)" "$SEED_LOG_DIR/seed-showcase-workflow.log" \
-            npx playwright test seed-showcase-workflow --config="$SEED_CONFIG" --reporter=line
-
-        run_seed_step "AI seed (agents/knowledge base)" "$SEED_LOG_DIR/seed-showcase-ai.log" \
-            npx playwright test seed-showcase-ai --config="$SEED_CONFIG" --reporter=line
-
-        run_seed_step "Arsenal seed (all-fields + dashboard + report + BPMN + automation)" "$SEED_LOG_DIR/seed-showcase-arsenal.log" \
-            npx playwright test seed-showcase-arsenal --config="$SEED_CONFIG" --reporter=line
-
-        run_seed_step "Supplement seed (more contacts + leads + activities)" "$SEED_LOG_DIR/seed-showcase-supplement.log" \
-            npx playwright test seed-showcase-supplement --config="$SEED_CONFIG" --reporter=line
+        seed_phases=(data extended workflow ai arsenal supplement)
 
         case "$SHOWCASE_COMMERCIAL_SEED" in
             skip)
@@ -676,8 +660,7 @@ GRANT_SQL
                 ;;
             auto)
                 if command_definition_exists "crm:create_quote" && command_definition_exists "crm:create_complaint"; then
-                    run_seed_step "Commercial seed (quotes/complaints/IM/email/opp-contacts)" "$SEED_LOG_DIR/seed-showcase-commercial.log" \
-                        npx playwright test seed-showcase-commercial --config="$SEED_CONFIG" --reporter=line
+                    seed_phases+=(commercial)
                 else
                     echo -e "${YELLOW}   Commercial seed skipped: full CRM quote/complaint commands are not imported.${NC}"
                     echo "     OSS crm-starter supports base CRM seed; full commercial seed requires the enterprise CRM plugin."
@@ -689,18 +672,20 @@ GRANT_SQL
                     echo "   Import the enterprise CRM plugin resources, or set SHOWCASE_COMMERCIAL_SEED=auto/skip."
                     exit 1
                 fi
-                run_seed_step "Commercial seed (quotes/complaints/IM/email/opp-contacts)" "$SEED_LOG_DIR/seed-showcase-commercial.log" \
-                    npx playwright test seed-showcase-commercial --config="$SEED_CONFIG" --reporter=line
+                seed_phases+=(commercial)
                 ;;
         esac
 
-        run_seed_step "Seed invariants (CRM + arsenal)" "$SEED_LOG_DIR/seed-showcase-invariants.log" \
-            npx playwright test seed-showcase-invariants --config="$SEED_CONFIG" --reporter=line
+        run_seed_step "Showcase seed sequence (${seed_phases[*]})" "$SEED_LOG_DIR/showcase-seed-sequence.log" \
+            node scripts/run-showcase-seed-sequence.mjs --config="$SEED_CONFIG" \
+                --output-prefix="$SEED_LOG_DIR/showcase" "${seed_phases[@]}"
 
         select_default_showcase_dashboard
+        export SHOWCASE_DEFAULT_DASHBOARD_CODE
         echo "   Demo default dashboard target: ${SHOWCASE_DEFAULT_DASHBOARD_CODE}"
-        run_seed_step "CRM dashboard demo default (${SHOWCASE_DEFAULT_DASHBOARD_CODE})" "$SEED_LOG_DIR/seed-showcase-dashboard-default.log" \
-            npx playwright test seed-showcase-dashboard-default --config="$SEED_CONFIG" --reporter=line
+        run_seed_step "Showcase seed finalization (dashboard-default + invariants)" "$SEED_LOG_DIR/showcase-seed-finalization.log" \
+            node scripts/run-showcase-seed-sequence.mjs --config="$SEED_CONFIG" \
+                --output-prefix="$SEED_LOG_DIR/showcase" dashboard-default invariants
 
         echo -e "${GREEN}   All showcase data seeded successfully${NC}"
     else

@@ -279,9 +279,9 @@ else
     --reporter=line >/dev/null 2>&1 || true
 
   if [ ! -f tests/storage/admin.json ]; then
-    echo "  WARNING: admin.json still missing — skipping seed (auth.setup failed)" >&2
+    echo "  ERROR: admin.json still missing — cannot run showcase seed (auth.setup failed)" >&2
+    exit 1
   else
-    seed_failures=()
     seed_names=(data extended workflow ai arsenal supplement)
     case "${SHOWCASE_COMMERCIAL_SEED:-auto}" in
       skip)
@@ -290,7 +290,7 @@ else
       required)
         if [ "$(command_exists 'crm:create_quote')" != "yes" ] || [ "$(command_exists 'crm:create_complaint')" != "yes" ]; then
           echo "  seed-showcase-commercial ... FAIL (full CRM quote/complaint commands are not imported)" >&2
-          seed_failures+=("commercial")
+          exit 1
         else
           seed_names+=(commercial)
         fi
@@ -304,29 +304,23 @@ else
         ;;
       *)
         echo "  seed-showcase-commercial ... FAIL (SHOWCASE_COMMERCIAL_SEED must be auto|required|skip)" >&2
-        seed_failures+=("commercial")
+        exit 1
         ;;
     esac
-    seed_names+=(invariants dashboard-default)
+    seed_names+=(dashboard-default invariants)
 
-    for seed in "${seed_names[@]}"; do
-      printf '  seed-showcase-%s ... ' "$seed"
-      if SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
-           PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 NO_PROXY=localhost,127.0.0.1 \
-           npx playwright test --config=playwright.seed.config.ts \
-             -g "seed-showcase-$seed" --reporter=line \
-             > "/tmp/ga-e2e-seed-$seed.log" 2>&1; then
-        passed=$(grep -oE "[0-9]+ passed" "/tmp/ga-e2e-seed-$seed.log" | head -1)
-        echo "OK ($passed)"
-      else
-        echo "FAIL (see /tmp/ga-e2e-seed-$seed.log)"
-        seed_failures+=("$seed")
-      fi
-    done
-
-    if [ "${#seed_failures[@]}" -gt 0 ]; then
-      echo "[ga-e2e-bootstrap] WARNING: ${#seed_failures[@]} seed run(s) failed:" >&2
-      printf '  - %s\n' "${seed_failures[@]}" >&2
+    seed_log="/tmp/ga-e2e-seed-sequence.log"
+    if SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
+         PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 NO_PROXY=localhost,127.0.0.1 \
+         node scripts/run-showcase-seed-sequence.mjs \
+           --output-prefix=test-results/ga-e2e-seed "${seed_names[@]}" \
+           > "$seed_log" 2>&1; then
+      passed=$(grep -oE "[0-9]+ passed" "$seed_log" | tail -1)
+      echo "  showcase seed sequence ... OK (${passed:-completed})"
+    else
+      echo "  showcase seed sequence ... FAIL (see $seed_log)" >&2
+      tail -80 "$seed_log" >&2 || true
+      exit 1
     fi
   fi
   cd ..
