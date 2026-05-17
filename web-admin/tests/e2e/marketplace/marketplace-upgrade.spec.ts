@@ -32,7 +32,10 @@ async function navigateToMarketplace(page: Page) {
   const discoveryTab = page.getByRole('tab', { name: /Discovery|发现/ });
   await discoveryTab.first().waitFor({ state: 'visible', timeout: 10000 });
   await discoveryTab.first().click();
-  await expect(page).toHaveURL(/tab=discovery/, { timeout: 10000 });
+  await expect(discoveryTab.first()).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-testid="marketplace-categories"]')).toBeVisible({
+    timeout: 10000,
+  });
 }
 
 test.describe('Marketplace Upgrade Tests', () => {
@@ -121,7 +124,9 @@ test.describe('Marketplace Upgrade Tests', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Should show back link
-    await expect(page.locator('text=/Back to (Marketplace|Plugins)|返回(市场|插件)/')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Back to Marketplace|返回市场/ })).toBeVisible({
+      timeout: 10000,
+    });
 
     // Should show version info in the header area
     const versionTag = page.locator('span').filter({ hasText: /v\d+\.\d+/ }).first();
@@ -154,7 +159,9 @@ test.describe('Marketplace Upgrade Tests', () => {
       await expect(firstCard).toBeVisible({ timeout: 10000 });
       await firstCard.click();
       await page.waitForLoadState('domcontentloaded');
-      await expect(page.locator('text=/Back to (Marketplace|Plugins)|返回(市场|插件)/')).toBeVisible();
+      await expect(page.getByRole('button', { name: /Back to Marketplace|返回市场/ })).toBeVisible({
+        timeout: 10000,
+      });
     }
   });
 
