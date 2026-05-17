@@ -94,6 +94,9 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /enterprise:host/);
   assert.match(script, /enterprise:docker/);
   assert.match(script, /stop-isolated\.sh" --slug="\$SLUG" --purge/);
+  assert.match(script, /enterprise-docker\] building backend jar on host/);
+  assert.match(script, /gradlew bootJar --no-daemon -x test/);
+  assert.match(script, /ISOLATED_BACKEND_DOCKERFILE="\$\{ISOLATED_BACKEND_DOCKERFILE:-Dockerfile\.runtime\}"/);
   assert.match(script, /scripts\/dev\/import-isolated-plugins\.sh/);
   assert.match(script, /import_profile="enterprise-demo"/);
   assert.match(script, /--edition=enterprise/);
