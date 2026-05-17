@@ -25,6 +25,7 @@ INCLUDE_OSS_FULL=0
 HOST_RUNNER=0
 FRONTEND_IMAGE=""
 STARTED=0
+AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE="${AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE:-e2e}"
 
 usage() {
     cat <<USAGE
@@ -136,12 +137,14 @@ fi
 source "$ENV_FILE"
 
 FRONTEND_CONTAINER="${COMPOSE_PROJECT_NAME}-frontend"
+API_BASE="http://localhost:${BE_PORT}"
 echo "==> Frontend container: $FRONTEND_CONTAINER"
 if [ "$HOST_RUNNER" = "1" ]; then
     echo "==> Runner: host Playwright -> isolated ports"
 else
     echo "==> Runner: isolated Playwright runner container"
 fi
+echo "==> Plugin import profile: $AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE"
 echo "==> Logs: $LOG_DIR"
 
 capture_stack_logs() {
@@ -223,6 +226,77 @@ run_frontend_phase() {
         exit "$exit_code"
     fi
 }
+
+ensure_bootstrap_initialized() {
+    echo
+    echo "==> Ensuring minimal bootstrap is initialized"
+
+    local status_resp initialized
+    status_resp="$(NO_PROXY=localhost curl -sS --max-time 10 "$API_BASE/api/bootstrap/status" 2>/dev/null || echo '{}')"
+    initialized="$(printf '%s' "$status_resp" | python3 -c "
+import json
+import sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print('false')
+    sys.exit(0)
+data = d.get('data') if isinstance(d, dict) else {}
+print('true' if isinstance(data, dict) and data.get('initialized') is True else 'false')
+" 2>/dev/null || echo false)"
+
+    if [ "$initialized" = "true" ]; then
+        echo "    bootstrap already initialized"
+        return
+    fi
+
+    local setup_out setup_body http_code response_code response_message
+    setup_out="$(NO_PROXY=localhost curl -sS --max-time 30 -w $'\n%{http_code}' -X POST "$API_BASE/api/bootstrap/setup" \
+        -H "Content-Type: application/json" \
+        -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single"}')"
+    http_code="$(printf '%s\n' "$setup_out" | tail -n1)"
+    setup_body="$(printf '%s\n' "$setup_out" | sed '$d')"
+
+    if [ "$http_code" != "200" ]; then
+        echo "ERROR: /api/bootstrap/setup failed (HTTP $http_code)" >&2
+        printf '%s\n' "$setup_body" >&2
+        exit 1
+    fi
+
+    response_code="$(printf '%s' "$setup_body" | python3 -c "import json,sys; print(json.load(sys.stdin).get('code',''))" 2>/dev/null || echo "")"
+    response_message="$(printf '%s' "$setup_body" | python3 -c "import json,sys; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")"
+
+    if [ "$response_code" != "0" ] && ! printf '%s' "$response_message" | grep -qi "already initialized"; then
+        echo "ERROR: /api/bootstrap/setup returned code=$response_code message=$response_message" >&2
+        printf '%s\n' "$setup_body" >&2
+        exit 1
+    fi
+
+    status_resp="$(NO_PROXY=localhost curl -sS --max-time 10 "$API_BASE/api/bootstrap/status")"
+    initialized="$(printf '%s' "$status_resp" | python3 -c "
+import json
+import sys
+d = json.load(sys.stdin)
+data = d.get('data') if isinstance(d, dict) else {}
+print('true' if isinstance(data, dict) and data.get('initialized') is True else 'false')
+" 2>/dev/null || echo false)"
+    if [ "$initialized" != "true" ]; then
+        echo "ERROR: bootstrap status is still not initialized: $status_resp" >&2
+        exit 1
+    fi
+}
+
+import_agent_runtime_plugins() {
+    echo
+    echo "==> Importing plugins for agent runtime gate"
+    "$PROJECT_ROOT/scripts/import-plugins.sh" \
+        --slug="$SLUG" \
+        --profile="$AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE" \
+        --edition=oss
+}
+
+ensure_bootstrap_initialized
+import_agent_runtime_plugins
 
 run_frontend_phase "auth" \
     "pnpm exec playwright test -c playwright.noweb.config.ts tests/auth.setup.ts --project=auth --reporter=line --output=test-results/agent-runtime-gate-auth"

@@ -17,6 +17,7 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/seed-marketplace\.sh/);
   assert.match(gate, /bash -n scripts\/sync-marketplace-catalog\.sh/);
   assert.match(gate, /bash -n scripts\/docker-ga-e2e-bootstrap\.sh/);
+  assert.match(gate, /bash -n scripts\/dev\/run-agent-runtime-full-gate-docker\.sh/);
   assert.match(gate, /bash -n scripts\/env\/reset-and-init\.sh/);
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
   assert.match(gate, /node web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
@@ -210,4 +211,24 @@ test('docker GA bootstrap refreshes storage against the active isolated stack on
   assert.match(script, /BACKEND_URL="\$API_BASE"[\s\S]*BE_PORT=6444[\s\S]*PGPORT=5433/);
   assert.match(script, /npx playwright test tests\/auth\.setup\.ts[\s\S]*--project=auth --no-deps --reporter=line/);
   assert.doesNotMatch(script, /npx playwright test tests\/auth\.setup\.ts\s*\\\n\s*--reporter=line/);
+});
+
+test('agent runtime gate bootstraps then imports plugins before Playwright setup', () => {
+  const script = read('scripts/dev/run-agent-runtime-full-gate-docker.sh');
+
+  assert.match(script, /AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE="\$\{AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE:-e2e\}"/);
+  assert.match(script, /ensure_bootstrap_initialized\(\)/);
+  assert.match(script, /api\/bootstrap\/status/);
+  assert.match(script, /api\/bootstrap\/setup/);
+  assert.match(script, /"companyName":"AuraBoot Dev"/);
+  assert.match(script, /import_agent_runtime_plugins\(\)/);
+  assert.match(script, /scripts\/import-plugins\.sh/);
+  assert.match(script, /--slug="\$SLUG"/);
+  assert.match(script, /--profile="\$AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE"/);
+  assert.match(script, /--edition=oss/);
+  assert.doesNotMatch(script, /seedDemoData/);
+  assert.match(
+    script,
+    /ensure_bootstrap_initialized[\s\S]*import_agent_runtime_plugins[\s\S]*run_frontend_phase "auth"/,
+  );
 });

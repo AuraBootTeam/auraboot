@@ -167,6 +167,7 @@ scripts/import-plugins.sh \
 | Quickstart workflow | 只调用 `/api/bootstrap/setup` 并验证登录；不导 demo，不跑 showcase seed。 |
 | OSS host reset | `bootstrap/setup` 后调用 `scripts/import-plugins.sh --profile=demo --edition=oss`；`SKIP_SEED=1` 时可降为 `--profile=core`。 |
 | OSS Docker reset | `docker-ga-e2e-bootstrap.sh` 只负责 bootstrap、测试用户、storage state；插件导入委托 `scripts/import-plugins.sh --profile=e2e --edition=oss`。 |
+| Agent Runtime gate | 自己启动 isolated stack，因此也必须显式执行 `/api/bootstrap/setup`，再调用 `scripts/import-plugins.sh --profile=e2e --edition=oss`，最后才进入 Playwright setup/auth。 |
 | Enterprise host reset | 删除手写逐个导入列表，委托统一导入脚本；profile 使用 `enterprise-demo` 或企业专项 profile。 |
 | Enterprise Docker reset | `scripts/env/reset-and-init.sh --product=enterprise --runtime=docker` 调用统一导入脚本，传入 `/app/plugins` 与 `/app/plugins-enterprise`。 |
 | Mobile E2E bootstrap | 删除内置插件数组，复用统一 profile，移动端只保留自己的 seed/校验步骤。 |
@@ -180,6 +181,7 @@ scripts/import-plugins.sh \
 - `/api/bootstrap/setup` 已收窄为最小系统初始化，不再调用 built-in plugin import，也不再消费 `seedDemoData` 执行 demo seed。
 - Quickstart workflow 和 Setup Wizard 不再传 `seedDemoData`。
 - OSS Docker reset 与 Enterprise Docker reset 已通过统一导入脚本验证。企业仓路径解析会优先使用 `AURA_ENTERPRISE_ROOT`，否则在 side-by-side checkout 与 `.worktrees/<branch>` checkout 两类目录结构中查找完整企业仓，并要求找到 `plugins/platform-admin-ee/plugin.json`。
+- Agent Runtime Docker gate 已补回显式 bootstrap + `e2e` profile 导入；它不再依赖 Playwright `00-bootstrap` 或 `/api/bootstrap/setup` 隐式提供插件模型。
 
 ## 迁移计划
 
