@@ -62,6 +62,58 @@ ADMIN_PASSWORD="Test2026x"
 echo "[ga-e2e-bootstrap] target stack: $API_BASE"
 echo "[ga-e2e-bootstrap] plugins (${#PLUGINS[@]}): ${PLUGINS[*]}"
 
+ensure_bootstrap_initialized() {
+  local status initialized resp body http_code ok
+
+  status=$(NO_PROXY=localhost curl -fsS "$API_BASE/api/bootstrap/status" || true)
+  initialized=$(printf '%s' "$status" | python3 -c "
+import sys, json
+try:
+    d = json.loads(sys.stdin.read() or '{}')
+except Exception:
+    d = {}
+print('yes' if d.get('initialized') is True else 'no')
+")
+
+  if [ "$initialized" = "yes" ]; then
+    echo "[ga-e2e-bootstrap] bootstrap already initialized"
+    return
+  fi
+
+  echo "[ga-e2e-bootstrap] bootstrap is not initialized; running /api/bootstrap/setup..."
+  resp=$(NO_PROXY=localhost curl -sS -w $'\n%{http_code}' -X POST "$API_BASE/api/bootstrap/setup" \
+    -H 'Content-Type: application/json' \
+    -d "{
+      \"companyName\":\"AuraBoot Dev\",
+      \"adminEmail\":\"$ADMIN_EMAIL\",
+      \"adminPassword\":\"$ADMIN_PASSWORD\",
+      \"adminDisplayName\":\"Admin User\",
+      \"systemMode\":\"single\",
+      \"seedDemoData\":true
+    }")
+  http_code=$(printf '%s\n' "$resp" | tail -n 1)
+  body=$(printf '%s\n' "$resp" | sed '$d')
+  ok=$(printf '%s' "$body" | python3 -c "
+import sys, json
+try:
+    d = json.loads(sys.stdin.read() or '{}')
+except Exception:
+    d = {}
+data = d.get('data') if isinstance(d, dict) else {}
+success = d.get('success') is True or (isinstance(data, dict) and data.get('success') is True)
+print('yes' if success else 'no')
+")
+
+  if [ "$http_code" != "200" ] || [ "$ok" != "yes" ]; then
+    echo "[ga-e2e-bootstrap] ERROR: /api/bootstrap/setup failed (HTTP $http_code)" >&2
+    printf '%s\n' "$body" >&2
+    exit 1
+  fi
+  echo "[ga-e2e-bootstrap] bootstrap setup OK"
+}
+
+ensure_bootstrap_initialized
+
 # 1. Login as admin -> JWT
 JWT=$(NO_PROXY=localhost curl -fsS -X POST "$API_BASE/api/auth/login" \
   -H 'Content-Type: application/json' \
