@@ -14,6 +14,7 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/oss-reset-and-init\.sh/);
   assert.match(gate, /bash -n scripts\/reset-db\.sh/);
   assert.match(gate, /bash -n scripts\/seed-marketplace\.sh/);
+  assert.match(gate, /bash -n scripts\/docker-ga-e2e-bootstrap\.sh/);
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
   assert.match(gate, /node web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
 });
@@ -66,4 +67,33 @@ test('OSS marketplace seed is env-aware and writes the catalog to the system ten
   assert.match(seed, /-v ON_ERROR_STOP=1/);
   assert.match(seed, /tenant_id = \$SYSTEM_TENANT_ID/);
   assert.match(seed, /WHERE tenant_id = \$SYSTEM_TENANT_ID/);
+});
+
+test('showcase CRM opportunity seeds send date-only values to DATE fields', () => {
+  for (const file of [
+    'web-admin/tests/api/setup/seed-showcase-data.spec.ts',
+    'web-admin/tests/api/setup/seed-showcase-extended.spec.ts',
+  ]) {
+    const source = read(file);
+    assert.doesNotMatch(
+      source,
+      /crm_opp_expected_close_date:\s*dateTimeAt\(/,
+      `${file} must not feed datetime values into crm_opp_expected_close_date`,
+    );
+    assert.doesNotMatch(
+      source,
+      /closeDate:\s*dateTimeAt\(/,
+      `${file} must keep opportunity closeDate seed values date-only`,
+    );
+  }
+});
+
+test('docker GA bootstrap initializes a blank stack before admin login', () => {
+  const script = read('scripts/docker-ga-e2e-bootstrap.sh');
+
+  assert.match(script, /ensure_bootstrap_initialized\(\)/);
+  assert.match(script, /api\/bootstrap\/status/);
+  assert.match(script, /api\/bootstrap\/setup/);
+  assert.match(script, /seedDemoData/);
+  assert.match(script, /ensure_bootstrap_initialized\s*\n\s*# 1\. Login as admin -> JWT/);
 });
