@@ -16,7 +16,13 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# shellcheck source=lib/reset-init-common.sh
+source "$PROJECT_ROOT/scripts/lib/reset-init-common.sh"
+
+cd "$PROJECT_ROOT"
 
 API_BASE="http://localhost:6444"
 ADMIN_EMAIL="admin@auraboot.com"
@@ -26,61 +32,14 @@ PLUGIN_IMPORT_PROFILE="${PLUGIN_IMPORT_PROFILE:-e2e}"
 echo "[ga-e2e-bootstrap] target stack: $API_BASE"
 echo "[ga-e2e-bootstrap] plugin profile: $PLUGIN_IMPORT_PROFILE"
 
-ensure_bootstrap_initialized() {
-  local status initialized resp body http_code ok
-
-  status=$(NO_PROXY=localhost curl -fsS "$API_BASE/api/bootstrap/status" || true)
-  initialized=$(printf '%s' "$status" | python3 -c "
-import sys, json
-try:
-    d = json.loads(sys.stdin.read() or '{}')
-except Exception:
-    d = {}
-data = d.get('data') if isinstance(d, dict) else {}
-print('yes' if isinstance(data, dict) and data.get('initialized') is True else 'no')
-")
-
-  if [ "$initialized" = "yes" ]; then
-    echo "[ga-e2e-bootstrap] bootstrap already initialized"
-    return
-  fi
-
-  echo "[ga-e2e-bootstrap] bootstrap is not initialized; running /api/bootstrap/setup..."
-  resp=$(NO_PROXY=localhost curl -sS -w $'\n%{http_code}' -X POST "$API_BASE/api/bootstrap/setup" \
-    -H 'Content-Type: application/json' \
-    -d "{
-      \"companyName\":\"AuraBoot Dev\",
-      \"adminEmail\":\"$ADMIN_EMAIL\",
-      \"adminPassword\":\"$ADMIN_PASSWORD\",
-      \"adminDisplayName\":\"Admin User\",
-      \"systemMode\":\"single\"
-    }")
-  http_code=$(printf '%s\n' "$resp" | tail -n 1)
-  body=$(printf '%s\n' "$resp" | sed '$d')
-  ok=$(printf '%s' "$body" | python3 -c "
-import sys, json
-try:
-    d = json.loads(sys.stdin.read() or '{}')
-except Exception:
-    d = {}
-data = d.get('data') if isinstance(d, dict) else {}
-success = (
-    d.get('success') is True
-    or d.get('code') == '0'
-    or (isinstance(data, dict) and data.get('success') is True)
-)
-print('yes' if success else 'no')
-")
-
-  if [ "$http_code" != "200" ] || [ "$ok" != "yes" ]; then
-    echo "[ga-e2e-bootstrap] ERROR: /api/bootstrap/setup failed (HTTP $http_code)" >&2
-    printf '%s\n' "$body" >&2
-    exit 1
-  fi
-  echo "[ga-e2e-bootstrap] bootstrap setup OK"
-}
-
-ensure_bootstrap_initialized
+aura_bootstrap_setup_if_needed \
+  "$API_BASE" \
+  "AuraBoot Dev" \
+  "$ADMIN_EMAIL" \
+  "$ADMIN_PASSWORD" \
+  "Admin User" \
+  "single" \
+  "[ga-e2e-bootstrap]"
 
 echo "[ga-e2e-bootstrap] importing OSS plugins via scripts/import-plugins.sh..."
 plugin_import_args=(
@@ -269,23 +228,39 @@ else
   echo "[ga-e2e-bootstrap] seeding showcase records..."
   cd web-admin
 
+  if [ ! -d "$PROJECT_ROOT/node_modules" ] || [ ! -e "$PROJECT_ROOT/web-admin/node_modules/@playwright/test" ]; then
+    echo "  web-admin Playwright dependencies missing — installing pnpm workspace deps..."
+    if ! (cd "$PROJECT_ROOT" && pnpm install --frozen-lockfile); then
+      echo "  ERROR: pnpm install --frozen-lockfile failed; cannot generate Playwright storage" >&2
+      exit 1
+    fi
+  fi
+
   echo "  Refreshing Playwright storage for the current GA stack..."
   rm -f tests/storage/admin.json tests/storage/operator.json tests/storage/viewer.json
-  BACKEND_URL="$API_BASE" \
-  BE_PORT=6444 \
-  PGHOST=localhost \
-  PGPORT=5433 \
-  PGUSER=auraboot \
-  PGDATABASE=aura_boot \
-  PGPASSWORD=auraboot_dev \
-  PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 \
-  PW_SKIP_WEBSERVER=1 \
-  NO_PROXY=localhost,127.0.0.1 \
-    npx playwright test tests/auth.setup.ts \
-    --project=auth --no-deps --reporter=line >/dev/null 2>&1 || true
+  auth_setup_log="$PROJECT_ROOT/web-admin/test-results/ga-e2e-auth-setup.log"
+  mkdir -p "$(dirname "$auth_setup_log")"
+  if ! BACKEND_URL="$API_BASE" \
+       BE_PORT=6444 \
+       PGHOST=localhost \
+       PGPORT=5433 \
+       PGUSER=auraboot \
+       PGDATABASE=aura_boot \
+       PGPASSWORD=auraboot_dev \
+       PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 \
+       PW_SKIP_WEBSERVER=1 \
+       NO_PROXY=localhost,127.0.0.1 \
+       pnpm exec playwright test tests/auth.setup.ts \
+         --project=auth --no-deps --reporter=line > "$auth_setup_log" 2>&1; then
+    echo "  ERROR: auth.setup failed; last 80 log lines:" >&2
+    tail -80 "$auth_setup_log" >&2 || true
+    echo "  Full log: $auth_setup_log" >&2
+    exit 1
+  fi
 
   if [ ! -f tests/storage/admin.json ]; then
     echo "  ERROR: admin.json still missing — cannot run showcase seed (auth.setup failed)" >&2
+    echo "  Full log: $auth_setup_log" >&2
     exit 1
   else
     seed_names=(data extended workflow ai arsenal supplement)

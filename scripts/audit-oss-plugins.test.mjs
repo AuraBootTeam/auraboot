@@ -164,6 +164,10 @@ describe('OSS plugin config audit', () => {
     assert.match(script, /while IFS= read -r plugin/);
     assert.match(script, /PLUGINS\+=\("\$plugin"\)/);
     assert.match(wrapper, /scripts\/import-plugins\.sh/);
+    assert.doesNotMatch(wrapper, /--profile=default/);
+    assert.match(wrapper, /--profile=e2e/);
+    assert.match(wrapper, /has_help=0/);
+    assert.match(wrapper, /if \[ "\$has_help" -eq 1 \]/);
     assert.deepEqual(Object.keys(profiles).sort(), [
       'core',
       'default',

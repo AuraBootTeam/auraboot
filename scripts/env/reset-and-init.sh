@@ -4,6 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# shellcheck source=../lib/reset-init-common.sh
+source "$PROJECT_ROOT/scripts/lib/reset-init-common.sh"
+
 PRODUCT=""
 RUNTIME=""
 PROFILE="dev"
@@ -87,33 +90,6 @@ if [ "$DRY_RUN" = "1" ]; then
   exit 0
 fi
 
-export_docker_proxy_defaults() {
-  local host_http="${http_proxy:-${HTTP_PROXY:-}}"
-  local host_https="${https_proxy:-${HTTPS_PROXY:-}}"
-
-  if [ -n "$host_http" ] && [ -z "${AURA_DOCKER_HTTP_PROXY:-}" ]; then
-    export AURA_DOCKER_HTTP_PROXY="${host_http/127.0.0.1/host.docker.internal}"
-  fi
-  if [ -n "$host_https" ] && [ -z "${AURA_DOCKER_HTTPS_PROXY:-}" ]; then
-    export AURA_DOCKER_HTTPS_PROXY="${host_https/127.0.0.1/host.docker.internal}"
-  fi
-  if [ -z "${AURA_DOCKER_NPM_REGISTRY:-}" ]; then
-    export AURA_DOCKER_NPM_REGISTRY="${npm_config_registry:-https://registry.npmmirror.com}"
-  fi
-}
-
-sync_marketplace_catalog() {
-  local catalog_root="$1"
-  local pg_port="$2"
-
-  PG_HOST=localhost \
-  PG_PORT="$pg_port" \
-  PG_USER="${PG_USER:-auraboot}" \
-  PG_DB="${PG_DB:-aura_boot}" \
-  PGPASSWORD="${PGPASSWORD:-auraboot_dev}" \
-    "$catalog_root/scripts/sync-marketplace-catalog.sh"
-}
-
 resolve_enterprise_root() {
   if [ -n "${AURA_ENTERPRISE_ROOT:-}" ]; then
     if [ -f "$AURA_ENTERPRISE_ROOT/plugins/platform-admin-ee/plugin.json" ]; then
@@ -148,7 +124,7 @@ case "$PRODUCT:$RUNTIME" in
     ;;
 
   oss:docker)
-    export_docker_proxy_defaults
+    aura_export_docker_proxy_defaults
     if [ "$PROFILE" != "e2e" ] && [ "$PROFILE" != "showcase" ]; then
       echo "ERROR: OSS docker reset currently supports --profile=e2e or --profile=showcase" >&2
       exit 2
@@ -157,7 +133,7 @@ case "$PRODUCT:$RUNTIME" in
     GA_E2E_FRONTEND_IMAGE="${GA_E2E_FRONTEND_IMAGE:-node:22-bookworm-slim}" \
       "$PROJECT_ROOT/scripts/docker-ga-e2e-up.sh"
     "$PROJECT_ROOT/scripts/docker-ga-e2e-bootstrap.sh"
-    sync_marketplace_catalog "$PROJECT_ROOT" 5433
+    aura_sync_marketplace_catalog "$PROJECT_ROOT" 5433
     ;;
 
   enterprise:host)
@@ -166,7 +142,7 @@ case "$PRODUCT:$RUNTIME" in
     ;;
 
   enterprise:docker)
-    export_docker_proxy_defaults
+    aura_export_docker_proxy_defaults
     enterprise_root="$(resolve_enterprise_root)"
     "$PROJECT_ROOT/scripts/dev/stop-isolated.sh" --slug="$SLUG" --purge || true
     echo "[enterprise-docker] building backend jar on host with Gradle cache..."
@@ -179,9 +155,14 @@ case "$PRODUCT:$RUNTIME" in
     env_file="$PROJECT_ROOT/.aura-stack/$SLUG.env"
     # shellcheck disable=SC1090
     source "$env_file"
-    curl -fsS --noproxy localhost -X POST "http://localhost:${BE_PORT}/api/bootstrap/setup" \
-      -H 'Content-Type: application/json' \
-      -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single"}' >/dev/null
+    aura_bootstrap_setup_if_needed \
+      "http://localhost:${BE_PORT}" \
+      "AuraBoot Dev" \
+      "admin@auraboot.com" \
+      "Test2026x" \
+      "Admin User" \
+      "single" \
+      "[enterprise-docker]"
     import_profile="$PROFILE"
     case "$import_profile" in
       dev|demo|enterprise-demo) import_profile="enterprise-demo" ;;
@@ -192,6 +173,6 @@ case "$PRODUCT:$RUNTIME" in
       --slug="$SLUG" \
       --profile="$import_profile" \
       --edition=enterprise
-    sync_marketplace_catalog "$enterprise_root" "$PG_PORT"
+    aura_sync_marketplace_catalog "$enterprise_root" "$PG_PORT"
     ;;
 esac
