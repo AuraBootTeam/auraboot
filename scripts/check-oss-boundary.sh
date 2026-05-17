@@ -64,6 +64,7 @@ PATH_HITS=$(grep -rEn \
   | grep -v 'check-oss-boundary' \
   | grep -v 'CLAUDE.md\|AGENTS.md' \
   | grep -v 'scripts/publish-repos\.sh' \
+  | grep -v 'scripts/env/reset-and-init\.sh' \
   | grep -v 'permission-codes\.yml' \
   | grep -v 'docker-compose\.cleanup-batch\.override\.yml' \
   | grep -v 'docker-compose\.ga-e2e\.override\.yml' \
@@ -71,6 +72,8 @@ PATH_HITS=$(grep -rEn \
   | grep -v 'oss-scope\.json' || true)
   # Intentional exclusions:
   #  - publish-repos.sh: multi-repo release script (OSS + enterprise sync)
+  #  - reset-and-init.sh: normalized local lifecycle entrypoint can target
+  #    side-by-side OSS/enterprise checkouts without importing enterprise code
   #  - permission-codes.yml: CI references enterprise repo in comments only
   #  - docker-compose.{cleanup-batch,ga-e2e,isolated}.yml: dev/test compose mounts enterprise plugins
   #    when both repos are checked out side-by-side (no-op in pure OSS clones)
