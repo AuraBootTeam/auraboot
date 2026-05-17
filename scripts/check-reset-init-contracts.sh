@@ -7,6 +7,7 @@ cd "$PROJECT_ROOT"
 echo "[reset-init-contracts] shell syntax"
 bash -n scripts/oss-reset-and-init.sh
 bash -n scripts/reset-db.sh
+bash -n scripts/import-plugins.sh
 bash -n scripts/seed-marketplace.sh
 bash -n scripts/sync-marketplace-catalog.sh
 bash -n scripts/docker-ga-e2e-bootstrap.sh

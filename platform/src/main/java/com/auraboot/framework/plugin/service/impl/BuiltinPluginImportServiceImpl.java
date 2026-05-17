@@ -30,9 +30,9 @@ import java.util.List;
  * <p>Phase 3 uses a 2-profile split (see {@link BuiltinPluginImportService}
  * javadoc): {@link Profile#CORE} (always imported, 6 plugins) vs
  * {@link Profile#DEMO} (opt-in, 4 plugins). The
- * {@code includeDemoPlugins} flag flows from
- * {@code BootstrapRepairService.RepairOptions} → wizard payload
- * ({@code BootstrapRequest.seedDemoData}) or startup env ({@code AURABOOT_DEMO_SEED}).
+ * {@code includeDemoPlugins} flag is used only by explicit repair/admin flows.
+ * The first-install {@code /api/bootstrap/setup} path is intentionally minimal;
+ * reset/init scripts import plugin profiles through {@code scripts/import-plugins.sh}.
  */
 @Slf4j
 @Service

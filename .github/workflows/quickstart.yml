@@ -127,9 +127,9 @@ jobs:
           fi
 
           set +e
-          response=$(curl -sS -m 180 -w $'\n%{http_code}' -X POST http://localhost:3000/api/bootstrap/setup \
+          response=$(curl -sS -m 30 -w $'\n%{http_code}' -X POST http://localhost:3000/api/bootstrap/setup \
             -H "Content-Type: application/json" \
-            -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single","seedDemoData":true}')
+            -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single"}')
           curl_exit=$?
           set -e
           http_code=$(printf '%s\n' "$response" | tail -n 1)

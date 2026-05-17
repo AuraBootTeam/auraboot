@@ -13,6 +13,7 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /set -euo pipefail/);
   assert.match(gate, /bash -n scripts\/oss-reset-and-init\.sh/);
   assert.match(gate, /bash -n scripts\/reset-db\.sh/);
+  assert.match(gate, /bash -n scripts\/import-plugins\.sh/);
   assert.match(gate, /bash -n scripts\/seed-marketplace\.sh/);
   assert.match(gate, /bash -n scripts\/sync-marketplace-catalog\.sh/);
   assert.match(gate, /bash -n scripts\/docker-ga-e2e-bootstrap\.sh/);
@@ -50,10 +51,27 @@ test('OSS reset script fails fast and delegates showcase seeds through the order
   const reset = read('scripts/oss-reset-and-init.sh');
 
   assert.match(reset, /set -o pipefail/);
+  assert.match(reset, /scripts\/import-plugins\.sh/);
+  assert.match(reset, /--profile="\$PLUGIN_IMPORT_PROFILE"/);
+  assert.doesNotMatch(reset, /bootstrap seedDemoData/);
+  assert.doesNotMatch(reset, /\"seedDemoData\"/);
   assert.match(reset, /"\$SCRIPT_DIR\/seed-marketplace\.sh" 2>&1 \| tail -1/);
   assert.match(reset, /node scripts\/run-showcase-seed-sequence\.mjs[\s\S]*"\$\{seed_phases\[@\]\}"/);
   assert.match(reset, /node scripts\/run-showcase-seed-sequence\.mjs[\s\S]*dashboard-default invariants/);
   assert.doesNotMatch(reset, /npx playwright test tests\/api\/setup\/seed-showcase-/);
+});
+
+test('bootstrap setup remains a minimal system initialization API', () => {
+  const engine = read('platform/src/main/java/com/auraboot/framework/saas/bootstrap/BootstrapEngineService.java');
+  const wizard = read('web-admin/app/routes/setup/SetupWizard.tsx');
+
+  assert.match(engine, /Main entry point\. Runs the minimal bootstrap pipeline/);
+  assert.doesNotMatch(engine, /executeRuntimeSetup\(/);
+  assert.doesNotMatch(engine, /executeOptionalSetup\(/);
+  assert.doesNotMatch(engine, /repairBuiltinPlugins/);
+  assert.doesNotMatch(engine, /seed_demo_data/);
+  assert.doesNotMatch(wizard, /seedDemoData/);
+  assert.doesNotMatch(wizard, /Load demo data/);
 });
 
 test('OSS marketplace seed is env-aware and writes the catalog to the system tenant', () => {
@@ -99,7 +117,7 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /enterprise-docker\] building backend jar on host/);
   assert.match(script, /gradlew bootJar --no-daemon -x test/);
   assert.match(script, /ISOLATED_BACKEND_DOCKERFILE="\$\{ISOLATED_BACKEND_DOCKERFILE:-Dockerfile\.runtime\}"/);
-  assert.match(script, /scripts\/dev\/import-isolated-plugins\.sh/);
+  assert.match(script, /scripts\/import-plugins\.sh/);
   assert.match(script, /import_profile="enterprise-demo"/);
   assert.match(script, /--edition=enterprise/);
   assert.match(script, /sync_marketplace_catalog "\$enterprise_root" "\$PG_PORT"/);
@@ -107,18 +125,42 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /PGPASSWORD="\$\{PGPASSWORD:-auraboot_dev\}"/);
 });
 
-test('isolated plugin import retries each plugin before importing dependents', () => {
-  const script = read('scripts/dev/import-isolated-plugins.sh');
+test('plugin import profiles use explicit semantic names and deprecate default', () => {
+  const profiles = JSON.parse(read('scripts/dev/plugin-import-profiles.json'));
+
+  assert.deepEqual(Object.keys(profiles).sort(), [
+    'core',
+    'default',
+    'demo',
+    'e2e',
+    'enterprise-demo',
+    'pcba-agent',
+  ]);
+  assert.deepEqual(profiles.core, [
+    'core-meta',
+    'core-bpm',
+    'core-aurabot',
+    'page-manager',
+    'org-management',
+    'platform-admin',
+  ]);
+  assert.deepEqual(profiles.demo.slice(0, profiles.core.length), profiles.core);
+  assert.ok(profiles.e2e.includes('test-fixtures'));
+});
+
+test('plugin import retries each plugin before importing dependents', () => {
+  const script = read('scripts/import-plugins.sh');
 
   assert.match(script, /IMPORT_ATTEMPTS="\$\{IMPORT_ATTEMPTS:-2\}"/);
+  assert.match(script, /deprecated profile: default/);
   assert.match(script, /import_plugin_once\(\)/);
   assert.match(script, /while \[ "\$attempt" -le "\$IMPORT_ATTEMPTS" \]/);
   assert.match(script, /sleep "\$attempt"/);
   assert.match(script, /failures\+=\("\$plugin: \$result"\)/);
 });
 
-test('isolated plugin import validates latest import state instead of whole history', () => {
-  const script = read('scripts/dev/import-isolated-plugins.sh');
+test('plugin import validates latest import state instead of whole history', () => {
+  const script = read('scripts/import-plugins.sh');
 
   assert.match(script, /successful_plugin_ids=\(\)/);
   assert.match(script, /verify_latest_import_statuses\(\)/);
@@ -152,11 +194,13 @@ test('docker GA bootstrap initializes a blank stack before admin login', () => {
   assert.match(script, /ensure_bootstrap_initialized\(\)/);
   assert.match(script, /api\/bootstrap\/status/);
   assert.match(script, /api\/bootstrap\/setup/);
-  assert.match(script, /seedDemoData/);
+  assert.match(script, /scripts\/import-plugins\.sh/);
+  assert.match(script, /--profile="\$PLUGIN_IMPORT_PROFILE"/);
+  assert.doesNotMatch(script, /seedDemoData/);
   assert.match(script, /data = d\.get\('data'\) if isinstance\(d, dict\) else \{\}/);
   assert.match(script, /data\.get\('initialized'\) is True/);
   assert.match(script, /d\.get\('code'\) == '0'/);
-  assert.match(script, /ensure_bootstrap_initialized\s*\n\s*# 1\. Login as admin -> JWT/);
+  assert.match(script, /ensure_bootstrap_initialized[\s\S]*scripts\/import-plugins\.sh[\s\S]*# 1\. Login as admin -> JWT/);
 });
 
 test('docker GA bootstrap refreshes storage against the active isolated stack only', () => {

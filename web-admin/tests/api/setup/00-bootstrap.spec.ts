@@ -15,8 +15,7 @@
  *   5. admin → System Tenant membership
  *   6. admin → platform_admin role grant
  *   7. Business Tenant row
- *   8. Built-in plugins imported (com.auraboot.org-management,
- *      com.auraboot.platform-admin) for the Business Tenant
+ *   8. Business Tenant template roles exist
  *   9. JWT signing key consistent (system_config.jwt_secret OR
  *      security.jwt.secret — see runtime contract below)
  *
@@ -51,12 +50,6 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 const COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
 const AUTO_BOOTSTRAP_WAIT_MS = Number(process.env.AURA_AUTO_BOOTSTRAP_WAIT_MS ?? '0');
 const BOOTSTRAP_POLL_MS = 2000;
-
-/** Built-in plugin pluginIds imported by the platform on bootstrap (canonical: BuiltinPluginImportServiceImpl). */
-const BUILTIN_PLUGIN_IDS = [
-  'com.auraboot.org-management',
-  'com.auraboot.platform-admin',
-];
 
 /**
  * Run a SQL query against the configured stack and return scalar / row.
@@ -160,7 +153,6 @@ test('00-bootstrap: ensure system is initialized via /api/bootstrap/setup', asyn
         adminPassword: DEFAULT_TEST_ACCOUNT.password,
         adminDisplayName: 'Admin User',
         systemMode: 'single',
-        seedDemoData: false,
       },
     });
     expect(setup.status()).toBe(200);
@@ -253,35 +245,20 @@ test('00-bootstrap: invariant 7 — Business Tenant exists', async () => {
   expect(count, `Business Tenant '${COMPANY_NAME}' missing`).toBeGreaterThanOrEqual(1);
 });
 
-test('00-bootstrap: invariant 8 — built-in plugins imported (org-management, platform-admin)', async () => {
-  // ab_plugin is the plugin registry; ab_plugin_installation is the
-  // tenant-binding table. We accept either as proof of import: some test
-  // stacks may register without binding (or bind without registering on
-  // a fresh re-deploy). Per Phase 2.2 docs, repairBuiltinPlugins is
-  // documented as non-fatal — so if BOTH tables come up empty for a
-  // pluginId, we surface the gap rather than silently passing.
-  const installTblExists =
-    psqlInt(
-      `SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'ab_plugin_installation'`,
-    ) > 0;
+test('00-bootstrap: invariant 8 — Business Tenant template roles exist', async () => {
+  const roles = psql(
+    `SELECT r.code
+     FROM ab_role r
+     JOIN ab_tenant t ON r.tenant_id = t.id
+     WHERE t.name = '${COMPANY_NAME}'
+       AND r.code IN ('tenant_admin', 'operator', 'viewer')
+       AND COALESCE(r.deleted_flag, false) = false
+     ORDER BY r.code`,
+  )
+    .split('\n')
+    .filter(Boolean);
 
-  for (const pluginId of BUILTIN_PLUGIN_IDS) {
-    let found = 0;
-    if (installTblExists) {
-      found += psqlInt(
-        `SELECT COUNT(*) FROM ab_plugin_installation WHERE plugin_id = '${pluginId}'`,
-      );
-    }
-    if (found === 0) {
-      found += psqlInt(
-        `SELECT COUNT(*) FROM ab_plugin WHERE plugin_id = '${pluginId}'`,
-      );
-    }
-    expect(
-      found,
-      `built-in plugin ${pluginId} not registered (neither installation nor plugin row)`,
-    ).toBeGreaterThanOrEqual(1);
-  }
+  expect(roles).toEqual(['operator', 'tenant_admin', 'viewer']);
 });
 
 test('00-bootstrap: invariant 9 — JWT signing key usable (login round-trip)', async ({ request }) => {

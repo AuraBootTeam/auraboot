@@ -25,18 +25,24 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 
 /**
- * Bootstrap Engine — orchestrates the 15-step system initialization pipeline.
+ * Bootstrap Engine — orchestrates the minimal system initialization pipeline.
  *
- * <p>As of Phase 2.2 (bootstrap-unified plan §7), the actual repair work for the
- * 9 invariants lives in {@link BootstrapRepairService}. This service retains the
- * existing public contract:
+ * <p>The setup API is the first-install authority for platform minimum data:
+ * system config, System tenant, admin user, Business tenant, tenant membership,
+ * Business tenant roles/permissions, and System tenant platform_admin grant.
+ * Plugin import, marketplace catalog sync, and demo seeds are explicitly owned
+ * by reset/init scripts.
+ *
+ * <p>The actual repair work for the bootstrap invariants lives in
+ * {@link BootstrapRepairService}. This service retains the existing public
+ * contract:
  * <ul>
  *   <li>Guards "already initialized" + "another in progress"</li>
  *   <li>Creates / updates the {@code ab_bootstrap} progress row</li>
  *   <li>Calls {@link BootstrapRepairService} step-by-step inside a single
  *       Layer-A transaction (matches pre-2.2 behavior)</li>
  *   <li>Runs {@code TenantBootstrapService.bootstrapTenant} for the business
- *       tenant (heavy roles/permissions/menus seeding — kept here, not extracted)</li>
+ *       tenant roles/permissions/menus</li>
  *   <li>Finalizes by writing {@code system.initialized=true}</li>
  * </ul>
  *
@@ -49,7 +55,7 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class BootstrapEngineService {
 
-    private static final int TOTAL_STEPS = 15;
+    private static final int TOTAL_STEPS = 9;
 
     private final SystemConfigService systemConfigService;
     private final BootstrapMapper bootstrapMapper;
@@ -62,7 +68,7 @@ public class BootstrapEngineService {
     // ── Public API ──────────────────────────────────────────────────────
 
     /**
-     * Main entry point. Runs the full 15-step bootstrap pipeline.
+     * Main entry point. Runs the minimal bootstrap pipeline.
      *
      * @return result containing success flag, JWT placeholder, tenant ID, or error
      */
@@ -80,8 +86,6 @@ public class BootstrapEngineService {
 
         try {
             CoreBootstrapResult coreResult = executeCoreBootstrap(bootstrap, request);
-            executeRuntimeSetup(bootstrap, coreResult, request);
-            executeOptionalSetup(bootstrap, request, coreResult);
             finalizeBootstrap(bootstrap, coreResult);
             return BootstrapResult.success(null, coreResult.defaultTenantId);
         } catch (Exception e) {
@@ -138,12 +142,8 @@ public class BootstrapEngineService {
         result.systemTenantId = systemTenant.getId();
         bootstrap.setSystemTenantId(systemTenant.getId());
 
-        // Step 4: Platform Account (stub for Phase 5)
-        updateProgress(bootstrap, 4, "create_platform_account");
-        log.info("Step 4: Platform Account — stub for Phase 5");
-
-        // Step 5: Create admin user
-        updateProgress(bootstrap, 5, "create_admin_user");
+        // Step 4: Create admin user
+        updateProgress(bootstrap, 4, "create_admin_user");
         throwIfError(bootstrapRepairService.repairAdminUser(opts));
         User adminUser = userService.findByEmail(request.getAdminEmail());
         if (adminUser == null) {
@@ -153,8 +153,8 @@ public class BootstrapEngineService {
         result.adminUserPid = adminUser.getPid();
         bootstrap.setAdminUserId(adminUser.getId());
 
-        // Step 6: Create default (business) tenant
-        updateProgress(bootstrap, 6, "create_default_tenant");
+        // Step 5: Create default (business) tenant
+        updateProgress(bootstrap, 5, "create_default_tenant");
         throwIfError(bootstrapRepairService.repairBusinessTenant(opts));
         Tenant defaultTenant = tenantService.findByName(request.getCompanyName());
         if (defaultTenant == null) {
@@ -163,13 +163,12 @@ public class BootstrapEngineService {
         result.defaultTenantId = defaultTenant.getId();
         bootstrap.setDefaultTenantId(defaultTenant.getId());
 
-        // Step 7: Add admin to both tenants
-        updateProgress(bootstrap, 7, "add_admin_to_tenants");
+        // Step 6: Add admin to both tenants
+        updateProgress(bootstrap, 6, "add_admin_to_tenants");
         throwIfError(bootstrapRepairService.repairAdminMembership(opts));
 
-        // Step 8: Bootstrap default tenant (roles/permissions/menus). Heavy seed —
-        // owned by TenantBootstrapService, NOT one of the 9 invariants.
-        updateProgress(bootstrap, 8, "bootstrap_default_tenant");
+        // Step 7: Bootstrap default tenant roles/permissions/menus.
+        updateProgress(bootstrap, 7, "bootstrap_default_tenant");
         MetaContext.setContext(defaultTenant.getId(), adminUser.getId(), adminUser.getPid(), adminUser.getEmail());
         try {
             TenantBootstrapService.BootstrapResult tenantResult =
@@ -184,7 +183,7 @@ public class BootstrapEngineService {
             MetaContext.clear();
         }
 
-        // Step 8.5: Bootstrap System Tenant — platform_admin role + grant + menus
+        // Step 8: Bootstrap System Tenant — platform_admin role + grant + menus
         updateProgress(bootstrap, 8, "bootstrap_system_tenant");
         MetaContext.setContext(systemTenant.getId(), adminUser.getId(), adminUser.getPid(), adminUser.getEmail());
         try {
@@ -198,48 +197,10 @@ public class BootstrapEngineService {
         return result;
     }
 
-    // ── Layer B: Runtime Setup (Non-Transactional) ──────────────────────
-
-    private void executeRuntimeSetup(BootstrapEntity bootstrap, CoreBootstrapResult coreResult,
-                                     BootstrapRequest request) {
-        // Step 9: Import builtin plugins (non-fatal on failure — matches pre-2.2 behavior)
-        updateProgress(bootstrap, 9, "import_builtin_plugins");
-        BootstrapRepairService.RepairOptions opts =
-                BootstrapRepairService.RepairOptions.fromBootstrapRequest(request);
-        RepairStepResult plugins = bootstrapRepairService.repairBuiltinPlugins(opts);
-        if (plugins.status() == RepairStepResult.Status.ERROR) {
-            log.warn("Step 9: Built-in plugin import failed (non-fatal): {}", plugins.detail());
-        } else {
-            log.info("Step 9: Built-in plugins imported — {}", plugins.detail());
-        }
-
-        // Steps 10-12: stubs (kept here for progress reporting parity)
-        updateProgress(bootstrap, 10, "marketplace_categories");
-        log.info("Step 10: Marketplace categories — stub");
-        updateProgress(bootstrap, 11, "i18n_sync");
-        log.info("Step 11: i18n sync — stub");
-        updateProgress(bootstrap, 12, "license_init");
-        log.info("Step 12: License initialization — stub");
-    }
-
-    // ── Layer C: Optional Setup (Non-Transactional) ─────────────────────
-
-    private void executeOptionalSetup(BootstrapEntity bootstrap, BootstrapRequest request,
-                                      CoreBootstrapResult coreResult) {
-        updateProgress(bootstrap, 13, "seed_demo_data");
-        if (Boolean.TRUE.equals(request.getSeedDemoData())) {
-            log.info("Step 13: Demo data seeding — stub");
-        } else {
-            log.info("Step 13: Demo data seeding — skipped (not requested)");
-        }
-        updateProgress(bootstrap, 14, "aurabot_setup");
-        log.info("Step 14: AuraBot setup — stub");
-    }
-
-    // ── Step 15: Finalize ───────────────────────────────────────────────
+    // ── Step 9: Finalize ────────────────────────────────────────────────
 
     private void finalizeBootstrap(BootstrapEntity bootstrap, CoreBootstrapResult coreResult) {
-        updateProgress(bootstrap, 15, "finalize");
+        updateProgress(bootstrap, 9, "finalize");
 
         systemConfigService.initialize(SystemConfigKeys.SYSTEM_INITIALIZED, "true",
                 "system", "boolean", "Whether the system has been bootstrapped", true);

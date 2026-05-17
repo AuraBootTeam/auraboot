@@ -1,4 +1,44 @@
 {
+  "core": [
+    "core-meta",
+    "core-bpm",
+    "core-aurabot",
+    "page-manager",
+    "org-management",
+    "platform-admin"
+  ],
+  "demo": [
+    "core-meta",
+    "core-bpm",
+    "core-aurabot",
+    "page-manager",
+    "org-management",
+    "platform-admin",
+    "crm-starter",
+    "showcase",
+    "agent-control-plane",
+    "workflow-demo"
+  ],
+  "e2e": [
+    "core-meta",
+    "core-bpm",
+    "core-announcement",
+    "core-aurabot",
+    "org-management",
+    "agent-control-plane",
+    "platform-admin",
+    "page-manager",
+    "golden-path",
+    "showcase",
+    "asset-management",
+    "project-management",
+    "crm-starter",
+    "crm-quick-start",
+    "hr-essentials",
+    "simple-inventory",
+    "workflow-demo",
+    "test-fixtures"
+  ],
   "default": [
     "core-meta",
     "core-bpm",

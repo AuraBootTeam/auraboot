@@ -15,18 +15,9 @@
 #   2026-05-10 — §8 seed is now fail-fast: Playwright seed output is written to
 #                per-step logs, failures print the tail and stop the script, and
 #                final invariants verify CRM/showcase/arsenal/default dashboard.
-#   2026-05-09 — §7.5 removed (Phase 3 / bootstrap-unified Op 6+8): plugin
-#                import for core (core-meta/core-bpm/core-aurabot/page-manager/
-#                org-management/platform-admin) and demo
-#                (crm-starter/showcase/agent-control-plane/workflow-demo)
-#                profiles is now in-process via
-#                BuiltinPluginImportService, gated by AURABOOT_DEMO_SEED.
-#                test-fixtures is seeded by the Playwright setup project
-#                (web-admin/tests/api/setup/03-import-test-fixtures.spec.ts).
-#                §7.6/§7.7/§7.8/§7.9 are KEPT — they seed marketplace
-#                registry / agent definitions / model displayName, which
-#                are not part of the bootstrap invariants and need direct
-#                SQL/script access.
+#   2026-05-17 — §7.5 restored as explicit profile-based plugin import.
+#                /api/bootstrap/setup is now minimal system bootstrap only;
+#                core/demo/e2e plugin selection is owned by scripts/import-plugins.sh.
 #   2026-05-09 — §6 trimmed: test pages, system_overview dashboard, and
 #                multi-role users moved into the Playwright setup project
 #                (web-admin/tests/api/setup/0[0-2]-*.spec.ts). The setup
@@ -45,8 +36,8 @@
 # 5.   Start frontend + wait for ready
 # 6.   Generate Playwright storageState (test data prep itself moved to setup project)
 # 7.   Verify bootstrap data
-# 7.4  Grant platform_admin to default admin user
-# 7.5  (removed — plugin import is now in-process; see History above)
+# 7.4  Verify platform_admin bootstrap invariant
+# 7.5  Import plugins via scripts/import-plugins.sh profile
 # 7.6-7.9. Backfill + marketplace seed + CS Agent seed + AuraBot seed
 # 8.   (Optional) Seed showcase demo data via Playwright
 #
@@ -80,10 +71,10 @@ for arg in "$@"; do
             echo ""
             echo "Env vars:"
             echo "  SKIP_SEED=1     Skip Playwright showcase seed (step 8)"
-            echo "  AURABOOT_DEMO_SEED=false  Disable demo plugin import (use with SKIP_SEED=1)"
+            echo "  PLUGIN_IMPORT_PROFILE=core|demo|e2e  Override plugin import profile"
+            echo "  AURABOOT_DEMO_SEED=false  Backward-compatible alias for PLUGIN_IMPORT_PROFILE=core"
             echo "  SHOWCASE_COMMERCIAL_SEED=auto|required|skip  Control full-CRM commercial seed"
             echo "  SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_overview|crm_dashboard  Override demo default dashboard"
-            echo "  AURA_ENV=test   Also import test-fixtures plugin"
             exit 0
             ;;
     esac
@@ -138,13 +129,26 @@ export PG_PORT="${PG_PORT:-5432}"
 export PG_USER="${PG_USER:-${USER:-ghj}}"
 export PG_DB="${PG_DB:-aura_boot}"
 export AURABOOT_DEMO_SEED="${AURABOOT_DEMO_SEED:-true}"
+export PLUGIN_IMPORT_PROFILE="${PLUGIN_IMPORT_PROFILE:-}"
 export SHOWCASE_COMMERCIAL_SEED="${SHOWCASE_COMMERCIAL_SEED:-auto}"
 export AURA_PSQL_BASE="psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d ${PG_DB}"
 
-BOOTSTRAP_SEED_DEMO_DATA=true
-case "$AURABOOT_DEMO_SEED" in
-    false|FALSE|False|0|no|NO|No)
-        BOOTSTRAP_SEED_DEMO_DATA=false
+if [ -z "$PLUGIN_IMPORT_PROFILE" ]; then
+    case "$AURABOOT_DEMO_SEED" in
+        false|FALSE|False|0|no|NO|No) PLUGIN_IMPORT_PROFILE="core" ;;
+        *) PLUGIN_IMPORT_PROFILE="demo" ;;
+    esac
+fi
+
+case "$PLUGIN_IMPORT_PROFILE" in
+    core|demo|e2e|pcba-agent) ;;
+    default)
+        echo "PLUGIN_IMPORT_PROFILE=default is deprecated; use core, demo, e2e, or pcba-agent."
+        exit 2
+        ;;
+    *)
+        echo "PLUGIN_IMPORT_PROFILE must be one of: core, demo, e2e, pcba-agent"
+        exit 2
         ;;
 esac
 
@@ -170,9 +174,9 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}=== AuraBoot Environment Reset & Initialization ===${NC}"
 echo ""
 
-if [ "$NO_BOOTSTRAP" != "1" ] && [ "$BOOTSTRAP_SEED_DEMO_DATA" = "false" ] && [ "${SKIP_SEED:-0}" != "1" ]; then
-    echo -e "${RED}AURABOOT_DEMO_SEED=false disables demo plugin import, so Step 8 showcase seed cannot run.${NC}"
-    echo "Set SKIP_SEED=1 or enable AURABOOT_DEMO_SEED=true."
+if [ "$NO_BOOTSTRAP" != "1" ] && [ "$PLUGIN_IMPORT_PROFILE" = "core" ] && [ "${SKIP_SEED:-0}" != "1" ]; then
+    echo -e "${RED}PLUGIN_IMPORT_PROFILE=core does not import demo plugins, so Step 8 showcase seed cannot run.${NC}"
+    echo "Set SKIP_SEED=1 or use PLUGIN_IMPORT_PROFILE=demo/e2e."
     exit 1
 fi
 
@@ -306,7 +310,7 @@ if [ "$NO_BOOTSTRAP" = "1" ]; then
     echo "   bootstrap setup disabled (--no-bootstrap escape hatch)"
 else
     echo "   /api/bootstrap/setup is script authority"
-    echo "   AURABOOT_DEMO_SEED=${AURABOOT_DEMO_SEED} (bootstrap seedDemoData=${BOOTSTRAP_SEED_DEMO_DATA})"
+    echo "   PLUGIN_IMPORT_PROFILE=${PLUGIN_IMPORT_PROFILE}"
 fi
 
 # Start backend in background as a single long-running process
@@ -363,8 +367,7 @@ else
                 \"adminEmail\": \"admin@auraboot.com\",
                 \"adminPassword\": \"Test2026x\",
                 \"adminDisplayName\": \"Admin User\",
-                \"systemMode\": \"single\",
-                \"seedDemoData\": ${BOOTSTRAP_SEED_DEMO_DATA}
+                \"systemMode\": \"single\"
             }" 2>/dev/null)
 
         BOOTSTRAP_BODY=$(echo "$BOOTSTRAP_RESP" | sed '$d')
@@ -553,65 +556,38 @@ SELECT
     fi
     echo -e "${GREEN}   Bootstrap verification passed${NC}"
 
-    # Step 7.4: Grant platform_admin to default admin user
-    #
-    # /api/bootstrap/setup grants tenant_admin automatically but NOT platform_admin.
-    # platform_admin gates /api/admin/infrastructure/** and /api/admin/cloud-config/**.
-    # We JOIN via ab_tenant_member so the grant is scoped to each tenant the admin belongs to.
-    #
-    # ID generation:  floor(epoch_µs + random_µs) — no sequence on ab_user_role.id (plain BIGINT PK).
-    # PID generation: left(md5('pa_ur_' || member_id), 26) — deterministic, exactly 26 chars,
-    #                 safe to re-run (NOT EXISTS guard prevents duplicate).
-    echo -e "${YELLOW}Step 7.4: Granting platform_admin role to default admin user...${NC}"
-    psql_run -v ON_ERROR_STOP=1 -P pager=off <<'GRANT_SQL'
-INSERT INTO ab_user_role (
-    id, pid, member_id, tenant_id, role_id,
-    status, assign_type, deleted_flag,
-    created_at, updated_at
-)
-SELECT
-    -- id: epoch microseconds + random offset → unique BIGINT (no sequence on this table)
-    floor(extract(epoch from clock_timestamp()) * 1000000 + random() * 999999)::bigint,
-    -- pid: deterministic 26-char md5 prefix keyed on member_id (safe for re-runs)
-    left(md5('pa_ur_' || tm.id::text), 26),
-    tm.id,
-    r.tenant_id,
-    r.id,
-    'active', 'direct', FALSE,
-    NOW(), NOW()
-FROM ab_user u
-JOIN ab_tenant_member tm
-    ON tm.user_id = u.id
-    AND (tm.deleted_flag = FALSE OR tm.deleted_flag IS NULL)
-JOIN ab_role r
-    ON r.code = 'platform_admin'
-    AND r.tenant_id = tm.tenant_id
-    AND (r.deleted_flag = FALSE OR r.deleted_flag IS NULL)
+    # Step 7.4: Verify platform_admin invariant created by /api/bootstrap/setup.
+    echo -e "${YELLOW}Step 7.4: Verifying System tenant platform_admin grant...${NC}"
+    PLATFORM_ADMIN_GRANTS=$(psql_scalar "
+SELECT COUNT(*)
+FROM ab_user_role ur
+JOIN ab_tenant_member tm ON ur.member_id = tm.id
+JOIN ab_user u ON tm.user_id = u.id
+JOIN ab_role r ON ur.role_id = r.id
+JOIN ab_tenant t ON r.tenant_id = t.id
 WHERE u.email = 'admin@auraboot.com'
-  AND (u.deleted_flag = FALSE OR u.deleted_flag IS NULL)
-  AND NOT EXISTS (
-      SELECT 1 FROM ab_user_role ur2
-      WHERE ur2.member_id = tm.id
-        AND ur2.role_id = r.id
-        AND (ur2.deleted_flag = FALSE OR ur2.deleted_flag IS NULL)
-  );
-GRANT_SQL
-    echo -e "${GREEN}   platform_admin granted to admin user${NC}"
+  AND t.name = 'System'
+  AND r.code = 'platform_admin'
+  AND COALESCE(ur.deleted_flag, false) = false
+  AND COALESCE(tm.deleted_flag, false) = false
+  AND COALESCE(r.deleted_flag, false) = false;
+")
+    if [ "${PLATFORM_ADMIN_GRANTS}" -lt 1 ]; then
+        echo -e "${RED}   Bootstrap verification failed: admin lacks platform_admin in System tenant${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}   platform_admin grant verified${NC}"
 
-    # Step 7.5: (REMOVED 2026-05-09 — Phase 3 of bootstrap-unified)
-    #
-    # Plugin import for the core+demo profiles is now done in-process by
-    # BuiltinPluginImportService (core-meta, core-bpm, core-aurabot,
-    # page-manager, org-management, platform-admin, crm-starter, showcase,
-    # agent-control-plane, workflow-demo). In this script the
-    # /api/bootstrap/setup path invokes BootstrapEngineService step 9;
-    # startup-runner imports are disabled above to keep one bootstrap
-    # authority. Demo profile is controlled by the seedDemoData request field,
-    # which is derived from AURABOOT_DEMO_SEED.
-    #
-    # The internal-only `test-fixtures` plugin is NOT imported via the platform.
-    # It is seeded by the Playwright setup project (web-admin/tests/api/setup/
-    # 03-import-test-fixtures.spec.ts), gated by AURA_ENV=test.
+    # Step 7.5: Import plugins via explicit profile. Bootstrap setup does not
+    # import core/demo plugins; scripts/import-plugins.sh owns retry and latest
+    # import-history success verification.
+    echo -e "${YELLOW}Step 7.5: Importing plugins (profile=${PLUGIN_IMPORT_PROFILE})...${NC}"
+    "$SCRIPT_DIR/import-plugins.sh" \
+        --profile="$PLUGIN_IMPORT_PROFILE" \
+        --edition=oss \
+        --backend-url="$AURA_BE_BASE" \
+        --plugin-root="$PROJECT_ROOT/plugins"
+    echo -e "${GREEN}   Plugin import complete${NC}"
 
     # Step 7.6: Backfill model displayName for AuraBot Chinese search
     echo -e "${YELLOW}Step 7.6: Backfilling model displayNames...${NC}"
