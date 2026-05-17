@@ -14,6 +14,7 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/oss-reset-and-init\.sh/);
   assert.match(gate, /bash -n scripts\/reset-db\.sh/);
   assert.match(gate, /bash -n scripts\/import-plugins\.sh/);
+  assert.match(gate, /bash -n scripts\/lib\/reset-init-common\.sh/);
   assert.match(gate, /bash -n scripts\/seed-marketplace\.sh/);
   assert.match(gate, /bash -n scripts\/sync-marketplace-catalog\.sh/);
   assert.match(gate, /bash -n scripts\/docker-ga-e2e-bootstrap\.sh/);
@@ -104,13 +105,14 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /enterprise:docker\) PROFILE="enterprise-demo"/);
   assert.match(script, /oss:host/);
   assert.match(script, /oss:docker/);
-  assert.match(script, /export_docker_proxy_defaults\(\)/);
-  assert.match(script, /host\.docker\.internal/);
-  assert.match(script, /AURA_DOCKER_NPM_REGISTRY/);
-  assert.match(script, /sync_marketplace_catalog\(\)/);
+  assert.match(script, /scripts\/lib\/reset-init-common\.sh/);
+  assert.match(script, /aura_export_docker_proxy_defaults/);
+  assert.match(script, /aura_sync_marketplace_catalog/);
+  assert.doesNotMatch(script, /export_docker_proxy_defaults\(\)/);
+  assert.doesNotMatch(script, /sync_marketplace_catalog\(\)/);
   assert.match(script, /docker-ga-e2e-down\.sh" --purge/);
   assert.match(script, /GA_E2E_FRONTEND_IMAGE="\$\{GA_E2E_FRONTEND_IMAGE:-node:22-bookworm-slim\}"/);
-  assert.match(script, /sync_marketplace_catalog "\$PROJECT_ROOT" 5433/);
+  assert.match(script, /aura_sync_marketplace_catalog "\$PROJECT_ROOT" 5433/);
   assert.match(script, /enterprise:host/);
   assert.match(script, /enterprise:docker/);
   assert.match(script, /stop-isolated\.sh" --slug="\$SLUG" --purge/);
@@ -120,9 +122,21 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /scripts\/import-plugins\.sh/);
   assert.match(script, /import_profile="enterprise-demo"/);
   assert.match(script, /--edition=enterprise/);
-  assert.match(script, /sync_marketplace_catalog "\$enterprise_root" "\$PG_PORT"/);
-  assert.match(script, /PG_PORT="\$pg_port"/);
-  assert.match(script, /PGPASSWORD="\$\{PGPASSWORD:-auraboot_dev\}"/);
+  assert.match(script, /aura_sync_marketplace_catalog "\$enterprise_root" "\$PG_PORT"/);
+});
+
+test('reset init common helper owns shared docker and bootstrap primitives', () => {
+  const helper = read('scripts/lib/reset-init-common.sh');
+
+  assert.match(helper, /aura_export_docker_proxy_defaults\(\)/);
+  assert.match(helper, /host\.docker\.internal/);
+  assert.match(helper, /AURA_DOCKER_NPM_REGISTRY/);
+  assert.match(helper, /aura_sync_marketplace_catalog\(\)/);
+  assert.match(helper, /sync-marketplace-catalog\.sh/);
+  assert.match(helper, /aura_bootstrap_setup_if_needed\(\)/);
+  assert.match(helper, /api\/bootstrap\/status/);
+  assert.match(helper, /api\/bootstrap\/setup/);
+  assert.match(helper, /AURA_BOOTSTRAP_SETUP_TIMEOUT:-30/);
 });
 
 test('plugin import profiles use explicit semantic names and deprecate default', () => {
@@ -191,16 +205,12 @@ test('showcase CRM opportunity seeds send date-only values to DATE fields', () =
 test('docker GA bootstrap initializes a blank stack before admin login', () => {
   const script = read('scripts/docker-ga-e2e-bootstrap.sh');
 
-  assert.match(script, /ensure_bootstrap_initialized\(\)/);
-  assert.match(script, /api\/bootstrap\/status/);
-  assert.match(script, /api\/bootstrap\/setup/);
+  assert.match(script, /scripts\/lib\/reset-init-common\.sh/);
+  assert.match(script, /aura_bootstrap_setup_if_needed[\s\S]*"\$API_BASE"/);
   assert.match(script, /scripts\/import-plugins\.sh/);
   assert.match(script, /--profile="\$PLUGIN_IMPORT_PROFILE"/);
   assert.doesNotMatch(script, /seedDemoData/);
-  assert.match(script, /data = d\.get\('data'\) if isinstance\(d, dict\) else \{\}/);
-  assert.match(script, /data\.get\('initialized'\) is True/);
-  assert.match(script, /d\.get\('code'\) == '0'/);
-  assert.match(script, /ensure_bootstrap_initialized[\s\S]*scripts\/import-plugins\.sh[\s\S]*# 1\. Login as admin -> JWT/);
+  assert.match(script, /aura_bootstrap_setup_if_needed[\s\S]*scripts\/import-plugins\.sh[\s\S]*# 1\. Login as admin -> JWT/);
 });
 
 test('docker GA bootstrap refreshes storage against the active isolated stack only', () => {
@@ -208,18 +218,19 @@ test('docker GA bootstrap refreshes storage against the active isolated stack on
 
   assert.match(script, /API_BASE="http:\/\/localhost:6444"/);
   assert.match(script, /BACKEND_URL="\$API_BASE"[\s\S]*BE_PORT=6444[\s\S]*PGPORT=5433/);
-  assert.match(script, /npx playwright test tests\/auth\.setup\.ts[\s\S]*--project=auth --no-deps --reporter=line/);
-  assert.doesNotMatch(script, /npx playwright test tests\/auth\.setup\.ts\s*\\\n\s*--reporter=line/);
+  assert.match(script, /pnpm install --frozen-lockfile/);
+  assert.match(script, /pnpm exec playwright test tests\/auth\.setup\.ts[\s\S]*--project=auth --no-deps --reporter=line/);
+  assert.match(script, /auth_setup_log=/);
+  assert.doesNotMatch(script, /tests\/auth\.setup\.ts[\s\S]*>\/dev\/null 2>&1 \|\| true/);
 });
 
 test('agent runtime gate bootstraps then imports plugins before Playwright setup', () => {
   const script = read('scripts/dev/run-agent-runtime-full-gate-docker.sh');
 
   assert.match(script, /AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE="\$\{AGENT_RUNTIME_PLUGIN_IMPORT_PROFILE:-e2e\}"/);
-  assert.match(script, /ensure_bootstrap_initialized\(\)/);
-  assert.match(script, /api\/bootstrap\/status/);
-  assert.match(script, /api\/bootstrap\/setup/);
-  assert.match(script, /"companyName":"AuraBoot Dev"/);
+  assert.match(script, /scripts\/lib\/reset-init-common\.sh/);
+  assert.match(script, /aura_bootstrap_setup_if_needed[\s\S]*"\$API_BASE"/);
+  assert.match(script, /"AuraBoot Dev"/);
   assert.match(script, /import_agent_runtime_plugins\(\)/);
   assert.match(script, /scripts\/import-plugins\.sh/);
   assert.match(script, /--slug="\$SLUG"/);
@@ -228,6 +239,6 @@ test('agent runtime gate bootstraps then imports plugins before Playwright setup
   assert.doesNotMatch(script, /seedDemoData/);
   assert.match(
     script,
-    /ensure_bootstrap_initialized[\s\S]*import_agent_runtime_plugins[\s\S]*run_frontend_phase "auth"/,
+    /aura_bootstrap_setup_if_needed[\s\S]*import_agent_runtime_plugins[\s\S]*run_frontend_phase "auth"/,
   );
 });

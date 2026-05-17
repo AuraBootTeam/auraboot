@@ -29,6 +29,7 @@ Docker 镜像地址、Maven / pnpm cache、host shared volume 只属于构建与
 ## 脚本职责
 
 - `scripts/env/reset-and-init.sh`：规范化入口。只负责解析 product/runtime/profile，选择底层 host 或 Docker 工作流，并在 Docker 工作流里串起 bootstrap、插件导入、marketplace catalog 同步。
+- `scripts/lib/reset-init-common.sh`：reset/init 共享 helper。承接 Docker proxy 默认值、显式 bootstrap setup、marketplace catalog sync 等跨入口重复逻辑；业务 profile 选择仍由各入口决定。
 - `scripts/docker-ga-e2e-up.sh`：启动 OSS Docker 栈并等待 backend/frontend 可访问。
 - `scripts/docker-ga-e2e-bootstrap.sh`：对 OSS Docker 栈执行 bootstrap、导入 OSS 插件、创建测试用户、生成 Playwright storage、运行 showcase seed sequence。
 - `scripts/import-plugins.sh`（目标形态）：唯一插件导入执行器。按 profile 导入不同插件列表，负责登录、选择 business tenant、按顺序导入、retry、验证最新 import history 成功。
@@ -176,7 +177,8 @@ scripts/import-plugins.sh \
 当前 OSS 实现状态：
 
 - `scripts/import-plugins.sh` 已成为统一插件导入执行器。
-- `scripts/dev/import-isolated-plugins.sh` 仅保留为旧名兼容 wrapper。
+- `scripts/dev/import-isolated-plugins.sh` 仅保留为旧名兼容 wrapper；无显式 profile 时按 isolated E2E 语义默认使用 `e2e`，不再暗中注入 deprecated `default`。
+- `scripts/lib/reset-init-common.sh` 已收敛 Docker proxy、bootstrap setup、marketplace catalog sync 三类共享逻辑，避免 OSS Docker reset、企业 Docker reset、Agent Runtime gate 各自维护一份近似实现。
 - `core` / `demo` / `e2e` / `enterprise-demo` / `pcba-agent` profile 已写入 `scripts/dev/plugin-import-profiles.json`；`default` 仅保留为 deprecated alias。
 - `/api/bootstrap/setup` 已收窄为最小系统初始化，不再调用 built-in plugin import，也不再消费 `seedDemoData` 执行 demo seed。
 - Quickstart workflow 和 Setup Wizard 不再传 `seedDemoData`。
