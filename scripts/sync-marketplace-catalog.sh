@@ -35,7 +35,7 @@ category_for_namespace() {
   esac
 }
 
-count=0
+scanned_count=0
 IFS=':' read -r -a plugin_roots <<< "$PLUGIN_DIRS"
 shopt -s nullglob
 
@@ -105,6 +105,28 @@ VALUES ('$version_pid', $SYSTEM_TENANT_ID, '$plugin_pid', '$version', $v_major, 
 ON CONFLICT (marketplace_plugin_pid, version) DO UPDATE SET tenant_id = $SYSTEM_TENANT_ID, manifest_snapshot = EXCLUDED.manifest_snapshot, status = 'published', updated_at = NOW();
 SQL
 
+    "${PSQL[@]}" -q <<SQL
+UPDATE ab_marketplace_plugin
+SET latest_version = (
+      SELECT version
+      FROM ab_marketplace_version
+      WHERE marketplace_plugin_pid = '$plugin_pid'
+        AND tenant_id = $SYSTEM_TENANT_ID
+        AND status = 'published'
+      ORDER BY version_major DESC, version_minor DESC, version_patch DESC
+      LIMIT 1
+    ),
+    total_versions = (
+      SELECT COUNT(*)
+      FROM ab_marketplace_version
+      WHERE marketplace_plugin_pid = '$plugin_pid'
+        AND tenant_id = $SYSTEM_TENANT_ID
+        AND status = 'published'
+    ),
+    updated_at = NOW()
+WHERE pid = '$plugin_pid' AND tenant_id = $SYSTEM_TENANT_ID;
+SQL
+
     # Read README.md if exists
     readme_file="$dir/README.md"
     if [[ -f "$readme_file" ]]; then
@@ -122,7 +144,7 @@ EOSQL
       echo "  📖 Loaded README for $plugin_id"
     fi
 
-    count=$((count + 1))
+    scanned_count=$((scanned_count + 1))
     echo "✅ Seeded: $plugin_id ($namespace) v$version → $category"
   done
 done
@@ -139,7 +161,13 @@ UPDATE ab_marketplace_category SET plugin_count = (
 WHERE tenant_id = $SYSTEM_TENANT_ID;
 SQL
 
-echo ""
-echo "🎉 Seeded $count plugins to marketplace"
-echo ""
 "${PSQL[@]}" -c "SELECT code, display_name_en, plugin_count FROM ab_marketplace_category WHERE tenant_id = $SYSTEM_TENANT_ID AND plugin_count > 0 ORDER BY sort_order"
+
+published_plugin_count="$("${PSQL[@]}" -At -c "SELECT COUNT(*) FROM ab_marketplace_plugin WHERE tenant_id = $SYSTEM_TENANT_ID AND status = 'published' AND (deleted_flag = FALSE OR deleted_flag IS NULL)")"
+published_version_count="$("${PSQL[@]}" -At -c "SELECT COUNT(*) FROM ab_marketplace_version WHERE tenant_id = $SYSTEM_TENANT_ID AND status = 'published'")"
+
+echo ""
+if [[ "$published_plugin_count" != "$scanned_count" ]]; then
+  echo "ℹ️  Scanned manifests and published plugin rows differ; duplicate pluginId entries are merged by catalog upsert."
+fi
+echo "🎉 Synced marketplace catalog: scanned $scanned_count manifests, published $published_plugin_count plugins, published $published_version_count versions"

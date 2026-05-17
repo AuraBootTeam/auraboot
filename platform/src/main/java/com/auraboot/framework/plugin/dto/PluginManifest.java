@@ -136,6 +136,21 @@ public class PluginManifest {
      */
     private Map<String, Object> metadata;
 
+    /**
+     * Distribution edition for marketplace/catalog flows, for example oss or enterprise.
+     */
+    private String edition;
+
+    /**
+     * Plugin IDs that can be upgraded to this plugin.
+     */
+    private List<String> upgradesFrom;
+
+    /**
+     * Plugin IDs replaced by this plugin.
+     */
+    private List<String> replaces;
+
     // ==================== dependencies dual-format support ====================
 
     /**
