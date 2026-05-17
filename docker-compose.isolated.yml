@@ -202,7 +202,7 @@ services:
       sh -c "
       set -e;
       bash /repo/scripts/ga-e2e-prepare-deps.sh /repo;
-      cd web-admin;
+      cd /repo/web-admin;
       sh ../scripts/sync-platform-plugins.sh;
       node ../scripts/generate-plugin-routes.mjs;
       pnpm exec concurrently --names 'web,bff' --prefix-colors 'cyan,green' --restart-tries 5 --restart-after 2000 'pnpm dev:web' 'pnpm dev:bff'
@@ -325,7 +325,7 @@ services:
       sh -c "
       set -e;
       bash /repo/scripts/ga-e2e-prepare-deps.sh /repo;
-      cd web-admin;
+      cd /repo/web-admin;
       mkdir -p \"$$PW_ARTIFACT_DIR\" \"$$PW_REPORT_DIR\" \"$$(dirname \"$$PW_RESULTS_JSON\")\" \"$$PW_STORAGE_DIR\";
       pnpm exec playwright install chromium;
       sh -c \"${PLAYWRIGHT_RUNNER_COMMAND:-pnpm exec playwright test -c playwright.noweb.config.ts --reporter=line}\"
