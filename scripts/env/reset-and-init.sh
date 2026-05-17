@@ -87,12 +87,25 @@ if [ "$DRY_RUN" = "1" ]; then
   exit 0
 fi
 
+export_docker_proxy_defaults() {
+  local host_http="${http_proxy:-${HTTP_PROXY:-}}"
+  local host_https="${https_proxy:-${HTTPS_PROXY:-}}"
+
+  if [ -n "$host_http" ] && [ -z "${AURA_DOCKER_HTTP_PROXY:-}" ]; then
+    export AURA_DOCKER_HTTP_PROXY="${host_http/127.0.0.1/host.docker.internal}"
+  fi
+  if [ -n "$host_https" ] && [ -z "${AURA_DOCKER_HTTPS_PROXY:-}" ]; then
+    export AURA_DOCKER_HTTPS_PROXY="${host_https/127.0.0.1/host.docker.internal}"
+  fi
+}
+
 case "$PRODUCT:$RUNTIME" in
   oss:host)
     exec "$PROJECT_ROOT/scripts/oss-reset-and-init.sh"
     ;;
 
   oss:docker)
+    export_docker_proxy_defaults
     if [ "$PROFILE" != "e2e" ] && [ "$PROFILE" != "showcase" ]; then
       echo "ERROR: OSS docker reset currently supports --profile=e2e or --profile=showcase" >&2
       exit 2
@@ -109,6 +122,7 @@ case "$PRODUCT:$RUNTIME" in
     ;;
 
   enterprise:docker)
+    export_docker_proxy_defaults
     enterprise_root="${AURA_ENTERPRISE_ROOT:-$PROJECT_ROOT/../auraboot-enterprise}"
     if [ ! -d "$enterprise_root/plugins" ]; then
       echo "ERROR: enterprise plugin root not found: $enterprise_root/plugins" >&2
