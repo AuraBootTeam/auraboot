@@ -106,14 +106,9 @@ services:
       # in the same compose project network).
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      # Phase 2.4 of bootstrap-unified: removed the
-      # AURABOOT_BOOTSTRAP_ENABLED=false override. The Phase 2.3
-      # BootstrapStartupRunner is idempotent and produces the same
-      # 9-invariant state as /api/bootstrap/setup (System + Business
-      # tenant + platform_admin role + grant), so isolated stacks can
-      # auto-bootstrap on first start just like the host stack. The
-      # tests/api/setup/00-bootstrap.spec.ts contract test still runs as
-      # an idempotent verification of the 9 invariants.
+      # Bootstrap is initialized explicitly by reset/init tooling through
+      # /api/bootstrap/setup. Application startup must not repair or write
+      # bootstrap data implicitly.
       # Activate `test` profile alongside `community` so test-only beans
       # register on the isolated stack:
       #   - TestUserSpoofFilter (X-Test-Spoof-User-Id header support)

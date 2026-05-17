@@ -32,6 +32,12 @@ Marketplace catalog 是“可发现插件目录”，不是“已安装插件列
 
 如果最新状态不是 success，reset 必须失败；如果只有历史 failed 且最新 success，reset 可以继续。
 
+## Bootstrap 契约
+
+`/api/bootstrap/setup` 是默认管理员与租户初始化的唯一写入口。Docker compose、Kubernetes pod、host `bootRun` 启动阶段都不应依赖 `AURABOOT_BOOTSTRAP_ENABLED` 或 startup runner 自动写库。
+
+Quickstart、reset/init、E2E bootstrap 脚本必须在服务健康后显式判断 `/api/bootstrap/status`，未初始化时调用 `/api/bootstrap/setup`，然后再执行登录、插件导入、marketplace 同步或 Playwright storage 生成。
+
 ## 推荐验证层级
 
 1. Health / preflight：Docker disk、backend health、frontend health、bootstrap status。

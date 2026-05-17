@@ -13,6 +13,7 @@
 # Pass criteria:
 #   - docker compose --profile full up -d completes within 5 minutes
 #   - http://localhost:3000 (BFF/SSR) returns a ready 2xx/3xx response within ~120s of compose up
+#   - explicit setup initializes the default admin + tenant
 #   - login with default creds returns a JWT
 #   - backend `/actuator/health` responds inside the container
 #   - 3 sample API endpoints respond in expected shape (via BFF proxy)
@@ -41,14 +42,14 @@ fail() { echo "  ❌ $*"; FAIL=$((FAIL+1)); }
 warn() { echo "  ⚠️  $*"; WARN=$((WARN+1)); }
 step() { echo ""; echo "==> $*"; }
 
-step "1/9 Pre-flight"
+step "1/10 Pre-flight"
 command -v docker >/dev/null      && ok "docker installed" || fail "docker missing"
 docker info >/dev/null 2>&1       && ok "docker daemon up" || fail "docker daemon down"
 command -v curl >/dev/null        && ok "curl installed"   || fail "curl missing"
 [ "$FAIL" -eq 0 ] || { echo "Pre-flight failed; aborting."; exit 1; }
 
 if [ $CLEAN_CLONE -eq 1 ]; then
-  step "2/9 Fresh clone (--clean-clone)"
+  step "2/10 Fresh clone (--clean-clone)"
   REPO_ROOT="/tmp/auraboot-quickstart-verify-$$"
   git clone --depth 1 https://github.com/AuraBootTeam/auraboot.git "$REPO_ROOT"
   ok "cloned to $REPO_ROOT"
@@ -56,7 +57,7 @@ fi
 
 cd "$REPO_ROOT"
 
-step "3/9 docker compose up (target: < 5min cold start)"
+step "3/10 docker compose up (target: < 5min cold start)"
 T0=$(date +%s)
 # The README quickstart uses the `full` profile to bring up postgres + backend + frontend.
 # Without --profile full, only postgres starts (backend/frontend are gated behind it).
@@ -69,7 +70,7 @@ else
   warn "compose up took ${DURATION}s (target < 300s)"
 fi
 
-step "4/9 Wait for backend health (target: < 180s — backend healthcheck has 120s start_period)"
+step "4/10 Wait for backend health (target: < 180s — backend healthcheck has 120s start_period)"
 # Backend port 6443 is intentionally NOT exposed to host in docker-compose.yml,
 # so we exec into the container and curl actuator from inside.
 ATTEMPTS=0
@@ -84,7 +85,7 @@ until docker compose exec -T backend wget -q --spider http://localhost:6443/actu
 done
 [ $ATTEMPTS -le 60 ] && ok "backend healthy after ${ATTEMPTS}×3s"
 
-step "5/9 Frontend reachable (BFF/SSR on host port 3000)"
+step "5/10 Frontend reachable (BFF/SSR on host port 3000)"
 FRONTEND_STATUS="000"
 ATTEMPTS=0
 while true; do
@@ -104,7 +105,25 @@ while true; do
   sleep 2
 done
 
-step "6/9 Login API contract (via BFF proxy)"
+step "6/10 Bootstrap setup contract (via BFF proxy)"
+# The README quickstart starts from an empty database. The explicit setup API is
+# the single authority for creating admin@auraboot.com and the default tenant.
+BOOTSTRAP_STATUS=$(curl -fsS -m 5 http://localhost:3000/api/bootstrap/status 2>/dev/null || echo '{}')
+if echo "$BOOTSTRAP_STATUS" | grep -q '"initialized":true'; then
+  ok "bootstrap already initialized"
+else
+  BOOTSTRAP_RESPONSE=$(curl -fsS -m 30 -X POST http://localhost:3000/api/bootstrap/setup \
+    -H "Content-Type: application/json" \
+    -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single","seedDemoData":true}' \
+    2>/dev/null || echo "FAIL")
+  if echo "$BOOTSTRAP_RESPONSE" | grep -Eq '"success":true|"code":"0"'; then
+    ok "bootstrap setup creates default admin + tenant"
+  else
+    fail "bootstrap setup failed; response: $(echo "$BOOTSTRAP_RESPONSE" | head -c 200)"
+  fi
+fi
+
+step "7/10 Login API contract (via BFF proxy)"
 # Frontend BFF proxies /api/* to backend; we go through it to mirror real user flow.
 LOGIN_RESPONSE="FAIL"
 for _ in $(seq 1 20); do
@@ -123,7 +142,7 @@ else
   TOKEN=""
 fi
 
-step "7/9 Authenticated API smoke"
+step "8/10 Authenticated API smoke"
 if [ -n "$TOKEN" ]; then
   # Endpoints any authenticated user can hit (no specific permission code).
   # /api/menu and /api/permissions root paths have no GET handler;
@@ -137,7 +156,7 @@ if [ -n "$TOKEN" ]; then
   done
 fi
 
-step "8/9 Dashboard UI smoke"
+step "9/10 Dashboard UI smoke"
 if [ -n "$TOKEN" ]; then
   DEFAULT_DASHBOARD="FAIL"
   for _ in $(seq 1 30); do
@@ -164,7 +183,7 @@ else
   fail "cannot verify default dashboard without login token"
 fi
 
-step "9/9 Log scan (looking for ERROR-level surprises)"
+step "10/10 Log scan (looking for ERROR-level surprises)"
 KNOWN_NOISE='Connection refused: connect|temporary failure|retrying|com.zaxxer.hikari.pool|Task :|^$'
 ERR_LINES=$(docker compose logs backend 2>/dev/null | grep "ERROR\b" || true)
 if [ -z "$ERR_LINES" ]; then

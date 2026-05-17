@@ -302,15 +302,10 @@ echo -e "${GREEN}   Database reset complete${NC}"
 echo -e "${YELLOW}Step 4: Starting backend service...${NC}"
 cd "$PLATFORM_DIR"
 
-# This script still drives the canonical /api/bootstrap/setup flow below.
-# Keep the in-process BootstrapStartupRunner disabled here so there is only one
-# bootstrap authority in this process. Otherwise the runner can import plugins
-# while /api/bootstrap/setup is still creating the default tenant roles.
-export AURABOOT_BOOTSTRAP_ENABLED=false
 if [ "$NO_BOOTSTRAP" = "1" ]; then
-    echo "   AURABOOT_BOOTSTRAP_ENABLED=false (--no-bootstrap escape hatch)"
+    echo "   bootstrap setup disabled (--no-bootstrap escape hatch)"
 else
-    echo "   AURABOOT_BOOTSTRAP_ENABLED=false (/api/bootstrap/setup is script authority)"
+    echo "   /api/bootstrap/setup is script authority"
     echo "   AURABOOT_DEMO_SEED=${AURABOOT_DEMO_SEED} (bootstrap seedDemoData=${BOOTSTRAP_SEED_DEMO_DATA})"
 fi
 

@@ -59,7 +59,6 @@ esac
 SKIP_RESET="${SKIP_RESET:-false}"
 if [[ "$SKIP_RESET" != "true" ]]; then
   echo "=== Running oss-reset-and-init.sh ==="
-  export AURABOOT_BOOTSTRAP_ENABLED=false
   bash "$SCRIPT_DIR/oss-reset-and-init.sh"
   echo ""
 fi

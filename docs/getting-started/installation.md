@@ -157,7 +157,6 @@ Navigate to [http://localhost:5173](http://localhost:5173) and log in with:
 
 | Variable | Default | Description |
 |---|---|---|
-| `AURABOOT_BOOTSTRAP_ENABLED` | `false` | Auto-create admin user and tenant on first start. Set `true` for Docker. |
 | `FRONTEND_BASE_URL` | `http://localhost:5173` | Base URL for the frontend (used in emails and redirects) |
 | `SPRING_PROFILES_ACTIVE` | `dev,local,test` | Active Spring profiles. Use `community` for Docker deployment. |
 
