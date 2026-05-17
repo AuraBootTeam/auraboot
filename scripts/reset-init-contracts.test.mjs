@@ -143,5 +143,17 @@ test('docker GA bootstrap initializes a blank stack before admin login', () => {
   assert.match(script, /api\/bootstrap\/status/);
   assert.match(script, /api\/bootstrap\/setup/);
   assert.match(script, /seedDemoData/);
+  assert.match(script, /data = d\.get\('data'\) if isinstance\(d, dict\) else \{\}/);
+  assert.match(script, /data\.get\('initialized'\) is True/);
+  assert.match(script, /d\.get\('code'\) == '0'/);
   assert.match(script, /ensure_bootstrap_initialized\s*\n\s*# 1\. Login as admin -> JWT/);
+});
+
+test('docker GA bootstrap refreshes storage against the active isolated stack only', () => {
+  const script = read('scripts/docker-ga-e2e-bootstrap.sh');
+
+  assert.match(script, /API_BASE="http:\/\/localhost:6444"/);
+  assert.match(script, /BACKEND_URL="\$API_BASE"[\s\S]*BE_PORT=6444[\s\S]*PGPORT=5433/);
+  assert.match(script, /npx playwright test tests\/auth\.setup\.ts[\s\S]*--project=auth --no-deps --reporter=line/);
+  assert.doesNotMatch(script, /npx playwright test tests\/auth\.setup\.ts\s*\\\n\s*--reporter=line/);
 });

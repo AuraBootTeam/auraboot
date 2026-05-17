@@ -72,7 +72,8 @@ try:
     d = json.loads(sys.stdin.read() or '{}')
 except Exception:
     d = {}
-print('yes' if d.get('initialized') is True else 'no')
+data = d.get('data') if isinstance(d, dict) else {}
+print('yes' if isinstance(data, dict) and data.get('initialized') is True else 'no')
 ")
 
   if [ "$initialized" = "yes" ]; then
@@ -100,7 +101,11 @@ try:
 except Exception:
     d = {}
 data = d.get('data') if isinstance(d, dict) else {}
-success = d.get('success') is True or (isinstance(data, dict) and data.get('success') is True)
+success = (
+    d.get('success') is True
+    or d.get('code') == '0'
+    or (isinstance(data, dict) and data.get('success') is True)
+)
 print('yes' if success else 'no')
 ")
 
@@ -326,9 +331,18 @@ else
 
   echo "  Refreshing Playwright storage for the current GA stack..."
   rm -f tests/storage/admin.json tests/storage/operator.json tests/storage/viewer.json
-  PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 PW_SKIP_WEBSERVER=1 NO_PROXY=localhost,127.0.0.1 \
+  BACKEND_URL="$API_BASE" \
+  BE_PORT=6444 \
+  PGHOST=localhost \
+  PGPORT=5433 \
+  PGUSER=auraboot \
+  PGDATABASE=aura_boot \
+  PGPASSWORD=auraboot_dev \
+  PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 \
+  PW_SKIP_WEBSERVER=1 \
+  NO_PROXY=localhost,127.0.0.1 \
     npx playwright test tests/auth.setup.ts \
-    --reporter=line >/dev/null 2>&1 || true
+    --project=auth --no-deps --reporter=line >/dev/null 2>&1 || true
 
   if [ ! -f tests/storage/admin.json ]; then
     echo "  ERROR: admin.json still missing — cannot run showcase seed (auth.setup failed)" >&2
@@ -362,8 +376,16 @@ else
     seed_names+=(dashboard-default invariants)
 
     seed_log="/tmp/ga-e2e-seed-sequence.log"
-    if SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
-         PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 NO_PROXY=localhost,127.0.0.1 \
+    if BACKEND_URL="$API_BASE" \
+         BE_PORT=6444 \
+         PGHOST=localhost \
+         PGPORT=5433 \
+         PGUSER=auraboot \
+         PGDATABASE=aura_boot \
+         PGPASSWORD=auraboot_dev \
+         SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
+         PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 \
+         NO_PROXY=localhost,127.0.0.1 \
          node scripts/run-showcase-seed-sequence.mjs \
            --output-prefix=test-results/ga-e2e-seed "${seed_names[@]}" \
            > "$seed_log" 2>&1; then
