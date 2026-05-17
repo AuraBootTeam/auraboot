@@ -181,6 +181,12 @@ services:
       PUPPETEER_SKIP_DOWNLOAD: "true"
       OSS_PLUGIN_ROOT: /app/plugins
       ENTERPRISE_PLUGIN_ROOT: /app/plugins-enterprise
+      http_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
+      https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
+      HTTP_PROXY: ${AURA_DOCKER_HTTP_PROXY:-}
+      HTTPS_PROXY: ${AURA_DOCKER_HTTPS_PROXY:-}
+      npm_config_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
+      npm_config_https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
     volumes:
       - ./:/repo:cached
       # Keep Linux node_modules project-local for correctness, but share the
@@ -194,14 +200,7 @@ services:
     command: >-
       sh -c "
       set -e;
-      if command -v pnpm >/dev/null 2>&1; then
-        pnpm --version;
-      else
-        corepack enable;
-        corepack prepare pnpm@9 --activate;
-      fi;
-      cd /repo;
-      pnpm install --no-frozen-lockfile --prefer-offline;
+      bash /repo/scripts/ga-e2e-prepare-deps.sh /repo;
       cd web-admin;
       sh ../scripts/sync-platform-plugins.sh;
       node ../scripts/generate-plugin-routes.mjs;
@@ -242,6 +241,12 @@ services:
       no_proxy: "localhost,127.0.0.1,backend"
       PUPPETEER_SKIP_DOWNLOAD: "true"
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+      http_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
+      https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
+      HTTP_PROXY: ${AURA_DOCKER_HTTP_PROXY:-}
+      HTTPS_PROXY: ${AURA_DOCKER_HTTPS_PROXY:-}
+      npm_config_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
+      npm_config_https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
     depends_on:
       backend:
         condition: service_healthy
@@ -317,14 +322,7 @@ services:
     command: >-
       sh -c "
       set -e;
-      if command -v pnpm >/dev/null 2>&1; then
-        pnpm --version;
-      else
-        corepack enable;
-        corepack prepare pnpm@9 --activate;
-      fi;
-      cd /repo;
-      pnpm install --no-frozen-lockfile --prefer-offline;
+      bash /repo/scripts/ga-e2e-prepare-deps.sh /repo;
       cd web-admin;
       mkdir -p \"$$PW_ARTIFACT_DIR\" \"$$PW_REPORT_DIR\" \"$$(dirname \"$$PW_RESULTS_JSON\")\" \"$$PW_STORAGE_DIR\";
       pnpm exec playwright install chromium;

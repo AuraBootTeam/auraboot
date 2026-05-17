@@ -85,7 +85,10 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /enterprise:docker\) PROFILE="enterprise-demo"/);
   assert.match(script, /oss:host/);
   assert.match(script, /oss:docker/);
+  assert.match(script, /export_docker_proxy_defaults\(\)/);
+  assert.match(script, /host\.docker\.internal/);
   assert.match(script, /docker-ga-e2e-down\.sh" --purge/);
+  assert.match(script, /GA_E2E_FRONTEND_IMAGE="\$\{GA_E2E_FRONTEND_IMAGE:-node:22-bookworm-slim\}"/);
   assert.match(script, /enterprise:host/);
   assert.match(script, /enterprise:docker/);
   assert.match(script, /stop-isolated\.sh" --slug="\$SLUG" --purge/);
