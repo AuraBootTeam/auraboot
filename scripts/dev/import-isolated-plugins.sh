@@ -20,15 +20,20 @@ normalize_slug() {
 has_slug=0
 has_profile=0
 has_explicit_plugin=0
+has_help=0
 for arg in "$@"; do
     case "$arg" in
         --slug=*) has_slug=1 ;;
         --profile=*) has_profile=1 ;;
-        --help|-h) ;;
+        --help|-h) has_help=1 ;;
         --*) ;;
         *) has_explicit_plugin=1 ;;
     esac
 done
+
+if [ "$has_help" -eq 1 ]; then
+    exec "$PROJECT_ROOT/scripts/import-plugins.sh" "$@"
+fi
 
 args=()
 if [ "$has_slug" -eq 0 ]; then
@@ -40,7 +45,8 @@ if [ "$has_slug" -eq 0 ]; then
 fi
 
 if [ "$has_profile" -eq 0 ] && [ "$has_explicit_plugin" -eq 0 ]; then
-    args+=("--profile=default")
+    echo "WARNING: scripts/dev/import-isolated-plugins.sh now defaults to --profile=e2e; pass --profile explicitly for other profiles." >&2
+    args+=("--profile=e2e")
 fi
 
 exec "$PROJECT_ROOT/scripts/import-plugins.sh" "${args[@]}" "$@"
