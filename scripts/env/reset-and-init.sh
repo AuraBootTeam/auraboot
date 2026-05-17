@@ -132,8 +132,11 @@ case "$PRODUCT:$RUNTIME" in
       exit 1
     fi
     "$PROJECT_ROOT/scripts/dev/stop-isolated.sh" --slug="$SLUG" --purge || true
+    echo "[enterprise-docker] building backend jar on host with Gradle cache..."
+    (cd "$PROJECT_ROOT/platform" && ./gradlew bootJar --no-daemon -x test)
     ENTERPRISE_PLUGINS_DIR="${ENTERPRISE_PLUGINS_DIR:-$enterprise_root/plugins}" \
     ENTERPRISE_PLUGIN_JARS_DIR="${ENTERPRISE_PLUGIN_JARS_DIR:-$enterprise_root/build/plugin-jars}" \
+    ISOLATED_BACKEND_DOCKERFILE="${ISOLATED_BACKEND_DOCKERFILE:-Dockerfile.runtime}" \
     ISOLATED_FRONTEND_IMAGE="${ISOLATED_FRONTEND_IMAGE:-node:22-bookworm-slim}" \
       "$PROJECT_ROOT/scripts/dev/start-isolated.sh" --slug="$SLUG" --rebuild --wait --skip-pull
     env_file="$PROJECT_ROOT/.aura-stack/$SLUG.env"
