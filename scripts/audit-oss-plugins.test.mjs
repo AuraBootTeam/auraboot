@@ -119,4 +119,46 @@ describe('OSS plugin config audit', () => {
     before('pcba-manufacturing', 'pcba-warehouse');
     before('pcba-manufacturing', 'pcba-compliance');
   });
+
+  it('defines an enterprise-demo isolated-stack profile without OSS demo templates', () => {
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
+    const match = script.match(/ENTERPRISE_DEMO_PLUGINS=\(\n([\s\S]*?)\n\)/);
+    assert.ok(match, 'ENTERPRISE_DEMO_PLUGINS profile must exist.');
+
+    const plugins = match[1]
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'));
+
+    for (const forbidden of ['crm-quick-start', 'crm-starter', 'golden-path', 'hr-essentials', 'simple-inventory']) {
+      assert.equal(plugins.includes(forbidden), false, `${forbidden} must not be in enterprise-demo.`);
+    }
+
+    for (const required of ['project-management', 'crm', 'product-catalog', 'sales', 'procurement', 'pcba-solution']) {
+      assert.equal(plugins.includes(required), true, `${required} must be in enterprise-demo.`);
+    }
+  });
+
+  it('prefers enterprise plugin directories for isolated-stack name collisions', () => {
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
+    const enterpriseBlock = script.match(/auto\|enterprise\)([\s\S]*?;;)/);
+
+    assert.match(script, /container_plugin_path\(\)/, 'container_plugin_path function must exist.');
+    assert.ok(enterpriseBlock, 'auto|enterprise edition branch must exist.');
+    assert.ok(
+      enterpriseBlock[1].indexOf('/app/plugins-enterprise/$plugin/plugin.json') <
+        enterpriseBlock[1].indexOf('/app/plugins/$plugin/plugin.json'),
+      'enterprise plugin directory must win over OSS templates for duplicate plugin names',
+    );
+  });
+
+  it('supports explicit isolated-stack edition modes', () => {
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
+
+    assert.match(script, /--edition=auto\|oss\|enterprise/);
+    assert.match(script, /case "\$EDITION" in/);
+    assert.match(script, /auto\|oss\|enterprise/);
+    assert.match(script, /oss\)/);
+    assert.match(script, /auto\|enterprise\)/);
+  });
 });
