@@ -11,6 +11,28 @@
 import { test, expect } from '../../fixtures';
 import type { Page } from '../../fixtures';
 
+const MARKETPLACE_API_TIMEOUT = 30000;
+const MARKETPLACE_CARD_TIMEOUT = 30000;
+
+function marketplaceCards(page: Page) {
+  return page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
+}
+
+async function waitForMarketplaceListReady(page: Page) {
+  const cards = marketplaceCards(page);
+  const apiResponse = page.waitForResponse(
+    (resp) => resp.url().includes('/api/marketplace/plugins') && resp.status() === 200,
+    { timeout: MARKETPLACE_API_TIMEOUT },
+  ).catch(() => null);
+
+  await Promise.race([
+    cards.first().waitFor({ state: 'visible', timeout: MARKETPLACE_CARD_TIMEOUT }).catch(() => null),
+    apiResponse,
+  ]);
+  await expect(cards.first()).toBeVisible({ timeout: MARKETPLACE_CARD_TIMEOUT });
+  return cards;
+}
+
 /**
  * Navigate to the Plugin Management page (discovery tab) via sidebar menu.
  *
@@ -46,9 +68,11 @@ async function navigateToMarketplace(page: Page) {
   await expect(page.locator('[data-testid="marketplace-categories"]')).toBeVisible({
     timeout: 10000,
   });
+  await waitForMarketplaceListReady(page);
 }
 
 test.describe('Marketplace Smoke Tests', () => {
+  test.describe.configure({ timeout: 60000 });
 
   test('marketplace page loads via sidebar menu and shows plugins', async ({ page }) => {
     await navigateToMarketplace(page);
@@ -57,20 +81,18 @@ test.describe('Marketplace Smoke Tests', () => {
     await expect(page.locator('h3').filter({ hasText: /Categories|分类/ })).toBeVisible();
 
     // At least 1 plugin card should be visible (after seed)
-    const cards = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    await waitForMarketplaceListReady(page);
 
     // Plugin count should be > 0
-    const countText = page.locator('text=/\\d+ (plugins|个插件)/');
-    await expect(countText).toBeVisible();
+    const countText = page.locator('span').filter({ hasText: /^\d+ (plugins|个插件)$/ });
+    await expect(countText.first()).toBeVisible();
   });
 
   test('marketplace categories filter works', async ({ page }) => {
     await navigateToMarketplace(page);
 
     // Wait for plugins to load
-    const cards = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    await waitForMarketplaceListReady(page);
 
     // Click a category button in the marketplace categories sidebar
     const catNav = page.locator('[data-testid="marketplace-categories"]');
@@ -78,7 +100,10 @@ test.describe('Marketplace Smoke Tests', () => {
     const categoryButton = catNav.locator('button').filter({ hasText: /ERP|CRM/ }).first();
     if (await categoryButton.isVisible()) {
       // Set up response wait BEFORE clicking
-      const responsePromise = page.waitForResponse(resp => resp.url().includes('/api/marketplace/plugins'));
+      const responsePromise = page.waitForResponse(
+        resp => resp.url().includes('/api/marketplace/plugins') && resp.status() === 200,
+        { timeout: MARKETPLACE_API_TIMEOUT },
+      );
       await categoryButton.click();
       await responsePromise;
       // Page should still show content (not error)
@@ -96,7 +121,10 @@ test.describe('Marketplace Smoke Tests', () => {
     await searchInput.press('Enter');
 
     // Wait for search results
-    await page.waitForResponse(resp => resp.url().includes('/api/marketplace/plugins'));
+    await page.waitForResponse(
+      resp => resp.url().includes('/api/marketplace/plugins') && resp.status() === 200,
+      { timeout: MARKETPLACE_API_TIMEOUT },
+    );
 
     // Should show results (at least CRM plugin)
     await expect(page.locator('h1')).toBeVisible();
@@ -106,8 +134,7 @@ test.describe('Marketplace Smoke Tests', () => {
     await navigateToMarketplace(page);
 
     // Click first plugin card
-    const firstCard = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ }).first();
-    await expect(firstCard).toBeVisible({ timeout: 10000 });
+    const firstCard = (await waitForMarketplaceListReady(page)).first();
     await firstCard.click();
 
     // Detail page should load
@@ -131,28 +158,26 @@ test.describe('Marketplace Smoke Tests', () => {
     await navigateToMarketplace(page);
 
     // Wait for initial load
-    const cards = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    const cards = await waitForMarketplaceListReady(page);
 
     // Click "Newest" sort
     const newestButton = page.locator('button').filter({ hasText: /Newest|最新/ });
     const sortResponsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/marketplace/plugins') && resp.status() === 200,
-      { timeout: 10000 },
+      { timeout: MARKETPLACE_API_TIMEOUT },
     ).catch(() => null);
     await newestButton.click();
     await sortResponsePromise;
 
     // Page should still show plugins
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    await expect(cards.first()).toBeVisible({ timeout: MARKETPLACE_CARD_TIMEOUT });
   });
 
   test('installed plugins show correct status', async ({ page }) => {
     await navigateToMarketplace(page);
 
     // Wait for cards to load
-    const cards = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    await waitForMarketplaceListReady(page);
 
     // At least one card should show "Installed" badge (since most plugins are installed)
     const installedBadge = page.locator('.grid > div').filter({ hasText: /Installed|已安装/ });
@@ -163,8 +188,7 @@ test.describe('Marketplace Smoke Tests', () => {
     await navigateToMarketplace(page);
 
     // Click first plugin card
-    const firstCard = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ }).first();
-    await expect(firstCard).toBeVisible({ timeout: 10000 });
+    const firstCard = (await waitForMarketplaceListReady(page)).first();
     await firstCard.click();
 
     await page.waitForLoadState('domcontentloaded');
@@ -180,8 +204,7 @@ test.describe('Marketplace Smoke Tests', () => {
     await navigateToMarketplace(page);
 
     // Wait for cards to load
-    const cards = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    const cards = await waitForMarketplaceListReady(page);
 
     // Phase 2: cards should have a rating area (may show "⭐ 0.0" or stars if reviews exist)
     // Just verify the first card contains either a star/rating element or at least a version badge

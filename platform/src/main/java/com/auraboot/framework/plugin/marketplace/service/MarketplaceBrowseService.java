@@ -7,6 +7,7 @@ import com.auraboot.framework.plugin.marketplace.dto.*;
 import com.auraboot.framework.plugin.marketplace.entity.*;
 import com.auraboot.framework.plugin.marketplace.mapper.*;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -48,26 +49,17 @@ public class MarketplaceBrowseService {
         }
         // default is "popular" — already sorted by install_count DESC
 
-        // Get installed plugins for current tenant (marketplace installs + direct imports)
         Long tenantId = MetaContext.getCurrentTenantId();
-        Map<String, MarketplaceInstall> installedMap = new HashMap<>();
-        Map<String, PluginRecord> directInstalledMap = new HashMap<>();
-        if (tenantId != null) {
-            installMapper.findByTenant(tenantId).forEach(i -> installedMap.put(i.getMarketplacePluginPid(), i));
-            // Also check ab_plugin for plugins installed via direct import (not through marketplace)
-            List<PluginRecord> tenantPlugins = pluginRecordMapper.findByTenant();
-            tenantPlugins.forEach(pr -> directInstalledMap.put(pr.getPluginId(), pr));
-        }
+        TenantInstallSnapshot installSnapshot = loadTenantInstallSnapshot(tenantId);
 
         // Map category names — G2 table
         Map<String, MarketplaceCategory> categoryMap = new HashMap<>();
         SystemTenantContextExecutor.executeAsSystem(() -> categoryMapper.findAll())
             .forEach(c -> categoryMap.put(c.getCode(), c));
 
-        final Map<String, PluginRecord> directMap = directInstalledMap;
         return plugins.stream().map(p -> {
-            MarketplaceInstall mpInstall = installedMap.get(p.getPid());
-            PluginRecord directInstall = directMap.get(p.getPluginId());
+            MarketplaceInstall mpInstall = installSnapshot.marketplaceInstallsByPluginPid().get(p.getPid());
+            PluginRecord directInstall = resolveDirectInstall(p, installSnapshot);
             return toDTO(p, mpInstall, directInstall, categoryMap.get(p.getCategoryCode()));
         }).collect(Collectors.toList());
     }
@@ -83,7 +75,8 @@ public class MarketplaceBrowseService {
 
         Long tenantId = MetaContext.getCurrentTenantId();
         MarketplaceInstall mpInstall = tenantId != null ? installMapper.findByTenantAndPlugin(tenantId, plugin.getPid()) : null;
-        PluginRecord directInstall = tenantId != null ? pluginRecordMapper.findByTenantAndPluginId(plugin.getPluginId()) : null;
+        TenantInstallSnapshot installSnapshot = loadTenantInstallSnapshot(tenantId);
+        PluginRecord directInstall = tenantId != null ? resolveDirectInstall(plugin, installSnapshot) : null;
         boolean installed = mpInstall != null || directInstall != null;
         String installedVersion = mpInstall != null ? mpInstall.getInstalledVersion()
                 : (directInstall != null ? directInstall.getVersion() : null);
@@ -132,17 +125,17 @@ public class MarketplaceBrowseService {
         // G2 tables — system tenant context
         List<MarketplacePlugin> plugins = SystemTenantContextExecutor.executeAsSystem(() -> pluginMapper.findFeatured());
         Long tenantId = MetaContext.getCurrentTenantId();
-        Map<String, MarketplaceInstall> installedMap = new HashMap<>();
-        Map<String, PluginRecord> directInstalledMap = new HashMap<>();
-        if (tenantId != null) {
-            installMapper.findByTenant(tenantId).forEach(i -> installedMap.put(i.getMarketplacePluginPid(), i));
-            pluginRecordMapper.findByTenant().forEach(pr -> directInstalledMap.put(pr.getPluginId(), pr));
-        }
+        TenantInstallSnapshot installSnapshot = loadTenantInstallSnapshot(tenantId);
         Map<String, MarketplaceCategory> categoryMap = new HashMap<>();
         SystemTenantContextExecutor.executeAsSystem(() -> categoryMapper.findAll())
             .forEach(c -> categoryMap.put(c.getCode(), c));
-        final Map<String, PluginRecord> directMap = directInstalledMap;
-        return plugins.stream().map(p -> toDTO(p, installedMap.get(p.getPid()), directMap.get(p.getPluginId()), categoryMap.get(p.getCategoryCode()))).collect(Collectors.toList());
+        return plugins.stream()
+                .map(p -> toDTO(
+                        p,
+                        installSnapshot.marketplaceInstallsByPluginPid().get(p.getPid()),
+                        resolveDirectInstall(p, installSnapshot),
+                        categoryMap.get(p.getCategoryCode())))
+                .collect(Collectors.toList());
     }
 
     public List<MarketplacePluginDTO> getUpgrades() {
@@ -152,25 +145,19 @@ public class MarketplaceBrowseService {
         }
 
         List<MarketplacePlugin> plugins = SystemTenantContextExecutor.executeAsSystem(pluginMapper::findPublished);
-        Map<String, MarketplaceInstall> installedMap = new HashMap<>();
-        installMapper.findByTenant(tenantId).forEach(i -> installedMap.put(i.getMarketplacePluginPid(), i));
-
-        Map<String, PluginRecord> directInstalledMap = new HashMap<>();
-        pluginRecordMapper.findByTenant().forEach(pr -> directInstalledMap.put(pr.getPluginId(), pr));
+        TenantInstallSnapshot installSnapshot = loadTenantInstallSnapshot(tenantId);
 
         Map<String, MarketplaceCategory> categoryMap = new HashMap<>();
         SystemTenantContextExecutor.executeAsSystem(() -> categoryMapper.findAll())
             .forEach(c -> categoryMap.put(c.getCode(), c));
 
         return plugins.stream()
-                .filter(p -> {
-                    MarketplaceInstall mpInstall = installedMap.get(p.getPid());
-                    PluginRecord directInstall = directInstalledMap.get(p.getPluginId());
-                    String installedVersion = mpInstall != null ? mpInstall.getInstalledVersion()
-                            : (directInstall != null ? directInstall.getVersion() : null);
-                    return installedVersion != null && compareVersions(p.getLatestVersion(), installedVersion) > 0;
-                })
-                .map(p -> toDTO(p, installedMap.get(p.getPid()), directInstalledMap.get(p.getPluginId()), categoryMap.get(p.getCategoryCode())))
+                .filter(p -> isUpgradeCandidate(p, installSnapshot))
+                .map(p -> toDTO(
+                        p,
+                        installSnapshot.marketplaceInstallsByPluginPid().get(p.getPid()),
+                        resolveDirectInstall(p, installSnapshot),
+                        categoryMap.get(p.getCategoryCode())))
                 .collect(Collectors.toList());
     }
 
@@ -217,6 +204,102 @@ public class MarketplaceBrowseService {
                 .reviewCount(p.getReviewCount())
                 .build();
     }
+
+    private TenantInstallSnapshot loadTenantInstallSnapshot(Long tenantId) {
+        if (tenantId == null) {
+            return new TenantInstallSnapshot(Map.of(), Map.of());
+        }
+
+        Map<String, MarketplaceInstall> marketplaceInstallsByPluginPid = new HashMap<>();
+        installMapper.findByTenant(tenantId)
+                .forEach(i -> marketplaceInstallsByPluginPid.put(i.getMarketplacePluginPid(), i));
+
+        Map<String, PluginRecord> directInstallsByPluginId = new HashMap<>();
+        pluginRecordMapper.findByTenant()
+                .forEach(pr -> directInstallsByPluginId.put(pr.getPluginId(), pr));
+
+        return new TenantInstallSnapshot(marketplaceInstallsByPluginPid, directInstallsByPluginId);
+    }
+
+    private boolean isUpgradeCandidate(MarketplacePlugin plugin, TenantInstallSnapshot installSnapshot) {
+        MarketplaceInstall marketplaceInstall = installSnapshot.marketplaceInstallsByPluginPid().get(plugin.getPid());
+        if (marketplaceInstall != null) {
+            return compareVersions(plugin.getLatestVersion(), marketplaceInstall.getInstalledVersion()) > 0;
+        }
+
+        PluginRecord samePluginInstall = installSnapshot.directInstallsByPluginId().get(plugin.getPluginId());
+        if (samePluginInstall != null) {
+            return compareVersions(plugin.getLatestVersion(), samePluginInstall.getVersion()) > 0;
+        }
+
+        PluginRecord replacementInstall = findReplacementSourceInstall(plugin, installSnapshot);
+        return replacementInstall != null
+                && compareVersions(plugin.getLatestVersion(), replacementInstall.getVersion()) > 0;
+    }
+
+    private PluginRecord resolveDirectInstall(MarketplacePlugin plugin, TenantInstallSnapshot installSnapshot) {
+        PluginRecord samePluginInstall = installSnapshot.directInstallsByPluginId().get(plugin.getPluginId());
+        if (samePluginInstall != null) {
+            return samePluginInstall;
+        }
+        return findReplacementSourceInstall(plugin, installSnapshot);
+    }
+
+    private PluginRecord findReplacementSourceInstall(MarketplacePlugin plugin, TenantInstallSnapshot installSnapshot) {
+        for (String sourcePluginId : getUpgradeSourcePluginIds(plugin)) {
+            PluginRecord installed = installSnapshot.directInstallsByPluginId().get(sourcePluginId);
+            if (installed != null) {
+                return installed;
+            }
+        }
+        return null;
+    }
+
+    private Set<String> getUpgradeSourcePluginIds(MarketplacePlugin plugin) {
+        MarketplaceVersion latestVersion = SystemTenantContextExecutor.executeAsSystem(
+                () -> versionMapper.findLatestPublished(plugin.getPid()));
+        if (latestVersion == null || latestVersion.getManifestSnapshot() == null
+                || latestVersion.getManifestSnapshot().isBlank()) {
+            return Set.of();
+        }
+
+        LinkedHashSet<String> sourcePluginIds = new LinkedHashSet<>();
+        try {
+            JsonNode manifest = objectMapper.readTree(latestVersion.getManifestSnapshot());
+            addManifestPluginIds(sourcePluginIds, manifest.get("upgradesFrom"));
+            addManifestPluginIds(sourcePluginIds, manifest.get("replaces"));
+        } catch (Exception e) {
+            log.warn("Failed to parse marketplace manifest metadata for {}: {}",
+                    plugin.getPluginId(), e.getMessage());
+        }
+        sourcePluginIds.remove(plugin.getPluginId());
+        return sourcePluginIds;
+    }
+
+    private void addManifestPluginIds(Set<String> target, JsonNode node) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+        if (node.isTextual() && !node.asText().isBlank()) {
+            target.add(node.asText());
+            return;
+        }
+        if (node.isArray()) {
+            for (JsonNode item : node) {
+                addManifestPluginIds(target, item);
+            }
+            return;
+        }
+        JsonNode pluginId = node.get("pluginId");
+        if (pluginId != null && pluginId.isTextual() && !pluginId.asText().isBlank()) {
+            target.add(pluginId.asText());
+        }
+    }
+
+    private record TenantInstallSnapshot(
+            Map<String, MarketplaceInstall> marketplaceInstallsByPluginPid,
+            Map<String, PluginRecord> directInstallsByPluginId
+    ) {}
 
     private MarketplaceVersionDTO toVersionDTO(MarketplaceVersion v) {
         return MarketplaceVersionDTO.builder()

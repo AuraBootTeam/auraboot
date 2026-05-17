@@ -60,6 +60,14 @@ Marketplace catalog 是“可发现插件目录”，不是“已安装插件列
 
 插件自身仍拥有自己的功能 seed、demo data、config resources；marketplace catalog sync 只把插件元数据投影到 `ab_marketplace_plugin` / `ab_marketplace_version`。这允许 OSS 插件和企业插件共存，也允许企业同名插件通过 manifest metadata 表达“从 OSS/template 升级而来”。
 
+同步脚本的输出区分三类数量：
+
+- scanned manifests：本次扫描到的 `plugin.json` 数量。
+- published plugins：`ab_marketplace_plugin` 中按 `plugin_id` 去重后的 published 插件数量。
+- published versions：`ab_marketplace_version` 中 published 版本数量。
+
+企业 demo 中曾出现 `Seeded 65 plugins` 但 API/DB 只有 64 个 published plugins，根因是 OSS 和企业插件目录都包含 `com.auraboot.test-fixtures`。catalog 以 `plugin_id` 为唯一键执行 upsert，因此两个 manifest 会合并成一个 marketplace plugin，同时保留两个 version rows。这个差异不是 reset 失败，但脚本必须按上述三个维度汇报，避免把“扫描数量”误读成“最终 marketplace card 数量”。
+
 ## Import History 契约
 
 插件导入校验看“每个 pluginId 最新一条 import history 是否 success”，不是要求整个 history 里没有 failed。
@@ -160,6 +168,14 @@ scripts/import-plugins.sh \
 - `--edition=auto`：有 enterprise root 时按 enterprise 优先，否则按 OSS。
 
 当企业插件 shadow OSS 同名插件时，企业插件 manifest 必须声明 `edition`、`upgradesFrom` / `replaces` 等升级元数据。marketplace sync 和 upgrade smoke 依赖这些元数据判断“可升级”而不是把同名插件视为冲突。
+
+当前升级路径契约：
+
+- `GET /api/marketplace/upgrades` 同时识别同 pluginId 的版本升级，以及企业插件 manifest 中 `upgradesFrom` / `replaces` 指向的 OSS/template 插件。
+- marketplace list/detail DTO 会把匹配到的 OSS/template 已安装版本作为 `installedVersion` 返回，这样 UI 能显示企业插件的 `Update/升级` 状态。
+- `POST /api/marketplace/plugins/{pluginId}/upgrade/preview` 返回升级来源、当前版本、目标版本和升级类型。
+- `POST /api/marketplace/plugins/{pluginId}/upgrade` 复用 marketplace manifest snapshot 执行导入，并记录目标企业插件的 marketplace install。升级后如果目标企业插件已安装到最新版本，不应继续因为旧 OSS/template 插件仍存在而重复提示。
+- `PluginManifest` 显式支持 `edition`、`upgradesFrom`、`replaces`，避免 marketplace install/upgrade 从 manifest snapshot 反序列化时把这些字段当作未知字段失败。
 
 ## 各入口接入方式
 
