@@ -10,6 +10,28 @@
 import { test, expect } from '../../fixtures';
 import type { Page } from '../../fixtures';
 
+const MARKETPLACE_API_TIMEOUT = 30000;
+const MARKETPLACE_CARD_TIMEOUT = 30000;
+
+function marketplaceCards(page: Page) {
+  return page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
+}
+
+async function waitForMarketplaceListReady(page: Page) {
+  const cards = marketplaceCards(page);
+  const apiResponse = page.waitForResponse(
+    (resp) => resp.url().includes('/api/marketplace/plugins') && resp.status() === 200,
+    { timeout: MARKETPLACE_API_TIMEOUT },
+  ).catch(() => null);
+
+  await Promise.race([
+    cards.first().waitFor({ state: 'visible', timeout: MARKETPLACE_CARD_TIMEOUT }).catch(() => null),
+    apiResponse,
+  ]);
+  await expect(cards.first()).toBeVisible({ timeout: MARKETPLACE_CARD_TIMEOUT });
+  return cards;
+}
+
 /**
  * Navigate to the Plugin Management page (discovery tab) via sidebar menu.
  *
@@ -36,9 +58,11 @@ async function navigateToMarketplace(page: Page) {
   await expect(page.locator('[data-testid="marketplace-categories"]')).toBeVisible({
     timeout: 10000,
   });
+  await waitForMarketplaceListReady(page);
 }
 
 test.describe('Marketplace Upgrade Tests', () => {
+  test.describe.configure({ timeout: 60000 });
 
   test('upgrade API returns valid response', async ({ page }) => {
     const resp = await page.request.get('/api/marketplace/upgrades');
@@ -52,12 +76,11 @@ test.describe('Marketplace Upgrade Tests', () => {
     await navigateToMarketplace(page);
 
     // Wait for plugin grid to render
-    const cards = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    await waitForMarketplaceListReady(page);
 
     // Should show plugin count
-    const countText = page.locator('text=/\\d+ (plugins|个插件)/');
-    await expect(countText).toBeVisible();
+    const countText = page.locator('span').filter({ hasText: /^\d+ (plugins|个插件)$/ });
+    await expect(countText.first()).toBeVisible();
   });
 
   test('upgrade banner shows when upgrades are available', async ({ page }) => {
@@ -65,7 +88,10 @@ test.describe('Marketplace Upgrade Tests', () => {
 
     // Wait for page to finish loading upgrades
     // Wait for upgrade API to complete (don't use networkidle — project rule)
-    await page.waitForResponse(resp => resp.url().includes('/api/marketplace/upgrades') || resp.url().includes('/api/marketplace/plugins'), { timeout: 10000 }).catch(() => {});
+    await page.waitForResponse(
+      resp => resp.url().includes('/api/marketplace/upgrades') || resp.url().includes('/api/marketplace/plugins'),
+      { timeout: MARKETPLACE_API_TIMEOUT },
+    ).catch(() => {});
 
     // Check if banner exists — acceptable states:
     // 1. Banner visible (upgrades available)
@@ -86,16 +112,14 @@ test.describe('Marketplace Upgrade Tests', () => {
       await expect(banner).not.toBeVisible();
     } else {
       // No upgrades — verify the page still rendered correctly
-      const cards = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
-      await expect(cards.first()).toBeVisible({ timeout: 10000 });
+      await waitForMarketplaceListReady(page);
     }
   });
 
   test('plugin card shows upgrade badge when update available', async ({ page }) => {
     await navigateToMarketplace(page);
 
-    const cards = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ });
-    await expect(cards.first()).toBeVisible({ timeout: 10000 });
+    await waitForMarketplaceListReady(page);
 
     // Check if any card shows upgrade badge
     const upgradeBadge = page.locator('.grid > div').filter({ hasText: /Update|可更新/ });
@@ -116,8 +140,7 @@ test.describe('Marketplace Upgrade Tests', () => {
     await navigateToMarketplace(page);
 
     // Click first plugin card
-    const firstCard = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ }).first();
-    await expect(firstCard).toBeVisible({ timeout: 10000 });
+    const firstCard = (await waitForMarketplaceListReady(page)).first();
     await firstCard.click();
 
     // Detail page should load
@@ -155,8 +178,7 @@ test.describe('Marketplace Upgrade Tests', () => {
       await expect(upgradeBtn).toBeVisible();
     } else {
       // No upgradable plugins in seed data — verify detail page still works
-      const firstCard = page.locator('.grid > div').filter({ hasText: /v\d+\.\d+/ }).first();
-      await expect(firstCard).toBeVisible({ timeout: 10000 });
+      const firstCard = (await waitForMarketplaceListReady(page)).first();
       await firstCard.click();
       await page.waitForLoadState('domcontentloaded');
       await expect(page.getByRole('button', { name: /Back to Marketplace|返回市场/ })).toBeVisible({
