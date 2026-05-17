@@ -4,6 +4,7 @@
 #
 # Usage:
 #   scripts/dev/import-isolated-plugins.sh --slug=agent-runtime-e2e --profile=pcba-agent
+#   scripts/dev/import-isolated-plugins.sh --slug=enterprise-demo --profile=enterprise-demo --edition=enterprise
 #   scripts/dev/import-isolated-plugins.sh --slug=agent-runtime-e2e core-meta core-aurabot
 
 set -euo pipefail
@@ -14,16 +15,22 @@ STACK_DIR="$PROJECT_ROOT/.aura-stack"
 
 SLUG=""
 PROFILE="default"
+EDITION="auto"
 PLUGINS=()
 
 usage() {
     cat <<USAGE
-Usage: $0 [--slug=<name>] [--profile=default|pcba-agent] [plugin...]
+Usage: $0 [--slug=<name>] [--profile=default|pcba-agent|enterprise-demo] [--edition=auto|oss|enterprise] [plugin...]
 
 Options:
   --slug=<name>      Isolated stack slug. Defaults to current branch slug.
   --profile=<name>   Plugin import profile. pcba-agent imports the minimum
                      OSS + enterprise plugins needed by the PCBA agent E2E.
+                     enterprise-demo imports the enterprise reset/demo plugin set.
+  --edition=<mode>   Plugin root selection mode:
+                       auto       prefer enterprise root when it exists (default)
+                       oss        only import from /app/plugins
+                       enterprise prefer /app/plugins-enterprise, then /app/plugins
 
 Environment:
   ADMIN_EMAIL        default: admin@auraboot.com
@@ -44,6 +51,7 @@ for arg in "$@"; do
     case "$arg" in
         --slug=*) SLUG="${arg#--slug=}" ;;
         --profile=*) PROFILE="${arg#--profile=}" ;;
+        --edition=*) EDITION="${arg#--edition=}" ;;
         --help|-h) usage; exit 0 ;;
         --*) echo "ERROR: unknown argument: $arg" >&2; usage; exit 2 ;;
         *) PLUGINS+=("$arg") ;;
@@ -57,6 +65,11 @@ if [ -z "$SLUG" ]; then
     fi
     SLUG="$(normalize_slug "$branch")"
 fi
+
+case "$EDITION" in
+    auto|oss|enterprise) ;;
+    *) echo "ERROR: unknown edition: $EDITION" >&2; exit 2 ;;
+esac
 
 if [ -z "$SLUG" ]; then
     echo "ERROR: could not derive slug — supply --slug=<name>" >&2
@@ -118,15 +131,76 @@ PCBA_AGENT_PLUGINS=(
   pcba-compliance
 )
 
+ENTERPRISE_DEMO_PLUGINS=(
+  core-meta
+  core-bpm
+  page-manager
+  platform-admin
+  platform-admin-ee
+  org-management
+  core-announcement
+  core-aurabot
+  agent-control-plane
+  marketplace-server
+  portal
+  connectors
+  compliance
+  ai-employees
+  crm
+  showcase
+  asset-management
+  workflow-demo
+  dual-prevention
+  product-catalog
+  project-management
+  pcba-crm
+  finance
+  inventory
+  quality
+  annual-plan
+  construction-process
+  contract-cost
+  doc-knowledge
+  quarry-industry
+  sales
+  procurement
+  indirect-procurement
+  source-to-pay
+  production
+  maintenance
+  logistics
+  jiejia-integration
+  jiejia-ai-bom-quote
+  jiejia-portal
+  tax-compliance
+  pcba-base
+  pcba-industry
+  pcba-solution
+  pcba-procurement
+  pcba-sales
+  pcba-manufacturing
+  pcba-warehouse
+  pcba-compliance
+  pcba-finance
+  sales-templates
+  quarry-solution
+  d7-knowledge-wiki
+  dev-pipeline
+  growth
+  jiejia-solution
+)
+
 if [ "${#PLUGINS[@]}" -eq 0 ]; then
     case "$PROFILE" in
         default) PLUGINS=("${DEFAULT_PLUGINS[@]}") ;;
         pcba-agent) PLUGINS=("${PCBA_AGENT_PLUGINS[@]}") ;;
+        enterprise-demo) PLUGINS=("${ENTERPRISE_DEMO_PLUGINS[@]}") ;;
         *) echo "ERROR: unknown profile: $PROFILE" >&2; exit 2 ;;
     esac
 fi
 
 echo "Importing plugins into $PROJECT_NAME ($BACKEND_URL)"
+echo "Profile: $PROFILE; edition: $EDITION"
 echo "Plugins (${#PLUGINS[@]}): ${PLUGINS[*]}"
 
 health="$(NO_PROXY=localhost curl -s "$BACKEND_URL/actuator/health" 2>/dev/null || echo '{}')"
@@ -176,14 +250,27 @@ fi
 
 container_plugin_path() {
     local plugin="$1"
-    if docker exec "$BACKEND_CONTAINER" sh -lc "[ -f /app/plugins/$plugin/plugin.json ]" >/dev/null 2>&1; then
-        printf '/app/plugins/%s\n' "$plugin"
-        return 0
-    fi
-    if docker exec "$BACKEND_CONTAINER" sh -lc "[ -f /app/plugins-enterprise/$plugin/plugin.json ]" >/dev/null 2>&1; then
-        printf '/app/plugins-enterprise/%s\n' "$plugin"
-        return 0
-    fi
+    case "$EDITION" in
+        oss)
+            if docker exec "$BACKEND_CONTAINER" sh -lc "[ -f /app/plugins/$plugin/plugin.json ]" >/dev/null 2>&1; then
+                printf '/app/plugins/%s\n' "$plugin"
+                return 0
+            fi
+            ;;
+        auto|enterprise)
+            # Match enterprise reset-and-init.sh precedence: when an enterprise
+            # plugin shadows an OSS template name, import the enterprise
+            # solution variant.
+            if docker exec "$BACKEND_CONTAINER" sh -lc "[ -f /app/plugins-enterprise/$plugin/plugin.json ]" >/dev/null 2>&1; then
+                printf '/app/plugins-enterprise/%s\n' "$plugin"
+                return 0
+            fi
+            if docker exec "$BACKEND_CONTAINER" sh -lc "[ -f /app/plugins/$plugin/plugin.json ]" >/dev/null 2>&1; then
+                printf '/app/plugins/%s\n' "$plugin"
+                return 0
+            fi
+            ;;
+    esac
     return 1
 }
 

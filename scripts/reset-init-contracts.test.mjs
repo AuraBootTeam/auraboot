@@ -14,7 +14,9 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/oss-reset-and-init\.sh/);
   assert.match(gate, /bash -n scripts\/reset-db\.sh/);
   assert.match(gate, /bash -n scripts\/seed-marketplace\.sh/);
+  assert.match(gate, /bash -n scripts\/sync-marketplace-catalog\.sh/);
   assert.match(gate, /bash -n scripts\/docker-ga-e2e-bootstrap\.sh/);
+  assert.match(gate, /bash -n scripts\/env\/reset-and-init\.sh/);
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
   assert.match(gate, /node web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
 });
@@ -56,17 +58,38 @@ test('OSS reset script fails fast and delegates showcase seeds through the order
 
 test('OSS marketplace seed is env-aware and writes the catalog to the system tenant', () => {
   const seed = read('scripts/seed-marketplace.sh');
+  const sync = read('scripts/sync-marketplace-catalog.sh');
 
   assert.match(seed, /set -euo pipefail/);
-  assert.match(seed, /PLUGIN_DIRS="\$\{PLUGIN_DIRS:-\$PLUGINS_DIR\}"/);
-  assert.match(seed, /SYSTEM_TENANT_ID="\$\{SYSTEM_TENANT_ID:-1\}"/);
-  assert.match(seed, /PG_HOST:-localhost/);
-  assert.match(seed, /PG_PORT:-5432/);
-  assert.match(seed, /PG_DB:-aura_boot/);
-  assert.match(seed, /PG_USER:-\$\{USER:-ghj\}/);
-  assert.match(seed, /-v ON_ERROR_STOP=1/);
-  assert.match(seed, /tenant_id = \$SYSTEM_TENANT_ID/);
-  assert.match(seed, /WHERE tenant_id = \$SYSTEM_TENANT_ID/);
+  assert.match(seed, /deprecated name/);
+  assert.match(seed, /exec "\$SCRIPT_DIR\/sync-marketplace-catalog\.sh" "\$@"/);
+
+  assert.match(sync, /PLUGIN_DIRS="\$\{PLUGIN_DIRS:-\$PLUGINS_DIR\}"/);
+  assert.match(sync, /SYSTEM_TENANT_ID="\$\{SYSTEM_TENANT_ID:-1\}"/);
+  assert.match(sync, /PG_HOST:-localhost/);
+  assert.match(sync, /PG_PORT:-5432/);
+  assert.match(sync, /PG_DB:-aura_boot/);
+  assert.match(sync, /PG_USER:-\$\{USER:-ghj\}/);
+  assert.match(sync, /-v ON_ERROR_STOP=1/);
+  assert.match(sync, /tenant_id = \$SYSTEM_TENANT_ID/);
+  assert.match(sync, /WHERE tenant_id = \$SYSTEM_TENANT_ID/);
+});
+
+test('normalized reset entrypoint makes product runtime and profile explicit', () => {
+  const script = read('scripts/env/reset-and-init.sh');
+
+  assert.match(script, /--product=oss\|enterprise/);
+  assert.match(script, /--runtime=host\|docker/);
+  assert.match(script, /--profile=<name>/);
+  assert.match(script, /oss:docker\) PROFILE="e2e"/);
+  assert.match(script, /enterprise:docker\) PROFILE="enterprise-demo"/);
+  assert.match(script, /oss:host/);
+  assert.match(script, /oss:docker/);
+  assert.match(script, /enterprise:host/);
+  assert.match(script, /enterprise:docker/);
+  assert.match(script, /scripts\/dev\/import-isolated-plugins\.sh/);
+  assert.match(script, /import_profile="enterprise-demo"/);
+  assert.match(script, /--edition=enterprise/);
 });
 
 test('showcase CRM opportunity seeds send date-only values to DATE fields', () => {
