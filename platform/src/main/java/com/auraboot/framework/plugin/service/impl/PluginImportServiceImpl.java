@@ -617,7 +617,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         String importId = UlidGenerator.generate();
-        Long tenantId = MetaContext.getCurrentTenantId();
+        Long tenantId = requireTenantContextForImport();
 
         // Create import history record
         PluginImportHistory history = PluginImportHistory.builder()
@@ -735,6 +735,17 @@ public class PluginImportServiceImpl implements PluginImportService {
             importHistoryMapper.markFailed(importId, rootErrorMessage(e), getStackTrace(e));
             throw e;
         }
+    }
+
+    private Long requireTenantContextForImport() {
+        if (!MetaContext.exists()) {
+            throw new PluginException("Tenant context is required for plugin import");
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new PluginException("Tenant context is required for plugin import");
+        }
+        return tenantId;
     }
 
     private void generateChangePreview(PluginManifestExtended manifest, ImportPreviewResult result, PluginRecord existing) {
