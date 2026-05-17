@@ -102,6 +102,18 @@ export_docker_proxy_defaults() {
   fi
 }
 
+sync_marketplace_catalog() {
+  local catalog_root="$1"
+  local pg_port="$2"
+
+  PG_HOST=localhost \
+  PG_PORT="$pg_port" \
+  PG_USER="${PG_USER:-auraboot}" \
+  PG_DB="${PG_DB:-aura_boot}" \
+  PGPASSWORD="${PGPASSWORD:-auraboot_dev}" \
+    "$catalog_root/scripts/sync-marketplace-catalog.sh"
+}
+
 case "$PRODUCT:$RUNTIME" in
   oss:host)
     exec "$PROJECT_ROOT/scripts/oss-reset-and-init.sh"
@@ -117,12 +129,7 @@ case "$PRODUCT:$RUNTIME" in
     GA_E2E_FRONTEND_IMAGE="${GA_E2E_FRONTEND_IMAGE:-node:22-bookworm-slim}" \
       "$PROJECT_ROOT/scripts/docker-ga-e2e-up.sh"
     "$PROJECT_ROOT/scripts/docker-ga-e2e-bootstrap.sh"
-    PG_HOST=localhost \
-    PG_PORT=5433 \
-    PG_USER="${PG_USER:-auraboot}" \
-    PG_DB="${PG_DB:-aura_boot}" \
-    PGPASSWORD="${PGPASSWORD:-auraboot_dev}" \
-      "$PROJECT_ROOT/scripts/sync-marketplace-catalog.sh"
+    sync_marketplace_catalog "$PROJECT_ROOT" 5433
     ;;
 
   enterprise:host)
@@ -160,11 +167,6 @@ case "$PRODUCT:$RUNTIME" in
       --slug="$SLUG" \
       --profile="$import_profile" \
       --edition=enterprise
-    PG_HOST=localhost \
-    PG_PORT="$PG_PORT" \
-    PG_USER="${PG_USER:-auraboot}" \
-    PG_DB="${PG_DB:-aura_boot}" \
-    PGPASSWORD="${PGPASSWORD:-auraboot_dev}" \
-      "$enterprise_root/scripts/sync-marketplace-catalog.sh"
+    sync_marketplace_catalog "$enterprise_root" "$PG_PORT"
     ;;
 esac
