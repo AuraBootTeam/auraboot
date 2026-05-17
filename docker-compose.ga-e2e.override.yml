@@ -161,6 +161,7 @@ services:
       HTTPS_PROXY: ${AURA_DOCKER_HTTPS_PROXY:-}
       npm_config_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
       npm_config_https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
+      npm_config_registry: ${AURA_DOCKER_NPM_REGISTRY:-}
     volumes:
       # Bind-mount the whole repo so workspace deps + plugins resolve and
       # hot-reload works the same way as host-mode dev.
@@ -229,6 +230,7 @@ services:
       HTTPS_PROXY: ${AURA_DOCKER_HTTPS_PROXY:-}
       npm_config_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
       npm_config_https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
+      npm_config_registry: ${AURA_DOCKER_NPM_REGISTRY:-}
     volumes:
       - ./:/repo:cached
       - ga_e2e_runner_node_modules:/repo/node_modules

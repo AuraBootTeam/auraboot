@@ -61,6 +61,13 @@ ensure_pnpm() {
   fi
 
   pnpm config set store-dir "$PNPM_STORE"
+  if [[ -n "${npm_config_registry:-}" ]]; then
+    pnpm config set registry "$npm_config_registry"
+  fi
+  pnpm config set fetch-retries "${PNPM_FETCH_RETRIES:-5}"
+  pnpm config set fetch-retry-factor "${PNPM_FETCH_RETRY_FACTOR:-2}"
+  pnpm config set fetch-retry-mintimeout "${PNPM_FETCH_RETRY_MIN_TIMEOUT:-10000}"
+  pnpm config set fetch-retry-maxtimeout "${PNPM_FETCH_RETRY_MAX_TIMEOUT:-120000}"
 }
 
 dependency_fingerprint() {
