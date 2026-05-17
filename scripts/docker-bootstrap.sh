@@ -3,7 +3,7 @@
 #
 # Prerequisites:
 #   - Docker backend container healthy at BACKEND_URL (default: http://localhost:16443)
-#   - Admin user already bootstrapped (AURABOOT_BOOTSTRAP_ENABLED=true did its job)
+#   - Admin user already bootstrapped through /api/bootstrap/setup
 #   - plugins/ directory mounted into the container at /app/plugins
 #     → the OSS docker-compose.e2e.override.yml provides this mount.
 #

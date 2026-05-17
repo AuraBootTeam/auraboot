@@ -106,14 +106,9 @@ services:
       # in the same compose project network).
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      # Phase 2.4 of bootstrap-unified: removed the
-      # AURABOOT_BOOTSTRAP_ENABLED=false override. The Phase 2.3
-      # BootstrapStartupRunner is idempotent and produces the same
-      # 9-invariant state as /api/bootstrap/setup (System + Business
-      # tenant + platform_admin role + grant), so isolated stacks can
-      # auto-bootstrap on first start just like the host stack. The
-      # tests/api/setup/00-bootstrap.spec.ts contract test still runs as
-      # an idempotent verification of the 9 invariants.
+      # Bootstrap is initialized explicitly by reset/init tooling through
+      # /api/bootstrap/setup. Application startup must not repair or write
+      # bootstrap data implicitly.
       # Activate `test` profile alongside `community` so test-only beans
       # register on the isolated stack:
       #   - TestUserSpoofFilter (X-Test-Spoof-User-Id header support)
@@ -181,6 +176,13 @@ services:
       PUPPETEER_SKIP_DOWNLOAD: "true"
       OSS_PLUGIN_ROOT: /app/plugins
       ENTERPRISE_PLUGIN_ROOT: /app/plugins-enterprise
+      http_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
+      https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
+      HTTP_PROXY: ${AURA_DOCKER_HTTP_PROXY:-}
+      HTTPS_PROXY: ${AURA_DOCKER_HTTPS_PROXY:-}
+      npm_config_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
+      npm_config_https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
+      npm_config_registry: ${AURA_DOCKER_NPM_REGISTRY:-}
     volumes:
       - ./:/repo:cached
       # Keep Linux node_modules project-local for correctness, but share the
@@ -194,15 +196,8 @@ services:
     command: >-
       sh -c "
       set -e;
-      if command -v pnpm >/dev/null 2>&1; then
-        pnpm --version;
-      else
-        corepack enable;
-        corepack prepare pnpm@9 --activate;
-      fi;
-      cd /repo;
-      pnpm install --no-frozen-lockfile --prefer-offline;
-      cd web-admin;
+      bash /repo/scripts/ga-e2e-prepare-deps.sh /repo;
+      cd /repo/web-admin;
       sh ../scripts/sync-platform-plugins.sh;
       node ../scripts/generate-plugin-routes.mjs;
       pnpm exec concurrently --names 'web,bff' --prefix-colors 'cyan,green' --restart-tries 5 --restart-after 2000 'pnpm dev:web' 'pnpm dev:bff'
@@ -242,6 +237,13 @@ services:
       no_proxy: "localhost,127.0.0.1,backend"
       PUPPETEER_SKIP_DOWNLOAD: "true"
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+      http_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
+      https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
+      HTTP_PROXY: ${AURA_DOCKER_HTTP_PROXY:-}
+      HTTPS_PROXY: ${AURA_DOCKER_HTTPS_PROXY:-}
+      npm_config_proxy: ${AURA_DOCKER_HTTP_PROXY:-}
+      npm_config_https_proxy: ${AURA_DOCKER_HTTPS_PROXY:-}
+      npm_config_registry: ${AURA_DOCKER_NPM_REGISTRY:-}
     depends_on:
       backend:
         condition: service_healthy
@@ -317,15 +319,8 @@ services:
     command: >-
       sh -c "
       set -e;
-      if command -v pnpm >/dev/null 2>&1; then
-        pnpm --version;
-      else
-        corepack enable;
-        corepack prepare pnpm@9 --activate;
-      fi;
-      cd /repo;
-      pnpm install --no-frozen-lockfile --prefer-offline;
-      cd web-admin;
+      bash /repo/scripts/ga-e2e-prepare-deps.sh /repo;
+      cd /repo/web-admin;
       mkdir -p \"$$PW_ARTIFACT_DIR\" \"$$PW_REPORT_DIR\" \"$$(dirname \"$$PW_RESULTS_JSON\")\" \"$$PW_STORAGE_DIR\";
       pnpm exec playwright install chromium;
       sh -c \"${PLAYWRIGHT_RUNNER_COMMAND:-pnpm exec playwright test -c playwright.noweb.config.ts --reporter=line}\"

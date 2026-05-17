@@ -13,7 +13,6 @@ auraboot:
   # Community startup must not repair/bootstrap data implicitly.
   # Use the explicit setup flow or reset-and-init.sh to initialize a database.
   bootstrap:
-    enabled: ${AURABOOT_BOOTSTRAP_ENABLED:false}
     # Phase 3: community profile defaults demo-seed ON for showcase parity.
     demo-seed: ${AURABOOT_DEMO_SEED:true}
 

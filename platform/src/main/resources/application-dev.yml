@@ -23,7 +23,6 @@
 # initialization writer; startup only logs missing bootstrap state.
 auraboot:
   bootstrap:
-    enabled: ${AURABOOT_BOOTSTRAP_ENABLED:false}
     # Phase 3: dev profile defaults demo-seed to true so `gradlew bootRun` gets
     # the demo plugin set (showcase / crm-starter / agent-control-plane / workflow-demo).
     # Override with AURABOOT_DEMO_SEED=false to opt out.

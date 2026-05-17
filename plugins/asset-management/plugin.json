@@ -1,5 +1,6 @@
 {
   "pluginId": "com.auraboot.template.asset-management",
+  "edition": "oss",
   "namespace": "tasset",
   "version": "1.0.0",
   "dslVersion": 1,

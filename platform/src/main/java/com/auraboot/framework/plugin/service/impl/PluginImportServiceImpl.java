@@ -617,7 +617,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         }
 
         String importId = UlidGenerator.generate();
-        Long tenantId = MetaContext.getCurrentTenantId();
+        Long tenantId = requireTenantContextForImport();
 
         // Create import history record
         PluginImportHistory history = PluginImportHistory.builder()
@@ -643,8 +643,9 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         importHistoryMapper.insert(history);
 
-        // Remove JSON comment objects (entries with only _-prefixed fields) before validation
-        manifest.sanitize();
+        try {
+            // Remove JSON comment objects (entries with only _-prefixed fields) before validation
+            manifest.sanitize();
 
         // Validate manifest — separate [WARN]-prefixed soft warnings from hard errors
         List<String> allValidationMessages = validateManifest(manifest);
@@ -729,7 +730,22 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Cache the context
         importContextCache.put(importId, new ImportContext(manifest, history, result));
 
-        return result;
+            return result;
+        } catch (Exception e) {
+            importHistoryMapper.markFailed(importId, rootErrorMessage(e), getStackTrace(e));
+            throw e;
+        }
+    }
+
+    private Long requireTenantContextForImport() {
+        if (!MetaContext.exists()) {
+            throw new PluginException("Tenant context is required for plugin import");
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new PluginException("Tenant context is required for plugin import");
+        }
+        return tenantId;
     }
 
     private void generateChangePreview(PluginManifestExtended manifest, ImportPreviewResult result, PluginRecord existing) {
@@ -2770,6 +2786,9 @@ public class PluginImportServiceImpl implements PluginImportService {
     @Override
     public List<ImportPreviewResult.ResourceConflict> checkConflicts(PluginManifestExtended manifest) {
         List<ImportPreviewResult.ResourceConflict> conflicts = new ArrayList<>();
+        if (!MetaContext.exists()) {
+            return conflicts;
+        }
         Long tenantId = MetaContext.getCurrentTenantId();
         if (tenantId == null || manifest == null) {
             return conflicts;

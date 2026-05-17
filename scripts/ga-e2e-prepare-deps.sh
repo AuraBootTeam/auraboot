@@ -42,23 +42,32 @@ hash_stream() {
 }
 
 ensure_pnpm() {
+  install_pnpm() {
+    log "installing pnpm@$PNPM_VERSION with npm"
+    npm install -g "pnpm@$PNPM_VERSION"
+  }
+
   if command -v pnpm >/dev/null 2>&1; then
     local current
     current="$(pnpm --version 2>/dev/null || true)"
     if [[ "$current" == "$PNPM_VERSION".* ]]; then
       log "pnpm $current ready"
     else
-      log "pnpm $current present; activating pnpm@$PNPM_VERSION"
-      corepack enable
-      corepack prepare "pnpm@$PNPM_VERSION" --activate
+      log "pnpm $current present; replacing with pnpm@$PNPM_VERSION"
+      install_pnpm
     fi
   else
-    log "activating pnpm@$PNPM_VERSION"
-    corepack enable
-    corepack prepare "pnpm@$PNPM_VERSION" --activate
+    install_pnpm
   fi
 
   pnpm config set store-dir "$PNPM_STORE"
+  if [[ -n "${npm_config_registry:-}" ]]; then
+    pnpm config set registry "$npm_config_registry"
+  fi
+  pnpm config set fetch-retries "${PNPM_FETCH_RETRIES:-5}"
+  pnpm config set fetch-retry-factor "${PNPM_FETCH_RETRY_FACTOR:-2}"
+  pnpm config set fetch-retry-mintimeout "${PNPM_FETCH_RETRY_MIN_TIMEOUT:-10000}"
+  pnpm config set fetch-retry-maxtimeout "${PNPM_FETCH_RETRY_MAX_TIMEOUT:-120000}"
 }
 
 dependency_fingerprint() {

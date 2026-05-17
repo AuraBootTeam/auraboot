@@ -122,7 +122,7 @@ class PluginImportServiceImplCoreTest {
         if (MetaContext.exists()) {
             MetaContext.clear();
         }
-        MetaContext.setContext(100L, 1L, "U-1", "tester");
+        MetaContext.setContext(1L, 100L, "U-1", "tester");
     }
 
     @AfterEach
@@ -655,6 +655,30 @@ class PluginImportServiceImplCoreTest {
                 new com.auraboot.framework.plugin.dto.imports.ImportRequest()))
                 .isInstanceOfAny(PluginException.class, RootUnCheckedException.class)
                 .hasMessageContaining("validation failed");
+        verify(distributedLock, never()).tryLock(anyString(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("previewFromManifest requires tenant context before creating import history")
+    void previewFromManifest_requiresTenantContext() {
+        MetaContext.clear();
+
+        assertThatThrownBy(() -> service.previewFromManifest(baseManifest()))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("Tenant context is required for plugin import");
+        verify(importHistoryMapper, never()).insert(any(PluginImportHistory.class));
+    }
+
+    @Test
+    @DisplayName("executeFromManifest requires tenant context before creating import history")
+    void executeFromManifest_requiresTenantContext() {
+        MetaContext.clear();
+
+        assertThatThrownBy(() -> service.executeFromManifest(baseManifest(),
+                new com.auraboot.framework.plugin.dto.imports.ImportRequest()))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("Tenant context is required for plugin import");
+        verify(importHistoryMapper, never()).insert(any(PluginImportHistory.class));
         verify(distributedLock, never()).tryLock(anyString(), anyLong(), any());
     }
 

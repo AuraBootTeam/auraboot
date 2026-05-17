@@ -21,12 +21,11 @@ export default function SetupWizard() {
     adminPassword: '',
     confirmPassword: '',
     systemMode: 'single',
-    seedDemoData: true,
   });
   const [phase, setPhase] = useState<'form' | 'progress' | 'done' | 'error'>('form');
   const [progress, setProgress] = useState({
     completedSteps: 0,
-    totalSteps: 15,
+    totalSteps: 9,
     currentStep: '',
     status: '',
   });
@@ -99,7 +98,6 @@ export default function SetupWizard() {
           adminEmail: formData.adminEmail,
           adminPassword: formData.adminPassword,
           systemMode: formData.systemMode,
-          seedDemoData: formData.seedDemoData,
         }),
       });
       const result = await res.json();
@@ -190,20 +188,6 @@ export default function SetupWizard() {
                   className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
-
-              {/* Demo Data */}
-              <label className="flex cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={formData.seedDemoData}
-                  onChange={(e) => handleChange('seedDemoData', e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Load demo data{' '}
-                  <span className="text-gray-400">(recommended for first-time users)</span>
-                </span>
-              </label>
 
               {/* Advanced Settings */}
               <div>

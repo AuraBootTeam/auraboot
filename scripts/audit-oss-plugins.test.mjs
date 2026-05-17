@@ -10,6 +10,13 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(repoRoot, relativePath), 'utf8'));
 }
 
+function readPluginProfile(name) {
+  const profiles = readJson('scripts/dev/plugin-import-profiles.json');
+  const plugins = profiles[name];
+  assert.ok(Array.isArray(plugins), `${name} profile must exist.`);
+  return plugins;
+}
+
 function collectValues(value, predicate, matches = []) {
   if (Array.isArray(value)) {
     for (const item of value) collectValues(item, predicate, matches);
@@ -94,15 +101,7 @@ describe('OSS plugin config audit', () => {
   });
 
   it('orders the PCBA isolated-stack profile by plugin dependencies', () => {
-    const script = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
-    const match = script.match(/PCBA_AGENT_PLUGINS=\(\n([\s\S]*?)\n\)/);
-    assert.ok(match, 'PCBA_AGENT_PLUGINS profile must exist.');
-
-    const plugins = match[1]
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#'));
-
+    const plugins = readPluginProfile('pcba-agent');
     const indexOf = (plugin) => plugins.indexOf(plugin);
     const before = (dependency, plugin) => {
       assert.ok(indexOf(dependency) >= 0, `${dependency} must be in PCBA_AGENT_PLUGINS.`);
@@ -118,5 +117,97 @@ describe('OSS plugin config audit', () => {
     before('pcba-procurement', 'pcba-warehouse');
     before('pcba-manufacturing', 'pcba-warehouse');
     before('pcba-manufacturing', 'pcba-compliance');
+  });
+
+  it('defines an enterprise-demo isolated-stack profile without OSS demo templates', () => {
+    const plugins = readPluginProfile('enterprise-demo');
+
+    for (const forbidden of ['crm-quick-start', 'crm-starter', 'golden-path', 'hr-essentials', 'simple-inventory']) {
+      assert.equal(plugins.includes(forbidden), false, `${forbidden} must not be in enterprise-demo.`);
+    }
+
+    for (const required of ['project-management', 'crm', 'product-catalog', 'sales', 'procurement', 'pcba-solution']) {
+      assert.equal(plugins.includes(required), true, `${required} must be in enterprise-demo.`);
+    }
+  });
+
+  it('prefers enterprise plugin directories for isolated-stack name collisions', () => {
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/import-plugins.sh'), 'utf8');
+    const enterpriseBlock = script.match(/auto\|enterprise\)([\s\S]*?;;)/);
+
+    assert.match(script, /container_plugin_path\(\)/, 'container_plugin_path function must exist.');
+    assert.ok(enterpriseBlock, 'auto|enterprise edition branch must exist.');
+    assert.ok(
+      enterpriseBlock[1].indexOf('ENTERPRISE_PLUGIN_ROOT') <
+        enterpriseBlock[1].indexOf('PLUGIN_ROOT'),
+      'enterprise plugin directory must win over OSS templates for duplicate plugin names',
+    );
+  });
+
+  it('supports explicit isolated-stack edition modes', () => {
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/import-plugins.sh'), 'utf8');
+
+    assert.match(script, /--edition=auto\|oss\|enterprise/);
+    assert.match(script, /case "\$EDITION" in/);
+    assert.match(script, /auto\|oss\|enterprise/);
+    assert.match(script, /oss\)/);
+    assert.match(script, /auto\|enterprise\)/);
+  });
+
+  it('loads isolated-stack import profiles from explicit JSON config', () => {
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/import-plugins.sh'), 'utf8');
+    const wrapper = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
+    const profiles = readJson('scripts/dev/plugin-import-profiles.json');
+
+    assert.match(script, /PROFILE_CONFIG="\$PROJECT_ROOT\/scripts\/dev\/plugin-import-profiles\.json"/);
+    assert.match(script, /load_profile_plugins\(\)/);
+    assert.match(script, /while IFS= read -r plugin/);
+    assert.match(script, /PLUGINS\+=\("\$plugin"\)/);
+    assert.match(wrapper, /scripts\/import-plugins\.sh/);
+    assert.deepEqual(Object.keys(profiles).sort(), [
+      'core',
+      'default',
+      'demo',
+      'e2e',
+      'enterprise-demo',
+      'pcba-agent',
+    ]);
+  });
+
+  it('requires enterprise same-name production plugins to declare upgrade metadata', () => {
+    const enterprisePlugins = path.join(optionalEnterpriseRoot, 'plugins');
+    if (!fs.existsSync(enterprisePlugins)) return;
+
+    const ignoredDuplicateNames = new Set(['test-fixtures']);
+    const ossPluginNames = new Set(
+      fs.readdirSync(path.join(repoRoot, 'plugins')).filter((name) =>
+        fs.existsSync(path.join(repoRoot, 'plugins', name, 'plugin.json')),
+      ),
+    );
+
+    for (const name of fs.readdirSync(enterprisePlugins)) {
+      if (!ossPluginNames.has(name) || ignoredDuplicateNames.has(name)) continue;
+
+      const ossManifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'plugins', name, 'plugin.json'), 'utf8'));
+      const enterpriseManifest = JSON.parse(
+        fs.readFileSync(path.join(enterprisePlugins, name, 'plugin.json'), 'utf8'),
+      );
+
+      assert.equal(ossManifest.edition, 'oss', `${name} OSS manifest must declare edition=oss.`);
+      assert.equal(
+        enterpriseManifest.edition,
+        'enterprise',
+        `${name} enterprise manifest must declare edition=enterprise.`,
+      );
+      assert.ok(
+        Array.isArray(enterpriseManifest.upgradesFrom) &&
+          enterpriseManifest.upgradesFrom.includes(ossManifest.pluginId),
+        `${name} enterprise manifest must declare upgradesFrom ${ossManifest.pluginId}.`,
+      );
+      assert.ok(
+        Array.isArray(enterpriseManifest.replaces) && enterpriseManifest.replaces.includes(ossManifest.pluginId),
+        `${name} enterprise manifest must declare replaces ${ossManifest.pluginId}.`,
+      );
+    }
   });
 });

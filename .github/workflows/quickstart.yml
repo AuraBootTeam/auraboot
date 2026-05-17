@@ -115,6 +115,40 @@ jobs:
           docker compose logs --tail 100 backend
           exit 1
 
+      - name: Ensure default bootstrap initialized
+        if: steps.changes.outputs.run == 'true'
+        # The quickstart stack starts empty. Keep the explicit setup API as the
+        # single authority for creating the default admin + tenant.
+        run: |
+          status=$(curl -fsS -m 10 http://localhost:3000/api/bootstrap/status || echo '{}')
+          if echo "$status" | grep -q '"initialized":true'; then
+            echo "bootstrap already initialized"
+            exit 0
+          fi
+
+          set +e
+          response=$(curl -sS -m 30 -w $'\n%{http_code}' -X POST http://localhost:3000/api/bootstrap/setup \
+            -H "Content-Type: application/json" \
+            -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single"}')
+          curl_exit=$?
+          set -e
+          http_code=$(printf '%s\n' "$response" | tail -n 1)
+          body=$(printf '%s\n' "$response" | sed '$d')
+          echo "$body" | head -c 200
+          echo
+          if [ "$curl_exit" != "0" ]; then
+            echo "bootstrap setup curl failed (exit=$curl_exit http=$http_code)"
+            docker compose logs --tail 150 backend
+            docker compose logs --tail 100 frontend
+            exit 1
+          fi
+          if ! printf '%s' "$body" | grep -Eq '"success":true|"code":"0"'; then
+            echo "bootstrap setup did not report success (http=$http_code)"
+            docker compose logs --tail 150 backend
+            docker compose logs --tail 100 frontend
+            exit 1
+          fi
+
       - name: Login API contract via BFF proxy
         if: steps.changes.outputs.run == 'true'
         # End-to-end smoke: BFF /api/* proxy + backend /api/auth/login + the
