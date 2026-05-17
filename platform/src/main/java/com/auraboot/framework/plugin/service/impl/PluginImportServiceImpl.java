@@ -643,8 +643,9 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         importHistoryMapper.insert(history);
 
-        // Remove JSON comment objects (entries with only _-prefixed fields) before validation
-        manifest.sanitize();
+        try {
+            // Remove JSON comment objects (entries with only _-prefixed fields) before validation
+            manifest.sanitize();
 
         // Validate manifest — separate [WARN]-prefixed soft warnings from hard errors
         List<String> allValidationMessages = validateManifest(manifest);
@@ -729,7 +730,11 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Cache the context
         importContextCache.put(importId, new ImportContext(manifest, history, result));
 
-        return result;
+            return result;
+        } catch (Exception e) {
+            importHistoryMapper.markFailed(importId, rootErrorMessage(e), getStackTrace(e));
+            throw e;
+        }
     }
 
     private void generateChangePreview(PluginManifestExtended manifest, ImportPreviewResult result, PluginRecord existing) {
