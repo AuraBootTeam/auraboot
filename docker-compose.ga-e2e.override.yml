@@ -188,7 +188,7 @@ services:
     # Generous start period - first install can take a few minutes when the
     # node_modules volume is empty.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5173 >/dev/null 2>&1 && wget -q -O- http://127.0.0.1:3500/health >/dev/null 2>&1 || wget -q -O- http://127.0.0.1:3500 >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "node -e \"Promise.all([fetch('http://127.0.0.1:5173'), fetch('http://127.0.0.1:3500/health').catch(() => fetch('http://127.0.0.1:3500'))]).then(r => process.exit(r.every(x => x.ok || x.status < 500) ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 30
