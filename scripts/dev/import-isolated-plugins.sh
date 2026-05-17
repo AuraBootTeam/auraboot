@@ -92,6 +92,9 @@ BACKEND_URL="${BACKEND_URL:-http://localhost:${BE_PORT}}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@auraboot.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Test2026x}"
 BACKEND_CONTAINER="${PROJECT_NAME}-backend"
+POSTGRES_CONTAINER="${PROJECT_NAME}-postgres"
+DB_USER="${PG_USER:-auraboot}"
+DB_NAME="${PG_DB:-aura_boot}"
 IMPORT_ATTEMPTS="${IMPORT_ATTEMPTS:-2}"
 
 DEFAULT_PLUGINS=(
@@ -292,7 +295,11 @@ except Exception:
     print('parse-error')
     sys.exit(0)
 if d.get('success') is True:
-    print('ok')
+    plugin_id = d.get('pluginId') or d.get('data', {}).get('pluginId') or ''
+    if plugin_id:
+        print('ok\\t' + plugin_id)
+    else:
+        print('missing pluginId in import response')
 else:
     print(d.get('errorMessage') or d.get('message') or str(d)[:300])
 " 2>/dev/null || echo "$resp")"
@@ -300,6 +307,7 @@ else:
 }
 
 failures=()
+successful_plugin_ids=()
 for plugin in "${PLUGINS[@]}"; do
     if ! path="$(container_plugin_path "$plugin")"; then
         echo "  FAIL $plugin: plugin.json not found in /app/plugins or /app/plugins-enterprise"
@@ -308,6 +316,7 @@ for plugin in "${PLUGINS[@]}"; do
     fi
 
     result=""
+    imported=0
     attempt=1
     while [ "$attempt" -le "$IMPORT_ATTEMPTS" ]; do
         printf '  Importing %-24s ' "$plugin"
@@ -316,7 +325,9 @@ for plugin in "${PLUGINS[@]}"; do
         fi
 
         result="$(import_plugin_once "$path")"
-        if [ "$result" = "ok" ]; then
+        if [[ "$result" == ok$'\t'* ]]; then
+            successful_plugin_ids+=("${result#*$'\t'}")
+            imported=1
             echo "OK ($path)"
             break
         fi
@@ -328,15 +339,57 @@ for plugin in "${PLUGINS[@]}"; do
         attempt=$((attempt + 1))
     done
 
-    if [ "$result" != "ok" ]; then
+    if [ "$imported" -ne 1 ]; then
         failures+=("$plugin: $result")
     fi
 done
+
+verify_latest_import_statuses() {
+    local plugin_id values_sql failed_rows
+
+    if [ "${#successful_plugin_ids[@]}" -eq 0 ]; then
+        echo "ERROR: no successful plugin IDs were captured for latest-status verification" >&2
+        return 1
+    fi
+
+    values_sql=""
+    for plugin_id in "${successful_plugin_ids[@]}"; do
+        if [[ ! "$plugin_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "ERROR: unsafe pluginId returned by import API: $plugin_id" >&2
+            return 1
+        fi
+        values_sql="${values_sql}('$plugin_id'),"
+    done
+    values_sql="${values_sql%,}"
+
+    failed_rows="$(docker exec "$POSTGRES_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -Atc "
+with expected(plugin_id) as (values $values_sql),
+latest as (
+  select distinct on (plugin_id) plugin_id, status
+  from ab_plugin_import_history
+  where plugin_id in (select plugin_id from expected)
+  order by plugin_id, id desc
+)
+select e.plugin_id || '|' || coalesce(l.status, 'missing')
+from expected e
+left join latest l using (plugin_id)
+where coalesce(l.status, 'missing') != 'success'
+" 2>/dev/null || true)"
+
+    if [ -n "$failed_rows" ]; then
+        while IFS='|' read -r plugin_id status; do
+            echo "ERROR: $plugin_id latest import status is not success: $status" >&2
+        done <<< "$failed_rows"
+        return 1
+    fi
+}
 
 if [ "${#failures[@]}" -gt 0 ]; then
     echo "ERROR: ${#failures[@]} plugin import(s) failed:" >&2
     printf '  - %s\n' "${failures[@]}" >&2
     exit 1
 fi
+
+verify_latest_import_statuses
 
 echo "Plugin import complete."

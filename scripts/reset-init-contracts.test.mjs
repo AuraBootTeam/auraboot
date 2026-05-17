@@ -107,6 +107,16 @@ test('isolated plugin import retries each plugin before importing dependents', (
   assert.match(script, /failures\+=\("\$plugin: \$result"\)/);
 });
 
+test('isolated plugin import validates latest import state instead of whole history', () => {
+  const script = read('scripts/dev/import-isolated-plugins.sh');
+
+  assert.match(script, /successful_plugin_ids=\(\)/);
+  assert.match(script, /verify_latest_import_statuses\(\)/);
+  assert.match(script, /distinct on \(plugin_id\)/);
+  assert.match(script, /latest import status is not success/);
+  assert.doesNotMatch(script, /where status <> 'success'/i);
+});
+
 test('showcase CRM opportunity seeds send date-only values to DATE fields', () => {
   for (const file of [
     'web-admin/tests/api/setup/seed-showcase-data.spec.ts',
