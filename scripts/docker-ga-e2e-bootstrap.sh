@@ -174,7 +174,7 @@ provision_user "e2e-operator@test.com" "Test2026x" "operator"
 provision_user "e2e-viewer@test.com"   "Test2026x" "viewer"
 
 # 3b. Ensure admin@auraboot.com is a member of a "System" (platform) tenant.
-# The auraboot bootstrap only seeds a single business tenant ("AuraBoot Demo"),
+# The auraboot bootstrap seeds the configured business tenant ("AuraBoot Dev"),
 # but the space-selection E2E suite (and any UI flow that surfaces a Platform
 # Console toggle) requires admin to belong to BOTH a platform tenant (named
 # "System" — see TenantSelectionController.getMySpaces logic) and a business
