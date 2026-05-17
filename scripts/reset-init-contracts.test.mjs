@@ -91,6 +91,7 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /registry\.npmmirror\.com/);
   assert.match(script, /docker-ga-e2e-down\.sh" --purge/);
   assert.match(script, /GA_E2E_FRONTEND_IMAGE="\$\{GA_E2E_FRONTEND_IMAGE:-node:22-bookworm-slim\}"/);
+  assert.match(script, /PG_PORT=5433[\s\S]*sync-marketplace-catalog\.sh/);
   assert.match(script, /enterprise:host/);
   assert.match(script, /enterprise:docker/);
   assert.match(script, /stop-isolated\.sh" --slug="\$SLUG" --purge/);

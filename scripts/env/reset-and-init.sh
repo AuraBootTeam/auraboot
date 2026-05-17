@@ -117,6 +117,12 @@ case "$PRODUCT:$RUNTIME" in
     GA_E2E_FRONTEND_IMAGE="${GA_E2E_FRONTEND_IMAGE:-node:22-bookworm-slim}" \
       "$PROJECT_ROOT/scripts/docker-ga-e2e-up.sh"
     "$PROJECT_ROOT/scripts/docker-ga-e2e-bootstrap.sh"
+    PG_HOST=localhost \
+    PG_PORT=5433 \
+    PG_USER="${PG_USER:-auraboot}" \
+    PG_DB="${PG_DB:-aura_boot}" \
+    PGPASSWORD="${PGPASSWORD:-auraboot_dev}" \
+      "$PROJECT_ROOT/scripts/sync-marketplace-catalog.sh"
     ;;
 
   enterprise:host)
