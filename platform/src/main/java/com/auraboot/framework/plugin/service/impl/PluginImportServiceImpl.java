@@ -2775,6 +2775,9 @@ public class PluginImportServiceImpl implements PluginImportService {
     @Override
     public List<ImportPreviewResult.ResourceConflict> checkConflicts(PluginManifestExtended manifest) {
         List<ImportPreviewResult.ResourceConflict> conflicts = new ArrayList<>();
+        if (!MetaContext.exists()) {
+            return conflicts;
+        }
         Long tenantId = MetaContext.getCurrentTenantId();
         if (tenantId == null || manifest == null) {
             return conflicts;

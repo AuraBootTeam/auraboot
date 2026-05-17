@@ -26,13 +26,13 @@ public class PluginException extends RootUnCheckedException {
     }
 
     public PluginException(String message, Throwable cause) {
-        super(ResponseCode.BUSINESS_ERROR, cause);
+        super(ResponseCode.BUSINESS_ERROR, message, cause);
         this.pluginId = null;
         this.namespace = null;
     }
 
     public PluginException(String message, String pluginId, String namespace, Throwable cause) {
-        super(ResponseCode.BUSINESS_ERROR, cause);
+        super(ResponseCode.BUSINESS_ERROR, message, cause);
         this.pluginId = pluginId;
         this.namespace = namespace;
     }
