@@ -97,6 +97,9 @@ export_docker_proxy_defaults() {
   if [ -n "$host_https" ] && [ -z "${AURA_DOCKER_HTTPS_PROXY:-}" ]; then
     export AURA_DOCKER_HTTPS_PROXY="${host_https/127.0.0.1/host.docker.internal}"
   fi
+  if [ -z "${AURA_DOCKER_NPM_REGISTRY:-}" ]; then
+    export AURA_DOCKER_NPM_REGISTRY="${npm_config_registry:-https://registry.npmmirror.com}"
+  fi
 }
 
 case "$PRODUCT:$RUNTIME" in
