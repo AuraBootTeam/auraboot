@@ -34,5 +34,11 @@ public class RootUnCheckedException extends RuntimeException{
         this.context = context;
     }
 
+    public RootUnCheckedException(ResponseCode responseCode, Object context, Throwable cause) {
+        super(context.toString(), cause);
+
+        this.responseCode = responseCode;
+        this.context = context;
+    }
 
 }

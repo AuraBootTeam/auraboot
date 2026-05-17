@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Extended plugin manifest that includes full configuration data for import.
@@ -603,22 +604,31 @@ public class PluginManifestExtended extends PluginManifest {
      * These are a common JSON documentation pattern but are not valid resource definitions.
      */
     public void sanitize() {
-        if (models != null) models.removeIf(m -> isCommentObject(m.getCode(), m.getUnknownFields()));
-        if (fields != null) fields.removeIf(f -> isCommentObject(f.getCode(), f.getUnknownFields()));
-        if (modelFieldBindings != null) modelFieldBindings.removeIf(b -> isCommentObject(b.getModelCode(), b.getUnknownFields()));
-        if (commands != null) commands.removeIf(c -> isCommentObject(c.getCode(), c.getUnknownFields()));
-        if (bindingRules != null) bindingRules.removeIf(r -> isCommentObject(r.getCommandCode(), r.getUnknownFields()));
-        if (permissions != null) permissions.removeIf(p -> isCommentObject(p.getCode(), p.getUnknownFields()));
-        if (roles != null) roles.removeIf(r -> isCommentObject(r.getCode(), r.getUnknownFields()));
-        if (menus != null) menus.removeIf(m -> isCommentObject(m.getCode(), m.getUnknownFields()));
-        if (processes != null) processes.removeIf(p -> isCommentObject(p.getKey(), p.getUnknownFields()));
-        if (pages != null) pages.removeIf(p -> isCommentObject(p.getPageKey(), p.getUnknownFields()));
-        if (dicts != null) dicts.removeIf(d -> isCommentObject(d.getCode(), d.getUnknownFields()));
-        if (namedQueries != null) namedQueries.removeIf(n -> isCommentObject(n.getCode(), n.getUnknownFields()));
-        if (agentDefinitions != null) agentDefinitions.removeIf(a -> isCommentObject(a.getAgentCode(), a.getUnknownFields()));
-        if (savedViews != null) savedViews.removeIf(s -> isCommentObject(s.getUniqueKey(), s.getUnknownFields()));
-        if (dashboards != null) dashboards.removeIf(d -> isCommentObject(d.getCode(), d.getUnknownFields()));
-        if (i18nResources != null) i18nResources.removeIf(i -> i.getKey() == null || i.getKey().isBlank());
+        models = sanitized(models, m -> isCommentObject(m.getCode(), m.getUnknownFields()));
+        fields = sanitized(fields, f -> isCommentObject(f.getCode(), f.getUnknownFields()));
+        modelFieldBindings = sanitized(modelFieldBindings, b -> isCommentObject(b.getModelCode(), b.getUnknownFields()));
+        commands = sanitized(commands, c -> isCommentObject(c.getCode(), c.getUnknownFields()));
+        bindingRules = sanitized(bindingRules, r -> isCommentObject(r.getCommandCode(), r.getUnknownFields()));
+        permissions = sanitized(permissions, p -> isCommentObject(p.getCode(), p.getUnknownFields()));
+        roles = sanitized(roles, r -> isCommentObject(r.getCode(), r.getUnknownFields()));
+        menus = sanitized(menus, m -> isCommentObject(m.getCode(), m.getUnknownFields()));
+        processes = sanitized(processes, p -> isCommentObject(p.getKey(), p.getUnknownFields()));
+        pages = sanitized(pages, p -> isCommentObject(p.getPageKey(), p.getUnknownFields()));
+        dicts = sanitized(dicts, d -> isCommentObject(d.getCode(), d.getUnknownFields()));
+        namedQueries = sanitized(namedQueries, n -> isCommentObject(n.getCode(), n.getUnknownFields()));
+        agentDefinitions = sanitized(agentDefinitions, a -> isCommentObject(a.getAgentCode(), a.getUnknownFields()));
+        savedViews = sanitized(savedViews, s -> isCommentObject(s.getUniqueKey(), s.getUnknownFields()));
+        dashboards = sanitized(dashboards, d -> isCommentObject(d.getCode(), d.getUnknownFields()));
+        i18nResources = sanitized(i18nResources, i -> i.getKey() == null || i.getKey().isBlank());
+    }
+
+    private static <T> List<T> sanitized(List<T> source, Predicate<T> shouldRemove) {
+        if (source == null) {
+            return null;
+        }
+        List<T> result = new ArrayList<>(source);
+        result.removeIf(shouldRemove);
+        return result;
     }
 
     /**
@@ -633,8 +643,9 @@ public class PluginManifestExtended extends PluginManifest {
         if (unknownFields != null && !unknownFields.isEmpty()) {
             return unknownFields.keySet().stream().allMatch(k -> k.startsWith("_"));
         }
-        // No identifier and no data at all → empty/invalid object, also filter out
-        return true;
+        // No identifier and no unknown metadata means this is an invalid resource
+        // object, not a comment. Keep it so validation can report missing fields.
+        return false;
     }
 
     // ==================== Nested Classes ====================
