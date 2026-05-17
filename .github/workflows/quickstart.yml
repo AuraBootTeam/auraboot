@@ -126,17 +126,28 @@ jobs:
             exit 0
           fi
 
-          response=$(curl -fsS -m 30 -X POST http://localhost:3000/api/bootstrap/setup \
+          set +e
+          response=$(curl -sS -m 180 -w $'\n%{http_code}' -X POST http://localhost:3000/api/bootstrap/setup \
             -H "Content-Type: application/json" \
             -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single","seedDemoData":true}')
-          echo "$response" | head -c 200
+          curl_exit=$?
+          set -e
+          http_code=$(printf '%s\n' "$response" | tail -n 1)
+          body=$(printf '%s\n' "$response" | sed '$d')
+          echo "$body" | head -c 200
           echo
-          echo "$response" | grep -Eq '"success":true|"code":"0"' || {
-            echo "bootstrap setup did not report success"
+          if [ "$curl_exit" != "0" ]; then
+            echo "bootstrap setup curl failed (exit=$curl_exit http=$http_code)"
             docker compose logs --tail 150 backend
             docker compose logs --tail 100 frontend
             exit 1
-          }
+          fi
+          if ! printf '%s' "$body" | grep -Eq '"success":true|"code":"0"'; then
+            echo "bootstrap setup did not report success (http=$http_code)"
+            docker compose logs --tail 150 backend
+            docker compose logs --tail 100 frontend
+            exit 1
+          fi
 
       - name: Login API contract via BFF proxy
         if: steps.changes.outputs.run == 'true'

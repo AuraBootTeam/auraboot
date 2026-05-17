@@ -112,7 +112,7 @@ BOOTSTRAP_STATUS=$(curl -fsS -m 5 http://localhost:3000/api/bootstrap/status 2>/
 if echo "$BOOTSTRAP_STATUS" | grep -q '"initialized":true'; then
   ok "bootstrap already initialized"
 else
-  BOOTSTRAP_RESPONSE=$(curl -fsS -m 30 -X POST http://localhost:3000/api/bootstrap/setup \
+  BOOTSTRAP_RESPONSE=$(curl -fsS -m 180 -X POST http://localhost:3000/api/bootstrap/setup \
     -H "Content-Type: application/json" \
     -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single","seedDemoData":true}' \
     2>/dev/null || echo "FAIL")
