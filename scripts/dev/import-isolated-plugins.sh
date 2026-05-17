@@ -24,9 +24,7 @@ Usage: $0 [--slug=<name>] [--profile=default|pcba-agent|enterprise-demo] [--edit
 
 Options:
   --slug=<name>      Isolated stack slug. Defaults to current branch slug.
-  --profile=<name>   Plugin import profile. pcba-agent imports the minimum
-                     OSS + enterprise plugins needed by the PCBA agent E2E.
-                     enterprise-demo imports the enterprise reset/demo plugin set.
+  --profile=<name>   Plugin import profile from scripts/dev/plugin-import-profiles.json.
   --edition=<mode>   Plugin root selection mode:
                        auto       prefer enterprise root when it exists (default)
                        oss        only import from /app/plugins
@@ -96,112 +94,33 @@ POSTGRES_CONTAINER="${PROJECT_NAME}-postgres"
 DB_USER="${PG_USER:-auraboot}"
 DB_NAME="${PG_DB:-aura_boot}"
 IMPORT_ATTEMPTS="${IMPORT_ATTEMPTS:-2}"
+PROFILE_CONFIG="$PROJECT_ROOT/scripts/dev/plugin-import-profiles.json"
 
-DEFAULT_PLUGINS=(
-  core-meta
-  core-bpm
-  core-announcement
-  core-aurabot
-  page-manager
-  platform-admin
-  org-management
-  agent-control-plane
-)
+load_profile_plugins() {
+    local profile="$1"
+    python3 - "$PROFILE_CONFIG" "$profile" <<'PY'
+import json
+import sys
 
-PCBA_AGENT_PLUGINS=(
-  core-meta
-  core-bpm
-  core-announcement
-  core-aurabot
-  page-manager
-  platform-admin
-  org-management
-  agent-control-plane
-  product-catalog
-  crm
-  inventory
-  finance
-  sales
-  quality
-  procurement
-  pcba-base
-  pcba-crm
-  pcba-solution
-  pcba-industry
-  pcba-procurement
-  pcba-sales
-  pcba-manufacturing
-  pcba-warehouse
-  pcba-finance
-  pcba-compliance
-)
+config_path, profile = sys.argv[1], sys.argv[2]
+with open(config_path, encoding='utf-8') as f:
+    profiles = json.load(f)
 
-ENTERPRISE_DEMO_PLUGINS=(
-  core-meta
-  core-bpm
-  page-manager
-  platform-admin
-  platform-admin-ee
-  org-management
-  core-announcement
-  core-aurabot
-  agent-control-plane
-  marketplace-server
-  portal
-  connectors
-  compliance
-  ai-employees
-  crm
-  showcase
-  asset-management
-  workflow-demo
-  dual-prevention
-  product-catalog
-  project-management
-  pcba-crm
-  finance
-  inventory
-  quality
-  annual-plan
-  construction-process
-  contract-cost
-  doc-knowledge
-  quarry-industry
-  sales
-  procurement
-  indirect-procurement
-  source-to-pay
-  production
-  maintenance
-  logistics
-  jiejia-integration
-  jiejia-ai-bom-quote
-  jiejia-portal
-  tax-compliance
-  pcba-base
-  pcba-industry
-  pcba-solution
-  pcba-procurement
-  pcba-sales
-  pcba-manufacturing
-  pcba-warehouse
-  pcba-compliance
-  pcba-finance
-  sales-templates
-  quarry-solution
-  d7-knowledge-wiki
-  dev-pipeline
-  growth
-  jiejia-solution
-)
+plugins = profiles.get(profile)
+if not isinstance(plugins, list) or any(not isinstance(item, str) or not item for item in plugins):
+    known = ', '.join(sorted(profiles))
+    print(f"ERROR: unknown or invalid profile: {profile}. Known profiles: {known}", file=sys.stderr)
+    sys.exit(2)
+
+for plugin in plugins:
+    print(plugin)
+PY
+}
 
 if [ "${#PLUGINS[@]}" -eq 0 ]; then
-    case "$PROFILE" in
-        default) PLUGINS=("${DEFAULT_PLUGINS[@]}") ;;
-        pcba-agent) PLUGINS=("${PCBA_AGENT_PLUGINS[@]}") ;;
-        enterprise-demo) PLUGINS=("${ENTERPRISE_DEMO_PLUGINS[@]}") ;;
-        *) echo "ERROR: unknown profile: $PROFILE" >&2; exit 2 ;;
-    esac
+    while IFS= read -r plugin; do
+        PLUGINS+=("$plugin")
+    done < <(load_profile_plugins "$PROFILE")
 fi
 
 echo "Importing plugins into $PROJECT_NAME ($BACKEND_URL)"
