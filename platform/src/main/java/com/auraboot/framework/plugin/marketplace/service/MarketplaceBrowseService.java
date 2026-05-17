@@ -145,6 +145,35 @@ public class MarketplaceBrowseService {
         return plugins.stream().map(p -> toDTO(p, installedMap.get(p.getPid()), directMap.get(p.getPluginId()), categoryMap.get(p.getCategoryCode()))).collect(Collectors.toList());
     }
 
+    public List<MarketplacePluginDTO> getUpgrades() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            return List.of();
+        }
+
+        List<MarketplacePlugin> plugins = SystemTenantContextExecutor.executeAsSystem(pluginMapper::findPublished);
+        Map<String, MarketplaceInstall> installedMap = new HashMap<>();
+        installMapper.findByTenant(tenantId).forEach(i -> installedMap.put(i.getMarketplacePluginPid(), i));
+
+        Map<String, PluginRecord> directInstalledMap = new HashMap<>();
+        pluginRecordMapper.findByTenant().forEach(pr -> directInstalledMap.put(pr.getPluginId(), pr));
+
+        Map<String, MarketplaceCategory> categoryMap = new HashMap<>();
+        SystemTenantContextExecutor.executeAsSystem(() -> categoryMapper.findAll())
+            .forEach(c -> categoryMap.put(c.getCode(), c));
+
+        return plugins.stream()
+                .filter(p -> {
+                    MarketplaceInstall mpInstall = installedMap.get(p.getPid());
+                    PluginRecord directInstall = directInstalledMap.get(p.getPluginId());
+                    String installedVersion = mpInstall != null ? mpInstall.getInstalledVersion()
+                            : (directInstall != null ? directInstall.getVersion() : null);
+                    return installedVersion != null && compareVersions(p.getLatestVersion(), installedVersion) > 0;
+                })
+                .map(p -> toDTO(p, installedMap.get(p.getPid()), directInstalledMap.get(p.getPluginId()), categoryMap.get(p.getCategoryCode())))
+                .collect(Collectors.toList());
+    }
+
     public List<MarketplaceCategory> getCategories() {
         return SystemTenantContextExecutor.executeAsSystem(() -> categoryMapper.findAll());
     }
@@ -220,6 +249,43 @@ public class MarketplaceBrowseService {
             return objectMapper.readValue(json, new TypeReference<List<String>>() {});
         } catch (Exception e) {
             return List.of();
+        }
+    }
+
+    private int compareVersions(String left, String right) {
+        if (Objects.equals(left, right)) return 0;
+        String[] leftParts = normalizeVersion(left).split("\\.");
+        String[] rightParts = normalizeVersion(right).split("\\.");
+        int max = Math.max(leftParts.length, rightParts.length);
+        for (int i = 0; i < max; i++) {
+            int l = i < leftParts.length ? parseVersionPart(leftParts[i]) : 0;
+            int r = i < rightParts.length ? parseVersionPart(rightParts[i]) : 0;
+            if (l != r) {
+                return Integer.compare(l, r);
+            }
+        }
+        return 0;
+    }
+
+    private String normalizeVersion(String version) {
+        if (version == null || version.isBlank()) {
+            return "0";
+        }
+        String normalized = version.trim();
+        return normalized.startsWith("v") || normalized.startsWith("V")
+                ? normalized.substring(1)
+                : normalized;
+    }
+
+    private int parseVersionPart(String part) {
+        String digits = part == null ? "" : part.replaceFirst("[^0-9].*$", "");
+        if (digits.isBlank()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            return 0;
         }
     }
 }
