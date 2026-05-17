@@ -3,6 +3,5 @@
   "adminEmail": "admin@auraboot.com",
   "adminPassword": "Test2026x",
   "adminDisplayName": "Admin",
-  "systemMode": "single",
-  "seedDemoData": true
+  "systemMode": "single"
 }

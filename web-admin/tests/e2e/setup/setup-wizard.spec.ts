@@ -5,7 +5,7 @@
  *
  * Coverage dimensions:
  *   D1  Page Load          — /setup loads with correct form fields
- *   D5  Form Field Types   — email input, password inputs, checkbox, radio
+ *   D5  Form Field Types   — email input, password inputs, radio
  *   D12 Form Validation    — empty submit, invalid email, short password, mismatch
  *   D14 Toast / Feedback   — error messages appear inline
  *
@@ -64,7 +64,6 @@ test.describe('Setup Wizard', () => {
         adminEmail: 'test@example.com',
         adminPassword: 'Test12345678',
         systemMode: 'single',
-        seedDemoData: false,
       },
     });
 
@@ -105,10 +104,9 @@ test.describe('Setup Wizard', () => {
     await expect(passwordInputs.nth(0)).toHaveAttribute('placeholder', 'At least 8 characters');
     await expect(passwordInputs.nth(1)).toHaveAttribute('placeholder', 'Re-enter your password');
 
-    // Demo data checkbox
-    await expect(page.getByText('Load demo data')).toBeVisible();
-    const checkbox = page.locator('input[type="checkbox"]');
-    await expect(checkbox).toBeChecked(); // default is true
+    // Demo data import is owned by reset/init scripts, not by the setup wizard.
+    await expect(page.getByText('Load demo data')).not.toBeVisible();
+    await expect(page.locator('input[type="checkbox"]')).toHaveCount(0);
 
     // Advanced Settings toggle
     await expect(page.getByText('Advanced Settings')).toBeVisible();

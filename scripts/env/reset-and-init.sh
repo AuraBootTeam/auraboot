@@ -16,7 +16,7 @@ usage() {
 Usage: scripts/env/reset-and-init.sh --product=oss|enterprise --runtime=host|docker [options]
 
 Options:
-  --profile=<name>  dev, e2e, showcase, demo, or enterprise-demo (default: dev)
+  --profile=<name>  core, demo, e2e, showcase, enterprise-demo, or pcba-agent (default depends on product/runtime)
   --slug=<name>     Docker isolated stack slug (default depends on product/profile)
   --dry-run         Print the resolved plan without executing it
 
@@ -114,8 +114,36 @@ sync_marketplace_catalog() {
     "$catalog_root/scripts/sync-marketplace-catalog.sh"
 }
 
+resolve_enterprise_root() {
+  if [ -n "${AURA_ENTERPRISE_ROOT:-}" ]; then
+    if [ -f "$AURA_ENTERPRISE_ROOT/plugins/platform-admin-ee/plugin.json" ]; then
+      (cd "$AURA_ENTERPRISE_ROOT" && pwd)
+      return
+    fi
+    echo "ERROR: AURA_ENTERPRISE_ROOT does not look like a full enterprise repo: $AURA_ENTERPRISE_ROOT" >&2
+    exit 1
+  fi
+
+  local candidate
+  for candidate in \
+    "$PROJECT_ROOT/../auraboot-enterprise" \
+    "$PROJECT_ROOT/../../auraboot-enterprise"
+  do
+    if [ -f "$candidate/plugins/platform-admin-ee/plugin.json" ]; then
+      (cd "$candidate" && pwd)
+      return
+    fi
+  done
+
+  echo "ERROR: could not locate full enterprise repo. Set AURA_ENTERPRISE_ROOT=/path/to/auraboot-enterprise." >&2
+  exit 1
+}
+
 case "$PRODUCT:$RUNTIME" in
   oss:host)
+    if [ "$PROFILE" != "dev" ]; then
+      export PLUGIN_IMPORT_PROFILE="${PLUGIN_IMPORT_PROFILE:-$PROFILE}"
+    fi
     exec "$PROJECT_ROOT/scripts/oss-reset-and-init.sh"
     ;;
 
@@ -133,17 +161,13 @@ case "$PRODUCT:$RUNTIME" in
     ;;
 
   enterprise:host)
-    enterprise_root="${AURA_ENTERPRISE_ROOT:-$PROJECT_ROOT/../auraboot-enterprise}"
+    enterprise_root="$(resolve_enterprise_root)"
     exec "$enterprise_root/scripts/reset-and-init.sh"
     ;;
 
   enterprise:docker)
     export_docker_proxy_defaults
-    enterprise_root="${AURA_ENTERPRISE_ROOT:-$PROJECT_ROOT/../auraboot-enterprise}"
-    if [ ! -d "$enterprise_root/plugins" ]; then
-      echo "ERROR: enterprise plugin root not found: $enterprise_root/plugins" >&2
-      exit 1
-    fi
+    enterprise_root="$(resolve_enterprise_root)"
     "$PROJECT_ROOT/scripts/dev/stop-isolated.sh" --slug="$SLUG" --purge || true
     echo "[enterprise-docker] building backend jar on host with Gradle cache..."
     (cd "$PROJECT_ROOT/platform" && ./gradlew bootJar --no-daemon -x test)
@@ -157,13 +181,14 @@ case "$PRODUCT:$RUNTIME" in
     source "$env_file"
     curl -fsS --noproxy localhost -X POST "http://localhost:${BE_PORT}/api/bootstrap/setup" \
       -H 'Content-Type: application/json' \
-      -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single","seedDemoData":true}' >/dev/null
+      -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single"}' >/dev/null
     import_profile="$PROFILE"
     case "$import_profile" in
       dev|demo|enterprise-demo) import_profile="enterprise-demo" ;;
-      *) echo "ERROR: enterprise docker reset currently supports --profile=dev, demo, or enterprise-demo" >&2; exit 2 ;;
+      core|pcba-agent) ;;
+      *) echo "ERROR: enterprise docker reset currently supports --profile=dev, demo, core, enterprise-demo, or pcba-agent" >&2; exit 2 ;;
     esac
-    "$PROJECT_ROOT/scripts/dev/import-isolated-plugins.sh" \
+    "$PROJECT_ROOT/scripts/import-plugins.sh" \
       --slug="$SLUG" \
       --profile="$import_profile" \
       --edition=enterprise

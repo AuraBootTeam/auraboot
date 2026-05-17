@@ -172,6 +172,15 @@ scripts/import-plugins.sh \
 | Mobile E2E bootstrap | 删除内置插件数组，复用统一 profile，移动端只保留自己的 seed/校验步骤。 |
 | Setup Wizard | 只提交基础 bootstrap 字段；移除或隐藏 `Load demo data`，demo 导入作为后续明确动作处理。 |
 
+当前 OSS 实现状态：
+
+- `scripts/import-plugins.sh` 已成为统一插件导入执行器。
+- `scripts/dev/import-isolated-plugins.sh` 仅保留为旧名兼容 wrapper。
+- `core` / `demo` / `e2e` / `enterprise-demo` / `pcba-agent` profile 已写入 `scripts/dev/plugin-import-profiles.json`；`default` 仅保留为 deprecated alias。
+- `/api/bootstrap/setup` 已收窄为最小系统初始化，不再调用 built-in plugin import，也不再消费 `seedDemoData` 执行 demo seed。
+- Quickstart workflow 和 Setup Wizard 不再传 `seedDemoData`。
+- OSS Docker reset 与 Enterprise Docker reset 已通过统一导入脚本验证。企业仓路径解析会优先使用 `AURA_ENTERPRISE_ROOT`，否则在 side-by-side checkout 与 `.worktrees/<branch>` checkout 两类目录结构中查找完整企业仓，并要求找到 `plugins/platform-admin-ee/plugin.json`。
+
 ## 迁移计划
 
 1. 收窄 backend `/api/bootstrap/setup`：移除 `executeRuntimeSetup` 里的 built-in plugin import 调用，保留基础 bootstrap 与 progress/finalize。

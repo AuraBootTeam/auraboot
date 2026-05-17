@@ -132,20 +132,20 @@ describe('OSS plugin config audit', () => {
   });
 
   it('prefers enterprise plugin directories for isolated-stack name collisions', () => {
-    const script = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/import-plugins.sh'), 'utf8');
     const enterpriseBlock = script.match(/auto\|enterprise\)([\s\S]*?;;)/);
 
     assert.match(script, /container_plugin_path\(\)/, 'container_plugin_path function must exist.');
     assert.ok(enterpriseBlock, 'auto|enterprise edition branch must exist.');
     assert.ok(
-      enterpriseBlock[1].indexOf('/app/plugins-enterprise/$plugin/plugin.json') <
-        enterpriseBlock[1].indexOf('/app/plugins/$plugin/plugin.json'),
+      enterpriseBlock[1].indexOf('ENTERPRISE_PLUGIN_ROOT') <
+        enterpriseBlock[1].indexOf('PLUGIN_ROOT'),
       'enterprise plugin directory must win over OSS templates for duplicate plugin names',
     );
   });
 
   it('supports explicit isolated-stack edition modes', () => {
-    const script = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/import-plugins.sh'), 'utf8');
 
     assert.match(script, /--edition=auto\|oss\|enterprise/);
     assert.match(script, /case "\$EDITION" in/);
@@ -155,14 +155,23 @@ describe('OSS plugin config audit', () => {
   });
 
   it('loads isolated-stack import profiles from explicit JSON config', () => {
-    const script = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/import-plugins.sh'), 'utf8');
+    const wrapper = fs.readFileSync(path.join(repoRoot, 'scripts/dev/import-isolated-plugins.sh'), 'utf8');
     const profiles = readJson('scripts/dev/plugin-import-profiles.json');
 
     assert.match(script, /PROFILE_CONFIG="\$PROJECT_ROOT\/scripts\/dev\/plugin-import-profiles\.json"/);
     assert.match(script, /load_profile_plugins\(\)/);
     assert.match(script, /while IFS= read -r plugin/);
     assert.match(script, /PLUGINS\+=\("\$plugin"\)/);
-    assert.deepEqual(Object.keys(profiles).sort(), ['default', 'enterprise-demo', 'pcba-agent']);
+    assert.match(wrapper, /scripts\/import-plugins\.sh/);
+    assert.deepEqual(Object.keys(profiles).sort(), [
+      'core',
+      'default',
+      'demo',
+      'e2e',
+      'enterprise-demo',
+      'pcba-agent',
+    ]);
   });
 
   it('requires enterprise same-name production plugins to declare upgrade metadata', () => {

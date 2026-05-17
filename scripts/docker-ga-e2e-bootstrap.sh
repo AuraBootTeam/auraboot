@@ -10,57 +10,21 @@
 # This script idempotently fills the gap. Safe to re-run after `docker-ga-e2e-up.sh`.
 #
 # Usage:
-#   ./scripts/docker-ga-e2e-bootstrap.sh                    # default plugin set
+#   ./scripts/docker-ga-e2e-bootstrap.sh                    # e2e plugin profile
+#   PLUGIN_IMPORT_PROFILE=demo ./scripts/docker-ga-e2e-bootstrap.sh
 #   PLUGINS="showcase workflow-demo" ./scripts/docker-ga-e2e-bootstrap.sh
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Default plugin set: dependency-ordered minimum that the showcase + workflow-
-# demo + page-designer regression suites need. Extend by exporting PLUGINS or
-# editing this list.
-DEFAULT_PLUGINS=(
-  # Layer 0 — no inter-plugin deps; the core platform plugins go first
-  # so anything declaring `requires: core-*` resolves on the next pass.
-  core-meta
-  core-bpm
-  core-announcement
-  core-aurabot
-  org-management
-  agent-control-plane
-  platform-admin
-  page-manager
-  golden-path
-  showcase
-  asset-management
-  project-management
-  # Layer 1 — depend on layer 0
-  crm-starter
-  crm-quick-start
-  hr-essentials
-  simple-inventory
-  workflow-demo
-  # acp-showcase removed: plugin directory was deleted on commit 59050eed
-  # (platformization) and now contains only scripts/ — no plugin.json. Bootstrap
-  # would always fail with "Directory does not contain plugin.json".
-  #
-  # test-fixtures provides the e2et_* model/page/command set that ~100+ specs
-  # depend on (action-system, activity, data-tools, permission, saved-view, …).
-  # Backend gates the plugin loader behind IMPORT_TEST_FIXTURES=true (set in
-  # docker-compose.ga-e2e.override.yml) so this only resolves when run against
-  # a stack that has the env var; on host bootRun without the flag, the import
-  # api call returns "plugin not allowed".
-  test-fixtures
-)
-PLUGINS=( ${PLUGINS:-${DEFAULT_PLUGINS[@]}} )
-
 API_BASE="http://localhost:6444"
 ADMIN_EMAIL="admin@auraboot.com"
 ADMIN_PASSWORD="Test2026x"
+PLUGIN_IMPORT_PROFILE="${PLUGIN_IMPORT_PROFILE:-e2e}"
 
 echo "[ga-e2e-bootstrap] target stack: $API_BASE"
-echo "[ga-e2e-bootstrap] plugins (${#PLUGINS[@]}): ${PLUGINS[*]}"
+echo "[ga-e2e-bootstrap] plugin profile: $PLUGIN_IMPORT_PROFILE"
 
 ensure_bootstrap_initialized() {
   local status initialized resp body http_code ok
@@ -89,8 +53,7 @@ print('yes' if isinstance(data, dict) and data.get('initialized') is True else '
       \"adminEmail\":\"$ADMIN_EMAIL\",
       \"adminPassword\":\"$ADMIN_PASSWORD\",
       \"adminDisplayName\":\"Admin User\",
-      \"systemMode\":\"single\",
-      \"seedDemoData\":true
+      \"systemMode\":\"single\"
     }")
   http_code=$(printf '%s\n' "$resp" | tail -n 1)
   body=$(printf '%s\n' "$resp" | sed '$d')
@@ -118,6 +81,25 @@ print('yes' if success else 'no')
 }
 
 ensure_bootstrap_initialized
+
+echo "[ga-e2e-bootstrap] importing OSS plugins via scripts/import-plugins.sh..."
+plugin_import_args=(
+  --profile="$PLUGIN_IMPORT_PROFILE"
+  --edition=oss
+  --backend-url="$API_BASE"
+  --plugin-root=/app/plugins
+)
+if [ -n "${PLUGINS:-}" ]; then
+  # shellcheck disable=SC2206
+  explicit_plugins=( ${PLUGINS} )
+  plugin_import_args+=("${explicit_plugins[@]}")
+fi
+PGHOST=localhost \
+PGPORT=5433 \
+PGUSER=auraboot \
+PGDATABASE=aura_boot \
+PGPASSWORD=auraboot_dev \
+  "$PWD/scripts/import-plugins.sh" "${plugin_import_args[@]}"
 
 # 1. Login as admin -> JWT
 JWT=$(NO_PROXY=localhost curl -fsS -X POST "$API_BASE/api/auth/login" \
@@ -154,49 +136,7 @@ print('yes' if d.get('code') == '0' and d.get('data') else 'no')
 "
 }
 
-# 2. Import each plugin via import-directory-sync.
-# The backend container mounts the host's `./plugins` at /app/plugins:ro,
-# so plugin paths inside the container are /app/plugins/<name>.
-import_failures=()
-for plugin in "${PLUGINS[@]}"; do
-  if [ ! -d "plugins/$plugin" ]; then
-    echo "  [skip] plugins/$plugin not found in this worktree"
-    import_failures+=("$plugin (missing)")
-    continue
-  fi
-  echo -n "  Importing $plugin ... "
-  resp=$(api_post "/api/plugins/import/import-directory-sync" \
-    "{\"path\":\"/app/plugins/$plugin\",\"overwrite\":true}")
-  status=$(printf '%s' "$resp" | python3 -c "
-import sys, json
-try:
-    d = json.loads(sys.stdin.read())
-except Exception:
-    print('parse-error'); sys.exit(0)
-if isinstance(d, dict):
-    if d.get('success') is True:
-        print('ok')
-    elif d.get('errorMessage'):
-        print('err:' + d['errorMessage'][:100])
-    elif d.get('code') == '0':
-        print('ok')
-    else:
-        print('err:' + str(d.get('message', d))[:100])
-else:
-    print('err:unexpected-shape')
-")
-  case "$status" in
-    ok) echo "OK" ;;
-    *)  echo "FAIL ($status)"; import_failures+=("$plugin: $status") ;;
-  esac
-done
-
-if [ "${#import_failures[@]}" -gt 0 ]; then
-  echo "[ga-e2e-bootstrap] WARNING: ${#import_failures[@]} plugin(s) failed:"
-  printf '  - %s\n' "${import_failures[@]}"
-fi
-
-# 3. Provision operator / viewer test users (idempotent — backend rejects
+# 2. Provision operator / viewer test users (idempotent — backend rejects
 # duplicate emails with a 4xx that we treat as success).
 provision_user() {
   local email="$1" pwd="$2" role="$3"
