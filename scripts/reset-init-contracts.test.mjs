@@ -89,9 +89,10 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /host\.docker\.internal/);
   assert.match(script, /AURA_DOCKER_NPM_REGISTRY/);
   assert.match(script, /registry\.npmmirror\.com/);
+  assert.match(script, /sync_marketplace_catalog\(\)/);
   assert.match(script, /docker-ga-e2e-down\.sh" --purge/);
   assert.match(script, /GA_E2E_FRONTEND_IMAGE="\$\{GA_E2E_FRONTEND_IMAGE:-node:22-bookworm-slim\}"/);
-  assert.match(script, /PG_PORT=5433[\s\S]*sync-marketplace-catalog\.sh/);
+  assert.match(script, /sync_marketplace_catalog "\$PROJECT_ROOT" 5433/);
   assert.match(script, /enterprise:host/);
   assert.match(script, /enterprise:docker/);
   assert.match(script, /stop-isolated\.sh" --slug="\$SLUG" --purge/);
@@ -101,8 +102,8 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /scripts\/dev\/import-isolated-plugins\.sh/);
   assert.match(script, /import_profile="enterprise-demo"/);
   assert.match(script, /--edition=enterprise/);
-  assert.match(script, /sync-marketplace-catalog\.sh/);
-  assert.match(script, /PG_PORT="\$PG_PORT"/);
+  assert.match(script, /sync_marketplace_catalog "\$enterprise_root" "\$PG_PORT"/);
+  assert.match(script, /PG_PORT="\$pg_port"/);
   assert.match(script, /PGPASSWORD="\$\{PGPASSWORD:-auraboot_dev\}"/);
 });
 
