@@ -71,6 +71,12 @@ class AutoPermissionAssignmentServiceTest {
 
         service.autoAssignPermissions("tcrm_lead", "tcrm", 123L);
 
+        ArgumentCaptor<Permission> permissionCaptor = ArgumentCaptor.forClass(Permission.class);
+        verify(permissionMapper, org.mockito.Mockito.times(4)).insert(permissionCaptor.capture());
+        assertThat(permissionCaptor.getAllValues())
+                .extracting(Permission::getDeletedFlag)
+                .containsOnly(false);
+
         verify(roleService).findByTenantId(123L);
 
         ArgumentCaptor<RolePermission> bindingCaptor = ArgumentCaptor.forClass(RolePermission.class);
