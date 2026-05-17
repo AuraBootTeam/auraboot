@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @SuppressWarnings("java/spring-disabled-csrf-protection")
@@ -34,6 +35,25 @@ public class MarketplaceInstallController {
             request = new MarketplaceInstallRequest();
         }
         return ApiResponse.ok(installService.install(pluginId, request));
+    }
+
+    @PostMapping("/plugins/{pluginId}/upgrade/preview")
+    @Operation(summary = "Preview a marketplace plugin upgrade")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
+    public ApiResponse<Map<String, Object>> previewUpgrade(@PathVariable String pluginId) {
+        return ApiResponse.ok(installService.previewUpgrade(pluginId));
+    }
+
+    @PostMapping("/plugins/{pluginId}/upgrade")
+    @Operation(summary = "Upgrade a plugin from marketplace")
+    @SuppressWarnings("java/csrf-unprotected-request-type")
+    public ApiResponse<ImportExecuteResult> upgrade(
+            @PathVariable String pluginId,
+            @RequestBody(required = false) MarketplaceInstallRequest request) {
+        if (request == null) {
+            request = new MarketplaceInstallRequest();
+        }
+        return ApiResponse.ok(installService.upgrade(pluginId, request));
     }
 
     // codeql[java/csrf-unprotected-request-type] Read-only JWT API; CSRF is disabled centrally for stateless bearer-token authentication.

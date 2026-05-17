@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.entitlement.spi.EntitlementChecker;
 import com.auraboot.framework.entitlement.spi.EntitlementProvisioner;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
+import com.auraboot.framework.plugin.entity.PluginRecord;
+import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
@@ -13,6 +15,7 @@ import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.plugin.marketplace.entity.*;
 import com.auraboot.framework.plugin.marketplace.mapper.*;
 import com.auraboot.framework.plugin.service.PluginImportService;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +39,7 @@ public class MarketplaceInstallService {
     private final MarketplaceCategoryMapper categoryMapper;
     private final PluginImportService pluginImportService;
     private final ObjectMapper objectMapper;
+    private final PluginRecordMapper pluginRecordMapper;
     private final EntitlementChecker entitlementChecker;
     private final EntitlementProvisioner entitlementProvisioner;
     private final MarketplacePaidService marketplacePaidService;
@@ -90,16 +94,7 @@ public class MarketplaceInstallService {
         }
 
         // Build import request
-        ImportRequest importRequest = new ImportRequest();
-        try {
-            importRequest.setConflictStrategy(ImportRequest.ConflictStrategy.valueOf(request.getConflictStrategy()));
-        } catch (IllegalArgumentException e) {
-            importRequest.setConflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE);
-        }
-        importRequest.setAutoPublishModels(request.isAutoPublishModels());
-        importRequest.setAutoPublishFields(request.isAutoPublishFields());
-        importRequest.setAutoPublishCommands(request.isAutoPublishCommands());
-        importRequest.setAutoPublishPages(request.isAutoPublishPages());
+        ImportRequest importRequest = buildImportRequest(request);
 
         // Execute import via existing PluginImportService
         ImportExecuteResult result = pluginImportService.executeFromManifest(manifest, importRequest);
@@ -118,27 +113,89 @@ public class MarketplaceInstallService {
                     .build();
             installMapper.insert(install);
 
-            // Create entitlement based on license mode
-            if (entitlementChecker.isEnabled()) {
-                String licenseMode = mpPlugin.getLicenseMode() != null ? mpPlugin.getLicenseMode() : "free";
-                if ("free".equals(licenseMode)) {
-                    entitlementProvisioner.createFreeEntitlement(tenantId, pluginId);
-                } else if ("platform".equals(licenseMode)) {
-                    // Auto-start trial if eligible, otherwise entitlement requires admin grant or license token
-                    if (entitlementProvisioner.isEligibleForTrial(tenantId, pluginId)) {
-                        entitlementProvisioner.grantTrial(tenantId, pluginId);
-                        log.info("Auto-started trial for PLATFORM plugin {} tenant {}", pluginId, tenantId);
-                    } else {
-                        log.info("PLATFORM plugin {} installed for tenant {} — requires license activation", pluginId, tenantId);
-                    }
-                }
-                // VENDOR mode: no auto-entitlement, requires vendor-issued license token
-            }
+            provisionEntitlementAfterInstall(tenantId, mpPlugin);
 
             // Update install counts — G2 table, system tenant context
             SystemTenantContextExecutor.runAsSystem(() -> pluginMapper.incrementInstallCount(mpPlugin.getPid()));
 
             log.info("Marketplace plugin installed: {} v{} for tenant {}", pluginId, version.getVersion(), tenantId);
+        }
+
+        return result;
+    }
+
+    public Map<String, Object> previewUpgrade(String pluginId) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context required for upgrade preview");
+        }
+
+        UpgradeTarget target = resolveUpgradeTarget(pluginId, tenantId);
+        ensureUpgradeAvailable(target);
+
+        Map<String, Object> preview = new LinkedHashMap<>();
+        preview.put("success", true);
+        preview.put("pluginId", target.marketplacePlugin().getPluginId());
+        preview.put("upgradeFromPluginId", target.sourcePluginId());
+        preview.put("installedVersion", target.installedVersion());
+        preview.put("latestVersion", target.version().getVersion());
+        preview.put("upgradeType", target.isReplacementUpgrade() ? "replacement" : "version");
+        return preview;
+    }
+
+    @Transactional
+    public ImportExecuteResult upgrade(String pluginId, MarketplaceInstallRequest request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context required for upgrade");
+        }
+        if (request == null) {
+            request = new MarketplaceInstallRequest();
+        }
+
+        UpgradeTarget target = resolveUpgradeTarget(pluginId, tenantId);
+        ensureUpgradeAvailable(target);
+        enforceLicenseBeforeInstall(tenantId, target.marketplacePlugin(), target.version(), request);
+
+        PluginManifestExtended manifest;
+        try {
+            manifest = objectMapper.readValue(target.version().getManifestSnapshot(), PluginManifestExtended.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse manifest snapshot: " + e.getMessage());
+        }
+
+        ImportRequest importRequest = buildImportRequest(request);
+        ImportExecuteResult result = pluginImportService.executeFromManifest(manifest, importRequest);
+
+        if (result.isSuccess()) {
+            if (target.marketplaceInstall() != null) {
+                installMapper.updateInstalledVersion(
+                        tenantId,
+                        target.marketplacePlugin().getPid(),
+                        target.version().getPid(),
+                        target.version().getVersion()
+                );
+            } else {
+                MarketplaceInstall install = MarketplaceInstall.builder()
+                        .pid(UlidGenerator.nextULID())
+                        .tenantId(tenantId)
+                        .marketplacePluginPid(target.marketplacePlugin().getPid())
+                        .marketplaceVersionPid(target.version().getPid())
+                        .pluginPid(result.getPluginPid())
+                        .installedVersion(target.version().getVersion())
+                        .installedAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                installMapper.insert(install);
+                SystemTenantContextExecutor.runAsSystem(
+                        () -> pluginMapper.incrementInstallCount(target.marketplacePlugin().getPid()));
+            }
+
+            if (target.marketplaceInstall() == null) {
+                provisionEntitlementAfterInstall(tenantId, target.marketplacePlugin());
+            }
+            log.info("Marketplace plugin upgraded: {} from {} to {} for tenant {}",
+                    pluginId, target.installedVersion(), target.version().getVersion(), tenantId);
         }
 
         return result;
@@ -220,6 +277,142 @@ public class MarketplaceInstallService {
         return install(pluginId, request);
     }
 
+    private ImportRequest buildImportRequest(MarketplaceInstallRequest request) {
+        ImportRequest importRequest = new ImportRequest();
+        try {
+            importRequest.setConflictStrategy(ImportRequest.ConflictStrategy.valueOf(request.getConflictStrategy()));
+        } catch (IllegalArgumentException e) {
+            importRequest.setConflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE);
+        }
+        importRequest.setAutoPublishModels(request.isAutoPublishModels());
+        importRequest.setAutoPublishFields(request.isAutoPublishFields());
+        importRequest.setAutoPublishCommands(request.isAutoPublishCommands());
+        importRequest.setAutoPublishPages(request.isAutoPublishPages());
+        return importRequest;
+    }
+
+    private UpgradeTarget resolveUpgradeTarget(String pluginId, Long tenantId) {
+        MarketplacePlugin mpPlugin = SystemTenantContextExecutor.executeAsSystem(
+                () -> pluginMapper.findByPluginId(pluginId));
+        if (mpPlugin == null) {
+            throw new RuntimeException("Plugin not found in marketplace: " + pluginId);
+        }
+        if (!StatusConstants.PUBLISHED.equals(mpPlugin.getStatus())) {
+            throw new RuntimeException("Plugin is not published: " + pluginId);
+        }
+
+        MarketplaceVersion version = SystemTenantContextExecutor.executeAsSystem(
+                () -> versionMapper.findLatestPublished(mpPlugin.getPid()));
+        if (version == null) {
+            throw new RuntimeException("No published version available");
+        }
+
+        MarketplaceInstall marketplaceInstall = installMapper.findByTenantAndPlugin(tenantId, mpPlugin.getPid());
+        if (marketplaceInstall != null) {
+            return new UpgradeTarget(
+                    mpPlugin,
+                    version,
+                    marketplaceInstall,
+                    mpPlugin.getPluginId(),
+                    marketplaceInstall.getInstalledVersion(),
+                    false
+            );
+        }
+
+        PluginRecord samePluginInstall = pluginRecordMapper.findByTenantAndPluginId(mpPlugin.getPluginId());
+        if (samePluginInstall != null) {
+            return new UpgradeTarget(
+                    mpPlugin,
+                    version,
+                    null,
+                    mpPlugin.getPluginId(),
+                    samePluginInstall.getVersion(),
+                    false
+            );
+        }
+
+        Map<String, PluginRecord> directInstallsByPluginId = new HashMap<>();
+        pluginRecordMapper.findByTenant()
+                .forEach(record -> directInstallsByPluginId.put(record.getPluginId(), record));
+        for (String sourcePluginId : getUpgradeSourcePluginIds(version, mpPlugin.getPluginId())) {
+            PluginRecord sourceInstall = directInstallsByPluginId.get(sourcePluginId);
+            if (sourceInstall != null) {
+                return new UpgradeTarget(
+                        mpPlugin,
+                        version,
+                        null,
+                        sourcePluginId,
+                        sourceInstall.getVersion(),
+                        true
+                );
+            }
+        }
+
+        throw new RuntimeException("No installed plugin can be upgraded to: " + pluginId);
+    }
+
+    private void ensureUpgradeAvailable(UpgradeTarget target) {
+        if (target.installedVersion() == null
+                || compareVersions(target.version().getVersion(), target.installedVersion()) <= 0) {
+            throw new RuntimeException("Plugin is already at the latest version: "
+                    + target.marketplacePlugin().getPluginId());
+        }
+    }
+
+    private Set<String> getUpgradeSourcePluginIds(MarketplaceVersion version, String pluginId) {
+        if (version.getManifestSnapshot() == null || version.getManifestSnapshot().isBlank()) {
+            return Set.of();
+        }
+        LinkedHashSet<String> sourcePluginIds = new LinkedHashSet<>();
+        try {
+            JsonNode manifest = objectMapper.readTree(version.getManifestSnapshot());
+            addManifestPluginIds(sourcePluginIds, manifest.get("upgradesFrom"));
+            addManifestPluginIds(sourcePluginIds, manifest.get("replaces"));
+        } catch (Exception e) {
+            log.warn("Failed to parse marketplace upgrade metadata for {}: {}", pluginId, e.getMessage());
+        }
+        sourcePluginIds.remove(pluginId);
+        return sourcePluginIds;
+    }
+
+    private void addManifestPluginIds(Set<String> target, JsonNode node) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+        if (node.isTextual() && !node.asText().isBlank()) {
+            target.add(node.asText());
+            return;
+        }
+        if (node.isArray()) {
+            for (JsonNode item : node) {
+                addManifestPluginIds(target, item);
+            }
+            return;
+        }
+        JsonNode pluginId = node.get("pluginId");
+        if (pluginId != null && pluginId.isTextual() && !pluginId.asText().isBlank()) {
+            target.add(pluginId.asText());
+        }
+    }
+
+    private void provisionEntitlementAfterInstall(Long tenantId, MarketplacePlugin mpPlugin) {
+        if (!entitlementChecker.isEnabled()) {
+            return;
+        }
+        String licenseMode = mpPlugin.getLicenseMode() != null ? mpPlugin.getLicenseMode() : "free";
+        String pluginId = mpPlugin.getPluginId();
+        if ("free".equals(licenseMode)) {
+            entitlementProvisioner.createFreeEntitlement(tenantId, pluginId);
+        } else if ("platform".equals(licenseMode)) {
+            if (entitlementProvisioner.isEligibleForTrial(tenantId, pluginId)) {
+                entitlementProvisioner.grantTrial(tenantId, pluginId);
+                log.info("Auto-started trial for PLATFORM plugin {} tenant {}", pluginId, tenantId);
+            } else {
+                log.info("PLATFORM plugin {} installed for tenant {} — requires license activation", pluginId, tenantId);
+            }
+        }
+    }
+
     private void enforceLicenseBeforeInstall(
             Long tenantId,
             MarketplacePlugin plugin,
@@ -243,4 +436,50 @@ public class MarketplaceInstallService {
                 request.getTargetInstanceUrl()
         );
     }
+
+    private int compareVersions(String left, String right) {
+        if (Objects.equals(left, right)) return 0;
+        String[] leftParts = normalizeVersion(left).split("\\.");
+        String[] rightParts = normalizeVersion(right).split("\\.");
+        int max = Math.max(leftParts.length, rightParts.length);
+        for (int i = 0; i < max; i++) {
+            int l = i < leftParts.length ? parseVersionPart(leftParts[i]) : 0;
+            int r = i < rightParts.length ? parseVersionPart(rightParts[i]) : 0;
+            if (l != r) {
+                return Integer.compare(l, r);
+            }
+        }
+        return 0;
+    }
+
+    private String normalizeVersion(String version) {
+        if (version == null || version.isBlank()) {
+            return "0";
+        }
+        String normalized = version.trim();
+        return normalized.startsWith("v") || normalized.startsWith("V")
+                ? normalized.substring(1)
+                : normalized;
+    }
+
+    private int parseVersionPart(String part) {
+        String digits = part == null ? "" : part.replaceFirst("[^0-9].*$", "");
+        if (digits.isBlank()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private record UpgradeTarget(
+            MarketplacePlugin marketplacePlugin,
+            MarketplaceVersion version,
+            MarketplaceInstall marketplaceInstall,
+            String sourcePluginId,
+            String installedVersion,
+            boolean isReplacementUpgrade
+    ) {}
 }

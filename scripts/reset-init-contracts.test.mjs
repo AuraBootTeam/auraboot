@@ -93,6 +93,11 @@ test('OSS marketplace seed is env-aware and writes the catalog to the system ten
   assert.match(sync, /-v ON_ERROR_STOP=1/);
   assert.match(sync, /tenant_id = \$SYSTEM_TENANT_ID/);
   assert.match(sync, /WHERE tenant_id = \$SYSTEM_TENANT_ID/);
+  assert.match(sync, /scanned_count=/);
+  assert.match(sync, /published_plugin_count=/);
+  assert.match(sync, /published_version_count=/);
+  assert.match(sync, /Synced marketplace catalog: scanned/);
+  assert.doesNotMatch(sync, /Seeded \$count plugins to marketplace/);
 });
 
 test('normalized reset entrypoint makes product runtime and profile explicit', () => {
@@ -241,4 +246,14 @@ test('agent runtime gate bootstraps then imports plugins before Playwright setup
     script,
     /aura_bootstrap_setup_if_needed[\s\S]*import_agent_runtime_plugins[\s\S]*run_frontend_phase "auth"/,
   );
+});
+
+test('marketplace smoke waits for API data and allows cold plugin boot latency', () => {
+  const smoke = read('web-admin/tests/e2e/marketplace/marketplace-smoke.spec.ts');
+
+  assert.match(smoke, /MARKETPLACE_API_TIMEOUT = 30000/);
+  assert.match(smoke, /MARKETPLACE_CARD_TIMEOUT = 30000/);
+  assert.match(smoke, /waitForMarketplaceListReady/);
+  assert.match(smoke, /\/api\/marketplace\/plugins/);
+  assert.doesNotMatch(smoke, /cards\.first\(\)\)\.toBeVisible\(\{ timeout: 10000 \}\)/);
 });
