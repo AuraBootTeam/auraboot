@@ -11,7 +11,7 @@
  *
  * Run AFTER seed-showcase-data.spec.ts and plugin imports:
  *   aura plugin publish plugins/showcase --yes
- *   npx playwright test seed-showcase-arsenal --config=playwright.seed.config.ts
+ *   node scripts/run-showcase-seed-sequence.mjs arsenal
  */
 
 import { test, expect } from '@playwright/test';

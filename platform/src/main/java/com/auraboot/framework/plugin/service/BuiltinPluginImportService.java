@@ -1,7 +1,8 @@
 package com.auraboot.framework.plugin.service;
 
 /**
- * Service for importing built-in plugins during tenant bootstrap.
+ * Service for importing built-in plugins when an explicit repair/admin flow
+ * asks for it.
  *
  * <p>Built-in plugins are shipped with the platform and grouped into two profiles
  * (Phase 3 of the bootstrap-unified plan):
@@ -13,11 +14,12 @@ package com.auraboot.framework.plugin.service;
  *   <li><b>demo</b> — opt-in only. Provides showcase / demo plugins
  *       ({@code crm-starter}, {@code showcase}, {@code agent-control-plane},
  *       {@code workflow-demo}).
- *       Imported only when {@code includeDemoPlugins=true} (gated by the
- *       {@code AURABOOT_DEMO_SEED} env / {@code auraboot.bootstrap.demo-seed}
- *       property at startup, or {@code BootstrapRequest.seedDemoData=true} via
- *       the wizard).</li>
+ *       Imported only when {@code includeDemoPlugins=true}.</li>
  * </ul>
+ *
+ * <p>The first-install {@code /api/bootstrap/setup} path does not call this
+ * service. Reset/init scripts import plugins through {@code scripts/import-plugins.sh}
+ * after minimal bootstrap completes.
  *
  * <p>Test-fixture plugins ({@code test-fixtures}) are NOT loaded by this service —
  * they are seeded out-of-band by the Playwright {@code 03-import-test-fixtures.spec.ts}

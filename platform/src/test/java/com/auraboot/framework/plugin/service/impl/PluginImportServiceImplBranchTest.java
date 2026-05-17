@@ -103,7 +103,7 @@ class PluginImportServiceImplBranchTest {
         if (MetaContext.exists()) {
             MetaContext.clear();
         }
-        MetaContext.setContext(100L, 1L, "U-1", "tester");
+        MetaContext.setContext(1L, 100L, "U-1", "tester");
     }
 
     @AfterEach

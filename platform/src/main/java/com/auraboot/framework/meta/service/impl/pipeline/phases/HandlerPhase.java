@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
@@ -20,6 +21,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +54,9 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private com.auraboot.framework.bpm.service.BpmIntegrationService bpmIntegrationService;
+
+    @Autowired(required = false)
+    private LlmProviderFactory llmProviderFactory;
 
     @Override public String name() { return "handler"; }
 
@@ -264,6 +269,10 @@ public class HandlerPhase implements CommandPhase {
             if (biTemporalService != null) {
                 pluginSettings.put("__biTemporalAccessor",
                         new BiTemporalAccessorImpl(biTemporalService, objectMapper));
+            }
+            if (llmProviderFactory != null) {
+                pluginSettings.put(CommandHandlerExtension.AI_PROVIDER_ACCESSOR_KEY,
+                        new LlmProviderAccessorImpl(llmProviderFactory, objectMapper, tenantId));
             }
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)

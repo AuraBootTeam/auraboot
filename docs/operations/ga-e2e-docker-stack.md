@@ -7,7 +7,7 @@ A fully isolated OSS test stack on non-default host ports. Use it when you want 
 | Service | Container | Host port → container | Notes |
 |---------|-----------|------------------------|-------|
 | postgres | `auraboot-ga-e2e-postgres` | 5433 → 5432 | pgvector/pg16 with auto schema bootstrap |
-| backend  | `auraboot-ga-e2e-backend`  | 6444 → 6443 | OSS gradle bootJar; AURABOOT_BOOTSTRAP_ENABLED=true creates admin + default tenant |
+| backend  | `auraboot-ga-e2e-backend`  | 6444 → 6443 | OSS gradle bootJar; `docker-ga-e2e-bootstrap.sh` initializes admin + default tenant through `/api/bootstrap/setup` |
 | frontend | `auraboot-ga-e2e-frontend` | 5174 → 5173 (vite) / 3501 → 3500 (BFF) | node:20-alpine; bind-mounts the worktree; runs `pnpm sync-plugins && pnpm dev:full` |
 
 All three are gated behind the `ga-e2e-stack` compose profile and a distinct `COMPOSE_PROJECT_NAME=auraboot-ga-e2e` so volumes / networks / containers do not collide with any other compose stack.

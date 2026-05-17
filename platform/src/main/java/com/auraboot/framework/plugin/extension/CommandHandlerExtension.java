@@ -36,6 +36,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for BiTemporalAccessor in the settings map. */
     String BI_TEMPORAL_ACCESSOR_KEY = "__biTemporalAccessor";
 
+    /** Well-known key for AiProviderAccessor in the settings map. */
+    String AI_PROVIDER_ACCESSOR_KEY = AiProviderAccessor.SETTINGS_KEY;
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
@@ -174,6 +177,15 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public BiTemporalAccessor biTemporalAccessor() {
             Object bta = settings != null ? settings.get(BI_TEMPORAL_ACCESSOR_KEY) : null;
             return bta instanceof BiTemporalAccessor ? (BiTemporalAccessor) bta : null;
+        }
+
+        /**
+         * Get the platform LLM provider accessor from the settings map.
+         * Returns null if the host application has no provider bridge.
+         */
+        public AiProviderAccessor aiProviderAccessor() {
+            Object accessor = settings != null ? settings.get(AI_PROVIDER_ACCESSOR_KEY) : null;
+            return accessor instanceof AiProviderAccessor ? (AiProviderAccessor) accessor : null;
         }
 
         public static Builder builder() {

@@ -1,0 +1,56 @@
+name: Reset Init Contracts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/check-reset-init-contracts.sh'
+      - 'scripts/reset-init-contracts.test.mjs'
+      - 'scripts/oss-reset-and-init.sh'
+      - 'scripts/reset-db.sh'
+      - 'scripts/seed-marketplace.sh'
+      - 'scripts/docker-ga-e2e-bootstrap.sh'
+      - 'scripts/docker-ga-showcase-e2e.sh'
+      - 'web-admin/package.json'
+      - 'web-admin/scripts/run-showcase-seed-sequence.mjs'
+      - 'web-admin/scripts/run-showcase-seed-sequence.test.mjs'
+      - '.github/workflows/reset-init-contracts.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/check-reset-init-contracts.sh'
+      - 'scripts/reset-init-contracts.test.mjs'
+      - 'scripts/oss-reset-and-init.sh'
+      - 'scripts/reset-db.sh'
+      - 'scripts/seed-marketplace.sh'
+      - 'scripts/docker-ga-e2e-bootstrap.sh'
+      - 'scripts/docker-ga-showcase-e2e.sh'
+      - 'web-admin/package.json'
+      - 'web-admin/scripts/run-showcase-seed-sequence.mjs'
+      - 'web-admin/scripts/run-showcase-seed-sequence.test.mjs'
+      - '.github/workflows/reset-init-contracts.yml'
+
+concurrency:
+  group: reset-init-contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  reset-init-contracts:
+    name: Reset Init Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Run reset/init contract gate
+        run: bash scripts/check-reset-init-contracts.sh

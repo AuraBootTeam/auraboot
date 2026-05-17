@@ -43,14 +43,15 @@ import static com.auraboot.framework.saas.executor.SystemTenantContextExecutor.S
  * {@link RepairStepResult.Status#PRESENT} (no write) or
  * {@link RepairStepResult.Status#CREATED} (created) accordingly.
  *
- * <p><b>Behavior contract</b>: this service performs the same writes that
- * {@link BootstrapEngineService#executeCoreBootstrap} did before the Phase 2.2
- * extraction, plus the runtime-layer "import builtin plugins" step. The
- * {@code BootstrapEngineService} now delegates to this service.
+ * <p><b>Behavior contract</b>: this service owns idempotent repair steps that
+ * can be invoked one-by-one by {@code BootstrapEngineService} or by explicit
+ * repair/admin flows. The first-install {@code /api/bootstrap/setup} path uses
+ * only the minimal system bootstrap steps; plugin import is a separate script
+ * responsibility.
  *
  * <p>What is <b>not</b> here (kept in {@code BootstrapEngineService}):
  * <ul>
- *   <li>{@code BootstrapEntity} progress tracking (steps 1, 2, 4, 10–14)</li>
+ *   <li>{@code BootstrapEntity} progress tracking</li>
  *   <li>{@code TenantBootstrapService.bootstrapTenant} (creates tenant-scoped
  *       roles/permissions/menus for the business tenant — heavy, owned by
  *       {@code TenantBootstrapService})</li>

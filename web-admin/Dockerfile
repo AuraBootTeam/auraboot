@@ -47,7 +47,8 @@ RUN apk add --no-cache bash
 # Install pnpm directly via npm. We avoid `corepack prepare` because it
 # probes registry.npmjs.org regardless of the npm config registry, which
 # fails on networks where only the mirror is reachable.
-RUN npm install -g pnpm@9
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g pnpm@9
 
 # 1. Workspace manifests + lockfile (cache-friendly layer).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -63,7 +64,8 @@ COPY web-admin/packages ./web-admin/packages
 #    skips the git hook install (no .git/ inside the build context).
 #    --ignore-scripts skips puppeteer's ~200MB chrome download which is
 #    only needed by tests, not the build.
-RUN HUSKY=0 pnpm install --frozen-lockfile --ignore-scripts
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    HUSKY=0 pnpm install --frozen-lockfile --ignore-scripts --store-dir /root/.local/share/pnpm/store
 
 # 4. Source needed for the web-admin build. The build script chains
 #    `pnpm sync-plugins` which reads plugins/platform/** + scripts/**.
@@ -100,7 +102,8 @@ RUN addgroup -g 1001 -S appuser && \
 
 WORKDIR /app
 
-RUN npm install -g pnpm@9
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g pnpm@9
 
 USER appuser
 
@@ -117,7 +120,8 @@ COPY --chown=appuser:appuser web-admin/packages ./web-admin/packages
 #    also strip tsx + its tsconfig-discovery internals. HUSKY=0 disables
 #    the `prepare` hook (no .git/ in the build context) and
 #    --ignore-scripts skips puppeteer's ~200MB chrome download.
-RUN HUSKY=0 pnpm install --frozen-lockfile --filter auraboot-app... --ignore-scripts
+RUN --mount=type=cache,target=/home/appuser/.local/share/pnpm/store,uid=1001,gid=1001 \
+    HUSKY=0 pnpm install --frozen-lockfile --filter auraboot-app... --ignore-scripts --store-dir /home/appuser/.local/share/pnpm/store
 
 # 3. Built application + BFF runtime source. The BFF imports are not
 #    confined to app/server/ — bff.server.ts (and its transitive deps)

@@ -11,7 +11,7 @@
  * 7. Automation execution logs (5) — via SQL
  *
  * Run AFTER seed-showcase-supplement:
- *   npx playwright test seed-showcase-commercial --config=playwright.seed.config.ts
+ *   node scripts/run-showcase-seed-sequence.mjs commercial
  *
  * Design doc: docs/strategy/05-Seed数据设计方案.md
  */
@@ -341,7 +341,11 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     const roles = ['decision_maker', 'technical', 'procurement', 'influencer'];
 
     // For each opportunity, associate 2-3 contacts from same account
-    const topOpps = opportunities.slice(0, 6);
+    const topOpps = opportunities
+      .filter((opp) =>
+        contacts.some((contact: any) => contact.crm_ct_account_id === opp.crm_opp_account_id),
+      )
+      .slice(0, 6);
     for (const opp of topOpps) {
       const accountContacts = contacts.filter(
         (c: any) => c.crm_ct_account_id === opp.crm_opp_account_id,
@@ -604,17 +608,18 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       { status: 'delivered', httpStatus: 201, month: 17, day: 7 },
     ];
 
+    let ensuredDeliveryLogs = 0;
     for (let i = 0; i < deliveryLogs.length; i++) {
       const log = deliveryLogs[i];
       const eventTs = datetimeAt(log.month, log.day);
-      const pid = `whdl_seed_${Date.now()}_${i}`;
+      const pid = `whdl_seed_${i}`;
       const sql = `
         INSERT INTO ab_webhook_delivery_log (
-          id, pid, tenant_id, subscription_pid, event_id,
+          pid, tenant_id, subscription_pid, event_id,
           request_url, request_body, response_status, response_body,
           delivery_status, retry_count, error_message, delivered_at, created_at
         ) VALUES (
-          nextval('hibernate_sequence'), '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${subPid}',
+          '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${subPid}',
           'evt_opp_stage_${Date.now()}_${i}',
           '${subUrl}',
           '{"event":"entity.updated","model":"crm_opportunity","recordId":"demo-${i}"}',
@@ -629,13 +634,11 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       `.trim();
 
       try {
-        execSync(
-          `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
-          {
-            timeout: 5000,
-            stdio: 'pipe',
-          },
-        );
+        execSync(`${PSQL_BASE} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`, {
+          timeout: 5000,
+          stdio: 'pipe',
+        });
+        ensuredDeliveryLogs += 1;
       } catch (e) {
         console.warn(
           `  Webhook delivery log ${i} insert failed: ${(e as Error).message?.slice(0, 80)}`,
@@ -643,7 +646,8 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       }
     }
 
-    console.log(`  Inserted: ${deliveryLogs.length} webhook delivery logs`);
+    expect(ensuredDeliveryLogs).toBe(deliveryLogs.length);
+    console.log(`  Ensured: ${ensuredDeliveryLogs} webhook delivery logs`);
   });
 
   test('Phase C7: Seed Automation Execution Logs via SQL', async ({ page }) => {
@@ -673,45 +677,49 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       { status: 'success', trigger: 'SCHEDULED', month: 17, day: 1, duration: 890 },
     ];
 
+    let ensuredExecutionLogs = 0;
     for (let i = 0; i < execLogs.length; i++) {
       const log = execLogs[i];
       const auto = automations[i % automations.length];
       if (!auto) continue;
       const autoId = auto.pid || auto.id || 'unknown';
+      const autoTrigger = auto.triggerType || auto.trigger_type || log.trigger.toLowerCase();
       const startTs = datetimeAt(log.month, log.day);
       const endTs = datetimeAt(log.month, log.day, 9);
-      const pid = `autolog_seed_${Date.now()}_${i}`;
+      const pid = `alog_seed_${i}`;
+      const actionResults = JSON.stringify([
+        { action: 'notify', status: log.status, durationMs: log.duration },
+      ]).replace(/'/g, "''");
 
       const sql = `
         INSERT INTO ab_automation_log (
-          id, pid, tenant_id, automation_id,
+          pid, tenant_id, automation_id,
           trigger_type, trigger_record_id, trigger_payload,
-          status, started_at, completed_at, error_message, execution_log, created_at
+          status, started_at, completed_at, error_message, action_results, created_at
         ) VALUES (
-          nextval('hibernate_sequence'), '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${autoId}',
-          '${log.trigger}', 'demo_record_${i}',
+          '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${autoId}',
+          '${autoTrigger}', 'demo_record_${i}',
           '{"model":"crm_opportunity","field":"crm_opp_stage","oldValue":"proposal","newValue":"negotiation"}'::jsonb,
           '${log.status}', '${startTs}', '${endTs}',
           ${log.error ? `'${log.error}'` : 'NULL'},
-          'Step 1: Trigger matched → Step 2: Condition evaluated (true) → Step 3: Action executed (${log.status === 'success' ? 'notification sent' : 'FAILED: ' + (log.error || '')})',
+          '${actionResults}'::jsonb,
           '${startTs}'
         ) ON CONFLICT DO NOTHING;
       `.trim();
 
       try {
-        execSync(
-          `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
-          {
-            timeout: 5000,
-            stdio: 'pipe',
-          },
-        );
+        execSync(`${PSQL_BASE} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`, {
+          timeout: 5000,
+          stdio: 'pipe',
+        });
+        ensuredExecutionLogs += 1;
       } catch (e) {
         console.warn(`  Automation log ${i} insert failed: ${(e as Error).message?.slice(0, 80)}`);
       }
     }
 
-    console.log(`  Inserted: ${execLogs.length} automation execution logs`);
+    expect(ensuredExecutionLogs).toBe(execLogs.length);
+    console.log(`  Ensured: ${ensuredExecutionLogs} automation execution logs`);
   });
 
   // ═════════════════════════════════════════════════════════════════════════
