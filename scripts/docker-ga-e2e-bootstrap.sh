@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Bootstrap the GA-E2E docker stack for OSS Playwright runs.
 #
-# What auto-bootstrap (AURABOOT_BOOTSTRAP_ENABLED=true on the backend) gives us:
+# What /api/bootstrap/setup gives us:
 #   - admin@auraboot.com user with TENANT_ADMIN role on a default tenant
-# What it does NOT give us, but the OSS E2E suite needs:
+# What the explicit setup flow does NOT give us, but the OSS E2E suite needs:
 #   - The OSS plugins published into the tenant (model + page + binding rows)
 #   - operator / viewer test users that auth.setup expects
 #
@@ -266,9 +266,9 @@ esac
 
 # 3c. Verify admin@auraboot.com holds platform_admin in the System tenant.
 #
-# BootstrapStartupRunner now owns the platform_admin bootstrap invariant through
+# /api/bootstrap/setup owns the platform_admin bootstrap invariant through
 # BootstrapRepairService.repairAll(): role creation, System membership, and admin
-# grant happen during backend startup. Keep this script as an API-only verifier.
+# grant happen during explicit bootstrap. Keep this script as an API-only verifier.
 # Do not call /api/roles/* here: those endpoints require org.role.* permissions,
 # while the System tenant platform_admin role is intentionally a path-scope role
 # for /api/admin/infrastructure/** and /api/admin/cloud-config/**, not a general

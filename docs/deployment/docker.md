@@ -95,8 +95,9 @@ DATABASE_PASSWORD=auraboot_dev
 JWT_SECRET=<openssl rand -hex 32>
 FRONTEND_BASE_URL=http://localhost:3000
 SPRING_PROFILES_ACTIVE=community
-AURABOOT_BOOTSTRAP_ENABLED=true
 ```
+
+Initialize an empty deployment explicitly through `/api/bootstrap/setup` (or the setup UI) after the backend and frontend are healthy. Application startup does not create or repair bootstrap data.
 
 Health check: `wget http://localhost:6443/actuator/health` every 15 seconds, 120-second start period.
 
@@ -302,7 +303,7 @@ server {
 - [ ] Configure SMTP for email notifications
 - [ ] Set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` for AI features
 - [ ] Put a TLS-terminating reverse proxy in front
-- [ ] Review `AURABOOT_BOOTSTRAP_ENABLED` -- disable after initial setup
+- [ ] Run `/api/bootstrap/setup` once for an empty database, then verify login
 - [ ] Set `AURABOOT_PORT` to your desired port if not 3000
 - [ ] Configure backup schedule for PostgreSQL
 

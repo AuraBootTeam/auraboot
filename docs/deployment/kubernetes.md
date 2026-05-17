@@ -54,11 +54,12 @@ metadata:
   namespace: auraboot
 data:
   SPRING_PROFILES_ACTIVE: "community"
-  AURABOOT_BOOTSTRAP_ENABLED: "true"
   FRONTEND_BASE_URL: "https://app.example.com"
   REDIS_HOST: "redis-svc"
   SERVER_PORT: "6443"
 ```
+
+Run `/api/bootstrap/setup` once after the backend is healthy to initialize an empty database. Do not rely on backend pod startup to create the default admin or tenant.
 
 ## Secrets
 

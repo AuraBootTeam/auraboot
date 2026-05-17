@@ -83,10 +83,7 @@ aura:
 
 ### Bootstrap
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AURABOOT_BOOTSTRAP_ENABLED` | `false` | Auto-create default tenant and admin user on startup |
-| `AURABOOT_BOOTSTRAP_MODE` | `none` | SaaS bootstrap mode: `setup`, `seed`, or `none` |
+Default tenant and admin creation is explicit: call `/api/bootstrap/setup` for an empty database. Application startup must not create or repair bootstrap data.
 
 ### Server
 

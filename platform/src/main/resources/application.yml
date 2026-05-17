@@ -86,7 +86,6 @@ auraboot:
   platform:
     version: 1.0.0
   bootstrap:
-    enabled: ${AURABOOT_BOOTSTRAP_ENABLED:false}
     # Phase 3: when true, the demo profile of built-in plugins (crm-starter,
     # showcase, agent-control-plane, workflow-demo) is imported in addition to
     # the always-on core profile. Default false — prod-safe.
@@ -103,9 +102,6 @@ auraboot:
       # private-key-path: classpath:license/private.pem  # Enterprise only — not included in open-source
       # jwks-url:                       # optional: https://license.auraboot.com/.well-known/jwks.json
       # jwks-refresh-interval: 24h      # optional: how often to refresh remote keys
-  saas:
-    bootstrap:
-      mode: ${AURABOOT_BOOTSTRAP_MODE:none}   # setup | seed | none
   performance:
     # Queries taking longer than this threshold (ms) are logged at WARN level and metered.
     slow-query-threshold-ms: 500

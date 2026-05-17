@@ -23,7 +23,9 @@ COPY platform-mq-rabbitmq/build.gradle platform-mq-rabbitmq/build.gradle
 RUN chmod +x gradlew
 
 # Download dependencies (cached unless build files change)
-RUN ./gradlew dependencies --no-daemon || true
+RUN --mount=type=cache,target=/root/.gradle/wrapper \
+    --mount=type=cache,target=/root/.gradle/caches \
+    ./gradlew dependencies --no-daemon || true
 
 # Copy source code
 COPY src ./src
@@ -33,7 +35,9 @@ COPY platform-plugin-api/src platform-plugin-api/src
 COPY vendor* ./vendor/
 
 # Build the application (skip tests for faster builds)
-RUN ./gradlew bootJar --no-daemon -x test
+RUN --mount=type=cache,target=/root/.gradle/wrapper \
+    --mount=type=cache,target=/root/.gradle/caches \
+    ./gradlew bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
