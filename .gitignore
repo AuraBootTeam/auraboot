@@ -68,6 +68,7 @@ bin/
 
 
 web-admin/tests/storage/login-failed.png
+web-admin/tests/storage/enterprise-fresh/
 
 # Ralph runtime files (keep CLAUDE.md, ralph.sh, prd.json.example in git)
 scripts/ralph/prd.json
