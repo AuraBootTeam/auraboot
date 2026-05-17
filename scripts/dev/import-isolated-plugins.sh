@@ -35,6 +35,7 @@ Options:
 Environment:
   ADMIN_EMAIL        default: admin@auraboot.com
   ADMIN_PASSWORD     default: Test2026x
+  IMPORT_ATTEMPTS    default: 2
 USAGE
 }
 
@@ -91,6 +92,7 @@ BACKEND_URL="${BACKEND_URL:-http://localhost:${BE_PORT}}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@auraboot.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Test2026x}"
 BACKEND_CONTAINER="${PROJECT_NAME}-backend"
+IMPORT_ATTEMPTS="${IMPORT_ATTEMPTS:-2}"
 
 DEFAULT_PLUGINS=(
   core-meta
@@ -274,15 +276,10 @@ container_plugin_path() {
     return 1
 }
 
-failures=()
-for plugin in "${PLUGINS[@]}"; do
-    if ! path="$(container_plugin_path "$plugin")"; then
-        echo "  FAIL $plugin: plugin.json not found in /app/plugins or /app/plugins-enterprise"
-        failures+=("$plugin: missing")
-        continue
-    fi
+import_plugin_once() {
+    local path="$1"
+    local resp result
 
-    printf '  Importing %-24s ' "$plugin"
     resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/plugins/import/import-directory-sync" \
         -H "Authorization: Bearer $jwt" \
         -H "Content-Type: application/json" \
@@ -299,10 +296,39 @@ if d.get('success') is True:
 else:
     print(d.get('errorMessage') or d.get('message') or str(d)[:300])
 " 2>/dev/null || echo "$resp")"
-    if [ "$result" = "ok" ]; then
-        echo "OK ($path)"
-    else
+    printf '%s\n' "$result"
+}
+
+failures=()
+for plugin in "${PLUGINS[@]}"; do
+    if ! path="$(container_plugin_path "$plugin")"; then
+        echo "  FAIL $plugin: plugin.json not found in /app/plugins or /app/plugins-enterprise"
+        failures+=("$plugin: missing")
+        continue
+    fi
+
+    result=""
+    attempt=1
+    while [ "$attempt" -le "$IMPORT_ATTEMPTS" ]; do
+        printf '  Importing %-24s ' "$plugin"
+        if [ "$attempt" -gt 1 ]; then
+            printf '(retry %s/%s) ' "$attempt" "$IMPORT_ATTEMPTS"
+        fi
+
+        result="$(import_plugin_once "$path")"
+        if [ "$result" = "ok" ]; then
+            echo "OK ($path)"
+            break
+        fi
+
         echo "FAIL ($result)"
+        if [ "$attempt" -lt "$IMPORT_ATTEMPTS" ]; then
+            sleep "$attempt"
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    if [ "$result" != "ok" ]; then
         failures+=("$plugin: $result")
     fi
 done

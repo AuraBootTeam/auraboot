@@ -85,11 +85,26 @@ test('normalized reset entrypoint makes product runtime and profile explicit', (
   assert.match(script, /enterprise:docker\) PROFILE="enterprise-demo"/);
   assert.match(script, /oss:host/);
   assert.match(script, /oss:docker/);
+  assert.match(script, /docker-ga-e2e-down\.sh" --purge/);
   assert.match(script, /enterprise:host/);
   assert.match(script, /enterprise:docker/);
+  assert.match(script, /stop-isolated\.sh" --slug="\$SLUG" --purge/);
   assert.match(script, /scripts\/dev\/import-isolated-plugins\.sh/);
   assert.match(script, /import_profile="enterprise-demo"/);
   assert.match(script, /--edition=enterprise/);
+  assert.match(script, /sync-marketplace-catalog\.sh/);
+  assert.match(script, /PG_PORT="\$PG_PORT"/);
+  assert.match(script, /PGPASSWORD="\$\{PGPASSWORD:-auraboot_dev\}"/);
+});
+
+test('isolated plugin import retries each plugin before importing dependents', () => {
+  const script = read('scripts/dev/import-isolated-plugins.sh');
+
+  assert.match(script, /IMPORT_ATTEMPTS="\$\{IMPORT_ATTEMPTS:-2\}"/);
+  assert.match(script, /import_plugin_once\(\)/);
+  assert.match(script, /while \[ "\$attempt" -le "\$IMPORT_ATTEMPTS" \]/);
+  assert.match(script, /sleep "\$attempt"/);
+  assert.match(script, /failures\+=\("\$plugin: \$result"\)/);
 });
 
 test('showcase CRM opportunity seeds send date-only values to DATE fields', () => {

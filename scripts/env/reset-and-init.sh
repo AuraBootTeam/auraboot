@@ -97,7 +97,7 @@ case "$PRODUCT:$RUNTIME" in
       echo "ERROR: OSS docker reset currently supports --profile=e2e or --profile=showcase" >&2
       exit 2
     fi
-    "$PROJECT_ROOT/scripts/docker-ga-e2e-down.sh" || true
+    "$PROJECT_ROOT/scripts/docker-ga-e2e-down.sh" --purge || true
     GA_E2E_FRONTEND_IMAGE="${GA_E2E_FRONTEND_IMAGE:-node:22-bookworm-slim}" \
       "$PROJECT_ROOT/scripts/docker-ga-e2e-up.sh"
     "$PROJECT_ROOT/scripts/docker-ga-e2e-bootstrap.sh"
@@ -114,6 +114,7 @@ case "$PRODUCT:$RUNTIME" in
       echo "ERROR: enterprise plugin root not found: $enterprise_root/plugins" >&2
       exit 1
     fi
+    "$PROJECT_ROOT/scripts/dev/stop-isolated.sh" --slug="$SLUG" --purge || true
     ENTERPRISE_PLUGINS_DIR="${ENTERPRISE_PLUGINS_DIR:-$enterprise_root/plugins}" \
     ENTERPRISE_PLUGIN_JARS_DIR="${ENTERPRISE_PLUGIN_JARS_DIR:-$enterprise_root/build/plugin-jars}" \
     ISOLATED_FRONTEND_IMAGE="${ISOLATED_FRONTEND_IMAGE:-node:22-bookworm-slim}" \
@@ -133,5 +134,11 @@ case "$PRODUCT:$RUNTIME" in
       --slug="$SLUG" \
       --profile="$import_profile" \
       --edition=enterprise
+    PG_HOST=localhost \
+    PG_PORT="$PG_PORT" \
+    PG_USER="${PG_USER:-auraboot}" \
+    PG_DB="${PG_DB:-aura_boot}" \
+    PGPASSWORD="${PGPASSWORD:-auraboot_dev}" \
+      "$enterprise_root/scripts/sync-marketplace-catalog.sh"
     ;;
 esac
