@@ -32,7 +32,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
     @Select("""
         SELECT * FROM ab_permission
         WHERE LOWER(code) = LOWER(#{code})
-          AND deleted_flag = false
+          AND (deleted_flag = false OR deleted_flag IS NULL)
         ORDER BY created_at DESC
         LIMIT 1
         """)
