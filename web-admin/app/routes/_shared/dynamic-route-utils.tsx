@@ -22,9 +22,7 @@ function parseMemberPickerValue(value: unknown, multiple: boolean): string | str
   if (value == null || value === '') return undefined;
 
   if (Array.isArray(value)) {
-    const ids = value
-      .map((item) => String(item ?? '').trim())
-      .filter(Boolean);
+    const ids = value.map((item) => String(item ?? '').trim()).filter(Boolean);
     return multiple ? ids : ids[0];
   }
 
@@ -36,9 +34,7 @@ function parseMemberPickerValue(value: unknown, multiple: boolean): string | str
       try {
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
-          const ids = parsed
-            .map((item) => String(item ?? '').trim())
-            .filter(Boolean);
+          const ids = parsed.map((item) => String(item ?? '').trim()).filter(Boolean);
           return multiple ? ids : ids[0];
         }
       } catch {
@@ -52,6 +48,41 @@ function parseMemberPickerValue(value: unknown, multiple: boolean): string | str
   const normalized = String(value).trim();
   if (!normalized) return undefined;
   return multiple ? [normalized] : normalized;
+}
+
+function parseReadonlyValueList(value: unknown, multiple = false): string[] {
+  const parsed = parseMemberPickerValue(value, multiple);
+  if (Array.isArray(parsed)) return parsed;
+  return parsed ? [parsed] : [];
+}
+
+function formatAddressValue(value: unknown): string {
+  if (value == null || value === '') return '-';
+
+  let address = value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return '-';
+    if (trimmed.startsWith('{')) {
+      try {
+        address = JSON.parse(trimmed);
+      } catch {
+        return trimmed;
+      }
+    } else {
+      return trimmed;
+    }
+  }
+
+  if (address && typeof address === 'object' && !Array.isArray(address)) {
+    const data = address as Record<string, unknown>;
+    const parts = [data.province, data.city, data.district, data.street, data.detail, data.address]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : '-';
+  }
+
+  return String(address).trim() || '-';
 }
 
 /**
@@ -70,7 +101,10 @@ interface FieldConfig {
   field: string;
   label?: string | LocalizedText;
   component?: string;
+  dataType?: string;
   dictCode?: string;
+  refTarget?: Record<string, any>;
+  referenceModelCode?: string;
   props?: Record<string, any>;
   validation?: ValidationRule[];
   span?: number;
@@ -96,6 +130,76 @@ interface DynamicFieldProps {
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
 }
 
+function getReferenceModel(field: FieldConfig): string {
+  const refTarget = {
+    ...(field.props?.refTarget || {}),
+    ...(field.refTarget || {}),
+  };
+  return String(
+    refTarget.targetModel ||
+      refTarget.modelCode ||
+      field.referenceModelCode ||
+      field.props?.referenceModelCode ||
+      '',
+  ).toLowerCase();
+}
+
+const ReadonlyOrganizationValue: React.FC<{ value: unknown; multiple?: boolean }> = ({
+  value,
+  multiple = false,
+}) => {
+  const ids = React.useMemo(() => parseReadonlyValueList(value, multiple), [value, multiple]);
+  const [labels, setLabels] = React.useState<string[]>([]);
+  const [resolved, setResolved] = React.useState(false);
+
+  React.useEffect(() => {
+    let active = true;
+    if (ids.length === 0) {
+      setLabels([]);
+      setResolved(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    setResolved(false);
+    Promise.all(
+      ids.map(async (id) => {
+        try {
+          const resp = await fetch(`/api/dynamic/org_department/${encodeURIComponent(id)}`);
+          if (!resp.ok) return id;
+          const body = await resp.json();
+          const record = body?.data ?? {};
+          return String(
+            record.org_dept_name ||
+              record.name ||
+              record.displayName ||
+              record.org_dept_code ||
+              record.code ||
+              id,
+          );
+        } catch {
+          return id;
+        }
+      }),
+    ).then((nextLabels) => {
+      if (!active) return;
+      setLabels(nextLabels.filter(Boolean));
+      setResolved(true);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [ids.join('|')]);
+
+  if (ids.length === 0 || (resolved && labels.length === 0)) {
+    return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
+  }
+
+  return <div className="py-1 text-sm text-gray-900">{resolved ? labels.join('、') : ''}</div>;
+};
+
 /**
  * DynamicField - Legacy field renderer for dynamic pages
  * Supports common field types with read-only mode
@@ -115,6 +219,11 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
 
   const isRequired = field.validation?.some((v) => v.type === 'required');
   const componentType = field.component?.toLowerCase() || 'smartinput';
+  const effectiveDictCode =
+    field.dictCode ||
+    (typeof field.props?.dictCode === 'string' && field.props.dictCode.trim()
+      ? field.props.dictCode
+      : undefined);
 
   // Common input classes
   const inputClasses = `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
@@ -124,7 +233,17 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
   const renderField = () => {
     // Read-only display
     if (readOnly) {
-      if (componentType === 'memberpicker') {
+      const referenceModel = getReferenceModel(field);
+      const isUserSelect =
+        componentType === 'userselect' ||
+        componentType === 'smartuserselect' ||
+        (componentType === 'reference' && referenceModel === 'sys_user');
+      const isOrganizationSelect =
+        componentType === 'organizationselect' ||
+        componentType === 'smartorganizationselect' ||
+        (componentType === 'reference' && referenceModel === 'org_department');
+
+      if (componentType === 'memberpicker' || isUserSelect) {
         const memberValue = parseMemberPickerValue(value, Boolean(field.props?.multiple));
         return (
           <MemberPicker
@@ -136,9 +255,31 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         );
       }
 
+      if (isOrganizationSelect) {
+        return (
+          <ReadonlyOrganizationValue value={value} multiple={Boolean(field.props?.multiple)} />
+        );
+      }
+
+      if (componentType === 'addressfield') {
+        const displayValue = formatAddressValue(value);
+        return (
+          <div className="py-1 text-sm text-gray-900">
+            {displayValue === '-' ? <span className="text-gray-400">&mdash;</span> : displayValue}
+          </div>
+        );
+      }
+
       // 1. Dict field with color tag
-      if (field.dictCode && getDictItems) {
-        const items = getDictItems(field.dictCode);
+      if (effectiveDictCode && getDictItems) {
+        const items = getDictItems(effectiveDictCode);
+        const values = parseReadonlyValueList(value, Boolean(field.props?.multiple));
+        const labels = values
+          .map((currentValue) => items.find((i) => String(i.value) === currentValue)?.label)
+          .filter((currentLabel): currentLabel is string => Boolean(currentLabel));
+        if (labels.length > 1 || (labels.length === 1 && values.length > 1)) {
+          return <div className="py-1 text-sm text-gray-900">{labels.join('、')}</div>;
+        }
         const item = items.find((i) => String(i.value) === String(value));
         if (item) {
           const color = item.extension?.color || 'gray';
@@ -241,7 +382,9 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         let files: Array<{ name: string; url: string; size?: number }> = [];
         try {
           files = typeof value === 'string' ? JSON.parse(value) : Array.isArray(value) ? value : [];
-        } catch { /* ignore parse errors */ }
+        } catch {
+          /* ignore parse errors */
+        }
         if (files.length === 0) {
           return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
         }
@@ -255,10 +398,23 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
               >
-                <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                <svg
+                  className="h-4 w-4 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                  />
                 </svg>
-                {f.name}{f.size ? ` (${f.size < 1024 ? f.size + ' B' : f.size < 1048576 ? (f.size / 1024).toFixed(1) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB'})` : ''}
+                {f.name}
+                {f.size
+                  ? ` (${f.size < 1024 ? f.size + ' B' : f.size < 1048576 ? (f.size / 1024).toFixed(1) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB'})`
+                  : ''}
               </a>
             ))}
           </div>
@@ -286,10 +442,19 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       }
 
       // 9. URL detection - render as clickable link
-      if (displayValue && typeof displayValue === 'string' && /^https?:\/\/.+/i.test(displayValue)) {
+      if (
+        displayValue &&
+        typeof displayValue === 'string' &&
+        /^https?:\/\/.+/i.test(displayValue)
+      ) {
         return (
           <div className="py-1 text-sm">
-            <a href={displayValue} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">
+            <a
+              href={displayValue}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 hover:underline"
+            >
               {displayValue}
             </a>
           </div>
@@ -297,10 +462,17 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       }
 
       // 10. Email detection - render as mailto link
-      if (displayValue && typeof displayValue === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(displayValue)) {
+      if (
+        displayValue &&
+        typeof displayValue === 'string' &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(displayValue)
+      ) {
         return (
           <div className="py-1 text-sm">
-            <a href={`mailto:${displayValue}`} className="text-blue-600 hover:text-blue-800 hover:underline">
+            <a
+              href={`mailto:${displayValue}`}
+              className="text-blue-600 hover:text-blue-800 hover:underline"
+            >
               {displayValue}
             </a>
           </div>
