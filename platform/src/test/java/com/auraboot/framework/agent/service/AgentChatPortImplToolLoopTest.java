@@ -10,6 +10,9 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.AgentExecutionState;
+import com.auraboot.framework.agent.runtime.AgentRuntimeEvent;
+import com.auraboot.framework.agent.runtime.DefaultAgentReducer;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.conversation.ResponseSink;
@@ -39,6 +42,7 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -219,6 +223,38 @@ class AgentChatPortImplToolLoopTest {
                 .build();
     }
 
+    @SuppressWarnings("unchecked")
+    private void assertRuntimeStateExtension(ChatSessionStore.PendingTool stored) {
+        assertThat(stored.getExtension()).containsKey("_runtime_state");
+        Object runtimeState = stored.getExtension().get("_runtime_state");
+        assertThat(runtimeState).isInstanceOf(Map.class);
+        Map<String, Object> snapshot = (Map<String, Object>) runtimeState;
+        assertThat(snapshot)
+                .containsEntry("schemaVersion", "agent-runtime-state/v1")
+                .containsEntry("executionKind", "chat_turn")
+                .containsEntry("agentCode", AGENT_CODE)
+                .containsEntry("providerCode", "openai")
+                .containsEntry("model", "test-model");
+        assertThat((String) snapshot.get("stateHash")).hasSize(64);
+        assertThat(snapshot.get("context")).isInstanceOf(Map.class);
+        assertThat((Map<String, Object>) snapshot.get("context"))
+                .containsKeys("systemPromptHash", "messagesHash", "toolsHash", "contextHash");
+        assertThat(String.valueOf(snapshot))
+                .doesNotContain("test-key")
+                .doesNotContain("https://example.invalid")
+                .doesNotContain("Compare suppliers.");
+    }
+
+    private void assertProviderSecretNotPersisted(ChatSessionStore.PendingTool stored) {
+        assertThat(stored.getProviderCode()).isEqualTo("openai");
+        assertThat(stored.getModel()).isEqualTo("test-model");
+        assertThat(stored.getApiKey()).isNull();
+        assertThat(stored.getBaseUrl()).isNull();
+        assertThat(String.valueOf(stored))
+                .doesNotContain("test-key")
+                .doesNotContain("https://example.invalid");
+    }
+
     private LlmChatResponse toolUseResponse(String toolId, String toolName, Map<String, Object> input) {
         return LlmChatResponse.builder()
                 .stopReason("tool_use")
@@ -229,6 +265,32 @@ class AgentChatPortImplToolLoopTest {
                         .input(input)
                         .build()))
                 .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> errorFrame(Map<String, Object> result) {
+        Object frame = result.get("errorFrame");
+        assertThat(frame).isInstanceOf(Map.class);
+        return (Map<String, Object>) frame;
+    }
+
+    private String firstToolResultPayload(LlmChatRequest request) {
+        for (LlmChatRequest.Message message : request.getMessages()) {
+            Object content = message.getContent();
+            if (!(content instanceof List<?> blocks)) {
+                continue;
+            }
+            for (Object block : blocks) {
+                if (block instanceof LlmChatRequest.ContentBlock contentBlock
+                        && "tool_result".equals(contentBlock.getType())) {
+                    return String.valueOf(contentBlock.getResult());
+                }
+                if (block instanceof Map<?, ?> raw && "tool_result".equals(String.valueOf(raw.get("type")))) {
+                    return String.valueOf(raw.get("result"));
+                }
+            }
+        }
+        return "";
     }
 
     // =========================================================================
@@ -467,16 +529,85 @@ class AgentChatPortImplToolLoopTest {
         ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
         verify(sink).onToolResult(eq("toolu-unknown"), resultCaptor.capture(), eq(false));
         assertThat(resultCaptor.getValue())
-                .containsEntry("success", false);
-        assertThat(String.valueOf(resultCaptor.getValue()))
-                .contains("Unknown tool")
+                .containsEntry("success", false)
+                .containsKey("errorFrame");
+        Map<String, Object> errorFrame = errorFrame(resultCaptor.getValue());
+        assertThat(errorFrame)
+                .containsEntry("category", "validation")
+                .containsEntry("toolName", "platform.create_model")
+                .containsEntry("errorClass", "UnknownTool")
+                .containsEntry("retryable", true)
+                .containsEntry("userSafeMessage", "The model requested an unavailable tool.");
+        assertThat((String) errorFrame.get("argsHash")).hasSize(64);
+        assertThat((String) errorFrame.get("modelRecoveryHint"))
                 .contains("nq_pe_procurement_comparison_supplier_options");
+        assertThat(String.valueOf(resultCaptor.getValue()))
+                .doesNotContain("Create a Customer table");
 
         ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
         verify(provider, times(2)).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
         assertThat(String.valueOf(requestCaptor.getAllValues().get(1).getMessages()))
                 .contains("tool_result")
-                .contains("Unknown tool");
+                .contains("errorFrame")
+                .contains("validation");
+    }
+
+    @Test
+    @DisplayName("tool execution failure feeds a retryable compact error frame back to the model")
+    void toolExecutionFailureFeedsRetryableErrorFrameBackToModel() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        Map<String, Object> input = Map.of("productId", "P-100", "note", "secret-note");
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(readOnlyTool()));
+        when(toolLoopService.executeToolCall(
+                eq(TENANT_ID),
+                anyString(),
+                isNull(),
+                eq(AGENT_CODE),
+                eq("nq_pe_procurement_comparison_supplier_options"),
+                eq(input),
+                anyList(),
+                isNull()))
+                .thenThrow(new IllegalStateException("database password=secret-db exploded"));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse(
+                        "toolu-fail",
+                        "nq_pe_procurement_comparison_supplier_options",
+                        input))
+                .thenReturn(endTurnResponse("I cannot load supplier options right now."));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers for P-100"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(sink).onToolResult(eq("toolu-fail"), resultCaptor.capture(), eq(false));
+        Map<String, Object> result = resultCaptor.getValue();
+        assertThat(result)
+                .containsEntry("success", false)
+                .containsKey("errorFrame");
+        Map<String, Object> errorFrame = errorFrame(result);
+        assertThat(errorFrame)
+                .containsEntry("category", "tool")
+                .containsEntry("toolName", "nq_pe_procurement_comparison_supplier_options")
+                .containsEntry("errorClass", "IllegalStateException")
+                .containsEntry("retryable", true)
+                .containsEntry("userSafeMessage", "Tool execution failed.");
+        assertThat((String) errorFrame.get("argsHash")).hasSize(64);
+        assertThat(String.valueOf(result))
+                .doesNotContain("secret-db")
+                .doesNotContain("secret-note");
+
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(2)).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        String toolResultPayload = firstToolResultPayload(requestCaptor.getAllValues().get(1));
+        assertThat(toolResultPayload)
+                .contains("errorFrame")
+                .contains("Tool execution failed.")
+                .doesNotContain("secret-db")
+                .doesNotContain("secret-note");
     }
 
     @Test
@@ -530,6 +661,8 @@ class AgentChatPortImplToolLoopTest {
         assertThat(pendingTool.getAgentToolDefinitions()).hasSize(1);
         assertThat(pendingTool.getAgentToolDefinitions().get(0).isRequiresApproval()).isTrue();
         assertThat(pendingTool.getAgentToolDefinitions().get(0).getSourceCode()).isEqualTo("platform.create_model");
+        assertProviderSecretNotPersisted(pendingTool);
+        assertRuntimeStateExtension(pendingTool);
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
     }
 
@@ -673,7 +806,37 @@ class AgentChatPortImplToolLoopTest {
         assertThat(stored.getModel()).isEqualTo("test-model");
         assertThat(stored.getSessionId()).isEqualTo(SESSION_ID);
         assertThat(stored.getMessages()).isNotEmpty();
+        assertProviderSecretNotPersisted(stored);
+        assertRuntimeStateExtension(stored);
         verify(chatSessionStore).storeConversationMessages(eq(SESSION_ID), any());
+    }
+
+    @Test
+    @DisplayName("requiresConfirmation path records reducer events for model response, tool use, and suspension")
+    void confirmationToolRecordsReducerEvents() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        DefaultAgentReducer reducer = spy(new DefaultAgentReducer());
+        ReflectionTestUtils.setField(service, "agentReducer", reducer);
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(writeTool()));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse(
+                        "toolu-write",
+                        "cmd_pe_create_procurement_comparison_draft",
+                        Map.of("productId", "P-100")));
+
+        service.runAgentTurn(newTurnContext(), newRequest("Create draft for P-100"), sink);
+
+        ArgumentCaptor<AgentRuntimeEvent> eventCaptor = ArgumentCaptor.forClass(AgentRuntimeEvent.class);
+        verify(reducer, times(3)).reduce(any(AgentExecutionState.class), eventCaptor.capture());
+        assertThat(eventCaptor.getAllValues())
+                .extracting(AgentRuntimeEvent::type)
+                .containsExactly(
+                        AgentRuntimeEvent.MODEL_RESPONSE_RECEIVED,
+                        AgentRuntimeEvent.TOOL_USE_REQUESTED,
+                        AgentRuntimeEvent.CONFIRMATION_REQUIRED);
     }
 
     @Test
@@ -785,6 +948,8 @@ class AgentChatPortImplToolLoopTest {
                 .containsEntry("previewToken", "preview-1")
                 .containsEntry("riskLevel", "high");
         assertThat(stored.getExtension().get("preview")).isEqualTo(Map.of("modelCode", "crm_customer"));
+        assertProviderSecretNotPersisted(stored);
+        assertRuntimeStateExtension(stored);
     }
 
     @Test
@@ -793,18 +958,32 @@ class AgentChatPortImplToolLoopTest {
         stubAgentDefinition();
         stubProvider();
         stubGrounding();
+        DefaultAgentReducer reducer = spy(new DefaultAgentReducer());
+        ReflectionTestUtils.setField(service, "agentReducer", reducer);
         when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
-                .thenThrow(new RuntimeException("boom"));
+                .thenThrow(new IllegalArgumentException("Invalid scheme [stub] apiKey=sk-secret"));
 
         TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Hello"), sink);
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
         TurnOutcome.Failed failed = (TurnOutcome.Failed) outcome;
-        assertThat(failed.errorMessage()).contains("boom");
-        verify(sink).onError(any(String.class), eq(null));
+        assertThat(failed.errorMessage())
+                .contains("LLM provider request failed.")
+                .doesNotContain("sk-secret")
+                .doesNotContain("Invalid scheme [stub]");
+        verify(sink).onError(contains("LLM provider request failed."), eq(null));
         // No sink.onDone on failure.
         verify(sink, never()).onDone(any(String.class), any());
+        ArgumentCaptor<AgentRuntimeEvent> eventCaptor = ArgumentCaptor.forClass(AgentRuntimeEvent.class);
+        verify(reducer).reduce(any(AgentExecutionState.class), eventCaptor.capture());
+        AgentRuntimeEvent failedEvent = eventCaptor.getValue();
+        assertThat(failedEvent.type()).isEqualTo(AgentRuntimeEvent.TURN_FAILED);
+        assertThat(String.valueOf(failedEvent.payload()))
+                .contains("provider")
+                .contains("IllegalArgumentException")
+                .doesNotContain("sk-secret")
+                .doesNotContain("Invalid scheme [stub]");
     }
 
     @Test

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -38,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -224,6 +226,59 @@ class AgentRunServiceSyncTest {
         assertThat(success.outputTokens()).isEqualTo(45);
         assertThat(success.totalCost()).isEqualTo(0.0123d);
         assertThat(success.runPid()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("plan setup writes secret-free runtime state and fallback audit into run metadata")
+    void planSetupPersistsRuntimeStateMetadata() throws Exception {
+        primeHappyPath();
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "All steps completed.";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenReturn(ok);
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(true);
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper, atLeastOnce()).update(eq("ab_agent_run"), updateCaptor.capture(), anyMap());
+        String metadata = updateCaptor.getAllValues().stream()
+                .filter(update -> update.containsKey("metadata"))
+                .map(update -> String.valueOf(update.get("metadata")))
+                .findFirst()
+                .orElse(null);
+
+        assertThat(metadata).isNotBlank();
+        Map<String, Object> parsed = new ObjectMapper().readValue(metadata, Map.class);
+        assertThat(parsed).containsKeys("runtimeState", "fallbackAudit");
+        Map<String, Object> runtimeState = (Map<String, Object>) parsed.get("runtimeState");
+        assertThat(runtimeState)
+                .containsEntry("schemaVersion", "agent-runtime-state/v1")
+                .containsEntry("executionKind", "acp_run")
+                .containsEntry("agentCode", AGENT_CODE)
+                .containsEntry("providerCode", "anthropic")
+                .containsEntry("model", "claude-test");
+        assertThat((String) runtimeState.get("stateHash")).hasSize(64);
+        assertThat(runtimeState.get("context")).isInstanceOf(Map.class);
+
+        Map<String, Object> fallbackAudit = (Map<String, Object>) parsed.get("fallbackAudit");
+        Map<String, Object> providerAudit = (Map<String, Object>) fallbackAudit.get("provider");
+        assertThat(providerAudit)
+                .containsEntry("preferred", "anthropic")
+                .containsEntry("resolved", "anthropic")
+                .containsEntry("fallbackUsed", false);
+        assertThat((List<Object>) providerAudit.get("chain")).contains("anthropic");
+        Map<String, Object> toolDiscovery = (Map<String, Object>) fallbackAudit.get("toolDiscovery");
+        assertThat(toolDiscovery).containsEntry("mode", "registry_all");
+
+        assertThat(metadata)
+                .doesNotContain("sk-test")
+                .doesNotContain("https://api.example.com")
+                .doesNotContain("You are a test agent.")
+                .doesNotContain("Test description");
     }
 
     @Test

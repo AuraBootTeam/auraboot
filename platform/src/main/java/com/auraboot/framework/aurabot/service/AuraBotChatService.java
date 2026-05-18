@@ -497,10 +497,24 @@ public class AuraBotChatService {
         // 4. Add tool_result to messages and call LLM for final response
         messages.add(buildToolResultMessage(List.of(toolResultBlock)));
 
-        LlmProvider provider = llmProviderFactory.getProvider(pending.getProviderCode());
+        ProviderConfig resumeConfig = resolveResumeProviderConfig(pending);
+        String resumeProviderCode = resumeConfig != null
+                ? LlmProviderFactory.effectiveProviderCode(pending.getProviderCode(), resumeConfig)
+                : pending.getProviderCode();
+        LlmProvider provider = llmProviderFactory.getProvider(resumeProviderCode);
         if (provider == null) {
             aiTraceService.endTraceWithError(trace, "LLM provider not available");
-            String msg = "LLM provider not available: " + pending.getProviderCode();
+            String msg = "LLM provider not available: " + resumeProviderCode;
+            sink.onError(msg, tid);
+            return new TurnOutcome.Failed(msg, null);
+        }
+        String resumeApiKey = firstNonBlank(pending.getApiKey(),
+                resumeConfig != null ? resumeConfig.getApiKey() : null);
+        String resumeBaseUrl = firstNonBlank(pending.getBaseUrl(),
+                resumeConfig != null ? resumeConfig.getBaseUrl() : null);
+        if (resumeApiKey == null) {
+            aiTraceService.endTraceWithError(trace, "LLM provider config unavailable");
+            String msg = "LLM provider config unavailable for resume: " + resumeProviderCode;
             sink.onError(msg, tid);
             return new TurnOutcome.Failed(msg, null);
         }
@@ -527,7 +541,7 @@ public class AuraBotChatService {
 
             LlmChatResponse response;
             try {
-                response = provider.chat(request, pending.getApiKey(), pending.getBaseUrl());
+                response = provider.chat(request, resumeApiKey, resumeBaseUrl);
             } catch (Exception e) {
                 aiTraceService.endSpan(llmSpan, Map.of("error", e.getMessage()), "error");
                 aiTraceService.endTraceWithError(trace, e.getMessage());
@@ -668,8 +682,6 @@ public class AuraBotChatService {
                                 .agentToolDefinitions(pending.getAgentToolDefinitions())
                                 .messages(serializeMessages(messages))
                                 .providerCode(pending.getProviderCode())
-                                .apiKey(pending.getApiKey())
-                                .baseUrl(pending.getBaseUrl())
                                 .model(pending.getModel())
                                 .systemPrompt(pending.getSystemPrompt())
                                 .maxTokens(pending.getMaxTokens())
@@ -845,6 +857,30 @@ public class AuraBotChatService {
         return fallback;
     }
 
+    private ProviderConfig resolveResumeProviderConfig(ChatSessionStore.PendingTool pending) {
+        if (pending == null) {
+            return null;
+        }
+        try {
+            return llmProviderFactory.resolveConfig(pending.getTenantId(), pending.getProviderCode());
+        } catch (RuntimeException e) {
+            // Resume fails closed below when provider config cannot be resolved.
+            log.warn("Failed to resolve resume provider config: provider={}, error={}",
+                    pending.getProviderCode(), e.getMessage());
+            return null;
+        }
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
+    }
+
     /**
      * Persist a fresh {@link ChatSessionStore.PendingTool} for an AuraBot skill
      * preview and emit the {@code confirm_required} SSE event so the FE renders
@@ -888,8 +924,6 @@ public class AuraBotChatService {
                 .agentToolDefinitions(basis.getAgentToolDefinitions())
                 .messages(serializeMessages(messages))
                 .providerCode(basis.getProviderCode())
-                .apiKey(basis.getApiKey())
-                .baseUrl(basis.getBaseUrl())
                 .model(basis.getModel())
                 .systemPrompt(basis.getSystemPrompt())
                 .maxTokens(basis.getMaxTokens())
