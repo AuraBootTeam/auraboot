@@ -42,9 +42,7 @@ import { test, expect, type Page } from '../../fixtures';
 // ---------------------------------------------------------------------------
 
 const SHOWCASE_MODEL_CODE = 'showcase_all_fields';
-const SHOWCASE_FORM_NEW_URL_RE = new RegExp(
-  `/p/${SHOWCASE_MODEL_CODE}/new(?:$|\\?)`,
-);
+const SHOWCASE_FORM_NEW_URL_RE = new RegExp(`/p/${SHOWCASE_MODEL_CODE}/new(?:$|\\?)`);
 
 function uniquePageKey(): string {
   return `e2e_b1_text_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -97,11 +95,7 @@ async function fetchSavedBlocks(page: Page, pid: string): Promise<any[]> {
 // Designer navigation (sidebar → 元数据管理 → 页面配置 → row click)
 // ---------------------------------------------------------------------------
 
-async function navigateToDesignerViaMenu(
-  page: Page,
-  pid: string,
-  pageKey: string,
-): Promise<void> {
+async function navigateToDesignerViaMenu(page: Page, pid: string, pageKey: string): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
 
   const parent = page
@@ -113,13 +107,20 @@ async function navigateToDesignerViaMenu(
   const leaf = page.locator('a[href="/p/page_schema"], a[href*="/p/page_schema"]').first();
   await leaf.waitFor({ state: 'attached', timeout: 5_000 });
   const listResp = page.waitForResponse(
-    (r) => r.url().includes('/dynamic/page_schema_list') && r.url().includes('/list'),
+    (r) =>
+      r.url().includes('/api/dynamic/page_schema/list') ||
+      (r.url().includes('/dynamic/page_schema_list') && r.url().includes('/list')),
     { timeout: 5_000 },
   );
   await leaf.evaluate((el: HTMLElement) => el.click());
   await listResp.catch(() => null);
 
-  if (!(await page.getByTestId('toolbar-btn-create').isVisible({ timeout: 5_000 }).catch(() => false))) {
+  if (
+    !(await page
+      .getByTestId('toolbar-btn-create')
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false))
+  ) {
     await page.goto('/p/page_schema', { waitUntil: 'domcontentloaded' });
   }
   await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 8_000 });
@@ -130,7 +131,9 @@ async function navigateToDesignerViaMenu(
 
   // Narrow the list to our row with a keyword search.
   const search = page
-    .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
+    .locator(
+      '[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"], input[type="search"]',
+    )
     .first();
   if (await search.isVisible({ timeout: 1_500 }).catch(() => false)) {
     await search.click();
@@ -138,7 +141,10 @@ async function navigateToDesignerViaMenu(
     await search.press('Enter').catch(() => null);
     await page
       .waitForResponse(
-        (r) => r.url().includes('/dynamic/page_schema_list') && r.status() === 200,
+        (r) =>
+          (r.url().includes('/api/dynamic/page_schema/list') ||
+            r.url().includes('/dynamic/page_schema_list')) &&
+          r.status() === 200,
         { timeout: 5_000 },
       )
       .catch(() => null);
@@ -177,11 +183,49 @@ async function navigateToDesignerViaMenu(
 // Designer DOM helpers
 // ---------------------------------------------------------------------------
 
-async function addBlockViaPalette(page: Page, blockType: string): Promise<void> {
+async function addBlockViaPalette(page: Page, blockType: string): Promise<string> {
   await page.getByTestId('designer-tab-blocks').click();
   const item = page.getByTestId(`block-palette-item-${blockType}`);
   await expect(item).toBeVisible({ timeout: 5_000 });
+  const sel = `[data-block-type="${blockType}"]`;
+  const idsBefore = await page
+    .locator(sel)
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).getAttribute('data-block-id') || ''));
   await item.click();
+  await expect
+    .poll(async () => page.locator(sel).count(), { timeout: 5_000 })
+    .toBe(idsBefore.length + 1);
+  const idsAfter = await page
+    .locator(sel)
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).getAttribute('data-block-id') || ''));
+  const newId = idsAfter.find((id) => id && !idsBefore.includes(id));
+  if (!newId) throw new Error(`addBlockViaPalette: no new ${blockType} block id found`);
+  return newId;
+}
+
+async function ensureSelectedBlockEditor(page: Page, blockId: string): Promise<void> {
+  const panel = page.getByTestId('designer-properties-panel');
+  const codeInput = panel.locator('input[placeholder="输入字段代码"]').first();
+  if (await codeInput.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    return;
+  }
+
+  await page.getByTestId('designer-tab-outline').click();
+  const exactOutlineButton = page
+    .locator(`[data-testid="designer-outline-block-${blockId}"], [data-block-id="${blockId}"]`)
+    .first();
+  if (await exactOutlineButton.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    await exactOutlineButton.click();
+  } else {
+    const legacyOutlineButton = page
+      .locator('button')
+      .filter({ hasText: /Section Title|区段标题|form-section|表单区段/i })
+      .last();
+    await expect(legacyOutlineButton).toBeVisible({ timeout: 5_000 });
+    await legacyOutlineButton.click();
+  }
+
+  await expect(codeInput).toBeVisible({ timeout: 5_000 });
 }
 
 async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promise<void> {
@@ -208,13 +252,10 @@ async function selectFieldInBlock(page: Page, fieldCode: string): Promise<void> 
   const canvas = page.getByTestId('designer-canvas');
   const fieldLabel = canvas.locator(`label:has-text("${fieldCode}")`).first();
   await expect(fieldLabel).toBeVisible({ timeout: 5_000 });
-  await fieldLabel
-    .locator('xpath=ancestor::div[contains(@class,"group/field")]')
-    .first()
-    .click();
-  await expect(
-    page.getByTestId('designer-properties-panel').locator('text=字段属性'),
-  ).toBeVisible({ timeout: 5_000 });
+  await fieldLabel.locator('xpath=ancestor::div[contains(@class,"group/field")]').first().click();
+  await expect(page.getByTestId('designer-properties-panel').locator('text=字段属性')).toBeVisible({
+    timeout: 5_000,
+  });
 }
 
 function widgetSelect(page: Page) {
@@ -253,10 +294,12 @@ async function chooseWidgetByValue(page: Page, widgetValue: string): Promise<boo
   await expect
     .poll(
       async () => {
-        const stillPresent = await select.locator('option').evaluateAll(
-          (opts, val) => (opts as HTMLOptionElement[]).some((o) => o.value === val),
-          widgetValue,
-        );
+        const stillPresent = await select
+          .locator('option')
+          .evaluateAll(
+            (opts, val) => (opts as HTMLOptionElement[]).some((o) => o.value === val),
+            widgetValue,
+          );
         if (!stillPresent) return null;
         await select.evaluate((el, val) => {
           const sel = el as HTMLSelectElement;
@@ -390,9 +433,7 @@ async function configureWidgetPropsViaG1Panel(
     // Yield to React between iterations — the panel's `makeAdapter` reads a
     // snapshot of `props`; back-to-back synchronous fills would each see
     // the same stale snapshot and overwrite earlier writes via spread.
-    await page.evaluate(
-      () => new Promise<void>((r) => requestAnimationFrame(() => r())),
-    );
+    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
     const wrapper = panel.locator(`[data-testid="widget-prop-${key}"]`).first();
     const present = await wrapper.isVisible({ timeout: 2_000 }).catch(() => false);
     if (!present) {
@@ -425,9 +466,7 @@ async function configureWidgetPropsViaG1Panel(
     // would be a React no-op against the input value tracker).
     await input.click();
     await input.fill('');
-    await page.evaluate(
-      () => new Promise<void>((r) => requestAnimationFrame(() => r())),
-    );
+    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
     await input.fill(String(value));
     await input.evaluate((el) => (el as HTMLElement).blur());
     applied[key] = value;
@@ -459,9 +498,7 @@ async function clickSaveAndWait(page: Page, pid: string): Promise<void> {
   const putResp = page
     .waitForResponse(
       (r) =>
-        r.url().includes(`/api/pages/${pid}`) &&
-        r.request().method() === 'PUT' &&
-        r.status() < 400,
+        r.url().includes(`/api/pages/${pid}`) && r.request().method() === 'PUT' && r.status() < 400,
       { timeout: 5_000 },
     )
     .catch(() => null);
@@ -501,9 +538,7 @@ async function navigateToShowcaseRuntimeForm(page: Page): Promise<void> {
   await parent.evaluate((el: HTMLElement) => el.click());
 
   const listResp = page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/dynamic/${SHOWCASE_MODEL_CODE}/list`) &&
-      r.status() === 200,
+    (r) => r.url().includes(`/api/dynamic/${SHOWCASE_MODEL_CODE}/list`) && r.status() === 200,
     { timeout: 15_000 },
   );
   const leaf = page
@@ -525,9 +560,7 @@ async function navigateToShowcaseRuntimeForm(page: Page): Promise<void> {
     .first();
   await expect(createBtn).toBeVisible({ timeout: 8_000 });
   await createBtn.scrollIntoViewIfNeeded().catch(() => null);
-  await createBtn
-    .click({ trial: true })
-    .catch(() => null);
+  await createBtn.click({ trial: true }).catch(() => null);
   await createBtn.click();
   await expect(page).toHaveURL(SHOWCASE_FORM_NEW_URL_RE, { timeout: 10_000 });
 
@@ -629,8 +662,10 @@ const WIDGET_CASES: WidgetCase[] = [
     runtimeAssert: {
       // TipTap editors render a contenteditable ProseMirror node, plus a
       // toolbar (buttons for bold/italic/etc.). Either is proof-positive.
-      selector: '.ProseMirror, [contenteditable="true"], [data-tiptap-editor], .richtext-toolbar, button[aria-label*="bold" i]',
-      describe: 'richtext editor (ProseMirror/contenteditable/toolbar) present under sc_richtext_content',
+      selector:
+        '.ProseMirror, [contenteditable="true"], [data-tiptap-editor], .richtext-toolbar, button[aria-label*="bold" i]',
+      describe:
+        'richtext editor (ProseMirror/contenteditable/toolbar) present under sc_richtext_content',
     },
   },
   {
@@ -686,9 +721,7 @@ test.describe('Task B1 — Text-bucket widget full coverage', () => {
           r.status() >= 400
         ) {
           const body = await r.text().catch(() => '');
-          console.log(
-            `[B1/${wc.id}] PUT ${r.url()} → ${r.status()} ${body.slice(0, 300)}`,
-          );
+          console.log(`[B1/${wc.id}] PUT ${r.url()} → ${r.status()} ${body.slice(0, 300)}`);
         }
       });
 
@@ -700,11 +733,8 @@ test.describe('Task B1 — Text-bucket widget full coverage', () => {
       await navigateToDesignerViaMenu(page, pid, pageKey);
 
       // --- Add form-section + target field ---
-      await addBlockViaPalette(page, 'form-section');
-      await page.getByTestId('designer-tab-outline').click();
-      const outlineButtons = page.locator('button:has-text("Section Title"), button:has-text("区段标题")');
-      await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
-      await outlineButtons.first().click();
+      const blockId = await addBlockViaPalette(page, 'form-section');
+      await ensureSelectedBlockEditor(page, blockId);
       await addFieldsToSelectedBlock(page, [wc.field]);
 
       // --- Click the field in the canvas → open FieldPropertyEditor ---
@@ -868,9 +898,7 @@ test.describe('Task B1 — Text-bucket widget full coverage', () => {
         );
       if (!section) {
         // Surface the full blocks structure on miss to make the gap diagnosable.
-        console.log(
-          `[B1/${wc.id}] DEBUG blocks: ${JSON.stringify(blocks, null, 2)}`,
-        );
+        console.log(`[B1/${wc.id}] DEBUG blocks: ${JSON.stringify(blocks, null, 2)}`);
       }
       expect(section, `form-section containing ${wc.field} should exist`).toBeTruthy();
 

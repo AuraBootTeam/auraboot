@@ -35,7 +35,7 @@ test.describe('Executive Dashboard Deep @smoke', () => {
   // =========================================================================
   test.beforeAll(async ({ browser }, testInfo) => {
     testInfo.setTimeout(180000);
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // 1. Create project

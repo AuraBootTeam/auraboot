@@ -73,7 +73,8 @@ public class WdLeaveAiFillService {
                             + "before using AI fill (P1 vertical slice)."
             );
         }
-        LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
 
         String userMessage = String.format("currentDate: %s\n\nuser said:\n%s", currentDate, nlInput);
 

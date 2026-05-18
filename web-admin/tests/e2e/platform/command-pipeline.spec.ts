@@ -17,7 +17,7 @@ import { executeCommandViaApi, uniqueId } from '../helpers';
 const uid = uniqueId('cmd');
 
 test.describe('Command Pipeline Stages', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(60_000);
 
   let accountPid: string;

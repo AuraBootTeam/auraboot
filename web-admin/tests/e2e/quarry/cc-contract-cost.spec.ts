@@ -338,7 +338,7 @@ test.describe('CC Contract — CRUD & Lifecycle', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -362,7 +362,7 @@ test.describe('CC Contract Change — Approval & SideEffect', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -447,7 +447,7 @@ test.describe('CC Contract Change — Approval & SideEffect', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -476,7 +476,7 @@ test.describe('CC Payment & Receipt — SideEffect on Contract', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -566,7 +566,7 @@ test.describe('CC Payment & Receipt — SideEffect on Contract', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -594,7 +594,7 @@ test.describe('CC Cost Budget & Budget Lines', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -684,7 +684,7 @@ test.describe('CC Cost Budget & Budget Lines', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -714,7 +714,7 @@ test.describe('CC Actual Cost', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -753,7 +753,7 @@ test.describe('CC Actual Cost', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();

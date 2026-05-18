@@ -24,7 +24,7 @@ test.describe('E2E Test Payment — Workflow', () => {
   let orderPid: string;
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
@@ -42,7 +42,7 @@ test.describe('E2E Test Payment — Workflow', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
 
     // Clean up payments linked to this order

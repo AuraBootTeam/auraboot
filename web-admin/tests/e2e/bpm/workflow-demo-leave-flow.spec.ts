@@ -42,7 +42,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import { uniqueId, dateOffsetStr } from '../helpers';
+import { uniqueId, dateOffsetStr, findRowInPaginatedList } from '../helpers';
 import { ensureRoleUsers } from '../../helpers/wd-fixtures';
 import {
   loginAsAdmin,
@@ -84,7 +84,7 @@ async function navigateToLeaveRequestList(page: Page): Promise<void> {
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
   // Expand "请假 demo" parent
-  const rootBtn = nav.getByRole('button', { name: /请假|Leave Demo/i }).first();
+  const rootBtn = nav.getByRole('button', { name: /请假|Leave Demo|menu\.wd_root/i }).first();
   await expect(rootBtn).toBeVisible({ timeout: 5_000 });
   await rootBtn.evaluate((el: HTMLElement) => el.click());
 
@@ -182,11 +182,10 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
     // UI nav: sidebar → "我的申请"
     await navigateToLeaveRequestList(page);
 
-    // Find the draft row by its code (unique per run)
-    const row = page.locator('table tbody tr').filter({ hasText: leaveRequestCode }).first();
-    await expect(row, `row for ${leaveRequestCode} must appear in list`).toBeVisible({
-      timeout: 10_000,
-    });
+    // Find the draft row by its generated code. The list can already contain
+    // many WDLR rows, so narrow through the list search/pagination helper.
+    const row = await findRowInPaginatedList(page, leaveRequestCode, 15_000);
+    await expect(row, `row for ${leaveRequestCode} must appear in list`).toBeVisible();
 
     // Row should show status=draft before submit (D7 baseline)
     await expect(row).toContainText(/draft|草稿/i);

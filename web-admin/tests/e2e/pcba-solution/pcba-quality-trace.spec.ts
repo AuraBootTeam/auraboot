@@ -281,7 +281,7 @@ async function clickRowActionAndGetCommandBody(
 // ==========================================================================
 
 test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+  const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   const page = await ctx.newPage();
 
   // 1. Fetch an existing product PID
@@ -357,7 +357,7 @@ test.describe('PCBA Quality — FQC Order CRUD', () => {
   const created: CleanupEntry[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     await ctx.close();
@@ -673,7 +673,7 @@ test.describe('PCBA Quality — Batch Trace CRUD', () => {
   const created: CleanupEntry[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     await ctx.close();
@@ -1008,7 +1008,7 @@ test.describe('PCBA Quality — PQC Record CRUD', () => {
   const created: CleanupEntry[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     await ctx.close();

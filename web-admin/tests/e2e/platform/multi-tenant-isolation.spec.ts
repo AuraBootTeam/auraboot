@@ -17,7 +17,7 @@ import { executeCommandViaApi, uniqueId } from '../helpers';
 const uid = uniqueId('tenant');
 
 test.describe('Multi-Tenant Data Isolation', () => {
-  test.use({ storageState: 'tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(60_000);
 
   let adminAccountPid: string;
@@ -59,7 +59,7 @@ test.describe('Multi-Tenant Data Isolation', () => {
   test('RBAC: Operator user can access permitted data', async ({ page }) => {
     // Check if operator storage state exists
     const fs = await import('fs');
-    const operatorStoragePath = 'tests/storage/operator.json';
+    const operatorStoragePath = process.env.PW_OPERATOR_STORAGE_STATE || 'tests/storage/operator.json';
     if (!fs.existsSync(operatorStoragePath)) {
       console.log('  Skipping: operator storage state not found');
       test.skip();

@@ -213,7 +213,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
       refTarget?.modelCode ||
       refTarget?.targetEntity ||
       (field as any).referenceModelCode;
-    const labelField = refTarget?.targetField;
+    const labelField = refTarget?.displayField || refTarget?.labelField || refTarget?.targetField;
     if (targetModelCode) {
       // System-model dispatch: sys_user / sys_role / sys_dept live in platform tables,
       // not in ab_meta_model, so they are not reachable via /api/dynamic/{code}/list.
@@ -235,7 +235,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
           type: 'api',
           endpoint: `/api/dynamic/${targetModelCode}/list`,
           method: 'get',
-          params: { page: 1, pageSize: 200 },
+          params: { pageNum: 1, pageSize: 200 },
           adaptor: 'optionList',
           valueField: 'pid',
           autoFetch: true,

@@ -110,7 +110,7 @@ test.describe('Permission Management — Role Members Tab', () => {
   // ---- beforeAll: create a test role via API ----
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const page = await context.newPage();
     // Resolve baseURL the same way the runner does — PLAYWRIGHT_BASE_URL is

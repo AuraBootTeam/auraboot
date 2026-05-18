@@ -81,7 +81,7 @@ test.describe.serial('Cross-Tenant Grants admin page', () => {
   test.afterAll(async ({ browser }) => {
     if (createdIds.length === 0) return;
     const ctx = await browser.newContext({
-      storageState: './tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     for (const id of createdIds) {
       await ctx.request.delete(`${API_BASE}/${id}`).catch(() => undefined);

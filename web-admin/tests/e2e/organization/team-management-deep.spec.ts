@@ -36,7 +36,7 @@ test.describe('Team Management Depth', () => {
     if (teamCodes.length === 0) return;
 
     const context = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const page = await context.newPage();
 

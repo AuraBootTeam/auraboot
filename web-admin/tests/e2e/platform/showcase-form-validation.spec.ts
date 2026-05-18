@@ -65,7 +65,7 @@ async function navigateToShowcaseList(page: Page): Promise<void> {
 // ---------------------------------------------------------------------------
 
 test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+  const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   const page = await context.newPage();
 
   try {

@@ -81,7 +81,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const token = formData.get('token') as string;
     const redirectTo = safeRedirect(formData.get('redirectTo'), '/');
     if (!token) {
-      return { errors: { general: 'Missing token' }, status: 400 };
+      return data({ errors: { general: 'Missing token' } }, { status: 400 });
     }
     return createUserSession({
       request,
@@ -103,7 +103,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return handleEmailCodeLogin(formData, request, redirectTo, remember === 'on');
   }
 
-  return { errors: { general: 'Unsupported login method' }, status: 400 };
+  return data({ errors: { general: 'Unsupported login method' } }, { status: 400 });
 };
 
 async function handleEmailPasswordLogin(
@@ -116,15 +116,15 @@ async function handleEmailPasswordLogin(
   const password = formData.get('password');
 
   if (!validateEmail(email)) {
-    return { errors: { email: 'Email is invalid', password: null }, status: 400 };
+    return data({ errors: { email: 'Email is invalid', password: null } }, { status: 400 });
   }
 
   if (typeof password !== 'string' || password.length === 0) {
-    return { errors: { email: null, password: 'Password is required' }, status: 400 };
+    return data({ errors: { email: null, password: 'Password is required' } }, { status: 400 });
   }
 
   if (password.length < 6) {
-    return { errors: { email: null, password: 'Password is too short' }, status: 400 };
+    return data({ errors: { email: null, password: 'Password is too short' } }, { status: 400 });
   }
 
   const result = await post<User>(
@@ -135,7 +135,7 @@ async function handleEmailPasswordLogin(
   );
 
   if (!ResultHelper.isSuccess(result)) {
-    return { errors: { general: 'auth.error.invalidCredentials' }, status: 400 };
+    return data({ errors: { general: 'auth.error.invalidCredentials' } }, { status: 400 });
   }
 
   return completeLogin(result.data as User, request, redirectTo, remember);
@@ -151,10 +151,10 @@ async function handleSmsLogin(
   const code = formData.get('code') as string;
 
   if (!mobile || mobile.trim().length < 10) {
-    return { errors: { mobile: 'auth.error.invalidMobile', code: null }, status: 400 };
+    return data({ errors: { mobile: 'auth.error.invalidMobile', code: null } }, { status: 400 });
   }
   if (!code || code.trim().length < 4) {
-    return { errors: { mobile: null, code: 'auth.error.codeRequired' }, status: 400 };
+    return data({ errors: { mobile: null, code: 'auth.error.codeRequired' } }, { status: 400 });
   }
 
   const result = await post<User>(
@@ -165,10 +165,10 @@ async function handleSmsLogin(
   );
 
   if (!ResultHelper.isSuccess(result)) {
-    return {
-      errors: { mobile: null, code: result.desc || result.message || 'auth.error.codeInvalid' },
-      status: 400,
-    };
+    return data(
+      { errors: { mobile: null, code: result.desc || result.message || 'auth.error.codeInvalid' } },
+      { status: 400 },
+    );
   }
 
   return completeLogin(result.data as User, request, redirectTo, remember);
@@ -184,10 +184,10 @@ async function handleEmailCodeLogin(
   const code = formData.get('code') as string;
 
   if (!validateEmail(email)) {
-    return { errors: { email: 'Email is invalid', code: null }, status: 400 };
+    return data({ errors: { email: 'Email is invalid', code: null } }, { status: 400 });
   }
   if (!code || code.trim().length < 4) {
-    return { errors: { email: null, code: 'auth.error.codeRequired' }, status: 400 };
+    return data({ errors: { email: null, code: 'auth.error.codeRequired' } }, { status: 400 });
   }
 
   const result = await post<User>(
@@ -198,10 +198,10 @@ async function handleEmailCodeLogin(
   );
 
   if (!ResultHelper.isSuccess(result)) {
-    return {
-      errors: { email: null, code: result.desc || result.message || 'auth.error.codeInvalid' },
-      status: 400,
-    };
+    return data(
+      { errors: { email: null, code: result.desc || result.message || 'auth.error.codeInvalid' } },
+      { status: 400 },
+    );
   }
 
   return completeLogin(result.data as User, request, redirectTo, remember);
@@ -210,7 +210,7 @@ async function handleEmailCodeLogin(
 function completeLogin(user: User, request: Request, redirectTo: string, remember: boolean) {
   const token = user.jwt ?? '';
   if (!token) {
-    return { errors: { general: 'Login failed, please retry later' }, status: 500 };
+    return data({ errors: { general: 'Login failed, please retry later' } }, { status: 500 });
   }
   const tenantId = user.tenantId;
   const mustChangePassword = (user as any).mustChangePassword;
@@ -244,7 +244,12 @@ export default function LoginPage() {
   const redirectTo = searchParams.get('redirectTo') || '/';
   const actionData = useActionData<typeof action>();
   const loaderData = useLoaderData<typeof loader>();
-  const channels = (loaderData as any)?.channels || ['email_password'];
+  const rawChannels = Array.isArray((loaderData as any)?.channels)
+    ? ((loaderData as any).channels as unknown[])
+    : ['email_password'];
+  const channels: string[] = Array.from(
+    new Set(rawChannels.map((channel) => String(channel || '').toLowerCase()).filter(Boolean)),
+  );
 
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -258,6 +263,13 @@ export default function LoginPage() {
   const tabChannels = channels.filter((c: string) => !SOCIAL_CHANNELS.includes(c as any));
   const socialChannels = channels.filter((c: string) => SOCIAL_CHANNELS.includes(c as any));
   const [activeTab, setActiveTab] = useState<string>(tabChannels[0] || 'email_password');
+
+  useEffect(() => {
+    if (tabChannels.length === 0) return;
+    if (!tabChannels.includes(activeTab)) {
+      setActiveTab(tabChannels[0] || 'email_password');
+    }
+  }, [activeTab, tabChannels]);
 
   useEffect(() => {
     const checkDevice = () => {
@@ -537,6 +549,7 @@ function EmailPasswordForm({
     <Form
       method="post"
       action="/login"
+      reloadDocument
       onSubmit={(e) => {
         if (typeof window === 'undefined') return;
         const formData = new FormData(e.currentTarget);
@@ -724,7 +737,12 @@ function SmsLoginForm({
   }, [mobile]);
 
   return (
-    <Form method="post" action="/login" className={isMobile ? 'space-y-4' : 'space-y-6'}>
+    <Form
+      method="post"
+      action="/login"
+      reloadDocument
+      className={isMobile ? 'space-y-4' : 'space-y-6'}
+    >
       <input type="hidden" name="channelCode" value="sms" />
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
@@ -879,7 +897,12 @@ function EmailCodeLoginForm({
   }, [email]);
 
   return (
-    <Form method="post" action="/login" className={isMobile ? 'space-y-4' : 'space-y-6'}>
+    <Form
+      method="post"
+      action="/login"
+      reloadDocument
+      className={isMobile ? 'space-y-4' : 'space-y-6'}
+    >
       <input type="hidden" name="channelCode" value="email_code" />
       <input type="hidden" name="redirectTo" value={redirectTo} />
 

@@ -93,7 +93,7 @@ test.describe.serial('GAP-311 — group-chat agent reply WS broadcast', () => {
     // Backend gap GAP-311: the seed call below cannot succeed today (no agent-
     // member endpoint). We swallow the error so the per-test `test.fixme`
     // calls below can fire cleanly instead of the whole suite aborting.
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       convId = await ensureGroupConversationWithAurabot(page).catch(() => 0);

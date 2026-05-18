@@ -285,7 +285,7 @@ test.describe('PCBA Manufacturing — Production Plan CRUD', () => {
   let sharedBomPid: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     sharedProductPid = await createProduct(page, `E2E PP Product ${uniqueId()}`);
     sharedBomPid = await createBom(page, sharedProductPid, `E2E PP BOM ${uniqueId()}`);
@@ -293,7 +293,7 @@ test.describe('PCBA Manufacturing — Production Plan CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     for (const { commandCode, pid } of createdPids) {
       await executeCommandViaApi(page, commandCode, {}, pid, 'delete').catch(() => {});
@@ -474,7 +474,7 @@ test.describe('PCBA Manufacturing — Work Order Operation CRUD', () => {
   let woBomPid: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     // Create prerequisite product + BOM for the production plan
     woProductPid = await createProduct(page, `E2E WO Product ${uniqueId()}`);
@@ -494,7 +494,7 @@ test.describe('PCBA Manufacturing — Work Order Operation CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     for (const { commandCode, pid } of createdPids) {
       await executeCommandViaApi(page, commandCode, {}, pid, 'delete').catch(() => {});
@@ -619,7 +619,7 @@ test.describe('PCBA Manufacturing — IQC Order CRUD', () => {
   const createdProductPids: string[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     for (const { commandCode, pid } of createdPids) {
       // IQC orders have no explicit delete command; try dynamic delete
@@ -732,7 +732,7 @@ test.describe('PCBA Manufacturing — Equipment CRUD', () => {
   const createdPids: { commandCode: string; pid: string }[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     for (const { commandCode, pid } of createdPids) {
       await executeCommandViaApi(page, commandCode, {}, pid, 'delete').catch(() => {});
@@ -818,14 +818,14 @@ test.describe('PCBA Manufacturing — Routing CRUD', () => {
   let rtProductPid: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     rtProductPid = await createProduct(page, `E2E RT Product ${uniqueId()}`);
     await ctx.close();
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     for (const { commandCode, pid } of createdPids) {
       await executeCommandViaApi(page, commandCode, {}, pid, 'delete').catch(() => {});

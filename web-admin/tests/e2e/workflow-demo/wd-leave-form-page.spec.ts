@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '../../fixtures';
 import { loginAs, loginViaUI } from '../../helpers/wd-fixtures';
 import { BACKEND_URL } from '../../helpers/environments';
+import { findRowInPaginatedList } from '../helpers';
 
 const LICENSE_FILE = fileURLToPath(new URL('../../../../LICENSE.txt', import.meta.url));
 const BACKEND = BACKEND_URL;
@@ -210,6 +211,8 @@ test.describe('workflow-demo — leave request form page', () => {
       const detailBody = await detailResp.json();
       const record = detailBody?.data as Record<string, unknown> | undefined;
       expect(record).toBeTruthy();
+      const recordCode = String(record?.wd_req_code ?? '');
+      expect(recordCode).toMatch(/^WDLR-/);
       expect(record?.wd_req_applicant).toBe(selectedApplicantId);
       expect(record?.wd_req_type).toBe('annual');
       expect(String(record?.wd_req_days)).toBe('0.5');
@@ -247,14 +250,13 @@ test.describe('workflow-demo — leave request form page', () => {
       await expect(page.locator('main').first()).toContainText(/变更历史|加载变更历史|暂无变更记录|No change history/i);
 
       await page.goto('/p/wd_leave_request', { waitUntil: 'domcontentloaded' });
-      const listRow = page.locator('[data-testid="table-row-0"]').first();
-      await expect(listRow).toBeVisible({ timeout: 10_000 });
+      const listRow = await findRowInPaginatedList(page, recordCode, 15_000);
+      await expect(listRow).toBeVisible();
 
-      const navigationPromise = page.waitForURL(new RegExp(`/p/wd_leave_request/view/${recordId}$`), {
+      await listRow.click();
+      await expect(page).toHaveURL(new RegExp(`/p/wd_leave_request/view/${recordId}(?:[?#]|$)`), {
         timeout: 15_000,
       });
-      await listRow.click();
-      await navigationPromise;
       await expect(page.locator('[data-testid="record-preview-drawer"]')).toHaveCount(0);
       await expect(page.locator('main').first()).toContainText(reason);
     });

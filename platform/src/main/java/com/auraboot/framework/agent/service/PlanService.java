@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.provider.StubLlmProvider;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,9 @@ public class PlanService {
     List<AgentPlanStep> generatePlan(LlmProvider provider, LlmProviderFactory.ProviderConfig config,
                                       String model, String systemPrompt, String userMessage,
                                       List<AgentToolDefinition> tools) {
+        if (config != null && StubLlmProvider.PROVIDER_CODE.equals(config.getProviderCode())) {
+            return List.of(new AgentPlanStep(0, "Execute task directly"));
+        }
         String toolNames = tools.stream().map(AgentToolDefinition::getName).collect(Collectors.joining(", "));
         String planningPrompt = systemPrompt + "\n\n## Planning Phase\n"
                 + "You are in PLANNING mode. Analyze the task and create a step-by-step execution plan.\n"

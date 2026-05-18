@@ -44,7 +44,8 @@ public class PlatformAiScoringServiceImpl implements PlatformAiScoringService {
             throw new IllegalStateException(
                     "No LLM provider configured. Please configure an LLM provider in Cloud Config.");
         }
-        LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
 
         // 2. Resolve table name
         String tableName = metaModelService.getTableName(request.getModelCode());

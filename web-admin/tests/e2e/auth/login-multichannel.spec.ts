@@ -56,8 +56,8 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   // Enable SMS and EMAIL_CODE channels before tests run
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
-      baseURL: (BASE_URL),
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     await page.request.put('/api/admin/login-channels', {
@@ -74,8 +74,8 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   // Restore default channels after tests
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
-      baseURL: (BASE_URL),
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+      baseURL: BASE_URL,
     });
     const page = await ctx.newPage();
     await page.request.put('/api/admin/login-channels', {
@@ -149,12 +149,18 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
   test('LM-002: email/password login works @smoke', async ({ browser }) => {
     test.setTimeout(30000); // Login + redirect can be slow under parallel load
     // Use an isolated context so authenticated state does not leak
-    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const context = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+      baseURL: BASE_URL,
+    });
     const page = await context.newPage();
 
     try {
       await page.goto(LOGIN_URL);
       await page.waitForLoadState('domcontentloaded');
+      await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
+        timeout: 5000,
+      });
 
       // Wait for the email input to be ready
       await page.locator('#email').waitFor({ state: 'visible', timeout: 5000 });
@@ -162,12 +168,18 @@ test.describe('Login Multi-Channel @login-multichannel', () => {
       // Fill credentials (click-before-fill to ensure React hydration)
       await page.locator('#email').click();
       await page.locator('#email').fill(TEST_CREDENTIALS.email);
+      await expect(page.locator('#email')).toHaveValue(TEST_CREDENTIALS.email, {
+        timeout: 3000,
+      });
 
       await page.locator('#password').click();
       await page.locator('#password').fill(TEST_CREDENTIALS.password);
+      await expect(page.locator('#password')).toHaveValue(TEST_CREDENTIALS.password, {
+        timeout: 3000,
+      });
 
       // Submit
-      await page.locator('button:has-text("立即登录")').click();
+      await page.locator('form button[type="submit"]').first().click();
 
       // Wait until we leave /login
       await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20000 });

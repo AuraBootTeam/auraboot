@@ -237,7 +237,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
 
     // Step 4: filter via keyword search → only seed A row should remain.
     const keywordInput = page
-      .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
+      .locator('[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"], input[type="search"]')
       .first();
     if (await keywordInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
       const filterResp = page.waitForResponse(
@@ -542,7 +542,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
 
     // Search for the row so it's on page 1.
     const keywordInput = page
-      .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
+      .locator('[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"], input[type="search"]')
       .first();
     if (await keywordInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
       const filterResp = page.waitForResponse(
