@@ -376,6 +376,7 @@ public class SystemPermissionInitializer {
         permission.setLevel(level);
         permission.setParentId(parentId);
         permission.setStatus(StatusConstants.ACTIVE);
+        permission.setDeletedFlag(false);
         permission.setCreatedAt(Instant.now());
         permission.setUpdatedAt(Instant.now());
 
