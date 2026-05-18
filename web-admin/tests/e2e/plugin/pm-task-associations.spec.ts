@@ -68,7 +68,7 @@ test.describe('PM Task Associations', () => {
   const labelName = `Label ${uniqueId('lbl')}`;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // Create project

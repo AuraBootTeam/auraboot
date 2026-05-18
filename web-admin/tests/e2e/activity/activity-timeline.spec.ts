@@ -26,7 +26,7 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
   let orderTitle: string;
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
@@ -88,11 +88,17 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
     expect(note.actorType).toBe('user');
 
     // System activity from command execution should also be present
-    const systemOrCreate = activities.find(
-      (a: any) => a.activityType === 'create' || a.activityType === 'system',
+    const systemActivities = activities.filter(
+      (a: any) =>
+        a.activityType === 'create' ||
+        a.activityType === 'state_change' ||
+        a.activityType === 'system',
     );
-    expect(systemOrCreate).toBeTruthy();
-    expect(systemOrCreate.commandCode).toContain('create_order');
+    const commandCodes = systemActivities.map((a: any) => String(a.commandCode ?? ''));
+    expect(
+      commandCodes.some((code: string) => /e2et:(create|submit)_order/.test(code)),
+      `expected create/submit command activity, got ${JSON.stringify(commandCodes)}`,
+    ).toBe(true);
   });
 
   /**

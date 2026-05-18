@@ -159,7 +159,7 @@ test.describe('Member Management — Deep Tests', () => {
     testInfo.setTimeout(120000);
 
     // Use storageState context to make API calls with proper tenant session
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // Find admin userId for MM-11 self-deletion test

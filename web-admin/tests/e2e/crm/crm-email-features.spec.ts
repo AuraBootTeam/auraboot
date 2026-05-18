@@ -97,7 +97,7 @@ test.describe('CRM Email Log @smoke', () => {
 
   // Setup: create a seed email log record via API
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const result = await executeCommandViaApi(
@@ -212,7 +212,7 @@ test.describe('CRM Email Log Status Transitions @critical', () => {
 
   // Setup: create a draft email log to send
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const result = await executeCommandViaApi(
@@ -311,7 +311,7 @@ test.describe('CRM Email Template @critical', () => {
 
   // Setup: create seed email templates
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // Template for list presence test

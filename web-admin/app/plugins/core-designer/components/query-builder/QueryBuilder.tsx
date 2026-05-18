@@ -39,8 +39,40 @@ export const QueryBuilder: React.FC = () => {
   const [error, setError] = useState<string>();
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const queryStateRef = useRef({
+    modelCode,
+    selectedFields,
+    filters,
+    groupBy,
+    aggregations,
+    sortField,
+    sortOrder,
+    limit,
+  });
+
+  useEffect(() => {
+    queryStateRef.current = {
+      modelCode,
+      selectedFields,
+      filters,
+      groupBy,
+      aggregations,
+      sortField,
+      sortOrder,
+      limit,
+    };
+  }, [modelCode, selectedFields, filters, groupBy, aggregations, sortField, sortOrder, limit]);
 
   const handleModelChange = useCallback((code: string) => {
+    queryStateRef.current = {
+      ...queryStateRef.current,
+      modelCode: code,
+      selectedFields: [],
+      filters: [],
+      groupBy: [],
+      aggregations: [],
+      sortField: '',
+    };
     setModelCode(code);
     setSelectedFields([]);
     setFilters([]);
@@ -57,6 +89,15 @@ export const QueryBuilder: React.FC = () => {
   }, []);
 
   const handleReset = useCallback(() => {
+    queryStateRef.current = {
+      ...queryStateRef.current,
+      selectedFields: [],
+      filters: [],
+      groupBy: [],
+      aggregations: [],
+      sortField: '',
+      limit: 500,
+    };
     setSelectedFields([]);
     setFilters([]);
     setGroupBy([]);
@@ -69,7 +110,8 @@ export const QueryBuilder: React.FC = () => {
   }, []);
 
   const handleRun = useCallback(async () => {
-    if (!modelCode) {
+    const snapshot = queryStateRef.current;
+    if (!snapshot.modelCode) {
       showErrorToast('Please select a model first');
       return;
     }
@@ -78,14 +120,14 @@ export const QueryBuilder: React.FC = () => {
     const t0 = performance.now();
     try {
       const resp = await queryBuilderService.execute({
-        modelCode,
-        fields: selectedFields.length > 0 ? selectedFields : undefined,
-        filters: filters.length > 0 ? filters : undefined,
-        groupBy: groupBy.length > 0 ? groupBy : undefined,
-        aggregations: aggregations.length > 0 ? aggregations : undefined,
-        sortField: sortField || undefined,
-        sortOrder: sortField ? sortOrder : undefined,
-        limit,
+        modelCode: snapshot.modelCode,
+        fields: snapshot.selectedFields.length > 0 ? snapshot.selectedFields : undefined,
+        filters: snapshot.filters.length > 0 ? snapshot.filters : undefined,
+        groupBy: snapshot.groupBy.length > 0 ? snapshot.groupBy : undefined,
+        aggregations: snapshot.aggregations.length > 0 ? snapshot.aggregations : undefined,
+        sortField: snapshot.sortField || undefined,
+        sortOrder: snapshot.sortField ? snapshot.sortOrder : undefined,
+        limit: snapshot.limit,
       });
       if (ResultHelper.isSuccess(resp) && resp.data) {
         setResults(resp.data);
@@ -100,17 +142,7 @@ export const QueryBuilder: React.FC = () => {
       setLatencyMs(Math.round(performance.now() - t0));
       setLoading(false);
     }
-  }, [
-    modelCode,
-    selectedFields,
-    filters,
-    groupBy,
-    aggregations,
-    sortField,
-    sortOrder,
-    limit,
-    showErrorToast,
-  ]);
+  }, [showErrorToast]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -117,6 +117,22 @@ const SCOPE_CONFIGS: ScopeConfig[] = [
   { scope: 'personal', label: 'Personal Views', icon: '👤' },
 ];
 
+function nextAutoViewName(label: string, views: SavedView[]): string {
+  const baseName = `${label} View`;
+  const usedNames = new Set(
+    views.map((view) => String(view.name ?? '').trim().toLowerCase()).filter(Boolean),
+  );
+  if (!usedNames.has(baseName.toLowerCase())) {
+    return baseName;
+  }
+
+  let suffix = 2;
+  while (usedNames.has(`${baseName} ${suffix}`.toLowerCase())) {
+    suffix += 1;
+  }
+  return `${baseName} ${suffix}`;
+}
+
 /**
  * ViewManagePanel - A slide-out panel for managing saved views
  *
@@ -241,8 +257,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       gantt: 'Gantt', tree: 'Tree', timeline: 'Timeline', form: 'Form',
     };
     const label = typeLabels[viewType] || 'Table';
-    const existing = views.filter((v) => v.scope === 'personal' && (v.viewType || 'table') === viewType);
-    const autoName = existing.length === 0 ? `${label} View` : `${label} View ${existing.length + 1}`;
+    const autoName = nextAutoViewName(label, views);
 
     setLoadingState({ type: 'create' });
     try {

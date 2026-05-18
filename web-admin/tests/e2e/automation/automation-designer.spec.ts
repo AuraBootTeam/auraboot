@@ -31,7 +31,7 @@ import { ErrorCodes } from '~/shared/services/http-client/types';
  * zh-CN placeholder: "自动化名称", en-US: "Automation name"
  */
 function nameInput(page: import('@playwright/test').Page) {
-  return page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+  return page.getByTestId('automation-editor-name-input');
 }
 
 /**
@@ -39,7 +39,7 @@ function nameInput(page: import('@playwright/test').Page) {
  * zh-CN placeholder: "描述（可选）", en-US: "Description (optional)"
  */
 function descriptionInput(page: import('@playwright/test').Page) {
-  return page.locator('input[placeholder*="描述"], input[placeholder*="escription"]').first();
+  return page.getByTestId('automation-editor-description-input');
 }
 
 /**
@@ -95,7 +95,7 @@ test.describe('Automation Designer', () => {
   const createdPids: string[] = [];
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     try {
       testAutomation = await createAutomationViaApi(page);
@@ -108,7 +108,7 @@ test.describe('Automation Designer', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     for (const pid of createdPids) {
       await deleteAutomationViaApi(page, pid);

@@ -110,7 +110,7 @@ async function navigateToDesignerViaMenu(
   const leaf = page.locator('a[href="/p/page_schema"], a[href*="/p/page_schema"]').first();
   await leaf.waitFor({ state: 'attached', timeout: 5_000 });
   const listResp = page.waitForResponse(
-    (r) => r.url().includes('/dynamic/page_schema_list') && r.url().includes('/list'),
+    (r) => (r.url().includes('/api/dynamic/page_schema/list') || (r.url().includes('/dynamic/page_schema_list') && r.url().includes('/list'))),
     { timeout: 5_000 },
   );
   await leaf.evaluate((el: HTMLElement) => el.click());
@@ -123,7 +123,7 @@ async function navigateToDesignerViaMenu(
   });
 
   const search = page
-    .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
+    .locator('[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"], input[type="search"]')
     .first();
   if (await search.isVisible({ timeout: 1_500 }).catch(() => false)) {
     await search.click();
@@ -131,7 +131,7 @@ async function navigateToDesignerViaMenu(
     await search.press('Enter').catch(() => null);
     await page
       .waitForResponse(
-        (r) => r.url().includes('/dynamic/page_schema_list') && r.status() === 200,
+        (r) => (r.url().includes('/api/dynamic/page_schema/list') || r.url().includes('/dynamic/page_schema_list')) && r.status() === 200,
         { timeout: 5_000 },
       )
       .catch(() => null);

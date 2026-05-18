@@ -175,7 +175,7 @@ test.describe('BPM Deep Tests', () => {
   let instanceId: string | null = null;
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
 
     processKey = `bpm_deep_${Date.now().toString(36)}`;
@@ -199,7 +199,7 @@ test.describe('BPM Deep Tests', () => {
 
   test.afterAll(async ({ browser }) => {
     if (!processPid) return;
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     try {
       await page.request

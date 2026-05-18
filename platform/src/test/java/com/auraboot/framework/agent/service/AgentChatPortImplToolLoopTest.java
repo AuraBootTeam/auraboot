@@ -257,6 +257,32 @@ class AgentChatPortImplToolLoopTest {
     }
 
     @Test
+    @DisplayName("stub-routed provider config -> named-agent turn uses stub provider bean")
+    void stubRoutedConfigUsesStubProviderBean() throws Exception {
+        stubAgentDefinition();
+        stubGrounding();
+        when(providerFactory.resolveConfig(eq(TENANT_ID), eq("openai")))
+                .thenReturn(LlmProviderFactory.ProviderConfig.builder()
+                        .providerCode("stub")
+                        .apiKey("stub_key_for_no_llm_paths")
+                        .baseUrl("stub://local")
+                        .defaultModel("stub-model")
+                        .maxTokens(4096)
+                        .build());
+        when(providerFactory.getProvider("stub")).thenReturn(provider);
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
+        when(provider.chat(any(LlmChatRequest.class), eq("stub_key_for_no_llm_paths"), eq("stub://local")))
+                .thenReturn(endTurnResponse("[stub response]"));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        verify(providerFactory, times(1)).getProvider("stub");
+        verify(providerFactory, never()).getProvider("openai");
+        verify(sink).onDone("[stub response]", null);
+    }
+
+    @Test
     @DisplayName("tool_use round emits onToolStart/onToolResult and feeds the tool result back to the LLM")
     void toolUseRoundExecutesAndFeedsResultBack() throws Exception {
         stubAgentDefinition();

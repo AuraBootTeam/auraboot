@@ -285,7 +285,7 @@ test.describe('PCBA SRM Extended', () => {
 
   // Create reference supplier + product once before all tests in this file.
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
 
     // Create a reference supplier record (pe_supplier model in SRM plugin)
@@ -372,7 +372,7 @@ test.describe('PCBA SRM Extended', () => {
     const bucket = emptyBucket();
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanup(p, bucket);
       await ctx.close();
@@ -800,7 +800,7 @@ test.describe('PCBA SRM Extended', () => {
     const bucket = emptyBucket();
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanup(p, bucket);
       await ctx.close();

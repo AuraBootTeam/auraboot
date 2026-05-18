@@ -146,7 +146,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
   let warehousePid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Fetch or create a warehouse for REFERENCE fields
@@ -173,7 +173,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     await ctx.close();
@@ -327,7 +327,7 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
   let warehousePid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Fetch or create a warehouse for REFERENCE fields
@@ -354,7 +354,7 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     await ctx.close();
@@ -508,7 +508,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
   let toWarehousePid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Fetch existing warehouses — transfers need 2 distinct warehouses
@@ -570,7 +570,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     await ctx.close();

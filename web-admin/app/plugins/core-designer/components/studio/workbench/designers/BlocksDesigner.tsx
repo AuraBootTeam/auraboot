@@ -10,7 +10,7 @@
  *   Right sidebar — BlockPropertyPanel for selected block
  */
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -113,6 +113,19 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   // Drag state for visual feedback
   const [draggedBlock, setDraggedBlock] = useState<DslBlock | null>(null);
   const [draggedFieldName, setDraggedFieldName] = useState<string | null>(null);
+  const latestSchemaRef = useRef<PageSchema>(schema);
+
+  useEffect(() => {
+    latestSchemaRef.current = schema;
+  }, [schema]);
+
+  const commitSchema = useCallback(
+    (nextSchema: PageSchema) => {
+      latestSchemaRef.current = nextSchema;
+      onSchemaChange(nextSchema);
+    },
+    [onSchemaChange],
+  );
 
   // Configure sensors with activation constraint (8px movement before drag starts)
   const sensors = useSensors(
@@ -172,44 +185,52 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
           break;
       }
 
-      onSchemaChange({ ...schema, blocks: [...blocks, newBlock] });
+      const currentSchema = latestSchemaRef.current;
+      const currentBlocks = currentSchema.blocks ?? [];
+      commitSchema({ ...currentSchema, blocks: [...currentBlocks, newBlock] });
       setSelectedBlockId(newBlock.id);
     },
-    [schema, blocks, onSchemaChange, readonly, l],
+    [commitSchema, readonly, l],
   );
 
   const removeBlock = useCallback(
     (id: string) => {
       if (readonly) return;
-      onSchemaChange({ ...schema, blocks: blocks.filter((b) => b.id !== id) });
+      const currentSchema = latestSchemaRef.current;
+      const currentBlocks = currentSchema.blocks ?? [];
+      commitSchema({ ...currentSchema, blocks: currentBlocks.filter((b) => b.id !== id) });
       if (selectedBlockId === id) {
         setSelectedBlockId(null);
         setSelectedFieldInfo(null);
       }
     },
-    [schema, blocks, onSchemaChange, readonly, selectedBlockId],
+    [commitSchema, readonly, selectedBlockId],
   );
 
   const updateBlock = useCallback(
     (id: string, patch: Partial<DslBlock>) => {
       if (readonly) return;
-      onSchemaChange({
-        ...schema,
-        blocks: blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+      const currentSchema = latestSchemaRef.current;
+      const currentBlocks = currentSchema.blocks ?? [];
+      commitSchema({
+        ...currentSchema,
+        blocks: currentBlocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
       });
     },
-    [schema, blocks, onSchemaChange, readonly],
+    [commitSchema, readonly],
   );
 
   const reorderBlocks = useCallback(
     (activeId: string, overId: string) => {
       if (readonly || activeId === overId) return;
-      const oldIndex = blocks.findIndex((b) => b.id === activeId);
-      const newIndex = blocks.findIndex((b) => b.id === overId);
+      const currentSchema = latestSchemaRef.current;
+      const currentBlocks = currentSchema.blocks ?? [];
+      const oldIndex = currentBlocks.findIndex((b) => b.id === activeId);
+      const newIndex = currentBlocks.findIndex((b) => b.id === overId);
       if (oldIndex === -1 || newIndex === -1) return;
-      onSchemaChange({ ...schema, blocks: arrayMove(blocks, oldIndex, newIndex) });
+      commitSchema({ ...currentSchema, blocks: arrayMove(currentBlocks, oldIndex, newIndex) });
     },
-    [schema, blocks, onSchemaChange, readonly],
+    [commitSchema, readonly],
   );
 
   // ── Field mutation helpers ─────────────────────────────────────────────────
@@ -217,10 +238,12 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   const handleFieldDropToBlock = useCallback(
     (blockId: string, fieldCode: string, targetType: 'fields' | 'columns') => {
       if (readonly) return;
-      const blockIdx = blocks.findIndex((b) => b.id === blockId);
+      const currentSchema = latestSchemaRef.current;
+      const currentBlocks = currentSchema.blocks ?? [];
+      const blockIdx = currentBlocks.findIndex((b) => b.id === blockId);
       if (blockIdx === -1) return;
 
-      const block = { ...blocks[blockIdx] };
+      const block = { ...currentBlocks[blockIdx] };
 
       if (targetType === 'fields') {
         const current = block.fields || [];
@@ -233,38 +256,42 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
         if (!exists) block.columns = [...current, fieldCode];
       }
 
-      const newBlocks = [...blocks];
+      const newBlocks = [...currentBlocks];
       newBlocks[blockIdx] = block;
-      onSchemaChange({ ...schema, blocks: newBlocks });
+      commitSchema({ ...currentSchema, blocks: newBlocks });
     },
-    [schema, blocks, onSchemaChange, readonly],
+    [commitSchema, readonly],
   );
 
   const handleFieldReorder = useCallback(
     (blockId: string, oldIndex: number, newIndex: number) => {
       if (readonly || oldIndex === newIndex) return;
-      const blockIdx = blocks.findIndex((b) => b.id === blockId);
+      const currentSchema = latestSchemaRef.current;
+      const currentBlocks = currentSchema.blocks ?? [];
+      const blockIdx = currentBlocks.findIndex((b) => b.id === blockId);
       if (blockIdx === -1) return;
 
-      const block = { ...blocks[blockIdx] };
+      const block = { ...currentBlocks[blockIdx] };
       const fields = block.fields || [];
       if (oldIndex >= fields.length || newIndex >= fields.length) return;
 
       block.fields = arrayMove(fields, oldIndex, newIndex);
-      const newBlocks = [...blocks];
+      const newBlocks = [...currentBlocks];
       newBlocks[blockIdx] = block;
-      onSchemaChange({ ...schema, blocks: newBlocks });
+      commitSchema({ ...currentSchema, blocks: newBlocks });
     },
-    [schema, blocks, onSchemaChange, readonly],
+    [commitSchema, readonly],
   );
 
   const handleFieldUpdate = useCallback(
     (blockId: string, fieldIndex: number, updates: Partial<DslFieldOverride>) => {
       if (readonly) return;
-      const blockIdx = blocks.findIndex((b) => b.id === blockId);
+      const currentSchema = latestSchemaRef.current;
+      const currentBlocks = currentSchema.blocks ?? [];
+      const blockIdx = currentBlocks.findIndex((b) => b.id === blockId);
       if (blockIdx === -1) return;
 
-      const block = { ...blocks[blockIdx] };
+      const block = { ...currentBlocks[blockIdx] };
       const fields = [...(block.fields || [])];
 
       if (fieldIndex < fields.length) {
@@ -281,11 +308,11 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
         }
       }
 
-      const newBlocks = [...blocks];
+      const newBlocks = [...currentBlocks];
       newBlocks[blockIdx] = block;
-      onSchemaChange({ ...schema, blocks: newBlocks });
+      commitSchema({ ...currentSchema, blocks: newBlocks });
     },
-    [schema, blocks, onSchemaChange, readonly, selectedFieldInfo],
+    [commitSchema, readonly, selectedFieldInfo],
   );
 
   // ── Selection handlers ─────────────────────────────────────────────────────
@@ -483,6 +510,9 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
                         <li key={block.id}>
                           <button
                             onClick={() => handleBlockSelect(block.id)}
+                            data-testid={`designer-outline-block-${block.id}`}
+                            data-block-id={block.id}
+                            data-block-type={block.blockType}
                             className={`w-full rounded px-2 py-1.5 text-left text-xs transition-colors ${
                               selectedBlockId === block.id
                                 ? 'bg-blue-50 font-medium text-blue-700'
@@ -602,7 +632,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
               isCustomApiMode={isCustomApiMode}
               dataSource={apiDataSource}
               onDataSourceChange={(ds) => {
-                onSchemaChange({ ...schema, dataSource: ds } as any);
+                commitSchema({ ...latestSchemaRef.current, dataSource: ds } as any);
               }}
               onTestDetect={() => apiDetection.detect()}
               testStatus={{

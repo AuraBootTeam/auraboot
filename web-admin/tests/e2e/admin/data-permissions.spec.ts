@@ -224,14 +224,23 @@ test.describe('Data Permissions @gap010', () => {
     const nameInput = page
       .locator('[data-testid="form-field-name"] input:visible, [data-field="name"] input:visible, [name="name"]:visible')
       .first();
+    await expect(nameInput).toHaveValue(policyName, { timeout: 10000 });
     await nameInput.fill(updatedName);
+    await nameInput.blur();
     await expect(nameInput).toHaveValue(updatedName);
 
     await clickSaveAndWait(page);
 
     // Verify via API
-    const updated = await helper.fetchViaApi(pid).catch(() => null);
-    expect(String(updated?.name ?? '')).toBe(updatedName);
+    await expect
+      .poll(
+        async () => {
+          const updated = await helper.fetchViaApi(pid).catch(() => null);
+          return String(updated?.name ?? '');
+        },
+        { timeout: 15000, intervals: [500, 1000, 1500] },
+      )
+      .toBe(updatedName);
   });
 
   test('DP-005: delete policy via list row action', async ({ page }) => {

@@ -1461,6 +1461,11 @@ export function ListPageContent(props: PageContentProps) {
       if (modelLabel && modelLabel !== modelKey) {
         return modelLabel;
       }
+      const modelFieldKey = `field.${mc}.${fieldCode}.label`;
+      const modelFieldLabel = t(modelFieldKey);
+      if (modelFieldLabel && modelFieldLabel !== modelFieldKey) {
+        return modelFieldLabel;
+      }
       const fieldKey = `field.${fieldCode}.label`;
       const fieldLabel = t(fieldKey);
       if (fieldLabel && fieldLabel !== fieldKey) {
@@ -1663,6 +1668,9 @@ export function ListPageContent(props: PageContentProps) {
       const modelKey = `model.${mc}.${column.field}.label`;
       const modelLabel = t(modelKey);
       if (modelLabel !== modelKey) return modelLabel;
+      const modelFieldKey = `field.${mc}.${column.field}.label`;
+      const modelFieldLabel = t(modelFieldKey);
+      if (modelFieldLabel !== modelFieldKey) return modelFieldLabel;
       const fieldKey = `field.${column.field}.label`;
       const fieldLabel = t(fieldKey);
       if (fieldLabel !== fieldKey) return fieldLabel;

@@ -687,7 +687,8 @@ public class MemoryPromotionExtractor {
             if (cfg == null || cfg.getApiKey() == null || cfg.getApiKey().isBlank()) {
                 return null;
             }
-            LlmProvider provider = llmProviderFactory.getProvider(cfg.getProviderCode());
+            String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, cfg);
+            LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
             if (provider == null) return null;
 
             String systemPrompt =

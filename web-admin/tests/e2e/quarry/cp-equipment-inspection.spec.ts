@@ -41,7 +41,7 @@ test.describe('CP Equipment Inspection — CRUD & Status', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -215,7 +215,7 @@ test.describe('CP Equipment Inspection — CRUD & Status', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();

@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from '../../fixtures';
 import { loginAs, loginViaUI } from '../../helpers/wd-fixtures';
+import { findRowInPaginatedList } from '../helpers';
 
 test.setTimeout(120_000);
 
@@ -87,7 +88,7 @@ async function navigateToLeaveRequestList(page: Page): Promise<void> {
   const nav = page.locator('nav').first();
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
-  const rootBtn = nav.getByRole('button', { name: /请假|Leave Demo/i }).first();
+  const rootBtn = nav.getByRole('button', { name: /请假|Leave Demo|menu\.wd_root/i }).first();
   await expect(rootBtn).toBeVisible({ timeout: 5_000 });
   await rootBtn.evaluate((el: HTMLElement) => el.click());
 
@@ -118,8 +119,8 @@ test.describe('workflow-demo — workflow diagram first open', () => {
     await loginViaUI(page, 'admin@auraboot.com', 'Test2026x');
     await navigateToLeaveRequestList(page);
 
-    const row = page.locator('table tbody tr').filter({ hasText: submitted.code }).first();
-    await expect(row).toBeVisible({ timeout: 10_000 });
+    const row = await findRowInPaginatedList(page, submitted.code, 15_000);
+    await expect(row).toBeVisible();
 
     const detailUrl = new RegExp(`/p/wd_leave_request/view/${submitted.recordId}$`);
     await Promise.all([

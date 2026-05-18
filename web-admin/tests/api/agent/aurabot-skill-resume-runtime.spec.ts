@@ -228,6 +228,25 @@ DELETE FROM ab_agent_definition
 test.describe('AuraBot skill resume runtime', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test('chat/stream default provider emits done SSE event without error event', async ({ request }) => {
+    const auth = await login(request);
+    const streamed = await postSse(auth.jwt, '/api/ai/aurabot/chat/stream', {
+      sessionId: `session-${randomUUID()}`,
+      message: '统计客户信息',
+      options: { stream: true },
+    });
+
+    expect(streamed.ok, streamed.text).toBe(true);
+    const events = parseSse(streamed.text);
+    const errorEvent = events.find((event) => event.event === 'error');
+    expect(errorEvent, JSON.stringify(events)).toBeUndefined();
+    expect(streamed.text).not.toContain('Invalid scheme');
+
+    const done = events.find((event) => event.event === 'done')?.data as any;
+    expect(done, JSON.stringify(events)).toBeTruthy();
+    expect(String(done?.content ?? '')).not.toContain('Invalid scheme');
+  });
+
   test('chat/stream creates pending skill preview and /execute confirms through canonical ToolLoopService', async ({
     request,
   }) => {

@@ -2,7 +2,7 @@
  * ModelSelector — Models rail with search and accent-bar selection.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { queryBuilderService, type ModelInfo } from '../services/queryBuilderService';
 import { ResultHelper } from '~/utils/type';
 
@@ -17,25 +17,45 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange, s
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const requestSeqRef = useRef(0);
 
-  const loadModels = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
+    const requestSeq = ++requestSeqRef.current;
     setLoading(true);
+    const timer = window.setTimeout(async () => {
     try {
       const resp = await queryBuilderService.getModels(search || undefined);
-      if (ResultHelper.isSuccess(resp) && resp.data) setModels(resp.data);
+      if (
+        !cancelled &&
+        requestSeq === requestSeqRef.current &&
+        ResultHelper.isSuccess(resp) &&
+        resp.data
+      ) {
+        setModels(resp.data);
+      }
     } catch {
       /* ignore */
     } finally {
-      setLoading(false);
+      if (!cancelled && requestSeq === requestSeqRef.current) {
+        setLoading(false);
+      }
     }
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [search]);
 
-  useEffect(() => {
-    loadModels();
-  }, [loadModels]);
-
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div
+      className="flex h-full flex-col gap-3"
+      data-testid="qb-model-selector"
+      data-loading={loading ? 'true' : 'false'}
+      data-query={search}
+      data-result-count={models.length}
+    >
       <div className="px-1">
         <h2 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Data Models</h2>
         <p className="mt-1 text-xs text-slate-400">Pick a model to start</p>

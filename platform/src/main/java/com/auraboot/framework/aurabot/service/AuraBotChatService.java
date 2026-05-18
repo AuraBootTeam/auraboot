@@ -300,7 +300,7 @@ public class AuraBotChatService {
             return new TurnOutcome.Failed(msg, null);
         }
         // Use the resolved provider code (may differ from input when auto-discovered)
-        providerCode = config.getProviderCode();
+        providerCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
 
         // --- Trace: create trace ---
         Map<String, Object> traceMetadata = new HashMap<>();

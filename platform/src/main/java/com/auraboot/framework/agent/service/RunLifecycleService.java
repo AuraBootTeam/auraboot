@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.provider.StubLlmProvider;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -290,9 +291,12 @@ public class RunLifecycleService {
                     + "- Only extract genuinely useful memories, not routine operations\n"
                     + "- Respond with JSON array only. If nothing worth remembering, respond with []";
 
-            LlmProvider provider = providerFactory.getProvider(providerCode);
             LlmProviderFactory.ProviderConfig config = providerFactory.resolveConfig(tenantId, providerCode);
             if (config == null || config.getApiKey() == null || config.getApiKey().isBlank()) return false;
+            String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
+            if (StubLlmProvider.PROVIDER_CODE.equals(effectiveProviderCode)) return false;
+            LlmProvider provider = providerFactory.getProvider(effectiveProviderCode);
+            if (provider == null) return false;
 
             LlmChatRequest req = LlmChatRequest.builder()
                     .model(model)

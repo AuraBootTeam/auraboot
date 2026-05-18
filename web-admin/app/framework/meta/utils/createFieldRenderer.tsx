@@ -33,7 +33,7 @@ import type { ExpressionContext } from '~/framework/meta/runtime/expression/cont
  */
 export function createFieldRenderer(
   data: Record<string, any>,
-  setData: (data: Record<string, any>) => void,
+  setData: React.Dispatch<React.SetStateAction<Record<string, any>>>,
   context: ExpressionContext,
   fieldErrors: Record<string, string> = {},
   onFieldChange?: (fieldCode: string) => void,
@@ -45,10 +45,10 @@ export function createFieldRenderer(
       value={data[field.field]}
       onChange={(newValue) => {
         onFieldChange?.(field.field);
-        setData({
-          ...data,
+        setData((prev) => ({
+          ...prev,
           [field.field]: newValue,
-        });
+        }));
       }}
       context={context}
       error={fieldErrors[field.field]}

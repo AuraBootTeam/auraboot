@@ -47,7 +47,7 @@ test.describe('E2E Test Customer — CRUD + UNIQUE_COMPOSITE', () => {
 
   test.afterAll(async ({ browser }) => {
     // Clean up any test customers created
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const helper = new ModelTestHelper(page, E2ET_CUSTOMER_CONFIG);
 

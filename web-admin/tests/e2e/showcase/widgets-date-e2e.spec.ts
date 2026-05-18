@@ -189,11 +189,7 @@ async function apiCreateFormPage(
  * Duplicates the pattern used by form-blocksdesigner-e2e.spec.ts — kept
  * inline to avoid cross-test helper coupling.
  */
-async function navigateToDesignerViaMenu(
-  page: Page,
-  pid: string,
-  pageKey: string,
-): Promise<void> {
+async function navigateToDesignerViaMenu(page: Page, pid: string, pageKey: string): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' }).catch(() => {});
 
   const parent = page
@@ -205,7 +201,9 @@ async function navigateToDesignerViaMenu(
   const leaf = page.locator('a[href="/p/page_schema"], a[href*="/p/page_schema"]').first();
   await leaf.waitFor({ state: 'attached', timeout: 5_000 });
   const listResp = page.waitForResponse(
-    (r) => r.url().includes('/dynamic/page_schema_list') && r.url().includes('/list'),
+    (r) =>
+      r.url().includes('/api/dynamic/page_schema/list') ||
+      (r.url().includes('/dynamic/page_schema_list') && r.url().includes('/list')),
     { timeout: 5_000 },
   );
   await leaf.evaluate((el: HTMLElement) => el.click());
@@ -218,7 +216,9 @@ async function navigateToDesignerViaMenu(
   });
 
   const search = page
-    .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
+    .locator(
+      '[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"], input[type="search"]',
+    )
     .first();
   if (await search.isVisible({ timeout: 1_500 }).catch(() => false)) {
     await search.click();
@@ -226,7 +226,10 @@ async function navigateToDesignerViaMenu(
     await search.press('Enter').catch(() => null);
     await page
       .waitForResponse(
-        (r) => r.url().includes('/dynamic/page_schema_list') && r.status() === 200,
+        (r) =>
+          (r.url().includes('/api/dynamic/page_schema/list') ||
+            r.url().includes('/dynamic/page_schema_list')) &&
+          r.status() === 200,
         { timeout: 5_000 },
       )
       .catch(() => null);
@@ -255,11 +258,49 @@ async function navigateToDesignerViaMenu(
   await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 5_000 });
 }
 
-async function addBlockViaPalette(page: Page, blockType: string): Promise<void> {
+async function addBlockViaPalette(page: Page, blockType: string): Promise<string> {
   await page.getByTestId('designer-tab-blocks').click();
   const item = page.getByTestId(`block-palette-item-${blockType}`);
   await expect(item).toBeVisible({ timeout: 5_000 });
+  const sel = `[data-block-type="${blockType}"]`;
+  const idsBefore = await page
+    .locator(sel)
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).getAttribute('data-block-id') || ''));
   await item.click();
+  await expect
+    .poll(async () => page.locator(sel).count(), { timeout: 5_000 })
+    .toBe(idsBefore.length + 1);
+  const idsAfter = await page
+    .locator(sel)
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).getAttribute('data-block-id') || ''));
+  const newId = idsAfter.find((id) => id && !idsBefore.includes(id));
+  if (!newId) throw new Error(`addBlockViaPalette: no new ${blockType} block id found`);
+  return newId;
+}
+
+async function ensureSelectedBlockEditor(page: Page, blockId: string): Promise<void> {
+  const panel = page.getByTestId('designer-properties-panel');
+  const codeInput = panel.locator('input[placeholder="输入字段代码"]').first();
+  if (await codeInput.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    return;
+  }
+
+  await page.getByTestId('designer-tab-outline').click();
+  const exactOutlineButton = page
+    .locator(`[data-testid="designer-outline-block-${blockId}"], [data-block-id="${blockId}"]`)
+    .first();
+  if (await exactOutlineButton.isVisible({ timeout: 1_500 }).catch(() => false)) {
+    await exactOutlineButton.click();
+  } else {
+    const legacyOutlineButton = page
+      .locator('button')
+      .filter({ hasText: /Section Title|区段标题|form-section|表单区段/i })
+      .last();
+    await expect(legacyOutlineButton).toBeVisible({ timeout: 5_000 });
+    await legacyOutlineButton.click();
+  }
+
+  await expect(codeInput).toBeVisible({ timeout: 5_000 });
 }
 
 async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promise<void> {
@@ -302,10 +343,12 @@ async function chooseWidgetByValue(page: Page, widgetValue: string): Promise<boo
   return await expect
     .poll(
       async () => {
-        const stillPresent = await select.locator('option').evaluateAll(
-          (opts, val) => (opts as HTMLOptionElement[]).some((o) => o.value === val),
-          widgetValue,
-        );
+        const stillPresent = await select
+          .locator('option')
+          .evaluateAll(
+            (opts, val) => (opts as HTMLOptionElement[]).some((o) => o.value === val),
+            widgetValue,
+          );
         if (!stillPresent) return null;
         await select.evaluate((el, val) => {
           const sel = el as HTMLSelectElement;
@@ -323,12 +366,14 @@ async function chooseWidgetByValue(page: Page, widgetValue: string): Promise<boo
 
 async function selectFieldInCanvas(page: Page, fieldCode: string): Promise<void> {
   // All form-section blocks may exist; scan any that hosts the label.
-  const label = page.locator(`[data-block-type="form-section"] label:has-text("${fieldCode}")`).first();
+  const label = page
+    .locator(`[data-block-type="form-section"] label:has-text("${fieldCode}")`)
+    .first();
   await expect(label).toBeVisible({ timeout: 5_000 });
   await label.locator('xpath=ancestor::div[contains(@class,"group/field")]').first().click();
-  await expect(
-    page.getByTestId('designer-properties-panel').locator('text=字段属性'),
-  ).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByTestId('designer-properties-panel').locator('text=字段属性')).toBeVisible({
+    timeout: 5_000,
+  });
 }
 
 async function toggleRequired(page: Page): Promise<void> {
@@ -361,9 +406,7 @@ async function clickSaveAndWait(page: Page, pid: string): Promise<void> {
   const putResp = page
     .waitForResponse(
       (r) =>
-        r.url().includes(`/api/pages/${pid}`) &&
-        r.request().method() === 'PUT' &&
-        r.status() < 400,
+        r.url().includes(`/api/pages/${pid}`) && r.request().method() === 'PUT' && r.status() < 400,
       { timeout: 5_000 },
     )
     .catch(() => null);
@@ -415,7 +458,9 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
   // -------------------------------------------------------------------------
   // D4.1 — widget-specific props round-trip through the designer save pipeline
   // -------------------------------------------------------------------------
-  test('D4.1: all 5 widget-specific props survive designer load → save round-trip', async ({ page }) => {
+  test('D4.1: all 5 widget-specific props survive designer load → save round-trip', async ({
+    page,
+  }) => {
     const pageKey = uniquePageKey('props');
     const pid = await apiCreateFormPage(page, pageKey, /* seedWidgets */ true);
     createdPagePids.push(pid);
@@ -481,7 +526,9 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
   // -------------------------------------------------------------------------
   // D4.2 — UI chain: add fields, select each, pick widget, set common props
   // -------------------------------------------------------------------------
-  test('D4.2: UI chain — select widget + common props (required/visible) for all 5', async ({ page }) => {
+  test('D4.2: UI chain — select widget + common props (required/visible) for all 5', async ({
+    page,
+  }) => {
     const pageKey = uniquePageKey('ui');
     const pid = await apiCreateFormPage(page, pageKey, /* seedWidgets */ false);
     createdPagePids.push(pid);
@@ -491,14 +538,14 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
     // Use two sections so the 5 fields fit within the 8-field canvas cap
     // (FormSectionPreview slices fields.slice(0,8) — one section easily holds 5
     // but two sections keeps this robust if the cap tightens).
-    await addBlockViaPalette(page, 'form-section');
+    const blockId = await addBlockViaPalette(page, 'form-section');
 
     // Click the newly-added section in the outline and add all 5 fields.
-    await page.getByTestId('designer-tab-outline').click();
-    const outlineButtons = page.locator('button:has-text("Section Title"), button:has-text("区段标题")');
-    await expect(outlineButtons.first()).toBeVisible({ timeout: 5_000 });
-    await outlineButtons.nth(0).click();
-    await addFieldsToSelectedBlock(page, WIDGETS.map((w) => w.field));
+    await ensureSelectedBlockEditor(page, blockId);
+    await addFieldsToSelectedBlock(
+      page,
+      WIDGETS.map((w) => w.field),
+    );
 
     // Trace what the dropdown offers per field (helps diagnose gaps when a
     // widget isn't registered for the resolved dataType bucket).
@@ -647,9 +694,9 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
     // Then wait for at least one date/time input to mount — the form's
     // smart components hydrate after the form tag itself, and the inputs we
     // probe below are conditional on that hydration completing.
-    await expect(
-      page.locator('input[type="date"], input[type="time"]').first(),
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('input[type="date"], input[type="time"]').first()).toBeVisible({
+      timeout: 5_000,
+    });
 
     // Smart components on this form hydrate one-by-one (each field-renderer
     // resolves its widget asynchronously). Poll until the picker count is
@@ -681,7 +728,8 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
     // We don't hard-fail if a field doesn't render (e.g. plugin revision
     // drift); instead we collect misses and require ≥3 of 5 to render with
     // the correct primitive. This mirrors D4.2's tolerance.
-    const runtimeTrace: Array<{ field: string; component: string; detected: string; ok: boolean }> = [];
+    const runtimeTrace: Array<{ field: string; component: string; detected: string; ok: boolean }> =
+      [];
 
     // date → input[type=date] whose name contains sc_start_date
     {
@@ -697,7 +745,9 @@ test.describe('GA B4 — Date-bucket widgets (5 widgets × props chain)', () => 
     // datetime → input type=date OR datetime-local depending on showTime
     {
       const dt = page
-        .locator('input[type="date"][name*="sc_created_at"], input[type="datetime-local"][name*="sc_created_at"]')
+        .locator(
+          'input[type="date"][name*="sc_created_at"], input[type="datetime-local"][name*="sc_created_at"]',
+        )
         .first();
       const ok = await dt.count().then((c) => c > 0);
       runtimeTrace.push({

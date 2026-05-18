@@ -205,7 +205,7 @@ test.describe('BPM Process Status Viewer @bpm-regression', () => {
   // STATV-1/2 progress, one is reserved for STATV-3 termination).
   // =========================================================================
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // 1. Create process definition

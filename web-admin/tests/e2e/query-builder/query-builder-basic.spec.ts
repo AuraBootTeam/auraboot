@@ -42,6 +42,17 @@ async function seedE2etRecord(): Promise<void> {
   }
 }
 
+async function searchModel(page: import('@playwright/test').Page, modelCode: string): Promise<void> {
+  const searchInput = page.locator('[data-testid="qb-model-search"]');
+  await expect(searchInput).toBeVisible({ timeout: 10000 });
+  await searchInput.fill('');
+  await searchInput.fill(modelCode);
+  await expect(searchInput).toHaveValue(modelCode);
+  await expect(page.locator(`[data-testid="qb-model-${modelCode}"]`)).toBeVisible({
+    timeout: 15000,
+  });
+}
+
 // TODO(2026-05-08): QB-02..05 are API-only and should move to tests/api/
 // per docs/standards/core/testing-e2e-web.md. Kept in this file to maintain
 // the green baseline; new UI coverage lives in QB-07/08 below.
@@ -113,9 +124,15 @@ test.describe('Query Builder @smoke', () => {
     await expect(modelItems.first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('QB-07: full UI flow — select model, fields, filter, run, verify result', async ({ page }) => {
+  test('QB-07: full UI flow — select model, fields, filter, run, verify result', async ({
+    page,
+  }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: /query builder|查询构建/i }).first().click();
+    await page
+      .getByRole('link', { name: /query builder|查询构建|menu\.query_builder/i })
+      .or(page.locator('nav a[href="/query-builder"]'))
+      .first()
+      .click();
     await expect(page.locator('[data-testid="query-builder"]')).toBeVisible({ timeout: 10000 });
 
     await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeVisible();
@@ -123,8 +140,7 @@ test.describe('Query Builder @smoke', () => {
     // The QB models endpoint caps results at 20; in stacks with many seeded
     // models, e2et_record may not appear in the default list. Use the search
     // input (which re-fetches with keyword) to surface it deterministically.
-    await page.locator('[data-testid="qb-model-search"]').fill('e2et_record');
-    await expect(page.locator('[data-testid="qb-model-e2et_record"]')).toBeVisible({ timeout: 10000 });
+    await searchModel(page, 'e2et_record');
     await page.locator('[data-testid="qb-model-e2et_record"]').click();
     await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeHidden();
     await expect(page.locator('[data-testid="qb-step-fields"]')).toBeVisible();
@@ -158,11 +174,16 @@ test.describe('Query Builder @smoke', () => {
 
   test('QB-08: ⌘+Enter triggers run after model selection', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: /query builder|查询构建/i }).first().click();
-    await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeVisible({ timeout: 10000 });
+    await page
+      .getByRole('link', { name: /query builder|查询构建|menu\.query_builder/i })
+      .or(page.locator('nav a[href="/query-builder"]'))
+      .first()
+      .click();
+    await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeVisible({
+      timeout: 10000,
+    });
 
-    await page.locator('[data-testid="qb-model-search"]').fill('e2et_record');
-    await expect(page.locator('[data-testid="qb-model-e2et_record"]')).toBeVisible({ timeout: 10000 });
+    await searchModel(page, 'e2et_record');
     await page.locator('[data-testid="qb-model-e2et_record"]').click();
     await expect(page.locator('[data-testid="qb-empty-onboarding"]')).toBeHidden();
 

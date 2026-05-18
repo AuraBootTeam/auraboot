@@ -156,10 +156,11 @@ export default function PageDesignerEditorImpl() {
   }, [id, schema]);
 
   const handlePublish = useCallback(async () => {
-    if (!id || !schema) return;
+    const currentSchema = latestSchemaRef.current || schema;
+    if (!id || !currentSchema) return;
 
     // First save the current schema
-    await pageManagerService.updatePageSchema(id, schema);
+    await pageManagerService.updatePageSchema(id, currentSchema);
 
     // Then publish the page
     const updatedMeta = await pageManagerService.publishPage(id);

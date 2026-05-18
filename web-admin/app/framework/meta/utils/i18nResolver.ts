@@ -8,6 +8,7 @@
  * Resolution Rules:
  * 1. Button `action` → `action.{action}` (e.g., action.create → "新建")
  * 2. Field `field` + modelCode → `model.{modelCode}.{fieldCode}.label`
+ *    or `field.{modelCode}.{fieldCode}.label`
  * 3. `messageKey` → `message.{messageKey}` (e.g., message.delete.success)
  * 4. `contentKey` → special resolution (e.g., selectedInfo → table.selected)
  * 5. Table column `isActionColumn` → `table.actions`
@@ -128,9 +129,10 @@ export function resolveButtonLabel(button: DslButton, t: TranslateFunction): str
  *
  * Resolution order:
  * 1. model.{modelCode}.{fieldCode}.label
- * 2. common.field.{fieldCode} (for common fields like id, name, code)
- * 3. Field displayName (from Field metadata if available)
- * 4. Field code as fallback
+ * 2. field.{modelCode}.{fieldCode}.label
+ * 3. common.field.{fieldCode} (for common fields like id, name, code)
+ * 4. Field displayName (from Field metadata if available)
+ * 5. Field code as fallback
  *
  * @param field - Field definition or field code
  * @param modelCode - Model code
@@ -157,6 +159,12 @@ export function resolveFieldLabel(
   const modelLabel = t(modelKey);
   if (modelLabel !== modelKey) {
     return modelLabel;
+  }
+
+  const modelFieldKey = `field.${modelCode}.${fieldCode}.label`;
+  const modelFieldLabel = t(modelFieldKey);
+  if (modelFieldLabel !== modelFieldKey) {
+    return modelFieldLabel;
   }
 
   // Try common field key

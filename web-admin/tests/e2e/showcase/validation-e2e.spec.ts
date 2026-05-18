@@ -321,7 +321,7 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
 
     // Search for our seeded record to ensure it's on page 1.
     const keywordInput = page
-      .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
+      .locator('[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"], input[type="search"]')
       .first();
     if (await keywordInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
       const filterResp = page.waitForResponse(

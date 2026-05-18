@@ -24,7 +24,7 @@ test.describe('GAP-158: Page Designer enableMultiView Settings', () => {
   let pagePid: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: './tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Create a test page via API for the Page Designer (V2 flat format)
@@ -188,7 +188,7 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
   let hasReport = false;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: './tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Create a report template associated with crm_account model

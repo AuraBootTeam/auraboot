@@ -34,6 +34,7 @@ monitoring/.env
 *.ps1
 
 .gradle/
+platform/.m2/
 build/
 
 .idea/

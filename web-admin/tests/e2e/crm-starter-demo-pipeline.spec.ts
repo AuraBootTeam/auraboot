@@ -140,14 +140,19 @@ async function gotoAccountListViaSidebar(page: Page): Promise<void> {
 
 async function selectPipelineBoardKanban(page: Page): Promise<void> {
   // ViewSelector trigger — confirmed live by saved-view-kanban.spec.ts pattern
-  const viewSelector = page.locator('button[aria-haspopup="listbox"]').first();
+  const viewSelector = page
+    .locator('[data-testid="view-selector-trigger"], button[aria-haspopup="listbox"]')
+    .first();
   await viewSelector.waitFor({ state: 'visible', timeout: 10_000 });
   await viewSelector.click();
 
-  const panel = page.locator('[role="dialog"]').first();
+  const panel = page.locator('[role="listbox"], [role="dialog"]').first();
   await panel.waitFor({ state: 'visible', timeout: 5_000 });
 
-  const viewOption = panel.getByText(PIPELINE_VIEW_NAME, { exact: false }).first();
+  const viewOption = panel
+    .locator(`[data-view-name="${PIPELINE_VIEW_NAME}"][data-view-type="kanban"]`)
+    .first()
+    .or(panel.getByText(PIPELINE_VIEW_NAME, { exact: false }).first());
   await viewOption.waitFor({ state: 'visible', timeout: 5_000 });
   await viewOption.click();
 
@@ -156,26 +161,39 @@ async function selectPipelineBoardKanban(page: Page): Promise<void> {
     await closeBtn.click();
   }
   await panel.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => null);
+  if ((await viewSelector.getAttribute('data-current-view-type')) !== null) {
+    await expect(viewSelector).toHaveAttribute('data-current-view-type', 'kanban', {
+      timeout: 10_000,
+    });
+  }
 
   // Kanban columns rendered (header testid is the canonical hook per kanban/README.md).
   // We wait for the *full* set of 6 dict-derived stages (discovery, qualification,
   // proposal, negotiation, closed_won, closed_lost) so downstream column-id
   // selectors don't race the async dict fetch that seeds empty columns.
-  await expect(
-    page.locator('[data-testid="kanban-column-header"]'),
-  ).toHaveCount(6, { timeout: 15_000 });
+  await expect(page.locator('[data-testid="kanban-column-header"]')).toHaveCount(6, {
+    timeout: 15_000,
+  });
 }
 
 async function selectDefaultTableView(page: Page): Promise<void> {
-  if (await page.locator('tbody tr').first().isVisible({ timeout: 2_000 }).catch(() => false)) {
+  if (
+    await page
+      .locator('tbody tr')
+      .first()
+      .isVisible({ timeout: 2_000 })
+      .catch(() => false)
+  ) {
     return;
   }
 
-  const viewSelector = page.locator('button[aria-haspopup="listbox"]').first();
+  const viewSelector = page
+    .locator('[data-testid="view-selector-trigger"], button[aria-haspopup="listbox"]')
+    .first();
   await viewSelector.waitFor({ state: 'visible', timeout: 10_000 });
   await viewSelector.click();
 
-  const panel = page.locator('[role="dialog"]').first();
+  const panel = page.locator('[role="listbox"], [role="dialog"]').first();
   await panel.waitFor({ state: 'visible', timeout: 5_000 });
 
   const tableView = panel.getByText('Default View', { exact: false }).first();
@@ -204,7 +222,9 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
   let demoDataAvailable = true;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
     const page = await ctx.newPage();
     try {
       // Seed account via dynamic API (read parameter naming from CRM commands.json)
@@ -229,24 +249,21 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
         return;
       }
 
-      const oppResp = await page.request.post(
-        '/api/meta/commands/execute/crm:create_opportunity',
-        {
-          data: {
-            payload: {
-              crm_opp_name: OPP_NAME,
-              crm_opp_account_id: accountPid,
-              crm_opp_stage: STAGE_QUALIFICATION,
-              crm_opp_expected_amount: 150000,
-              crm_opp_probability: 40,
-              crm_opp_expected_close_date: new Date(Date.now() + 14 * 86400000)
-                .toISOString()
-                .slice(0, 10),
-            },
-            operationType: 'CREATE',
+      const oppResp = await page.request.post('/api/meta/commands/execute/crm:create_opportunity', {
+        data: {
+          payload: {
+            crm_opp_name: OPP_NAME,
+            crm_opp_account_id: accountPid,
+            crm_opp_stage: STAGE_QUALIFICATION,
+            crm_opp_expected_amount: 150000,
+            crm_opp_probability: 40,
+            crm_opp_expected_close_date: new Date(Date.now() + 14 * 86400000)
+              .toISOString()
+              .slice(0, 10),
           },
+          operationType: 'CREATE',
         },
-      );
+      });
       if (!oppResp.ok()) {
         demoDataAvailable = false;
         return;
@@ -260,7 +277,10 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    test.skip(!demoDataAvailable, 'crm-starter demo data could not be seeded (plugin not imported?)');
+    test.skip(
+      !demoDataAvailable,
+      'crm-starter demo data could not be seeded (plugin not imported?)',
+    );
     // Toggle SmartKanban to E2E sensor mode (MouseSensor) BEFORE any navigation.
     // addInitScript installs the flag on every document the page loads, so
     // subsequent page.goto() / reload() / link clicks all see it.
@@ -369,36 +389,30 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
     await expect(lostHeader).toHaveAttribute('data-column-terminal', 'lost');
 
     // Seed two opportunities directly into terminal stages so the visual rules are exercised.
-    const wonResp = await page.request.post(
-      '/api/meta/commands/execute/crm:create_opportunity',
-      {
-        data: {
-          payload: {
-            crm_opp_name: `WonOpp_${UID}`,
-            crm_opp_account_id: accountPid,
-            crm_opp_stage: 'closed_won',
-            crm_opp_expected_amount: 90000,
-            crm_opp_probability: 100,
-          },
-          operationType: 'CREATE',
+    const wonResp = await page.request.post('/api/meta/commands/execute/crm:create_opportunity', {
+      data: {
+        payload: {
+          crm_opp_name: `WonOpp_${UID}`,
+          crm_opp_account_id: accountPid,
+          crm_opp_stage: 'closed_won',
+          crm_opp_expected_amount: 90000,
+          crm_opp_probability: 100,
         },
+        operationType: 'CREATE',
       },
-    );
-    const lostResp = await page.request.post(
-      '/api/meta/commands/execute/crm:create_opportunity',
-      {
-        data: {
-          payload: {
-            crm_opp_name: `LostOpp_${UID}`,
-            crm_opp_account_id: accountPid,
-            crm_opp_stage: 'closed_lost',
-            crm_opp_expected_amount: 1000,
-            crm_opp_probability: 0,
-          },
-          operationType: 'CREATE',
+    });
+    const lostResp = await page.request.post('/api/meta/commands/execute/crm:create_opportunity', {
+      data: {
+        payload: {
+          crm_opp_name: `LostOpp_${UID}`,
+          crm_opp_account_id: accountPid,
+          crm_opp_stage: 'closed_lost',
+          crm_opp_expected_amount: 1000,
+          crm_opp_probability: 0,
         },
+        operationType: 'CREATE',
       },
-    );
+    });
     expect(wonResp.ok(), 'seed closed_won opp').toBeTruthy();
     expect(lostResp.ok(), 'seed closed_lost opp').toBeTruthy();
 
@@ -467,14 +481,12 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
     await expect(createBtn).toBeVisible();
     await createBtn.evaluate((el: HTMLElement) => el.click());
 
-    await page.waitForURL(/\/p\/crm_opportunity_form|\/new|\/create/, { timeout: 15_000 }).catch(
-      () => null,
-    );
+    await page
+      .waitForURL(/\/p\/crm_opportunity_form|\/new|\/create/, { timeout: 15_000 })
+      .catch(() => null);
 
     const nameInput = page
-      .locator(
-        '[data-testid="form-field-crm_opp_name"] input, [data-field="crm_opp_name"] input',
-      )
+      .locator('[data-testid="form-field-crm_opp_name"] input, [data-field="crm_opp_name"] input')
       .first();
     await nameInput.waitFor({ state: 'visible', timeout: 15_000 });
     const formOppName = `FormOpp_${UID}`;
@@ -487,29 +499,30 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
           '[data-field="crm_opp_account_id"] [role="combobox"]',
       )
       .first();
-    if (await accountField.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await accountField.click();
-      const accSearch = page
-        .locator('[data-testid="form-field-crm_opp_account_id"] input')
-        .first();
-      if (await accSearch.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await accSearch.fill(ACCOUNT_NAME.slice(0, 12));
-      }
-      const accOption = page
-        .locator('[role="option"]')
-        .filter({ hasText: new RegExp(UID.slice(0, 6)) })
-        .first();
-      if (await accOption.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        await accOption.click();
-      } else {
-        const firstOpt = page.locator('[role="option"]').first();
-        if (await firstOpt.isVisible({ timeout: 3_000 }).catch(() => false)) {
-          await firstOpt.click();
-        } else {
-          await page.keyboard.press('Escape').catch(() => null);
-        }
-      }
-    }
+    await expect(accountField).toBeVisible({ timeout: 10_000 });
+    await expect(accountField).toBeEnabled({ timeout: 10_000 });
+    const accountOptionsResponse = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/dynamic/crm_account/list') &&
+          r.request().method().toLowerCase() === 'get' &&
+          r.status() === 200,
+        { timeout: 8_000 },
+      )
+      .catch(() => null);
+    await accountField.click();
+    await accountOptionsResponse;
+    const exactAccountOption = page.getByRole('option', { name: ACCOUNT_NAME }).first();
+    const accountOption = (await exactAccountOption
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false))
+      ? exactAccountOption
+      : page.getByRole('option').first();
+    await expect(accountOption).toBeVisible({ timeout: 10_000 });
+    await accountOption.click();
+    await expect(page.locator('input[name="crm_opp_account_id"]').first()).not.toHaveValue('', {
+      timeout: 5_000,
+    });
 
     // Amount
     const amountInput = page
@@ -559,9 +572,7 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
   // =========================================================================
   // PIPE-005: D14 — opportunity row navigates to associated account detail
   // =========================================================================
-  test('PIPE-005 — opportunity list reference field links to account detail', async ({
-    page,
-  }) => {
+  test('PIPE-005 — opportunity list reference field links to account detail', async ({ page }) => {
     await gotoOpportunityListViaSidebar(page);
 
     // Find our seeded opportunity row by name
@@ -585,9 +596,9 @@ test.describe('CRM Starter Demo — Pipeline Kanban Lifecycle', () => {
       // This still exercises D14 from the menu perspective without inventing a renderer hook.
       void navigateToDynamicPage; // keep helper referenced for future tightening
       await gotoAccountListViaSidebar(page);
-      await expect(
-        page.locator('tbody tr').filter({ hasText: ACCOUNT_NAME }).first(),
-      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('tbody tr').filter({ hasText: ACCOUNT_NAME }).first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
   });
 });

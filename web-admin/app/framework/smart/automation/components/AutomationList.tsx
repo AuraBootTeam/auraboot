@@ -1,5 +1,5 @@
 // web-admin/app/smart/automation/components/AutomationList.tsx
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate, useRevalidator } from 'react-router';
 import { useSmartText } from '~/utils/i18n';
 import { cn } from '~/utils/cn';
@@ -27,6 +27,7 @@ export function AutomationList({
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const [hydrated, setHydrated] = useState(false);
   const [logDialogAutomation, setLogDialogAutomation] = useState<Automation | null>(null);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +35,10 @@ export function AutomationList({
   const authHeaders: HeadersInit = token
     ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
     : { 'Content-Type': 'application/json' };
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const handleToggleEnabled = async (automation: Automation) => {
     try {
@@ -182,6 +187,7 @@ export function AutomationList({
           />
           <button
             onClick={() => importInputRef.current?.click()}
+            disabled={!hydrated}
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
             data-testid="btn-import-automation"
           >
@@ -190,6 +196,7 @@ export function AutomationList({
           {/* New from Template */}
           <button
             onClick={() => setShowTemplateGallery(true)}
+            disabled={!hydrated}
             className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
             data-testid="btn-new-from-template"
           >
@@ -261,6 +268,7 @@ export function AutomationList({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleToggleEnabled(automation)}
+                    disabled={!hydrated}
                     className={cn(
                       'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                       automation.enabled
@@ -275,6 +283,7 @@ export function AutomationList({
                   </button>
                   <button
                     onClick={() => setLogDialogAutomation(automation)}
+                    disabled={!hydrated}
                     className="rounded-md bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100"
                     data-testid={`btn-logs-${automation.pid}`}
                   >
@@ -282,6 +291,7 @@ export function AutomationList({
                   </button>
                   <button
                     onClick={() => handleExportAutomation(automation)}
+                    disabled={!hydrated}
                     className="rounded-md bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 transition-colors hover:bg-teal-100"
                     data-testid={`btn-export-${automation.pid}`}
                   >
@@ -296,6 +306,7 @@ export function AutomationList({
                   </Link>
                   <button
                     onClick={() => handleDelete(automation)}
+                    disabled={!hydrated}
                     className="rounded-md bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
                     data-testid={`btn-delete-${automation.pid}`}
                   >
