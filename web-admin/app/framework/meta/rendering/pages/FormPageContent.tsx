@@ -1391,7 +1391,7 @@ export function FormPageContent(props: PageContentProps) {
   // subTableBlocks computed via useMemo above (used for metadata fetching and rendering)
   const buttonBlock = allBlocks.find((block: any) => block.blockType === 'form-buttons');
   const effectiveButtonBlock = buttonBlock || null;
-  const formReady = mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
+  const submitReady = mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
 
   return (
     <DataSourceProvider manager={dataSourceManager}>
@@ -1455,7 +1455,7 @@ export function FormPageContent(props: PageContentProps) {
 
           {/* Form Content - Using ComponentLoader Pattern */}
           <form className="p-6" data-testid="dynamic-form" onSubmit={(e) => e.preventDefault()}>
-            {!formReady ? (
+            {!mainRecordLoaded ? (
               <div
                 className="py-8 text-center text-sm text-gray-400"
                 data-testid="dynamic-form-loading"
@@ -1637,7 +1637,7 @@ export function FormPageContent(props: PageContentProps) {
             })}
 
             {/* Form Buttons */}
-            {formReady &&
+            {mainRecordLoaded &&
               effectiveButtonBlock &&
               effectiveButtonBlock.buttons &&
               effectiveButtonBlock.buttons.length > 0 && (
@@ -1662,7 +1662,7 @@ export function FormPageContent(props: PageContentProps) {
                           button.code,
                         )}
                         onClick={() => handleFormAction(button)}
-                        disabled={loading || !formReady}
+                        disabled={loading || !submitReady}
                         className={`rounded-md px-4 py-2 text-sm font-medium ${
                           button.primary
                             ? 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400'
