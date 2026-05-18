@@ -93,10 +93,7 @@ async function selectTenantApi(
   return String(body.data.jwt);
 }
 
-async function discoverTenantA(
-  request: APIRequestContext,
-  baseJwt: string,
-): Promise<string> {
+async function discoverTenantA(request: APIRequestContext, baseJwt: string): Promise<string> {
   const resp = await request.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
     headers: authHeaders(baseJwt),
   });
@@ -108,9 +105,7 @@ async function discoverTenantA(
   }>;
   const preferred =
     spaces.find((s) => s.spaceType === 'business' && s.tenantName === 'AuraBoot Dev') ??
-    spaces.find(
-      (s) => s.spaceType === 'business' && !s.tenantName.startsWith('p3d_isolation_'),
-    );
+    spaces.find((s) => s.spaceType === 'business' && !s.tenantName.startsWith('p3d_isolation_'));
   expect(preferred).toBeTruthy();
   return String(preferred!.tenantId);
 }
@@ -128,8 +123,7 @@ async function seedSecondTenant(
   await client.connect();
   try {
     const tenantIdNum =
-      BigInt(Date.now()) * BigInt(1_000_000) +
-      BigInt(Math.floor(Math.random() * 1_000_000));
+      BigInt(Date.now()) * BigInt(1_000_000) + BigInt(Math.floor(Math.random() * 1_000_000));
     const tenantId = tenantIdNum.toString();
     const pid = `01TUIB${UID.toUpperCase().padEnd(20, '0').slice(0, 20)}`;
 
@@ -226,22 +220,19 @@ async function createAndDeploy(
   jwt: string,
   args: { processKey: string; processName: string },
 ): Promise<string> {
-  const createResp = await request.post(
-    `${BACKEND_URL}/api/bpm/process-definitions`,
-    {
-      headers: authHeaders(jwt),
-      data: {
-        processKey: args.processKey,
-        processName: args.processName,
-        description: `tenant-isolation UI E2E ${args.processKey}`,
-        category: 'isolation-test-ui',
-        bpmnContent: buildBpmn(args.processKey, args.processName),
-        designerJson: JSON.stringify({ nodes: [], edges: [] }),
-        formBindings: {},
-        businessDataBindings: [],
-      },
+  const createResp = await request.post(`${BACKEND_URL}/api/bpm/process-definitions`, {
+    headers: authHeaders(jwt),
+    data: {
+      processKey: args.processKey,
+      processName: args.processName,
+      description: `tenant-isolation UI E2E ${args.processKey}`,
+      category: 'isolation-test-ui',
+      bpmnContent: buildBpmn(args.processKey, args.processName),
+      designerJson: JSON.stringify({ nodes: [], edges: [] }),
+      formBindings: {},
+      businessDataBindings: [],
     },
-  );
+  });
   expect(createResp.ok(), `create definition ${createResp.status()}`).toBe(true);
   const pid: string = (await createResp.json())?.data?.pid;
   expect(typeof pid).toBe('string');
@@ -262,9 +253,7 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
   const nav = page.locator('nav').first();
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
-  const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
-    .first();
+  const bpmParent = nav.getByRole('button', { name: /流程管理|Process Management/i }).first();
   if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await bpmParent.scrollIntoViewIfNeeded();
     await bpmParent.evaluate((el: HTMLElement) => el.click());
@@ -301,18 +290,18 @@ async function searchByKeyword(page: Page, keyword: string): Promise<void> {
     .or(page.locator('input[placeholder*="Search" i]'))
     .first();
   await searchInput.waitFor({ state: 'visible', timeout: 5_000 });
+  const responsePromise = page.waitForResponse(
+    (r) =>
+      (r.url().includes('/api/bpm/process-definitions') ||
+        r.url().includes('/api/dynamic/bpm-process-management/list')) &&
+      new URL(r.url()).searchParams.get('keyword') === keyword &&
+      r.status() === 200,
+    { timeout: 10_000 },
+  );
   await searchInput.fill(keyword);
+  await expect(searchInput).toHaveValue(keyword, { timeout: 3000 });
   await page.keyboard.press('Enter');
-  // Let the debounced list re-fetch settle — wait for any /list response.
-  await page
-    .waitForResponse(
-      (r) => r.url().includes('/api/bpm/process-definitions') && r.status() === 200,
-      { timeout: 10_000 },
-    )
-    .catch(() => {
-      /* ignore — subsequent row assertions will fail loudly if the list
-         didn't refresh */
-    });
+  await responsePromise;
 }
 
 /** Open the user dropdown in the header. */
@@ -325,7 +314,12 @@ async function openUserMenu(page: Page): Promise<void> {
   for (let i = 0; i < 10; i++) {
     if (await dropdown.isVisible({ timeout: 0 }).catch(() => false)) return;
     await menuBtn.click({ force: true });
-    if (await dropdown.waitFor({ state: 'visible', timeout: 500 }).then(() => true).catch(() => false)) {
+    if (
+      await dropdown
+        .waitFor({ state: 'visible', timeout: 500 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
       return;
     }
   }
@@ -415,18 +409,16 @@ test.describe('BPM tenant isolation — UI path @bpm-regression', () => {
         `UPDATE ab_permission SET deleted_flag = true WHERE tenant_id = $1::bigint`,
         [tenantBId],
       );
-      await client.query(
-        `UPDATE ab_role SET deleted_flag = true WHERE tenant_id = $1::bigint`,
-        [tenantBId],
-      );
+      await client.query(`UPDATE ab_role SET deleted_flag = true WHERE tenant_id = $1::bigint`, [
+        tenantBId,
+      ]);
       await client.query(
         `UPDATE ab_tenant_member SET deleted_flag = true WHERE tenant_id = $1::bigint`,
         [tenantBId],
       );
-      await client.query(
-        `UPDATE ab_tenant SET deleted_flag = true WHERE id = $1::bigint`,
-        [tenantBId],
-      );
+      await client.query(`UPDATE ab_tenant SET deleted_flag = true WHERE id = $1::bigint`, [
+        tenantBId,
+      ]);
     } catch {
       // Best-effort cleanup — never fail the suite on cleanup errors,
       // but the leak will resurface in the next run if this throws.
@@ -461,9 +453,7 @@ test.describe('BPM tenant isolation — UI path @bpm-regression', () => {
     expect(totalRows).toBe(1);
   });
 
-  test('UI-2: switching to tenant B via header hides tenant A definition', async ({
-    page,
-  }) => {
+  test('UI-2: switching to tenant B via header hides tenant A definition', async ({ page }) => {
     // Switch through the UI (no API shortcut).
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
     await switchTenantViaHeader(page, tenantBId);

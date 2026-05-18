@@ -187,8 +187,9 @@ test.describe('List Query Dynamic Configuration', () => {
     await navigateToDynamicPage(page, testPageKey);
     await waitForDynamicPageLoad(page);
 
-    // Wait for at least one data row with a checkbox
-    const firstRow = page.locator('tbody tr:has(input[type="checkbox"])').first();
+    // Wait for at least one data row. This page validates hover action chrome,
+    // not bulk selection; some list schemas intentionally do not enable row checkboxes.
+    const firstRow = page.locator('tbody tr[data-testid^="table-row-"], tbody tr').first();
     await expect(firstRow).toBeVisible({ timeout: 8000 });
 
     // Verify row has the 'group' class (enables group-hover for children)

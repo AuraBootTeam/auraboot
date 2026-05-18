@@ -387,7 +387,7 @@ test.describe('PA: SLA Configuration CRUD', () => {
   const createdPids: string[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     const helper = new ModelTestHelper(page, ADMIN_SLA_CONFIG);
     for (const pid of createdPids) {
@@ -474,8 +474,15 @@ test.describe('PA: SLA Configuration CRUD', () => {
       }
     }
 
-    const records = await queryFilteredList(page, 'sla-config', 'name', name);
-    expect(records.length).toBe(0);
+    await expect
+      .poll(
+        async () => {
+          const records = await queryFilteredList(page, 'sla-config', 'name', name);
+          return records.length;
+        },
+        { timeout: 15000, intervals: [500, 1000, 1500] },
+      )
+      .toBe(0);
   });
 });
 
@@ -488,7 +495,7 @@ test.describe('PA: BPM Domain Configuration CRUD', () => {
   const createdPids: string[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     const helper = new ModelTestHelper(page, ADMIN_BPM_DOMAIN_CONFIG);
     for (const pid of createdPids) {
@@ -574,7 +581,7 @@ test.describe('PA: Data Permission CRUD', () => {
   const createdPids: string[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     const helper = new ModelTestHelper(page, ADMIN_DATA_PERMISSION_CONFIG);
     for (const pid of createdPids) {
@@ -682,7 +689,7 @@ test.describe('PA: Webhook Subscription CRUD', () => {
   const createdPids: string[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     const helper = new ModelTestHelper(page, ADMIN_WEBHOOK_CONFIG);
     for (const pid of createdPids) {
@@ -798,7 +805,7 @@ test.describe('PA: API Connector CRUD', () => {
   const createdPids: string[] = [];
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     const helper = new ModelTestHelper(page, ADMIN_API_CONNECTOR_CONFIG);
     for (const pid of createdPids) {

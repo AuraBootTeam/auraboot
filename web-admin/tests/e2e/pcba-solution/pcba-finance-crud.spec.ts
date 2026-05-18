@@ -120,7 +120,7 @@ test.describe('PCBA Finance CRUD', () => {
     const bucket = emptyBucket();
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanup(p, bucket);
       await ctx.close();
@@ -300,7 +300,7 @@ test.describe('PCBA Finance CRUD', () => {
 
     test.beforeAll(async ({ browser }) => {
       // Create a fiscal period prerequisite — fin_journal_entry requires fin_je_period_id
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       const result = await executeCommandViaApi(
         p,
@@ -323,7 +323,7 @@ test.describe('PCBA Finance CRUD', () => {
     });
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanup(p, bucket);
       // Clean up fiscal period

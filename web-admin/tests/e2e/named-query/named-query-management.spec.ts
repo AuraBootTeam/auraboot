@@ -31,6 +31,23 @@ function pickStatus(input: any): string | undefined {
   return undefined;
 }
 
+function pickPid(input: any): string | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  if (typeof input.pid === 'string') return input.pid;
+  if (typeof input.id === 'string') return input.id;
+  for (const value of Object.values(input)) {
+    if (value && typeof value === 'object') {
+      const nested = pickPid(value);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
+function normalizeStatus(status: string | undefined): string {
+  return String(status ?? '').trim().toLowerCase();
+}
+
 test.describe('Named Query Management', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -96,6 +113,7 @@ test.describe('Named Query Management', () => {
     await nq.fillCreateForm(testCode, testTitle, 'E2E lifecycle test query', testFromSql);
 
     const apiResponse = await nq.submitCreate();
+    const createBody = apiResponse?.ok() ? await apiResponse.json().catch(() => ({})) : {};
 
     if (apiResponse?.ok()) {
       await page.waitForURL(
@@ -112,6 +130,13 @@ test.describe('Named Query Management', () => {
     if (match) {
       queryPid = match[1];
       queryCode = testCode;
+    }
+    if (!queryPid) {
+      const createdPid = pickPid(createBody);
+      if (createdPid) {
+        queryPid = createdPid;
+        queryCode = testCode;
+      }
     }
 
     // API fallback: if URL-based extraction failed, query the API to find the just-created named query
@@ -134,22 +159,33 @@ test.describe('Named Query Management', () => {
 
     // Verify draft status via API. Newer detail payloads may omit a top-level
     // status field even though list/batch-status still exposes the lifecycle
-    // state, so fall back to those shapes before failing.
-    const resp = await page.request.get(`/api/meta/named-queries/${queryPid}`);
-    const result = await resp.json();
-    let status = pickStatus(result);
-    if (!status && queryCode) {
-      const listResp = await page.request.get(
-        `/api/meta/named-queries?pageSize=10&sortBy=createdAt&sortOrder=desc`,
-      );
-      if (listResp.ok()) {
-        const listData = await listResp.json();
-        const records = listData.data?.data || listData.data?.records || [];
-        const found = records.find((r: any) => r.code === queryCode || r.pid === queryPid);
-        status = pickStatus(found);
-      }
-    }
-    expect(status).toBe('draft');
+    // state, so poll detail/create/list shapes before failing.
+    await expect
+      .poll(
+        async () => {
+          const fromCreate = normalizeStatus(pickStatus(createBody));
+          if (fromCreate) return fromCreate;
+
+          const resp = await page.request.get(`/api/meta/named-queries/${queryPid}`);
+          const result = await resp.json().catch(() => ({}));
+          const fromDetail = normalizeStatus(pickStatus(result));
+          if (fromDetail) return fromDetail;
+
+          const listResp = await page.request.get(
+            `/api/meta/named-queries?pageSize=20&sortBy=createdAt&sortOrder=desc&keyword=${encodeURIComponent(testCode)}`,
+          );
+          if (listResp.ok()) {
+            const listData = await listResp.json().catch(() => ({}));
+            const records = listData.data?.data || listData.data?.records || [];
+            const found = records.find((r: any) => r.code === queryCode || r.pid === queryPid);
+            const fromList = normalizeStatus(pickStatus(found));
+            if (fromList) return fromList;
+          }
+          return '';
+        },
+        { timeout: 10000, intervals: [500, 1000, 1500] },
+      )
+      .toBe('draft');
   });
 
   // =====================================================================

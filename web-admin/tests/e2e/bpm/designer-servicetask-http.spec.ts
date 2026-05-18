@@ -22,6 +22,7 @@
  * @since Wave2 SVCH (OSS BPM / HTTP delegate)
  */
 
+import { createServer, type Server } from 'node:http';
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
 import {
   loginAsAdmin,
@@ -41,10 +42,8 @@ const PROCESS_KEY = `svch_${TS}`;
 const PROCESS_NAME = `Http ServiceTask E2E ${TS}`;
 const BK = `svch_bk_${TS}`;
 
-// SSRF protection intentionally blocks loopback/private targets and management
-// ports. Use a stable public HTTPS endpoint so the E2E still exercises the real
-// HttpServiceTaskDelegate network path and responseVar capture.
-const HEALTH_URL = 'https://example.com/';
+const FIXTURE_BODY = `AuraBoot SVCH OK ${TS}`;
+const FIXTURE_HOST = process.env.SVCH_FIXTURE_HOST || 'host.docker.internal';
 const RESPONSE_VAR = 'healthResp';
 
 // ---------------------------------------------------------------------------
@@ -52,6 +51,48 @@ const RESPONSE_VAR = 'healthResp';
 // ---------------------------------------------------------------------------
 let processPid = '';
 let adminToken = '';
+let healthUrl = '';
+let fixtureServer: Server | null = null;
+
+async function startHttpFixture(): Promise<string> {
+  if (process.env.SVCH_FIXTURE_URL) {
+    return process.env.SVCH_FIXTURE_URL;
+  }
+
+  fixtureServer = createServer((req, res) => {
+    if (req.url !== '/health') {
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('not found');
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end(FIXTURE_BODY);
+  });
+
+  const basePort = Number(process.env.SVCH_FIXTURE_PORT || 38997);
+  for (let offset = 0; offset < 12; offset += 1) {
+    const port = basePort + offset;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        fixtureServer!.once('error', reject);
+        fixtureServer!.listen(port, '0.0.0.0', () => {
+          fixtureServer!.off('error', reject);
+          resolve();
+        });
+      });
+      return `http://${FIXTURE_HOST}:${port}/health`;
+    } catch {
+      fixtureServer.removeAllListeners('error');
+    }
+  }
+  throw new Error(`Unable to bind SVCH HTTP fixture near port ${basePort}`);
+}
+
+async function stopHttpFixture(): Promise<void> {
+  if (!fixtureServer) return;
+  await new Promise<void>((resolve) => fixtureServer!.close(() => resolve()));
+  fixtureServer = null;
+}
 
 // ---------------------------------------------------------------------------
 // Sidebar → process definitions (D1: navigate via menu, not page.goto)
@@ -62,9 +103,7 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
   const nav = page.locator('nav').first();
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
-  const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
-    .first();
+  const bpmParent = nav.getByRole('button', { name: /流程管理|Process Management/i }).first();
   if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await bpmParent.scrollIntoViewIfNeeded();
     await bpmParent.evaluate((el: HTMLElement) => el.click());
@@ -86,7 +125,7 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
 // BPMN XML for start → http-serviceTask → end. The smart:class attribute is
 // what makes SmartEngine resolve and invoke HttpServiceTaskDelegate.
 // ---------------------------------------------------------------------------
-function buildHttpBpmnXml(processKey: string, processName: string): string {
+function buildHttpBpmnXml(processKey: string, processName: string, serviceUrl: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
              xmlns:smart="http://smartengine.org/schema/process"
@@ -95,7 +134,7 @@ function buildHttpBpmnXml(processKey: string, processName: string): string {
     <startEvent id="start"/>
     <serviceTask id="svc_http" name="Ping Health"
                  smart:class="httpServiceTaskDelegate"
-                 smart:serviceUrl="${HEALTH_URL}"
+                 smart:serviceUrl="${serviceUrl}"
                  smart:responseVar="${RESPONSE_VAR}"/>
     <endEvent id="end"/>
     <sequenceFlow id="e_start_svc" sourceRef="start" targetRef="svc_http"/>
@@ -104,7 +143,7 @@ function buildHttpBpmnXml(processKey: string, processName: string): string {
 </definitions>`;
 }
 
-function buildHttpDesignerJson() {
+function buildHttpDesignerJson(serviceUrl: string) {
   return {
     nodes: [
       {
@@ -122,7 +161,7 @@ function buildHttpDesignerJson() {
           label: 'Ping Health',
           config: {
             serviceType: 'http',
-            serviceUrl: HEALTH_URL,
+            serviceUrl,
             responseVar: RESPONSE_VAR,
           },
         },
@@ -135,8 +174,20 @@ function buildHttpDesignerJson() {
       },
     ],
     edges: [
-      { id: 'e_start_svc', source: 'start', target: 'svc_http', type: 'smoothstep', data: { label: '' } },
-      { id: 'e_svc_end', source: 'svc_http', target: 'end', type: 'smoothstep', data: { label: '' } },
+      {
+        id: 'e_start_svc',
+        source: 'start',
+        target: 'svc_http',
+        type: 'smoothstep',
+        data: { label: '' },
+      },
+      {
+        id: 'e_svc_end',
+        source: 'svc_http',
+        target: 'end',
+        type: 'smoothstep',
+        data: { label: '' },
+      },
     ],
   };
 }
@@ -148,7 +199,11 @@ function buildHttpDesignerJson() {
 // ---------------------------------------------------------------------------
 async function selectNodeOpenEditor(page: Page, nodeId: string): Promise<void> {
   await page.evaluate((id) => {
-    const store = (window as unknown as { __bpmnDesignerStore?: { getState: () => Record<string, (...args: unknown[]) => unknown> } }).__bpmnDesignerStore;
+    const store = (
+      window as unknown as {
+        __bpmnDesignerStore?: { getState: () => Record<string, (...args: unknown[]) => unknown> };
+      }
+    ).__bpmnDesignerStore;
     if (!store) throw new Error('BPMN store missing');
     const state = store.getState() as unknown as {
       setSelectedEdge: (e: string | null) => void;
@@ -170,7 +225,12 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
   test.setTimeout(180_000);
 
   test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
+    healthUrl = await startHttpFixture();
     adminToken = await loginAsAdmin(request);
+  });
+
+  test.afterAll(async () => {
+    await stopHttpFixture();
   });
 
   // -------------------------------------------------------------------------
@@ -183,8 +243,8 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
     // Seed draft (equivalent to "user drew + clicked Save"; new-process save
     // path hits a known DataCloneError — see designer-gateway-lifecycle
     // preamble. UI focus is on ServiceTaskEditor + Deploy button.)
-    const bpmnXml = buildHttpBpmnXml(PROCESS_KEY, PROCESS_NAME);
-    const designerJson = JSON.stringify(buildHttpDesignerJson());
+    const bpmnXml = buildHttpBpmnXml(PROCESS_KEY, PROCESS_NAME, healthUrl);
+    const designerJson = JSON.stringify(buildHttpDesignerJson(healthUrl));
     const createResp = await page.request.post('/api/bpm/process-definitions', {
       data: {
         processKey: PROCESS_KEY,
@@ -225,7 +285,7 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
 
     const serviceUrlInput = page.locator('[data-testid="servicetask-service-url"]');
     await serviceUrlInput.waitFor({ state: 'visible', timeout: 3_000 });
-    await expect(serviceUrlInput).toHaveValue(HEALTH_URL);
+    await expect(serviceUrlInput).toHaveValue(healthUrl);
 
     // Deselect before Deploy so isDirty check is stable
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
@@ -237,8 +297,7 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
 
     const deployResponsePromise = page.waitForResponse(
       (r) =>
-        r.url().includes(`/api/bpm/process-definitions/${processPid}/deploy`) &&
-        r.status() < 400,
+        r.url().includes(`/api/bpm/process-definitions/${processPid}/deploy`) && r.status() < 400,
       { timeout: 20_000 },
     );
     await deployBtn.click();
@@ -250,27 +309,24 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
     // The BPMN XML is served by the dedicated /{pid}/bpmn endpoint
     // (ProcessDefinitionController#getBpmn); the detail endpoint does NOT
     // include it.
-    const bpmnResp = await page.request.get(
-      `/api/bpm/process-definitions/${processPid}/bpmn`,
-      { headers: { Authorization: `Bearer ${adminToken}` } },
-    );
+    const bpmnResp = await page.request.get(`/api/bpm/process-definitions/${processPid}/bpmn`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
     expect(bpmnResp.ok(), `bpmn fetch must succeed: ${bpmnResp.status()}`).toBe(true);
     const bpmnBody = await bpmnResp.json();
     const bpmnContent: string = bpmnBody?.data ?? '';
-    expect(
-      bpmnContent,
-      'deployed BPMN must contain smart:class=httpServiceTaskDelegate',
-    ).toContain('smart:class="httpServiceTaskDelegate"');
-    expect(
-      bpmnContent,
-      'deployed BPMN must carry the configured serviceUrl',
-    ).toContain(HEALTH_URL);
+    expect(bpmnContent, 'deployed BPMN must contain smart:class=httpServiceTaskDelegate').toContain(
+      'smart:class="httpServiceTaskDelegate"',
+    );
+    expect(bpmnContent, 'deployed BPMN must carry the configured serviceUrl').toContain(healthUrl);
   });
 
   // -------------------------------------------------------------------------
   // SVCH-2: starting an instance performs a real HTTP call + stores response
   // -------------------------------------------------------------------------
-  test('SVCH-2: start instance → real HTTP call + response variable captured', async ({ request }) => {
+  test('SVCH-2: start instance → real HTTP call + response variable captured', async ({
+    request,
+  }) => {
     expect(processPid, 'processPid must be set from SVCH-1').toBeTruthy();
 
     const started: StartInstanceResult = await startProcessInstance(request, adminToken, {
@@ -304,12 +360,15 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
     // HTTP delegate must have stored the response into the configured variable
     const variables = status.variables ?? {};
     const healthResp = variables[RESPONSE_VAR] as Record<string, unknown> | undefined;
-    expect(healthResp, `process variable '${RESPONSE_VAR}' must be populated by HTTP delegate`).toBeTruthy();
+    expect(
+      healthResp,
+      `process variable '${RESPONSE_VAR}' must be populated by HTTP delegate`,
+    ).toBeTruthy();
     expect(healthResp?.status, 'HTTP delegate must record status=200').toBe(200);
     expect(
       String(healthResp?.body ?? ''),
       'HTTP delegate must capture the remote response body',
-    ).toContain('Example Domain');
+    ).toContain(FIXTURE_BODY);
 
     // D11: svc_http must appear in completedNodes
     const completedIds = (status.completedNodes ?? []).map((n) => n.nodeId);
@@ -324,7 +383,10 @@ test.describe('BPM Designer ServiceTask HTTP lifecycle', { tag: ['@bpm-regressio
     const { ok, status } = await undeployProcess(request, adminToken, processPid);
     // 200/204 expected for completed-instance case; 500 acceptable if backend
     // blocks on running instances (none here, but we keep the guard).
-    expect([200, 204, 500], `undeploy response ${status} must be success or running-blocked`).toContain(status);
+    expect(
+      [200, 204, 500],
+      `undeploy response ${status} must be success or running-blocked`,
+    ).toContain(status);
     if (!ok) {
       // eslint-disable-next-line no-console
       console.warn(`SVCH-3: undeploy returned ${status}, env-reset handles deep cleanup`);

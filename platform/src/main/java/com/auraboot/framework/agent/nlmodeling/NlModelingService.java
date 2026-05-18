@@ -245,7 +245,8 @@ public class NlModelingService {
             return null;
         }
 
-        LlmProvider provider = providerFactory.getProvider(providerCode);
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
+        LlmProvider provider = providerFactory.getProvider(effectiveProviderCode);
 
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(config.getDefaultModel())

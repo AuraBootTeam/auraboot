@@ -16,7 +16,7 @@ import { uniqueId } from '../helpers/index';
 let pagePid: string;
 
 test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+  const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   const page = await ctx.newPage();
   const name = uniqueId('sc');
   const pageKey = `e2e_sc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;

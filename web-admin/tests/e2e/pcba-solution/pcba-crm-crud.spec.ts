@@ -162,7 +162,7 @@ test.describe('PCBA CRM CRUD', () => {
     const bucket = emptyBucket();
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanup(p, bucket);
       await ctx.close();
@@ -402,7 +402,7 @@ test.describe('PCBA CRM CRUD', () => {
     const bucket = emptyBucket();
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanup(p, bucket);
       await ctx.close();
@@ -611,7 +611,7 @@ test.describe('PCBA CRM CRUD', () => {
     const bucket = emptyBucket();
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanup(p, bucket);
       await ctx.close();

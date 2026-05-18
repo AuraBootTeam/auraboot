@@ -129,7 +129,7 @@ test.describe('Space Selection API', () => {
 });
 
 test.describe('Tenant Switch in Avatar Menu', () => {
-  test.use({ storageState: './tests/storage/admin.json' });
+  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
   test('header shows current tenant name', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });

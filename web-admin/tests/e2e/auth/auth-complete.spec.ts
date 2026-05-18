@@ -60,21 +60,22 @@ const PWD_TEST_PASSWORD = 'PwdTest2026!';
 
 async function loginViaUI(page: Page, email: string, password: string) {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
+    timeout: 5000,
+  });
   const emailInput = page.locator('input#email');
   await emailInput.waitFor({ state: 'visible', timeout: 5000 });
   const pwd = page.locator('input#password');
   await pwd.waitFor({ state: 'visible', timeout: 5000 });
 
-  // Clear deterministically first, then type through keyboard events so controlled
-  // inputs still receive the same user-like change sequence after hydration.
+  // Use Playwright's input fill to avoid per-keystroke races while React
+  // hydrates the controlled login form.
   await emailInput.click();
-  await emailInput.fill('');
-  await emailInput.pressSequentially(email, { delay: 5 });
+  await emailInput.fill(email);
   await expect(emailInput).toHaveValue(email, { timeout: 3000 });
 
   await pwd.click();
-  await pwd.fill('');
-  await pwd.pressSequentially(password, { delay: 5 });
+  await pwd.fill(password);
   await expect(pwd).toHaveValue(password, { timeout: 3000 });
 
   await page
@@ -322,9 +323,7 @@ test.describe('Registration Flow', () => {
       { timeout: 20000 },
     );
     const currentUrl = page.url();
-    expect(
-      currentUrl.includes('tenant-selection') || currentUrl.includes('/home'),
-    ).toBe(true);
+    expect(currentUrl.includes('tenant-selection') || currentUrl.includes('/home')).toBe(true);
   });
 
   test('REG-006: should reject duplicate email registration', async ({ page }) => {
@@ -439,8 +438,8 @@ test.describe('Login — Email OTP', () => {
 
   test.beforeAll(async () => {
     const adminRequest = await playwrightRequest.newContext({
-      baseURL: (BASE_URL),
-      storageState: 'tests/storage/admin.json',
+      baseURL: BASE_URL,
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     try {
       devCodeAvailable = await isDevVerifyCodeAvailable(adminRequest);
@@ -495,6 +494,9 @@ test.describe('Login — Email OTP', () => {
     const otpEmail = `otp-login-${TEST_PREFIX.toLowerCase()}@e2e-test.local`;
 
     await page.goto('/login');
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
+      timeout: 5000,
+    });
     const tab = page.locator('[data-testid="login-tab-email_code"]');
     if (await tab.isVisible()) {
       await tab.click();
@@ -537,9 +539,15 @@ test.describe('Login — Email OTP', () => {
 
     await page.goto('/login');
     const tab = page.locator('[data-testid="login-tab-email_code"]');
-    if (await tab.isVisible()) await tab.click();
+    if (await tab.isVisible()) {
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+    }
 
-    await page.locator('#ec-email, input[name="email"]').first().fill(newEmail);
+    const emailCodeInput = page.locator('#ec-email');
+    await expect(emailCodeInput).toBeVisible({ timeout: 8000 });
+    await emailCodeInput.fill(newEmail);
+    await expect(emailCodeInput).toHaveValue(newEmail, { timeout: 3000 });
     const sendBtn = page
       .locator('#ec-code')
       .locator('xpath=following-sibling::button[1]')
@@ -551,7 +559,9 @@ test.describe('Login — Email OTP', () => {
     const code = await waitForDevVerifyCode(request, newEmail);
     expect(code, 'Verification code should be retrievable for new email').toBeTruthy();
 
-    await page.locator('#ec-code, input[name="code"]').first().fill(code!);
+    const codeInput = page.locator('#ec-code');
+    await codeInput.fill(code!);
+    await expect(codeInput).toHaveValue(code!, { timeout: 3000 });
     await page.locator('form[action="/login"] button[type="submit"]').click();
 
     // New user → should go to tenant-selection (no tenant yet), or /home if auto-assigned
@@ -744,10 +754,14 @@ test.describe('Password Change', () => {
     await page.locator('[data-testid="confirm-password-input"]').fill('short');
     await page.locator('[data-testid="change-password-btn"]').click();
 
-    await expect(page.getByText(/at least 8|至少8|密码长度|minimum.*8|password.*short/i).first()).toBeVisible({ timeout: 5000 }).catch(async () => {
-      // Validation may show as toast or inline
-      await expect(page.locator('[class*="error"], [class*="destructive"], [role="alert"]').first()).toBeVisible({ timeout: 5000 });
-    });
+    await expect(page.getByText(/at least 8|至少8|密码长度|minimum.*8|password.*short/i).first())
+      .toBeVisible({ timeout: 5000 })
+      .catch(async () => {
+        // Validation may show as toast or inline
+        await expect(
+          page.locator('[class*="error"], [class*="destructive"], [role="alert"]').first(),
+        ).toBeVisible({ timeout: 5000 });
+      });
   });
 
   test('PWD-004: should validate password confirmation match', async ({ page }) => {
@@ -790,7 +804,10 @@ test.describe('Password Change', () => {
         },
       });
       const probeBody = await regProbe.json().catch(() => ({}));
-      if (probeBody?.message?.includes('disabled') || probeBody?.message?.includes('single-tenant')) {
+      if (
+        probeBody?.message?.includes('disabled') ||
+        probeBody?.message?.includes('single-tenant')
+      ) {
         test.skip(true, 'Self-registration is disabled in single-tenant mode');
         return;
       }
@@ -961,7 +978,10 @@ test.describe('Forgot & Reset Password', () => {
 
     // Error is rendered in a <p> tag; use locator for more reliable matching
     await expect(
-      page.locator('p.text-red-600').filter({ hasText: /invalid reset link/i }).first(),
+      page
+        .locator('p.text-red-600')
+        .filter({ hasText: /invalid reset link/i })
+        .first(),
     ).toContainText(/invalid reset link/i, {
       timeout: 5000,
     });
@@ -973,23 +993,38 @@ test.describe('Forgot & Reset Password', () => {
 
     await page.locator('[data-testid="reset-new-password"]').click();
     await page.locator('[data-testid="reset-new-password"]').fill('short');
+    await expect(page.locator('[data-testid="reset-new-password"]')).toHaveValue('short');
     await page.locator('[data-testid="reset-confirm-password"]').click();
     await page.locator('[data-testid="reset-confirm-password"]').fill('short');
+    await expect(page.locator('[data-testid="reset-confirm-password"]')).toHaveValue('short');
     await page.locator('[data-testid="reset-submit-btn"]').click();
 
-    await expect(page.getByText(/at least 8|至少8|密码长度|minimum.*8|password.*short/i).first()).toBeVisible({ timeout: 5000 }).catch(async () => {
-      await expect(page.locator('[class*="error"], [class*="destructive"], [role="alert"]').first()).toBeVisible({ timeout: 5000 });
-    });
+    await expect(page.getByText(/at least 8|至少8|密码长度|minimum.*8|password.*short/i).first())
+      .toBeVisible({ timeout: 5000 })
+      .catch(async () => {
+        await expect(
+          page.locator('[class*="error"], [class*="destructive"], [role="alert"]').first(),
+        ).toBeVisible({ timeout: 5000 });
+      });
   });
 
   test('RP-004: should validate password confirmation match', async ({ page }) => {
     await page.goto('/reset-password?token=fake-token', { waitUntil: 'load' });
     await expect(page.locator('[data-testid="reset-new-password"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="reset-password-page-root"]')).toHaveAttribute(
+      'data-hydrated',
+      'true',
+      { timeout: 5000 },
+    );
 
     await page.locator('[data-testid="reset-new-password"]').click();
     await page.locator('[data-testid="reset-new-password"]').fill('ValidPass2026!');
+    await expect(page.locator('[data-testid="reset-new-password"]')).toHaveValue('ValidPass2026!');
     await page.locator('[data-testid="reset-confirm-password"]').click();
     await page.locator('[data-testid="reset-confirm-password"]').fill('DifferentPass!');
+    await expect(page.locator('[data-testid="reset-confirm-password"]')).toHaveValue(
+      'DifferentPass!',
+    );
     await page.locator('[data-testid="reset-submit-btn"]').click();
 
     await expect(page.getByText(/do not match/i)).toBeVisible();
@@ -1062,13 +1097,6 @@ test.describe('Logout Flow', () => {
     const header = new HeaderPage(page);
     await header.userMenuButton.waitFor({ state: 'visible', timeout: 20000 });
     await header.logout();
-
-    const confirmBtn = page
-      .locator('button:has-text("确认退出"), button:has-text("Log Out")')
-      .first();
-    if (await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await confirmBtn.click();
-    }
 
     // After Form POST, should redirect to /login (increase timeout for batch runs)
     await expect(page).toHaveURL(/login/, { timeout: 20000 });

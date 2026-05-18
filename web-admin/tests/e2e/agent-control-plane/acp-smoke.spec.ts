@@ -51,7 +51,7 @@ test.describe('Agent Control Plane @smoke', () => {
   // Seed Data — comprehensive across all entity types
   // =========================================================================
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // Probe whether ACP plugin is installed by trying to create a mission

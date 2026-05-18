@@ -67,7 +67,7 @@ test.describe('Finance — Currency & Exchange Rate Management', () => {
   // -------------------------------------------------------------------------
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Ensure CNY exists as base currency (may already exist from previous runs)

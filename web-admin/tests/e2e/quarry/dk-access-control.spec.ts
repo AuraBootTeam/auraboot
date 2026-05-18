@@ -131,7 +131,7 @@ test.describe('DK Access Control @smoke', () => {
   // -----------------------------------------------------------------------
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const cleanupPage = await ctx.newPage();

@@ -47,9 +47,28 @@ let defaultTableView: DefaultTableViewState | null = null;
 // Helpers
 // ---------------------------------------------------------------------------
 
+function viewSelectorButton(page: Page) {
+  return page
+    .locator('[data-testid="view-selector-trigger"], button[aria-haspopup="listbox"]')
+    .first();
+}
+
 /** Navigate to showcase list and wait for table to render with data. */
 async function gotoShowcaseList(page: Page) {
-  await page.goto(SHOWCASE_LIST_URL, { waitUntil: 'domcontentloaded' });
+  const viewParam = defaultTableView?.createdPid
+    ? `?view=${encodeURIComponent(defaultTableView.createdPid)}`
+    : '';
+  await page.goto(`${SHOWCASE_LIST_URL}${viewParam}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 20_000 });
+  if (defaultTableView?.createdPid) {
+    const viewBtn = viewSelectorButton(page);
+    await expect(viewBtn).toBeVisible({ timeout: 15_000 });
+    if ((await viewBtn.getAttribute('data-current-view-type')) !== null) {
+      await expect(viewBtn).toHaveAttribute('data-current-view-type', 'table', {
+        timeout: 15_000,
+      });
+    }
+  }
   await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 20_000 });
 }
 
@@ -57,7 +76,7 @@ async function gotoShowcaseList(page: Page) {
 async function openViewManagePanel(page: Page) {
   // The ViewSelector is a button with the current view name or "Select view"
   // It has aria-haspopup="listbox" — clicking it opens the manage panel directly
-  const viewBtn = page.locator('button[aria-haspopup="listbox"]').first();
+  const viewBtn = viewSelectorButton(page);
   await expect(viewBtn).toBeVisible({ timeout: 10_000 });
   await viewBtn.click();
 
@@ -93,7 +112,12 @@ test.describe('View Management Panel', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
   test.beforeAll(async ({ request }) => {
-    defaultTableView = await createDefaultTableView(request, MODEL_CODE, PAGE_KEY, 'view management');
+    defaultTableView = await createDefaultTableView(
+      request,
+      MODEL_CODE,
+      PAGE_KEY,
+      'view management',
+    );
   });
 
   test.afterAll(async ({ request }) => {
@@ -117,7 +141,10 @@ test.describe('View Management Panel', () => {
     const groupHeaders = panel.locator('text=/Global Views|Team Views|Personal Views/');
     const emptyState = panel.getByText('No saved views available');
     // At least one of these must be visible
-    const hasViews = await groupHeaders.first().isVisible().catch(() => false);
+    const hasViews = await groupHeaders
+      .first()
+      .isVisible()
+      .catch(() => false);
     const hasEmptyState = await emptyState.isVisible().catch(() => false);
     expect(hasViews || hasEmptyState).toBe(true);
 
@@ -159,7 +186,7 @@ test.describe('View Management Panel', () => {
     expect(rowCount).toBeGreaterThan(0);
 
     // Remember the created view name for later
-    const viewBtn = page.locator('button[aria-haspopup="listbox"]').first();
+    const viewBtn = viewSelectorButton(page);
     createdTableViewName = (await viewBtn.innerText()).trim();
     // Table view name should contain "Table"
     expect(createdTableViewName).toMatch(/table/i);
@@ -232,7 +259,7 @@ test.describe('View Management Panel', () => {
 
     // The active view should now be the kanban view we just created
     // The view selector may show the newly created view or fallback to another
-    const viewBtn = page.locator('button[aria-haspopup="listbox"]').first();
+    const viewBtn = viewSelectorButton(page);
     createdKanbanViewName = (await viewBtn.innerText()).trim();
     // View name may be auto-generated or match the type — accept any non-empty name
     expect(createdKanbanViewName.length).toBeGreaterThan(0);
@@ -254,7 +281,13 @@ test.describe('View Management Panel', () => {
           if (await emptyNotConfigured.isVisible().catch(() => false)) return 'empty';
           // Any kanban-like board present? (.flex.gap-4.overflow-x-auto is the
           // observed structural marker, see saved-view-kanban.spec.ts)
-          if (await page.locator('.flex.gap-4.overflow-x-auto').first().isVisible().catch(() => false)) {
+          if (
+            await page
+              .locator('.flex.gap-4.overflow-x-auto')
+              .first()
+              .isVisible()
+              .catch(() => false)
+          ) {
             return 'rendered';
           }
           return 'pending';
@@ -269,7 +302,10 @@ test.describe('View Management Panel', () => {
       // this is a real bug: the config step saved the fields but the parent
       // component or API didn't persist/reload viewConfig correctly.
       // We still mark this as a legitimate test finding.
-      test.fail(true, 'BUG: Kanban shows "not configured" after saving groupByField + titleField in config step. The viewConfig may not persist correctly.');
+      test.fail(
+        true,
+        'BUG: Kanban shows "not configured" after saving groupByField + titleField in config step. The viewConfig may not persist correctly.',
+      );
       return;
     }
 
@@ -331,8 +367,10 @@ test.describe('View Management Panel', () => {
     await panelLoc.waitFor({ state: 'hidden', timeout: 10_000 });
 
     // View name should mention "Calendar" — wait for loading to finish
-    const viewBtn = page.locator('button[aria-haspopup="listbox"]').first();
-    await expect.poll(async () => (await viewBtn.innerText()).trim(), { timeout: 10_000 }).not.toBe('Loading...');
+    const viewBtn = viewSelectorButton(page);
+    await expect
+      .poll(async () => (await viewBtn.innerText()).trim(), { timeout: 10_000 })
+      .not.toBe('Loading...');
     const viewName = (await viewBtn.innerText()).trim();
     expect(viewName).toMatch(/calendar/i);
 
@@ -358,15 +396,24 @@ test.describe('View Management Panel', () => {
     const isNotConfigured = await notConfiguredCal.isVisible().catch(() => false);
 
     if (isNotConfigured) {
-      test.fail(true, 'BUG: Calendar shows "not configured" after saving date field in config step.');
+      test.fail(
+        true,
+        'BUG: Calendar shows "not configured" after saving date field in config step.',
+      );
       return;
     }
 
     const isCalendarVisible = await calendarContainer.isVisible().catch(() => false);
     if (isCalendarVisible) {
       // Calendar rendered — verify it has the grid structure
-      const hasHeader = await page.locator('.fc-toolbar').isVisible().catch(() => false);
-      const hasDayGrid = await page.locator('.fc-daygrid').isVisible().catch(() => false);
+      const hasHeader = await page
+        .locator('.fc-toolbar')
+        .isVisible()
+        .catch(() => false);
+      const hasDayGrid = await page
+        .locator('.fc-daygrid')
+        .isVisible()
+        .catch(() => false);
       expect(hasHeader || hasDayGrid).toBe(true);
     }
   });
@@ -414,7 +461,9 @@ test.describe('View Management Panel', () => {
       }
     }
 
-    const galleryNavigation = page.waitForURL(/(?:\?|&)view=/, { timeout: 10_000 }).catch(() => null);
+    const galleryNavigation = page
+      .waitForURL(/(?:\?|&)view=/, { timeout: 10_000 })
+      .catch(() => null);
 
     // Click Done
     await doneBtn.click();
@@ -425,8 +474,10 @@ test.describe('View Management Panel', () => {
     await panelLoc.waitFor({ state: 'hidden', timeout: 10_000 });
 
     // View name should mention "Gallery"
-    const viewBtn = page.locator('button[aria-haspopup="listbox"]').first();
-    await expect.poll(async () => (await viewBtn.innerText()).trim(), { timeout: 10_000 }).not.toBe('Loading...');
+    const viewBtn = viewSelectorButton(page);
+    await expect
+      .poll(async () => (await viewBtn.innerText()).trim(), { timeout: 10_000 })
+      .not.toBe('Loading...');
     const viewName = (await viewBtn.innerText()).trim();
     expect(viewName).toMatch(/gallery|view|default/i);
   });
@@ -529,7 +580,7 @@ test.describe('View Management Panel', () => {
     expect(count).toBeGreaterThanOrEqual(2);
 
     // Get the current view button text from the selector
-    const viewSelector = page.locator('button[aria-haspopup="listbox"]').first();
+    const viewSelector = viewSelectorButton(page);
     const currentName = (await viewSelector.innerText()).trim();
 
     // Find a different view to switch to
@@ -555,7 +606,9 @@ test.describe('View Management Panel', () => {
       }
 
       // Verify the view selector shows the new view name (may take a moment to update)
-      await expect(viewSelector).toContainText(new RegExp(switchTarget.split(' ')[0], 'i'), { timeout: 10_000 });
+      await expect(viewSelector).toContainText(new RegExp(switchTarget.split(' ')[0], 'i'), {
+        timeout: 10_000,
+      });
     }
   });
 

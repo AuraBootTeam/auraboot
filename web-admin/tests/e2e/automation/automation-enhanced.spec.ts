@@ -71,7 +71,7 @@ test.describe('Automation Enhanced', () => {
   const createdPids: string[] = [];
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     try {
       seedAutomation = await createAutomationViaApi(page, `Seed ${uniqueId()}`);
@@ -84,7 +84,7 @@ test.describe('Automation Enhanced', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     for (const pid of createdPids) {
       await deleteAutomationViaApi(page, pid);
@@ -147,12 +147,12 @@ test.describe('Automation Enhanced', () => {
 
     // Verify header form inputs exist and are empty
     // zh-CN placeholder "自动化名称", en-US "Automation name"
-    const nameInput = page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+    const nameInput = page.getByTestId('automation-editor-name-input');
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await expect(nameInput).toHaveValue('');
 
     // zh-CN placeholder "描述（可选）", en-US "Description (optional)"
-    const descInput = page.locator('input[placeholder*="描述"], input[placeholder*="escription"]').first();
+    const descInput = page.getByTestId('automation-editor-description-input');
     await expect(descInput).toBeVisible({ timeout: 5000 });
     await expect(descInput).toHaveValue('');
 
@@ -211,7 +211,7 @@ test.describe('Automation Enhanced', () => {
 
     // Verify name input is pre-filled
     // zh-CN placeholder "自动化名称", en-US "Automation name"
-    const nameInput = page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+    const nameInput = page.getByTestId('automation-editor-name-input');
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await expect(nameInput).toHaveValue(seedAutomation.name);
 

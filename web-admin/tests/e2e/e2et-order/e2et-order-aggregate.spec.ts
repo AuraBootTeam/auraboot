@@ -23,7 +23,7 @@ test.describe('E2E Test Order — AGGREGATE SideEffect', () => {
   let order: ModelTestHelper;
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     orderPid = await order.createViaApi({ e2et_order_title: `Aggregate ${uniqueId()}` });
@@ -32,7 +32,7 @@ test.describe('E2E Test Order — AGGREGATE SideEffect', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const helper = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     await helper.deleteViaApi(orderPid);

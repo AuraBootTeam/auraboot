@@ -50,6 +50,7 @@
 
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
 import { createLeaveApplicant, ensureRoleUsers } from '../../helpers/wd-fixtures';
+import { findRowInPaginatedList } from '../helpers';
 import {
   AuditOp,
   listAuditEvents,
@@ -112,7 +113,7 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
   const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
+    .getByRole('button', { name: /流程管理|Process Management|menu\.bpm_management/i })
     .first();
   if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await bpmParent.scrollIntoViewIfNeeded();
@@ -141,7 +142,7 @@ async function navigateToLeaveRequestList(page: Page): Promise<void> {
   const nav = page.locator('nav').first();
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
-  const rootBtn = nav.getByRole('button', { name: /请假|Leave Demo/i }).first();
+  const rootBtn = nav.getByRole('button', { name: /请假|Leave Demo|menu\.wd_root/i }).first();
   await expect(rootBtn).toBeVisible({ timeout: 5_000 });
   await rootBtn.evaluate((el: HTMLElement) => el.click());
 
@@ -620,15 +621,11 @@ test.describe(
       // 11. Wait for list table to re-render after the form-save redirect.
       await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
 
-      // 12. Find our freshly-created row by its generated code (D7)
-      const row = page
-        .locator('table tbody tr')
-        .filter({ hasText: leaveRequestCode })
-        .first();
-      await expect(
-        row,
-        `row for ${leaveRequestCode} must appear in the list`,
-      ).toBeVisible({ timeout: 10_000 });
+      // 12. Find our freshly-created row by its generated code (D7).
+      // The demo environment keeps historical WDLR rows, so use the list
+      // search/pagination helper instead of assuming the row is on page 1.
+      const row = await findRowInPaginatedList(page, leaveRequestCode, 15_000);
+      await expect(row, `row for ${leaveRequestCode} must appear in the list`).toBeVisible();
       // Pre-submit state visible in UI (D7 baseline)
       await expect(row, 'row status should read draft pre-submit').toContainText(/draft|草稿/i);
 

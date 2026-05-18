@@ -1,10 +1,12 @@
 package com.auraboot.framework.meta.entity;
 
+import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -13,7 +15,7 @@ import java.time.Instant;
  * Supports both system-generated (from command execution) and user-created activities.
  */
 @Data
-@TableName("ab_activity")
+@TableName(value = "ab_activity", autoResultMap = true)
 public class Activity {
 
     @TableId(value = "id", type = IdType.AUTO)
@@ -61,7 +63,7 @@ public class Activity {
     @TableField("operation_type")
     private String operationType;
 
-    @TableField("metadata")
+    @TableField(value = "metadata", jdbcType = JdbcType.OTHER, typeHandler = JsonbStringTypeHandler.class)
     private String metadata;
 
     @TableField("occurred_at")
