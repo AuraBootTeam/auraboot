@@ -90,7 +90,7 @@ test.describe('CRM Lead Merge Queue @critical', () => {
   // Same company (1.0 * 0.5 = 0.5) + same name (1.0 * 0.3 = 0.3) = 0.80 ≥ 0.70 ✓
   // =========================================================================
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // 1. Probe merge queue API

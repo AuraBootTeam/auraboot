@@ -519,7 +519,7 @@ test.describe('BPM designer — D4: ruleTask + Drools routing', { tag: ['@bpm-re
     const nav = page.locator('nav').first();
     await nav.waitFor({ state: 'visible', timeout: 10_000 });
     const bpmParent = nav
-      .getByRole('button', { name: /流程管理|Process Management/i })
+      .getByRole('button', { name: /流程管理|Process Management|menu\.bpm_management/i })
       .first();
     if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await bpmParent.scrollIntoViewIfNeeded();

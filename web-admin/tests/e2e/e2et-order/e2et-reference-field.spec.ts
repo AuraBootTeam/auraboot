@@ -21,7 +21,7 @@ test.describe('E2E Test Order — REFERENCE Field UI', () => {
   let customerName: string;
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const customer = new ModelTestHelper(page, E2ET_CUSTOMER_CONFIG);
     customerName = `RefCust ${uniqueId('RC')}`;
@@ -35,7 +35,7 @@ test.describe('E2E Test Order — REFERENCE Field UI', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const customer = new ModelTestHelper(page, E2ET_CUSTOMER_CONFIG);
     await customer.deleteViaApi(customerPid).catch(() => {});

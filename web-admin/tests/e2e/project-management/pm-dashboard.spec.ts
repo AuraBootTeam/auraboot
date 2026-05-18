@@ -34,7 +34,7 @@ test.describe('PM Dashboard @smoke', () => {
   // DATA SETUP — Create diverse seed data for dashboard to display
   // =========================================================================
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // --- Project 1: Active (in_progress) with tasks ---

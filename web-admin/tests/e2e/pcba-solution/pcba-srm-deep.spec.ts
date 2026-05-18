@@ -84,7 +84,7 @@ test.describe('PCBA SRM Deep — Supplier Evaluation', () => {
   let sharedSupplierId: string | null = null;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
 
     const uid = uniqueId('srm_eval');
@@ -110,7 +110,7 @@ test.describe('PCBA SRM Deep — Supplier Evaluation', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
     await cleanup(p, bucket);
     await ctx.close();

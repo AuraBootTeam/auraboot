@@ -284,7 +284,7 @@ test.describe('PCBA BOM -- CRUD', () => {
   let productName: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     productName = `E2E BOM Product ${uniqueId('prod')}`;
     const result = await executeCommandViaApi(
@@ -305,7 +305,7 @@ test.describe('PCBA BOM -- CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     if (productPid) {
@@ -580,7 +580,7 @@ test.describe('PCBA BOM -- State Transitions', () => {
   let materialPid: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     const result = await executeCommandViaApi(
       page,
@@ -643,7 +643,7 @@ test.describe('PCBA BOM -- State Transitions', () => {
   }
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     if (materialPid) {
@@ -823,7 +823,7 @@ test.describe('PCBA BOM -- BOM Lines', () => {
   let materialPid: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Create a material (product) for BOM lines — must be created BEFORE the BOM
@@ -864,7 +864,7 @@ test.describe('PCBA BOM -- BOM Lines', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Clean up BOM lines first (child records)

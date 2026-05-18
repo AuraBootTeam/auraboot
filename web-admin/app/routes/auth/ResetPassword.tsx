@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
@@ -12,9 +12,13 @@ export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  const submitReset = async () => {
     setError('');
 
     if (!token) {
@@ -46,6 +50,11 @@ export default function ResetPassword() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitReset();
   };
 
   if (success) {
@@ -83,7 +92,11 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+    <div
+      className="flex min-h-screen items-center justify-center bg-gray-50"
+      data-hydrated={hydrated ? 'true' : 'false'}
+      data-testid="reset-password-page-root"
+    >
       <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
         <h2 className="mb-2 text-2xl font-semibold text-gray-900">Reset Password</h2>
         <p className="mb-6 text-gray-600">Enter your new password below.</p>
@@ -117,8 +130,9 @@ export default function ResetPassword() {
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <button
-            type="submit"
-            disabled={isLoading}
+            type="button"
+            disabled={!hydrated || isLoading}
+            onClick={() => void submitReset()}
             className="w-full rounded-md bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
             data-testid="reset-submit-btn"
           >

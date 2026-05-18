@@ -44,7 +44,7 @@ test.describe('CP Construction Log — CRUD', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -213,7 +213,7 @@ test.describe('CP Construction Log — CRUD', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -241,7 +241,7 @@ test.describe('CP Weekly Report — Lifecycle', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -447,7 +447,7 @@ test.describe('CP Weekly Report — Lifecycle', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -474,7 +474,7 @@ test.describe('CP Material Inspection — Lifecycle', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -606,7 +606,7 @@ test.describe('CP Material Inspection — Lifecycle', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -641,7 +641,7 @@ test.describe('CP Site Issue — Lifecycle', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -737,7 +737,7 @@ test.describe('CP Site Issue — Lifecycle', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -765,7 +765,7 @@ test.describe('CP Issue Follow-Up', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();
@@ -822,7 +822,7 @@ test.describe('CP Issue Follow-Up', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const p = await ctx.newPage();

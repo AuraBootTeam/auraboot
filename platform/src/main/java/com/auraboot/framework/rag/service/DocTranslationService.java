@@ -176,7 +176,8 @@ public class DocTranslationService {
                 .build();
 
         try {
-            LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+            String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+            LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
             LlmChatResponse response = provider.chat(chatRequest, config.getApiKey(), config.getBaseUrl());
 
             if (response == null || response.getContent() == null || response.getContent().isEmpty()) {

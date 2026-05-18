@@ -71,7 +71,7 @@ async function navigateViaSidebar(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 
   const nav = page.locator('nav').first();
-  const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center/ });
+  const aiCenter = nav.getByRole('button', { name: /AI 中心|AI Center|menu\.ai_center/ });
   await aiCenter.waitFor({ state: 'visible', timeout: 10_000 });
   await aiCenter.evaluate((el: HTMLElement) => el.click());
 
@@ -79,29 +79,49 @@ async function navigateViaSidebar(page: Page): Promise<void> {
   await leaf.waitFor({ state: 'visible', timeout: 5_000 });
   await leaf.evaluate((el: HTMLElement) => el.click());
 
-  await expect(
-    page.locator('[data-testid="memory-promotions-page"]'),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('[data-testid="memory-promotions-page"]')).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 /** Wait for a pending-tab row to render. Pending cards always show the
  *  approve / reject / expand buttons inline — no pre-click needed. */
 async function waitPendingRow(page: Page, pid: string): Promise<void> {
-  await expect(page.locator(`[data-testid="promotion-${pid}"]`))
-      .toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(`[data-testid="promotion-${pid}"]`)).toBeVisible({ timeout: 10_000 });
 }
 
 /** Wait for a shadow-tab row to render. Shadow cards use the `shadow-${pid}`
  *  testid (different from the pending tab's `promotion-${pid}`). */
 async function waitShadowRow(page: Page, pid: string): Promise<void> {
-  await expect(page.locator(`[data-testid="shadow-${pid}"]`))
-      .toBeVisible({ timeout: 10_000 });
+  const row = page.locator(`[data-testid="shadow-${pid}"]`);
+  const tab = page.locator('[data-testid="tab-shadow"]');
+
+  await expect
+    .poll(
+      async () => {
+        if (await row.isVisible({ timeout: 500 }).catch(() => false)) {
+          return true;
+        }
+        const refresh = page
+          .waitForResponse(
+            (r) =>
+              r.url().includes('/api/memory/promotions') &&
+              r.url().includes('PROMOTED_SHADOW') &&
+              r.status() === 200,
+            { timeout: 3000 },
+          )
+          .catch(() => null);
+        await tab.click().catch(() => null);
+        await refresh;
+        return row.isVisible({ timeout: 500 }).catch(() => false);
+      },
+      { timeout: 15000, intervals: [500, 1000, 1500] },
+    )
+    .toBe(true);
 }
 
 test.describe('Mission Control — Memory Promotion review (real backend, PR-69)', () => {
-  test('MP-E2E-01: approve flow — DRAFT_PENDING_REVIEW → PROMOTED_SHADOW', async ({
-    page,
-  }) => {
+  test('MP-E2E-01: approve flow — DRAFT_PENDING_REVIEW → PROMOTED_SHADOW', async ({ page }) => {
     const pid = seedMemoryPromotion('DRAFT_PENDING_REVIEW', 0.85, 'cross_user_agreement');
 
     await navigateViaSidebar(page);
@@ -112,9 +132,7 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     await expect(page.locator('[data-testid="toast"]')).toBeVisible({
       timeout: 5_000,
     });
-    await expect(page.locator('[data-testid="toast"]')).toContainText(
-      /批准|Approv/,
-    );
+    await expect(page.locator('[data-testid="toast"]')).toContainText(/批准|Approv/);
 
     const row = dbPromotionRow(pid);
     expect(row.status).toBe('PROMOTED_SHADOW');
@@ -142,9 +160,7 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     await expect(page.locator('[data-testid="toast"]')).toBeVisible({
       timeout: 5_000,
     });
-    await expect(page.locator('[data-testid="toast"]')).toContainText(
-      /驳回|Reject/,
-    );
+    await expect(page.locator('[data-testid="toast"]')).toContainText(/驳回|Reject/);
 
     const row = dbPromotionRow(pid);
     expect(row.status).toBe('REVIEWED_REJECTED');
@@ -155,6 +171,9 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     page,
   }) => {
     const seed = seedMemoryPromotionWithPromotedMemory();
+    await expect
+      .poll(() => dbPromotionRow(seed.pid).status, { timeout: 5000 })
+      .toBe('PROMOTED_SHADOW');
 
     await navigateViaSidebar(page);
 
@@ -175,22 +194,17 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     await expect(page.locator('[data-testid="toast"]')).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.locator('[data-testid="toast"]')).toContainText(
-      /撤回|Retract/,
-    );
+    await expect(page.locator('[data-testid="toast"]')).toContainText(/撤回|Retract/);
 
     // Poll DB read to absorb the async commit gap between toast and persisted row.
-    await expect.poll(() => dbPromotionRow(seed.pid).status, { timeout: 10_000 })
-      .toBe('RETRACTED');
+    await expect.poll(() => dbPromotionRow(seed.pid).status, { timeout: 10_000 }).toBe('RETRACTED');
     expect(dbMemoryIsDeleted(seed.promotedMemoryPid!)).toBe(true);
   });
 
-  test('MP-E2E-04: batch approve — 3 DRAFT rows → all PROMOTED_SHADOW', async ({
-    page,
-  }) => {
+  test('MP-E2E-04: batch approve — 3 DRAFT rows → all PROMOTED_SHADOW', async ({ page }) => {
     const pid1 = seedMemoryPromotion('DRAFT_PENDING_REVIEW', 0.86, 'cross_user_agreement');
     const pid2 = seedMemoryPromotion('DRAFT_PENDING_REVIEW', 0.83, 'cross_user_agreement');
-    const pid3 = seedMemoryPromotion('DRAFT_PENDING_REVIEW', 0.90, 'implicit_co_sign');
+    const pid3 = seedMemoryPromotion('DRAFT_PENDING_REVIEW', 0.9, 'implicit_co_sign');
 
     await navigateViaSidebar(page);
 
@@ -217,13 +231,19 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     }
   });
 
-  test('MP-E2E-05: provenance modal — chain renders expected data', async ({
-    page,
-  }) => {
+  test('MP-E2E-05: provenance modal — chain renders expected data', async ({ page }) => {
     const seed = seedMemoryPromotionWithPromotedMemory();
 
     await navigateViaSidebar(page);
     await page.locator('[data-testid="tab-shadow"]').click();
+    await expect(page.locator('[data-testid="tab-shadow"]')).toHaveAttribute(
+      'aria-selected',
+      'true',
+      { timeout: 5_000 },
+    );
+    await expect(
+      page.locator('[data-testid="shadow-tab"], [data-testid="shadow-empty"]').first(),
+    ).toBeVisible({ timeout: 10_000 });
     await waitShadowRow(page, seed.pid);
     const row = page.locator(`[data-testid="shadow-${seed.pid}"]`);
 
@@ -238,7 +258,7 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     await expect(modal.locator('[data-testid="timeline-promotion"]')).toBeVisible();
     await expect(modal.locator('[data-testid="timeline-promoted"]')).toBeVisible();
     await expect(modal).toContainText(/PROMOTED_SHADOW|观察/);
-    await expect(modal).toContainText('user');    // source scope
-    await expect(modal).toContainText('tenant');  // target scope
+    await expect(modal).toContainText('user'); // source scope
+    await expect(modal).toContainText('tenant'); // target scope
   });
 });

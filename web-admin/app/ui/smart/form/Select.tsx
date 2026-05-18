@@ -32,6 +32,8 @@ const baseStyles = `${fieldControlBase} focus:ring-offset-2 disabled:opacity-50 
 
 const variantStyles = fieldVariantStyles;
 
+const EMPTY_OPTIONS: SelectProps['options'] = [];
+
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
     {
@@ -45,7 +47,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       multiple = false,
       clearable = false,
       inline = false,
-      options: staticOptions = [],
+      options: staticOptions = EMPTY_OPTIONS,
       dataSource,
       validationRules = [],
       expressions = {},
@@ -184,7 +186,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               )}
               onBlur={field.onBlur}
             >
-              <SelectValue placeholder={loading ? t('common.loading') || '...' : placeholderText || actionSelectLabel} />
+              <SelectValue
+                placeholder={
+                  loading ? t('common.loading') || '...' : placeholderText || actionSelectLabel
+                }
+              />
             </SelectTrigger>
             <SelectContent>
               {options?.map((option) => (

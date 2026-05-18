@@ -69,7 +69,7 @@ test.describe('Command Palette Document Search', () => {
   test.setTimeout(60_000);
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await page.goto('/aurabot/knowledge');
     await page.waitForLoadState('domcontentloaded');

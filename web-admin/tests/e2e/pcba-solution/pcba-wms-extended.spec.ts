@@ -262,7 +262,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
   };
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     const warehouseName = `E2E WMS Warehouse ${uniqueId()}`;
@@ -287,7 +287,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     await ctx.close();
@@ -720,7 +720,7 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
   };
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     const productName = `E2E WMS Product ${uniqueId()}`;
@@ -761,7 +761,7 @@ test.describe('PCBA WMS Extended — Lot Management (inv_lot)', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     await ctx.close();

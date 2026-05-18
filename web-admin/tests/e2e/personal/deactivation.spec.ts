@@ -50,7 +50,7 @@ test.describe.serial('Account Deactivation', () => {
     ensureUserEnabled();
 
     const ctx = await browser.newContext({
-      storageState: './tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const cleanupPage = await ctx.newPage();
     try {
@@ -64,7 +64,7 @@ test.describe.serial('Account Deactivation', () => {
   // Cleanup: cancel any deactivation created during tests and re-enable user
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: './tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const cleanupPage = await ctx.newPage();
     try {

@@ -46,7 +46,7 @@ test.describe('RecordPreviewDrawer — Row Click Preview', () => {
   let leadPid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // Seed a lead record for preview tests
@@ -173,7 +173,7 @@ test.describe('CRM Kanban Saved Views', () => {
   let oppAccountPid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // Create account for linking opportunities
@@ -559,7 +559,7 @@ test.describe('Inline Editing — Double-click Cell Edit', () => {
   let leadPid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // Seed a lead with known values for inline edit tests

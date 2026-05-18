@@ -20,6 +20,19 @@ import {
   fieldErrorFocusStyles,
 } from '~/ui/ui/field-styles';
 
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
 const NumberInput: React.FC<NumberInputProps> = ({
   name,
   label,
@@ -95,9 +108,10 @@ const NumberInput: React.FC<NumberInputProps> = ({
 
   // Format number with precision
   const formatValue = useCallback(
-    (val: number | undefined): string => {
-      if (val === undefined || val === null || isNaN(val)) return '';
-      return precision > 0 ? val.toFixed(precision) : String(val);
+    (val: unknown): string => {
+      const normalized = toFiniteNumber(val);
+      if (normalized === undefined) return '';
+      return precision > 0 ? normalized.toFixed(precision) : String(normalized);
     },
     [precision],
   );
@@ -132,8 +146,9 @@ const NumberInput: React.FC<NumberInputProps> = ({
 
   const handleBlur = () => {
     // Clamp on blur
-    const clamped = clampValue(field.value);
-    if (clamped !== field.value) {
+    const currentValue = toFiniteNumber(field.value);
+    const clamped = clampValue(currentValue);
+    if (clamped !== currentValue) {
       field.setValue(clamped);
     }
     field.onBlur();
@@ -141,14 +156,14 @@ const NumberInput: React.FC<NumberInputProps> = ({
 
   const increment = () => {
     if (disabledValue || readOnly) return;
-    const currentValue = field.value ?? 0;
+    const currentValue = toFiniteNumber(field.value) ?? 0;
     const newValue = clampValue(currentValue + step);
     field.setValue(newValue);
   };
 
   const decrement = () => {
     if (disabledValue || readOnly) return;
-    const currentValue = field.value ?? 0;
+    const currentValue = toFiniteNumber(field.value) ?? 0;
     const newValue = clampValue(currentValue - step);
     field.setValue(newValue);
   };
@@ -167,6 +182,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
   if (!isVisible) {
     return null;
   }
+  const numericValue = toFiniteNumber(field.value);
 
   const buttonClass = `
     flex items-center justify-center h-7 w-7 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100
@@ -196,7 +212,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
             type="button"
             onClick={decrement}
             disabled={
-              disabledValue || readOnly || (min !== undefined && (field.value ?? 0) <= min)
+              disabledValue || readOnly || (min !== undefined && (numericValue ?? 0) <= min)
             }
             className={`${buttonClass} absolute top-1/2 left-1 -translate-y-1/2`}
             tabIndex={-1}
@@ -234,7 +250,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
             type="button"
             onClick={increment}
             disabled={
-              disabledValue || readOnly || (max !== undefined && (field.value ?? 0) >= max)
+              disabledValue || readOnly || (max !== undefined && (numericValue ?? 0) >= max)
             }
             className={`${buttonClass} absolute top-1/2 right-1 -translate-y-1/2`}
             tabIndex={-1}

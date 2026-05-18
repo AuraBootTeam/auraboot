@@ -585,7 +585,7 @@ test.describe.serial('Showcase Seed — Extended', () => {
         crm_opp_name: oppNames[i],
         crm_opp_account_id: acc.pid,
         crm_opp_expected_amount: amount,
-        crm_opp_expected_close_date: dateTimeAt(closeMonth, randInt(1, 28)),
+        crm_opp_expected_close_date: dateAt(closeMonth, randInt(1, 28)),
       });
 
       for (const transition of transitionMap[stage] || []) {
@@ -846,7 +846,7 @@ test.describe.serial('Showcase Seed — Extended', () => {
         crm_opp_name: `${accName.slice(0, 4)}-${template.name}`,
         crm_opp_account_id: accId,
         crm_opp_expected_amount: amount,
-        crm_opp_expected_close_date: dateTimeAt(randInt(8, 18), randInt(1, 28)),
+        crm_opp_expected_close_date: dateAt(randInt(8, 18), randInt(1, 28)),
       });
 
       for (const transition of transitionMap[stage] || []) {

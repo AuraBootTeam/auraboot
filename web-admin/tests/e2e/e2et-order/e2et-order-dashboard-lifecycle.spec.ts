@@ -116,7 +116,7 @@ async function getBlockByTitle(page: Page, titleRegex: RegExp) {
 // ---------------------------------------------------------------------------
 test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext({
-    storageState: 'tests/storage/admin.json',
+    storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
   });
   const setupPage = await context.newPage();
 

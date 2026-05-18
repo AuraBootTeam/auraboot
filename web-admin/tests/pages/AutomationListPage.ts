@@ -70,11 +70,19 @@ export class AutomationListPage extends BasePage {
   }
 
   get confirmDialogLocator(): Locator {
-    return this.page.locator('[data-testid="confirm-dialog"], [role="alertdialog"], [role="dialog"]:has(button:has-text("OK"))').first();
+    return this.page
+      .locator(
+        '[data-testid="confirm-dialog"], [role="alertdialog"], [role="dialog"]:has(button:has-text("OK"))',
+      )
+      .first();
   }
 
   get confirmOkButton(): Locator {
-    return this.page.locator('[data-testid="confirm-ok"], [role="alertdialog"] button:has-text("OK"), [role="alertdialog"] button:has-text("确定"), [role="dialog"] button:has-text("OK"), [role="dialog"] button:has-text("确定")').first();
+    return this.page
+      .locator(
+        '[data-testid="confirm-ok"], [role="alertdialog"] button:has-text("OK"), [role="alertdialog"] button:has-text("确定"), [role="dialog"] button:has-text("OK"), [role="dialog"] button:has-text("确定")',
+      )
+      .first();
   }
 
   // --- Actions ---
@@ -99,6 +107,7 @@ export class AutomationListPage extends BasePage {
   async openLogs(pid: string): Promise<void> {
     const btn = this.logsButton(pid);
     await expect(btn).toBeVisible({ timeout: 10000 });
+    await expect(btn).toBeEnabled({ timeout: 10000 });
     await btn.click();
     await expect(this.logDialog).toBeVisible({ timeout: 8000 });
   }
@@ -118,10 +127,12 @@ export class AutomationListPage extends BasePage {
 
     // Click confirm and wait for DELETE API response
     const [deleteResp] = await Promise.all([
-      this.page.waitForResponse(
-        (r) => r.url().includes(`/api/automations/${pid}`) && r.request().method() === 'DELETE',
-        { timeout: 10000 },
-      ).catch(() => null),
+      this.page
+        .waitForResponse(
+          (r) => r.url().includes(`/api/automations/${pid}`) && r.request().method() === 'DELETE',
+          { timeout: 10000 },
+        )
+        .catch(() => null),
       this.confirmOkButton.click(),
     ]);
 

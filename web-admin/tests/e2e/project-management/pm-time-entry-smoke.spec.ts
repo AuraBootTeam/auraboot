@@ -37,7 +37,7 @@ test.describe('PM Time Entry Smoke Tests @smoke', () => {
   // DATA SETUP — Create a project for time entries
   // =========================================================================
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const meResp = await page.request.get('/api/auth/me');

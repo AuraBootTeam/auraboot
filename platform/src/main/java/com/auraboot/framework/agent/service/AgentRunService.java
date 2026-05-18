@@ -242,12 +242,14 @@ public class AgentRunService {
             for (String pc : providerChain) {
                 LlmProviderFactory.ProviderConfig candidateConfig = providerFactory.resolveConfig(tenantId, pc);
                 if (candidateConfig != null && candidateConfig.getApiKey() != null && !candidateConfig.getApiKey().isBlank()) {
-                    provider = providerFactory.getProvider(pc);
+                    String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(pc, candidateConfig);
+                    provider = providerFactory.getProvider(effectiveProviderCode);
                     config = candidateConfig;
-                    resolvedProviderCode = pc;
-                    if (!pc.equals(providerCode)) {
-                        log.info("Preferred provider '{}' not configured, falling back to '{}'", providerCode, pc);
-                        model = resolveModel(agentDef, pc, true);  // force fallback: use new provider's default model
+                    resolvedProviderCode = effectiveProviderCode;
+                    if (!effectiveProviderCode.equals(providerCode)) {
+                        log.info("Preferred provider '{}' resolved via '{}' to '{}'",
+                                providerCode, pc, effectiveProviderCode);
+                        model = resolveModel(agentDef, effectiveProviderCode, true);
                     }
                     break;
                 }

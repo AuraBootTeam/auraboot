@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { NavLink, useLocation, useRevalidator } from 'react-router';
 import { useRootLoaderData } from '~/root';
 import { useI18n } from '~/contexts/I18nContext';
-import SidebarSubmenu from '~/routes/SidebarSubmenu';
+import SidebarSubmenu, { resolveMenuLabel } from '~/routes/SidebarSubmenu';
 import { XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { resolveIcon } from '~/utils/icon-resolver';
@@ -119,7 +119,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
                 ) : menu.submenu && menu.submenu.length > 0 ? (
                   <SidebarSubmenu
                     submenu={menu.submenu}
-                    name={t(menu.nameKey) || menu.name}
+                    name={resolveMenuLabel(t, menu)}
                     icon={menu.icon}
                   />
                 ) : (
@@ -135,9 +135,9 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
                     onClick={() => setSidebarOpen(false)}
                   >
                     <span className="me-3 flex-shrink-0">
-                      {resolveIcon(menu.icon, t(menu.nameKey) || menu.name, 18)}
+                      {resolveIcon(menu.icon, resolveMenuLabel(t, menu), 18)}
                     </span>
-                    <span className="truncate">{t(menu.nameKey) || menu.name}</span>
+                    <span className="truncate">{resolveMenuLabel(t, menu)}</span>
                     {location.pathname === menu.path && (
                       <span className="ms-auto h-2 w-2 rounded-full bg-blue-500" />
                     )}
@@ -177,7 +177,7 @@ function CollapsedMenuItem({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { isRTL } = useDirection();
 
-  const menuName = t(menu.nameKey) || menu.name;
+  const menuName = resolveMenuLabel(t, menu);
   const hasSubmenu = menu.submenu && menu.submenu.length > 0;
   const isActive = hasSubmenu
     ? isPathInSubmenu(menu.submenu, location.pathname)
@@ -320,7 +320,7 @@ function PopoverSubmenu({
   return (
     <div className={depth > 0 ? 'ms-3 border-s border-gray-100 dark:border-gray-700' : ''}>
       {items.map((item: any, index: number) => {
-        const itemName = t(item.nameKey || item.name) || item.name;
+        const itemName = resolveMenuLabel(t, item);
         const hasChildren = item.submenu && item.submenu.length > 0;
 
         if (hasChildren) {

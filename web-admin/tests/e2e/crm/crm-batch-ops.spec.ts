@@ -39,7 +39,7 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
   // DATA SETUP — Create at least 2 leads for batch selection
   // =========================================================================
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const modelResp = await page.request.get('/api/meta/models/code/crm_lead');

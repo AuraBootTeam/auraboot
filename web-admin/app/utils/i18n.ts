@@ -55,13 +55,21 @@ export function useSmartText() {
   const lt = useLocalizedText();
 
   return useCallback(
-    (text: SmartText, _fallback?: string) => {
+    (text: SmartText, fallback?: string) => {
       if (text === null || text === undefined) return '';
-      if (typeof text === 'string') return lt(text);
+      if (typeof text === 'string') {
+        if (text.startsWith('$i18n:')) {
+          const key = text.slice(6);
+          const translated = t(key, undefined, fallback);
+          return translated === key ? (fallback ?? '') : translated;
+        }
+        return lt(text);
+      }
       if (typeof text === 'object' && 'i18nKey' in text) {
         const i18nKey = (text as { i18nKey?: string; params?: Record<string, any> }).i18nKey;
         if (i18nKey) {
-          return t(i18nKey, (text as { params?: Record<string, any> }).params);
+          const translated = t(i18nKey, (text as { params?: Record<string, any> }).params, fallback);
+          return translated === i18nKey ? (fallback ?? '') : translated;
         }
       }
       return getLocalizedTextImpl(text as LocalizedText, locale, t);

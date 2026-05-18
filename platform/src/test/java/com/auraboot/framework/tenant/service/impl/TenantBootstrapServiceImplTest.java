@@ -1,6 +1,7 @@
 package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.i18n.service.I18nResourceService;
+import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.menu.service.MenuService;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
@@ -55,6 +56,7 @@ class TenantBootstrapServiceImplTest {
     @Mock private SystemPermissionInitializer systemPermissionInitializer;
     @Mock private PermissionMapper permissionMapper;
     @Mock private I18nResourceService i18nResourceService;
+    @Mock private I18nService i18nService;
     @Mock private DynamicDataMapper dynamicDataMapper;
 
     private TenantBootstrapServiceImpl service;
@@ -73,6 +75,7 @@ class TenantBootstrapServiceImplTest {
                 systemPermissionInitializer,
                 permissionMapper,
                 i18nResourceService,
+                i18nService,
                 dynamicDataMapper);
     }
 

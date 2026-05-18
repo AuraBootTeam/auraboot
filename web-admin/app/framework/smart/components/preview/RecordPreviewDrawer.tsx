@@ -307,6 +307,10 @@ function resolveFieldLabel(
   const resolved = t(modelKey);
   if (resolved !== modelKey) return resolved;
 
+  const modelFieldKey = `field.${modelCode}.${fieldCode}.label`;
+  const modelFieldResolved = t(modelFieldKey);
+  if (modelFieldResolved !== modelFieldKey) return modelFieldResolved;
+
   // Try field-level key
   const fieldKey = `field.${fieldCode}.label`;
   const fieldResolved = t(fieldKey);

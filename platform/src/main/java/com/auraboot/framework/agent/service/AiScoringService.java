@@ -45,7 +45,8 @@ public class AiScoringService {
         if (config == null) {
             throw new IllegalStateException("No LLM provider configured. Please configure an LLM provider in Cloud Config.");
         }
-        LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
 
         // 2. Fetch leads to score
         NamedQueryTestRequest nqRequest = new NamedQueryTestRequest();

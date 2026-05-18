@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.service.impl;
 import com.auraboot.framework.i18n.compiler.I18nCompiler;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
+import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.entity.ViewConfig;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
@@ -102,6 +103,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final RolePermissionMapper rolePermissionMapper;
     private final DistributedLock distributedLock;
     private final I18nResourceService i18nResourceService;
+    private final I18nService i18nService;
     private final I18nCompiler i18nCompiler;
     private final PlatformProperties platformProperties;
     private final com.auraboot.framework.plugin.service.PlatformVersionChecker platformVersionChecker;
@@ -1762,6 +1764,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         if (!resources.isEmpty()) {
             int count = i18nResourceService.batchUpsert(resources);
+            i18nService.clearCache(null);
             log.info("Auto-generated {} menu i18n records from localized names", count);
         }
     }

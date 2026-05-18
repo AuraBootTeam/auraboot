@@ -202,7 +202,8 @@ public class AiTranslationService {
             throw new IllegalStateException("No LLM provider configured");
         }
 
-        LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
         LlmChatRequest chatRequest = LlmChatRequest.builder()
                 .model(config.getDefaultModel())
                 .systemPrompt("You are a professional software localization assistant. "

@@ -46,7 +46,8 @@ public class AgentHintEnhancer {
             throw new IllegalStateException(
                     "No LLM provider configured. Please configure an LLM provider in Cloud Config.");
         }
-        LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
 
         // 2. Query commands with missing or short agent_hint
         String sql = """

@@ -108,20 +108,26 @@ async function navigateToPageSchemaList(page: Page): Promise<void> {
 
 async function openDesignerFromList(page: Page, pid: string, pageKey: string): Promise<void> {
   const search = page
-    .locator('input[placeholder*="搜索"], input[placeholder*="Search"], input[type="search"]')
+    .locator(
+      '[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"], input[type="search"]',
+    )
     .first();
 
   if (await search.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    const listResponse = page.waitForResponse(
+      (response) => {
+        if (!response.url().includes('/api/dynamic/page_schema/list') || response.status() !== 200) {
+          return false;
+        }
+        const url = new URL(response.url());
+        return url.searchParams.get('keyword') === pageKey;
+      },
+      { timeout: 8_000 },
+    );
     await search.click();
     await search.fill(pageKey);
     await search.press('Enter').catch(() => null);
-    await page
-      .waitForResponse(
-        (response) =>
-          response.url().includes('/dynamic/page_schema_list') && response.status() === 200,
-        { timeout: 8_000 },
-      )
-      .catch(() => null);
+    await listResponse;
   }
 
   const row = page.locator(`tr:has-text("${pageKey}")`).first();
@@ -290,6 +296,21 @@ test.describe('Page Designer full lifecycle', () => {
 
     await page.getByTestId('toolbar-back').click();
     await expect(page.getByTestId('toolbar-btn-create')).toBeVisible({ timeout: 8_000 });
+
+    const search = page.getByTestId('list-search-input');
+    const listResponse = page.waitForResponse(
+      (response) => {
+        if (!response.url().includes('/api/dynamic/page_schema/list') || response.status() !== 200) {
+          return false;
+        }
+        const url = new URL(response.url());
+        return url.searchParams.get('keyword') === pageKey;
+      },
+      { timeout: 8_000 },
+    );
+    await search.fill(pageKey);
+    await search.press('Enter');
+    await listResponse;
 
     const row = page.locator(`tr:has-text("${pageKey}")`).first();
     await expect(row).toBeVisible({ timeout: 8_000 });

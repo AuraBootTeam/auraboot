@@ -100,6 +100,42 @@ public class LlmProviderFactory {
     }
 
     /**
+     * Resolve provider config and implementation together so callers do not
+     * accidentally use the originally requested provider after config
+     * resolution has routed to a different implementation, such as stub mode.
+     */
+    public ProviderResolution resolveProvider(Long tenantId, String providerCode) {
+        ProviderConfig config = resolveConfig(tenantId, providerCode);
+        if (config == null || config.getApiKey() == null || config.getApiKey().isBlank()) {
+            return null;
+        }
+
+        String effectiveProviderCode = effectiveProviderCode(providerCode, config);
+        LlmProvider provider = getProvider(effectiveProviderCode);
+        if (provider == null) {
+            return null;
+        }
+
+        return ProviderResolution.builder()
+                .requestedProviderCode(defaultProviderCode(providerCode))
+                .effectiveProviderCode(effectiveProviderCode)
+                .config(config)
+                .provider(provider)
+                .build();
+    }
+
+    public static String effectiveProviderCode(String requestedProviderCode, ProviderConfig config) {
+        if (config != null && config.getProviderCode() != null && !config.getProviderCode().isBlank()) {
+            return config.getProviderCode();
+        }
+        return defaultProviderCode(requestedProviderCode);
+    }
+
+    private static String defaultProviderCode(String providerCode) {
+        return providerCode != null && !providerCode.isBlank() ? providerCode : "anthropic";
+    }
+
+    /**
      * Resolve provider configuration: API key, base URL, model.
      * Tries CloudConfig first, falls back to application.yml for anthropic.
      */
@@ -436,6 +472,17 @@ public class LlmProviderFactory {
         private String baseUrl;
         private String defaultModel;
         private int maxTokens;
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class ProviderResolution {
+        private String requestedProviderCode;
+        private String effectiveProviderCode;
+        private ProviderConfig config;
+        private LlmProvider provider;
     }
 
     @lombok.Data

@@ -510,7 +510,7 @@ test.describe('DK Document Version', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const setupPage = await ctx.newPage();
@@ -567,7 +567,7 @@ test.describe('DK Document Version', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const cleanupPage = await ctx.newPage();
@@ -605,7 +605,7 @@ test.describe('DK Project-Document Link', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const setupPage = await ctx.newPage();
@@ -670,7 +670,7 @@ test.describe('DK Project-Document Link', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: BASE_URL,
     });
     const cleanupPage = await ctx.newPage();

@@ -64,6 +64,61 @@ describe('ControlledFieldRenderer', () => {
     });
   });
 
+  it('uses reference displayField labels and backend pageNum pagination params', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'crm_opp_account_id',
+            component: 'SmartSelect',
+            dataType: 'reference',
+            props: {
+              refTarget: {
+                targetModel: 'crm_account',
+                targetField: 'id',
+                displayField: 'crm_acc_name',
+              },
+            },
+          } as any
+        }
+        value={undefined}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartSelect');
+    });
+
+    expect(capturedPropsSpy.mock.calls[0]?.[0]?.props?.dataSource).toEqual({
+      type: 'api',
+      endpoint: '/api/dynamic/crm_account/list',
+      method: 'get',
+      params: { pageNum: 1, pageSize: 200 },
+      adaptor: 'optionList',
+      valueField: 'pid',
+      labelField: 'crm_acc_name',
+      autoFetch: true,
+    });
+  });
+
   it('rehydrates stringified daterange values for edit mode', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
@@ -143,7 +198,14 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
     rerender(
       <ControlledFieldRenderer
-        field={{ field: 'sc_attachment_file', component: 'SmartUpload', dataType: 'file', props: {} } as any}
+        field={
+          {
+            field: 'sc_attachment_file',
+            component: 'SmartUpload',
+            dataType: 'file',
+            props: {},
+          } as any
+        }
         value={'[{"name":"audit.txt","url":"/files/audit.txt","fileId":"f1"}]'}
         onChange={vi.fn()}
         context={{ locale: 'zh-CN', t: (key: string) => key } as any}

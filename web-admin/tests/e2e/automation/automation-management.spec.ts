@@ -65,7 +65,7 @@ test.describe('Automation Management', () => {
   let testAutomation: { pid: string; name: string };
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     testAutomation = await createAutomationViaApi(page);
     await page.close();
@@ -73,7 +73,7 @@ test.describe('Automation Management', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     await deleteAutomationViaApi(page, testAutomation.pid).catch(() => {});
     await page.close();
@@ -122,11 +122,11 @@ test.describe('Automation Management', () => {
     await page.waitForURL(/\/automation\/new/, { timeout: 10000 });
 
     // Verify name input — zh-CN "自动化名称", en-US "Automation name"
-    const nameInput = page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+    const nameInput = page.getByTestId('automation-editor-name-input');
     await expect(nameInput).toBeVisible({ timeout: 5000 });
 
     // Verify description input — zh-CN "描述（可选）", en-US "Description (optional)"
-    const descInput = page.locator('input[placeholder*="描述"], input[placeholder*="escription"]').first();
+    const descInput = page.getByTestId('automation-editor-description-input');
     await expect(descInput).toBeVisible({ timeout: 5000 });
 
     // Verify name input is empty (new automation)
@@ -220,13 +220,13 @@ test.describe('Automation Management', () => {
 
     // Verify name input has the automation name
     // zh-CN placeholder "自动化名称", en-US "Automation name"
-    const nameInput = page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+    const nameInput = page.getByTestId('automation-editor-name-input');
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await expect(nameInput).toHaveValue(testAutomation.name);
 
     // Verify description input has the description
     // zh-CN placeholder "描述（可选）", en-US "Description (optional)"
-    const descInput = page.locator('input[placeholder*="描述"], input[placeholder*="escription"]').first();
+    const descInput = page.getByTestId('automation-editor-description-input');
     await expect(descInput).toBeVisible({ timeout: 5000 });
     await expect(descInput).toHaveValue('E2E test automation');
   });

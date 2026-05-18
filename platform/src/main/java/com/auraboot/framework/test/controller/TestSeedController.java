@@ -73,7 +73,9 @@ public class TestSeedController {
             "e2et_payment",
             "tpm_project",
             "tpm_task",
-            "tpm_milestone"
+            "tpm_milestone",
+            "showcase_all_fields",
+            "sc_monthly_metric"
     );
 
     private final TenantService tenantService;
@@ -272,6 +274,12 @@ public class TestSeedController {
         try {
             try {
                 importTestPlugin("../plugins/project-management", "project-management", tenant.getId());
+                importFirstAvailableTestPlugin(
+                        tenant.getId(),
+                        "showcase",
+                        "../plugins/showcase",
+                        "../../auraboot/plugins/showcase"
+                );
                 importTestPlugin("../plugins/test-fixtures", "test-fixtures", tenant.getId());
             } catch (Exception e) {
                 log.warn("test-fixtures plugin install threw exception for tenant {}: {}",
@@ -279,9 +287,259 @@ public class TestSeedController {
             }
 
             ensureTestAdminCanUseImportedResources(tenant, user);
+            ensureShowcasePagesImportedForMobileE2e(tenant);
+            ensureShowcaseAllFieldsSeedDataForMobileE2e(tenant, user);
         } finally {
             MetaContext.clear();
         }
+    }
+
+    private void ensureShowcasePagesImportedForMobileE2e(Tenant tenant) {
+        Integer pageCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM ab_page_schema
+                WHERE tenant_id = ?
+                  AND page_key IN (
+                    'showcase_all_fields_list',
+                    'showcase_all_fields_form',
+                    'showcase_all_fields_detail'
+                )
+                  AND model_code = 'showcase_all_fields'
+                  AND status = 'published'
+                  AND deleted_flag = FALSE
+                """, Integer.class, tenant.getId());
+        if (pageCount == null || pageCount < 3) {
+            throw new IllegalStateException(
+                    "Mobile showcase seed requires published PageSchemas for list/form/detail; " +
+                            "found=" + pageCount + ", tenant=" + tenant.getId());
+        }
+    }
+
+    private void ensureShowcaseAllFieldsSeedDataForMobileE2e(Tenant tenant, User user) {
+        Integer existing = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM mt_showcase_all_fields
+                WHERE tenant_id = ?
+                """, Integer.class, tenant.getId());
+        if (existing != null && existing > 0) {
+            log.info("Mobile showcase seed data already exists: tenantId={}, rows={}", tenant.getId(), existing);
+            return;
+        }
+
+        insertShowcaseAllFieldsRecord(
+                tenant,
+                user,
+                "mobile_showcase_iot_gateway",
+                "IoT Gateway Development Kit",
+                "SC-20260513-005",
+                "Linux board + 4G module + WiFi/BLE/GPS, preloaded with AuraBoot Agent.",
+                24,
+                "1280.00",
+                true,
+                "2026-05-13",
+                "2026-09-30",
+                "2026-05-13T12:06:18+00:00",
+                "active",
+                "high",
+                "electronics",
+                "iot,gateway,edge",
+                82,
+                5,
+                "#2563EB",
+                "https://auraboot.io/showcase/iot-gateway",
+                "iot@auraboot.io",
+                "+1-555-0101",
+                "<h2>IoT Gateway v3.2</h2><p>One-stop <strong>IoT gateway</strong> solution with AuraBoot Agent.</p>",
+                """
+                [{"url":"/files/iot-quickstart.pdf","name":"IoT Gateway Quickstart.pdf","size":1572864,"type":"application/pdf"},{"url":"/files/firmware-v3.2.1.bin","name":"firmware-v3.2.1.bin","size":8388608,"type":"application/octet-stream"}]
+                """,
+                "OTA ready",
+                "125000.00",
+                "09:30",
+                "2026-05-13~2026-09-30",
+                "09:00-18:00",
+                "Industrial gateway kit for mobile record rendering validation.",
+                "Building A, 8F",
+                "advanced settings enabled"
+        );
+        insertShowcaseAllFieldsRecord(
+                tenant,
+                user,
+                "mobile_showcase_flexible_pc",
+                "Flexible PC Controller Board",
+                "SC-20260513-006",
+                "Controller board development and validation.",
+                12,
+                "860.00",
+                true,
+                "2026-05-14",
+                "2026-07-15",
+                "2026-05-14T09:15:00+00:00",
+                "active",
+                "low",
+                "electronics",
+                "pc,controller",
+                48,
+                4,
+                "#16A34A",
+                "https://auraboot.io/showcase/controller",
+                "controller@auraboot.io",
+                "+1-555-0102",
+                "<p>Flexible controller board with validation package.</p>",
+                """
+                [{"url":"/files/controller-spec.pdf","name":"Controller Spec.pdf","size":1048576,"type":"application/pdf"}]
+                """,
+                "Validation in progress",
+                "56000.00",
+                "10:00",
+                "2026-05-14~2026-07-15",
+                "10:00-17:00",
+                "Flexible controller board record for list card comparison.",
+                "Lab 2",
+                ""
+        );
+        insertShowcaseAllFieldsRecord(
+                tenant,
+                user,
+                "mobile_showcase_sensor_module",
+                "Industrial Sensor Module",
+                "SC-20260513-004",
+                "High precision industrial sensor module with multi-protocol support.",
+                36,
+                "420.00",
+                true,
+                "2026-05-12",
+                "2026-08-31",
+                "2026-05-12T16:20:00+00:00",
+                "review",
+                "medium",
+                "electronics",
+                "sensor,industrial",
+                64,
+                4,
+                "#7C3AED",
+                "https://auraboot.io/showcase/sensor",
+                "sensor@auraboot.io",
+                "+1-555-0103",
+                "<p>Sensor module pending review.</p>",
+                """
+                [{"url":"/files/sensor-guide.pdf","name":"Sensor Guide.pdf","size":734003,"type":"application/pdf"}]
+                """,
+                "Review required",
+                "78000.00",
+                "14:30",
+                "2026-05-12~2026-08-31",
+                "08:30-17:30",
+                "Sensor module summary for status and priority rendering.",
+                "Factory Zone C",
+                ""
+        );
+        insertShowcaseAllFieldsRecord(
+                tenant,
+                user,
+                "mobile_showcase_power_unit",
+                "Smart Power Management Unit",
+                "SC-20260513-007",
+                "Power management and energy optimization package.",
+                18,
+                "620.00",
+                false,
+                "2026-05-15",
+                "2026-10-01",
+                "2026-05-15T08:00:00+00:00",
+                "draft",
+                "medium",
+                "electronics",
+                "power,energy",
+                20,
+                3,
+                "#F59E0B",
+                "https://auraboot.io/showcase/power",
+                "power@auraboot.io",
+                "+1-555-0104",
+                "<p>Draft power unit package.</p>",
+                "[]",
+                "Draft record",
+                "43000.00",
+                "15:00",
+                "2026-05-15~2026-10-01",
+                "09:00-16:00",
+                "Power unit summary for inactive boolean rendering.",
+                "Warehouse 1",
+                ""
+        );
+        log.info("Inserted mobile showcase seed rows: tenantId={}, rows=4", tenant.getId());
+    }
+
+    private void insertShowcaseAllFieldsRecord(
+            Tenant tenant,
+            User user,
+            String pid,
+            String name,
+            String code,
+            String description,
+            int quantity,
+            String price,
+            boolean active,
+            String startDate,
+            String endDate,
+            String createdAt,
+            String status,
+            String priority,
+            String category,
+            String tags,
+            int progress,
+            int rating,
+            String color,
+            String website,
+            String email,
+            String phone,
+            String richText,
+            String attachmentJson,
+            String remark,
+            String budget,
+            String timeSlot,
+            String dateRange,
+            String workingHours,
+            String aiSummary,
+            String address,
+            String advancedSettings) {
+        jdbcTemplate.update("""
+                INSERT INTO mt_showcase_all_fields (
+                    pid, created_by, updated_by, tenant_id, created_at, updated_at,
+                    sc_name, sc_code, sc_description, sc_quantity, sc_price,
+                    sc_is_active, sc_start_date, sc_end_date, sc_created_at,
+                    sc_status, sc_priority, sc_category, sc_tags, sc_progress,
+                    sc_rating, sc_color, sc_website, sc_email, sc_phone,
+                    sc_richtext_content, sc_attachment, sc_remark, sc_budget,
+                    sc_time_slot, sc_date_range, sc_working_hours,
+                    sc_cascade_category, sc_tree_node, sc_assignee, sc_team_members,
+                    sc_department, sc_address, sc_ai_summary, sc_owner_user,
+                    sc_attachment_file, sc_advanced_settings
+                )
+                VALUES (
+                    ?, ?, ?, ?, NOW(), NOW(),
+                    ?, ?, ?, ?, ?::numeric,
+                    ?, ?::date, ?::date, ?::timestamptz,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?::jsonb, ?, ?::numeric,
+                    ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?
+                )
+                """,
+                pid, user.getId(), user.getId(), tenant.getId(),
+                name, code, description, quantity, price,
+                active, startDate, endDate, createdAt,
+                status, priority, category, tags, progress,
+                rating, color, website, email, phone,
+                richText, attachmentJson, remark, budget,
+                timeSlot, dateRange, workingHours,
+                "electronics/gateway/edge", "engineering", user.getPid(), user.getPid(),
+                "platform", address, aiSummary, user.getPid(),
+                attachmentJson, advancedSettings);
     }
 
     private void ensureTestAdminCanUseImportedResources(Tenant tenant, User user) {
@@ -523,6 +781,19 @@ public class TestSeedController {
             log.warn("{} plugin install failed for tenant {}: {}",
                     pluginName, tenantId, result.getErrorMessage());
         }
+    }
+
+    private void importFirstAvailableTestPlugin(Long tenantId, String pluginName, String... relativePaths) {
+        Path workingDir = Path.of(System.getProperty("user.dir"));
+        for (String relativePath : relativePaths) {
+            Path pluginDir = workingDir.resolve(relativePath).normalize();
+            if (pluginDir.toFile().isDirectory()) {
+                importTestPlugin(relativePath, pluginName, tenantId);
+                return;
+            }
+        }
+        log.warn("{} plugin directory not found in any candidate path {}, skipping plugin install",
+                pluginName, List.of(relativePaths));
     }
 
     /**

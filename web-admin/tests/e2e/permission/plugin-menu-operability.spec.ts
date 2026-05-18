@@ -68,7 +68,7 @@ test.describe('Plugin Menu Operability', () => {
     browser,
   }) => {
     test.setTimeout(90000);
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     let page = await context.newPage();
 
     try {

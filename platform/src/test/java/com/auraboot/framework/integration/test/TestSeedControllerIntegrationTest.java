@@ -310,6 +310,70 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                     userPermissionService.hasPermission(userId, "model.e2et_order.read"),
                     "mobile E2E seed user must be able to read e2et_order records"
             );
+            Integer showcaseMenuCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM ab_menu
+                    WHERE tenant_id = ?
+                      AND page_key = 'showcase_all_fields_list'
+                      AND deleted_flag = FALSE
+                    """, Integer.class, tenantId);
+            Assertions.assertTrue(
+                    showcaseMenuCount != null && showcaseMenuCount > 0,
+                    "mobile showcase E2E seed must expose showcase_all_fields in the tenant menu"
+            );
+            Assertions.assertTrue(
+                    userPermissionService.hasPermission(userId, "sc.showcase.read"),
+                    "mobile showcase E2E seed user must be able to read showcase_all_fields menu"
+            );
+            Integer showcasePageCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(DISTINCT page_key)
+                    FROM ab_page_schema
+                    WHERE tenant_id = ?
+                      AND page_key IN (
+                        'showcase_all_fields_list',
+                        'showcase_all_fields_form',
+                        'showcase_all_fields_detail'
+                    )
+                      AND model_code = 'showcase_all_fields'
+                      AND status = 'published'
+                      AND deleted_flag = FALSE
+                    """, Integer.class, tenantId);
+            Assertions.assertEquals(
+                    3,
+                    showcasePageCount,
+                    "mobile showcase E2E seed must publish list/form/detail PageSchemas"
+            );
+            Integer showcaseRecordCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM mt_showcase_all_fields
+                    WHERE tenant_id = ?
+                    """, Integer.class, tenantId);
+            Assertions.assertTrue(
+                    showcaseRecordCount != null && showcaseRecordCount >= 4,
+                    "mobile showcase E2E seed must include real showcase_all_fields records"
+            );
+            Integer showcaseAttachmentCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM mt_showcase_all_fields
+                    WHERE tenant_id = ?
+                      AND sc_attachment IS NOT NULL
+                      AND jsonb_typeof(sc_attachment) = 'array'
+                      AND jsonb_array_length(sc_attachment) > 0
+                    """, Integer.class, tenantId);
+            Assertions.assertTrue(
+                    showcaseAttachmentCount != null && showcaseAttachmentCount > 0,
+                    "mobile showcase E2E seed must include attachment JSON to verify safe mobile rendering"
+            );
+            Integer showcaseRichTextCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM mt_showcase_all_fields
+                    WHERE tenant_id = ?
+                      AND sc_richtext_content LIKE '<%'
+                    """, Integer.class, tenantId);
+            Assertions.assertTrue(
+                    showcaseRichTextCount != null && showcaseRichTextCount > 0,
+                    "mobile showcase E2E seed must include rich text to verify HTML-safe rendering"
+            );
         } finally {
             MetaContext.clear();
         }

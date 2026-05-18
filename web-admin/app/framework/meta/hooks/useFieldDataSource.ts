@@ -9,7 +9,7 @@
  * - 任何需要选项列表的表单字段
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import type { DataSourceConfig } from '~/framework/meta/schemas/types';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
@@ -34,6 +34,18 @@ export interface UseFieldDataSourceResult {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+}
+
+const EMPTY_OPTIONS: OptionItem[] = [];
+
+function stableDataSourceKey(value: unknown): string {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return `id:${value}`;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 /**
@@ -75,7 +87,7 @@ export interface UseFieldDataSourceResult {
  * ```
  */
 export function useFieldDataSource({
-  staticOptions = [],
+  staticOptions = EMPTY_OPTIONS,
   dataSource,
   context,
   managerInstance,
@@ -105,6 +117,9 @@ export function useFieldDataSource({
     expressionContextManager ||
     internalManagerRef.current;
 
+  const dataSourceKey = useMemo(() => stableDataSourceKey(dataSource), [dataSource]);
+  const staticOptionsKey = useMemo(() => stableDataSourceKey(staticOptions), [staticOptions]);
+
   // P0-3: 强制单例 - 如果没有外部 manager,抛出错误
   useEffect(() => {
     if (
@@ -121,7 +136,7 @@ export function useFieldDataSource({
           'Inline dataSource configs are no longer supported without an external DataSourceManager.',
       );
     }
-  }, [managerInstance, reactContextManager, expressionContextManager, dataSource]);
+  }, [managerInstance, reactContextManager, expressionContextManager, dataSourceKey]);
 
   // 注册数据源
   useEffect(() => {
@@ -193,11 +208,9 @@ export function useFieldDataSource({
     return () => {
       unsubscribe();
       // 清理临时数据源
-      if (manager === internalManagerRef.current) {
-        manager.unregister(dsId);
-      }
+      manager.unregister(dsId);
     };
-  }, [dataSource, manager, staticOptions]);
+  }, [dataSourceKey, manager, staticOptionsKey]);
 
   // 重新加载数据
   const refetch = useCallback(async () => {
@@ -221,7 +234,7 @@ export function useFieldDataSource({
     } finally {
       setLoading(false);
     }
-  }, [dataSource, manager]);
+  }, [dataSourceKey, manager]);
 
   // 清理内部 manager
   useEffect(() => {

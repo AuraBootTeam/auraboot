@@ -101,7 +101,7 @@ async function navigateToIssueList(page: Page): Promise<void> {
 // UI tests operate on this pre-created issue instead of relying on form PID extraction
 // ---------------------------------------------------------------------------
 test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+  const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   const page = await ctx.newPage();
   try {
     testProjectId = await getTestProjectId(page);
@@ -500,7 +500,7 @@ test('DIL-007: Triage issue with no_action — status changes to no_action @crit
   const ctx = await page
     .context()
     .browser()!
-    .newContext({ storageState: 'tests/storage/admin.json' });
+    .newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   const setupPage = await ctx.newPage();
   try {
     const noActionTitle = `NoAction-${UID}`;
@@ -630,7 +630,7 @@ test('DIL-008: Triage need_rectify — side-effect creates dp_rectification reco
   const ctx = await page
     .context()
     .browser()!
-    .newContext({ storageState: 'tests/storage/admin.json' });
+    .newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   const setupPage = await ctx.newPage();
   const rectifyTitle = `Rectify-${UID}`;
   try {

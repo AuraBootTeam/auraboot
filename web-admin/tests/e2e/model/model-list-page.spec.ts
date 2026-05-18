@@ -189,8 +189,7 @@ test.describe('Model List Page', () => {
     await expect(draftRow).not.toContainText('渲染错误');
     await expect(draftRow).toContainText(/草稿|Draft/);
     await expect(draftRow).toContainText(/物理表|Physical/);
-    const draftCells = draftRow.locator('td');
-    await expect(draftCells.nth(6)).toHaveText(/^1$/);
+    await expect(draftRow.locator('[data-testid$="-fieldCount"]')).toHaveText(/^0$/);
 
     await searchModel(page, publishedModel.code);
     const publishedRow = getModelRow(page, publishedModel.code);
@@ -198,8 +197,7 @@ test.describe('Model List Page', () => {
     await expect(publishedRow).not.toContainText('渲染错误');
     await expect(publishedRow).toContainText(/已发布|Published/);
     await expect(publishedRow).toContainText(/物理表|Physical/);
-    const publishedCells = publishedRow.locator('td');
-    await expect(publishedCells.nth(6)).toHaveText(/^1$/);
+    await expect(publishedRow.locator('[data-testid$="-fieldCount"]')).toHaveText(/^1$/);
   });
 
   test('ML-02: row actions navigate to detail and edit pages', async ({ page, api }) => {

@@ -461,7 +461,6 @@ export function FormPageContent(props: PageContentProps) {
   const hasModelCodeAndKindFields =
     schemaFieldNames.has('model_code') && schemaFieldNames.has('kind');
 
-
   // Determine mode string for expression context
   const mode = isEditMode ? 'edit' : 'create';
 
@@ -491,7 +490,9 @@ export function FormPageContent(props: PageContentProps) {
   // Kind × capability validation: fetch selected model's capabilities when the
   // form has both `model_code` and `kind` fields. No-op for other forms.
   const activeModelCodeForCaps = hasModelCodeAndKindFields
-    ? (typeof formData.model_code === 'string' ? formData.model_code : undefined)
+    ? typeof formData.model_code === 'string'
+      ? formData.model_code
+      : undefined
     : undefined;
   const { data: kindCapabilities } = useModelCapabilities(activeModelCodeForCaps);
 
@@ -570,22 +571,28 @@ export function FormPageContent(props: PageContentProps) {
     showToast,
   });
 
-  const clearFieldError = useCallback((fieldCode: string) => {
-    setFieldErrors((prev) => {
-      if (!prev[fieldCode]) return prev;
-      const next = { ...prev };
-      delete next[fieldCode];
-      return next;
-    });
-    setSummaryErrors([]);
-    setError(null);
-  }, [setError]);
+  const clearFieldError = useCallback(
+    (fieldCode: string) => {
+      setFieldErrors((prev) => {
+        if (!prev[fieldCode]) return prev;
+        const next = { ...prev };
+        delete next[fieldCode];
+        return next;
+      });
+      setSummaryErrors([]);
+      setError(null);
+    },
+    [setError],
+  );
 
   // Fetch model field metadata for component resolution (must be before early returns)
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
+  const [fieldMetaLoaded, setFieldMetaLoaded] = useState(false);
   useEffect(() => {
+    let cancelled = false;
+    setFieldMetaLoaded(false);
     // For page-key routes (e.g. dp_issue_triage), schema.modelCode is the real model.
-    const targetModelCode = (schema?.modelCode || tableName);
+    const targetModelCode = schema?.modelCode || tableName;
     // Use /api/dynamic/{pageKey}/field-meta which requires model-level read permission
     // instead of /api/meta/models/{pid}/fields which requires management permission
     fetchResult<
@@ -605,6 +612,7 @@ export function FormPageContent(props: PageContentProps) {
       token: token || undefined,
     })
       .then((fieldsResp) => {
+        if (cancelled) return;
         if (fieldsResp && ResultHelper.isSuccess(fieldsResp) && Array.isArray(fieldsResp.data)) {
           const map: Record<string, FieldMetaInfo> = {};
           for (const f of fieldsResp.data) {
@@ -665,7 +673,15 @@ export function FormPageContent(props: PageContentProps) {
           setModelFields(map);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setModelFields({});
+      })
+      .finally(() => {
+        if (!cancelled) setFieldMetaLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [tableName, schema?.modelCode, token, locale]);
 
   const computedFieldDefs = useMemo<ComputedFieldDef[]>(() => {
@@ -788,7 +804,8 @@ export function FormPageContent(props: PageContentProps) {
             Number.isFinite(rule.minLength)
           ) {
             if (value.length < Number(rule.minLength)) {
-              nextFieldErrors[rawField.field] = `${label} is shorter than min length ${rule.minLength}`;
+              nextFieldErrors[rawField.field] =
+                `${label} is shorter than min length ${rule.minLength}`;
               break;
             }
           }
@@ -899,6 +916,10 @@ export function FormPageContent(props: PageContentProps) {
           ['submit', 'create', 'update', 'edit', 'save', 'command'].includes(
             actionType.toLowerCase(),
           ) || !actionType;
+        if (shouldValidate && schemaFieldNames.size > 0 && !fieldMetaLoaded) {
+          showInfoToast(t('common.loading') || 'Loading...');
+          return;
+        }
         if (shouldValidate) {
           const validationResult = validateFormBeforeSubmit();
           if (
@@ -952,6 +973,10 @@ export function FormPageContent(props: PageContentProps) {
         ['submit', 'create', 'update', 'edit', 'save', 'command'].includes(
           effectiveActionType.toLowerCase(),
         ) || !effectiveActionType;
+      if (shouldValidate && schemaFieldNames.size > 0 && !fieldMetaLoaded) {
+        showInfoToast(t('common.loading') || 'Loading...');
+        return;
+      }
       if (shouldValidate) {
         const validationResult = validateFormBeforeSubmit();
         if (
@@ -1065,7 +1090,7 @@ export function FormPageContent(props: PageContentProps) {
         !effectiveButton.commandCode &&
         (effectiveActionType === 'create' || effectiveActionType === 'update')
       ) {
-        const targetModelCode = (schema?.modelCode || tableName);
+        const targetModelCode = schema?.modelCode || tableName;
         const endpoint =
           effectiveActionType === 'update'
             ? `/api/dynamic/${targetModelCode}/${recordId}`
@@ -1139,7 +1164,10 @@ export function FormPageContent(props: PageContentProps) {
       recordId,
       schema?.modelCode,
       setError,
+      fieldMetaLoaded,
+      schemaFieldNames,
       showErrorToast,
+      showInfoToast,
       showSuccessToast,
       sourceRecordId,
       t,
@@ -1363,16 +1391,13 @@ export function FormPageContent(props: PageContentProps) {
   // subTableBlocks computed via useMemo above (used for metadata fetching and rendering)
   const buttonBlock = allBlocks.find((block: any) => block.blockType === 'form-buttons');
   const effectiveButtonBlock = buttonBlock || null;
+  const submitReady = mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
 
   return (
     <DataSourceProvider manager={dataSourceManager}>
       <div
         className="mx-auto w-full px-2 py-3"
-        data-testid={deriveTestId(
-          'form',
-          (schema?.modelCode || tableName),
-          'container',
-        )}
+        data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
       >
         <div className="rounded-lg bg-white shadow-sm">
           {/* Page Header */}
@@ -1421,11 +1446,9 @@ export function FormPageContent(props: PageContentProps) {
               data-testid="form-modelcode-prefill-hint"
             >
               <p className="text-sm text-blue-700">
-                {(t('pageSchemaForm.modelCodePrefillHint') ||
-                  `Creating from model "{modelCode}"`).replace(
-                  '{modelCode}',
-                  urlSeededModelCode,
-                )}
+                {(
+                  t('pageSchemaForm.modelCodePrefillHint') || `Creating from model "{modelCode}"`
+                ).replace('{modelCode}', urlSeededModelCode)}
               </p>
             </div>
           )}
@@ -1433,7 +1456,10 @@ export function FormPageContent(props: PageContentProps) {
           {/* Form Content - Using ComponentLoader Pattern */}
           <form className="p-6" data-testid="dynamic-form" onSubmit={(e) => e.preventDefault()}>
             {!mainRecordLoaded ? (
-              <div className="py-8 text-center text-sm text-gray-400">
+              <div
+                className="py-8 text-center text-sm text-gray-400"
+                data-testid="dynamic-form-loading"
+              >
                 {t('common.loading') || 'Loading...'}
               </div>
             ) : (
@@ -1536,7 +1562,7 @@ export function FormPageContent(props: PageContentProps) {
                                   data-testid={`form-field-${field.field}`}
                                   data-ab-testid={deriveTestId(
                                     'form',
-                                    (schema?.modelCode || tableName),
+                                    schema?.modelCode || tableName,
                                     'field',
                                     field.field,
                                   )}
@@ -1630,9 +1656,13 @@ export function FormPageContent(props: PageContentProps) {
                         type="button"
                         key={button.code}
                         data-testid={`form-btn-${button.code}`}
-                        data-ab-testid={buttonTestId('form', (schema?.modelCode || tableName), button.code)}
+                        data-ab-testid={buttonTestId(
+                          'form',
+                          schema?.modelCode || tableName,
+                          button.code,
+                        )}
                         onClick={() => handleFormAction(button)}
-                        disabled={loading}
+                        disabled={loading || !submitReady}
                         className={`rounded-md px-4 py-2 text-sm font-medium ${
                           button.primary
                             ? 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400'

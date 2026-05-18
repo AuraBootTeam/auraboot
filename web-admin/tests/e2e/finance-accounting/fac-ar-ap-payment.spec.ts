@@ -322,7 +322,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
     const created: CleanupEntry[] = [];
 
     test.beforeAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       const createCustomer = await executeCommandViaApi(
         p,
@@ -343,7 +343,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
     });
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanupEntries(p, created);
       if (sharedReceivableCustomerPid) {
@@ -726,7 +726,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
     const created: CleanupEntry[] = [];
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanupEntries(p, created);
       await ctx.close();
@@ -1022,7 +1022,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
     const created: CleanupEntry[] = [];
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanupEntries(p, created);
       await ctx.close();
@@ -1331,7 +1331,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
     const created: CleanupEntry[] = [];
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       // Reopen any closed periods before cleanup so delete works
       for (const entry of created) {
@@ -1749,7 +1749,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
     const created: CleanupEntry[] = [];
 
     test.afterAll(async ({ browser }) => {
-      const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+      const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
       const p = await ctx.newPage();
       await cleanupEntries(p, created);
       await ctx.close();
