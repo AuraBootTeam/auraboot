@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   encodeSorts,
   decodeSorts,
+  areSortsEqual,
   encodeFilters,
   decodeFilters,
 } from '../useListUrlState';
@@ -65,6 +66,31 @@ describe('decodeSorts', () => {
   it('skips segments with invalid direction', () => {
     const result = decodeSorts('name:up');
     expect(result).toEqual([]);
+  });
+});
+
+describe('areSortsEqual', () => {
+  it('treats equivalent sort arrays as equal even when references and priorities differ', () => {
+    const fromUrl: SortConfig[] = [{ fieldCode: 'page_key', direction: 'asc', priority: 1 }];
+    const fromSavedView: SortConfig[] = [{ fieldCode: 'page_key', direction: 'asc', priority: 0 }];
+
+    expect(fromUrl).not.toBe(fromSavedView);
+    expect(areSortsEqual(fromUrl, fromSavedView)).toBe(true);
+  });
+
+  it('detects sort field or direction changes', () => {
+    expect(
+      areSortsEqual(
+        [{ fieldCode: 'page_key', direction: 'asc', priority: 1 }],
+        [{ fieldCode: 'updated_at', direction: 'asc', priority: 1 }],
+      ),
+    ).toBe(false);
+    expect(
+      areSortsEqual(
+        [{ fieldCode: 'page_key', direction: 'asc', priority: 1 }],
+        [{ fieldCode: 'page_key', direction: 'desc', priority: 1 }],
+      ),
+    ).toBe(false);
   });
 });
 

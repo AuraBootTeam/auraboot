@@ -18,9 +18,16 @@ import type { SortConfig, ViewFilterConfig } from '~/framework/smart/types/saved
  * Format: "fieldCode:direction,fieldCode:direction,..."
  * Returns null for empty arrays (caller should omit the param).
  */
-export function encodeSorts(sorts: SortConfig[]): string | null {
+export function encodeSorts(sorts: SortConfig[] | null | undefined): string | null {
   if (!sorts || sorts.length === 0) return null;
   return sorts.map((s) => `${s.fieldCode}:${s.direction}`).join(',');
+}
+
+export function areSortsEqual(
+  a: SortConfig[] | null | undefined,
+  b: SortConfig[] | null | undefined,
+): boolean {
+  return encodeSorts(a) === encodeSorts(b);
 }
 
 /**
