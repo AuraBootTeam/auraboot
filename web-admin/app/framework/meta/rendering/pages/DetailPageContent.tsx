@@ -63,18 +63,31 @@ interface RecordData {
 
 export function resolveDetailFieldComponent(meta?: {
   dataType?: string;
+  referenceModelCode?: string;
+  refTarget?: Record<string, any>;
   extension?: Record<string, any>;
 }): string | undefined {
   if (!meta) return undefined;
 
   const renderComp =
-    meta.extension?.renderComponent ||
-    meta.extension?.component ||
-    meta.extension?.uiComponent;
+    meta.extension?.renderComponent || meta.extension?.component || meta.extension?.uiComponent;
 
   if (renderComp) {
     return String(renderComp).trim().toLowerCase();
   }
+
+  const refTarget = {
+    ...(meta.extension?.refTarget || {}),
+    ...(meta.refTarget || {}),
+  };
+  const referenceModel = String(
+    refTarget.targetModel ||
+      refTarget.modelCode ||
+      meta.referenceModelCode ||
+      meta.extension?.referenceModelCode ||
+      meta.extension?.refModelCode ||
+      '',
+  ).toLowerCase();
 
   switch (String(meta.dataType || '').toLowerCase()) {
     case 'boolean':
@@ -85,6 +98,10 @@ export function resolveDetailFieldComponent(meta?: {
       return 'datetime';
     case 'file':
       return 'fileattachment';
+    case 'reference':
+      if (referenceModel === 'sys_user') return 'userselect';
+      if (referenceModel === 'org_department') return 'organizationselect';
+      return 'reference';
     default:
       return undefined;
   }
@@ -92,6 +109,100 @@ export function resolveDetailFieldComponent(meta?: {
 
 export function buildDetailRecordEndpoint(tableName: string, recordId: string): string {
   return buildApiEndpoint(tableName, recordId);
+}
+
+function getMetaExtension(meta?: { extension?: Record<string, any> }): Record<string, any> {
+  return meta?.extension && typeof meta.extension === 'object' ? meta.extension : {};
+}
+
+function shouldReplaceGeneratedLabel(label: unknown, fieldCode: string): boolean {
+  if (!label) return true;
+  if (typeof label !== 'string') return false;
+  const normalized = label.trim();
+  return normalized === fieldCode || normalized === fieldCode.toUpperCase();
+}
+
+export function enrichDetailField(field: FieldConfig, meta?: Record<string, any>): FieldConfig {
+  if (!meta) return field;
+
+  const enriched = { ...field } as any;
+  const extensionProps = getMetaExtension(meta);
+  const refTarget = {
+    ...(extensionProps.refTarget || {}),
+    ...(meta.refTarget || {}),
+  };
+  const dictCode = field.dictCode || meta.dictCode || extensionProps.dictCode;
+  const displayName = meta.displayName || extensionProps.displayName;
+
+  enriched.props = {
+    ...(field.props || {}),
+    ...extensionProps,
+  };
+
+  if (dictCode) {
+    enriched.dictCode = dictCode;
+  }
+
+  if (displayName && shouldReplaceGeneratedLabel(field.label, field.field)) {
+    enriched.label = displayName;
+  }
+
+  if (!enriched.component) {
+    const resolvedComponent = resolveDetailFieldComponent(meta);
+    if (resolvedComponent) {
+      enriched.component = resolvedComponent;
+    }
+  }
+
+  if (Object.keys(refTarget).length > 0 && !enriched.refTarget) {
+    enriched.refTarget = refTarget;
+  }
+
+  if (!enriched.referenceModelCode) {
+    enriched.referenceModelCode =
+      meta.referenceModelCode ||
+      extensionProps.referenceModelCode ||
+      extensionProps.refModelCode ||
+      refTarget.targetModel ||
+      refTarget.modelCode;
+  }
+
+  return enriched as FieldConfig;
+}
+
+export function collectDetailDictCodes(
+  schema: { blocks?: BlockConfig[] } | undefined | null,
+  modelFieldMap: Map<string, any>,
+): string[] {
+  if (!schema?.blocks) return [];
+  const codes: string[] = [];
+  const collectFromFields = (fields: FieldConfig[]) => {
+    for (const field of fields) {
+      const fieldProps = (field as any).props || {};
+      const meta = modelFieldMap.get(field.field);
+      const metaExtension = getMetaExtension(meta);
+      const dictCode =
+        field.dictCode || fieldProps.dictCode || meta?.dictCode || metaExtension.dictCode;
+      if (dictCode) codes.push(dictCode);
+    }
+  };
+  const walkBlocks = (blocks: BlockConfig[]) => {
+    for (const block of blocks) {
+      if (block.blockType === 'form-section' && block.fields) {
+        collectFromFields(block.fields);
+      }
+      if ((block as any).tabs) {
+        for (const tab of (block as any).tabs) {
+          if (tab.blocks) walkBlocks(tab.blocks);
+        }
+      }
+      if ((block as any).blocks) {
+        walkBlocks((block as any).blocks);
+      }
+    }
+  };
+  walkBlocks(schema.blocks);
+  return [...new Set(codes)];
 }
 
 export function resolveSubTableDataSourceConfig(
@@ -162,16 +273,15 @@ export function DetailPageContent(props: PageContentProps) {
     (async () => {
       try {
         // Fetch model fields and record data in parallel
-        await Promise.all([
-          loadModelFields().catch(() => {}),
-          loadRecord().catch(() => {}),
-        ]);
+        await Promise.all([loadModelFields().catch(() => {}), loadRecord().catch(() => {})]);
       } finally {
         if (!cancelled) setRecordLoading(false);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [recordId, tableName, schema?.modelCode, token]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
@@ -189,39 +299,7 @@ export function DetailPageContent(props: PageContentProps) {
   const enrichField = useCallback(
     (field: FieldConfig): FieldConfig => {
       const meta = modelFieldMap.get(field.field);
-      if (!meta) return field;
-
-      const enriched = { ...field } as any;
-      const extensionProps = meta.extension && typeof meta.extension === 'object'
-        ? meta.extension
-        : {};
-
-      enriched.props = {
-        ...(field.props || {}),
-        ...extensionProps,
-      };
-
-      // Add dictCode from model field
-      if (meta.dictCode && !enriched.dictCode) {
-        enriched.dictCode = meta.dictCode;
-      }
-
-      // Derive component from renderComponent or dataType
-      if (!enriched.component) {
-        const resolvedComponent = resolveDetailFieldComponent(meta);
-        if (resolvedComponent) {
-          enriched.component = resolvedComponent;
-        }
-      }
-
-      if (!enriched.referenceModelCode) {
-        enriched.referenceModelCode =
-          meta.referenceModelCode ||
-          meta.extension?.referenceModelCode ||
-          meta.extension?.refModelCode;
-      }
-
-      return enriched as FieldConfig;
+      return enrichDetailField(field, meta);
     },
     [modelFieldMap],
   );
@@ -229,32 +307,7 @@ export function DetailPageContent(props: PageContentProps) {
   // Collect all dictCodes from schema fields (including inside tabs → blocks → form-section → fields)
   // Also check modelFieldMap for dictCodes not declared in the page schema
   const allDictCodes = useMemo(() => {
-    if (!schema?.blocks) return [];
-    const codes: string[] = [];
-    const collectFromFields = (fields: FieldConfig[]) => {
-      for (const f of fields) {
-        if (f.dictCode) codes.push(f.dictCode);
-        const meta = modelFieldMap.get(f.field);
-        if (meta?.dictCode) codes.push(meta.dictCode);
-      }
-    };
-    for (const block of schema.blocks) {
-      if (block.blockType === 'tabs' && block.tabs) {
-        for (const tab of block.tabs as any[]) {
-          if (tab.blocks) {
-            for (const b of tab.blocks) {
-              if (b.blockType === 'form-section' && b.fields) {
-                collectFromFields(b.fields);
-              }
-            }
-          }
-        }
-      }
-      if (block.blockType === 'form-section' && block.fields) {
-        collectFromFields(block.fields);
-      }
-    }
-    return [...new Set(codes)];
+    return collectDetailDictCodes(schema as any, modelFieldMap);
   }, [schema, modelFieldMap]);
 
   const { getDictItems } = useDictCache({ dictCodes: allDictCodes, token: token || undefined });
@@ -433,9 +486,10 @@ export function DetailPageContent(props: PageContentProps) {
   const tabHashKeys = useMemo(
     () =>
       tabs.map((tab, index) => {
-        const rawKey = typeof tab.key === 'string' && tab.key.trim().length > 0
-          ? tab.key.trim()
-          : `tab-${index + 1}`;
+        const rawKey =
+          typeof tab.key === 'string' && tab.key.trim().length > 0
+            ? tab.key.trim()
+            : `tab-${index + 1}`;
         return decodeURIComponent(rawKey);
       }),
     [tabs],
@@ -550,7 +604,11 @@ export function DetailPageContent(props: PageContentProps) {
                       <button
                         key={button.code}
                         data-testid={`toolbar-btn-${button.code}`}
-                        data-ab-testid={buttonTestId('detail', schema?.modelCode || tableName, button.code)}
+                        data-ab-testid={buttonTestId(
+                          'detail',
+                          schema?.modelCode || tableName,
+                          button.code,
+                        )}
                         onClick={() => handleAction(button, recordData)}
                         disabled={actionLoading}
                         className={`rounded-md px-3 py-1.5 text-sm font-medium ${
@@ -596,11 +654,7 @@ export function DetailPageContent(props: PageContentProps) {
           <div>
             {/* Tab headers (hidden in print — only active tab content shows) */}
             <div className="print-hide border-b border-gray-200 px-6" data-print="hide">
-              <nav
-                className="-mb-px flex space-x-8"
-                role="tablist"
-                aria-label="Tabs"
-              >
+              <nav className="-mb-px flex space-x-8" role="tablist" aria-label="Tabs">
                 {tabs.map((tab, index) => (
                   <button
                     key={tab.key || index}
@@ -835,6 +889,9 @@ function DetailBlockRenderer({
         const modelKey = `model.${modelCode}.${fieldCode}.label`;
         const modelLabel = t(modelKey);
         if (modelLabel && modelLabel !== modelKey) return modelLabel;
+        const modelFieldKey = `field.${modelCode}.${fieldCode}.label`;
+        const modelFieldLabel = t(modelFieldKey);
+        if (modelFieldLabel && modelFieldLabel !== modelFieldKey) return modelFieldLabel;
       }
       const fieldKey = `field.${fieldCode}.label`;
       const fieldLabel = t(fieldKey);
@@ -1003,9 +1060,7 @@ function DetailBlockRenderer({
   // stat-card / form / filters / etc.). Renders an "Unknown block type"
   // placeholder if no renderer is registered — NEVER silently null.
   if (runtime) {
-    return (
-      <BlockRenderer block={block} runtime={runtime} areaId="detail-tab" />
-    );
+    return <BlockRenderer block={block} runtime={runtime} areaId="detail-tab" />;
   }
 
   // No runtime available — log and surface the miss so it's diagnosable.
@@ -1052,7 +1107,11 @@ function FallbackDetailView({
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
       {fields.map((field: FieldConfig) => (
-        <div key={field.field} data-testid={`form-field-${field.field}`} className={field.span === 2 ? 'md:col-span-2' : ''}>
+        <div
+          key={field.field}
+          data-testid={`form-field-${field.field}`}
+          className={field.span === 2 ? 'md:col-span-2' : ''}
+        >
           <DynamicField
             field={field}
             value={recordData ? recordData[field.field] : undefined}

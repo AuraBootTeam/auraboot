@@ -17,6 +17,35 @@
 import { test, expect } from '@playwright/test';
 import { executeCommandViaApi } from '../../e2e/helpers';
 
+type ShowcaseAttachment = {
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+};
+
+type ShowcaseSeedItem = {
+  name: string;
+  desc: string;
+  qty: number;
+  price: number;
+  active: boolean;
+  priority: string;
+  category: string;
+  progress: number;
+  rating: number;
+  color: string;
+  tags: string;
+  startDate: string;
+  endDate: string;
+  website: string;
+  email: string;
+  phone: string;
+  attachment: ShowcaseAttachment[];
+  richtext: string;
+  remark: string;
+};
+
 async function cmd(
   page: any,
   commandCode: string,
@@ -47,6 +76,175 @@ async function findShowcaseRecordIdByName(page: any, name: string): Promise<stri
   return String(record?.pid ?? record?.id ?? '');
 }
 
+async function getCurrentUserPid(page: any): Promise<string> {
+  const resp = await page.request.get('/api/auth/me');
+  expect(resp.ok(), 'current user API must be available for showcase seed').toBeTruthy();
+  const body = await resp.json();
+  const user = body?.data?.user ?? body?.data ?? body;
+  const userPid = String(user?.pid ?? user?.id ?? '');
+  expect(userPid, 'current user pid/id for people seed fields').toBeTruthy();
+  return userPid;
+}
+
+async function getDepartmentSeedValues(page: any): Promise<string[]> {
+  const resp = await page.request.get('/api/dynamic/org_department/list?pageNum=1&pageSize=20');
+  if (!resp.ok()) return ['org-seed-default'];
+  const body = await resp.json().catch(() => ({}));
+  const records = body?.data?.records ?? [];
+  const values = records
+    .map((record: Record<string, unknown>) => record.pid ?? record.org_dept_code ?? record.id)
+    .filter((value: unknown) => typeof value === 'string' && value.trim().length > 0)
+    .map(String);
+  return values.length > 0 ? values : ['org-seed-default'];
+}
+
+const REQUIRED_SHOWCASE_SEED_FIELDS = [
+  'sc_budget',
+  'sc_time_slot',
+  'sc_date_range',
+  'sc_working_hours',
+  'sc_cascade_category',
+  'sc_tree_node',
+  'sc_assignee',
+  'sc_team_members',
+  'sc_department',
+  'sc_owner_user',
+  'sc_ai_summary',
+  'sc_address',
+  'sc_attachment_file',
+  'sc_advanced_settings',
+] as const;
+
+const CASCADE_SEED_VALUES = [
+  'electronics_computer_laptop',
+  'electronics_phone_feature',
+  'service_ops_cloud',
+  'electronics_computer_desktop',
+  'software_saas_erp',
+  'electronics_tablet_android',
+  'electronics_phone_smart',
+  'service_training_online',
+  'service_consulting_tech',
+  'service_consulting_strategy',
+] as const;
+
+const TREE_SEED_VALUES = [
+  'tech_frontend',
+  'tech_backend',
+  'ops_marketing',
+  'tech_qa',
+  'product_pm',
+  'product_design',
+  'tech_frontend',
+  'ops_cs',
+  'tech_backend',
+  'product_pm',
+] as const;
+
+const TIME_SLOT_SEED_VALUES = [
+  '09:00',
+  '09:30',
+  '10:00',
+  '10:30',
+  '11:00',
+  '13:30',
+  '14:00',
+  '14:30',
+  '15:00',
+  '15:30',
+] as const;
+
+const WORKING_HOURS_SEED_VALUES = [
+  ['09:00', '18:00'],
+  ['08:30', '17:30'],
+  ['09:30', '18:30'],
+  ['10:00', '19:00'],
+  ['08:00', '16:30'],
+] as const;
+
+function hasSeedValue(value: unknown): boolean {
+  if (value == null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value).length > 0;
+  return true;
+}
+
+async function expectShowcaseSeedFieldsPopulated(
+  page: any,
+  recordIds: string[],
+  itemNames: string[],
+): Promise<void> {
+  for (const [index, recordId] of recordIds.entries()) {
+    expect(recordId, `record id for ${itemNames[index]}`).toBeTruthy();
+    const resp = await page.request.get(`/api/dynamic/showcase_all_fields/${recordId}`);
+    expect(resp.ok(), `detail API for ${itemNames[index]}`).toBeTruthy();
+    const body = await resp.json();
+    const record = body?.data ?? {};
+    const missing = REQUIRED_SHOWCASE_SEED_FIELDS.filter((field) => !hasSeedValue(record[field]));
+    expect(
+      missing,
+      `${itemNames[index]} should seed all detail fields; missing ${missing.join(', ')}`,
+    ).toEqual([]);
+  }
+}
+
+function buildShowcaseSeedPayload(
+  item: ShowcaseSeedItem,
+  index: number,
+  userPid: string,
+  departmentValues: string[],
+): Record<string, unknown> {
+  const [workStart, workEnd] = WORKING_HOURS_SEED_VALUES[index % WORKING_HOURS_SEED_VALUES.length];
+  const attachmentFile = item.attachment[0] ?? {
+    name: `${item.name}.txt`,
+    url: `/files/${index + 1}-showcase-seed.txt`,
+    size: 256,
+    type: 'text/plain',
+  };
+
+  return {
+    sc_name: item.name,
+    sc_description: item.desc,
+    sc_quantity: item.qty,
+    sc_price: item.price,
+    sc_budget: Number((item.price * Math.max(item.qty, 1) * 1.18).toFixed(2)),
+    sc_is_active: item.active,
+    sc_priority: item.priority,
+    sc_category: item.category,
+    sc_progress: item.progress,
+    sc_rating: item.rating,
+    sc_color: item.color,
+    sc_tags: item.tags,
+    sc_start_date: item.startDate,
+    sc_end_date: item.endDate,
+    sc_time_slot: TIME_SLOT_SEED_VALUES[index % TIME_SLOT_SEED_VALUES.length],
+    sc_date_range: JSON.stringify({ start: item.startDate, end: item.endDate }),
+    sc_working_hours: JSON.stringify({ start: workStart, end: workEnd }),
+    sc_website: item.website,
+    sc_email: item.email,
+    sc_phone: item.phone,
+    sc_attachment: JSON.stringify(item.attachment),
+    sc_attachment_file: JSON.stringify([attachmentFile]),
+    sc_richtext_content: item.richtext,
+    sc_remark: item.remark,
+    sc_cascade_category: CASCADE_SEED_VALUES[index % CASCADE_SEED_VALUES.length],
+    sc_tree_node: TREE_SEED_VALUES[index % TREE_SEED_VALUES.length],
+    sc_assignee: userPid,
+    sc_team_members: JSON.stringify([userPid]),
+    sc_department: departmentValues[index % departmentValues.length],
+    sc_owner_user: userPid,
+    sc_ai_summary: `${item.name}：${item.desc}。优先级 ${item.priority}，进度 ${item.progress}%。`,
+    sc_address: JSON.stringify({
+      province: '上海市',
+      city: '上海市',
+      district: ['浦东新区', '徐汇区', '闵行区', '嘉定区', '松江区'][index % 5],
+      detail: `${100 + index} 号示范园区 ${index + 1} 幢`,
+    }),
+    sc_advanced_settings: `Seed profile ${index + 1}: ${item.category}/${item.priority}`,
+  };
+}
+
 test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
   test.setTimeout(300_000);
@@ -58,7 +256,9 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
   test('Arsenal 1: Showcase All-Fields — 10 sample records with all 22 fields', async ({
     page,
   }) => {
-    const items = [
+    const userPid = await getCurrentUserPid(page);
+    const departmentValues = await getDepartmentSeedValues(page);
+    const items: ShowcaseSeedItem[] = [
       {
         name: '高性能MCU控制模块',
         desc: '基于ARM Cortex-M4的高性能微控制器模块，支持CAN/LIN通信',
@@ -409,29 +609,10 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
     const recordIds: string[] = [];
     let created = 0;
     let available = 0;
-    for (const item of items) {
+    for (const [index, item] of items.entries()) {
+      const payload = buildShowcaseSeedPayload(item, index, userPid, departmentValues);
       try {
-        const recordId = await cmd(page, 'sc:create_showcase', {
-          sc_name: item.name,
-          sc_description: item.desc,
-          sc_quantity: item.qty,
-          sc_price: item.price,
-          sc_is_active: item.active,
-          sc_priority: item.priority,
-          sc_category: item.category,
-          sc_progress: item.progress,
-          sc_rating: item.rating,
-          sc_color: item.color,
-          sc_tags: item.tags,
-          sc_start_date: item.startDate,
-          sc_end_date: item.endDate,
-          sc_website: item.website,
-          sc_email: item.email,
-          sc_phone: item.phone,
-          sc_attachment: JSON.stringify(item.attachment),
-          sc_richtext_content: item.richtext,
-          sc_remark: item.remark,
-        });
+        const recordId = await cmd(page, 'sc:create_showcase', payload);
         recordIds.push(recordId);
         created++;
         available++;
@@ -446,6 +627,11 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
             `  Failed to create showcase record "${item.name}": ${(e as Error).message.slice(0, 100)}`,
           );
         }
+      }
+
+      const recordId = recordIds[index];
+      if (recordId) {
+        await cmd(page, 'sc:update_showcase', payload, recordId, 'update');
       }
     }
     console.log(`  Created ${created}/10 showcase records, available ${available}/10`);
@@ -495,6 +681,12 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
     }
 
     console.log('  State transitions complete — draft:1, active:6, review:2, archived:1');
+
+    await expectShowcaseSeedFieldsPopulated(
+      page,
+      recordIds,
+      items.map((item) => item.name),
+    );
   });
 
   // ═════════════════════════════════════════════════════════════════════════
