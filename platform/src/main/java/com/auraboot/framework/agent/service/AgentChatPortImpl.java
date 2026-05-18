@@ -10,6 +10,12 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.AgentErrorFrame;
+import com.auraboot.framework.agent.runtime.AgentExecutionState;
+import com.auraboot.framework.agent.runtime.AgentReducer;
+import com.auraboot.framework.agent.runtime.AgentRuntimeEvent;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
+import com.auraboot.framework.agent.runtime.DefaultAgentReducer;
 import com.auraboot.framework.aurabot.dto.ChatMessage;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.ChatSessionStore;
@@ -118,6 +124,12 @@ public class AgentChatPortImpl implements AgentChatPort {
      */
     @Autowired(required = false)
     private ToolLoopService toolLoopService;
+
+    @Autowired(required = false)
+    private AgentRuntimeStateFactory runtimeStateFactory = new AgentRuntimeStateFactory();
+
+    @Autowired(required = false)
+    private AgentReducer agentReducer = new DefaultAgentReducer();
 
     // =========================================================================
     // AgentChatPort implementation
@@ -315,12 +327,21 @@ public class AgentChatPortImpl implements AgentChatPort {
                                         String sessionId, ResponseSink sink,
                                         boolean persistTape,
                                         boolean requireInitialToolCall) {
+        AgentExecutionState lastRuntimeState = null;
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             String toolChoice = resolveToolChoiceForRound(provider, providerCode, tools, messages,
                     requireInitialToolCall);
+            String effectiveSystemPrompt = applyToolChoicePrompt(systemPrompt, toolChoice, tools);
+            AgentExecutionState roundState = runtimeStateFactory.chatTurnState(
+                    ctx, agentCode, sessionId, providerCode, model, round, toolChoice,
+                    effectiveSystemPrompt, maxTokens, messages, tools, toolDefs, Map.of());
+            AgentExecutionState runtimeState = roundState;
+            lastRuntimeState = runtimeState;
+            log.debug("Agent chat runtime state: agent={}, turn={}, round={}, stateHash={}",
+                    agentCode, ctx.turnId(), round, roundState.stateHash());
             LlmChatRequest req = LlmChatRequest.builder()
                     .model(model)
-                    .systemPrompt(applyToolChoicePrompt(systemPrompt, toolChoice, tools))
+                    .systemPrompt(effectiveSystemPrompt)
                     .messages(new ArrayList<>(messages))
                     .tools(tools.isEmpty() ? null : tools)
                     .toolChoice(toolChoice)
@@ -331,26 +352,38 @@ public class AgentChatPortImpl implements AgentChatPort {
             try {
                 response = provider.chat(req, config.getApiKey(), config.getBaseUrl());
             } catch (Exception e) {
+                AgentErrorFrame errorFrame = providerErrorFrame(providerCode, model, e);
+                reduceRuntimeState(runtimeState, AgentRuntimeEvent.turnFailed(round, errorFrame));
                 log.error("Agent chat LLM call failed (round {}): {}", round, e.getMessage(), e);
-                String msg = "LLM request failed: " + e.getMessage();
+                String msg = errorFrame.userSafeMessage();
                 sink.onError(msg, null);
                 return new TurnOutcome.Failed(msg, e);
             }
 
             if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
+                runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.turnFailed(round, "empty_response"));
+                lastRuntimeState = runtimeState;
                 String msg = "Empty response from LLM";
                 sink.onError(msg, null);
                 return new TurnOutcome.Failed(msg, null);
             }
 
             String stopReason = response.getStopReason();
+            runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.modelResponse(
+                    round, stopReason, Map.of("contentBlockCount", response.getContent().size())));
+            lastRuntimeState = runtimeState;
             if ("required".equals(toolChoice) && !hasToolUse(response)) {
+                runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.turnFailed(
+                        round, "required_tool_call_missing"));
+                lastRuntimeState = runtimeState;
                 String msg = requiredToolCallMissingMessage(providerCode, stopReason, tools);
                 sink.onError(msg, null);
                 return new TurnOutcome.Failed(msg, null);
             }
 
             if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null) {
+                runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.turnCompleted(round));
+                lastRuntimeState = runtimeState;
                 // Persist the final assistant turn so subsequent turns see it as
                 // history without depending on the (potentially stale) frontend tape.
                 messages.add(buildAssistantMessage(response.getContent()));
@@ -372,6 +405,12 @@ public class AgentChatPortImpl implements AgentChatPort {
                     String toolId = block.getId();
                     String toolName = block.getName();
                     Map<String, Object> input = block.getInput() != null ? block.getInput() : Map.of();
+                    ToolDefinition def = findToolDef(toolDefs, toolName);
+                    boolean auraBotSkill = isAuraBotSkillTool(def);
+                    boolean requiresConfirmation = def != null && def.isRequiresConfirmation();
+                    runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.toolUseRequested(
+                            round, toolId, toolName, input, requiresConfirmation));
+                    lastRuntimeState = runtimeState;
 
                     // DC.2 (Q-DC.2=α): handoff signal. transfer_to_agent is a
                     // caller-injected tool (via extraTools per DC.1) whose
@@ -381,19 +420,23 @@ public class AgentChatPortImpl implements AgentChatPort {
                     // surface the handoff request via Success.meta, and let the
                     // caller (AgentReplyTask in DC.3) drive the recursion.
                     if (HANDOFF_TOOL_NAME.equals(toolName)) {
+                        runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.handoffRequested(
+                                round, stringValue(input.get("agent_code"))));
+                        lastRuntimeState = runtimeState;
                         if (persistTape) persistMessages(sessionId, messages);
                         return buildHandoffOutcome(response, sink, input);
                     }
-
-                    ToolDefinition def = findToolDef(toolDefs, toolName);
-                    boolean auraBotSkill = isAuraBotSkillTool(def);
-                    boolean requiresConfirmation = def != null && def.isRequiresConfirmation();
 
                     if (auraBotSkill) {
                         sink.onToolStart(toolId, toolName, input);
                         Map<String, Object> result = executeToolSafely(ctx, agentCode, toolName, input, toolDefs);
                         boolean success = Boolean.TRUE.equals(result.get("success"));
                         if (isAuraBotSkillPreviewPending(result)) {
+                            runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.toolResultRecorded(
+                                    round, toolId, toolName, result));
+                            runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                    round, toolId, toolName, input));
+                            lastRuntimeState = runtimeState;
                             sink.onConfirmRequired(toolId, toolName, buildToolDescription(toolName, input),
                                     input, ctx.turnId());
                             storeAuraBotSkillPendingTool(result, ctx, agentCode, sessionId, toolId, toolName, input,
@@ -403,7 +446,13 @@ public class AgentChatPortImpl implements AgentChatPort {
                             break;
                         }
                         sink.onToolResult(toolId, result, success);
+                        runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.toolResultRecorded(
+                                round, toolId, toolName, result));
+                        lastRuntimeState = runtimeState;
                         if (isApprovalRequiredResult(result)) {
+                            runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                    round, toolId, toolName, input));
+                            lastRuntimeState = runtimeState;
                             storeApprovalPendingTool(result, ctx, agentCode, sessionId, toolId, toolName, input,
                                     toolDefs, messages, providerCode, config, model, systemPrompt, maxTokens, round);
                             if (persistTape) persistMessages(sessionId, messages);
@@ -419,6 +468,9 @@ public class AgentChatPortImpl implements AgentChatPort {
                         // canonical ConversationTurnService.resumeTurn path handles
                         // resume from the stored PendingTool entry.
                         String description = buildToolDescription(toolName, input);
+                        runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                round, toolId, toolName, input));
+                        lastRuntimeState = runtimeState;
                         sink.onConfirmRequired(toolId, toolName, description, input, ctx.turnId());
 
                         chatSessionStore.storePending(ctx.turnId(),
@@ -437,12 +489,13 @@ public class AgentChatPortImpl implements AgentChatPort {
                                         .description(description)
                                         .messages(serializeMessages(messages))
                                         .providerCode(providerCode)
-                                        .apiKey(config.getApiKey())
-                                        .baseUrl(config.getBaseUrl())
                                         .model(model)
                                         .systemPrompt(systemPrompt)
                                         .maxTokens(maxTokens)
                                         .currentLoop(round)
+                                        .extension(runtimeStateExtension(null, ctx, agentCode, sessionId,
+                                                toolId, toolName, input, toolDefs, messages, providerCode, model,
+                                                systemPrompt, maxTokens, round, null))
                                         .build());
 
                         // Persist the running tape so a fresh turn can rehydrate
@@ -460,7 +513,13 @@ public class AgentChatPortImpl implements AgentChatPort {
                     Map<String, Object> result = executeToolSafely(ctx, agentCode, toolName, input, toolDefs);
                     boolean success = Boolean.TRUE.equals(result.get("success"));
                     sink.onToolResult(toolId, result, success);
+                    runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.toolResultRecorded(
+                            round, toolId, toolName, result));
+                    lastRuntimeState = runtimeState;
                     if (isApprovalRequiredResult(result)) {
+                        runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                round, toolId, toolName, input));
+                        lastRuntimeState = runtimeState;
                         storeApprovalPendingTool(result, ctx, agentCode, sessionId, toolId, toolName, input,
                                 toolDefs, messages, providerCode, config, model, systemPrompt, maxTokens, round);
                         if (persistTape) persistMessages(sessionId, messages);
@@ -479,18 +538,36 @@ public class AgentChatPortImpl implements AgentChatPort {
                 // Persist after each tool round so a connection drop does not lose
                 // the structured tool tape — the next turn will see it.
                 if (persistTape) persistMessages(sessionId, messages);
+                lastRuntimeState = runtimeState;
                 continue;
             }
 
             // Unknown stop reason — treat as final
+            runtimeState = reduceRuntimeState(runtimeState, AgentRuntimeEvent.turnCompleted(round));
+            lastRuntimeState = runtimeState;
             messages.add(buildAssistantMessage(response.getContent()));
             if (persistTape) persistMessages(sessionId, messages);
             return streamFinalResponse(response, sink);
         }
 
         String exhaustedMsg = "Agent tool loop exceeded maximum rounds (" + MAX_TOOL_ROUNDS + ")";
+        reduceRuntimeState(lastRuntimeState, AgentRuntimeEvent.turnFailed(MAX_TOOL_ROUNDS, "max_tool_rounds_exceeded"));
         sink.onError(exhaustedMsg, null);
         return new TurnOutcome.Failed(exhaustedMsg, null);
+    }
+
+    private AgentExecutionState reduceRuntimeState(AgentExecutionState state, AgentRuntimeEvent event) {
+        if (state == null || event == null || agentReducer == null) {
+            return state;
+        }
+        try {
+            AgentReducer.Result result = agentReducer.reduce(state, event);
+            return result != null && result.state() != null ? result.state() : state;
+        } catch (RuntimeException e) {
+            // Runtime state is diagnostic instrumentation; reducer failure must not change turn semantics.
+            log.debug("Agent runtime reducer failed: event={}, error={}", event.type(), e.getMessage());
+            return state;
+        }
     }
 
     private String resolveToolChoiceForRound(LlmProvider provider, String providerCode, List<LlmChatRequest.Tool> tools,
@@ -1026,18 +1103,18 @@ public class AgentChatPortImpl implements AgentChatPort {
                                                   Map<String, Object> input, List<ToolDefinition> toolDefs) {
         try {
             if (findToolDef(toolDefs, toolName) == null) {
-                Map<String, Object> response = new LinkedHashMap<>();
-                response.put("success", false);
-                response.put("error", unknownToolMessage(toolName, toolDefs));
-                response.put("durationMs", 0L);
-                return response;
+                return errorResult(validationErrorFrame(toolName, input, toolDefs), 0L);
             }
             if (toolLoopService == null) {
-                Map<String, Object> response = new LinkedHashMap<>();
-                response.put("success", false);
-                response.put("error", "Agent tool execution kernel is not available. No tool was executed.");
-                response.put("durationMs", 0L);
-                return response;
+                return errorResult(AgentErrorFrame.of(
+                        AgentErrorFrame.CATEGORY_TOOL,
+                        toolName,
+                        input,
+                        "ToolKernelUnavailable",
+                        false,
+                        "Tool execution kernel is unavailable.",
+                        "Stop the turn and ask an operator to check the agent tool runtime."),
+                        0L);
             }
             log.debug("Agent chat tool call via ToolLoopService: tool={}, input={}", toolName, input);
             String rawResult = toolLoopService.executeToolCall(
@@ -1052,11 +1129,15 @@ public class AgentChatPortImpl implements AgentChatPort {
             return normalizeToolLoopResult(rawResult);
         } catch (Exception e) {
             log.warn("Tool execution failed in agent chat: tool={}, error={}", toolName, e.getMessage());
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("success", false);
-            response.put("error", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
-            response.put("durationMs", 0L);
-            return response;
+            return errorResult(AgentErrorFrame.of(
+                    AgentErrorFrame.CATEGORY_TOOL,
+                    toolName,
+                    input,
+                    e.getClass().getSimpleName(),
+                    true,
+                    "Tool execution failed.",
+                    "Use corrected arguments or summarize the failure to the user."),
+                    0L);
         }
     }
 
@@ -1133,6 +1214,8 @@ public class AgentChatPortImpl implements AgentChatPort {
         extension.put("previewToken", result.get("previewToken"));
         extension.put("preview", result.get("preview"));
         extension.put("riskLevel", result.get("riskLevel"));
+        extension = runtimeStateExtension(extension, ctx, agentCode, sessionId, toolId, toolName, input,
+                toolDefs, messages, providerCode, model, systemPrompt, maxTokens, round, null);
 
         chatSessionStore.storePending(ctx.turnId(),
                 ChatSessionStore.PendingTool.builder()
@@ -1153,8 +1236,6 @@ public class AgentChatPortImpl implements AgentChatPort {
                         .agentToolDefinitions(toAgentToolDefinitions(toolDefs))
                         .messages(serializeMessages(messages))
                         .providerCode(providerCode)
-                        .apiKey(config != null ? config.getApiKey() : null)
-                        .baseUrl(config != null ? config.getBaseUrl() : null)
                         .model(model)
                         .systemPrompt(systemPrompt)
                         .maxTokens(maxTokens)
@@ -1195,25 +1276,105 @@ public class AgentChatPortImpl implements AgentChatPort {
                         .agentToolDefinitions(toAgentToolDefinitions(toolDefs))
                         .messages(serializeMessages(messages))
                         .providerCode(providerCode)
-                        .apiKey(config != null ? config.getApiKey() : null)
-                        .baseUrl(config != null ? config.getBaseUrl() : null)
                         .model(model)
                         .systemPrompt(systemPrompt)
                         .maxTokens(maxTokens)
                         .currentLoop(round)
+                        .extension(runtimeStateExtension(null, ctx, agentCode, sessionId,
+                                toolId, toolName, input, toolDefs, messages, providerCode, model,
+                                systemPrompt, maxTokens, round, approvalPid))
                         .build());
     }
 
-    private String unknownToolMessage(String toolName, List<ToolDefinition> toolDefs) {
-        String available = toolDefs == null || toolDefs.isEmpty()
-                ? "<none>"
-                : toolDefs.stream()
+    private Map<String, Object> runtimeStateExtension(Map<String, Object> existing, TurnContext ctx,
+                                                      String agentCode, String sessionId, String toolId,
+                                                      String toolName, Map<String, Object> input,
+                                                      List<ToolDefinition> toolDefs,
+                                                      List<LlmChatRequest.Message> messages,
+                                                      String providerCode, String model, String systemPrompt,
+                                                      int maxTokens, int round, String approvalPid) {
+        Map<String, Object> extension = existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
+        Map<String, Object> pending = new LinkedHashMap<>();
+        if (toolId != null && !toolId.isBlank()) {
+            pending.put("toolId", toolId);
+        }
+        if (toolName != null && !toolName.isBlank()) {
+            pending.put("toolName", toolName);
+        }
+        if (approvalPid != null && !approvalPid.isBlank()) {
+            pending.put("approvalPid", approvalPid);
+        }
+        if (input != null && !input.isEmpty()) {
+            pending.put("input", input);
+        }
+        AgentExecutionState state = runtimeStateFactory.chatTurnState(
+                ctx,
+                agentCode,
+                sessionId,
+                providerCode,
+                model,
+                round,
+                null,
+                systemPrompt,
+                maxTokens,
+                messages,
+                toLlmTools(toolDefs != null ? toolDefs : List.of()),
+                toolDefs != null ? toolDefs : List.of(),
+                pending);
+        extension.put("_runtime_state", state.toSnapshotMap());
+        return extension;
+    }
+
+    private AgentErrorFrame providerErrorFrame(String providerCode, String model, Exception e) {
+        Map<String, Object> args = new LinkedHashMap<>();
+        if (providerCode != null && !providerCode.isBlank()) {
+            args.put("providerCode", providerCode);
+        }
+        if (model != null && !model.isBlank()) {
+            args.put("model", model);
+        }
+        return AgentErrorFrame.of(
+                AgentErrorFrame.CATEGORY_PROVIDER,
+                null,
+                args,
+                e != null ? e.getClass().getSimpleName() : "ProviderError",
+                false,
+                "LLM provider request failed.",
+                "Stop the turn and ask an operator to check provider configuration.");
+    }
+
+    private AgentErrorFrame validationErrorFrame(String toolName, Map<String, Object> input,
+                                                 List<ToolDefinition> toolDefs) {
+        return AgentErrorFrame.of(
+                AgentErrorFrame.CATEGORY_VALIDATION,
+                toolName,
+                input,
+                "UnknownTool",
+                true,
+                "The model requested an unavailable tool.",
+                "Call one of the available tools: " + availableToolNames(toolDefs) + ".");
+    }
+
+    private Map<String, Object> errorResult(AgentErrorFrame errorFrame, long durationMs) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", false);
+        response.put("error", errorFrame.userSafeMessage());
+        response.put("errorFrame", errorFrame.toSnapshotMap());
+        response.put("retryable", errorFrame.retryable());
+        response.put("durationMs", durationMs);
+        return response;
+    }
+
+    private String availableToolNames(List<ToolDefinition> toolDefs) {
+        if (toolDefs == null || toolDefs.isEmpty()) {
+            return "<none>";
+        }
+        return toolDefs.stream()
                 .filter(t -> t != null && t.getToolCode() != null)
                 .map(ToolDefinition::getToolCode)
                 .limit(10)
                 .reduce((left, right) -> left + ", " + right)
                 .orElse("<none>");
-        return "Unknown tool '" + toolName + "'. Available tools: " + available;
     }
 
     @SuppressWarnings("unchecked")

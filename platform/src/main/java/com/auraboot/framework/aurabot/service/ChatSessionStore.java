@@ -254,6 +254,9 @@ public class ChatSessionStore {
         // --- Conversation context needed to resume LLM after confirmation ---
         private List<Map<String, Object>> messages;
         private String providerCode;
+        // Legacy compatibility only: new pending entries store providerCode
+        // and re-resolve provider credentials on resume instead of persisting
+        // apiKey/baseUrl in Redis or the in-memory fallback.
         private String apiKey;
         private String baseUrl;
         private String model;

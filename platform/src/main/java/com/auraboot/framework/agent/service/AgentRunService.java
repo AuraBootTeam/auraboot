@@ -10,6 +10,8 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.AgentExecutionState;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
 import com.auraboot.framework.agent.memory.SessionEndedEvent;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
@@ -61,6 +63,9 @@ public class AgentRunService {
     private final GroundingService groundingService;
     private final AgentSkillService skillService;
     private final ApplicationEventPublisher eventPublisher;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AgentRuntimeStateFactory runtimeStateFactory = new AgentRuntimeStateFactory();
 
     /**
      * User Soul Profile grounding reader (plan §5.5 / PR-77).
@@ -193,6 +198,7 @@ public class AgentRunService {
         try {
             Map<String, Object> agentDef = loadAgentDefinition(tenantId, agentCode);
             String providerCode = resolveProviderCode(agentDef);
+            String preferredProviderCode = providerCode;
             String model = resolveModel(agentDef, providerCode);
 
             // Create run record first (even if API key missing, we want the record).
@@ -301,12 +307,14 @@ public class AgentRunService {
             // Quality gate: if D1 quality insufficient, discover all tools
             String qualityIssue = groundingService.checkQualityGate(bif);
             List<AgentToolDefinition> tools;
+            String toolDiscoveryMode;
             if (qualityIssue != null) {
                 log.info("D1 quality gate triggered: {}, discovering all tools", qualityIssue);
                 tools = toAgentToolDefinitions(toolProviderRegistry.discoverAll(discoveryCtx));
+                toolDiscoveryMode = "quality_gate_expanded";
             } else {
                 // Use BIF candidateSkills to narrow tool selection
-                List<String> candidateSkills = bif.getCandidateSkills();
+                List<String> candidateSkills = bif != null ? bif.getCandidateSkills() : null;
                 if (candidateSkills != null && !candidateSkills.isEmpty()) {
                     // Load tools from candidate skills
                     List<AgentToolDefinition> skillTools = new ArrayList<>();
@@ -314,11 +322,16 @@ public class AgentRunService {
                         skillTools.addAll(skillService.resolveSkillTools(tenantId, skillCode));
                     }
                     // If skill tools found, use them; otherwise discover all
-                    tools = skillTools.isEmpty()
-                            ? toAgentToolDefinitions(toolProviderRegistry.discoverAll(discoveryCtx))
-                            : skillTools;
+                    if (skillTools.isEmpty()) {
+                        tools = toAgentToolDefinitions(toolProviderRegistry.discoverAll(discoveryCtx));
+                        toolDiscoveryMode = "registry_all";
+                    } else {
+                        tools = skillTools;
+                        toolDiscoveryMode = "candidate_skills";
+                    }
                 } else {
                     tools = toAgentToolDefinitions(toolProviderRegistry.discoverAll(discoveryCtx));
+                    toolDiscoveryMode = "registry_all";
                 }
             }
             log.info("Agent {} tools: selected={}, d1={}, provider={}, model={}",
@@ -330,9 +343,16 @@ public class AgentRunService {
                     ? ((Number) agentDef.get("execution_timeout_seconds")).intValue()
                     : DEFAULT_TIMEOUT_SECONDS;
             LocalDateTime timeoutAt = startedAt.plusSeconds(timeoutSeconds);
-            dynamicDataMapper.update("ab_agent_run",
-                    Map.of("timeout_at", timeoutAt, "run_model", model, "updated_at", LocalDateTime.now()),
-                    Map.of("pid", runPid));
+            Map<String, Object> runtimeMetadata = buildRunRuntimeMetadata(
+                    tenantId, runPid, taskPid, agentCode, preferredProviderCode, resolvedProviderCode,
+                    providerChain, model, systemPrompt, userMessage, config, tools, toolDiscoveryMode,
+                    qualityIssue, bif);
+            Map<String, Object> runSetupUpdate = new LinkedHashMap<>();
+            runSetupUpdate.put("timeout_at", timeoutAt);
+            runSetupUpdate.put("run_model", model);
+            runSetupUpdate.put("metadata", objectMapper.writeValueAsString(runtimeMetadata));
+            runSetupUpdate.put("updated_at", LocalDateTime.now());
+            dynamicDataMapper.update("ab_agent_run", runSetupUpdate, Map.of("pid", runPid));
 
             // Generate or load plan
             List<AgentPlanStep> plan;
@@ -437,6 +457,74 @@ public class AgentRunService {
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         } finally {
             currentTraceCtx.remove();
+        }
+    }
+
+
+    private Map<String, Object> buildRunRuntimeMetadata(Long tenantId, String runPid, String taskPid,
+                                                         String agentCode, String preferredProviderCode,
+                                                         String resolvedProviderCode, List<String> providerChain,
+                                                         String model, String systemPrompt, String userMessage,
+                                                         LlmProviderFactory.ProviderConfig config,
+                                                         List<AgentToolDefinition> tools,
+                                                         String toolDiscoveryMode, String qualityIssue,
+                                                         com.auraboot.framework.agent.dto.BusinessIntentFrame bif) {
+        int maxTokens = config != null && config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
+        AgentExecutionState runtimeState = runtimeStateFactory.acpRunState(
+                tenantId,
+                MetaContext.exists() ? MetaContext.getCurrentUserId() : null,
+                runPid,
+                taskPid,
+                agentCode,
+                resolvedProviderCode,
+                model,
+                systemPrompt,
+                userMessage,
+                maxTokens,
+                tools,
+                Map.of("toolDiscoveryMode", toolDiscoveryMode));
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("runtimeState", runtimeState.toSnapshotMap());
+        metadata.put("fallbackAudit", buildFallbackAudit(
+                preferredProviderCode, resolvedProviderCode, providerChain,
+                toolDiscoveryMode, qualityIssue, bif, tools != null ? tools.size() : 0));
+        return metadata;
+    }
+
+    private Map<String, Object> buildFallbackAudit(String preferredProviderCode, String resolvedProviderCode,
+                                                   List<String> providerChain, String toolDiscoveryMode,
+                                                   String qualityIssue,
+                                                   com.auraboot.framework.agent.dto.BusinessIntentFrame bif,
+                                                   int selectedTools) {
+        Map<String, Object> provider = new LinkedHashMap<>();
+        provider.put("preferred", preferredProviderCode);
+        provider.put("resolved", resolvedProviderCode);
+        provider.put("chain", providerChain == null ? List.of() : List.copyOf(providerChain));
+        provider.put("fallbackUsed", preferredProviderCode != null && resolvedProviderCode != null
+                && !preferredProviderCode.equals(resolvedProviderCode));
+
+        Map<String, Object> toolDiscovery = new LinkedHashMap<>();
+        toolDiscovery.put("mode", toolDiscoveryMode);
+        toolDiscovery.put("selectedTools", selectedTools);
+        if (qualityIssue != null && !qualityIssue.isBlank()) {
+            toolDiscovery.put("qualityIssue", qualityIssue);
+        }
+        if (bif != null) {
+            putIfNotBlank(toolDiscovery, "bifObject", bif.getObject());
+            putIfNotBlank(toolDiscovery, "bifIntent", bif.getIntent());
+            putIfNotBlank(toolDiscovery, "bifRiskLevel", bif.getRiskLevel());
+        }
+
+        Map<String, Object> audit = new LinkedHashMap<>();
+        audit.put("provider", provider);
+        audit.put("toolDiscovery", toolDiscovery);
+        return audit;
+    }
+
+    private void putIfNotBlank(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value);
         }
     }
 
