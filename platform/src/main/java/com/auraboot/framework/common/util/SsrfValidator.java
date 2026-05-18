@@ -44,6 +44,10 @@ public final class SsrfValidator {
             27017  // MongoDB
     );
 
+    private static final Set<String> TEST_PROFILE_PRIVATE_HOST_ALLOWLIST = Set.of(
+            "host.docker.internal"
+    );
+
     /**
      * A URL that has passed SSRF validation, with the resolved IP captured so
      * callers can pin it at connect time (defeats DNS rebinding TOCTOU).
@@ -136,8 +140,11 @@ public final class SsrfValidator {
             // rejection. Otherwise an attacker who controls DNS can answer with
             // [public-A, 127.0.0.1]; the OS may pick either at connect time.
             InetAddress[] all = InetAddress.getAllByName(host);
+            boolean allowPrivateTarget = isPrivateTargetAllowed(host);
             for (InetAddress a : all) {
-                rejectIfPrivate(a);
+                if (!allowPrivateTarget) {
+                    rejectIfPrivate(a);
+                }
             }
             // Pin the first resolved address for downstream connect-time use.
             InetAddress addr = all[0];
@@ -195,6 +202,25 @@ public final class SsrfValidator {
         if (addr.isAnyLocalAddress()) {
             throw new IllegalArgumentException("URL resolves to wildcard address");
         }
+    }
+
+    private static boolean isPrivateTargetAllowed(String host) {
+        String normalizedHost = host == null ? "" : host.toLowerCase();
+        String activeProfiles = System.getenv("SPRING_PROFILES_ACTIVE");
+        if (activeProfiles != null && activeProfiles.contains("test")
+                && TEST_PROFILE_PRIVATE_HOST_ALLOWLIST.contains(normalizedHost)) {
+            return true;
+        }
+        String configured = System.getenv("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        if (configured == null || configured.isBlank()) {
+            return false;
+        }
+        for (String item : configured.split(",")) {
+            if (normalizedHost.equals(item.trim().toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Returns true for the ::ffff:0:0/96 prefix (IPv4-mapped IPv6). */

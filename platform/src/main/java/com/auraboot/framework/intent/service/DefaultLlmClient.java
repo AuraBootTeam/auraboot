@@ -128,10 +128,11 @@ public class DefaultLlmClient implements LlmClient {
             throw new IllegalStateException(
                     "No LLM provider configured for tenant " + tenantId);
         }
-        LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
         if (provider == null) {
             throw new IllegalStateException(
-                    "LlmProvider not found for code: " + config.getProviderCode());
+                    "LlmProvider not found for code: " + effectiveProviderCode);
         }
 
         String resolvedModel = (options.modelOverride() != null && !options.modelOverride().isBlank())

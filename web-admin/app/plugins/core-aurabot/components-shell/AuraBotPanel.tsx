@@ -110,8 +110,6 @@ export function AuraBotPanel() {
     [setSelectedAgent],
   );
 
-  if (state.panelState === 'collapsed') return null;
-
   const handleSuggestionClick = (prompt: string) => {
     sendMessage(prompt);
   };

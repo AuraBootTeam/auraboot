@@ -124,7 +124,8 @@ public class SkillDraftNamer {
         }
         if (config == null) return null;
 
-        LlmProvider provider = providerFactory.getProvider(config.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+        LlmProvider provider = providerFactory.getProvider(effectiveProviderCode);
         if (provider == null) return null;
 
         String userMessage = "Pattern signature: " + signatureJson + "\n"
