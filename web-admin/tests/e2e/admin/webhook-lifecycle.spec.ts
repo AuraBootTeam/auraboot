@@ -15,6 +15,7 @@
  */
 
 import { test, expect } from '../../fixtures';
+import type { Page } from '@playwright/test';
 import {
   navigateToDynamicPage,
   waitForDynamicPageLoad,
@@ -25,6 +26,71 @@ import {
   clickRowActionByLocator,
   waitForToast,
 } from '../helpers';
+
+async function selectFormField(page: Page, fieldCode: string, value: string) {
+  const fieldRoots = [
+    `[data-testid="form-field-${fieldCode}"]`,
+    `[data-testid="field-${fieldCode}"]`,
+    `[data-field="${fieldCode}"]`,
+  ];
+  const anyField = page
+    .locator(
+      [
+        ...fieldRoots.flatMap((root) => [`${root} select`, `${root} input`, `${root} textarea`]),
+        `select[name="${fieldCode}"]`,
+        `input[name="${fieldCode}"]`,
+        `textarea[name="${fieldCode}"]`,
+      ].join(', '),
+    )
+    .first();
+  await anyField.waitFor({ state: 'attached', timeout: 12000 }).catch(() => null);
+
+  const select = page
+    .locator([...fieldRoots.map((root) => `${root} select`), `select[name="${fieldCode}"]`].join(', '))
+    .first();
+  if (await select.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await select.selectOption(value);
+    return;
+  }
+
+  const input = page
+    .locator(
+      [
+        ...fieldRoots.flatMap((root) => [
+          `${root} input:not([type="hidden"])`,
+          `${root} textarea`,
+        ]),
+        `input[name="${fieldCode}"]:not([type="hidden"])`,
+        `textarea[name="${fieldCode}"]`,
+      ].join(', '),
+    )
+    .first();
+  if (await input.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await input.fill(value);
+    return;
+  }
+
+  const hiddenInput = page
+    .locator(
+      [
+        ...fieldRoots.map((root) => `${root} input[type="hidden"]`),
+        `input[name="${fieldCode}"][type="hidden"]`,
+      ].join(', '),
+    )
+    .first();
+  if (await hiddenInput.count().then((count) => count > 0).catch(() => false)) {
+    await hiddenInput.evaluate((el, nextValue) => {
+      const inputEl = el as HTMLInputElement;
+      inputEl.value = String(nextValue ?? '');
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+    return;
+  }
+
+  throw new Error(`Could not find select field: ${fieldCode}`);
+}
+
 test.describe.serial('Webhook Lifecycle', () => {
   let seedPid: string;
   let createdPid: string | null = null;
@@ -36,7 +102,7 @@ test.describe.serial('Webhook Lifecycle', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: './tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const page = await ctx.newPage();
     const createResp = await page.request.post('/api/webhooks', {
@@ -115,26 +181,7 @@ test.describe.serial('Webhook Lifecycle', () => {
       .first();
     await urlInput.fill('https://example.com/webhook-e2e');
 
-    // Select event type
-    const eventTypeSelect = page.locator('[data-testid="form-field-event_type"]').first();
-    if (await eventTypeSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const nativeSelect = eventTypeSelect.locator('select').first();
-      if (await nativeSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await nativeSelect.selectOption('record_created');
-      } else {
-        const trigger = eventTypeSelect.locator(
-          '.ant-select, [role="combobox"], button, input',
-        ).first();
-        if (await trigger.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await trigger.click();
-          const option = page
-            .getByRole('option', { name: /Record Created|记录创建/i })
-            .last();
-          await expect(option).toBeVisible({ timeout: 5000 });
-          await option.click();
-        }
-      }
-    }
+    await selectFormField(page, 'event_type', 'CommandExecuted');
 
     await clickSaveButton(page);
     await waitForToast(page, undefined, 5_000).catch(() => null);

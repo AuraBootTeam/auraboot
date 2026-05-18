@@ -168,7 +168,7 @@ test.describe('Page Designer Deep Operations', () => {
   let designerPage: PageDesignerPage;
 
   test.beforeAll(async ({ browser }) => {
-    const storageStatePath = `${process.cwd()}/tests/storage/admin.json`;
+    const storageStatePath = process.env.PW_ADMIN_STORAGE_STATE || `${process.cwd()}/tests/storage/admin.json`;
     const context = await browser.newContext({
       storageState: storageStatePath,
     });

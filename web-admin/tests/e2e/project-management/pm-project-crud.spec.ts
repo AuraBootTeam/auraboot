@@ -562,7 +562,7 @@ test.describe('PM Project CRUD', () => {
     // Use a pre-created project (any active project will do)
     // Create one via API for reliability
     const setupCtx = await page.context().browser()!.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const setupPage = await setupCtx.newPage();
     let validationProjectPid: string;

@@ -53,7 +53,7 @@ test.describe('Login Channel Management', () => {
   // Pre-set known state to avoid flakiness from parallel projects sharing DB
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: './tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const setupPage = await ctx.newPage();
     try {
@@ -69,7 +69,7 @@ test.describe('Login Channel Management', () => {
   test.afterAll(async ({ browser }) => {
     // Restore default channel configuration
     const ctx = await browser.newContext({
-      storageState: './tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const cleanupPage = await ctx.newPage();
     try {

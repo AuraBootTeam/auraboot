@@ -185,7 +185,7 @@ async function focusSeededListRow(page: Page, seed: SeededRecord) {
   if (!(await row.isVisible({ timeout: 2_000 }).catch(() => false))) {
     const search = page
       .locator(
-        '[data-testid="toolbar-search"] input, input[type="search"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+        '[data-testid="list-search-input"], [data-testid="toolbar-search"] input, input[type="search"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"]',
       )
       .first();
     if (await search.isVisible({ timeout: 2_000 }).catch(() => false)) {

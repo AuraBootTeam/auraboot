@@ -6,11 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import {
-  type SavedView,
-  type ViewScope,
-  type ViewType,
-} from '~/framework/smart/types/savedView';
+import { type SavedView, type ViewScope, type ViewType } from '~/framework/smart/types/savedView';
 import type { ViewRecommendation } from '~/framework/smart/hooks/useViewRecommendations';
 import { cn } from '~/utils/cn';
 
@@ -317,6 +313,9 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         )}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        data-testid="view-selector-trigger"
+        data-current-view-name={currentView?.name || ''}
+        data-current-view-type={currentView?.viewType || ''}
       >
         {loading ? (
           <>
@@ -407,6 +406,9 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                       key={view.pid}
                       type="button"
                       onClick={() => handleSelectView(view.pid)}
+                      data-testid={`view-option-${view.pid}`}
+                      data-view-name={view.name}
+                      data-view-type={view.viewType}
                       className={cn(
                         'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
                         'hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',

@@ -90,9 +90,7 @@ test.describe('Model CRUD Operations', () => {
     await createResponse;
 
     // PhysicalModelForm navigates to /meta/models/{pid} on success.
-    await page
-      .waitForURL(/\/meta\/models\/[^/]+(?:\?|#|$)/, { timeout: 10_000 })
-      .catch(() => {});
+    await page.waitForURL(/\/meta\/models\/[^/]+(?:\?|#|$)/, { timeout: 10_000 }).catch(() => {});
     await page.waitForLoadState('domcontentloaded');
 
     // Verify model was created via API
@@ -186,10 +184,22 @@ test.describe('Model CRUD Operations', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Step 0: choose physical model type to reach the form
-    await page.getByTestId('model-type-physical').click();
+    const physicalCard = page.getByTestId('model-type-physical');
+    const codeInput = page.getByTestId('model-code-input');
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await physicalCard.click({ force: attempt > 0 });
+      const appeared = await codeInput
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (appeared) break;
+    }
+    await expect(codeInput).toBeVisible({ timeout: 5000 });
 
-    await page.locator('input[placeholder*="user_order"]').fill(modelData.code);
-    await page.locator('input[placeholder*="用户订单"]').fill('Duplicate Model');
+    const nameInput = page.getByTestId('model-display-name-input');
+    await expect(nameInput).toBeVisible({ timeout: 5000 });
+    await fillWithRetry(codeInput, modelData.code);
+    await fillWithRetry(nameInput, 'Duplicate Model');
 
     await page
       .locator('button[type="submit"], button:has-text("创建"), button:has-text("保存")')

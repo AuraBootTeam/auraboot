@@ -85,6 +85,9 @@ test.describe('Permission Management — Role List & Matrix', () => {
     // Click first role item
     const firstRole = page.locator('[data-testid^="role-item-"]').first();
     await expect(firstRole).toBeVisible({ timeout: 15_000 });
+    const matrixResponsePromise = page
+      .waitForResponse((r) => r.url().includes('/api/permissions/matrix/'), { timeout: 20_000 })
+      .catch(() => null);
     await firstRole.click();
 
     // Permissions tab should be active by default
@@ -101,10 +104,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
     await expect(roleNameInPanel.first()).toBeVisible({ timeout: 5_000 });
 
     // Wait for matrix API response — it may succeed or error
-    const matrixResp = await page.waitForResponse(
-      (r) => r.url().includes('/api/permissions/matrix/'),
-      { timeout: 20_000 },
-    ).catch(() => null);
+    const matrixResp = await matrixResponsePromise;
 
     // Matrix API may not fire if role click doesn't trigger it
     if (!matrixResp) {
@@ -143,9 +143,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
     // Click Members tab
     await page.getByTestId('permission-right-tab-members').click();
-    await expect(page.getByTestId('permission-right-tab-members')).toHaveClass(
-      /border-blue-500/,
-    );
+    await expect(page.getByTestId('permission-right-tab-members')).toHaveClass(/border-blue-500/);
 
     // Members tab content should be visible (either member table or empty state)
     const memberTab = page.getByTestId('role-member-tab');
@@ -181,9 +179,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
     // Submit with API response wait
     const createResponse = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/roles') &&
-        r.request().method().toUpperCase() === 'POST',
+      (r) => r.url().includes('/api/roles') && r.request().method().toUpperCase() === 'POST',
       { timeout: 10_000 },
     );
     await page.getByTestId('role-form-submit').click();
@@ -231,9 +227,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
     // Submit
     const updateResponse = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/roles/') &&
-        r.request().method().toUpperCase() === 'PUT',
+      (r) => r.url().includes('/api/roles/') && r.request().method().toUpperCase() === 'PUT',
       { timeout: 10_000 },
     );
     await page.getByTestId('role-form-submit').click();
@@ -284,13 +278,12 @@ test.describe('Permission Management — Role List & Matrix', () => {
     // Select our test role
     const roleItem = page.getByTestId(`role-item-${ROLE_CODE}`);
     await expect(roleItem).toBeVisible({ timeout: 8_000 });
-    await roleItem.click();
-
     // Wait for permission matrix API
-    const matrixResp = await page.waitForResponse(
-      (r) => r.url().includes('/api/permissions/matrix/'),
-      { timeout: 10_000 },
-    ).catch(() => null);
+    const matrixResponsePromise = page
+      .waitForResponse((r) => r.url().includes('/api/permissions/matrix/'), { timeout: 10_000 })
+      .catch(() => null);
+    await roleItem.click();
+    const matrixResp = await matrixResponsePromise;
 
     expect(matrixResp).not.toBeNull();
     expect(matrixResp!.ok()).toBe(true);
@@ -336,9 +329,7 @@ test.describe('Permission Management — Role List & Matrix', () => {
 
     // Click OK to confirm
     const deleteResponse = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/roles/') &&
-        r.request().method().toUpperCase() === 'DELETE',
+      (r) => r.url().includes('/api/roles/') && r.request().method().toUpperCase() === 'DELETE',
       { timeout: 10_000 },
     );
     await page.getByTestId('confirm-ok').click();

@@ -58,9 +58,10 @@ async function gotoCrmDashboardViaSidebar(page: Page): Promise<void> {
   await nav.waitFor({ state: 'visible', timeout: 10_000 });
 
   // Expand "CRM 演示" / "CRM Demo" parent
+  const rootLabel = /CRM 演示|CRM Demo|menu\.crm_root/i;
   const rootBtn = nav
-    .getByRole('button', { name: /CRM 演示|CRM Demo/i })
-    .or(nav.locator('text=/CRM 演示|CRM Demo/'))
+    .getByRole('button', { name: rootLabel })
+    .or(nav.locator('button, [role="menuitem"]', { hasText: rootLabel }))
     .first();
   await rootBtn.scrollIntoViewIfNeeded();
   await rootBtn.evaluate((el: HTMLElement) => el.click());

@@ -91,9 +91,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // Tree components (cascadeselect, treeselect) load their own dict data via useDictTree hook.
   // They receive dictCode through field.props (from extensionProps).
   const TREE_COMPONENTS = ['cascadeselect', 'treeselect'];
-  const isTreeComponent = TREE_COMPONENTS.includes(
-    String(field.component || '').toLowerCase(),
-  );
+  const isTreeComponent = TREE_COMPONENTS.includes(String(field.component || '').toLowerCase());
 
   // 构建组件 props
   // 如果有 dictCode 且未指定组件或组件为 SmartInput，自动使用 SmartSelect
@@ -280,7 +278,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       refTarget?.modelCode ||
       refTarget?.targetEntity ||
       (field as any).referenceModelCode;
-    const labelField = refTarget?.targetField;
+    const labelField = refTarget?.displayField || refTarget?.labelField || refTarget?.targetField;
     if (targetModelCode) {
       const systemModel = SYSTEM_MODEL_ENDPOINTS[targetModelCode];
       if (systemModel) {
@@ -299,7 +297,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
           type: 'api',
           endpoint: `/api/dynamic/${targetModelCode}/list`,
           method: 'get',
-          params: { page: 1, pageSize: 200 },
+          params: { pageNum: 1, pageSize: 200 },
           adaptor: 'optionList',
           valueField: 'pid',
           autoFetch: true,
@@ -332,8 +330,12 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // For readOnly picker components that don't have built-in readOnly rendering,
   // display the raw value as text instead of loading the interactive component.
   const READONLY_TEXT_COMPONENTS = [
-    'cascadeselect', 'treeselect', 'userselect', 'memberpicker',
-    'organizationselect', 'addressfield',
+    'cascadeselect',
+    'treeselect',
+    'userselect',
+    'memberpicker',
+    'organizationselect',
+    'addressfield',
   ];
   const shouldRenderAsText =
     isReadOnly &&
@@ -347,10 +349,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       data-testid={`field-${field.field}`}
     >
       {resolvedLabel && (
-        <label
-          htmlFor={field.field}
-          className="mb-1 block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor={field.field} className="mb-1 block text-sm font-medium text-gray-700">
           {resolvedLabel}
           {isRequired && <span className="ml-0.5 text-red-500">*</span>}
         </label>

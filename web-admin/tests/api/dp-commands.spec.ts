@@ -82,7 +82,7 @@ test.describe('Dual Prevention — Issue & Hazard CRUD @critical', () => {
   // beforeAll: check plugin installation
   // -------------------------------------------------------------------------
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const resp = await page.request.get('/api/meta/models/code/dp_issue');

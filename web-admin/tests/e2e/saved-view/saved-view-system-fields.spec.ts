@@ -40,7 +40,7 @@ test.describe('System Fields Visible (GAP-126)', () => {
   // Create a fresh view with NO system fields configured and set it as default,
   // so SF-001/SF-002 see the clean/default state regardless of prior test runs
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: './tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     const resp = await page.request.post('/api/views', {
       data: {

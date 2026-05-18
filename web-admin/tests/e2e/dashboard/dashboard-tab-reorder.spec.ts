@@ -161,7 +161,7 @@ test.describe('Dashboard Tab Reorder', () => {
   let dashBCode = '';
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
 
     // Create 2 published dashboards with unique titles for this test run
@@ -185,7 +185,7 @@ test.describe('Dashboard Tab Reorder', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
 
     for (const pid of createdPids) {

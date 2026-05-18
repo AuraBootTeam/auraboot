@@ -40,7 +40,7 @@ test.describe.serial('Page Schema List (DSL)', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: './tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const page = await ctx.newPage();
 
@@ -187,7 +187,7 @@ test.describe.serial('Page Schema List (DSL)', () => {
     // D13: Search for seed page
     const searchInput = page
       .locator(
-        '[data-testid="list-search-input"], [data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+        '[data-testid="list-search-input"], [data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"]',
       )
       .first();
 
@@ -225,6 +225,8 @@ test.describe.serial('Page Schema List (DSL)', () => {
     await expect(row).toBeVisible();
 
     // Click the row (not an action button)
+    await page.keyboard.press('Escape').catch(() => null);
+    await expect(page.getByTestId('command-palette')).toBeHidden({ timeout: 2000 }).catch(() => {});
     await row.click();
 
     // Should navigate to /page-designer/{pid}
@@ -325,7 +327,7 @@ test.describe.serial('Page Schema List (DSL)', () => {
     // Search for the deleted record
     const searchInput = page
       .locator(
-        '[data-testid="list-search-input"], [data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+        '[data-testid="list-search-input"], [data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"]',
       )
       .first();
     if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {

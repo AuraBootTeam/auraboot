@@ -61,7 +61,8 @@ public class AiFieldProcessor {
                         .error("No LLM provider configured. Please configure an LLM provider in Cloud Config.")
                         .build();
             }
-            LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+            String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+            LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
 
             // 2. Build prompt
             String prompt = buildPrompt(request);

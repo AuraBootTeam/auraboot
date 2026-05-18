@@ -39,9 +39,7 @@ public class LlmProviderAccessorImpl implements AiProviderAccessor {
         if (config == null || !StringUtils.hasText(config.getApiKey())) {
             throw new IllegalStateException("LLM provider is not configured for tenant " + tenantId);
         }
-        String effectiveProviderCode = StringUtils.hasText(config.getProviderCode())
-                ? config.getProviderCode()
-                : providerCode;
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
         LlmProvider provider = providerFactory.getProvider(effectiveProviderCode);
         if (provider == null) {
             throw new IllegalStateException("LLM provider implementation is not available: " + effectiveProviderCode);
