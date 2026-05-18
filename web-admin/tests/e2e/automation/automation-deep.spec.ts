@@ -65,7 +65,7 @@ test.describe('Automation Deep', () => {
   const createdPids: string[] = [];
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     try {
       baseAutomation = await createAutomationViaApi(page);
@@ -78,7 +78,7 @@ test.describe('Automation Deep', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     for (const pid of createdPids) {
       await deleteAutomationViaApi(page, pid);
@@ -110,7 +110,7 @@ test.describe('Automation Deep', () => {
     await page.waitForURL(/\/automation(s)?\/new/, { timeout: 10000 });
 
     // Verify form fields — zh-CN "自动化名称", en-US "Automation name"
-    const nameInput = page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+    const nameInput = page.getByTestId('automation-editor-name-input');
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await expect(nameInput).toHaveValue('');
   });
@@ -131,7 +131,7 @@ test.describe('Automation Deep', () => {
     await page.waitForURL(new RegExp(`/automation/${baseAutomation.pid}`), { timeout: 10000 });
 
     // Verify name field has the automation name
-    const nameInput = page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+    const nameInput = page.getByTestId('automation-editor-name-input');
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await expect(nameInput).toHaveValue(baseAutomation.name);
   });
@@ -212,7 +212,7 @@ test.describe('Automation Deep', () => {
     const hasCondition = await conditionSection.isVisible({ timeout: 5000 }).catch(() => false);
 
     // Editor page should have loaded
-    const nameInput = page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+    const nameInput = page.getByTestId('automation-editor-name-input');
     await expect(nameInput).toBeVisible({ timeout: 5000 });
 
     if (hasCondition) {
@@ -411,7 +411,7 @@ test.describe('Automation Deep', () => {
     await page.goto(`/automation/${highPriorityAuto.pid}`);
     await page.waitForLoadState('domcontentloaded');
 
-    const nameInput = page.locator('input[placeholder*="名称"], input[placeholder*="Automation name"]').first();
+    const nameInput = page.getByTestId('automation-editor-name-input');
     await expect(nameInput).toBeVisible({ timeout: 5000 });
   });
 });

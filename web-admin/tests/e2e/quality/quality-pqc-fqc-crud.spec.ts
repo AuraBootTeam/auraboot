@@ -139,7 +139,7 @@ test.describe('Quality — PQC CRUD', () => {
   let workOrderOpId: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // qc_pqc_work_order_op_id is required (references pe_work_order_op).
@@ -360,7 +360,7 @@ test.describe('Quality — FQC CRUD', () => {
   let productionPlanId: string;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // qc_fqc_work_order_id is required (references pe_production_plan).

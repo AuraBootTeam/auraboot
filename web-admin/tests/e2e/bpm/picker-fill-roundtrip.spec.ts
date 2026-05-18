@@ -79,7 +79,7 @@ async function navigateToShowcaseList(page: Page): Promise<void> {
   await nav.first().waitFor({ state: 'visible', timeout: 10_000 });
 
   // Expand root menu "能力展示 / Showcase"
-  const rootBtn = nav.getByRole('button', { name: /Showcase|展示/i }).first();
+  const rootBtn = nav.getByRole('button', { name: /Showcase|展示|menu\.sc_root/i }).first();
   await rootBtn.scrollIntoViewIfNeeded();
   await rootBtn.evaluate((el: HTMLElement) => el.click());
 
@@ -249,7 +249,7 @@ test.describe('All-picker UI fill round-trip', { tag: ['@bpm-regression', '@pick
   test.beforeAll(async ({ browser }) => {
     // Resolve real fixture ids from the reset database. Pickers persist pids,
     // not the old mock ids used before OrganizationSelect became API-backed.
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const resp = await page.request.get('/api/admin/users/search?keyword=&size=5');

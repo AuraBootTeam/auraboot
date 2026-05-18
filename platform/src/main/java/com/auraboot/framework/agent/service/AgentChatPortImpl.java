@@ -217,6 +217,7 @@ public class AgentChatPortImpl implements AgentChatPort {
             sink.onError(msg, null);
             return new TurnOutcome.Failed(msg, null);
         }
+        providerCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
         LlmProvider provider = providerFactory.getProvider(providerCode);
         if (provider == null) {
             String msg = "LLM provider not available: " + providerCode;

@@ -5,6 +5,7 @@ import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.permission.enums.RolePermissionTemplate;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
+import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -74,6 +75,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
     private final com.auraboot.framework.permission.service.SystemPermissionInitializer systemPermissionInitializer;
     private final PermissionMapper permissionMapper;
     private final I18nResourceService i18nResourceService;
+    private final I18nService i18nService;
     private final DynamicDataMapper dynamicDataMapper;
     
     @Override
@@ -547,6 +549,7 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
         }
         if (!resources.isEmpty()) {
             int count = i18nResourceService.batchUpsert(resources);
+            i18nService.clearCache(null);
             log.info("Auto-generated {} bootstrap menu i18n records", count);
         }
     }

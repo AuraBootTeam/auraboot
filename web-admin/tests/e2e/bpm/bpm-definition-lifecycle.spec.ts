@@ -101,7 +101,11 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
         .first()
         .isVisible({ timeout: 500 })
         .catch(() => false)) &&
-      !(await page.locator('.react-flow').first().isVisible({ timeout: 500 }).catch(() => false));
+      !(await page
+        .locator('.react-flow')
+        .first()
+        .isVisible({ timeout: 500 })
+        .catch(() => false));
 
     if (result === 'forbidden' || redirectedToUnavailableDesigner) {
       test.skip(true, 'Current environment cannot access BPM process management page');
@@ -215,7 +219,9 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
   // beforeAll: create test processes via API (data setup only)
   // =========================================================================
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
     const page = await ctx.newPage();
     try {
       try {
@@ -317,7 +323,9 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
 
     // Save via explicit toolbar save button (Ctrl+S was brittle across browsers)
     const saveResponse = page.waitForResponse(
-      (r) => r.url().includes('/api/bpm/process-definitions') && ['POST', 'PUT', 'PATCH'].includes(r.request().method()),
+      (r) =>
+        r.url().includes('/api/bpm/process-definitions') &&
+        ['POST', 'PUT', 'PATCH'].includes(r.request().method()),
       { timeout: 15_000 },
     );
     const saveBtn = page
@@ -475,20 +483,25 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
     await clickRowActionByLocator(page, row, 'suspend', '暂停');
     const resp = await suspendResponse;
     expect(resp.ok(), 'Suspend API should succeed').toBe(true);
+    const body = await resp.json().catch(() => ({}));
+    expect(
+      String(body?.data?.status ?? body?.data?.processStatus ?? '').toLowerCase(),
+      'Suspend API should return the suspended state',
+    ).toMatch(/suspended|暂停/);
 
-    // Wait for list to refresh
-    await page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/bpm/process-definitions') &&
-        !r.url().includes('/suspend') &&
-        r.status() === 200,
-      { timeout: 10_000 },
-    );
-
-    // Verify status badge changed
-    const updatedRow = await findRowInPaginatedList(page, PROCESS_KEY_MAIN, 12_000);
-    const rowText = await updatedRow.textContent();
-    expect(rowText).toMatch(/suspended|已暂停/i);
+    await expect
+      .poll(
+        async () => {
+          await page.reload({ waitUntil: 'domcontentloaded' });
+          const refreshedRow = await findRowInPaginatedList(page, PROCESS_KEY_MAIN, 12_000);
+          return (await refreshedRow.textContent()) || '';
+        },
+        {
+          timeout: 20_000,
+          intervals: [500, 1000, 1500, 2000],
+        },
+      )
+      .toMatch(/suspended|已暂停/i);
   });
 
   // =========================================================================
@@ -689,19 +702,18 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
     await expect(searchInput, 'Search input should be visible').toBeVisible({ timeout: 5_000 });
 
     await searchInput.click();
+    const filteredResponse = page.waitForResponse(
+      (r) =>
+        (r.url().includes('/api/bpm/process-definitions') ||
+          r.url().includes('/api/dynamic/bpm-process-management/list')) &&
+        new URL(r.url()).searchParams.get('keyword') === UID &&
+        r.status() === 200,
+      { timeout: 8_000 },
+    );
     await searchInput.fill(UID);
+    await expect(searchInput).toHaveValue(UID, { timeout: 3000 });
     await searchInput.press('Enter');
-
-    // Wait for filtered results
-    await page
-      .waitForResponse(
-        (r) =>
-          (r.url().includes('/api/bpm/process-definitions') ||
-            r.url().includes('/api/dynamic/bpm-process-management/list')) &&
-          r.status() === 200,
-        { timeout: 8_000 },
-      )
-      .catch(() => null);
+    await filteredResponse;
 
     // Results should contain our main process
     const row = page.locator('tbody tr').filter({ hasText: PROCESS_KEY_MAIN }).first();
@@ -709,15 +721,22 @@ test.describe('BPM Process Definition — CRUD Lifecycle', () => {
       timeout: 5_000,
     });
 
-    // Verify only matching results are shown — all visible rows should contain UID
-    const dataRows = page.locator('tbody tr');
-    const rowCount = await dataRows.count();
-    expect(rowCount, 'Search should return at least 1 result').toBeGreaterThan(0);
-
-    for (let i = 0; i < Math.min(rowCount, 5); i++) {
-      const text = await dataRows.nth(i).textContent();
-      expect(text, `Row ${i} should contain search term`).toContain(UID);
-    }
+    // Verify only matching results are shown after React has committed the
+    // filtered response. The table can briefly keep stale rows visible after
+    // the network response resolves under full-suite load.
+    await expect
+      .poll(
+        async () => {
+          const texts = (await page.locator('tbody tr').allTextContents())
+            .map((text) => text.trim())
+            .filter(Boolean)
+            .slice(0, 5);
+          if (texts.length === 0) return 'no rows';
+          return texts.every((text) => text.includes(UID)) ? 'ok' : texts.join('\n');
+        },
+        { timeout: 10000, intervals: [500, 1000, 1500] },
+      )
+      .toBe('ok');
   });
 
   // =========================================================================

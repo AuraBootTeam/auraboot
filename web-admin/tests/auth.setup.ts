@@ -223,7 +223,12 @@ async function loginViaApi(
       const body = await resp.json();
       const jwt = body?.data?.jwt;
       if (typeof jwt === 'string' && (await persistSessionCookie(jwt))) {
-        if (!body?.data?.tenantId) {
+        if (user.email === DEFAULT_TEST_ACCOUNT.email) {
+          const resolved = await autoSelectSpace(page, baseURL);
+          if (!resolved) {
+            console.log(`   [${user.email}] Warning: admin API login auto-select failed`);
+          }
+        } else if (!body?.data?.tenantId) {
           const resolved = await autoSelectSpace(page, baseURL);
           if (!resolved) {
             console.log(

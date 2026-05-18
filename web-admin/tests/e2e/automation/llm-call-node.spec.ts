@@ -101,9 +101,7 @@ async function navigateToAutomationsList(page: Page): Promise<void> {
   //
   // The submenu group sits near the bottom of the nav (orderNo=950); scroll
   // it into view before clicking.
-  const parentBtn = nav
-    .getByRole('button', { name: /系统管理|System Management|System/i })
-    .first();
+  const parentBtn = nav.getByRole('button', { name: /系统管理|System Management|System/i }).first();
   await parentBtn.waitFor({ state: 'visible', timeout: 8_000 });
   await parentBtn.scrollIntoViewIfNeeded().catch(() => null);
   // Use evaluate-click for robustness against the chevron icon swallowing the
@@ -155,9 +153,7 @@ async function openEditorViaListRow(page: Page, pid: string, name: string): Prom
 
   // The editor toolbar's name input is the first deterministic signal that
   // AutomationEditor mounted with our fixture data.
-  const nameInput = page
-    .locator('input[placeholder*="名称"], input[placeholder*="Automation name"]')
-    .first();
+  const nameInput = page.getByTestId('automation-editor-name-input');
   await expect(nameInput).toBeVisible({ timeout: 12_000 });
   await expect(nameInput).toHaveValue(name);
 }
@@ -387,7 +383,9 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
   // -------------------------------------------------------------------------
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
     const page = await ctx.newPage();
     try {
       seeded = await createLlmAutomationViaApi(page);
@@ -404,10 +402,7 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
   });
 
   test.beforeEach(async () => {
-    test.skip(
-      !seededOk,
-      'core-automation plugin / e2et_order fixture not available — seed failed',
-    );
+    test.skip(!seededOk, 'core-automation plugin / e2et_order fixture not available — seed failed');
   });
 
   // -------------------------------------------------------------------------
@@ -477,7 +472,9 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     // FlowPropertyPanel renders one input/textarea per PropertySchema entry.
     // BaseInput / BaseTextarea use `id={schema.key}` (see BaseInput.tsx:59),
     // so we can target the persisted user-prompt template by its schema key.
-    const userPromptInput = page.locator('textarea#userPromptTemplate, [id="userPromptTemplate"]').first();
+    const userPromptInput = page
+      .locator('textarea#userPromptTemplate, [id="userPromptTemplate"]')
+      .first();
     await expect(userPromptInput).toBeVisible({ timeout: 8_000 });
     // [D8] assertion: persisted template value is back in the field, not blank.
     await expect(userPromptInput).toHaveValue(USER_PROMPT_TEMPLATE);
@@ -490,7 +487,9 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     // outputVariableName is the key downstream nodes reference. Asserting
     // its persisted string protects against regressions in the
     // configSchema → adapter wiring (NodeRegistry / FlowFieldAdapter).
-    const outputVarInput = page.locator('input#outputVariableName, [id="outputVariableName"]').first();
+    const outputVarInput = page
+      .locator('input#outputVariableName, [id="outputVariableName"]')
+      .first();
     await expect(outputVarInput).toBeVisible({ timeout: 5_000 });
     await expect(outputVarInput).toHaveValue(OUTPUT_VARIABLE);
 
@@ -626,11 +625,15 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     await expect(llmNodeAgain).toBeVisible({ timeout: 10_000 });
     await llmNodeAgain.click();
 
-    const userPromptAfter = page.locator('textarea#userPromptTemplate, [id="userPromptTemplate"]').first();
+    const userPromptAfter = page
+      .locator('textarea#userPromptTemplate, [id="userPromptTemplate"]')
+      .first();
     await expect(userPromptAfter).toBeVisible({ timeout: 8_000 });
     await expect(userPromptAfter).toHaveValue(newPrompt);
 
-    const outputVarAfter = page.locator('input#outputVariableName, [id="outputVariableName"]').first();
+    const outputVarAfter = page
+      .locator('input#outputVariableName, [id="outputVariableName"]')
+      .first();
     await expect(outputVarAfter).toBeVisible({ timeout: 5_000 });
     await expect(outputVarAfter).toHaveValue(newOutputVar);
   });
@@ -700,10 +703,9 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     expect(results[0].result?.output).toBe(MOCK_LLM_OUTPUT);
     expect(results[0].result?.outputVariable).toBe(OUTPUT_VARIABLE);
     expect(results[1].actionType).toBe('send_notification');
-    expect(
-      results[1].result?.renderedContent,
-      'downstream node must consume ${llmOutput}',
-    ).toBe(MOCK_NOTIFICATION_RENDERED);
+    expect(results[1].result?.renderedContent, 'downstream node must consume ${llmOutput}').toBe(
+      MOCK_NOTIFICATION_RENDERED,
+    );
     expect(results[1].result?.renderedContent).toContain(MOCK_LLM_OUTPUT);
 
     // [D14] AutomationEditor.handleTestRun shows a success toast on
@@ -758,6 +760,7 @@ test.describe('Automation LLM Action Node — Workflow E2E (ACP A.4)', () => {
     await navigateToAutomationsList(page);
     const logsBtn = page.locator(`[data-testid="btn-logs-${seeded.pid}"]`).first();
     await expect(logsBtn).toBeVisible({ timeout: 10_000 });
+    await expect(logsBtn).toBeEnabled({ timeout: 10_000 });
     await logsBtn.click();
 
     // Dialog pops open (data-testid="execution-log-dialog").

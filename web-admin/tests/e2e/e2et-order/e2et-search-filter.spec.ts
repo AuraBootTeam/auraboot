@@ -24,7 +24,7 @@ test.describe('E2E Test Order — Search & Filter UI', () => {
   let custPid2: string;
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const customer = new ModelTestHelper(page, E2ET_CUSTOMER_CONFIG);
 
@@ -45,7 +45,7 @@ test.describe('E2E Test Order — Search & Filter UI', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const customer = new ModelTestHelper(page, E2ET_CUSTOMER_CONFIG);
     await customer.deleteViaApi(custPid1).catch(() => {});

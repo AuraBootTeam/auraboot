@@ -46,7 +46,7 @@ test.describe('SavedView — GANTT View', () => {
 
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: (BASE_URL),
     });
     const page = await ctx.newPage();
@@ -91,7 +91,7 @@ test.describe('SavedView — GANTT View', () => {
 
   test.afterAll(async ({ browser }) => {
     const ctx = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       baseURL: (BASE_URL),
     });
     const page = await ctx.newPage();

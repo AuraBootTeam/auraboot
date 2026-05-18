@@ -29,7 +29,7 @@ test.describe('Organization Department', () => {
     if (createdPids.length === 0) return;
 
     const context = await browser.newContext({
-      storageState: 'tests/storage/admin.json',
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       // Must supply baseURL so page.request relative-path calls resolve correctly
       baseURL: testInfo.project.use.baseURL ?? (BASE_URL),
     });

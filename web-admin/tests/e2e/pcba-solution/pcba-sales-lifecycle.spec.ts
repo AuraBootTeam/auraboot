@@ -354,7 +354,7 @@ test.describe('PCBA Sales Lifecycle — Shipment', () => {
   let pluginAvailable = true;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
 
     // Check if PCBA plugin is imported
@@ -432,7 +432,7 @@ test.describe('PCBA Sales Lifecycle — Shipment', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
     await safeCleanup(p, created);
     await ctx.close();
@@ -817,7 +817,7 @@ test.describe('PCBA Sales Lifecycle — Sales Return', () => {
   }
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Check if PCBA plugin is imported
@@ -851,7 +851,7 @@ test.describe('PCBA Sales Lifecycle — Sales Return', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
     await safeCleanup(p, created);
     if (productPid) {
@@ -1381,7 +1381,7 @@ test.describe('PCBA Sales Lifecycle — RMA', () => {
   }
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
 
     rmaCustomerPid = await ensureRmaCustomerAccount(p);
@@ -1390,7 +1390,7 @@ test.describe('PCBA Sales Lifecycle — RMA', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const p = await ctx.newPage();
     await safeCleanup(p, created);
     await ctx.close();

@@ -199,6 +199,8 @@ export default function MemoryPromotionsPage() {
         ] as const).map(([key, label]) => (
           <button
             key={key}
+            role="tab"
+            aria-selected={activeTab === key}
             onClick={() => setActiveTab(key as Tab)}
             className={`border-b-2 px-4 py-2 text-sm font-medium ${
               activeTab === key

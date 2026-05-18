@@ -328,7 +328,7 @@ test.describe('PCBA Procurement Extended — Outsource Order (pe_outsource_order
   let productPid: string | undefined;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const supResult = await executeCommandViaApi(
@@ -372,7 +372,7 @@ test.describe('PCBA Procurement Extended — Outsource Order (pe_outsource_order
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     if (supplierPid) {
@@ -894,7 +894,7 @@ test.describe('PCBA Procurement Extended — Outsource Receipt (pe_outsource_rec
   let setupProductPid: string | undefined;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Create supplier for the outsource order
@@ -988,7 +988,7 @@ test.describe('PCBA Procurement Extended — Outsource Receipt (pe_outsource_rec
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     // Clean up reference outsource order and its dependencies
@@ -1188,7 +1188,7 @@ test.describe('PCBA Procurement Extended — Purchase Return (pe_purchase_return
   let productPid: string | undefined;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     try {
@@ -1251,7 +1251,7 @@ test.describe('PCBA Procurement Extended — Purchase Return (pe_purchase_return
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     if (poPid) {
@@ -1571,7 +1571,7 @@ test.describe('PCBA Procurement Extended — Purchase Payment (pe_purchase_payme
   let poPid: string | undefined;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     try {
@@ -1618,7 +1618,7 @@ test.describe('PCBA Procurement Extended — Purchase Payment (pe_purchase_payme
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     if (poPid) {

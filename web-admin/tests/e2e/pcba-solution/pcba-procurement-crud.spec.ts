@@ -151,7 +151,7 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
   let supplierPid: string | undefined;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const result = await executeCommandViaApi(
@@ -175,7 +175,7 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     if (supplierPid) {
@@ -416,7 +416,7 @@ test.describe('PCBA Procurement — Purchase Request CRUD', () => {
   let productPid: string | undefined;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       const result = await executeCommandViaApi(
@@ -442,7 +442,7 @@ test.describe('PCBA Procurement — Purchase Request CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     if (productPid) {
@@ -616,7 +616,7 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
   let receiptSupplierPid: string | undefined;
 
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
     // Query existing warehouse
@@ -694,7 +694,7 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     await safeCleanup(page, created);
     // Clean up the PO and supplier created for receipts

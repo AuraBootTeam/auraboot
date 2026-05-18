@@ -102,9 +102,14 @@ public final class PinnedHttpRequests {
         }
 
         URI pinnedUri = rewriteHostToIp(originalUri, target.pinnedIp());
-        return HttpRequest.newBuilder()
-                .uri(pinnedUri)
-                .header("Host", hostHeaderValue(target));
+        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(pinnedUri);
+        try {
+            builder.header("Host", hostHeaderValue(target));
+        } catch (IllegalArgumentException restrictedHeader) {
+            log.debug("Pinned HTTP request continuing without Host header override: {}",
+                    restrictedHeader.getMessage());
+        }
+        return builder;
     }
 
     /**

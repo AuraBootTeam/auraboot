@@ -51,7 +51,7 @@ async function globalTeardown(config: FullConfig): Promise<void> {
     await cleanupByPrefix(baseURL, cookieHeader, 'e2et_order', 'e2et_order_title', 'E2E ');
 
     // Clean up temp integration test models
-    await cleanupTempModels(baseURL, cookieHeader);
+    await cleanupTempModels();
 
     // Clean up E2E-seeded AI-center menu rows (E2EM_* pid prefix). These
     // used to be cleaned up per spec file in afterAll but the per-file
@@ -118,38 +118,57 @@ async function cleanupByPrefix(
   }
 }
 
-async function cleanupTempModels(baseURL: string, cookieHeader: string): Promise<void> {
+async function cleanupTempModels(): Promise<void> {
   try {
-    const resp = await fetch(`${baseURL}/api/meta/models?current=1&size=200`, {
-      headers: { Cookie: cookieHeader },
-    });
-
-    if (!resp.ok) return;
-
-    const body = await resp.json();
-    const models = body.data?.records || body.data?.list || body.data || [];
-
-    if (!Array.isArray(models)) return;
-
-    const tempModels = models.filter((m: Record<string, unknown>) =>
-      String(m.code || '').startsWith('intg_e2e_'),
+    const rows = await executeCleanupQuery<{ count: number | string }>(
+      `SELECT COUNT(*)::int AS count
+         FROM ab_meta_model
+        WHERE code LIKE 'intg_e2e\\_%' ESCAPE '\\';`,
     );
+    const count = Number(rows[0]?.count ?? 0);
 
-    if (tempModels.length === 0) return;
+    if (count === 0) return;
 
-    console.log(`  Cleaning ${tempModels.length} temp integration test models`);
+    console.log(`  Cleaning ${count} temp integration test models`);
 
-    for (const model of tempModels) {
-      const pid = model.pid;
-      if (!pid) continue;
+    await executeCleanupSql(`
+CREATE TEMP TABLE tmp_e2e_temp_models AS
+SELECT id, code
+  FROM ab_meta_model
+ WHERE code LIKE 'intg_e2e\\_%' ESCAPE '\\';
 
-      await fetch(`${baseURL}/api/meta/models/${pid}`, {
-        method: 'delete',
-        headers: { Cookie: cookieHeader },
-      }).catch(() => {});
-    }
-  } catch {
-    // Silently ignore
+CREATE TEMP TABLE tmp_e2e_temp_fields AS
+SELECT DISTINCT b.field_id
+  FROM ab_meta_model_field_binding b
+  JOIN tmp_e2e_temp_models m ON m.id = b.model_id
+ WHERE b.deleted_flag = false
+   AND (b.is_system_binding IS NULL OR b.is_system_binding = false);
+
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT code FROM tmp_e2e_temp_models LOOP
+    EXECUTE format('DROP TABLE IF EXISTS %I', 'mt_' || r.code);
+  END LOOP;
+END $$;
+
+DELETE FROM ab_meta_model_field_binding
+ WHERE model_id IN (SELECT id FROM tmp_e2e_temp_models);
+
+DELETE FROM ab_meta_field f
+ WHERE f.id IN (SELECT field_id FROM tmp_e2e_temp_fields)
+   AND NOT EXISTS (
+     SELECT 1 FROM ab_meta_model_field_binding b WHERE b.field_id = f.id
+   );
+
+DELETE FROM ab_meta_model
+ WHERE id IN (SELECT id FROM tmp_e2e_temp_models);
+
+DROP TABLE tmp_e2e_temp_fields;
+DROP TABLE tmp_e2e_temp_models;
+`);
+  } catch (e) {
+    console.log(`  ⚠️ Temp model cleanup error (non-fatal): ${e}`);
   }
 }
 
@@ -250,6 +269,19 @@ async function executeCleanupSql(sql: string): Promise<void> {
   await client.connect();
   try {
     await client.query(sql);
+  } finally {
+    await client.end();
+  }
+}
+
+async function executeCleanupQuery<T extends Record<string, unknown>>(sql: string): Promise<T[]> {
+  const { Client } = await import('pg');
+  const client = new Client(PG_CONN);
+
+  await client.connect();
+  try {
+    const result = await client.query<T>(sql);
+    return result.rows;
   } finally {
     await client.end();
   }
