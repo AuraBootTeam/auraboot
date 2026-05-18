@@ -153,6 +153,7 @@ public class AutoPermissionAssignmentService {
         permission.setLevel(1);
         permission.setParentId(null);
         permission.setStatus(StatusConstants.ACTIVE);
+        permission.setDeletedFlag(false);
         permission.setCreatedAt(Instant.now());
         permission.setUpdatedAt(Instant.now());
 
@@ -186,6 +187,7 @@ public class AutoPermissionAssignmentService {
         permission.setLevel(2);
         permission.setParentId(modulePermission.getId());
         permission.setStatus(StatusConstants.ACTIVE);
+        permission.setDeletedFlag(false);
         permission.setCreatedAt(Instant.now());
         permission.setUpdatedAt(Instant.now());
 
@@ -220,6 +222,7 @@ public class AutoPermissionAssignmentService {
         permission.setLevel(3);
         permission.setParentId(resourcePermission.getId());
         permission.setStatus(StatusConstants.ACTIVE);
+        permission.setDeletedFlag(false);
         permission.setCreatedAt(Instant.now());
         permission.setUpdatedAt(Instant.now());
 
