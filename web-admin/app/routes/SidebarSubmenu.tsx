@@ -20,6 +20,16 @@ interface SidebarSubmenuProps {
   depth?: number;
 }
 
+export function resolveMenuLabel(
+  t: (key: string, params?: Record<string, any>, fallback?: string) => string,
+  item: Pick<SubmenuItem, 'name' | 'nameKey'>,
+): string {
+  const fallback = item.name || item.nameKey || '';
+  const key = item.nameKey || item.name;
+  if (!key) return fallback;
+  return t(key, undefined, fallback);
+}
+
 function isPathInSubmenu(items: SubmenuItem[], pathname: string): boolean {
   for (const item of items) {
     if (item.path === pathname) return true;
@@ -89,14 +99,14 @@ export default function SidebarSubmenu({ submenu, name, icon, depth = 0 }: Sideb
                 <SidebarSubmenu
                   key={item.id || index}
                   submenu={item.submenu}
-                  name={t(item.nameKey || item.name) || item.name}
+                  name={resolveMenuLabel(t, item)}
                   icon={item.icon}
                   depth={depth + 1}
                 />
               );
             }
 
-            const itemName = t(item.nameKey || item.name) || item.name;
+            const itemName = resolveMenuLabel(t, item);
             const isActive = location.pathname === item.path;
             return (
               <Link

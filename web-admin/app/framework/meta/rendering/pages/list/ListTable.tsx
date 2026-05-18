@@ -455,20 +455,21 @@ export const ListTable = React.memo(function ListTable({
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
                         onClick={() => onRowClick(record)}
                       >
-                        {/* Checkbox cell */}
-                        <td
-                          className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
-                          data-print="hide"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(rowId)}
-                            onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            data-testid={`row-checkbox-${index}`}
-                          />
-                        </td>
+                        {enableSelection && (
+                          <td
+                            className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
+                            data-print="hide"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(rowId)}
+                              onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              data-testid={`row-checkbox-${index}`}
+                            />
+                          </td>
+                        )}
 
                         {/* Data cells — ordered */}
                         {orderedDataColumns.map((column) => {

@@ -110,7 +110,8 @@ public class AiSearchServiceImpl implements AiSearchService {
             return keywordFallbackSearch(request);
         }
 
-        LlmProvider provider = llmProviderFactory.getProvider(config.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
         LlmChatRequest chatRequest = LlmChatRequest.builder()
                 .model(config.getDefaultModel())
                 .systemPrompt(systemPrompt)

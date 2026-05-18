@@ -51,6 +51,19 @@ const SIZE_CONFIG = {
   large: { height: 'h-12', text: 'text-base', pill: 'px-3 py-1.5 text-base', input: 'px-4' },
 } as const;
 
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim().replace(/[,\s]/g, '');
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
 const MoneyInput: React.FC<MoneyInputProps> = ({
   name,
   label,
@@ -127,18 +140,20 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
 
   // Format number for display with thousand separators
   const formatDisplay = useCallback(
-    (val: number | undefined): string => {
-      if (val === undefined || val === null || isNaN(val)) return '';
-      return displayFormatter.format(val);
+    (val: unknown): string => {
+      const normalized = toFiniteNumber(val);
+      if (normalized === undefined) return '';
+      return displayFormatter.format(normalized);
     },
     [displayFormatter],
   );
 
   // Format value for edit mode (no thousand separators, just precision)
   const formatEdit = useCallback(
-    (val: number | undefined): string => {
-      if (val === undefined || val === null || isNaN(val)) return '';
-      return precision > 0 ? val.toFixed(precision) : String(val);
+    (val: unknown): string => {
+      const normalized = toFiniteNumber(val);
+      if (normalized === undefined) return '';
+      return precision > 0 ? normalized.toFixed(precision) : String(normalized);
     },
     [precision],
   );
@@ -183,8 +198,9 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
 
   const handleBlur = () => {
     setIsFocused(false);
-    const clamped = clampValue(field.value);
-    if (clamped !== field.value) {
+    const currentValue = toFiniteNumber(field.value);
+    const clamped = clampValue(currentValue);
+    if (clamped !== currentValue) {
       field.setValue(clamped);
       setEditingValue(formatEdit(clamped));
     }
@@ -200,8 +216,9 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
   // Compute base currency equivalent
   const baseEquivalent = useMemo(() => {
     if (!showBaseEquivalent || !exchangeRate || exchangeRate === 1) return null;
-    if (field.value === undefined || field.value === null || isNaN(field.value)) return null;
-    const converted = field.value * exchangeRate;
+    const numericValue = toFiniteNumber(field.value);
+    if (numericValue === undefined) return null;
+    const converted = numericValue * exchangeRate;
     return {
       amount: displayFormatter.format(converted),
       rate: exchangeRate.toFixed(4),
@@ -219,7 +236,7 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
 
   // Read-only display
   if (readOnly) {
-    const hasValue = field.value !== undefined && field.value !== null && !isNaN(field.value);
+    const hasValue = toFiniteNumber(field.value) !== undefined;
 
     return (
       <FieldBase
@@ -235,7 +252,7 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
               {currencySymbol && (
                 <span className="text-sm font-medium text-gray-500">{currencySymbol}</span>
               )}
-              <span className="text-lg font-semibold tabular-nums text-gray-900">
+              <span className="text-lg font-semibold text-gray-900 tabular-nums">
                 {formatDisplay(field.value)}
               </span>
             </>
@@ -290,7 +307,7 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
           value={displayValue}
           placeholder={placeholderText || '0.00'}
           disabled={disabledValue}
-          className={`h-full w-full border-none bg-transparent text-right tabular-nums text-gray-900 outline-none placeholder:text-gray-400 ${sizeConfig.input} ${sizeConfig.text}`}
+          className={`h-full w-full border-none bg-transparent text-right text-gray-900 tabular-nums outline-none placeholder:text-gray-400 ${sizeConfig.input} ${sizeConfig.text}`}
           onChange={handleChange}
           onBlur={handleBlur}
           onFocus={handleFocus}
@@ -304,7 +321,13 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
       {/* Base currency equivalent */}
       {baseEquivalent && (
         <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
-          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg
+            className="h-3 w-3"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
             <path d="M1 8L4 4L7 6L11 2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <span>
@@ -319,8 +342,18 @@ const MoneyInput: React.FC<MoneyInputProps> = ({
       {/* Range indicator */}
       {(min !== undefined || max !== undefined) && (
         <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
-          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M2 6h8M2 6l2-2M2 6l2 2M10 6l-2-2M10 6l-2 2" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            className="h-3 w-3"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <path
+              d="M2 6h8M2 6l2-2M2 6l2 2M10 6l-2-2M10 6l-2 2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           <span>
             {min !== undefined && max !== undefined

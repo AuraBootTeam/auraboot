@@ -53,7 +53,7 @@ import { ListPagination } from './list/ListPagination';
 import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
 import { ListTable } from './list/ListTable';
-import { encodeSorts, decodeSorts } from './list/useListUrlState';
+import { areSortsEqual, encodeSorts, decodeSorts } from './list/useListUrlState';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { savedViewService } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
@@ -465,7 +465,7 @@ export function ListPageContent(props: PageContentProps) {
     }
     // Apply saved sorts
     if (vc.sorts && vc.sorts.length > 0) {
-      setActiveSorts(vc.sorts);
+      setActiveSorts((prev) => (areSortsEqual(prev, vc.sorts) ? prev : vc.sorts!));
     }
   }, [currentView, setPagination, setFilters]);
 
@@ -1202,23 +1202,41 @@ export function ListPageContent(props: PageContentProps) {
   // Auto-save sorts to SavedView (debounced) + sync to URL
   useEffect(() => {
     if (!schema) return;
+    const encoded = encodeSorts(activeSorts);
+    const currentEncoded = searchParams.get('sort');
+    if ((encoded ?? null) !== (currentEncoded ?? null)) {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (encoded) {
+            p.set('sort', encoded);
+          } else {
+            p.delete('sort');
+          }
+          return p;
+        },
+        { replace: true },
+      );
+    }
+    if (viewsLoading) return;
+    if (
+      currentView?.viewConfig?.sorts &&
+      areSortsEqual(currentView.viewConfig.sorts, activeSorts)
+    ) {
+      return;
+    }
     autoSave({ sorts: activeSorts });
-    // Sync sorts to URL
-    setSearchParams(
-      (prev) => {
-        const p = new URLSearchParams(prev);
-        const encoded = encodeSorts(activeSorts);
-        if (encoded) {
-          p.set('sort', encoded);
-        } else {
-          p.delete('sort');
-        }
-        return p;
-      },
-      { replace: true },
-    );
+    // autoSave is declared later in this component; evaluating it in the
+    // dependency array would hit the temporal dead zone during render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSorts]);
+  }, [
+    activeSorts,
+    schema,
+    viewsLoading,
+    currentView?.viewConfig?.sorts,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const handleImportComplete = useCallback(() => {
     setImportOpen(false);
@@ -1461,6 +1479,11 @@ export function ListPageContent(props: PageContentProps) {
       if (modelLabel && modelLabel !== modelKey) {
         return modelLabel;
       }
+      const modelFieldKey = `field.${mc}.${fieldCode}.label`;
+      const modelFieldLabel = t(modelFieldKey);
+      if (modelFieldLabel && modelFieldLabel !== modelFieldKey) {
+        return modelFieldLabel;
+      }
       const fieldKey = `field.${fieldCode}.label`;
       const fieldLabel = t(fieldKey);
       if (fieldLabel && fieldLabel !== fieldKey) {
@@ -1663,6 +1686,9 @@ export function ListPageContent(props: PageContentProps) {
       const modelKey = `model.${mc}.${column.field}.label`;
       const modelLabel = t(modelKey);
       if (modelLabel !== modelKey) return modelLabel;
+      const modelFieldKey = `field.${mc}.${column.field}.label`;
+      const modelFieldLabel = t(modelFieldKey);
+      if (modelFieldLabel !== modelFieldKey) return modelFieldLabel;
       const fieldKey = `field.${column.field}.label`;
       const fieldLabel = t(fieldKey);
       if (fieldLabel !== fieldKey) return fieldLabel;

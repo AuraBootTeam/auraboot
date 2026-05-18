@@ -227,6 +227,35 @@ class AgentRunServiceSyncTest {
     }
 
     @Test
+    @DisplayName("stub-routed provider config -> uses stub provider bean, not preferred provider")
+    void stubRoutedConfigUsesStubProviderBean() throws Exception {
+        primeHappyPath();
+        LlmProviderFactory.ProviderConfig stubConfig = LlmProviderFactory.ProviderConfig.builder()
+                .providerCode("stub")
+                .apiKey("stub_key_for_no_llm_paths")
+                .baseUrl("stub://local")
+                .defaultModel("stub-model")
+                .maxTokens(4096)
+                .build();
+        when(providerFactory.resolveConfig(any(), anyString())).thenReturn(stubConfig);
+        when(providerFactory.getProvider("stub")).thenReturn(provider);
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "[stub response]";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenReturn(ok);
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(true);
+
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.Success.class);
+        verify(providerFactory, times(1)).getProvider("stub");
+        verify(providerFactory, never()).getProvider("anthropic");
+    }
+
+    @Test
     @DisplayName("plan loop throws AgentApprovalPendingException -> RunOutcome.PendingApproval carries approvalPid")
     void planLoopPending_returnsPendingApproval() throws Exception {
         primeHappyPath();

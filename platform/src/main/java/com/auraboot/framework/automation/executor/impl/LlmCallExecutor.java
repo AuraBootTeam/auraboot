@@ -238,10 +238,11 @@ public class LlmCallExecutor implements ActionExecutor {
                         : null)
                 .build();
 
-        LlmProvider provider = llmProviderFactory.getProvider(providerConfig.getProviderCode());
+        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(providerCode, providerConfig);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
         if (provider == null) {
             throw new BusinessException("LLM_CALL: provider implementation not found for code "
-                    + providerConfig.getProviderCode());
+                    + effectiveProviderCode);
         }
 
         LlmChatResponse response;
