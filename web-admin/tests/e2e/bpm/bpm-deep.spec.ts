@@ -15,6 +15,7 @@
  * @since 7.0.0
  */
 
+import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
@@ -130,7 +131,7 @@ async function createAndDeployProcess(
 }
 
 async function startProcessInstance(
-  page: import('@playwright/test').Page,
+  page: Page,
   processKey: string,
   variables: Record<string, unknown> = {},
 ): Promise<string | null> {
@@ -160,6 +161,28 @@ async function startProcessInstance(
   } catch (e) {
     console.warn('BPM startProcessInstance error:', e);
     return null;
+  }
+}
+
+async function terminateInstanceForCleanup(page: Page, processInstanceId: string): Promise<boolean> {
+  try {
+    const resp = await page.request.post(
+      `/api/bpm/process-instances/${processInstanceId}/terminate`,
+      {
+        data: { reason: 'e2e-cleanup' },
+      },
+    );
+    if (resp.ok()) {
+      return true;
+    }
+    const body = await resp.text().catch(() => '');
+    console.warn(
+      `BPM cleanup skipped undeploy because terminate failed: ${resp.status()} ${body.slice(0, 200)}`,
+    );
+    return false;
+  } catch (error) {
+    console.warn('BPM cleanup skipped undeploy because terminate threw:', error);
+    return false;
   }
 }
 
@@ -202,10 +225,22 @@ test.describe('BPM Deep Tests', () => {
     const context = await browser.newContext({ storageState: 'tests/storage/admin.json' });
     const page = await context.newPage();
     try {
-      await page.request
-        .post(`/api/bpm/process-definitions/${processPid}/undeploy`)
-        .catch(() => {});
-      await page.request.delete(`/api/bpm/process-definitions/${processPid}`).catch(() => {});
+      const canRemoveDefinition = instanceId
+        ? await terminateInstanceForCleanup(page, instanceId)
+        : true;
+      if (canRemoveDefinition) {
+        const undeployResp = await page.request.post(
+          `/api/bpm/process-definitions/${processPid}/undeploy`,
+        );
+        if (undeployResp.ok()) {
+          await page.request.delete(`/api/bpm/process-definitions/${processPid}`);
+        } else {
+          const body = await undeployResp.text().catch(() => '');
+          console.warn(
+            `BPM cleanup skipped delete: undeploy failed ${undeployResp.status()} ${body.slice(0, 200)}`,
+          );
+        }
+      }
     } catch {
       /* ignore */
     }

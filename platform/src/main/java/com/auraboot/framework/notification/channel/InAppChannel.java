@@ -68,6 +68,10 @@ public class InAppChannel implements NotificationChannel {
 
     private void pushUnreadCount(Long userId) {
         try {
+            if (sseService.getActiveConnectionCount(userId) <= 0) {
+                log.debug("No active SSE connections for user {}, skipping unread count query", userId);
+                return;
+            }
             int count = queryService.getUnreadCount(userId);
             sseService.pushUnreadCount(userId, count);
         } catch (Exception e) {

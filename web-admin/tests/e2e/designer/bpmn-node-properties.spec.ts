@@ -51,8 +51,12 @@ function generateFullBpmn(pKey: string, pName: string): string {
     <endEvent id="end" name="End"/>
     <sequenceFlow id="flow_start_ut1" sourceRef="start" targetRef="ut1"/>
     <sequenceFlow id="flow_ut1_xgw1" sourceRef="ut1" targetRef="xgw1"/>
-    <sequenceFlow id="flow_xgw1_st1" sourceRef="xgw1" targetRef="st1" name="Approved"/>
-    <sequenceFlow id="flow_xgw1_rt1" sourceRef="xgw1" targetRef="rt1" name="Rejected"/>
+    <sequenceFlow id="flow_xgw1_st1" sourceRef="xgw1" targetRef="st1" name="Approved">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${'$'}{approved == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_xgw1_rt1" sourceRef="xgw1" targetRef="rt1" name="Rejected">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${'$'}{approved == false}</conditionExpression>
+    </sequenceFlow>
     <sequenceFlow id="flow_st1_pgw1" sourceRef="st1" targetRef="pgw1"/>
     <sequenceFlow id="flow_rt1_igw1" sourceRef="rt1" targetRef="igw1"/>
     <sequenceFlow id="flow_pgw1_ca1" sourceRef="pgw1" targetRef="ca1"/>
@@ -76,15 +80,27 @@ function generateDesignerJson(): string {
       { id: 'end', type: 'endEvent', position: { x: 1300, y: 300 }, data: { type: 'endEvent', label: 'End' } },
     ],
     edges: [
-      { id: 'flow_start_ut1', source: 'start', target: 'ut1', type: 'smoothstep' },
-      { id: 'flow_ut1_xgw1', source: 'ut1', target: 'xgw1', type: 'smoothstep' },
-      { id: 'flow_xgw1_st1', source: 'xgw1', target: 'st1', type: 'smoothstep', data: { label: 'Approved' } },
-      { id: 'flow_xgw1_rt1', source: 'xgw1', target: 'rt1', type: 'smoothstep', data: { label: 'Rejected' } },
-      { id: 'flow_st1_pgw1', source: 'st1', target: 'pgw1', type: 'smoothstep' },
-      { id: 'flow_rt1_igw1', source: 'rt1', target: 'igw1', type: 'smoothstep' },
-      { id: 'flow_pgw1_ca1', source: 'pgw1', target: 'ca1', type: 'smoothstep' },
-      { id: 'flow_igw1_end', source: 'igw1', target: 'end', type: 'smoothstep' },
-      { id: 'flow_ca1_end', source: 'ca1', target: 'end', type: 'smoothstep' },
+      { id: 'flow_start_ut1', source: 'start', target: 'ut1', type: 'smoothstep', data: {} },
+      { id: 'flow_ut1_xgw1', source: 'ut1', target: 'xgw1', type: 'smoothstep', data: {} },
+      {
+        id: 'flow_xgw1_st1',
+        source: 'xgw1',
+        target: 'st1',
+        type: 'smoothstep',
+        data: { label: 'Approved', condition: { type: 'expression', content: '${approved == true}' } },
+      },
+      {
+        id: 'flow_xgw1_rt1',
+        source: 'xgw1',
+        target: 'rt1',
+        type: 'smoothstep',
+        data: { label: 'Rejected', condition: { type: 'expression', content: '${approved == false}' } },
+      },
+      { id: 'flow_st1_pgw1', source: 'st1', target: 'pgw1', type: 'smoothstep', data: {} },
+      { id: 'flow_rt1_igw1', source: 'rt1', target: 'igw1', type: 'smoothstep', data: {} },
+      { id: 'flow_pgw1_ca1', source: 'pgw1', target: 'ca1', type: 'smoothstep', data: {} },
+      { id: 'flow_igw1_end', source: 'igw1', target: 'end', type: 'smoothstep', data: {} },
+      { id: 'flow_ca1_end', source: 'ca1', target: 'end', type: 'smoothstep', data: {} },
     ],
   });
 }
@@ -131,12 +147,6 @@ async function gotoDesigner(page: Page) {
   }
 }
 
-// Keep original name for compatibility
-async function waitForDesigner(page: Page) {
-  await page.locator('.react-flow').waitFor({ state: 'visible', timeout: 5_000 });
-  await page.locator('.react-flow__node').first().waitFor({ state: 'visible', timeout: 5_000 });
-}
-
 /** Click a node by its label text */
 async function selectNodeByLabel(page: Page, label: string | RegExp) {
   const node = page.locator('.react-flow__node').filter({ hasText: label }).first();
@@ -150,14 +160,6 @@ async function selectNodeById(page: Page, nodeId: string) {
   const node = page.locator(`.react-flow__node[data-id="${nodeId}"]`);
   await expect(node).toBeVisible({ timeout: 5_000 });
   await node.click();
-  await expect(page.locator('.w-80.border-l').first()).toBeVisible({ timeout: 5_000 });
-}
-
-/** Click an edge (sequence flow) */
-async function selectFirstEdge(page: Page) {
-  const edges = page.locator('.react-flow__edge');
-  await edges.first().waitFor({ state: 'visible', timeout: 5_000 });
-  await edges.first().click();
   await expect(page.locator('.w-80.border-l').first()).toBeVisible({ timeout: 5_000 });
 }
 
@@ -391,24 +393,6 @@ async function getNthSelectValue(page: Page, nth: number): Promise<string> {
     const selects = panel.querySelectorAll('select');
     return (selects[n] as HTMLSelectElement)?.value ?? '';
   }, nth);
-}
-
-/**
- * Check if the Nth checkbox in the property panel is checked.
- */
-async function isNthCheckboxChecked(page: Page, labelPattern: RegExp): Promise<boolean> {
-  return page.evaluate((pattern) => {
-    const panel = document.querySelector('.w-80.border-l');
-    if (!panel) return false;
-    const labels = panel.querySelectorAll('label');
-    for (const label of labels) {
-      if (new RegExp(pattern.source, pattern.flags).test(label.textContent || '')) {
-        const cb = label.querySelector('input[type="checkbox"]');
-        return (cb as HTMLInputElement)?.checked ?? false;
-      }
-    }
-    return false;
-  }, { source: labelPattern.source, flags: labelPattern.flags });
 }
 
 // ---------------------------------------------------------------------------
@@ -2316,7 +2300,6 @@ test.describe('BPMN Node Properties — Full Coverage', () => {
     await expect(enableMiCheckbox).toBeChecked({ timeout: 3_000 });
 
     // Click parallel radio button
-    const parallelRadio = propPanel.locator('input[type="radio"]').filter({ has: page.locator('..') }).first();
     const radios = propPanel.locator('input[type="radio"]');
     const radioCount = await radios.count();
     // Find and click the "parallel" radio (usually the 2nd one)
@@ -2520,7 +2503,6 @@ test.describe('BPMN Node Properties — Full Coverage', () => {
     let urlIdx = -1;
     for (let i = 0; i < inputCount; i++) {
       const placeholder = await textInputs.nth(i).getAttribute('placeholder');
-      const value = await textInputs.nth(i).inputValue();
       if (placeholder && /url|http/i.test(placeholder)) {
         urlIdx = i;
         break;
@@ -3049,9 +3031,6 @@ test.describe('BPMN Node Properties — Full Coverage', () => {
       const selectsAfter = await propPanel.locator('select').count();
       expect(selectsAfter, 'Select count should decrease after removing hook').toBeLessThan(selectsBefore);
     } else {
-      // Try finding a small icon button (X or trash icon) near the hook row
-      const iconBtns = propPanel.locator('button svg').locator('..');
-      const iconCount = await iconBtns.count();
       // Just verify hook was added successfully
       expect(selectsBefore, 'Hook was added with selects').toBeGreaterThanOrEqual(3);
     }
@@ -3513,10 +3492,7 @@ test.describe('BPMN Node Properties — Full Coverage', () => {
     const panelText = await propPanel.textContent();
     const hasVersionSection = radioCount > 0 || /latest|最新|fixed|固定|版本/i.test(panelText || '');
 
-    // At least one of saveStrategy or versionSection should exist in enterprise
-    if (hasSaveStrategy) {
-      expect(hasSaveStrategy, 'Enterprise FormBinding should have save strategy select').toBe(true);
-    }
+    expect(hasSaveStrategy || hasVersionSection, 'Enterprise FormBinding controls should exist').toBe(true);
   });
 
   // FB-02: FormBinding — save strategy select
@@ -3609,9 +3585,6 @@ test.describe('BPMN Node Properties — Full Coverage', () => {
         // Verify version number input appears
         const numberInputs = propPanel.locator('input[type="number"]');
         const numCount = await numberInputs.count();
-        const textInputs = propPanel.locator('input[type="text"]');
-        const txtCount = await textInputs.count();
-
         // Fill version number
         if (numCount > 0) {
           const lastNum = numberInputs.last();

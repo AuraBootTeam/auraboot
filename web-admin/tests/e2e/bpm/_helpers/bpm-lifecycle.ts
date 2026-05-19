@@ -258,6 +258,22 @@ export async function undeployProcess(
 }
 
 /**
+ * Delete a draft/non-deployed process definition without exercising the
+ * undeploy path. Use this for tests that never deployed the process; calling
+ * undeploy there creates an expected 500 and pollutes backend error logs.
+ */
+export async function deleteProcessDefinition(
+  request: APIRequestContext,
+  token: string,
+  pid: string,
+): Promise<{ ok: boolean; status: number }> {
+  const resp = await request.delete(`/api/bpm/process-definitions/${pid}`, {
+    headers: authHeaders(token),
+  });
+  return { ok: resp.ok(), status: resp.status() };
+}
+
+/**
  * Audit record classification (see ab_bpm_audit_record schema):
  *
  * - `operation` is a broad category, e.g. "process_start" (dedicated row at

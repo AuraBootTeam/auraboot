@@ -57,6 +57,12 @@ function generateMinimalBpmn(processKey: string): string {
 </definitions>`;
 }
 
+function isTerminalProcessStatus(status: unknown): boolean {
+  return /^(completed|terminated|aborted|cancelled|canceled|withdrawn)$/i.test(
+    String(status ?? ''),
+  );
+}
+
 /** Navigate to task center and wait for content + data to render */
 async function gotoTaskCenter(page: import('@playwright/test').Page) {
   await page.goto('/bpm/task-center', { waitUntil: 'domcontentloaded' });
@@ -941,6 +947,25 @@ test.describe('BPM Task Center', () => {
 
   test.afterAll(async ({ request }) => {
     if (!processPid) return;
+
+    try {
+      if (processInstanceId) {
+        const statusResp = await request.get(`/api/bpm/process-instances/${processInstanceId}/status`);
+        let shouldTerminate = true;
+        if (statusResp.ok()) {
+          const body = await statusResp.json().catch(() => null);
+          const status = body?.data?.status ?? body?.status;
+          shouldTerminate = !isTerminalProcessStatus(status);
+        }
+        if (shouldTerminate) {
+          await request.post(`/api/bpm/process-instances/${processInstanceId}/terminate`, {
+            data: { reason: 'E2E cleanup before undeploy' },
+          });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
 
     try {
       await request.post(`/api/bpm/process-definitions/${processPid}/undeploy`);

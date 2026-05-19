@@ -60,6 +60,9 @@ const PWD_TEST_PASSWORD = 'PwdTest2026!';
 
 async function loginViaUI(page: Page, email: string, password: string) {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
+    timeout: 5000,
+  });
   const emailInput = page.locator('input#email');
   await emailInput.waitFor({ state: 'visible', timeout: 5000 });
   const pwd = page.locator('input#password');
@@ -75,6 +78,13 @@ async function loginViaUI(page: Page, email: string, password: string) {
   await pwd.click();
   await pwd.fill('');
   await pwd.pressSequentially(password, { delay: 5 });
+  await expect(pwd).toHaveValue(password, { timeout: 3000 });
+
+  // The login page restores remembered credentials during hydration. Keep email
+  // as the last controlled-field write before submit so native required
+  // validation cannot block the form with a stale empty email value.
+  await emailInput.fill(email);
+  await expect(emailInput).toHaveValue(email, { timeout: 3000 });
   await expect(pwd).toHaveValue(password, { timeout: 3000 });
 
   await page

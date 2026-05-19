@@ -11,6 +11,8 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.service.CommandExecutor;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.EvaluationException;
@@ -94,6 +96,10 @@ public class BpmNodeHookService {
     private final DroolsEngineService droolsEngineService;
     private final CommandExecutor commandExecutor;
     private final RestTemplate restTemplate;
+    private final Cache<HookCacheKey, List<BpmNodeHook>> hooksByProcessCache = Caffeine.newBuilder()
+            .maximumSize(2_000)
+            .expireAfterWrite(Duration.ofMinutes(10))
+            .build();
     /**
      * SpEL parser configured without compiler optimisation and without auto-grow,
      * to keep script evaluation deterministic and bounded (GAP-257).
@@ -151,12 +157,42 @@ public class BpmNodeHookService {
 
     public List<BpmNodeHook> getHooks(String processKey, String nodeId, String hookType) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        return hookMapper.findHooks(tenantId, processKey, nodeId, normalizeHookType(hookType));
+        if (tenantId == null
+                || !StringUtils.hasText(processKey)
+                || !StringUtils.hasText(nodeId)
+                || !StringUtils.hasText(hookType)) {
+            return List.of();
+        }
+        String normalizedHookType = normalizeHookType(hookType);
+        return getCachedHooksByProcessKey(tenantId, processKey).stream()
+                .filter(hook -> nodeId.equals(hook.getNodeId()))
+                .filter(hook -> normalizedHookType.equals(hook.getHookType()))
+                .filter(hook -> Boolean.TRUE.equals(hook.getEnabled()))
+                .toList();
     }
 
     public List<BpmNodeHook> getHooksByProcessKey(String processKey) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return hookMapper.findByProcessKey(tenantId, processKey);
+    }
+
+    public void invalidateProcessHookCache(String processKey) {
+        invalidateHookCache(MetaContext.getCurrentTenantId(), processKey);
+    }
+
+    private List<BpmNodeHook> getCachedHooksByProcessKey(Long tenantId, String processKey) {
+        HookCacheKey cacheKey = new HookCacheKey(tenantId, processKey);
+        return hooksByProcessCache.get(cacheKey, ignored -> {
+            List<BpmNodeHook> hooks = hookMapper.findByProcessKey(tenantId, processKey);
+            return hooks == null ? List.of() : List.copyOf(hooks);
+        });
+    }
+
+    private void invalidateHookCache(Long tenantId, String processKey) {
+        if (tenantId == null || !StringUtils.hasText(processKey)) {
+            return;
+        }
+        hooksByProcessCache.invalidate(new HookCacheKey(tenantId, processKey));
     }
 
     /**
@@ -579,6 +615,7 @@ public class BpmNodeHookService {
         hook.setCreatedAt(Instant.now());
         hook.setUpdatedAt(Instant.now());
         hookMapper.insert(hook);
+        invalidateHookCache(hook.getTenantId(), hook.getProcessKey());
         return hook;
     }
 
@@ -598,6 +635,7 @@ public class BpmNodeHookService {
         }
         existing.setUpdatedAt(Instant.now());
         hookMapper.updateById(existing);
+        invalidateHookCache(existing.getTenantId(), existing.getProcessKey());
         return existing;
     }
 
@@ -606,8 +644,11 @@ public class BpmNodeHookService {
         BpmNodeHook hook = hookMapper.findByPid(pid);
         if (hook != null) {
             hookMapper.deleteById(hook.getId());
+            invalidateHookCache(hook.getTenantId(), hook.getProcessKey());
         }
     }
+
+    private record HookCacheKey(Long tenantId, String processKey) {}
 
     public record HookExecutionResult(boolean passed, String message) {}
 }
