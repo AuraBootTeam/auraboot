@@ -97,6 +97,40 @@ class SchemaManagementServiceMethodsTest {
         when(ddlDialect.formatDefaultValue(any(), any())).thenReturn("'default'");
     }
 
+    @Test
+    @DisplayName("createTableByModel - skips DDL for externally managed platform tables")
+    void testCreateTableByModel_ExternallyManagedTableSkipsDdl() {
+        testModel.setTableName("ab_page_schema");
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("ab_page_schema")).thenReturn(true);
+
+        SchemaOperationResult result = schemaManagementService.createTableByModel("test_model");
+
+        assertTrue(result.getSuccess());
+        assertEquals(SchemaOperationResult.SchemaOperationType.CREATE_TABLE, result.getOperationType());
+        assertEquals("Externally managed table; schema sync skipped", result.getMessage());
+        verify(dynamicDataMapper, never()).createTable(anyString());
+        verify(dynamicDataMapper, never()).alterTable(anyString());
+    }
+
+    @Test
+    @DisplayName("syncModelToTable - skips DDL for externally managed platform tables")
+    void testSyncModelToTable_ExternallyManagedTableSkipsDdl() {
+        testModel.setTableName("ab_page_schema");
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("ab_page_schema")).thenReturn(true);
+
+        SchemaOperationResult result = schemaManagementService.syncModelToTable("test_model", null);
+
+        assertTrue(result.getSuccess());
+        assertEquals(SchemaOperationResult.SchemaOperationType.SYNC_SCHEMA, result.getOperationType());
+        assertEquals("Externally managed table; schema sync skipped", result.getMessage());
+        verify(dynamicDataMapper, never()).createTable(anyString());
+        verify(dynamicDataMapper, never()).alterTable(anyString());
+    }
+
     // ==================== addFieldToModel 测试 ====================
 
     @Test

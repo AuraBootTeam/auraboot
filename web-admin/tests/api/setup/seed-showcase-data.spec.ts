@@ -33,6 +33,11 @@ function dateAt(monthOffset: number, dayOffset = 0): string {
   return d.toISOString().split('T')[0];
 }
 
+/** Convert a yyyy-MM-dd seed date into an ISO-8601 datetime accepted by DATETIME fields */
+function dateStringToDateTime(date: string): string {
+  return `${date}T09:00:00+08:00`;
+}
+
 /** Return full ISO-8601 datetime for DATETIME fields */
 function dateTimeAt(monthOffset: number, dayOffset = 0): string {
   const d = new Date(baseDate());
@@ -1518,7 +1523,7 @@ test.describe.serial('Showcase Seed Data', () => {
         crm_opp_name: opp.name,
         crm_opp_account_id: accountId,
         crm_opp_expected_amount: opp.amount,
-        crm_opp_expected_close_date: opp.closeDate,
+        crm_opp_expected_close_date: dateStringToDateTime(opp.closeDate),
         crm_opp_notes: opp.notes,
       });
 

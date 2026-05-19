@@ -75,6 +75,14 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         return LogSanitizer.safe(value);
     }
 
+    private static boolean isExternallyManagedTable(String tableName) {
+        if (tableName == null) {
+            return false;
+        }
+        String normalized = tableName.trim().toLowerCase();
+        return normalized.startsWith("ab_") || normalized.startsWith("se_");
+    }
+
     @Override
     @Transactional
     public SchemaOperationResult createTableByModel(String modelCode) {
@@ -87,6 +95,22 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             log.info("Creating table: model {} has {} fields", logSafe(modelCode), model.getFields() != null ? model.getFields().size() : 0);
             
             String tableName = model.getTableName();
+
+            if (isExternallyManagedTable(tableName)) {
+                if (!tableMetadataService.tableExists(tableName)) {
+                    throw new BusinessException("Externally managed table does not exist: " + tableName);
+                }
+                log.info("Skipping DDL for externally managed table {} mapped by model {}",
+                        logSafe(tableName), logSafe(modelCode));
+                return SchemaOperationResult.builder()
+                        .success(true)
+                        .operationType(SchemaOperationResult.SchemaOperationType.CREATE_TABLE)
+                        .modelCode(modelCode)
+                        .tableName(tableName)
+                        .message("Externally managed table; schema sync skipped")
+                        .operationTime(DateUtil.getCurrentLocalDateTimeUtc())
+                        .build();
+            }
             
             // 2. 检查表是否已存在
             if (tableMetadataService.tableExists(tableName)) {
@@ -347,6 +371,22 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // where the cache may still hold stale required/unique constraints.
             ModelDefinition model = metaModelService.getModelDefinitionFromDb(modelCode)
                     .orElseThrow(() -> new RuntimeException("Model not found: " + modelCode));
+
+            if (isExternallyManagedTable(model.getTableName())) {
+                if (!tableMetadataService.tableExists(model.getTableName())) {
+                    throw new BusinessException("Externally managed table does not exist: " + model.getTableName());
+                }
+                log.info("Skipping schema sync for externally managed table {} mapped by model {}",
+                        logSafe(model.getTableName()), logSafe(modelCode));
+                return SchemaOperationResult.builder()
+                        .success(true)
+                        .operationType(SchemaOperationResult.SchemaOperationType.SYNC_SCHEMA)
+                        .modelCode(modelCode)
+                        .tableName(model.getTableName())
+                        .message("Externally managed table; schema sync skipped")
+                        .operationTime(DateUtil.getCurrentLocalDateTimeUtc())
+                        .build();
+            }
 
             List<String> ddlStatements = buildSyncDdls(model, options);
             if (ddlStatements.isEmpty()) {
