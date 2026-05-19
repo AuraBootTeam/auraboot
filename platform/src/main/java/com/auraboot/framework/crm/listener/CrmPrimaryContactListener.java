@@ -27,10 +27,14 @@ public class CrmPrimaryContactListener {
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommandCompleted(CommandCompletedEvent event) {
+        if (event == null) {
+            return;
+        }
         if (!"crm_contact".equals(event.getModelCode())) {
             return;
         }
-        if (!SUPPORTED_OPERATIONS.contains(event.getOperationType())) {
+        String operationType = event.getOperationType();
+        if (operationType == null || !SUPPORTED_OPERATIONS.contains(operationType)) {
             return;
         }
 

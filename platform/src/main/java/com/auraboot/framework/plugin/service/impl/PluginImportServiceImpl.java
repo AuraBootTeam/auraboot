@@ -1275,15 +1275,33 @@ public class PluginImportServiceImpl implements PluginImportService {
     private String createOrUpdatePlugin(PluginManifestExtended manifest, Long tenantId) {
         PluginRecord existing = pluginRecordMapper.findByTenantAndPluginId(manifest.getPluginId());
 
-        // Fallback: also check by namespace (unique constraint is on tenant_id+namespace)
+        // Namespace is unique per tenant, but it must not alias a different plugin.
+        // Otherwise importing plugin B with plugin A's namespace silently rewrites A's
+        // plugin_id and breaks downstream dependency checks.
+        PluginRecord namespaceOwner = pluginRecordMapper.findByTenantAndNamespace(manifest.getNamespace());
+        if (namespaceOwner != null
+                && (existing == null || !Objects.equals(namespaceOwner.getPid(), existing.getPid()))
+                && !Objects.equals(namespaceOwner.getPluginId(), manifest.getPluginId())) {
+            throw new PluginException("Plugin namespace '" + manifest.getNamespace()
+                    + "' is already used by plugin " + namespaceOwner.getPluginId()
+                    + "; " + manifest.getPluginId() + " must use a unique namespace");
+        }
+
+        // Fallback: same plugin may be found by namespace when plugin_id is unchanged
+        // but lookup by plugin_id missed an older record.
         if (existing == null) {
-            existing = pluginRecordMapper.findByTenantAndNamespace(manifest.getNamespace());
+            existing = namespaceOwner;
         }
 
         // Check for soft-deleted record that may still occupy the unique constraint slot
         if (existing == null) {
             PluginRecord softDeleted = pluginRecordMapper.findByTenantAndNamespaceIncludeDeleted(manifest.getNamespace());
             if (softDeleted != null) {
+                if (!Objects.equals(softDeleted.getPluginId(), manifest.getPluginId())) {
+                    throw new PluginException("Plugin namespace '" + manifest.getNamespace()
+                            + "' is occupied by soft-deleted plugin " + softDeleted.getPluginId()
+                            + "; " + manifest.getPluginId() + " must use a unique namespace");
+                }
                 // Resurrect the soft-deleted record
                 pluginRecordMapper.resurrectPlugin(
                         softDeleted.getPid(),
@@ -1305,6 +1323,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (existing != null) {
             // Update existing
             existing.setPluginId(manifest.getPluginId());
+            existing.setNamespace(manifest.getNamespace());
             existing.setVersion(manifest.getVersion());
             existing.setDisplayName(manifest.getEffectiveDisplayName());
             existing.setDescription(manifest.getDescription());

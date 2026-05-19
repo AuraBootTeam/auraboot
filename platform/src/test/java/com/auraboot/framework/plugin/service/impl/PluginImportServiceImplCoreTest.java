@@ -140,6 +140,23 @@ class PluginImportServiceImplCoreTest {
         return m;
     }
 
+    private String invokeCreateOrUpdatePlugin(PluginManifestExtended manifest, Long tenantId) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "createOrUpdatePlugin", PluginManifestExtended.class, Long.class);
+            method.setAccessible(true);
+            return (String) method.invoke(service, manifest, tenantId);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private void invokeLoadResourcesFromZip(PluginManifestExtended manifest, Map<String, byte[]> files) {
         try {
@@ -486,6 +503,32 @@ class PluginImportServiceImplCoreTest {
         assertThat(analysis.isSatisfied()).isTrue();
         assertThat(analysis.getPluginDependencies()).isEmpty();
         assertThat(analysis.getMissingDependencies()).isEmpty();
+    }
+
+    // ---------- plugin record namespace ownership ----------
+
+    @Test
+    @DisplayName("createOrUpdatePlugin rejects namespace reuse by a different plugin")
+    void createOrUpdatePlugin_rejectsNamespaceCollision() {
+        PluginManifestExtended manifest = baseManifest();
+        manifest.setPluginId("com.auraboot.pcba-base");
+        manifest.setNamespace("pcba");
+
+        PluginRecord namespaceOwner = new PluginRecord();
+        namespaceOwner.setPid("owner-pid");
+        namespaceOwner.setPluginId("com.auraboot.pcba-industry");
+        namespaceOwner.setNamespace("pcba");
+
+        when(pluginRecordMapper.findByTenantAndPluginId("com.auraboot.pcba-base")).thenReturn(null);
+        when(pluginRecordMapper.findByTenantAndNamespace("pcba")).thenReturn(namespaceOwner);
+
+        assertThatThrownBy(() -> invokeCreateOrUpdatePlugin(manifest, 100L))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("namespace 'pcba'")
+                .hasMessageContaining("com.auraboot.pcba-industry");
+
+        verify(pluginRecordMapper, never()).updateById(any(PluginRecord.class));
+        verify(pluginRecordMapper, never()).insert(any(PluginRecord.class));
     }
 
     // ---------- rollback orchestration ----------
