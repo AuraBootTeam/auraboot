@@ -62,7 +62,7 @@ jobs:
 
       - name: Restore Playwright Docker image cache
         id: playwright-image-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ env.PLAYWRIGHT_IMAGE_CACHE_DIR }}
           key: ${{ runner.os }}-docker-playwright-v1.59.1-noble
@@ -80,7 +80,7 @@ jobs:
 
       - name: Save Playwright Docker image cache
         if: steps.playwright-image-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         continue-on-error: true
         with:
           path: ${{ env.PLAYWRIGHT_IMAGE_CACHE_DIR }}
