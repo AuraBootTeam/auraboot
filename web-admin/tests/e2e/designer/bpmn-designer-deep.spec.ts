@@ -15,18 +15,6 @@ import { uniqueId } from '../helpers';
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
 
-async function waitForDesignerLoad(page: Page) {
-  await page.waitForLoadState('networkidle').catch(() => {});
-  await page
-    .locator('.animate-spin')
-    .waitFor({ state: 'hidden', timeout: 10000 })
-    .catch(() => {});
-  await page
-    .locator('text=Loading page...')
-    .waitFor({ state: 'hidden', timeout: 10000 })
-    .catch(() => {});
-}
-
 function generateMinimalBpmn(pKey: string, pName: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -37,7 +25,9 @@ function generateMinimalBpmn(pKey: string, pName: string): string {
     <endEvent id="end"/>
     <sequenceFlow id="flow1" sourceRef="start" targetRef="userTask1"/>
     <sequenceFlow id="flow2" sourceRef="userTask1" targetRef="gw1"/>
-    <sequenceFlow id="flow3" sourceRef="gw1" targetRef="serviceTask1"/>
+    <sequenceFlow id="flow3" sourceRef="gw1" targetRef="serviceTask1">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">true</conditionExpression>
+    </sequenceFlow>
     <sequenceFlow id="flow4" sourceRef="serviceTask1" targetRef="end"/>
   </process>
 </definitions>`;
@@ -109,16 +99,19 @@ async function createAndOpenBpmn(page: Page): Promise<string> {
           },
         ],
         edges: [
-          { id: 'flow1', source: 'start', target: 'userTask1', type: 'smoothstep' },
-          { id: 'flow2', source: 'userTask1', target: 'gw1', type: 'smoothstep' },
+          { id: 'flow1', source: 'start', target: 'userTask1', type: 'smoothstep', data: {} },
+          { id: 'flow2', source: 'userTask1', target: 'gw1', type: 'smoothstep', data: {} },
           {
             id: 'flow3',
             source: 'gw1',
             target: 'serviceTask1',
             type: 'smoothstep',
-            data: { label: 'Approved' },
+            data: {
+              label: 'Approved',
+              condition: { type: 'expression', content: 'true' },
+            },
           },
-          { id: 'flow4', source: 'serviceTask1', target: 'end', type: 'smoothstep' },
+          { id: 'flow4', source: 'serviceTask1', target: 'end', type: 'smoothstep', data: {} },
         ],
       }),
     },

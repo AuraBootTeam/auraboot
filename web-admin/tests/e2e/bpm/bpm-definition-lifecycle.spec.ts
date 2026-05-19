@@ -162,8 +162,20 @@ function generateDesignerJson(): string {
       },
     ],
     edges: [
-      { id: 'flow1', source: 'start', target: 'userTask1', type: 'smoothstep' },
-      { id: 'flow2', source: 'userTask1', target: 'end', type: 'smoothstep' },
+      {
+        id: 'flow1',
+        source: 'start',
+        target: 'userTask1',
+        type: 'smoothstep',
+        data: { label: '' },
+      },
+      {
+        id: 'flow2',
+        source: 'userTask1',
+        target: 'end',
+        type: 'smoothstep',
+        data: { label: '' },
+      },
     ],
   });
 }

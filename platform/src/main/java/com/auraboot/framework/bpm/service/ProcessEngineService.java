@@ -451,6 +451,35 @@ public class ProcessEngineService {
         return list;
     }
 
+    public Map<String, ProcessInstance> getProcessInstancesByIds(Collection<String> processInstanceIds) {
+        if (processInstanceIds == null || processInstanceIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<String> ids = processInstanceIds.stream()
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        ProcessInstanceQueryParam param = new ProcessInstanceQueryParam();
+        param.setTenantId(MetaContext.getCurrentTenantIdAsString());
+        param.setProcessInstanceIdList(ids);
+        List<ProcessInstance> instances = smartEngine.getProcessQueryService().findList(param);
+        if (instances == null || instances.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return instances.stream()
+                .filter(instance -> StringUtils.hasText(instance.getInstanceId()))
+                .collect(Collectors.toMap(
+                        ProcessInstance::getInstanceId,
+                        instance -> instance,
+                        (left, right) -> right,
+                        LinkedHashMap::new
+                ));
+    }
+
     private String resolveProcessDefinitionVersion(String processDefinitionId, String tenantId) {
         RepositoryQueryService repositoryQueryService = smartEngine.getRepositoryQueryService();
         // SmartEngine does not associate tenantId with deployed process definitions,

@@ -11,7 +11,7 @@
  *   npx playwright test tests/api/setup/seed-showcase-workflow.spec.ts
  */
 
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe.serial('Showcase Seed — Workflow & Automation', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
@@ -36,8 +36,12 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
     <endEvent id="end" name="审批完成"/>
     <sequenceFlow id="f1" sourceRef="start" targetRef="manager_review"/>
     <sequenceFlow id="f2" sourceRef="manager_review" targetRef="amount_check"/>
-    <sequenceFlow id="f3" sourceRef="amount_check" targetRef="gm_review" name="金额>10万"/>
-    <sequenceFlow id="f4" sourceRef="amount_check" targetRef="send_notification" name="金额<=10万"/>
+    <sequenceFlow id="f3" sourceRef="amount_check" targetRef="gm_review" name="金额>10万">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${'$'}{amount &gt; 100000}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="f4" sourceRef="amount_check" targetRef="send_notification" name="金额<=10万">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${'$'}{amount &lt;= 100000}</conditionExpression>
+    </sequenceFlow>
     <sequenceFlow id="f5" sourceRef="gm_review" targetRef="send_notification"/>
     <sequenceFlow id="f6" sourceRef="send_notification" targetRef="end"/>
   </process>
@@ -91,24 +95,30 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
         },
       ],
       edges: [
-        { id: 'f1', source: 'start', target: 'manager_review', type: 'smoothstep' },
-        { id: 'f2', source: 'manager_review', target: 'amount_check', type: 'smoothstep' },
+        { id: 'f1', source: 'start', target: 'manager_review', type: 'smoothstep', data: {} },
+        { id: 'f2', source: 'manager_review', target: 'amount_check', type: 'smoothstep', data: {} },
         {
           id: 'f3',
           source: 'amount_check',
           target: 'gm_review',
           type: 'smoothstep',
-          data: { label: '金额>10万' },
+          data: {
+            label: '金额>10万',
+            condition: { type: 'expression', content: '${amount > 100000}' },
+          },
         },
         {
           id: 'f4',
           source: 'amount_check',
           target: 'send_notification',
           type: 'smoothstep',
-          data: { label: '金额<=10万' },
+          data: {
+            label: '金额<=10万',
+            condition: { type: 'expression', content: '${amount <= 100000}' },
+          },
         },
-        { id: 'f5', source: 'gm_review', target: 'send_notification', type: 'smoothstep' },
-        { id: 'f6', source: 'send_notification', target: 'end', type: 'smoothstep' },
+        { id: 'f5', source: 'gm_review', target: 'send_notification', type: 'smoothstep', data: {} },
+        { id: 'f6', source: 'send_notification', target: 'end', type: 'smoothstep', data: {} },
       ],
     });
 

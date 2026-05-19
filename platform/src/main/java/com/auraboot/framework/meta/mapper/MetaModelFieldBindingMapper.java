@@ -44,6 +44,50 @@ public interface MetaModelFieldBindingMapper extends BaseMapper<ModelFieldBindin
             "AND (is_system_binding IS NULL OR is_system_binding = false)")
     int countUserFieldsByModelId(@Param("modelId") Long modelId);
 
+    @Select("""
+        <script>
+        SELECT model_id AS "modelId", COUNT(*)::int AS "fieldCount"
+        FROM ab_meta_model_field_binding
+        WHERE deleted_flag = false
+          AND (is_system_binding IS NULL OR is_system_binding = false)
+          AND model_id IN
+          <foreach collection="modelIds" item="modelId" open="(" separator="," close=")">
+            #{modelId}
+          </foreach>
+        GROUP BY model_id
+        </script>
+        """)
+    List<ModelFieldCount> countUserFieldsByModelIds(@Param("modelIds") List<Long> modelIds);
+
+    class ModelFieldCount {
+        private Long modelId;
+        private Integer fieldCount;
+
+        public ModelFieldCount() {
+        }
+
+        public ModelFieldCount(Long modelId, Integer fieldCount) {
+            this.modelId = modelId;
+            this.fieldCount = fieldCount;
+        }
+
+        public Long getModelId() {
+            return modelId;
+        }
+
+        public void setModelId(Long modelId) {
+            this.modelId = modelId;
+        }
+
+        public Integer getFieldCount() {
+            return fieldCount;
+        }
+
+        public void setFieldCount(Integer fieldCount) {
+            this.fieldCount = fieldCount;
+        }
+    }
+
     @Select("SELECT COALESCE(MAX(field_order), -1) FROM ab_meta_model_field_binding WHERE model_id = #{modelId}")
     Integer getMaxFieldOrder(@Param("modelId") Long modelId);
 

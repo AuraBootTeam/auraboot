@@ -101,17 +101,20 @@ public class BpmIntegrationService {
         // Enrich todo tasks with business key from parent process instance.
         // SmartEngine TaskInstance does not carry bizUniqueId (businessKey); we look it
         // up from the ProcessInstance so the frontend task-center table can show it.
+        List<String> todoProcessInstanceIds = todoTasks.stream()
+                .map(TaskInstance::getProcessInstanceId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        Map<String, ProcessInstance> processInstancesById =
+                processEngineService.getProcessInstancesByIds(todoProcessInstanceIds);
+
         List<TaskSummaryDto> todoTaskDtos = todoTasks.stream().map(t -> {
             TaskSummaryDto dto = TaskSummaryDto.from(t);
             if (t.getProcessInstanceId() != null) {
-                try {
-                    ProcessInstance pi = processEngineService.getProcessInstance(t.getProcessInstanceId());
-                    if (pi != null && pi.getBizUniqueId() != null) {
-                        dto.setBusinessKey(pi.getBizUniqueId());
-                    }
-                } catch (Exception e) {
-                    log.debug("Could not fetch process instance {} for task {}: {}",
-                            t.getProcessInstanceId(), t.getInstanceId(), e.getMessage());
+                ProcessInstance pi = processInstancesById.get(t.getProcessInstanceId());
+                if (pi != null && pi.getBizUniqueId() != null) {
+                    dto.setBusinessKey(pi.getBizUniqueId());
                 }
             }
             return dto;

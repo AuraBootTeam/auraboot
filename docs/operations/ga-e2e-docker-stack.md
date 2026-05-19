@@ -26,13 +26,44 @@ All three are gated behind the `ga-e2e-stack` compose profile and a distinct `CO
 
 ## Running Playwright against the stack
 
+Default topology:
+
+- Host runs the Playwright test process only.
+- Docker runs the full system under test: Vite, BFF, backend, Postgres, and Redis.
+- Playwright reaches the app through the mapped frontend port, for example
+  `PLAYWRIGHT_BASE_URL=http://localhost:5174`.
+- `PW_SKIP_WEBSERVER=1` is mandatory so Playwright does not start a host Vite/BFF
+  process on top of the Docker stack.
+- Targeted OSS/BPM commands must pass the full URL/port contract. Setting only
+  `PLAYWRIGHT_BASE_URL` is not enough because API helpers resolve direct backend
+  calls from `BACKEND_URL` / `BE_PORT`, while SSR and BFF helpers depend on the
+  BFF port. `tests/helpers/environments.ts` fails fast when a non-default Docker
+  frontend port is used with an incomplete contract.
+
 ```bash
 cd web-admin
 PLAYWRIGHT_BASE_URL=http://localhost:5174 \
+BACKEND_URL=http://localhost:6444 \
+BE_PORT=6444 \
+BFF_PORT=3501 \
 PW_SKIP_WEBSERVER=1 \
 NO_PROXY=localhost \
   npx playwright test tests/e2e/showcase/... \
     --reporter=line --output=test-results/ga-a 2>&1 | tee /tmp/pw-ga-$(date +%Y%m%d-%H%M%S).log
+```
+
+For a per-worktree isolated stack with custom ports, keep the same shape:
+
+```bash
+PLAYWRIGHT_BASE_URL=http://localhost:5226 \
+BACKEND_URL=http://localhost:6496 \
+BE_PORT=6496 \
+BFF_PORT=3553 \
+PW_SKIP_WEBSERVER=1 \
+NO_PROXY=localhost,127.0.0.1 \
+  pnpm exec playwright test -c playwright.noweb.config.ts \
+    tests/e2e/bpm/task-center.spec.ts \
+    --project=chromium --no-deps --reporter=line
 ```
 
 For the pure Docker runner:
@@ -54,6 +85,42 @@ Preparation speed controls:
 `PW_SKIP_WEBSERVER=1` is required — the docker stack is the webServer; without this Playwright tries to start a host vite on top.
 
 `NO_PROXY=localhost` is required if you have a system HTTP proxy set (per `auraboot-enterprise/AGENTS.md`); the BFF inherits proxy env and 502s on outgoing fetches without it.
+
+Do not mix a host Vite/BFF with a Docker backend for E2E evidence. That shape is
+acceptable only as a short-lived single-page debugging aid in one worktree. It is
+not valid for targeted E2E, seed verification, or merge readiness because host
+Node, proxy env, `node_modules`, session state, and port mappings can differ from
+the isolated stack. In multi-worktree development, each worktree must use its own
+isolated ports, storage state, and artifact directories; the safer default is:
+
+```text
+host: Playwright runner only
+docker frontend: Vite + BFF
+docker backend: Spring Boot
+docker postgres/redis: data services
+```
+
+## Change propagation
+
+The default isolated frontend container bind-mounts the worktree and runs
+`pnpm dev:full`, so most `web-admin/app` UI changes are picked up by Vite HMR
+without rebuilding an image.
+
+Use this rule of thumb:
+
+| Change | Required action |
+|--------|-----------------|
+| React/TSX/CSS under `web-admin/app` | Usually hot reloads through Vite |
+| BFF code under `web-admin/app/server` | Restart the frontend container for a clean result |
+| `package.json`, lockfile, generated plugin routes, sync scripts, frontend env | Re-run dependency prep or restart the frontend container |
+| Java/backend code under `platform` | Rebuild the backend image and restart backend |
+| Plugin JSON/config resources | Re-import/bootstrap/seed into the target DB; restart backend if runtime handlers or startup-scanned resources changed |
+| PF4J/plugin handler JARs | Rebuild the JAR and restart backend |
+| Schema/bootstrap/reset changes | Use reset/init or a fresh stack |
+
+The optional pure Docker runner puts Playwright in Linux too. Use it for CI-like
+browser validation when needed, but it is not the local default because it adds
+browser runtime dependencies to the container path.
 
 ## Five traps this stack works around
 

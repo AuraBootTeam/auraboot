@@ -52,6 +52,9 @@ const nodeTypes: NodeTypes = {
   [BPMNNodeType.PARALLEL_GATEWAY]: ParallelGatewayNode,
   [BPMNNodeType.INCLUSIVE_GATEWAY]: InclusiveGatewayNode,
   [BPMNNodeType.CALL_ACTIVITY]: CallActivityNode,
+  [BPMNNodeType.RULE_TASK]: ServiceTaskNode,
+  [BPMNNodeType.NOTIFICATION_TASK]: ServiceTaskNode,
+  [BPMNNodeType.RECORD_UPDATE_TASK]: ServiceTaskNode,
 };
 
 const edgeTypes: EdgeTypes = {

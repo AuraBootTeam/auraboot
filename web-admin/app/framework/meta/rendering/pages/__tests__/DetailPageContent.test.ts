@@ -90,11 +90,15 @@ describe('collectDetailDictCodes', () => {
         {
           blocks: [
             {
+              id: 'detail-tabs',
               blockType: 'tabs',
               tabs: [
                 {
+                  key: 'main',
+                  label: 'Main',
                   blocks: [
                     {
+                      id: 'tree-node-section',
                       blockType: 'form-section',
                       fields: [{ field: 'sc_tree_node' }],
                     },
