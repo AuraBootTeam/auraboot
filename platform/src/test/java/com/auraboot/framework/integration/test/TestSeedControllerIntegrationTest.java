@@ -325,6 +325,32 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                     userPermissionService.hasPermission(userId, "sc.showcase.read"),
                     "mobile showcase E2E seed user must be able to read showcase_all_fields menu"
             );
+            Integer orgDepartmentModelCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM ab_meta_model
+                    WHERE tenant_id = ?
+                      AND code = 'org_department'
+                      AND deleted_flag = FALSE
+                    """, Integer.class, tenantId);
+            Assertions.assertTrue(
+                    orgDepartmentModelCount != null && orgDepartmentModelCount > 0,
+                    "mobile showcase E2E seed must import org_department because sc_department uses organizationselect"
+            );
+            Assertions.assertTrue(
+                    userPermissionService.hasPermission(userId, "model.org_department.read"),
+                    "mobile showcase E2E seed user must be able to open the department reference picker"
+            );
+            Integer orgDepartmentSeedCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM mt_org_department
+                    WHERE tenant_id = ?
+                      AND org_dept_code = 'DEPT-20260516-001'
+                      AND org_dept_name = '销售部'
+                    """, Integer.class, tenantId);
+            Assertions.assertTrue(
+                    orgDepartmentSeedCount != null && orgDepartmentSeedCount > 0,
+                    "mobile showcase E2E seed must include a department row for organizationselect picker"
+            );
             Integer showcasePageCount = jdbcTemplate.queryForObject("""
                     SELECT COUNT(DISTINCT page_key)
                     FROM ab_page_schema
@@ -370,19 +396,79 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
                     WHERE tenant_id = ?
                       AND sc_richtext_content LIKE '<%'
                     """, Integer.class, tenantId);
-            Assertions.assertTrue(
-                    showcaseRichTextCount != null && showcaseRichTextCount > 0,
-                    "mobile showcase E2E seed must include rich text to verify HTML-safe rendering"
-            );
-        } finally {
-            MetaContext.clear();
+                Assertions.assertTrue(
+                        showcaseRichTextCount != null && showcaseRichTextCount > 0,
+                        "mobile showcase E2E seed must include rich text to verify HTML-safe rendering"
+                );
+                String iotSeedName = jdbcTemplate.queryForObject("""
+                        SELECT sc_name
+                        FROM mt_showcase_all_fields
+                        WHERE tenant_id = ?
+                          AND pid = 'mobile_showcase_iot_gateway'
+                        """, String.class, tenantId);
+                Assertions.assertEquals(
+                        "物联网网关开发套件",
+                        iotSeedName,
+                        "mobile showcase IoT seed must match the localized golden record used by native UX tests"
+                );
+                String iotAttachment = jdbcTemplate.queryForObject("""
+                        SELECT sc_attachment::text
+                        FROM mt_showcase_all_fields
+                        WHERE tenant_id = ?
+                          AND pid = 'mobile_showcase_iot_gateway'
+                        """, String.class, tenantId);
+                Assertions.assertTrue(
+                        iotAttachment != null && iotAttachment.contains("IoT 网关快速入门指南.pdf"),
+                        "mobile showcase IoT seed must carry localized attachment names; attachment=" + iotAttachment
+                );
+            } finally {
+                MetaContext.clear();
+            }
         }
-    }
 
-    @Test
-    @Order(10)
-    @DisplayName("TS-10: POST /api/test/seed repairs dynamic table identity sequences for mobile E2E creates")
-    void seed_repairsDynamicTableIdentitySequenceForMobileE2eCreate() throws Exception {
+        @Test
+        @Order(10)
+        @DisplayName("TS-10: POST /api/test/seed repairs stale canonical mobile showcase rows")
+        void seed_repairsStaleCanonicalMobileShowcaseRows() throws Exception {
+            MvcResult result = mockMvc.perform(post("/api/test/seed")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+            long tenantId = body.get("tenantId").asLong();
+
+            jdbcTemplate.update("""
+                    UPDATE mt_showcase_all_fields
+                    SET sc_name = 'IoT Gateway Development Kit',
+                        sc_description = 'stale english fixture',
+                        sc_attachment = ?::jsonb
+                    WHERE tenant_id = ?
+                      AND pid = 'mobile_showcase_iot_gateway'
+                    """, """
+                    [{"url":"/files/iot-quickstart.pdf","name":"IoT Gateway Quickstart.pdf","size":1572864,"type":"application/pdf"}]
+                    """, tenantId);
+
+            mockMvc.perform(post("/api/test/seed")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
+
+            String repairedName = jdbcTemplate.queryForObject("""
+                    SELECT sc_name
+                    FROM mt_showcase_all_fields
+                    WHERE tenant_id = ?
+                      AND pid = 'mobile_showcase_iot_gateway'
+                    """, String.class, tenantId);
+            Assertions.assertEquals(
+                    "物联网网关开发套件",
+                    repairedName,
+                    "seed must refresh stale canonical mobile records instead of reusing old English fixtures"
+            );
+        }
+
+        @Test
+        @Order(11)
+        @DisplayName("TS-11: POST /api/test/seed repairs dynamic table identity sequences for mobile E2E creates")
+        void seed_repairsDynamicTableIdentitySequenceForMobileE2eCreate() throws Exception {
         MvcResult resetResult = mockMvc.perform(post("/api/test/reset")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
