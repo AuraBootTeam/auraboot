@@ -62,7 +62,8 @@ public class TestSeedController {
             "e2et_order_item",
             "e2et_order_log",
             "e2et_customer",
-            "e2et_payment"
+            "e2et_payment",
+            "org_department"
     );
     private static final List<String> KNOWN_E2E_RESET_MODELS = List.of(
             "e2et_record",
@@ -276,6 +277,12 @@ public class TestSeedController {
                 importTestPlugin("../plugins/project-management", "project-management", tenant.getId());
                 importFirstAvailableTestPlugin(
                         tenant.getId(),
+                        "org-management",
+                        "../plugins/org-management",
+                        "../../auraboot/plugins/org-management"
+                );
+                importFirstAvailableTestPlugin(
+                        tenant.getId(),
                         "showcase",
                         "../plugins/showcase",
                         "../../auraboot/plugins/showcase"
@@ -288,6 +295,7 @@ public class TestSeedController {
 
             ensureTestAdminCanUseImportedResources(tenant, user);
             ensureShowcasePagesImportedForMobileE2e(tenant);
+            ensureOrgDepartmentSeedDataForMobileE2e(tenant, user);
             ensureShowcaseAllFieldsSeedDataForMobileE2e(tenant, user);
         } finally {
             MetaContext.clear();
@@ -315,27 +323,75 @@ public class TestSeedController {
         }
     }
 
-    private void ensureShowcaseAllFieldsSeedDataForMobileE2e(Tenant tenant, User user) {
-        Integer existing = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
-                FROM mt_showcase_all_fields
-                WHERE tenant_id = ?
-                """, Integer.class, tenant.getId());
-        if (existing != null && existing > 0) {
-            log.info("Mobile showcase seed data already exists: tenantId={}, rows={}", tenant.getId(), existing);
-            return;
+    private void ensureOrgDepartmentSeedDataForMobileE2e(Tenant tenant, User user) {
+        Boolean tableExists = jdbcTemplate.queryForObject(
+                "SELECT to_regclass(?) IS NOT NULL",
+                Boolean.class,
+                "public.mt_org_department"
+        );
+        if (!Boolean.TRUE.equals(tableExists)) {
+            throw new IllegalStateException(
+                    "Mobile showcase seed requires org_department table for organizationselect; tenant="
+                            + tenant.getId());
         }
 
-        insertShowcaseAllFieldsRecord(
-                tenant,
-                user,
-                "mobile_showcase_iot_gateway",
-                "IoT Gateway Development Kit",
-                "SC-20260513-005",
-                "Linux board + 4G module + WiFi/BLE/GPS, preloaded with AuraBoot Agent.",
-                24,
-                "1280.00",
-                true,
+        jdbcTemplate.update("""
+                DELETE FROM mt_org_department
+                WHERE pid = 'mobile_showcase_department_sales'
+                   OR (
+                    tenant_id = ?
+                    AND org_dept_code = 'DEPT-20260516-001'
+                   )
+                """, tenant.getId());
+        jdbcTemplate.update("""
+                INSERT INTO mt_org_department (
+                    pid, created_by, updated_by, tenant_id, created_at, updated_at,
+                    org_dept_code, org_dept_name, org_dept_parent_id,
+                    org_dept_manager_id, org_dept_order, org_dept_status
+                )
+                VALUES (
+                    'mobile_showcase_department_sales', ?, ?, ?, NOW(), NOW(),
+                    'DEPT-20260516-001', '销售部', NULL,
+                    NULL, 10, 'active'
+                )
+                """,
+                user.getId(),
+                user.getId(),
+                tenant.getId());
+        log.info("Inserted mobile showcase organization seed rows: tenantId={}, rows=1", tenant.getId());
+    }
+
+    private void ensureShowcaseAllFieldsSeedDataForMobileE2e(Tenant tenant, User user) {
+            Integer existing = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM mt_showcase_all_fields
+                    WHERE tenant_id = ?
+                    """, Integer.class, tenant.getId());
+            if (existing != null && existing > 0) {
+                log.info("Refreshing canonical mobile showcase seed rows: tenantId={}, existingRows={}",
+                        tenant.getId(), existing);
+            }
+            jdbcTemplate.update("""
+                    DELETE FROM mt_showcase_all_fields
+                    WHERE tenant_id = ?
+                      AND pid IN (
+                        'mobile_showcase_iot_gateway',
+                        'mobile_showcase_flexible_pc',
+                        'mobile_showcase_sensor_module',
+                        'mobile_showcase_power_unit'
+                    )
+                    """, tenant.getId());
+
+            insertShowcaseAllFieldsRecord(
+                    tenant,
+                    user,
+                    "mobile_showcase_iot_gateway",
+                    "物联网网关开发套件",
+                    "SC-20260513-005",
+                    "含 Linux 主板 + 4G 模块 + WiFi + BLE + GPS，预装 AuraBoot Agent",
+                    24,
+                    "1280.00",
+                    true,
                 "2026-05-13",
                 "2026-09-30",
                 "2026-05-13T12:06:18+00:00",
@@ -345,30 +401,30 @@ public class TestSeedController {
                 "iot,gateway,edge",
                 82,
                 5,
-                "#2563EB",
-                "https://auraboot.io/showcase/iot-gateway",
-                "iot@auraboot.io",
-                "+1-555-0101",
-                "<h2>IoT Gateway v3.2</h2><p>One-stop <strong>IoT gateway</strong> solution with AuraBoot Agent.</p>",
-                """
-                [{"url":"/files/iot-quickstart.pdf","name":"IoT Gateway Quickstart.pdf","size":1572864,"type":"application/pdf"},{"url":"/files/firmware-v3.2.1.bin","name":"firmware-v3.2.1.bin","size":8388608,"type":"application/octet-stream"}]
-                """,
-                "OTA ready",
-                "125000.00",
-                "09:30",
-                "2026-05-13~2026-09-30",
-                "09:00-18:00",
-                "Industrial gateway kit for mobile record rendering validation.",
-                "Building A, 8F",
-                "advanced settings enabled"
-        );
-        insertShowcaseAllFieldsRecord(
-                tenant,
-                user,
-                "mobile_showcase_flexible_pc",
-                "Flexible PC Controller Board",
-                "SC-20260513-006",
-                "Controller board development and validation.",
+                    "#2563EB",
+                    "https://auraboot.io/showcase/iot-gateway",
+                    "iot@auraboot.io",
+                    "010-82568900",
+                    "<h2>物联网网关开发套件 v3.2</h2><p>一站式 <strong>IoT 网关解决方案</strong>，预装 <em>AuraBoot Agent</em>，开箱即用，支持多协议接入。</p><h3>硬件配置</h3><ul><li>处理器：<strong>ARM Cortex-A7</strong> 双核 1GHz</li><li>通信：<em>4G LTE / WiFi / BLE 5.0 / GPS</em></li></ul>",
+                    """
+                    [{"url":"/files/iot-quickstart.pdf","name":"IoT 网关快速入门指南.pdf","size":1572864,"type":"application/pdf"},{"url":"/files/firmware-v3.2.1.bin","name":"固件 v3.2.1.bin","size":8388608,"type":"application/octet-stream"}]
+                    """,
+                    "已发出 50 套样品，反馈良好，计划量产",
+                    "125000.00",
+                    "09:30",
+                    "2026-05-13~2026-09-30",
+                    "09:00-18:00",
+                    "移动端记录渲染验证的工业网关套件",
+                    "北京市海淀区中关村软件园 A 座 8 层",
+                    "已启用远程管理与 OTA 升级"
+            );
+            insertShowcaseAllFieldsRecord(
+                    tenant,
+                    user,
+                    "mobile_showcase_flexible_pc",
+                    "柔性PC控制板",
+                    "SC-20260513-006",
+                    "控制板开发与验证",
                 12,
                 "860.00",
                 true,
@@ -381,30 +437,30 @@ public class TestSeedController {
                 "pc,controller",
                 48,
                 4,
-                "#16A34A",
-                "https://auraboot.io/showcase/controller",
-                "controller@auraboot.io",
-                "+1-555-0102",
-                "<p>Flexible controller board with validation package.</p>",
-                """
-                [{"url":"/files/controller-spec.pdf","name":"Controller Spec.pdf","size":1048576,"type":"application/pdf"}]
-                """,
-                "Validation in progress",
-                "56000.00",
-                "10:00",
-                "2026-05-14~2026-07-15",
-                "10:00-17:00",
-                "Flexible controller board record for list card comparison.",
-                "Lab 2",
-                ""
-        );
-        insertShowcaseAllFieldsRecord(
-                tenant,
-                user,
-                "mobile_showcase_sensor_module",
-                "Industrial Sensor Module",
-                "SC-20260513-004",
-                "High precision industrial sensor module with multi-protocol support.",
+                    "#16A34A",
+                    "https://auraboot.io/showcase/controller",
+                    "controller@auraboot.io",
+                    "010-82568901",
+                    "<p>柔性 PC 控制板验证套件，覆盖控制逻辑与边缘接入。</p>",
+                    """
+                    [{"url":"/files/controller-spec.pdf","name":"控制板规格说明.pdf","size":1048576,"type":"application/pdf"}]
+                    """,
+                    "验证中",
+                    "56000.00",
+                    "10:00",
+                    "2026-05-14~2026-07-15",
+                    "10:00-17:00",
+                    "列表卡片对比用控制板记录",
+                    "二号实验室",
+                    ""
+            );
+            insertShowcaseAllFieldsRecord(
+                    tenant,
+                    user,
+                    "mobile_showcase_sensor_module",
+                    "工业级传感器模块",
+                    "SC-20260513-004",
+                    "高精度工业传感器，支持多协议",
                 36,
                 "420.00",
                 true,
@@ -417,30 +473,30 @@ public class TestSeedController {
                 "sensor,industrial",
                 64,
                 4,
-                "#7C3AED",
-                "https://auraboot.io/showcase/sensor",
-                "sensor@auraboot.io",
-                "+1-555-0103",
-                "<p>Sensor module pending review.</p>",
-                """
-                [{"url":"/files/sensor-guide.pdf","name":"Sensor Guide.pdf","size":734003,"type":"application/pdf"}]
-                """,
-                "Review required",
-                "78000.00",
-                "14:30",
-                "2026-05-12~2026-08-31",
-                "08:30-17:30",
-                "Sensor module summary for status and priority rendering.",
-                "Factory Zone C",
-                ""
-        );
-        insertShowcaseAllFieldsRecord(
-                tenant,
-                user,
-                "mobile_showcase_power_unit",
-                "Smart Power Management Unit",
-                "SC-20260513-007",
-                "Power management and energy optimization package.",
+                    "#7C3AED",
+                    "https://auraboot.io/showcase/sensor",
+                    "sensor@auraboot.io",
+                    "010-82568902",
+                    "<p>待审核的工业传感器模块，覆盖状态与优先级渲染。</p>",
+                    """
+                    [{"url":"/files/sensor-guide.pdf","name":"传感器接入指南.pdf","size":734003,"type":"application/pdf"}]
+                    """,
+                    "需要审核",
+                    "78000.00",
+                    "14:30",
+                    "2026-05-12~2026-08-31",
+                    "08:30-17:30",
+                    "状态与优先级渲染验证用传感器模块",
+                    "C 区工厂",
+                    ""
+            );
+            insertShowcaseAllFieldsRecord(
+                    tenant,
+                    user,
+                    "mobile_showcase_power_unit",
+                    "智能电源管理单元",
+                    "SC-20260513-007",
+                    "电源管理与能效优化方案",
                 18,
                 "620.00",
                 false,
@@ -453,21 +509,21 @@ public class TestSeedController {
                 "power,energy",
                 20,
                 3,
-                "#F59E0B",
-                "https://auraboot.io/showcase/power",
-                "power@auraboot.io",
-                "+1-555-0104",
-                "<p>Draft power unit package.</p>",
-                "[]",
-                "Draft record",
-                "43000.00",
-                "15:00",
-                "2026-05-15~2026-10-01",
-                "09:00-16:00",
-                "Power unit summary for inactive boolean rendering.",
-                "Warehouse 1",
-                ""
-        );
+                    "#F59E0B",
+                    "https://auraboot.io/showcase/power",
+                    "power@auraboot.io",
+                    "010-82568903",
+                    "<p>草稿状态的智能电源管理方案。</p>",
+                    "[]",
+                    "草稿记录",
+                    "43000.00",
+                    "15:00",
+                    "2026-05-15~2026-10-01",
+                    "09:00-16:00",
+                    "无效布尔状态渲染验证用电源单元",
+                    "一号仓库",
+                    ""
+            );
         log.info("Inserted mobile showcase seed rows: tenantId={}, rows=4", tenant.getId());
     }
 
