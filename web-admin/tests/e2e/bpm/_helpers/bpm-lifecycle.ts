@@ -60,10 +60,25 @@ export interface TodoTaskRecord {
  * Response shape: { data: { jwt: "..." } }
  */
 export async function loginAsAdmin(request: APIRequestContext): Promise<string> {
-  const resp = await request.post('/api/auth/login', {
-    data: { email: 'admin@auraboot.com', password: 'Test2026x' },
-    headers: { 'Content-Type': 'application/json' },
-  });
+  let resp;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      resp = await request.post('/api/auth/login', {
+        data: { email: 'admin@auraboot.com', password: 'Test2026x' },
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 20_000,
+      });
+      break;
+    } catch (err) {
+      lastError = err;
+      if (attempt === 3) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    }
+  }
+  if (!resp) {
+    throw new Error(`Admin login request failed: ${String(lastError)}`);
+  }
   if (!resp.ok()) {
     throw new Error(`Admin login failed: ${resp.status()} ${await resp.text()}`);
   }

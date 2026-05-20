@@ -99,6 +99,8 @@ async function submitFilters(page: Page) {
 async function clickColumnHeader(page: Page, columnLabel: string, expectedOrder: 'asc' | 'desc') {
   const header = page.locator('th').filter({ hasText: columnLabel }).first();
   await expect(header).toBeVisible({ timeout: 10_000 });
+  const sortTrigger = header.getByText(columnLabel, { exact: true }).first();
+  await expect(sortTrigger).toBeVisible({ timeout: 5_000 });
   const responsePromise = page.waitForResponse(
     (response) =>
       response.url().includes('/api/meta/models') &&
@@ -108,7 +110,7 @@ async function clickColumnHeader(page: Page, columnLabel: string, expectedOrder:
       response.status() === 200,
     { timeout: 10_000 },
   );
-  await header.click();
+  await sortTrigger.click();
   return responsePromise;
 }
 
