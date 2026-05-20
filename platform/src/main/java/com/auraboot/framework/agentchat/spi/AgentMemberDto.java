@@ -3,6 +3,8 @@ package com.auraboot.framework.agentchat.spi;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.Set;
+
 @Data
 @Builder
 public class AgentMemberDto {
@@ -16,4 +18,5 @@ public class AgentMemberDto {
     private String systemPrompt;
     private String soulProfile;     // JSON string
     private String tools;
+    private Set<String> profilePermissions;
 }

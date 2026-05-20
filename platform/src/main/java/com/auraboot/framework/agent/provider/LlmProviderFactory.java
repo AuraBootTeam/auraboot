@@ -95,8 +95,8 @@ public class LlmProviderFactory {
         // Default: chat_completions → OpenAI-compatible
         if (openAiCompatible != null) return openAiCompatible;
 
-        log.warn("No OpenAI-compatible provider bean available, falling back to anthropic for: {}", providerCode);
-        return providerMap.get("anthropic");
+        log.error("No OpenAI-compatible provider bean available for provider: {}", providerCode);
+        return null;
     }
 
     /**
@@ -190,7 +190,9 @@ public class LlmProviderFactory {
                 }
             }
         } catch (Exception e) {
-            log.debug("CloudConfig lookup failed for LLM/{}: {}", providerCode, e.getMessage());
+            String error = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            log.error("CloudConfig lookup failed for LLM/{}: {}", providerCode, error, e);
+            throw new IllegalStateException("CloudConfig lookup failed for LLM/" + providerCode + ": " + error, e);
         }
 
         // application.yml fallback (anthropic only). When the yml key is the
@@ -331,7 +333,9 @@ public class LlmProviderFactory {
                         .build());
             }
         } catch (Exception e) {
-            log.debug("Failed to list configured LLM providers: {}", e.getMessage());
+            String error = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            log.error("CloudConfig provider auto-discovery failed for LLM: {}", error, e);
+            throw new IllegalStateException("CloudConfig provider auto-discovery failed for LLM: " + error, e);
         }
 
         // Yml fallback for anthropic

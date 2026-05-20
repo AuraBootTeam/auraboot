@@ -21,6 +21,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.AopTestUtils;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -32,7 +34,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -115,6 +116,10 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
      * keyword classifier.
      */
     private TurnRequest buildTurnRequest(String message, TriageBucket bucket) {
+        return buildTurnRequest(message, bucket, null);
+    }
+
+    private TurnRequest buildTurnRequest(String message, TriageBucket bucket, Map<String, Object> options) {
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
         Long memberId = getTestTenantMember().getId();
@@ -132,7 +137,7 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
                 null,
                 message,
                 null,
-                null,
+                options,
                 InboundMode.NEW_FROM_REQUEST,
                 bucket,
                 null,                                 // inboundMessageId — D.1
@@ -153,6 +158,14 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
             body.run();
         } finally {
             MetaContext.clear();
+        }
+    }
+
+    private ConversationTurnServiceImpl targetTurnService() {
+        try {
+            return AopTestUtils.getTargetObject(turnService);
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to unwrap ConversationTurnService proxy", e);
         }
     }
 
@@ -248,7 +261,7 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ACP_RUN + PendingApproval(approvalPid=null) -> Failed (legacy throw site fallback)")
+    @DisplayName("ACP_RUN + PendingApproval(approvalPid=null) -> Failed (missing approval pid)")
     void acpRunPendingWithoutApprovalPid_mapsToFailed() {
         withTestIdentity(() -> {
             when(agentRunService.executeTaskSync(anyLong(), anyString(), eq("aurabot"), any()))
@@ -298,49 +311,73 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("C.3e: CONTEXTUAL_ANSWER -> ACP runtime; chatService NOT called")
-    void contextualAnswerBucket_dispatchesToAcp() {
-        // Phase C.3e (Q-C3.5=β step2): explanation-bucket turns reuse the
-        // ACP runtime so D1 grounding + skill routing + read-only tool
-        // discovery + result_contract rendering live in one place. After
-        // C.3e only LIGHT_CHAT (and the null-bucket defensive fallback)
-        // continues to flow through the legacy chat path.
+    @DisplayName("ACP_RUN with incomplete runtime wiring -> Failed; legacy chat fallback is not used")
+    void acpRunWithMissingRuntimeWiringFailsClosed() {
         withTestIdentity(() -> {
-            Long tenantId = getTestTenant().getId();
-            when(agentRunService.executeTaskSync(eq(tenantId), anyString(), eq("aurabot"), any()))
-                    .thenReturn(new RunOutcome.Success(
-                            "RUN_PID_CTX",
-                            "This page lists customer accounts grouped by region.",
-                            65, 22, 0.0021d));
+            ConversationTurnServiceImpl target = targetTurnService();
+            Object originalDurableWorkflowEngine = ReflectionTestUtils.getField(target, "durableWorkflowEngine");
+            ReflectionTestUtils.setField(target, "durableWorkflowEngine", null);
+            try {
+                when(chatService.executeAuraBotTurn(any(), any(), any()))
+                        .thenReturn(new TurnOutcome.Success("legacy fallback", Map.of()));
+
+                TurnOutcome outcome = turnService.runTurn(
+                        buildTurnRequest("create a lead", TriageBucket.ACP_RUN), sink);
+
+                assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+                assertThat(((TurnOutcome.Failed) outcome).errorMessage())
+                        .contains("ACP runtime wiring is incomplete");
+                verify(sink, atLeastOnce()).onError(contains("ACP runtime wiring is incomplete"), any());
+                verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
+                verify(agentRunService, never()).executeTaskSync(anyLong(), anyString(), anyString(), any());
+            } finally {
+                ReflectionTestUtils.setField(target, "durableWorkflowEngine", originalDurableWorkflowEngine);
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("precomputed CONTEXTUAL_ANSWER without durable hints -> chat runtime")
+    void contextualAnswerBucket_dispatchesToChat() {
+        withTestIdentity(() -> {
+            when(chatService.executeAuraBotTurn(any(), any(), any()))
+                    .thenReturn(new TurnOutcome.Success("contextual chat", Map.of()));
 
             TurnOutcome outcome = turnService.runTurn(
                     buildTurnRequest("what is this page showing", TriageBucket.CONTEXTUAL_ANSWER), sink);
 
             assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
             assertThat(((TurnOutcome.Success) outcome).finalResponse())
-                    .startsWith("This page lists customer accounts");
+                    .isEqualTo("contextual chat");
 
-            // ACP path engaged
+            verify(chatService, times(1)).executeAuraBotTurn(any(), any(), any());
+            verify(agentRunService, never()).executeTaskSync(anyLong(), anyString(), anyString(), any());
+        });
+    }
+
+    @Test
+    @DisplayName("durable policy metadata overrides LIGHT_CHAT and dispatches to ACP")
+    void durablePolicyMetadataDispatchesToAcpEvenWhenBucketIsLightChat() {
+        withTestIdentity(() -> {
+            Long tenantId = getTestTenant().getId();
+            when(agentRunService.executeTaskSync(eq(tenantId), anyString(), eq("aurabot"), any()))
+                    .thenReturn(new RunOutcome.Success(
+                            "RUN_PID_POLICY",
+                            "Queued durable customer update.",
+                            72, 18, 0.0019d));
+
+            TurnOutcome outcome = turnService.runTurn(
+                    buildTurnRequest("please update these customers", TriageBucket.LIGHT_CHAT, Map.of(
+                            "requiresApproval", true,
+                            "externalSideEffect", true,
+                            "batch", true)), sink);
+
+            assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+            assertThat(((TurnOutcome.Success) outcome).finalResponse())
+                    .isEqualTo("Queued durable customer update.");
             verify(agentRunService, times(1)).executeTaskSync(
                     eq(tenantId), anyString(), eq("aurabot"), any());
-            verify(sink, times(1)).onDone(
-                    eq("This page lists customer accounts grouped by region."), any());
-
-            // Legacy chat path NOT engaged
             verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
-
-            // ab_agent_task row written (assignee_type='ai', task carries the
-            // contextual question — not action-typed but still task-driven).
-            List<Map<String, Object>> tasks = jdbcTemplate.queryForList(
-                    "SELECT pid, assignee_type, assignee_id, title FROM ab_agent_task " +
-                            "WHERE tenant_id = ? AND deleted_flag = FALSE " +
-                            "ORDER BY created_at DESC LIMIT 1",
-                    tenantId);
-            assertThat(tasks).hasSize(1);
-            Map<String, Object> row = tasks.get(0);
-            assertThat(row.get("assignee_type")).isEqualTo("ai");
-            assertThat(row.get("assignee_id")).isEqualTo("aurabot");
-            assertThat((String) row.get("title")).startsWith("what is this page");
         });
     }
 }

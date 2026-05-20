@@ -9,12 +9,18 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.port.AgentTurnOverrides;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
+import com.auraboot.framework.agent.runtime.ChatMessageTapeStore;
+import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.runtime.DefaultAgentReducer;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
+import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
-import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,10 +31,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -71,7 +79,10 @@ class AgentChatPortImplExtraToolsTest {
     @Mock private AgentSkillService skillService;
     @Mock private LlmProvider provider;
     @Mock private ResponseSink sink;
-    @Mock private ChatSessionStore chatSessionStore;
+    @Mock private ChatMessageTapeStore chatMessageTapeStore;
+    @Mock private PendingToolStore pendingToolStore;
+    @Mock private ToolLoopService toolLoopService;
+    @Mock private UserPermissionService userPermissionService;
 
     private AgentChatPortImpl service;
 
@@ -84,7 +95,9 @@ class AgentChatPortImplExtraToolsTest {
     void setUp() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         service = new AgentChatPortImpl(dynamicDataMapper, providerFactory, toolProviderRegistry,
-                groundingService, skillService, mapper, chatSessionStore);
+                groundingService, skillService, mapper, chatMessageTapeStore, pendingToolStore,
+                toolLoopService, new AgentRuntimeStateFactory(), new DefaultAgentReducer(),
+                new ChatTurnRuntime(), new PendingToolSnapshotFactory(new AgentRuntimeStateFactory()));
 
         when(dynamicDataMapper.selectByQuery(any(), anyMap())).thenReturn(List.of(Map.of(
                 "agent_code", AGENT_CODE,
@@ -118,7 +131,7 @@ class AgentChatPortImplExtraToolsTest {
                         .type("text").text("done").build()))
                 .build());
 
-        when(chatSessionStore.loadConversationMessages(anyString())).thenReturn(List.of());
+        when(chatMessageTapeStore.loadConversationMessages(anyString())).thenReturn(List.of());
     }
 
     private TurnContext newCtx() {
@@ -182,6 +195,84 @@ class AgentChatPortImplExtraToolsTest {
         List<LlmChatRequest.Tool> tools = capturedToolsFromProviderCall();
         assertThat(tools).extracting(LlmChatRequest.Tool::getName)
                 .containsExactlyInAnyOrder("nq_demo_query", "transfer_to_agent");
+    }
+
+    @Test
+    @DisplayName("effectivePermissions filters caller-provided tools before model exposure")
+    void effectivePermissions_filtersExtraToolsBeforeModelExposure() throws Exception {
+        when(toolProviderRegistry.discoverAll(any())).thenReturn(List.of());
+        ToolDefinition customerTool = tool("nq_customer_stats", "customer stats");
+        customerTool.setRequiredPermissions(Set.of("crm.customer.read"));
+        ToolDefinition financeTool = tool("nq_finance_report", "finance report");
+        financeTool.setRequiredPermissions(Set.of("finance.invoice.read"));
+
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink,
+                AgentTurnOverrides.builder()
+                        .extraTools(List.of(customerTool, financeTool))
+                        .effectivePermissions(Set.of("crm.customer.read"))
+                        .build());
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        List<LlmChatRequest.Tool> tools = capturedToolsFromProviderCall();
+        assertThat(tools).extracting(LlmChatRequest.Tool::getName)
+                .containsExactly("nq_customer_stats");
+    }
+
+    @Test
+    @DisplayName("agent guardrails profilePermissions filter tools when no override boundary is supplied")
+    void agentProfilePermissions_filtersToolsWhenOverridesDoNotProvideBoundary() throws Exception {
+        when(dynamicDataMapper.selectByQuery(any(), anyMap())).thenReturn(List.of(Map.of(
+                "agent_code", AGENT_CODE,
+                "name", "Test Agent",
+                "status", "active",
+                "model", "test-model",
+                "system_prompt", "Helpful.",
+                "guardrails", "{\"provider\":\"openai\",\"profilePermissions\":[\"crm.customer.read\"]}")));
+        when(toolProviderRegistry.discoverAll(any())).thenReturn(List.of());
+        ToolDefinition customerTool = tool("nq_customer_stats", "customer stats");
+        customerTool.setRequiredPermissions(Set.of("crm.customer.read"));
+        ToolDefinition financeTool = tool("nq_finance_report", "finance report");
+        financeTool.setRequiredPermissions(Set.of("finance.invoice.read"));
+
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink,
+                AgentTurnOverrides.builder()
+                        .extraTools(List.of(customerTool, financeTool))
+                        .build());
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        List<LlmChatRequest.Tool> tools = capturedToolsFromProviderCall();
+        assertThat(tools).extracting(LlmChatRequest.Tool::getName)
+                .containsExactly("nq_customer_stats");
+    }
+
+    @Test
+    @DisplayName("agent profile permissions are intersected with current user permissions")
+    void agentProfilePermissions_intersectWithUserPermissions() throws Exception {
+        ReflectionTestUtils.setField(service, "userPermissionService", userPermissionService);
+        when(dynamicDataMapper.selectByQuery(any(), anyMap())).thenReturn(List.of(Map.of(
+                "agent_code", AGENT_CODE,
+                "name", "Test Agent",
+                "status", "active",
+                "model", "test-model",
+                "system_prompt", "Helpful.",
+                "guardrails", "{\"provider\":\"openai\",\"profilePermissions\":[\"crm.customer.read\",\"finance.invoice.read\"]}")));
+        when(userPermissionService.hasPermission(USER_ID, "crm.customer.read")).thenReturn(true);
+        when(userPermissionService.hasPermission(USER_ID, "finance.invoice.read")).thenReturn(false);
+        when(toolProviderRegistry.discoverAll(any())).thenReturn(List.of());
+        ToolDefinition customerTool = tool("nq_customer_stats", "customer stats");
+        customerTool.setRequiredPermissions(Set.of("crm.customer.read"));
+        ToolDefinition financeTool = tool("nq_finance_report", "finance report");
+        financeTool.setRequiredPermissions(Set.of("finance.invoice.read"));
+
+        TurnOutcome outcome = service.runAgentTurn(newCtx(), newRequest(), sink,
+                AgentTurnOverrides.builder()
+                        .extraTools(List.of(customerTool, financeTool))
+                        .build());
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        List<LlmChatRequest.Tool> tools = capturedToolsFromProviderCall();
+        assertThat(tools).extracting(LlmChatRequest.Tool::getName)
+                .containsExactly("nq_customer_stats");
     }
 
     @Test

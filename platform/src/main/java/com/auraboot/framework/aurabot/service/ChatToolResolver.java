@@ -133,8 +133,9 @@ public class ChatToolResolver {
             log.info("AuraBot D1: resolved {} tools via ToolDiscoveryPort", llmTools.size());
             return new ResolvedTools(llmTools, grounding.intent(), grounding.object(), grounding.readOnly());
         } catch (Exception e) {
-            log.error("AuraBot D1 grounding failed: {}", e.getMessage(), e);
-            return new ResolvedTools(List.of(), null, null, true);
+            String error = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            log.error("AuraBot tool resolution failed: {}", error, e);
+            throw new IllegalStateException("AuraBot tool resolution failed: " + error, e);
         }
     }
 

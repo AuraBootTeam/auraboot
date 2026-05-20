@@ -7,6 +7,8 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -26,15 +28,37 @@ public class AgentApprovalGateService {
     private final ObjectMapper objectMapper;
     private final AuraEventBus eventBus;
     private final AgentDispatchHandler dispatchHandler;
+    private final ApprovalNotificationOutbox approvalNotificationOutbox;
+
+    @Autowired
+    public AgentApprovalGateService(DynamicDataMapper dynamicDataMapper,
+                                     ObjectMapper objectMapper,
+                                     AuraEventBus eventBus,
+                                     @Lazy AgentDispatchHandler dispatchHandler,
+                                     ObjectProvider<ApprovalNotificationOutbox> approvalNotificationOutboxProvider) {
+        this(dynamicDataMapper, objectMapper, eventBus, dispatchHandler,
+                approvalNotificationOutboxProvider != null
+                        ? approvalNotificationOutboxProvider.getIfAvailable()
+                        : null);
+    }
 
     public AgentApprovalGateService(DynamicDataMapper dynamicDataMapper,
                                      ObjectMapper objectMapper,
                                      AuraEventBus eventBus,
                                      @Lazy AgentDispatchHandler dispatchHandler) {
+        this(dynamicDataMapper, objectMapper, eventBus, dispatchHandler, (ApprovalNotificationOutbox) null);
+    }
+
+    public AgentApprovalGateService(DynamicDataMapper dynamicDataMapper,
+                                     ObjectMapper objectMapper,
+                                     AuraEventBus eventBus,
+                                     @Lazy AgentDispatchHandler dispatchHandler,
+                                     ApprovalNotificationOutbox approvalNotificationOutbox) {
         this.dynamicDataMapper = dynamicDataMapper;
         this.objectMapper = objectMapper;
         this.eventBus = eventBus;
         this.dispatchHandler = dispatchHandler;
+        this.approvalNotificationOutbox = approvalNotificationOutbox;
     }
 
     /**
@@ -110,6 +134,7 @@ public class AgentApprovalGateService {
             approval.put("updated_at", now);
 
             dynamicDataMapper.insert("ab_agent_approval", approval);
+            enqueueApprovalNotifications(tenantId, approvalPid, matched, runId, taskId, toolCode, toolDescription);
             log.info("Approval requested: pid={}, tool={}, key={}, policy={}, plan_hash={}, expires_at=+{}h",
                     approvalPid, toolCode, idempotencyKey, matched.policyId(),
                     planHash.substring(0, 12), matched.timeoutHours());
@@ -121,7 +146,7 @@ public class AgentApprovalGateService {
     }
 
     /** Immutable holder for a matched policy — used for both timeout and policy_id linkage. */
-    private record PolicyMatch(String policyId, int timeoutHours, String autoAction) {}
+    private record PolicyMatch(String policyId, int timeoutHours, String autoAction, String approverRulesJson) {}
 
     /**
      * Find the first matching active approval policy for (tenant, toolCode, requestData).
@@ -134,7 +159,7 @@ public class AgentApprovalGateService {
      */
     private PolicyMatch findMatchingPolicy(Long tenantId, String toolCode,
                                             Map<String, Object> requestData) {
-        String sql = "SELECT pid, trigger_rules, timeout_hours, timeout_action " +
+        String sql = "SELECT pid, trigger_rules, approver_rules, timeout_hours, timeout_action " +
                 "FROM ab_approval_policy WHERE tenant_id = #{params.tenantId} " +
                 "AND policy_status = 'active' AND deleted_flag = FALSE";
         List<Map<String, Object>> policies = dynamicDataMapper.selectByQuery(sql, Map.of("tenantId", tenantId));
@@ -172,7 +197,8 @@ public class AgentApprovalGateService {
                     return new PolicyMatch(
                             (String) policy.get("pid"),
                             timeoutHours,
-                            autoAction);
+                            autoAction,
+                            (String) policy.get("approver_rules"));
                 }
             } catch (Exception e) {
                 log.warn("Failed to parse trigger rules while resolving policy: {}", e.getMessage());
@@ -180,6 +206,96 @@ public class AgentApprovalGateService {
         }
         return null;
     }
+
+    private void enqueueApprovalNotifications(Long tenantId,
+                                              String approvalPid,
+                                              PolicyMatch matched,
+                                              String runId,
+                                              String taskId,
+                                              String toolCode,
+                                              String toolDescription) {
+        if (approvalNotificationOutbox == null || matched == null) {
+            return;
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("approvalPid", approvalPid);
+        payload.put("policyId", matched.policyId());
+        payload.put("runId", runId);
+        payload.put("taskId", taskId);
+        payload.put("toolCode", toolCode);
+        payload.put("toolDescription", toolDescription);
+        for (ApprovalNotificationRecipient recipient : approvalNotificationRecipients(matched.approverRulesJson())) {
+            try {
+                approvalNotificationOutbox.enqueue(
+                        tenantId,
+                        approvalPid,
+                        recipient.kind(),
+                        recipient.id(),
+                        "inbox",
+                        payload);
+            } catch (RuntimeException e) {
+                log.warn("Failed to enqueue approval notification: approval={}, recipientKind={}, errorType={}",
+                        approvalPid, recipient.kind(), e.getClass().getSimpleName());
+            }
+        }
+    }
+
+    private List<ApprovalNotificationRecipient> approvalNotificationRecipients(String approverRulesJson) {
+        if (approverRulesJson == null || approverRulesJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<Map<String, Object>> rules = objectMapper.readValue(approverRulesJson, RULE_LIST_TYPE);
+            if (rules == null || rules.isEmpty()) {
+                return List.of();
+            }
+            List<ApprovalNotificationRecipient> recipients = new ArrayList<>();
+            for (Map<String, Object> rule : rules) {
+                ApprovalNotificationRecipient recipient = approvalNotificationRecipient(rule);
+                if (recipient != null) {
+                    recipients.add(recipient);
+                }
+            }
+            return List.copyOf(recipients);
+        } catch (Exception e) {
+            log.warn("Failed to parse approver rules for notification outbox: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private ApprovalNotificationRecipient approvalNotificationRecipient(Map<String, Object> rule) {
+        if (rule == null) {
+            return null;
+        }
+        String type = String.valueOf(rule.getOrDefault("type", "")).trim().toLowerCase(Locale.ROOT);
+        if ("user".equals(type)) {
+            String userId = firstNonBlank(rule.get("userId"), rule.get("user_id"), rule.get("id"));
+            return userId != null ? new ApprovalNotificationRecipient("user", userId) : null;
+        }
+        if ("role".equals(type)) {
+            String roleCode = firstNonBlank(rule.get("roleCode"), rule.get("role_code"), rule.get("code"));
+            return roleCode != null ? new ApprovalNotificationRecipient("role", roleCode) : null;
+        }
+        return null;
+    }
+
+    private String firstNonBlank(Object... values) {
+        if (values == null) {
+            return null;
+        }
+        for (Object value : values) {
+            if (value == null) {
+                continue;
+            }
+            String text = String.valueOf(value).trim();
+            if (!text.isBlank()) {
+                return text;
+            }
+        }
+        return null;
+    }
+
+    private record ApprovalNotificationRecipient(String kind, String id) {}
 
     /** SHA-256 hex digest of input string (UTF-8). Used for plan_hash. */
     private static String sha256Hex(String s) {
@@ -454,7 +570,12 @@ public class AgentApprovalGateService {
         update.put("approver_id", approverId);
         update.put("approved_at", now);
         update.put("updated_at", now);
-        dynamicDataMapper.update("ab_agent_approval", update, Map.of("pid", approvalPid));
+        int updated = dynamicDataMapper.update("ab_agent_approval", update,
+                Map.of("pid", approvalPid, "approval_status", "pending"));
+        if (updated == 0) {
+            log.warn("Approve race blocked: approval {} was no longer pending", approvalPid);
+            throw new IllegalStateException("Approval already processed: " + approvalPid);
+        }
         log.info("Approval approved: pid={}, approver={}, triggerAutoResume={}",
                 approvalPid, approverId, triggerAutoResume);
 

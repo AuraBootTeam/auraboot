@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.triage.TriageBucket;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 
 import java.time.Instant;
+import java.util.Set;
 
 /**
  * Materialized turn context. Built by {@link ConversationTurnService#runTurn} after
@@ -16,6 +17,12 @@ import java.time.Instant;
  *       Alpha/Beta/etc. agentCode). {@code AuraBotTurnPersistence} reads this
  *       to write the correct outbound {@code sender_id} (was hardcoded to the
  *       aurabot agent before, breaking named-agent group-chat outbound rows).</li>
+ *   <li>{@link #channel} — the request channel used by downstream execution-policy
+ *       and tool ACL gates. {@link #channelSessionId} is only the durable session
+ *       identity and should not be used as a channel substitute.</li>
+ *   <li>{@link #profileId} — the resolved {@code ab_agent_user_profile.pid}
+ *       when available. It is the profile dimension used by channel sessions,
+ *       triage and tool ACL gates.</li>
  *   <li>{@link #taskPid} — the {@code ab_agent_task.pid} that the chokepoint
  *       creates for this turn (named-agent + ACP_RUN paths). Surfaces on
  *       {@code TurnOutcome.Success.meta._taskPid} so callers can pass it as
@@ -30,14 +37,56 @@ public record TurnContext(
         Long humanMemberId,
         Long agentId,                        // resolved by AuraBotAgentResolver during Phase B
         String agentCode,                    // DC.3c Fix 2: drives outbound sender_id resolution
+        String channel,                      // request channel for downstream policy gates
+        String profileId,                    // ab_agent_user_profile.pid, null = tenant default
         String channelSessionId,             // resolved by ChannelSessionResolver during Phase B
         Long conversationId,
         Long inboundMessageId,               // null in Phase A (Persistence.NOOP)
         TriageBucket triageBucket,           // null in Phase A unless caller injected via TurnRequest.precomputedBucket
+        Set<String> allowedReadOnlyTools,     // populated for read-only CONTEXTUAL_ANSWER triage
         String traceId,
         String taskPid,                      // DC.3c Fix 3: ab_agent_task.pid for this turn (chokepoint creates)
         Instant beginAt
 ) {
+
+    public TurnContext(String turnId,
+                       long tenantId,
+                       long userId,
+                       Long humanMemberId,
+                       Long agentId,
+                       String agentCode,
+                       String channelSessionId,
+                       Long conversationId,
+                       Long inboundMessageId,
+                       TriageBucket triageBucket,
+                       Set<String> allowedReadOnlyTools,
+                       String traceId,
+                       String taskPid,
+                       Instant beginAt) {
+        this(turnId, tenantId, userId, humanMemberId, agentId, agentCode, null,
+                null, channelSessionId, conversationId, inboundMessageId, triageBucket,
+                allowedReadOnlyTools, traceId, taskPid, beginAt);
+    }
+
+    public TurnContext(String turnId,
+                       long tenantId,
+                       long userId,
+                       Long humanMemberId,
+                       Long agentId,
+                       String agentCode,
+                       String channel,
+                       String channelSessionId,
+                       Long conversationId,
+                       Long inboundMessageId,
+                       TriageBucket triageBucket,
+                       Set<String> allowedReadOnlyTools,
+                       String traceId,
+                       String taskPid,
+                       Instant beginAt) {
+        this(turnId, tenantId, userId, humanMemberId, agentId, agentCode, channel,
+                null, channelSessionId, conversationId, inboundMessageId, triageBucket,
+                allowedReadOnlyTools, traceId, taskPid, beginAt);
+    }
 
     /**
      * Phase A factory used by the legacy {@code AuraBotChatService.streamChat} async wrapper
@@ -53,10 +102,13 @@ public record TurnContext(
                 humanMemberId,
                 null,                            // agentId
                 null,                            // agentCode (DC.3c)
+                null,                            // channel
+                null,                            // profileId
                 null,                            // channelSessionId
                 null,                            // conversationId
                 null,                            // inboundMessageId
                 null,                            // triageBucket
+                Set.of(),                        // allowedReadOnlyTools
                 null,                            // traceId
                 null,                            // taskPid (DC.3c)
                 Instant.now());
@@ -70,7 +122,11 @@ public record TurnContext(
      */
     public TurnContext withTaskPid(String newTaskPid) {
         return new TurnContext(turnId, tenantId, userId, humanMemberId, agentId, agentCode,
-                channelSessionId, conversationId, inboundMessageId, triageBucket, traceId,
-                newTaskPid, beginAt);
+                channel, profileId, channelSessionId, conversationId, inboundMessageId, triageBucket,
+                allowedReadOnlyTools, traceId, newTaskPid, beginAt);
+    }
+
+    public TurnContext {
+        allowedReadOnlyTools = allowedReadOnlyTools == null ? Set.of() : Set.copyOf(allowedReadOnlyTools);
     }
 }

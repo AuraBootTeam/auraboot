@@ -84,6 +84,13 @@ auraboot:
     max-result-size: 10000
     timeout: 30000  # 30秒
 
+# Integration tests opt into the deterministic stub LLM explicitly. Production
+# application.yml leaves the key blank by default so missing credentials fail
+# closed instead of silently routing real traffic to stub.
+agent:
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:stub_key_for_no_llm_paths}
+
 # 安全配置
 security:
   jwt:

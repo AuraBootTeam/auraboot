@@ -45,7 +45,7 @@ class DefaultPreGroundingTriageTest {
     @DisplayName("Rule 3 break: platform keyword overrides streak")
     void rule3_platformKeywordBreaksStreak() {
         TriageVerdict v = triage.triage(new TriageRequest(
-                100L, 1L, "web", null, "查询本月销售", false, false, 6));
+                100L, 1L, "web", null, "更新本月销售记录", false, false, 6));
         assertThat(v.bucket()).isEqualTo(TriageBucket.ACP_RUN);
         assertThat(v.reasonCodes()).contains("rule:keyword_platform_verb");
     }
@@ -53,12 +53,28 @@ class DefaultPreGroundingTriageTest {
     @Test
     @DisplayName("Rule 4: CRUD verb in message → ACP_RUN")
     void rule4_crudVerbAcpRun() {
-        for (String msg : new String[] {"创建客户", "delete record", "更新订单", "查询统计"}) {
+        for (String msg : new String[] {"创建客户", "delete record", "更新订单", "导出客户"}) {
             TriageVerdict v = triage.triage(new TriageRequest(
                     100L, 1L, "web", null, msg, true, false, 0));
             assertThat(v.bucket())
                     .as("message: %s", msg)
                     .isEqualTo(TriageBucket.ACP_RUN);
+        }
+    }
+
+    @Test
+    @DisplayName("Rule 4: read-only platform questions stay in contextual answer with readonly tools")
+    void rule4_readOnlyPlatformQuestionUsesContextualAnswer() {
+        for (String msg : new String[] {"统计客户信息", "查询客户列表", "count customers", "list customers"}) {
+            TriageVerdict v = triage.triage(new TriageRequest(
+                    100L, 1L, "web", null, msg, false, false, 0));
+            assertThat(v.bucket())
+                    .as("message: %s", msg)
+                    .isEqualTo(TriageBucket.CONTEXTUAL_ANSWER);
+            assertThat(v.allowedReadOnlyTools())
+                    .as("message: %s", msg)
+                    .contains("schema.lookup", "record.view");
+            assertThat(v.reasonCodes()).contains("rule:keyword_readonly_platform");
         }
     }
 
