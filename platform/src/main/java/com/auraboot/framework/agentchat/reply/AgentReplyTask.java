@@ -350,6 +350,14 @@ public class AgentReplyTask {
                 Long targetAgentId = targetAgent.getAgentId();
                 Object handoffContext = success.meta().get("_handoff_context");
                 String childTrigger = handoffContext != null ? String.valueOf(handoffContext) : "";
+                AgentMemberDto sourceAgent = resolveAgentById(roster, agent.getId());
+                HandoffPermissionPolicy.Decision decision = HandoffPermissionPolicy.decide(
+                        sourceAgent, targetAgent, effectivePermissions);
+                if (!decision.allowed()) {
+                    log.warn("Handoff denied: sourceAgent={}, targetAgent={}, reason={}",
+                            agent.getAgentCode(), targetCode, decision.reasonCode());
+                    return;
+                }
                 publishHandoffFrame(humanMemberIds, conversationId, agent, targetAgent, childTrigger);
                 Object upstreamTaskPid = success.meta().get("_taskPid");
                 String parentTaskPidForChild = upstreamTaskPid != null ? String.valueOf(upstreamTaskPid) : null;
@@ -357,8 +365,7 @@ public class AgentReplyTask {
                 // available, otherwise fall back to the parent's triggeringSeq
                 // (no rows persisted between hops).
                 Long childTriggeringSeq = persistedSeq != null ? persistedSeq : triggeringSeq;
-                Set<String> childPermissions = HandoffPermissionPolicy.intersect(
-                        effectivePermissions, targetAgent.getProfilePermissions());
+                Set<String> childPermissions = decision.effectivePermissions();
                 executeReplyWithDepth(conversationId, tenantId, targetAgentId, childTrigger,
                         depth + 1, parentTaskPidForChild, childTriggeringSeq, childPermissions);
                 return;

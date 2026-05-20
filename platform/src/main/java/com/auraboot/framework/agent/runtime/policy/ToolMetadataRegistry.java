@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -11,6 +12,7 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 
+@Component
 public class ToolMetadataRegistry {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
