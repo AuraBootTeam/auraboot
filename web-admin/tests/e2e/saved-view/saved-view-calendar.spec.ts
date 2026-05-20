@@ -119,7 +119,7 @@ test.describe('SavedView — CALENDAR View', () => {
     await page.close();
   });
 
-  test.fixme('SV-020: CALENDAR — renders events by date field @smoke', async ({ page }) => {
+  test('SV-020: CALENDAR — renders events by date field @smoke', async ({ page }) => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     await gotoAndSelectCalendarView(page);
 

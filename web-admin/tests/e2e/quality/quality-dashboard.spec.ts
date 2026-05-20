@@ -10,7 +10,12 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, todayStr, executeCommandViaApi } from '../helpers/index';
+import {
+  uniqueId,
+  todayStr,
+  executeCommandViaApi,
+  expectCollectionViewVisible,
+} from '../helpers/index';
 
 test.describe('Quality Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -75,11 +80,11 @@ test.describe('Quality Dashboard @smoke', () => {
     await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
     await menuBtn.click();
 
-    const dashLink = page.locator('a[href="/quality/quality-dashboard"]');
+    const dashLink = page.locator('a[href="/dashboards/view/qc_quality_dashboard"]');
     await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await dashLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/quality\/quality-dashboard/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboards\/view\/qc_quality_dashboard/, { timeout: 10000 });
 
     await Promise.all([
       page
@@ -160,9 +165,7 @@ test.describe('Quality Dashboard @smoke', () => {
     const cardCount = await cards.count();
     expect(cardCount, 'Dashboard should render KPI cards').toBeGreaterThanOrEqual(1);
 
-    const tables = page.locator('table, [role="table"]');
-    const tableCount = await tables.count();
-    expect(tableCount, 'Dashboard should render data tables').toBeGreaterThanOrEqual(1);
+    await expectCollectionViewVisible(page);
   });
 
   test('QC-DASH-06: IQC inspection result NQ returns data', async ({ page }) => {

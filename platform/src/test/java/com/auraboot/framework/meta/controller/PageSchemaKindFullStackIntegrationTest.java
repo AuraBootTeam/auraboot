@@ -27,10 +27,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -46,9 +44,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@link MetaContext} and {@link SecurityContextHolder} (same pattern used in
  * {@code TeamScopeControllerIntegrationTest}).  The test role is granted the
  * {@code page.page.manage} permission so the interceptor passes, allowing
- * Bean Validation to fire and reject {@code kind=dashboard}.
+ * Bean Validation to allow V3 {@code kind=dashboard} pages.
  */
-@DisplayName("PageSchemaController kind validation - Full-stack IT (Plan 3a T7 replacement)")
+@DisplayName("PageSchemaController kind validation - Full-stack IT")
 class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
 
     private static final String PERMISSION_CODE = "page.page.manage";
@@ -119,8 +117,8 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
     // ── FS-VAL-01 ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("FS-VAL-01: POST /api/pages with kind=dashboard returns 400 through full pipeline")
-    void createPage_withKindDashboard_returns400() throws Exception {
+    @DisplayName("FS-VAL-01: POST /api/pages with kind=dashboard succeeds through full pipeline")
+    void createPage_withKindDashboard_succeeds() throws Exception {
         Map<String, Object> payload = Map.of(
                 "pageKey", "test_dashboard_" + System.currentTimeMillis(),
                 "name", "Test Dashboard",
@@ -133,8 +131,7 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.context.kind", containsString("Invalid kind")));
+                .andExpect(status().is2xxSuccessful());
     }
 
     // ── FS-VAL-02 ────────────────────────────────────────────────────────────

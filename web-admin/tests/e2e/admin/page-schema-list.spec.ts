@@ -10,7 +10,7 @@
  * - PS-001: Smoke — menu navigation shows table with data
  * - PS-002: Tab filtering — draft/published/archived tabs
  * - PS-003: Search — keyword search filters results
- * - PS-004: Row click navigates to page designer editor
+ * - PS-004: Row click navigates to Unified Designer Workbench
  * - PS-005: Create via form → redirects to editor
  * - PS-006: Publish state transition via row action
  * - PS-007: Delete via row action
@@ -215,7 +215,7 @@ test.describe.serial('Page Schema List (DSL)', () => {
     expect(rowText).toMatch(/列表|list/i);
   });
 
-  test('PS-004: Row click navigates to page designer editor', async ({ page }) => {
+  test('PS-004: Row click navigates to Unified Designer Workbench', async ({ page }) => {
     test.skip(!seedPid, 'page-manager plugin not imported');
     await navigateToDynamicPage(page, 'page_schema');
     await waitForDynamicPageLoad(page);
@@ -229,14 +229,19 @@ test.describe.serial('Page Schema List (DSL)', () => {
     await expect(page.getByTestId('command-palette')).toBeHidden({ timeout: 2000 }).catch(() => {});
     await row.click();
 
-    // Should navigate to /page-designer/{pid}
-    await page.waitForURL((url) => url.pathname.includes('/page-designer/'), {
+    // Should navigate to Unified Designer through the DSL table detail URL.
+    await page.waitForURL(
+      (url) => url.pathname === '/unified-designer' && url.searchParams.has('pageId'),
+      { timeout: 10000 },
+    );
+
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({
       timeout: 10000,
     });
-
-    // Verify the editor page loaded (not a 404 or error)
-    const pageContent = page.locator('main, [role="main"], .page-content, #root').first();
-    await expect(pageContent).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('designer-return-link')).toHaveAttribute(
+      'href',
+      '/p/page_schema',
+    );
   });
 
   test('PS-005: Create button opens form page with correct fields', async ({ page }) => {
@@ -262,7 +267,12 @@ test.describe.serial('Page Schema List (DSL)', () => {
     await expect(page.getByText('基本信息').or(page.getByText('Basic Information')).first()).toBeVisible({ timeout: 8000 });
 
     // D5: Verify form fields are present using stable field labels in the current DSL form.
-    await expect(page.getByText('名称').or(page.getByText('页面名称')).first()).toBeVisible({ timeout: 3000 });
+    await expect(
+      page
+        .getByLabel(/^(Name|名称|页面名称)\*?$/)
+        .or(page.getByText('名称').or(page.getByText('页面名称')).or(page.getByText('Name')).first())
+        .first(),
+    ).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('页面标识').or(page.getByText('Page Key')).first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('页面类型').or(page.getByText('Page Kind')).first()).toBeVisible({ timeout: 3000 });
 

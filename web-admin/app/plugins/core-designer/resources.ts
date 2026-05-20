@@ -2,6 +2,12 @@ import type { PluginResource } from '../_shared/types.js'
 
 export const RESOURCES: PluginResource[] = [
   {
+    key: 'designer.unified', path: '/unified-designer',
+    title: { en: 'Unified Designer', zh: '统一设计器' }, icon: 'blocks',
+    menu: { order: 5, group: 'designer' },
+    file: './plugins/core-designer/pages/unified-designer.tsx',
+  },
+  {
     key: 'designer.page', path: '/page-designer',
     title: { en: 'Page Designer', zh: '页面设计器' }, icon: 'layout-dashboard',
     menu: { order: 10, group: 'designer' },

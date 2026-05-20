@@ -84,6 +84,17 @@ test.describe('Global Search (Cmd+K) @smoke', () => {
     await page.goto('/dashboards', { waitUntil: 'load' });
     const trigger = page.locator('[data-testid="cmd-k-trigger"]');
     await expect(trigger).toBeVisible({ timeout: 10000 });
+    await expect(trigger).toBeEnabled({ timeout: 5000 });
+    await page.waitForFunction(
+      () => {
+        const btn = document.querySelector('[data-testid="cmd-k-trigger"]');
+        return (
+          !!btn &&
+          Object.keys(btn).some((k) => k.startsWith('__reactFiber') || k.startsWith('__reactProps'))
+        );
+      },
+      { timeout: 10000 },
+    );
 
     // Click somewhere on the page body first to ensure focus
     await page.locator('body').click({ position: { x: 400, y: 400 } });
@@ -91,12 +102,16 @@ test.describe('Global Search (Cmd+K) @smoke', () => {
     // Use keyboard shortcut (Meta on macOS, Control on others), then fall back
     // to the same robust open strategy used by the other command-palette tests.
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
-    await page.keyboard.press(`${modifier}+KeyK`).catch(() => null);
+    await page.keyboard.press(`${modifier}+k`).catch(() => null);
 
     const palette = page.locator('[data-testid="command-palette"]');
-    const openedViaShortcut = await palette.isVisible({ timeout: 2000 }).catch(() => false);
+    let openedViaShortcut = await palette.isVisible({ timeout: 3000 }).catch(() => false);
+    if (!openedViaShortcut && modifier !== 'Control') {
+      await page.keyboard.press('Control+k').catch(() => null);
+      openedViaShortcut = await palette.isVisible({ timeout: 3000 }).catch(() => false);
+    }
     if (!openedViaShortcut) {
-      await trigger.click();
+      await trigger.evaluate((el: HTMLElement) => el.click());
     }
     await expect(palette).toBeVisible({ timeout: 5000 });
 

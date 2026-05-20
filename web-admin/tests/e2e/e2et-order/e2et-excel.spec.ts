@@ -157,10 +157,12 @@ test.describe('E2E Test Order — Excel Import/Export', () => {
    * EX-004: Export order list as XLSX
    */
   test('EX-004: should export order list as XLSX @critical', async ({ page }) => {
-    const resp = await page.request.get('/api/meta/excel/export/e2et_order');
+    const resp = await page.request.post('/api/dynamic/e2et_order/export', {
+      data: { format: 'xlsx', filters: {}, columns: [] },
+    });
 
     if (resp.status() === 404 || resp.status() === 405) {
-      throw new Error(String('Excel export API not available'));
+      throw new Error(String('Dynamic Excel export API not available for e2et_order'));
       return;
     }
 

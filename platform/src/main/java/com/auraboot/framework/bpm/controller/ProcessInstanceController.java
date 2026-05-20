@@ -172,10 +172,11 @@ public class ProcessInstanceController {
     @Operation(summary = "终止流程实例", description = "强制终止流程实例")
     public ApiResponse<Void> terminateProcessInstance(
             @PathVariable String processInstanceId,
-            @RequestBody TerminateProcessRequest request,@CurrentUserId Long userId ) {
+            @RequestBody TerminateProcessRequest request,
+            @CurrentUserId Long userId) {
         log.info("Terminating process instance: {}, reason: {}", processInstanceId, request.getReason());
         
-        processEngineService.terminateProcessInstance(processInstanceId, request.getReason(),userId+"");
+        processEngineService.terminateProcessInstance(processInstanceId, userId + "", request.getReason());
         
         return ApiResponse.success();
     }

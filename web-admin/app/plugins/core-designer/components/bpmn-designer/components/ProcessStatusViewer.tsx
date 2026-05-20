@@ -45,6 +45,9 @@ const nodeTypes: NodeTypes = {
   [BPMNNodeType.PARALLEL_GATEWAY]: ParallelGatewayNode,
   [BPMNNodeType.INCLUSIVE_GATEWAY]: InclusiveGatewayNode,
   [BPMNNodeType.CALL_ACTIVITY]: CallActivityNode,
+  [BPMNNodeType.RULE_TASK]: ServiceTaskNode,
+  [BPMNNodeType.NOTIFICATION_TASK]: ServiceTaskNode,
+  [BPMNNodeType.RECORD_UPDATE_TASK]: ServiceTaskNode,
 };
 
 interface ProcessStatusViewerProps {
@@ -158,7 +161,7 @@ export function ProcessStatusViewer({
         instanceStatus: null,
       });
     };
-  }, [processInstanceId, processKey, businessKey]);
+  }, [processInstanceId, processKey, businessKey, store]);
 
   const handleNodeClick = useCallback<NodeMouseHandler<BPMNNode>>(
     (_event, node) => {

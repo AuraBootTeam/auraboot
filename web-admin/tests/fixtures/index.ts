@@ -16,7 +16,7 @@
  */
 
 import { test as base, expect } from '@playwright/test';
-import type { Page, APIRequestContext } from '@playwright/test';
+import type { Page, APIRequestContext, Locator } from '@playwright/test';
 import { ApiClient } from '../model-system/helpers/api-client';
 
 /**
@@ -65,4 +65,4 @@ export { expect };
 /**
  * Re-export types that tests commonly need
  */
-export type { Page, APIRequestContext };
+export type { Page, APIRequestContext, Locator };

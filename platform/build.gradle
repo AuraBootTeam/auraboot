@@ -189,6 +189,7 @@ compileJava {
 
 compileTestJava {
     options.encoding = 'UTF-8'
+    options.annotationProcessorPath = configurations.testAnnotationProcessor
 }
 
 // 版本管理
@@ -771,6 +772,10 @@ configurations {
     integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
     integrationTestCompileOnly.extendsFrom testCompileOnly
     integrationTestAnnotationProcessor.extendsFrom testAnnotationProcessor
+}
+
+tasks.named('compileIntegrationTestJava').configure {
+    options.annotationProcessorPath = configurations.integrationTestAnnotationProcessor
 }
 
 tasks.register('integrationTest', Test) {

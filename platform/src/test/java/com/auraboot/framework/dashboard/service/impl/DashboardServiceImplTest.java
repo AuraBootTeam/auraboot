@@ -355,6 +355,28 @@ class DashboardServiceImplTest {
     }
 
     @Test
+    @DisplayName("publish accepts localized title objects on imported dashboard widgets")
+    void publishAcceptsLocalizedWidgetTitles() throws Exception {
+        Dashboard d = fixture("p1", "personal", "u-1");
+        d.setWidgets(objectMapper.readTree("""
+                [
+                  {
+                    "id": "w1",
+                    "title": { "zh-CN": "关键指标", "en": "Key Metrics" },
+                    "config": {
+                      "title": { "zh-CN": "关键指标", "en": "Key Metrics" }
+                    }
+                  }
+                ]
+                """));
+        when(dashboardMapper.findByPid("p1")).thenReturn(d);
+
+        service.publish("p1");
+
+        assertEquals(StatusConstants.PUBLISHED, d.getStatus());
+    }
+
+    @Test
     @DisplayName("unpublish sets status to draft and records version")
     void unpublishHappy() {
         Dashboard d = fixture("p1", "personal", "u-1");

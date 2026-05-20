@@ -47,6 +47,18 @@ public interface UserPermissionService {
      * @return Set of permission IDs
      */
     Set<Long> getUserPermissionIds(Long userId);
+
+    /**
+     * Get user's permission codes through the service layer.
+     *
+     * <p>Controllers and other entry points must not resolve permission IDs
+     * through mapper access directly. This method keeps the permission lookup
+     * path behind the service boundary while reusing the cached ID resolution.
+     *
+     * @param userId User ID
+     * @return Set of permission codes
+     */
+    Set<String> getUserPermissionCodes(Long userId);
     
     /**
      * Evict user's permission cache

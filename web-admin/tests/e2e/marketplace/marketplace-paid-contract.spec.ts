@@ -10,7 +10,9 @@ import type { APIRequestContext } from '@playwright/test';
 
 type JsonRecord = Record<string, unknown>;
 
-const ENTERPRISE_PLUGIN_ROOT = '/Users/ghj/work/auraboot/auraboot-enterprise/plugins';
+const ENTERPRISE_PLUGIN_ROOT = process.env.AURA_ENTERPRISE_PROJECT_ROOT
+  ? `${process.env.AURA_ENTERPRISE_PROJECT_ROOT}/plugins`
+  : (process.env.ENTERPRISE_PLUGIN_ROOT ?? '/Users/ghj/work/auraboot/auraboot-enterprise/plugins');
 const MARKETPLACE_PLUGIN_DIR = `${ENTERPRISE_PLUGIN_ROOT}/marketplace-server`;
 
 function isRecord(value: unknown): value is JsonRecord {

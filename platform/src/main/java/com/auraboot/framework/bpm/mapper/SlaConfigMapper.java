@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -38,6 +39,14 @@ public interface SlaConfigMapper extends BaseMapper<SlaConfigEntity> {
         return selectList(new QueryWrapper<SlaConfigEntity>()
                 .eq("tenant_id", tenantId)
                 .eq("target_type", targetType)
+                .eq("target_key", targetKey)
+                .eq("enabled", true));
+    }
+
+    default List<SlaConfigEntity> findByTargetTypes(Long tenantId, Collection<String> targetTypes, String targetKey) {
+        return selectList(new QueryWrapper<SlaConfigEntity>()
+                .eq("tenant_id", tenantId)
+                .in("target_type", targetTypes)
                 .eq("target_key", targetKey)
                 .eq("enabled", true));
     }

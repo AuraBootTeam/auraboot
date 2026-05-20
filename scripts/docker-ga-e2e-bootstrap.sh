@@ -12,6 +12,7 @@
 # Usage:
 #   ./scripts/docker-ga-e2e-bootstrap.sh                    # e2e plugin profile
 #   PLUGIN_IMPORT_PROFILE=demo ./scripts/docker-ga-e2e-bootstrap.sh
+#   PLUGIN_IMPORT_PROFILE=enterprise-demo PLUGIN_IMPORT_EDITION=enterprise ./scripts/docker-ga-e2e-bootstrap.sh
 #   PLUGINS="showcase workflow-demo" ./scripts/docker-ga-e2e-bootstrap.sh
 
 set -euo pipefail
@@ -28,9 +29,12 @@ API_BASE="http://localhost:6444"
 ADMIN_EMAIL="admin@auraboot.com"
 ADMIN_PASSWORD="Test2026x"
 PLUGIN_IMPORT_PROFILE="${PLUGIN_IMPORT_PROFILE:-e2e}"
+PLUGIN_IMPORT_EDITION="${PLUGIN_IMPORT_EDITION:-oss}"
+ENTERPRISE_PLUGIN_ROOT="${ENTERPRISE_PLUGIN_ROOT:-/app/plugins-enterprise}"
 
 echo "[ga-e2e-bootstrap] target stack: $API_BASE"
 echo "[ga-e2e-bootstrap] plugin profile: $PLUGIN_IMPORT_PROFILE"
+echo "[ga-e2e-bootstrap] plugin edition: $PLUGIN_IMPORT_EDITION"
 
 aura_bootstrap_setup_if_needed \
   "$API_BASE" \
@@ -41,13 +45,16 @@ aura_bootstrap_setup_if_needed \
   "single" \
   "[ga-e2e-bootstrap]"
 
-echo "[ga-e2e-bootstrap] importing OSS plugins via scripts/import-plugins.sh..."
+echo "[ga-e2e-bootstrap] importing plugins via scripts/import-plugins.sh..."
 plugin_import_args=(
   --profile="$PLUGIN_IMPORT_PROFILE"
-  --edition=oss
+  --edition="$PLUGIN_IMPORT_EDITION"
   --backend-url="$API_BASE"
   --plugin-root=/app/plugins
 )
+if [ "$PLUGIN_IMPORT_EDITION" != "oss" ]; then
+  plugin_import_args+=(--enterprise-plugin-root="$ENTERPRISE_PLUGIN_ROOT")
+fi
 if [ -n "${PLUGINS:-}" ]; then
   # shellcheck disable=SC2206
   explicit_plugins=( ${PLUGINS} )
