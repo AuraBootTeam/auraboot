@@ -111,28 +111,28 @@
     "code": "process_keys",
     "displayName:zh-CN": "流程键",
     "displayName:en": "Process Keys",
-    "dataType": "text",
+    "dataType": "jsonb",
     "extension": { "multiline": true, "placeholder:zh-CN": "JSON 数组格式", "placeholder:en": "JSON array format" }
   },
   {
     "code": "list_fields",
     "displayName:zh-CN": "列表字段",
     "displayName:en": "List Fields",
-    "dataType": "text",
+    "dataType": "jsonb",
     "extension": { "multiline": true }
   },
   {
     "code": "filter_fields",
     "displayName:zh-CN": "筛选字段",
     "displayName:en": "Filter Fields",
-    "dataType": "text",
+    "dataType": "jsonb",
     "extension": { "multiline": true }
   },
   {
     "code": "sort_fields",
     "displayName:zh-CN": "排序字段",
     "displayName:en": "Sort Fields",
-    "dataType": "text",
+    "dataType": "jsonb",
     "extension": { "multiline": true }
   },
 
@@ -432,7 +432,7 @@
     "code": "params",
     "displayName:zh-CN": "参数",
     "displayName:en": "Parameters",
-    "dataType": "text",
+    "dataType": "jsonb",
     "extension": { "multiline": true, "placeholder:zh-CN": "JSON 格式参数", "placeholder:en": "JSON format parameters" }
   },
   {

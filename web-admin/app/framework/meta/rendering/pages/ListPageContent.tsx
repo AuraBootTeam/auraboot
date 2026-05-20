@@ -266,9 +266,15 @@ export function ListPageContent(props: PageContentProps) {
   }, []);
 
   // P2-1 fix: helper functions for updating filters and pagination
-  const setFilters = useCallback((filters: Record<string, any>) => {
-    setPageState((prev) => ({ ...prev, filters }));
-  }, []);
+  const setFilters = useCallback(
+    (filters: Record<string, any> | ((prev: Record<string, any>) => Record<string, any>)) => {
+      setPageState((prev) => ({
+        ...prev,
+        filters: typeof filters === 'function' ? filters(prev.filters) : filters,
+      }));
+    },
+    [],
+  );
 
   const setPagination = useCallback((pagination: any) => {
     setPageState((prev) => ({
