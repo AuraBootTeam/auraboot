@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
  *   <li>Channel explicit override (webhook / BPM → ACP_RUN)
  *   <li>Profile default policy (currently only "support_chat" → LIGHT_CHAT)
  *   <li>History hotness (≥5 recent light turns → continue LIGHT_CHAT unless platform keyword)
- *   <li>Keyword match (CRUD verbs → ACP_RUN; explanation verbs → CONTEXTUAL_ANSWER / LIGHT_CHAT)
+ *   <li>Keyword match (durable verbs → ACP_RUN; simple action verbs stay in chat for tool policy)
  *   <li>Default fallback (has any context → CONTEXTUAL_ANSWER else LIGHT_CHAT)
  * </ol>
  *
@@ -29,10 +29,16 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
     private static final Set<String> LIGHT_PROFILES = Set.of("support_chat");
     private static final int HISTORY_LIGHT_THRESHOLD = 5;
 
-    /** CJK + English platform action verbs that imply mutation, approval, export, or durable work. */
-    private static final Pattern PLATFORM_MUTATION_PATTERN = Pattern.compile(
-            "(创建|新建|新增|添加|编辑|修改|更新|删除|审批|导出|" +
-                    "create|add|edit|update|delete|approve|export)",
+    /** CJK + English platform action verbs that imply a write action but not durable execution by themselves. */
+    private static final Pattern PLATFORM_ACTION_PATTERN = Pattern.compile(
+            "(创建|新建|新增|添加|编辑|修改|更新|" +
+                    "create|add|edit|update)",
+            Pattern.CASE_INSENSITIVE);
+
+    /** CJK + English platform action signals that require durable orchestration before model grounding. */
+    private static final Pattern PLATFORM_DURABLE_PATTERN = Pattern.compile(
+            "(批量|大量|全量|全部|删除|审批|导出|同步|外部|" +
+                    "batch|bulk|delete|approve|export|sync|external)",
             Pattern.CASE_INSENSITIVE);
 
     /** CJK + English platform read verbs that should stay in a policy-gated read-only turn. */
@@ -68,13 +74,15 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
         }
 
         String message = request.userMessage() == null ? "" : request.userMessage();
-        boolean platformMutationKeyword = PLATFORM_MUTATION_PATTERN.matcher(message).find();
+        boolean platformActionKeyword = PLATFORM_ACTION_PATTERN.matcher(message).find();
+        boolean platformDurableKeyword = PLATFORM_DURABLE_PATTERN.matcher(message).find();
         boolean platformReadOnlyKeyword = PLATFORM_READONLY_PATTERN.matcher(message).find();
         boolean explainKeyword = EXPLAIN_VERB_PATTERN.matcher(message).find();
 
         // Rule 3: history hotness — sustained light_chat continues unless platform keyword breaks streak
         if (request.recentLightTurnCount() >= HISTORY_LIGHT_THRESHOLD
-                && !platformMutationKeyword
+                && !platformActionKeyword
+                && !platformDurableKeyword
                 && !platformReadOnlyKeyword) {
             return new TriageVerdict(
                     TriageBucket.LIGHT_CHAT, 0.85,
@@ -83,10 +91,16 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
         }
 
         // Rule 4: keyword match
-        if (platformMutationKeyword) {
+        if (platformDurableKeyword) {
             return new TriageVerdict(
                     TriageBucket.ACP_RUN, 0.85,
-                    List.of("rule:keyword_platform_verb"),
+                    List.of("rule:keyword_platform_durable"),
+                    Set.of());
+        }
+        if (platformActionKeyword) {
+            return new TriageVerdict(
+                    TriageBucket.LIGHT_CHAT, 0.80,
+                    List.of("rule:keyword_platform_action_sync"),
                     Set.of());
         }
         if (platformReadOnlyKeyword) {

@@ -5,6 +5,8 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.LlmProviderFactory.ProviderConfig;
 import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
+import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.runtime.context.AgentContextAssembler;
 import com.auraboot.framework.agent.runtime.context.AgentContextBundle;
 import com.auraboot.framework.agent.runtime.LlmChatRuntimeSupport;
@@ -22,6 +24,7 @@ import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import lombok.RequiredArgsConstructor;
@@ -80,6 +83,18 @@ public class AuraBotChatService {
     /** Optional chat run persistence from the shared AI runtime. */
     @Autowired(required = false)
     private ChatRunPersistencePort chatRunPersistencePort;
+
+    /** Optional pending-tool store. Required only when a policy-gated tool suspends the turn. */
+    @Autowired(required = false)
+    private PendingToolStore pendingToolStore;
+
+    /** Optional snapshot factory. Required only when a policy-gated tool suspends the turn. */
+    @Autowired(required = false)
+    private PendingToolSnapshotFactory pendingToolSnapshotFactory;
+
+    /** Optional permission resolver used to build the effective permission envelope for exposed tools. */
+    @Autowired(required = false)
+    private UserPermissionService userPermissionService;
 
     /**
      * Optional User Soul Profile reader (plan §5.5 / PR-77 Phase 3). When a profile
@@ -331,11 +346,16 @@ public class AuraBotChatService {
         if (bif != null) {
             tools = applyCandidateSkillsMode(tools, bif);
         }
+        ChatToolResolver.ResolvedTools effectiveResolved = tools == resolved.tools()
+                ? resolved
+                : new ChatToolResolver.ResolvedTools(tools, resolved.intent(), resolved.object(), resolved.isReadOnly());
+        String effectiveModelCode = firstNonBlank(modelCode, effectiveResolved.object());
         aiTraceService.endSpan(resolveSpan, buildResolveToolsSpanOutput(tools), "success");
 
         // --- Trace: render prompt span ---
         SpanContext promptSpan = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
-        String systemPrompt = buildSystemPrompt(tenantId, request, resolved);
+        AgentContextBundle contextBundle = buildAgentContextBundle(tenantId, request);
+        String systemPrompt = buildSystemPrompt(tenantId, request, effectiveResolved, contextBundle);
         if (bif != null) {
             systemPrompt = systemPrompt + buildBifContextHint(bif);
             if (qualityIssue != null) {
@@ -356,13 +376,26 @@ public class AuraBotChatService {
         }
         aiTraceService.endSpan(promptSpan, buildPromptSpanOutput(systemPrompt), "success");
 
-        // The chokepoint routes ACP_RUN and contextual answers that lack an
-        // explicit read-only policy to the ACP runtime. LIGHT_CHAT and readonly
-        // CONTEXTUAL_ANSWER use this text stream path. Tool resolution above
-        // remains because resolver metadata feeds buildSystemPrompt.
         try {
-            TurnOutcome streamOutcome = streamProvider(providerCode, config, model, systemPrompt,
-                    request.getHistory(), request.getMessage(), maxTokens, sink);
+            TurnOutcome streamOutcome;
+            if (tools != null && !tools.isEmpty()) {
+                streamOutcome = new AuraBotChatToolRuntimeAdapter(
+                        chatTurnRuntime,
+                        llmProviderFactory,
+                        chatToolResolver,
+                        chatToolExecutor,
+                        userPermissionService,
+                        pendingToolStore,
+                        pendingToolSnapshotFactory,
+                        objectMapper,
+                        maxToolRounds)
+                        .run(ctx, providerCode, config, model, systemPrompt,
+                                request.getHistory(), request.getMessage(), maxTokens, tools,
+                                effectiveResolved, effectiveModelCode, request.getSessionId(), contextBundle, sink);
+            } else {
+                streamOutcome = streamProvider(providerCode, config, model, systemPrompt,
+                        request.getHistory(), request.getMessage(), maxTokens, sink);
+            }
             endTraceForStreamOutcome(trace, streamOutcome);
             return streamOutcome;
         } catch (Exception e) {
@@ -384,6 +417,13 @@ public class AuraBotChatService {
      * Tries to load the "aurabot_chat" prompt template from CloudConfig first.
      */
     String buildSystemPrompt(Long tenantId, ChatRequest request, ChatToolResolver.ResolvedTools resolved) {
+        return buildSystemPrompt(tenantId, request, resolved, buildAgentContextBundle(tenantId, request));
+    }
+
+    String buildSystemPrompt(Long tenantId,
+                             ChatRequest request,
+                             ChatToolResolver.ResolvedTools resolved,
+                             AgentContextBundle assembledContextBundle) {
         boolean hasTools = resolved != null && !resolved.tools().isEmpty();
         String toolHint = buildToolHint(resolved);
 
@@ -391,15 +431,9 @@ public class AuraBotChatService {
         Map<String, Object> vars = new LinkedHashMap<>();
         ChatRequest.PageContext ctx = request.getPageContext();
         String modelSchemaText = ctx != null ? buildModelSchemaText(ctx.getModelCode()) : "";
-        String ragContext = resolveRagContext(tenantId, request);
-        AgentContextBundle contextBundle = new AgentContextAssembler(objectMapper).assemble(
-                new AgentContextAssembler.Request(
-                        tenantId,
-                        null,
-                        ctx,
-                        modelSchemaText,
-                        ragContext,
-                        request.getKnowledgeBaseIds()));
+        AgentContextBundle contextBundle = assembledContextBundle != null
+                ? assembledContextBundle
+                : buildAgentContextBundle(tenantId, request);
         String contextSection = contextBundle.renderPromptSection();
         if (ctx != null) {
             vars.put("hasPageContext", true);
@@ -448,6 +482,21 @@ public class AuraBotChatService {
     // Package-private overload used by focused prompt tests.
     String buildSystemPrompt(Long tenantId, ChatRequest request) {
         return buildSystemPrompt(tenantId, request, (ChatToolResolver.ResolvedTools) null);
+    }
+
+    private AgentContextBundle buildAgentContextBundle(Long tenantId, ChatRequest request) {
+        ChatRequest.PageContext ctx = request != null ? request.getPageContext() : null;
+        String modelSchemaText = ctx != null ? buildModelSchemaText(ctx.getModelCode()) : "";
+        String ragContext = request != null ? resolveRagContext(tenantId, request) : "";
+        AgentContextBundle contextBundle = new AgentContextAssembler(objectMapper).assemble(
+                new AgentContextAssembler.Request(
+                        tenantId,
+                        null,
+                        ctx,
+                        modelSchemaText,
+                        ragContext,
+                        request != null ? request.getKnowledgeBaseIds() : null));
+        return contextBundle;
     }
 
     /**
@@ -541,6 +590,18 @@ public class AuraBotChatService {
                 config.getBaseUrl(),
                 sink,
                 null);
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private void endTraceForStreamOutcome(TraceContext trace, TurnOutcome outcome) {

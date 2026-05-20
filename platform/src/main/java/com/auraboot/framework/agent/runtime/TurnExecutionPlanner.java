@@ -8,21 +8,19 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Deterministic runtime router for a conversation turn.
+ * Plans the initial execution mode for a conversation turn.
  *
- * <p>The router owns platform control flow. LLM triage may supply a
- * {@link TriageBucket}, but this class decides which runtime lifecycle handles
- * the turn. Named-agent turns keep the named-agent chat path. Durable lifecycle
- * signals use the durable runtime; otherwise the turn stays in the synchronous
- * chat runtime.
+ * <p>This class only chooses the initial execution mode: synchronous chat,
+ * named-agent chat, or durable workflow. It does not decide a domain action's
+ * fate; concrete tool calls still pass through tool policy gates.
  */
 @Component
-public class AgentTurnRouter {
+public class TurnExecutionPlanner {
 
-    public enum RuntimeRoute {
-        CHAT_TURN,
-        DURABLE_RUN,
-        NAMED_AGENT_CHAT
+    public enum InitialExecutionMode {
+        SYNC_AGENT_TURN,
+        DURABLE_WORKFLOW,
+        NAMED_AGENT_TURN
     }
 
     public enum DecisionReason {
@@ -43,7 +41,7 @@ public class AgentTurnRouter {
         CHAT_TRIAGE_BUCKET
     }
 
-    public record RuntimePolicyInput(String agentCode,
+    public record TurnExecutionInput(String agentCode,
                                      TriageBucket triageBucket,
                                      Set<String> allowedReadOnlyTools,
                                      boolean explicitDurableRequest,
@@ -51,7 +49,7 @@ public class AgentTurnRouter {
                                      boolean externalSideEffect,
                                      boolean batch) {
 
-        public RuntimePolicyInput {
+        public TurnExecutionInput {
             allowedReadOnlyTools = allowedReadOnlyTools == null ? Set.of() : Set.copyOf(allowedReadOnlyTools);
         }
 
@@ -64,50 +62,46 @@ public class AgentTurnRouter {
         }
     }
 
-    public record RuntimeDecision(RuntimeRoute route,
-                                  DecisionReason reason,
-                                  String normalizedAgentCode,
-                                  TriageBucket triageBucket,
-                                  Set<PolicySignal> policySignals) {
+    public record TurnExecutionPlan(InitialExecutionMode initialMode,
+                                    DecisionReason reason,
+                                    String normalizedAgentCode,
+                                    TriageBucket triageBucket,
+                                    Set<PolicySignal> policySignals) {
 
-        public RuntimeDecision {
+        public TurnExecutionPlan {
             policySignals = policySignals == null ? Set.of() : Set.copyOf(policySignals);
         }
 
         public boolean durableLifecycleRequired() {
-            return route == RuntimeRoute.DURABLE_RUN;
+            return initialMode == InitialExecutionMode.DURABLE_WORKFLOW;
         }
 
         public boolean namedAgent() {
-            return route == RuntimeRoute.NAMED_AGENT_CHAT;
+            return initialMode == InitialExecutionMode.NAMED_AGENT_TURN;
         }
     }
 
-    public RuntimeRoute route(String agentCode, TriageBucket triageBucket) {
-        return decide(agentCode, triageBucket).route();
-    }
-
-    public RuntimeDecision decide(String agentCode, TriageBucket triageBucket) {
-        return decide(new RuntimePolicyInput(agentCode, triageBucket, Set.of(),
+    public TurnExecutionPlan decide(String agentCode, TriageBucket triageBucket) {
+        return decide(new TurnExecutionInput(agentCode, triageBucket, Set.of(),
                 false, false, false, false));
     }
 
-    public RuntimeDecision decide(RuntimePolicyInput input) {
-        RuntimePolicyInput effective = input == null
-                ? new RuntimePolicyInput(null, null, Set.of(), false, false, false, false)
+    public TurnExecutionPlan decide(TurnExecutionInput input) {
+        TurnExecutionInput effective = input == null
+                ? new TurnExecutionInput(null, null, Set.of(), false, false, false, false)
                 : input;
         String normalizedAgentCode = normalizeAgentCode(effective.agentCode());
         if (!isDefaultAgentPath(effective.agentCode())) {
-            return new RuntimeDecision(
-                    RuntimeRoute.NAMED_AGENT_CHAT,
+            return new TurnExecutionPlan(
+                    InitialExecutionMode.NAMED_AGENT_TURN,
                     DecisionReason.NAMED_AGENT_PROFILE,
                     normalizedAgentCode,
                     effective.triageBucket(),
                     EnumSet.of(PolicySignal.EXPLICIT_NAMED_AGENT));
         }
         if (effective.triageBucket() == TriageBucket.ACP_RUN) {
-            return new RuntimeDecision(
-                    RuntimeRoute.DURABLE_RUN,
+            return new TurnExecutionPlan(
+                    InitialExecutionMode.DURABLE_WORKFLOW,
                     DecisionReason.DURABLE_TRIAGE_SIGNAL,
                     normalizedAgentCode,
                     effective.triageBucket(),
@@ -121,24 +115,24 @@ public class AgentTurnRouter {
             if (effective.requiresApproval() || effective.externalSideEffect() || effective.batch()) {
                 signals.add(PolicySignal.DURABLE_LIFECYCLE_SIGNAL);
             }
-            return new RuntimeDecision(
-                    RuntimeRoute.DURABLE_RUN,
+            return new TurnExecutionPlan(
+                    InitialExecutionMode.DURABLE_WORKFLOW,
                     DecisionReason.DURABLE_EXECUTION_POLICY,
                     normalizedAgentCode,
                     effective.triageBucket(),
                     signals);
         }
         if (effective.readOnlyContextualAnswer()) {
-            return new RuntimeDecision(
-                    RuntimeRoute.CHAT_TURN,
+            return new TurnExecutionPlan(
+                    InitialExecutionMode.SYNC_AGENT_TURN,
                     DecisionReason.SYNC_READ_ONLY_TURN,
                     normalizedAgentCode,
                     effective.triageBucket(),
                     EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.READ_ONLY_CONTEXT,
                             PolicySignal.CHAT_TRIAGE_BUCKET));
         }
-        return new RuntimeDecision(
-                RuntimeRoute.CHAT_TURN,
+        return new TurnExecutionPlan(
+                InitialExecutionMode.SYNC_AGENT_TURN,
                 DecisionReason.SYNC_CHAT_TURN,
                 normalizedAgentCode,
                 effective.triageBucket(),
