@@ -733,7 +733,9 @@ class AgentRuntimeArchitectureTest {
 
         assertThat(text)
                 .as("AgentChatPortImpl should consume a resolved AgentProfile instead of parsing guardrails inline")
+                .contains("AgentProfileResolver agentProfileResolver")
                 .contains("AgentProfile profile = agentProfileResolver.resolve(")
+                .doesNotContain("private final AgentProfileResolver agentProfileResolver =")
                 .doesNotContain("AgentProfilePermissionExtractor.extract(");
     }
 
@@ -747,7 +749,8 @@ class AgentRuntimeArchitectureTest {
                 .as("Named-agent page/schema context assembly should live outside the chat port")
                 .exists();
         assertThat(text)
-                .contains("new AgentChatContextAdapter(objectMapper).assemble(ctx, request)")
+                .contains("private final AgentChatContextAdapter contextAdapter;")
+                .contains("contextAdapter.assemble(ctx, request)")
                 .doesNotContain("new AgentContextAssembler(objectMapper).assemble(");
     }
 
@@ -761,7 +764,8 @@ class AgentRuntimeArchitectureTest {
                 .as("Named-agent ChatTurnRuntime callback wiring should live outside the chat port")
                 .exists();
         assertThat(text)
-                .contains("new AgentChatToolRuntimeAdapter(")
+                .contains("private final AgentChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory;")
+                .contains("toolRuntimeAdapterFactory.callbacks(this, contextBlocks)")
                 .doesNotContain(
                         "agentChatToolLoopCallbacks(",
                         "new ChatTurnRuntime.ChatToolLoopCallbacks()");
@@ -777,7 +781,8 @@ class AgentRuntimeArchitectureTest {
                 .as("Named-agent tool discovery should live outside the chat port adapter")
                 .exists();
         assertThat(text)
-                .contains("new AgentChatToolDiscoveryAdapter(")
+                .contains("private final AgentChatToolDiscoveryAdapter toolDiscoveryAdapter;")
+                .contains("toolDiscoveryAdapter.discover(")
                 .doesNotContain(
                         "ToolDiscoveryContext",
                         "private List<ToolDefinition> discoverToolDefinitions(",
@@ -796,7 +801,8 @@ class AgentRuntimeArchitectureTest {
                 .as("Approved pending execution claim/replay should live outside the chat port adapter")
                 .exists();
         assertThat(text)
-                .contains("new AgentChatApprovedPendingToolAdapter(")
+                .contains("private final AgentChatApprovedPendingToolAdapter approvedPendingToolAdapter;")
+                .contains("approvedPendingToolAdapter.execute(tenantId, approvalPid)")
                 .doesNotContain(
                         "PendingToolExecutionClaim",
                         "PendingToolExecutionRecord",
@@ -845,6 +851,45 @@ class AgentRuntimeArchitectureTest {
                         "private AgentErrorFrame validationErrorFrame(",
                         "private Map<String, Object> errorResult(",
                         "private String availableToolNames(");
+    }
+
+    @Test
+    @DisplayName("chat runtime policy collaborators must be constructor injectable")
+    void chatRuntimePolicyCollaboratorsAreConstructorInjectable() throws Exception {
+        String runtime = Files.readString(MAIN_SOURCES.resolve("agent/runtime/ChatTurnRuntime.java"));
+
+        assertThat(runtime)
+                .as("Generic runtime must not hide policy/planner singletons behind field initializers")
+                .contains(
+                        "public ChatTurnRuntime(ExecutionEnvelopePlanner executionEnvelopePlanner,",
+                        "ToolMetadataRegistry toolMetadataRegistry,",
+                        "ToolPolicyEngine toolPolicyEngine)")
+                .doesNotContain(
+                        "private final ExecutionEnvelopePlanner executionEnvelopePlanner = new ExecutionEnvelopePlanner();",
+                        "private final ToolMetadataRegistry toolMetadataRegistry = new ToolMetadataRegistry();",
+                        "private final ToolPolicyEngine toolPolicyEngine = new ToolPolicyEngine();");
+    }
+
+    @Test
+    @DisplayName("group-chat handoff must use explicit policy decision")
+    void groupChatHandoffUsesExplicitPolicyDecision() throws Exception {
+        String replyTask = Files.readString(MAIN_SOURCES.resolve("agentchat/reply/AgentReplyTask.java"));
+        String policy = Files.readString(MAIN_SOURCES.resolve("agentchat/handoff/HandoffPermissionPolicy.java"));
+
+        assertThat(replyTask)
+                .as("Handoff recursion must not compute target permissions inline")
+                .contains(
+                        "HandoffPermissionPolicy.Decision decision = HandoffPermissionPolicy.decide(",
+                        "decision.effectivePermissions()")
+                .doesNotContain("Set<String> childPermissions = HandoffPermissionPolicy.intersect(");
+        assertThat(policy)
+                .as("Handoff policy must make context/state transfer semantics explicit")
+                .contains(
+                        "ContextTransferPolicy",
+                        "StateTransferPolicy",
+                        "HANDOFF_CONTEXT_ONLY",
+                        "PARENT_TASK_ONLY",
+                        "target_not_allowed");
     }
 
     @Test
@@ -911,7 +956,9 @@ class AgentRuntimeArchitectureTest {
                 .exists();
         assertThat(aurabot)
                 .as("AuraBotChatService should stay focused on provider/prompt/context orchestration")
-                .contains("new AuraBotChatToolRuntimeAdapter(")
+                .contains("private final AuraBotChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory;")
+                .contains("toolRuntimeAdapterFactory.run(")
+                .doesNotContain("new AuraBotChatToolRuntimeAdapter(")
                 .doesNotContain(
                         "auraBotToolLoopCallbacks(",
                         "toolDefinitionFromAgentTool(",

@@ -27,7 +27,6 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -51,17 +50,16 @@ import java.util.concurrent.Executor;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuraBotChatService {
 
     private final LlmProviderFactory llmProviderFactory;
     private final PromptTemplateService promptTemplateService;
     private final ChatToolResolver chatToolResolver;
-    private final ChatToolExecutor chatToolExecutor;
     private final ObjectMapper objectMapper;
     private final AiTraceService aiTraceService;
     private final MetaModelService metaModelService;
     private final ChatTurnRuntime chatTurnRuntime;
+    private final AuraBotChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory;
     @Qualifier("asyncTaskExecutor")
     private final Executor asyncTaskExecutor;
 
@@ -112,6 +110,52 @@ public class AuraBotChatService {
             "You are AuraBot, an intelligent assistant for the AuraBoot platform. " +
             "Help users with their questions about the current page and data. " +
             "Be concise, accurate, and helpful. Respond in the user's language.";
+
+    public AuraBotChatService(LlmProviderFactory llmProviderFactory,
+                              PromptTemplateService promptTemplateService,
+                              ChatToolResolver chatToolResolver,
+                              ChatToolExecutor chatToolExecutor,
+                              ObjectMapper objectMapper,
+                              AiTraceService aiTraceService,
+                              MetaModelService metaModelService,
+                              ChatTurnRuntime chatTurnRuntime,
+                              Executor asyncTaskExecutor) {
+        this(llmProviderFactory,
+                promptTemplateService,
+                chatToolResolver,
+                objectMapper,
+                aiTraceService,
+                metaModelService,
+                chatTurnRuntime,
+                asyncTaskExecutor,
+                new AuraBotChatToolRuntimeAdapterFactory(
+                        chatTurnRuntime,
+                        llmProviderFactory,
+                        chatToolResolver,
+                        chatToolExecutor,
+                        objectMapper));
+    }
+
+    @Autowired
+    public AuraBotChatService(LlmProviderFactory llmProviderFactory,
+                              PromptTemplateService promptTemplateService,
+                              ChatToolResolver chatToolResolver,
+                              ObjectMapper objectMapper,
+                              AiTraceService aiTraceService,
+                              MetaModelService metaModelService,
+                              ChatTurnRuntime chatTurnRuntime,
+                              @Qualifier("asyncTaskExecutor") Executor asyncTaskExecutor,
+                              AuraBotChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory) {
+        this.llmProviderFactory = llmProviderFactory;
+        this.promptTemplateService = promptTemplateService;
+        this.chatToolResolver = chatToolResolver;
+        this.objectMapper = objectMapper;
+        this.aiTraceService = aiTraceService;
+        this.metaModelService = metaModelService;
+        this.chatTurnRuntime = chatTurnRuntime;
+        this.asyncTaskExecutor = asyncTaskExecutor;
+        this.toolRuntimeAdapterFactory = toolRuntimeAdapterFactory;
+    }
 
     static Map<String, Object> buildPromptSpanOutput(String systemPrompt) {
         return Map.of(
@@ -379,19 +423,11 @@ public class AuraBotChatService {
         try {
             TurnOutcome streamOutcome;
             if (tools != null && !tools.isEmpty()) {
-                streamOutcome = new AuraBotChatToolRuntimeAdapter(
-                        chatTurnRuntime,
-                        llmProviderFactory,
-                        chatToolResolver,
-                        chatToolExecutor,
-                        userPermissionService,
-                        pendingToolStore,
-                        pendingToolSnapshotFactory,
-                        objectMapper,
-                        maxToolRounds)
-                        .run(ctx, providerCode, config, model, systemPrompt,
-                                request.getHistory(), request.getMessage(), maxTokens, tools,
-                                effectiveResolved, effectiveModelCode, request.getSessionId(), contextBundle, sink);
+                streamOutcome = toolRuntimeAdapterFactory.run(
+                        ctx, providerCode, config, model, systemPrompt,
+                        request.getHistory(), request.getMessage(), maxTokens, tools,
+                        effectiveResolved, effectiveModelCode, request.getSessionId(), contextBundle, sink,
+                        userPermissionService, pendingToolStore, pendingToolSnapshotFactory, maxToolRounds);
             } else {
                 streamOutcome = streamProvider(providerCode, config, model, systemPrompt,
                         request.getHistory(), request.getMessage(), maxTokens, sink);

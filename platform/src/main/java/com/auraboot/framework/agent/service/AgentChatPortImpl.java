@@ -32,7 +32,6 @@ import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -67,7 +66,6 @@ import java.util.Set;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AgentChatPortImpl implements AgentChatPort {
 
     private final DynamicDataMapper dynamicDataMapper;
@@ -83,7 +81,93 @@ public class AgentChatPortImpl implements AgentChatPort {
     private final AgentReducer agentReducer;
     private final ChatTurnRuntime chatTurnRuntime;
     private final PendingToolSnapshotFactory pendingToolSnapshotFactory;
-    private final AgentProfileResolver agentProfileResolver = DefaultAgentProfileResolver.INSTANCE;
+    private final AgentProfileResolver agentProfileResolver;
+    private final AgentChatApprovedPendingToolAdapter approvedPendingToolAdapter;
+    private final AgentChatToolDiscoveryAdapter toolDiscoveryAdapter;
+    private final AgentChatContextAdapter contextAdapter;
+    private final AgentChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory;
+
+    public AgentChatPortImpl(DynamicDataMapper dynamicDataMapper,
+                             LlmProviderFactory providerFactory,
+                             ToolProviderRegistry toolProviderRegistry,
+                             GroundingService groundingService,
+                             AgentSkillService skillService,
+                             ObjectMapper objectMapper,
+                             ChatMessageTapeStore chatMessageTapeStore,
+                             PendingToolStore pendingToolStore,
+                             ToolLoopService toolLoopService,
+                             AgentRuntimeStateFactory runtimeStateFactory,
+                             AgentReducer agentReducer,
+                             ChatTurnRuntime chatTurnRuntime,
+                             PendingToolSnapshotFactory pendingToolSnapshotFactory) {
+        this(dynamicDataMapper,
+                providerFactory,
+                toolProviderRegistry,
+                groundingService,
+                skillService,
+                objectMapper,
+                chatMessageTapeStore,
+                pendingToolStore,
+                toolLoopService,
+                runtimeStateFactory,
+                agentReducer,
+                chatTurnRuntime,
+                pendingToolSnapshotFactory,
+                DefaultAgentProfileResolver.INSTANCE);
+    }
+
+    @Autowired
+    public AgentChatPortImpl(DynamicDataMapper dynamicDataMapper,
+                             LlmProviderFactory providerFactory,
+                             ToolProviderRegistry toolProviderRegistry,
+                             GroundingService groundingService,
+                             AgentSkillService skillService,
+                             ObjectMapper objectMapper,
+                             ChatMessageTapeStore chatMessageTapeStore,
+                             PendingToolStore pendingToolStore,
+                             ToolLoopService toolLoopService,
+                             AgentRuntimeStateFactory runtimeStateFactory,
+                             AgentReducer agentReducer,
+                             ChatTurnRuntime chatTurnRuntime,
+                             PendingToolSnapshotFactory pendingToolSnapshotFactory,
+                             AgentProfileResolver agentProfileResolver) {
+        this.dynamicDataMapper = dynamicDataMapper;
+        this.providerFactory = providerFactory;
+        this.toolProviderRegistry = toolProviderRegistry;
+        this.groundingService = groundingService;
+        this.skillService = skillService;
+        this.objectMapper = objectMapper;
+        this.chatMessageTapeStore = chatMessageTapeStore;
+        this.pendingToolStore = pendingToolStore;
+        this.toolLoopService = toolLoopService;
+        this.runtimeStateFactory = runtimeStateFactory;
+        this.agentReducer = agentReducer;
+        this.chatTurnRuntime = chatTurnRuntime;
+        this.pendingToolSnapshotFactory = pendingToolSnapshotFactory;
+        this.agentProfileResolver = agentProfileResolver != null
+                ? agentProfileResolver
+                : DefaultAgentProfileResolver.INSTANCE;
+        this.approvedPendingToolAdapter = new AgentChatApprovedPendingToolAdapter(
+                pendingToolStore,
+                toolLoopService,
+                objectMapper);
+        this.toolDiscoveryAdapter = new AgentChatToolDiscoveryAdapter(
+                dynamicDataMapper,
+                toolProviderRegistry,
+                groundingService,
+                objectMapper);
+        this.contextAdapter = new AgentChatContextAdapter(objectMapper);
+        AgentChatTurnOutcomeAdapter turnOutcomeAdapter =
+                new AgentChatTurnOutcomeAdapter(chatTurnRuntime, objectMapper);
+        AgentChatToolExecutionAdapter toolExecutionAdapter =
+                new AgentChatToolExecutionAdapter(toolLoopService, objectMapper);
+        this.toolRuntimeAdapterFactory = new AgentChatToolRuntimeAdapterFactory(
+                runtimeStateFactory,
+                pendingToolStore,
+                pendingToolSnapshotFactory,
+                turnOutcomeAdapter,
+                toolExecutionAdapter);
+    }
 
     /**
      * DC.3d: optional counter for {@code agentchatport.caller_overrides_used}
@@ -126,11 +210,7 @@ public class AgentChatPortImpl implements AgentChatPort {
 
     @Override
     public Map<String, Object> executeApprovedPendingTool(Long tenantId, String approvalPid) {
-        return new AgentChatApprovedPendingToolAdapter(
-                pendingToolStore,
-                toolLoopService,
-                objectMapper)
-                .execute(tenantId, approvalPid);
+        return approvedPendingToolAdapter.execute(tenantId, approvalPid);
     }
 
     @Override
@@ -205,12 +285,8 @@ public class AgentChatPortImpl implements AgentChatPort {
             recordOverrideUsage("toolDefsOverride");
         } else {
             try {
-                toolDefs = new AgentChatToolDiscoveryAdapter(
-                        dynamicDataMapper,
-                        toolProviderRegistry,
-                        groundingService,
-                        objectMapper)
-                        .discover(tenantId, ctx.userId(), agentCode, request.getMessage(), agentDef);
+                toolDefs = toolDiscoveryAdapter.discover(
+                        tenantId, ctx.userId(), agentCode, request.getMessage(), agentDef);
             } catch (IllegalStateException e) {
                 String msg = safeExceptionMessage(e);
                 sink.onError(msg, null);
@@ -264,7 +340,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                         profile.profilePermissions(),
                         toolDefs);
         boolean requireInitialToolCall = profile.evidenceFirst();
-        List<AgentContextBlock> contextBlocks = new AgentChatContextAdapter(objectMapper).assemble(ctx, request);
+        List<AgentContextBlock> contextBlocks = contextAdapter.assemble(ctx, request);
 
         log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
                 agentCode, providerCode, model, tools.size(), overrides != null);
@@ -317,15 +393,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                         AgentChatTurnOutcomeAdapter.HANDOFF_TOOL_NAME,
                         null,
                         objectMapper),
-                new AgentChatToolRuntimeAdapter(
-                        this,
-                        runtimeStateFactory,
-                        pendingToolStore,
-                        pendingToolSnapshotFactory,
-                        contextBlocks,
-                        new AgentChatTurnOutcomeAdapter(chatTurnRuntime, objectMapper),
-                        new AgentChatToolExecutionAdapter(toolLoopService, objectMapper))
-                        .callbacks());
+                toolRuntimeAdapterFactory.callbacks(this, contextBlocks));
     }
 
     boolean defersPolicyUntilToolResult(ToolDefinition definition) {

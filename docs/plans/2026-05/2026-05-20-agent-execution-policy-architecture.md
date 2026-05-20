@@ -1552,6 +1552,14 @@ scripts/dev/run-agent-runtime-full-gate-docker.sh --slug=agent-runtime-fix --reu
   - `AgentChatPortImpl` 已拆出 named-agent tool execution / unknown-tool validation / result normalization 到 `AgentChatToolExecutionAdapter`，chat port 不再直接调用 `ToolLoopResultNormalizer` 或维护 `AgentToolDefinition` 执行转换。
   - isolated agent runtime gate 已补充通过，并在 `TurnExecutionPlanner` 收敛后 fresh rerun：auth setup 19 passed、AuraBot skill resume API 2 passed、Admin Agent Runs UI replay 5 passed；按要求未运行 Page Designer 测试。
   - `scripts/dev/run-agent-runtime-full-gate-docker.sh --host-runner` 已修正 plugin root：host runner 面向容器后端时必须传 `/app/plugins` / `/app/plugins-enterprise`，避免把宿主机路径传给后端导致重复 import 或路径不可见被误判为产品失败。
+- 2026-05-20 final cleanup review 修正：
+  - `ChatTurnRuntime` 的 `ExecutionEnvelopePlanner`、`ToolMetadataRegistry`、`ToolPolicyEngine` 已从字段 initializer 中的隐藏 `new` 改为构造注入；保留无参构造仅用于现有轻量单测兼容，生产路径由 Spring 注入 policy collaborators。
+  - `ToolMetadataRegistry`、`ToolPolicyEngine` 已注册为 Spring component；`AgentProfileResolver` 通过 `AgentRuntimePolicyConfiguration` 以 `DefaultAgentProfileResolver.INSTANCE` 注册为 bean。
+  - `AuraBotChatService` 不再在 turn 主路径直接构造 `AuraBotChatToolRuntimeAdapter`；工具 loop 进入 `AuraBotChatToolRuntimeAdapterFactory`，service 继续只负责 provider / prompt / context orchestration。
+  - `AgentChatPortImpl` 的 `AgentProfileResolver` 已改为构造注入，并把 approved pending execution、tool discovery、context assembly、tool-loop callback wiring 收敛为固定 collaborators，避免每轮 turn 在主路径临时拼装 adapter 实现。
+  - group-chat handoff 已从直接 permission intersection 升级为 `HandoffPermissionPolicy.Decision`，显式记录 `ContextTransferPolicy.HANDOFF_CONTEXT_ONLY`、`StateTransferPolicy.PARENT_TASK_ONLY`、`target_not_allowed` deny reason 和 audit reason；handoff child turn 继续只继承 source / inherited / target 的权限交集，不能通过 target profile 获得额外权限。
+  - 架构测试新增防回退断言：禁止 `ChatTurnRuntime` 重新用字段 `new` 隐藏 policy singleton；禁止 `AuraBotChatService` 主路径重新直接构造 tool runtime adapter；要求 group-chat handoff 使用 explicit policy decision。
+  - fresh focused agent gate 已通过：`compileJava` / `compileTestJava`、`AgentRuntimeArchitectureTest`、`ChatTurnRuntimeTest`、`agent.runtime.policy.*`、`AgentChatPortImpl*`、`AuraBotChatServiceGroundingTest`、`DefaultPreGroundingTriageTest`、`TurnExecutionPlannerTest`、`ConversationTurnServiceImplDispatchTest`、`ConversationTurnServiceImplNamedAgentTaskTest`、`AgentReplyTaskChokepointTest`、`HandoffPermissionPolicyTest`。
 - 当前通用 runtime 架构基线已按本方案收敛；剩余不再是本轮通用 runtime 架构缺口，而是后续产品/业务扩展与更大范围 gate：
   - 接入具体业务补偿 handler。
   - 为非 pageContext 来源继续扩展结构化 RAG/schema/record provenance。

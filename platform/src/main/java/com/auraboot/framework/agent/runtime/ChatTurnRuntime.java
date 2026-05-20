@@ -24,6 +24,7 @@ import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -44,9 +45,28 @@ public class ChatTurnRuntime {
 
     public static final int DEFAULT_MAX_TOOL_ROUNDS = 5;
 
-    private final ExecutionEnvelopePlanner executionEnvelopePlanner = new ExecutionEnvelopePlanner();
-    private final ToolMetadataRegistry toolMetadataRegistry = new ToolMetadataRegistry();
-    private final ToolPolicyEngine toolPolicyEngine = new ToolPolicyEngine();
+    private final ExecutionEnvelopePlanner executionEnvelopePlanner;
+    private final ToolMetadataRegistry toolMetadataRegistry;
+    private final ToolPolicyEngine toolPolicyEngine;
+
+    public ChatTurnRuntime() {
+        this(new ExecutionEnvelopePlanner(), new ToolMetadataRegistry(), new ToolPolicyEngine());
+    }
+
+    @Autowired
+    public ChatTurnRuntime(ExecutionEnvelopePlanner executionEnvelopePlanner,
+                           ToolMetadataRegistry toolMetadataRegistry,
+                           ToolPolicyEngine toolPolicyEngine) {
+        this.executionEnvelopePlanner = executionEnvelopePlanner != null
+                ? executionEnvelopePlanner
+                : new ExecutionEnvelopePlanner();
+        this.toolMetadataRegistry = toolMetadataRegistry != null
+                ? toolMetadataRegistry
+                : new ToolMetadataRegistry();
+        this.toolPolicyEngine = toolPolicyEngine != null
+                ? toolPolicyEngine
+                : new ToolPolicyEngine();
+    }
 
     public record ChatToolLoopSpec(
             TurnContext ctx,
