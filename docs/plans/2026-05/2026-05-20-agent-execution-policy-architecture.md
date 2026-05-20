@@ -932,7 +932,7 @@ User approves / rejects / resumes
 
 不做业务场景判断。
 
-### 2. AgentTurnRouter
+### 2. ExecutionEnvelopePlanner
 
 演进为 `ExecutionEnvelopePlanner`。
 
@@ -1473,6 +1473,10 @@ runtime 只执行通用状态机。
 ./gradlew :test --tests 'com.auraboot.framework.agent.runtime.ChatTurnRuntimeTest.runToolLoop_deniesHiddenWriteToolCallAfterCatalogAcl'
 ./gradlew :test --tests 'com.auraboot.framework.agent.runtime.context.AgentContextAssemblerTest' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest.fallbackSystemPromptLabelsPageContextWithProvenance'
 ./gradlew :test --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest.conversationChokepointDelegatesDurableExecutionToDurableWorkflowEngine'
+./gradlew :test --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest.namedAgentChatDelegatesToolDiscovery' --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*'
+./gradlew :test --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest.namedAgentChatDelegatesApprovedPendingExecution' --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*'
+./gradlew :test --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest.namedAgentChatDelegatesPendingAndHandoffOutcomeHelpers' --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*'
+./gradlew :test --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest.namedAgentChatDelegatesToolExecution' --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*'
 ./gradlew :test --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpDispatchTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpResumeTest'
 ./gradlew :test --tests 'com.auraboot.framework.agent.runtime.policy.*' --tests 'com.auraboot.framework.agent.runtime.context.*' --tests 'com.auraboot.framework.agent.runtime.ChatTurnRuntimeTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpDispatchTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpResumeTest' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest' --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest'
 ./gradlew :test --tests 'com.auraboot.framework.agent.runtime.PendingToolSnapshotFactoryTest.usesContextProvenanceForRecordScopedPendingTools' --tests 'com.auraboot.framework.agent.runtime.ChatTurnRuntimeTest.runToolLoop_passesPolicyDecisionFieldsIntoPendingContext'
@@ -1505,6 +1509,14 @@ docker compose -f docker-compose.yml -f docker-compose.skills-c2.override.yml -p
 ./gradlew :test --tests 'com.auraboot.framework.aurabot.service.AuraBotChatSkillResumeIntegrationTest'
 ./gradlew :test --tests 'com.auraboot.framework.agent.provider.LlmProviderFactoryTest' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceResumeSnapshotTest' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceThinkingIntegrationTest' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceTracePayloadTest' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatSkillResumeIntegrationTest' --tests 'com.auraboot.framework.aurabot.service.ChatToolExecutorCanonicalRuntimeTest' --tests 'com.auraboot.framework.aurabot.service.ChatToolResolverIsReadOnlyTest' --tests 'com.auraboot.framework.conversation.AuraBotTurnPersistenceTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplDispatchTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplFinalizeTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplResumeTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplNamedAgentTaskTest' --tests 'com.auraboot.framework.integration.aurabot.AuraBotChatThinkingPersistenceIntegrationTest' --tests 'com.auraboot.framework.integration.aurabot.LlmWarningsSseIntegrationTest'
 ./gradlew :test --tests 'com.auraboot.framework.aurabot.service.ChatSessionStoreReliabilityTest'
+./gradlew :test --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest.simpleWriteToolSuspendsAsPendingConfirmation'
+./gradlew :test --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest.resolvedObjectProvidesModelCodeWhenPageContextIsAbsent'
+./gradlew :test --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest.discoveredProviderCodeToolsRemainExecutableAfterSanitization'
+./gradlew :test --tests 'com.auraboot.framework.agent.triage.DefaultPreGroundingTriageTest' --tests 'com.auraboot.framework.agent.runtime.TurnExecutionPlannerTest' --tests 'com.auraboot.framework.agent.runtime.ChatTurnRuntimeTest' --tests 'com.auraboot.framework.agent.runtime.policy.*' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplDispatchTest' --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest'
+./gradlew :test --tests 'com.auraboot.framework.agent.triage.DefaultPreGroundingTriageTest' --tests 'com.auraboot.framework.agent.runtime.TurnExecutionPlannerTest' --tests 'com.auraboot.framework.agent.runtime.ChatTurnRuntimeTest' --tests 'com.auraboot.framework.agent.runtime.policy.*' --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplDispatchTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplNamedAgentTaskTest' --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest'
+./gradlew :compileJava :compileTestJava
+./gradlew :test --tests 'com.auraboot.framework.agent.runtime.*' --tests 'com.auraboot.framework.agent.runtime.policy.*' --tests 'com.auraboot.framework.agent.service.ToolLoopServiceSafetyTest' --tests 'com.auraboot.framework.agent.service.StepLoopServiceCheckpointTest' --tests 'com.auraboot.framework.agent.service.StepLoopServiceLlmResponseGuardTest' --tests 'com.auraboot.framework.agent.service.StepLoopParallelToolTest' --tests 'com.auraboot.framework.agent.service.AgentRunServiceSyncTest' --tests 'com.auraboot.framework.agent.service.PlanServiceTest' --tests 'com.auraboot.framework.agent.service.SkillEngineTest' --tests 'com.auraboot.framework.agent.service.StepLoopServiceThinkingIntegrationTest' --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpDispatchTest' --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpResumeTest' --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest'
+scripts/dev/run-agent-runtime-full-gate-docker.sh --slug=agent-runtime-fix --reuse-stack --keep-stack --host-runner --skip-pull
 ```
 
 当前收尾状态：
@@ -1516,10 +1528,30 @@ docker compose -f docker-compose.yml -f docker-compose.skills-c2.override.yml -p
 - `DurableWorkflowEngine` 已建立 conversation-triggered ACP start/resume substrate，并已从 `ConversationTurnServiceImpl` 抽走 durable task/run 执行细节；direct external side-effect recovery 和可审计 step checkpoint history 已落地。后续新增 durable workflow 能力时应继续扩展 `DurableWorkflowEngine` / checkpoint store / recovery handler，而不是重新在 chokepoint 或 chat adapter 内写执行分支。
 - 2026-05-20 review 修正：
   - `ChatTurnRuntime` 已移除 AuraBot 专属 tool type / preview marker 判断，改由 generic `ToolResultDisposition` callbacks 承接 adapter-specific pending 行为。
-  - `AgentTurnRouter` 的 decision reason / policy signal 已改为执行语义命名，不再使用 AuraBot/light/contextual 场景命名。
+  - 旧 `AgentTurnRouter` / `ExecutionRoutePlanner` 已删除并替换为 `TurnExecutionPlanner`；这一层只决定 conversation turn 的初始执行模式（sync agent turn / named-agent turn / durable workflow），不再用 route 命名抢占 `ExecutionEnvelopePlanner` 的工具能力包络职责。
   - 已新增架构测试防止 generic runtime 重新引入 adapter-specific 分支。
   - `统计客户信息` 已补回归测试，确认只读统计走 chat runtime，而不是 ACP durable runtime。
   - 主 `application.yml` 已取消缺省 stub sentinel；stub LLM 只能通过 test profile、`AGENT_LLM_STUB_MODE=true` 或显式 sentinel opt-in。
+- 2026-05-20 completion review 修正：
+  - `DefaultPreGroundingTriage` 已把 simple write intent 从 `ACP_RUN` 降回 chat turn，让具体写工具由 post-model `ToolPolicyEngine` late binding 到 confirmation / approval / durable / deny；只有 `批量 / 导出 / 同步 / 外部 / delete / approve` 等 durable 信号继续进入 ACP durable。
+  - `ConversationTurnServiceImplDispatchTest` 已补 `创建客户` 回归测试，确认 simple write 通过 `ConversationTurnService.runTurn` 进入 AuraBot chat runtime，且不携带 read-only whitelist。
+  - `AuraBotChatService` 已在 resolved tools 非空时走 `ChatTurnRuntime.runToolLoop`，不再只把工具 hint 写入 prompt 后走纯文本 stream；只读 `统计客户信息` 已覆盖 provider tool catalog、tool execution、final answer round。
+  - AuraBot discovered provider-code 工具已修正 identity 边界：模型和 policy 使用 sanitized LLM tool name，canonical provider code 保留在 `sourceCode`，避免 `nq:...` / `nq_...` 不一致导致真实工具被误判 unavailable。
+  - AuraBot tool loop 的执行 modelCode 已修正为 page model 优先、grounded object 兜底，避免用户不在具体页面但 grounding 已解析业务对象时，工具执行拿到 `null` modelCode。
+  - AuraBot simple write 主路径已覆盖：模型提出 `cmd_crm_customer_create` 后由通用 tool policy 产生 `PendingConfirmation`，pending snapshot 保存 tool id/name、input、model、provider 与 context provenance，且不会直接执行工具。
+  - `AgentTenantPolicy.fromCatalog(...)` 不再因为 catalog 中存在一个 durable-required tool 就把整个 envelope 提升为 `DurabilityPreference.REQUIRED`；durable fate 回到具体 selected tool 的 `ToolDurabilityPolicy` 决定。
+  - `ToolPolicyCall` 已携带 `AgentContextBlock` provenance，新增 `ToolContextPolicy` 对写/外部动作做 tenant 与 record scope 校验；`ChatTurnRuntime` 在 post-model gating 时传入 callbacks 提供的 context blocks，越出当前 read/write relevant record scope 的写操作会 fail closed。
+  - 已新增 policy/runtime 测试覆盖：mixed catalog 不污染 read tool、out-of-scope write 被 deny、AuraBot read-only tools 走 tool loop、simple write chokepoint 不进 ACP。
+  - 已删除 3 个仅含注释、无 class/bean/调用方的 tombstone 文件，降低后续 review 对废旧入口的误判：旧 `agent/controller/NLModelingController.java`、旧 `agent/service/NLModelingService.java`、旧不安全 `user/controller/UserController.java`。真实 NL Modeling 实现仍在 `agent/nlmodeling/...`。
+  - `AuraBotChatService` 已进一步拆薄：AuraBot tool-loop callbacks、tool metadata 映射、pending snapshot 组装迁入 `AuraBotChatToolRuntimeAdapter`；service 只保留 provider/prompt/context orchestration。
+  - `AgentChatPortImpl` 已拆出 named-agent context assembly 到 `AgentChatContextAdapter`，避免 chat port 直接组装 page/schema context。
+  - `AgentChatPortImpl` 已拆出 named-agent `ChatTurnRuntime` callback wiring 到 `AgentChatToolRuntimeAdapter`，避免 chat port 直接持有 tool-loop callback 匿名类。
+  - `AgentChatPortImpl` 已拆出 named-agent tool discovery / explicit tools / named-query schema inference 到 `AgentChatToolDiscoveryAdapter`，chat port 不再直接依赖 `ToolDiscoveryContext` 或持有 discovery helper。
+  - `AgentChatPortImpl` 已拆出 approved pending tool execution 到 `AgentChatApprovedPendingToolAdapter`，claim / replay / terminal record 写入不再留在 chat port。
+  - `AgentChatPortImpl` 已拆出 approval/handoff outcome 与 pending snapshot store helper 到 `AgentChatTurnOutcomeAdapter` / `AgentChatToolRuntimeAdapter`，chat port 不再持有 handoff meta、approval outcome、AuraBot skill pending snapshot 或 approval pending snapshot 细节。
+  - `AgentChatPortImpl` 已拆出 named-agent tool execution / unknown-tool validation / result normalization 到 `AgentChatToolExecutionAdapter`，chat port 不再直接调用 `ToolLoopResultNormalizer` 或维护 `AgentToolDefinition` 执行转换。
+  - isolated agent runtime gate 已补充通过，并在 `TurnExecutionPlanner` 收敛后 fresh rerun：auth setup 19 passed、AuraBot skill resume API 2 passed、Admin Agent Runs UI replay 5 passed；按要求未运行 Page Designer 测试。
+  - `scripts/dev/run-agent-runtime-full-gate-docker.sh --host-runner` 已修正 plugin root：host runner 面向容器后端时必须传 `/app/plugins` / `/app/plugins-enterprise`，避免把宿主机路径传给后端导致重复 import 或路径不可见被误判为产品失败。
 - 当前通用 runtime 架构基线已按本方案收敛；剩余不再是本轮通用 runtime 架构缺口，而是后续产品/业务扩展与更大范围 gate：
   - 接入具体业务补偿 handler。
   - 为非 pageContext 来源继续扩展结构化 RAG/schema/record provenance。

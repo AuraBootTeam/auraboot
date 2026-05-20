@@ -428,7 +428,7 @@ class AgentRuntimeArchitectureTest {
     @DisplayName("chat adapters must use PendingToolSnapshotFactory for pending snapshots")
     void chatAdaptersUsePendingToolSnapshotFactory() {
         List<Path> chatAdapterFiles = List.of(
-                MAIN_SOURCES.resolve("agent/service/AgentChatPortImpl.java"),
+                MAIN_SOURCES.resolve("agent/service/AgentChatToolRuntimeAdapter.java"),
                 MAIN_SOURCES.resolve("aurabot/service/AuraBotPendingContinuationService.java"));
 
         List<Path> offenders = chatAdapterFiles.stream()
@@ -660,6 +660,28 @@ class AgentRuntimeArchitectureTest {
     }
 
     @Test
+    @DisplayName("conversation turn execution planner must use execution-policy naming")
+    void conversationTurnExecutionPlannerUsesExecutionPolicyNaming() throws Exception {
+        Path chokepoint = MAIN_SOURCES.resolve("conversation/ConversationTurnServiceImpl.java");
+        String text = Files.readString(chokepoint);
+
+        assertThat(MAIN_SOURCES.resolve("agent/runtime/AgentTurnRouter.java"))
+                .as("Scenario-era AgentTurnRouter should not remain as a production entrypoint")
+                .doesNotExist();
+        assertThat(MAIN_SOURCES.resolve("agent/runtime/ExecutionRoutePlanner.java"))
+                .as("Route-named lifecycle planner should not remain as a production entrypoint")
+                .doesNotExist();
+        assertThat(MAIN_SOURCES.resolve("agent/runtime/TurnExecutionPlanner.java"))
+                .as("The remaining planner must be named by turn execution semantics")
+                .exists();
+        assertThat(text)
+                .as("ConversationTurnService should depend on the execution-named planner")
+                .contains("TurnExecutionPlanner turnExecutionPlanner")
+                .contains("turnExecutionPlanner.decide(")
+                .doesNotContain("AgentTurnRouter");
+    }
+
+    @Test
     @DisplayName("durable run orchestrator must require runtime state factory")
     void durableRunOrchestratorRequiresRuntimeStateFactory() throws Exception {
         Path agentRunService = MAIN_SOURCES.resolve("agent/service/AgentRunService.java");
@@ -716,6 +738,116 @@ class AgentRuntimeArchitectureTest {
     }
 
     @Test
+    @DisplayName("named-agent chat must delegate context assembly")
+    void namedAgentChatDelegatesContextAssembly() throws Exception {
+        Path namedAgentChat = MAIN_SOURCES.resolve("agent/service/AgentChatPortImpl.java");
+        String text = Files.readString(namedAgentChat);
+
+        assertThat(MAIN_SOURCES.resolve("agent/service/AgentChatContextAdapter.java"))
+                .as("Named-agent page/schema context assembly should live outside the chat port")
+                .exists();
+        assertThat(text)
+                .contains("new AgentChatContextAdapter(objectMapper).assemble(ctx, request)")
+                .doesNotContain("new AgentContextAssembler(objectMapper).assemble(");
+    }
+
+    @Test
+    @DisplayName("named-agent chat must delegate tool-loop callback adapter")
+    void namedAgentChatDelegatesToolLoopCallbackAdapter() throws Exception {
+        Path namedAgentChat = MAIN_SOURCES.resolve("agent/service/AgentChatPortImpl.java");
+        String text = Files.readString(namedAgentChat);
+
+        assertThat(MAIN_SOURCES.resolve("agent/service/AgentChatToolRuntimeAdapter.java"))
+                .as("Named-agent ChatTurnRuntime callback wiring should live outside the chat port")
+                .exists();
+        assertThat(text)
+                .contains("new AgentChatToolRuntimeAdapter(")
+                .doesNotContain(
+                        "agentChatToolLoopCallbacks(",
+                        "new ChatTurnRuntime.ChatToolLoopCallbacks()");
+    }
+
+    @Test
+    @DisplayName("named-agent chat must delegate tool discovery")
+    void namedAgentChatDelegatesToolDiscovery() throws Exception {
+        Path namedAgentChat = MAIN_SOURCES.resolve("agent/service/AgentChatPortImpl.java");
+        String text = Files.readString(namedAgentChat);
+
+        assertThat(MAIN_SOURCES.resolve("agent/service/AgentChatToolDiscoveryAdapter.java"))
+                .as("Named-agent tool discovery should live outside the chat port adapter")
+                .exists();
+        assertThat(text)
+                .contains("new AgentChatToolDiscoveryAdapter(")
+                .doesNotContain(
+                        "ToolDiscoveryContext",
+                        "private List<ToolDefinition> discoverToolDefinitions(",
+                        "private List<ToolDefinition> discoverExplicitAgentTools(",
+                        "private ToolDefinition loadDirectExplicitTool(",
+                        "private Map<String, Object> buildNamedQueryParameterSchema(");
+    }
+
+    @Test
+    @DisplayName("named-agent chat must delegate approved pending execution")
+    void namedAgentChatDelegatesApprovedPendingExecution() throws Exception {
+        Path namedAgentChat = MAIN_SOURCES.resolve("agent/service/AgentChatPortImpl.java");
+        String text = Files.readString(namedAgentChat);
+
+        assertThat(MAIN_SOURCES.resolve("agent/service/AgentChatApprovedPendingToolAdapter.java"))
+                .as("Approved pending execution claim/replay should live outside the chat port adapter")
+                .exists();
+        assertThat(text)
+                .contains("new AgentChatApprovedPendingToolAdapter(")
+                .doesNotContain(
+                        "PendingToolExecutionClaim",
+                        "PendingToolExecutionRecord",
+                        "PendingToolExecutionStatus",
+                        "private Map<String, Object> replayPendingExecution(",
+                        "private List<AgentToolDefinition> markToolApproved(");
+    }
+
+    @Test
+    @DisplayName("named-agent chat must delegate pending and handoff outcome helpers")
+    void namedAgentChatDelegatesPendingAndHandoffOutcomeHelpers() throws Exception {
+        Path namedAgentChat = MAIN_SOURCES.resolve("agent/service/AgentChatPortImpl.java");
+        String text = Files.readString(namedAgentChat);
+
+        assertThat(MAIN_SOURCES.resolve("agent/service/AgentChatTurnOutcomeAdapter.java"))
+                .as("Named-agent pending/approval/handoff outcome helpers should live outside the chat port")
+                .exists();
+        assertThat(text)
+                .doesNotContain(
+                        "META_HANDOFF_TO",
+                        "META_HANDOFF_CONTEXT",
+                        "storeAuraBotSkillPendingTool(",
+                        "storeApprovalPendingTool(",
+                        "buildApprovalRequiredOutcome(",
+                        "buildHandoffOutcome(",
+                        "String buildToolDescription(",
+                        "approvalPidFrom(");
+    }
+
+    @Test
+    @DisplayName("named-agent chat must delegate tool execution")
+    void namedAgentChatDelegatesToolExecution() throws Exception {
+        Path namedAgentChat = MAIN_SOURCES.resolve("agent/service/AgentChatPortImpl.java");
+        String text = Files.readString(namedAgentChat);
+
+        assertThat(MAIN_SOURCES.resolve("agent/service/AgentChatToolExecutionAdapter.java"))
+                .as("Named-agent tool execution and result normalization should live outside the chat port")
+                .exists();
+        assertThat(text)
+                .contains("new AgentChatToolExecutionAdapter(")
+                .doesNotContain(
+                        "executeToolSafely(",
+                        "ToolLoopResultNormalizer.normalize(",
+                        "private ToolDefinition findToolDef(",
+                        "private List<AgentToolDefinition> toAgentToolDefinitions(",
+                        "private AgentErrorFrame validationErrorFrame(",
+                        "private Map<String, Object> errorResult(",
+                        "private String availableToolNames(");
+    }
+
+    @Test
     @DisplayName("chat runtime must derive tenant envelope after catalog ACL filtering")
     void chatRuntimeDerivesTenantEnvelopeAfterCatalogAclFiltering() throws Exception {
         String runtime = Files.readString(MAIN_SOURCES.resolve("agent/runtime/ChatTurnRuntime.java"));
@@ -766,6 +898,25 @@ class AgentRuntimeArchitectureTest {
                         "freshness",
                         "permission",
                         "recordIds");
+    }
+
+    @Test
+    @DisplayName("AuraBot chat service must delegate tool-loop adapter details")
+    void aurabotChatServiceDelegatesToolLoopAdapterDetails() throws Exception {
+        String aurabot = Files.readString(MAIN_SOURCES.resolve("aurabot/service/AuraBotChatService.java"));
+        Path adapterPath = MAIN_SOURCES.resolve("aurabot/service/AuraBotChatToolRuntimeAdapter.java");
+
+        assertThat(adapterPath)
+                .as("AuraBot-specific tool callback and pending snapshot details should live in a dedicated adapter")
+                .exists();
+        assertThat(aurabot)
+                .as("AuraBotChatService should stay focused on provider/prompt/context orchestration")
+                .contains("new AuraBotChatToolRuntimeAdapter(")
+                .doesNotContain(
+                        "auraBotToolLoopCallbacks(",
+                        "toolDefinitionFromAgentTool(",
+                        "storeAuraBotPending(",
+                        "isAurabotSkillPreviewPending(");
     }
 
     private static Stream<Path> productionJavaFiles() throws IOException {

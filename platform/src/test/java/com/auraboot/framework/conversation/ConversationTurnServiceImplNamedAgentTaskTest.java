@@ -1,7 +1,7 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.port.AgentChatPort;
-import com.auraboot.framework.agent.runtime.AgentTurnRouter;
+import com.auraboot.framework.agent.runtime.TurnExecutionPlanner;
 import com.auraboot.framework.agent.runtime.PendingContinuationService;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -102,7 +102,7 @@ class ConversationTurnServiceImplNamedAgentTaskTest {
         ConversationTurnServiceImpl service = new ConversationTurnServiceImpl(
                 chatService,
                 pendingContinuationService,
-                new AgentTurnRouter(),
+                new TurnExecutionPlanner(),
                 sideEffects,
                 pendingToolStore,
                 new ObjectMapper());
