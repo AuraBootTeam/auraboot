@@ -432,14 +432,14 @@ public class PageSchemaController {
      * @param pageKey 页面唯一标识
      * @return 页面配置
      */
-    @GetMapping("/key/{pageKey}")
+    @GetMapping({"/key/{pageKey}", "/page-key/{pageKey}"})
     @Operation(summary = "根据页面键获取Schema",
-               description = "统一的页面获取端点。Model相关页面使用 {modelCode}_{kind} 格式，如 device_list；独立页面使用自定义 key，如 dashboard_main")
+               description = "统一的页面获取端点。Model相关页面使用 {modelCode}_{kind} 格式，如 device_list；独立页面使用自定义 key，如 dashboard_main。支持草稿和已发布页面。")
     @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PageSchemaDTO> getByPageKey(
             @Parameter(description = "页面唯一标识，如 device_list, dashboard_main") @PathVariable String pageKey) {
         log.info("获取页面Schema: pageKey={}", logSafe(pageKey));
-        PageSchemaDTO schema = pageSchemaService.findByPageKey(pageKey);
+        PageSchemaDTO schema = pageSchemaService.findAnyByPageKey(pageKey);
         if (schema == null) {
             return ApiResponse.error("Page not found: " + pageKey);
         }

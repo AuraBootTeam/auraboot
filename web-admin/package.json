@@ -63,6 +63,7 @@
     "test:unit:watch": "vitest",
     "test:unit:ui": "vitest --ui",
     "test:unit:run": "vitest run",
+    "migrate:page-schema-v3": "tsx scripts/migrate-page-schema-v3.ts",
     "generate:dsl-schema": "node scripts/generate-dsl-schema.mjs",
     "check:dsl-schema": "node scripts/generate-dsl-schema.mjs && git diff --exit-code ../plugins/schemas/dsl-schema.generated.json",
     "generate-certs": "node generate-certs.js",
