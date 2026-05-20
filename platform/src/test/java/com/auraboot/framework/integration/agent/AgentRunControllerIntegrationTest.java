@@ -73,6 +73,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
     @AfterEach
     void cleanup() {
         if (tenantId != null) {
+            jdbc.update("DELETE FROM ab_idempotency_record WHERE tenant_id = ?", tenantId);
             jdbc.update("DELETE FROM ab_ai_trace_span WHERE tenant_id = ?", tenantId);
             jdbc.update("DELETE FROM ab_ai_trace WHERE tenant_id = ?", tenantId);
             jdbc.update("DELETE FROM ab_im_message WHERE tenant_id = ?", tenantId);
@@ -181,6 +182,13 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
 
     private String seedTrace(String sessionId) {
         return seedTraceForTenant(tenantId, sessionId);
+    }
+
+    private void seedIdempotency(String clientRequestId, String commandCode, String status, String outcomeJson) {
+        jdbc.update("INSERT INTO ab_idempotency_record " +
+                        "(tenant_id, client_request_id, request_hash, command_code, outcome, status, expires_at, created_at) " +
+                        "VALUES (?, ?, 'hash', ?, ?::jsonb, ?, NOW() + INTERVAL '1 hour', NOW())",
+                tenantId, clientRequestId, commandCode, outcomeJson, status);
     }
 
     private String seedTraceForTenant(Long traceTenantId, String sessionId) {
@@ -335,6 +343,46 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         AgentRunListItem only = resp.getData().getItems().get(0);
         assertThat(only.getRunId()).isEqualTo(pid);
         assertThat(only.getIntentSummary()).isEqualTo("QUERY_RECORDS");
+    }
+
+    @Test
+    @DisplayName("runtime ops diagnostics surface approval, pending and durable execution state")
+    @SuppressWarnings("unchecked")
+    void runtimeOps_surfacesExecutionStateDiagnostics() {
+        String runPid = seedRun("aurabot", "running");
+        String approvalPid = seedApproval(runPid, "cmd:crm_customer_update");
+        seedIdempotency("agent.pending_tool_execution:turn-1:tool-1",
+                "agent.pending_tool_execution:cmd:crm_customer_update",
+                "RUNNING",
+                "{\"executionKey\":\"agent.pending_tool_execution:turn-1:tool-1\",\"status\":\"RUNNING\"}");
+        seedIdempotency("agent.tool_execution:" + runPid + ":custom:sync_crm:args",
+                "agent.tool_execution:custom:sync_crm",
+                "COMPENSATION_REQUIRED",
+                "{\"executionKey\":\"agent.tool_execution:" + runPid + ":custom:sync_crm:args\","
+                        + "\"status\":\"COMPENSATION_REQUIRED\","
+                        + "\"compensationReason\":\"not retryable\","
+                        + "\"request\":{\"tenantId\":" + tenantId + ",\"runPid\":\"" + runPid + "\","
+                        + "\"toolName\":\"custom:sync_crm\",\"toolRef\":\"custom:sync_crm\"}}");
+        ApiResponse<Map<String, Object>> resp = controller.runtimeOps(runPid, 20);
+
+        assertThat(resp.isSuccess()).isTrue();
+        Map<String, Object> data = resp.getData();
+        assertThat((List<Map<String, Object>>) data.get("approvals"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row).containsEntry("pid", approvalPid);
+                    assertThat(row).containsEntry("approvalStatus", "pending");
+                });
+        assertThat((List<Map<String, Object>>) data.get("pendingToolExecutions"))
+                .singleElement()
+                .satisfies(row -> assertThat(row).containsEntry("status", "RUNNING"));
+        assertThat((List<Map<String, Object>>) data.get("durableToolExecutions"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row).containsEntry("status", "COMPENSATION_REQUIRED");
+                    assertThat(String.valueOf(row.get("outcome"))).contains("not retryable");
+                });
+        assertThat(data).containsKey("checkpoints");
     }
 
     // =========================================================================

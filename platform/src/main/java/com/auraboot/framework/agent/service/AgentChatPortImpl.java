@@ -18,6 +18,7 @@ import com.auraboot.framework.agent.runtime.LlmRuntimeResolver;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
 import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
+import com.auraboot.framework.agent.runtime.context.AgentContextAssembler;
 import com.auraboot.framework.agent.runtime.policy.AgentProfile;
 import com.auraboot.framework.agent.runtime.policy.AgentProfileResolver;
 import com.auraboot.framework.agent.runtime.policy.DefaultAgentProfileResolver;
@@ -113,7 +114,39 @@ public class AgentChatPortImpl implements AgentChatPort {
                 agentReducer,
                 chatTurnRuntime,
                 pendingToolSnapshotFactory,
-                DefaultAgentProfileResolver.INSTANCE);
+                DefaultAgentProfileResolver.INSTANCE,
+                fallbackContextAdapter(objectMapper));
+    }
+
+    public AgentChatPortImpl(DynamicDataMapper dynamicDataMapper,
+                             LlmProviderFactory providerFactory,
+                             ToolProviderRegistry toolProviderRegistry,
+                             GroundingService groundingService,
+                             AgentSkillService skillService,
+                             ObjectMapper objectMapper,
+                             ChatMessageTapeStore chatMessageTapeStore,
+                             PendingToolStore pendingToolStore,
+                             ToolLoopService toolLoopService,
+                             AgentRuntimeStateFactory runtimeStateFactory,
+                             AgentReducer agentReducer,
+                             ChatTurnRuntime chatTurnRuntime,
+                             PendingToolSnapshotFactory pendingToolSnapshotFactory,
+                             AgentProfileResolver agentProfileResolver) {
+        this(dynamicDataMapper,
+                providerFactory,
+                toolProviderRegistry,
+                groundingService,
+                skillService,
+                objectMapper,
+                chatMessageTapeStore,
+                pendingToolStore,
+                toolLoopService,
+                runtimeStateFactory,
+                agentReducer,
+                chatTurnRuntime,
+                pendingToolSnapshotFactory,
+                agentProfileResolver,
+                fallbackContextAdapter(objectMapper));
     }
 
     @Autowired
@@ -130,7 +163,8 @@ public class AgentChatPortImpl implements AgentChatPort {
                              AgentReducer agentReducer,
                              ChatTurnRuntime chatTurnRuntime,
                              PendingToolSnapshotFactory pendingToolSnapshotFactory,
-                             AgentProfileResolver agentProfileResolver) {
+                             AgentProfileResolver agentProfileResolver,
+                             AgentChatContextAdapter contextAdapter) {
         this.dynamicDataMapper = dynamicDataMapper;
         this.providerFactory = providerFactory;
         this.toolProviderRegistry = toolProviderRegistry;
@@ -156,7 +190,9 @@ public class AgentChatPortImpl implements AgentChatPort {
                 toolProviderRegistry,
                 groundingService,
                 objectMapper);
-        this.contextAdapter = new AgentChatContextAdapter(objectMapper);
+        this.contextAdapter = contextAdapter != null
+                ? contextAdapter
+                : fallbackContextAdapter(objectMapper);
         AgentChatTurnOutcomeAdapter turnOutcomeAdapter =
                 new AgentChatTurnOutcomeAdapter(chatTurnRuntime, objectMapper);
         AgentChatToolExecutionAdapter toolExecutionAdapter =
@@ -190,6 +226,10 @@ public class AgentChatPortImpl implements AgentChatPort {
 
     @Autowired(required = false)
     private ToolAclChecker toolAclChecker;
+
+    private static AgentChatContextAdapter fallbackContextAdapter(ObjectMapper mapper) {
+        return new AgentChatContextAdapter(new AgentContextAssembler(mapper));
+    }
 
     // =========================================================================
     // AgentChatPort implementation

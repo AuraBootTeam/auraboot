@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -82,6 +83,9 @@ public class AgentRunController {
 
     /** Hard cap on returned messages per reconstructed conversation turn. */
     private static final int MAX_CONVERSATION_MESSAGES = 50;
+
+    /** Hard cap on runtime ops diagnostic rows per section. */
+    private static final int MAX_RUNTIME_OPS_ROWS = 200;
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -246,6 +250,45 @@ public class AgentRunController {
     }
 
     // =========================================================================
+    // GET /runtime-ops — pending/approval/durable execution diagnostics
+    // =========================================================================
+
+    /**
+     * {@code GET /api/admin/agent-runs/runtime-ops}
+     *
+     * <p>Read-only operational projection for pending confirmations, approval
+     * requests, durable side-effect execution ledger rows, and workflow
+     * checkpoints. It intentionally does not retry, compensate, approve, or
+     * mutate any runtime state.
+     */
+    @GetMapping("/runtime-ops")
+    public ApiResponse<Map<String, Object>> runtimeOps(
+            @RequestParam(required = false) String runId,
+            @RequestParam(defaultValue = "50") int limit) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String normalizedRunId = normalizeBlank(runId);
+        int safeLimit = Math.min(Math.max(1, limit), MAX_RUNTIME_OPS_ROWS);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("runId", normalizedRunId);
+        result.put("limit", safeLimit);
+        result.put("approvals", loadRuntimeApprovals(tenantId, normalizedRunId, safeLimit));
+        result.put("pendingToolExecutions", loadRuntimeIdempotencyRows(
+                tenantId,
+                "agent.pending_tool_execution:%",
+                null,
+                safeLimit));
+        result.put("pendingToolExecutionScope", "tenant");
+        result.put("durableToolExecutions", loadRuntimeIdempotencyRows(
+                tenantId,
+                "agent.tool_execution:%",
+                normalizedRunId,
+                safeLimit));
+        result.put("checkpoints", loadRuntimeCheckpoints(tenantId, normalizedRunId, safeLimit));
+        return ApiResponse.ok(result);
+    }
+
+    // =========================================================================
     // GET /{runId} — single-run detail
     // =========================================================================
 
@@ -331,6 +374,105 @@ public class AgentRunController {
                 " LIMIT 1";
         List<AgentRunListItem> rows = jdbcTemplate.query(sql, RUN_ROW_MAPPER, tenantId, runId);
         return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private List<Map<String, Object>> loadRuntimeApprovals(Long tenantId, String runId, int limit) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT pid, run_id, task_id, approval_type, approval_status,
+                       policy_id, idempotency_key, expires_at, created_at, approved_at
+                  FROM ab_agent_approval
+                 WHERE tenant_id = ?
+                """);
+        List<Object> args = new ArrayList<>();
+        args.add(tenantId);
+        if (runId != null) {
+            sql.append(" AND run_id = ?");
+            args.add(runId);
+        }
+        sql.append(" ORDER BY created_at DESC LIMIT ?");
+        args.add(limit);
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("pid", rs.getString("pid"));
+            row.put("runId", rs.getString("run_id"));
+            row.put("taskId", rs.getString("task_id"));
+            row.put("approvalType", rs.getString("approval_type"));
+            row.put("approvalStatus", rs.getString("approval_status"));
+            row.put("policyId", rs.getString("policy_id"));
+            row.put("idempotencyKey", rs.getString("idempotency_key"));
+            row.put("expiresAt", timestampString(rs, "expires_at"));
+            row.put("createdAt", timestampString(rs, "created_at"));
+            row.put("approvedAt", timestampString(rs, "approved_at"));
+            return row;
+        }, args.toArray());
+    }
+
+    private List<Map<String, Object>> loadRuntimeIdempotencyRows(Long tenantId,
+                                                                 String commandCodePattern,
+                                                                 String runId,
+                                                                 int limit) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT client_request_id, request_hash, command_code, status,
+                       outcome::text AS outcome, expires_at, created_at
+                  FROM ab_idempotency_record
+                 WHERE tenant_id = ?
+                   AND command_code LIKE ?
+                   AND expires_at > NOW()
+                """);
+        List<Object> args = new ArrayList<>();
+        args.add(tenantId);
+        args.add(commandCodePattern);
+        if (runId != null) {
+            sql.append(" AND outcome->'request'->>'runPid' = ?");
+            args.add(runId);
+        }
+        sql.append(" ORDER BY created_at DESC LIMIT ?");
+        args.add(limit);
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("clientRequestId", rs.getString("client_request_id"));
+            row.put("requestHash", rs.getString("request_hash"));
+            row.put("commandCode", rs.getString("command_code"));
+            row.put("status", rs.getString("status"));
+            row.put("outcome", rs.getString("outcome"));
+            row.put("expiresAt", timestampString(rs, "expires_at"));
+            row.put("createdAt", timestampString(rs, "created_at"));
+            return row;
+        }, args.toArray());
+    }
+
+    private List<Map<String, Object>> loadRuntimeCheckpoints(Long tenantId, String runId, int limit) {
+        if (runId == null) {
+            return List.of();
+        }
+        String sql = """
+                SELECT pid, run_pid, checkpoint_type, step_index, reason,
+                       plan_snapshot::text AS plan_snapshot,
+                       state_snapshot::text AS state_snapshot,
+                       created_at
+                  FROM ab_agent_run_checkpoint
+                 WHERE tenant_id = ?
+                   AND run_pid = ?
+                 ORDER BY created_at DESC
+                 LIMIT ?
+                """;
+        try {
+            return jdbcTemplate.query(sql, (rs, rowNum) -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("pid", rs.getString("pid"));
+                row.put("runPid", rs.getString("run_pid"));
+                row.put("checkpointType", rs.getString("checkpoint_type"));
+                row.put("stepIndex", getInteger(rs, "step_index"));
+                row.put("reason", rs.getString("reason"));
+                row.put("planSnapshot", rs.getString("plan_snapshot"));
+                row.put("stateSnapshot", rs.getString("state_snapshot"));
+                row.put("createdAt", timestampString(rs, "created_at"));
+                return row;
+            }, tenantId, runId, limit);
+        } catch (DataAccessException e) {
+            log.debug("Agent workflow checkpoint diagnostics unavailable: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private List<AgentActionItem> loadActions(Long tenantId, String runId) {
@@ -1068,6 +1210,11 @@ public class AgentRunController {
     private static Long getLong(ResultSet rs, String col) throws SQLException {
         long v = rs.getLong(col);
         return rs.wasNull() ? null : v;
+    }
+
+    private static String timestampString(ResultSet rs, String col) throws SQLException {
+        Timestamp timestamp = rs.getTimestamp(col);
+        return timestamp == null ? null : timestamp.toInstant().toString();
     }
 
     private record RunConversationSeed(String runId, String metadata, String inputData) {}

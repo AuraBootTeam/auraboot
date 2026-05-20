@@ -60,6 +60,7 @@ public class AuraBotChatService {
     private final MetaModelService metaModelService;
     private final ChatTurnRuntime chatTurnRuntime;
     private final AuraBotChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory;
+    private final AgentContextAssembler contextAssembler;
     @Qualifier("asyncTaskExecutor")
     private final Executor asyncTaskExecutor;
 
@@ -128,12 +129,34 @@ public class AuraBotChatService {
                 metaModelService,
                 chatTurnRuntime,
                 asyncTaskExecutor,
+                fallbackContextAssembler(objectMapper),
                 new AuraBotChatToolRuntimeAdapterFactory(
                         chatTurnRuntime,
                         llmProviderFactory,
                         chatToolResolver,
                         chatToolExecutor,
                         objectMapper));
+    }
+
+    public AuraBotChatService(LlmProviderFactory llmProviderFactory,
+                              PromptTemplateService promptTemplateService,
+                              ChatToolResolver chatToolResolver,
+                              ObjectMapper objectMapper,
+                              AiTraceService aiTraceService,
+                              MetaModelService metaModelService,
+                              ChatTurnRuntime chatTurnRuntime,
+                              @Qualifier("asyncTaskExecutor") Executor asyncTaskExecutor,
+                              AuraBotChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory) {
+        this(llmProviderFactory,
+                promptTemplateService,
+                chatToolResolver,
+                objectMapper,
+                aiTraceService,
+                metaModelService,
+                chatTurnRuntime,
+                asyncTaskExecutor,
+                fallbackContextAssembler(objectMapper),
+                toolRuntimeAdapterFactory);
     }
 
     @Autowired
@@ -145,6 +168,7 @@ public class AuraBotChatService {
                               MetaModelService metaModelService,
                               ChatTurnRuntime chatTurnRuntime,
                               @Qualifier("asyncTaskExecutor") Executor asyncTaskExecutor,
+                              AgentContextAssembler contextAssembler,
                               AuraBotChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory) {
         this.llmProviderFactory = llmProviderFactory;
         this.promptTemplateService = promptTemplateService;
@@ -154,7 +178,14 @@ public class AuraBotChatService {
         this.metaModelService = metaModelService;
         this.chatTurnRuntime = chatTurnRuntime;
         this.asyncTaskExecutor = asyncTaskExecutor;
+        this.contextAssembler = contextAssembler != null
+                ? contextAssembler
+                : fallbackContextAssembler(objectMapper);
         this.toolRuntimeAdapterFactory = toolRuntimeAdapterFactory;
+    }
+
+    private static AgentContextAssembler fallbackContextAssembler(ObjectMapper mapper) {
+        return new AgentContextAssembler(mapper);
     }
 
     static Map<String, Object> buildPromptSpanOutput(String systemPrompt) {
@@ -524,7 +555,7 @@ public class AuraBotChatService {
         ChatRequest.PageContext ctx = request != null ? request.getPageContext() : null;
         String modelSchemaText = ctx != null ? buildModelSchemaText(ctx.getModelCode()) : "";
         String ragContext = request != null ? resolveRagContext(tenantId, request) : "";
-        AgentContextBundle contextBundle = new AgentContextAssembler(objectMapper).assemble(
+        AgentContextBundle contextBundle = contextAssembler.assemble(
                 new AgentContextAssembler.Request(
                         tenantId,
                         null,

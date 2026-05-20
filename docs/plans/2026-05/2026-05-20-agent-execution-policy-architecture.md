@@ -1561,6 +1561,13 @@ scripts/dev/run-agent-runtime-full-gate-docker.sh --slug=agent-runtime-fix --reu
   - 架构测试新增防回退断言：禁止 `ChatTurnRuntime` 重新用字段 `new` 隐藏 policy singleton；禁止 `AuraBotChatService` 主路径重新直接构造 tool runtime adapter；要求 group-chat handoff 使用 explicit policy decision。
   - fresh focused agent gate 已通过：`compileJava` / `compileTestJava`、`AgentRuntimeArchitectureTest`、`ChatTurnRuntimeTest`、`agent.runtime.policy.*`、`AgentChatPortImpl*`、`AuraBotChatServiceGroundingTest`、`DefaultPreGroundingTriageTest`、`TurnExecutionPlannerTest`、`ConversationTurnServiceImplDispatchTest`、`ConversationTurnServiceImplNamedAgentTaskTest`、`AgentReplyTaskChokepointTest`、`HandoffPermissionPolicyTest`。
 - 当前通用 runtime 架构基线已按本方案收敛；剩余不再是本轮通用 runtime 架构缺口，而是后续产品/业务扩展与更大范围 gate：
-  - 接入具体业务补偿 handler。
-  - 为非 pageContext 来源继续扩展结构化 RAG/schema/record provenance。
-  - 在提交前按仓库节奏继续跑 broader regular/deep gate；Page Designer 相关测试按用户要求继续排除。
+  - 2026-05-20 后续落地已补第一批产品化闭环：
+    - 新增 provider-backed `ProviderToolCompensationHandler`，`COMPENSATION_REQUIRED` 记录可通过显式 `compensationToolRef` / `compensationArgs` 调用已注册 tool provider 做真实补偿；没有显式补偿工具时仍保持 fail-closed，不从原 tool name 推断回滚动作。
+    - `AgentContextAssembler` 已注册为 Spring bean，并支持非 `pageContext` 来源直接注入 schema / record / RAG provenance；pageContext 旧语义保持 `CLIENT_SNAPSHOT + PAGE_CONTEXT`，结构化 server record 使用 `SERVER_CONTEXT + STRUCTURED_RECORD_CONTEXT`。
+    - `AuraBotChatService` / `AgentChatContextAdapter` 已改为消费注入的 `AgentContextAssembler`；架构测试锁定 named-agent adapter 不再自行 new assembler。
+    - `AgentRunController` 新增只读 `/api/admin/agent-runs/runtime-ops` 诊断接口，按 tenant 展示 approval、pending tool execution ledger、durable tool execution ledger 与 workflow checkpoint（checkpoint 表缺失的旧环境降级为空列表）。
+    - `AuraPluginManager.cleanup` 已从直接 `stopPlugins()` 改为 snapshot `getStartedPlugins()` 后逐个 stop，避免 shutdown 阶段集合被修改触发 `ConcurrentModificationException` warning。
+    - 新增 `scripts/dev/run-agent-runtime-backend-gate.sh`，并接入 `.github/workflows/agent-runtime-gate.yml`，把 Agent 后端 focused gate 固化到 CI；该 gate 继续排除 Page Designer。
+  - 剩余业务补偿工作从“扩展点缺失”变为“各业务工具按需提供显式 compensation tool/args 或更专用 handler”。
+  - 非 pageContext provenance 的底座已补，后续是把更多调用入口的 schema / record / RAG 实际数据接入这个 request，而不是继续扩展 prompt 字符串。
+  - 后续如需合入更大范围 regular/deep gate，仍按 targeted → slice/smoke → broader gate 分层推进；Page Designer 相关测试按用户要求继续排除。
