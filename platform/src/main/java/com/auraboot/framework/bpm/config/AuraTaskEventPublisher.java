@@ -1,6 +1,8 @@
 package com.auraboot.framework.bpm.config;
 
+import com.auraboot.smart.framework.engine.SmartEngine;
 import com.auraboot.smart.framework.engine.configuration.TaskEventPublisher;
+import com.auraboot.smart.framework.engine.model.assembly.ProcessDefinition;
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.smart.framework.engine.pvm.event.EventConstant;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -12,7 +14,9 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,6 +43,7 @@ public class AuraTaskEventPublisher implements TaskEventPublisher {
     private final EventBusService eventBusService;
     private final BpmProcessDefinitionMapper processDefinitionMapper;
     private final UserService userService;
+    private final ObjectProvider<SmartEngine> smartEngineProvider;
 
     @Override
     public void publish(EventConstant event, TaskInstance taskInstance,
@@ -110,6 +115,12 @@ public class AuraTaskEventPublisher implements TaskEventPublisher {
      */
     private void enrichWithProcessName(Map<String, Object> payload, String processKeyWithVersion, Long tenantId) {
         if (processKeyWithVersion == null || tenantId == null || tenantId == 0L) return;
+        String cachedName = resolveCachedProcessName(processKeyWithVersion, tenantId);
+        if (StringUtils.hasText(cachedName)) {
+            payload.put("processName", cachedName);
+            return;
+        }
+
         try {
             // processKey from SmartEngine includes version suffix (e.g. "pr_xxx:1.0.0")
             // Strip version to get the base process key
@@ -130,6 +141,33 @@ public class AuraTaskEventPublisher implements TaskEventPublisher {
         } catch (Exception e) {
             // CATCH: non-transactional enrichment, safe to handle — do not block event publishing
             log.debug("Could not enrich process name for key={}: {}", processKeyWithVersion, e.getMessage());
+        }
+    }
+
+    private String resolveCachedProcessName(String processKeyWithVersion, Long tenantId) {
+        try {
+            SmartEngine smartEngine = smartEngineProvider.getIfAvailable();
+            if (smartEngine == null || smartEngine.getRepositoryQueryService() == null) {
+                return null;
+            }
+            ProcessDefinition definition = null;
+            int versionSeparator = processKeyWithVersion.lastIndexOf(':');
+            if (versionSeparator > 0 && versionSeparator < processKeyWithVersion.length() - 1) {
+                definition = smartEngine.getRepositoryQueryService().getCachedProcessDefinition(
+                        processKeyWithVersion.substring(0, versionSeparator),
+                        processKeyWithVersion.substring(versionSeparator + 1),
+                        tenantId != null ? tenantId.toString() : null
+                );
+            }
+            if (definition == null) {
+                definition = smartEngine.getRepositoryQueryService()
+                        .getCachedProcessDefinition(processKeyWithVersion);
+            }
+            return definition != null ? definition.getName() : null;
+        } catch (Exception e) {
+            log.debug("Could not resolve cached process name for key={}: {}",
+                    processKeyWithVersion, e.getMessage());
+            return null;
         }
     }
 

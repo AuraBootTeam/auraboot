@@ -78,6 +78,13 @@ async function loginViaUI(page: Page, email: string, password: string) {
   await pwd.fill(password);
   await expect(pwd).toHaveValue(password, { timeout: 3000 });
 
+  // The login page restores remembered credentials during hydration. Keep email
+  // as the last controlled-field write before submit so native required
+  // validation cannot block the form with a stale empty email value.
+  await emailInput.fill(email);
+  await expect(emailInput).toHaveValue(email, { timeout: 3000 });
+  await expect(pwd).toHaveValue(password, { timeout: 3000 });
+
   await page
     .locator(
       'form button[type="submit"], form button:has-text("立即登录"), form button:has-text("Login"), form button:has-text("loginNow")',

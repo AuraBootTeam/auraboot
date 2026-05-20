@@ -15,6 +15,9 @@ export enum BPMNNodeType {
   PARALLEL_GATEWAY = 'parallelGateway',
   INCLUSIVE_GATEWAY = 'inclusiveGateway',
   CALL_ACTIVITY = 'callActivity',
+  RULE_TASK = 'rule-task',
+  NOTIFICATION_TASK = 'notification-task',
+  RECORD_UPDATE_TASK = 'record-update-task',
 }
 
 // 人员分配类型

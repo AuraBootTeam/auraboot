@@ -67,12 +67,9 @@ public class SlaActivationListener {
         }
 
         try {
-            // Look up SLA configs targeting this node (targetType may be stored as "NODE" or "node")
-            List<SlaConfigEntity> configs = slaConfigService.findByTarget("NODE", activityId);
-            if (configs.isEmpty()) {
-                // Also try lowercase (UI-created configs may use lowercase)
-                configs = slaConfigService.findByTarget("node", activityId);
-            }
+            // Look up SLA configs targeting this node. Target type may be stored
+            // as "NODE" or "node", so resolve all variants in one mapper call.
+            List<SlaConfigEntity> configs = slaConfigService.findByTargetAnyCase("NODE", activityId);
 
             if (configs.isEmpty()) {
                 log.debug("No SLA config found for NODE/{} — skipping SLA record creation", activityId);

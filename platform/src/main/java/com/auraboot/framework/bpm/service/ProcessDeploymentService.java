@@ -662,6 +662,7 @@ public class ProcessDeploymentService {
                 .eq("tenant_id", tenantId)
                 .eq("process_key", processKey);
         bpmNodeHookMapper.delete(deleteWrapper);
+        bpmNodeHookService.invalidateProcessHookCache(processKey);
 
         if (entries.isEmpty()) {
             log.debug("No designer node hooks to persist for processKey={}", processKey);
