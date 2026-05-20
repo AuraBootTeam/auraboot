@@ -87,16 +87,27 @@
 
 ## Task List
 
-- [ ] Task 1: Add failing tests for durable policy routing from request metadata.
-- [ ] Task 2: Implement durable policy extraction in `ConversationTurnServiceImpl`.
-- [ ] Task 3: Add failing tests proving `ChatTurnRuntime` delegates pending/approval policy without AuraBot-specific branches.
-- [ ] Task 4: Replace AuraBot-specific branches in `ChatTurnRuntime` with generic tool disposition callbacks.
-- [ ] Task 5: Add failing tests for pending resume follow-up tool execution through snapshot-backed `ToolLoopService`.
-- [ ] Task 6: Implement unified pending resume execution and runtime-state reducer.
-- [ ] Task 7: Extract `AuraBotPromptContextBuilder` and move prompt/schema/RAG/user-profile assembly out of `AuraBotChatService`.
-- [ ] Task 8: Sanitize remaining `StepLoopService` ACP error/log result paths and add focused regression tests.
-- [ ] Task 9: Add/extend architecture tests for runtime boundaries.
-- [ ] Task 10: Run targeted compile/test suite and `git diff --check`; update this document with completion evidence.
+- [x] Task 1: Add failing tests for durable policy routing from request metadata.
+- [x] Task 2: Implement durable policy extraction in `ConversationTurnServiceImpl`.
+- [x] Task 3: Add failing tests proving `ChatTurnRuntime` delegates pending/approval policy without AuraBot-specific branches.
+- [x] Task 4: Replace AuraBot-specific branches in `ChatTurnRuntime` with generic tool disposition callbacks.
+- [x] Task 5: Add failing tests for pending resume follow-up tool execution through snapshot-backed `ToolLoopService`.
+- [x] Task 6: Implement unified pending resume execution and runtime-state reducer.
+- [x] Task 7: Resolve prompt/context ownership by introducing provenance-labeled `AgentContextAssembler`; the original `AuraBotPromptContextBuilder` name is superseded, while future prompt-builder rename is non-blocking cleanup.
+- [x] Task 8: Sanitize remaining `StepLoopService` ACP error/log result paths and add focused regression tests.
+- [x] Task 9: Add/extend architecture tests for runtime boundaries.
+- [x] Task 10: Run targeted compile/test suite and `git diff --check`; update this document with completion evidence.
+
+2026-05-20 状态校准：
+
+- `ChatTurnRuntime` 已保持 adapter-neutral：不再直接命名 AuraBot 专属 tool type 或 preview-pending marker。Adapter-specific preview confirmation 统一通过 generic `ToolResultDisposition` callbacks 承接。
+- `AgentTurnRouter` decision reason 已改为执行语义命名（`DURABLE_TRIAGE_SIGNAL`、`DURABLE_EXECUTION_POLICY`、`SYNC_READ_ONLY_TURN`、`SYNC_CHAT_TURN`），不再使用 AuraBot/light/contextual 场景命名。
+- `AgentRuntimeArchitectureTest` 已锁住这两个边界，防止后续在 generic runtime 重新引入 AuraBot 分支，或在 router reason 中重新引入 scenario 命名。
+- Review fix verification 已覆盖：
+  - `./gradlew :test --tests 'com.auraboot.framework.agent.runtime.ChatTurnRuntimeTest' --tests 'com.auraboot.framework.agent.runtime.AgentTurnRouterTest' --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceResumeSnapshotTest' --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest'`
+  - `./gradlew :test --tests 'com.auraboot.framework.aurabot.service.AuraBotChatSkillResumeIntegrationTest'` with isolated `auraboot-skills-c2` Postgres/Redis preflight.
+  - `./gradlew :compileJava :compileTestJava`
+  - `git diff --check`
 
 ## Validation Plan
 

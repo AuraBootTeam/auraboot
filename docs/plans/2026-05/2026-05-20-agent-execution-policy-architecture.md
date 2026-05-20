@@ -1511,6 +1511,10 @@ docker compose -f docker-compose.yml -f docker-compose.skills-c2.override.yml -p
 - context freshness 已有 `ab_data_change_log` validator 和 pending 创建时的 version resolver；page/RAG/schema/record provenance 已正式沉淀到 `AgentContextAssembler` / `AgentContextBundle` 契约；`PendingToolSnapshotFactory` 已优先消费 context provenance 的 record scope，再回退到 tool input / tool name 推断。
 - profile permissions 已从 `AgentDefinition.guardrails` 进入 named-agent / group-chat 路径，并已沉淀为 `AgentProfileResolver` / `AgentContextPolicy` 契约；`ToolAclChecker` 已接入 named-agent pre-model catalog filtering，channel/profile identity 已进入 `TurnContext` 和 pending snapshot；tenant policy 已通过 `AgentTenantPolicy.fromCatalog(...)` 进入 envelope planning。
 - `DurableWorkflowEngine` 已建立 conversation-triggered ACP start/resume substrate，并已从 `ConversationTurnServiceImpl` 抽走 durable task/run 执行细节；direct external side-effect recovery 和可审计 step checkpoint history 已落地。后续新增 durable workflow 能力时应继续扩展 `DurableWorkflowEngine` / checkpoint store / recovery handler，而不是重新在 chokepoint 或 chat adapter 内写执行分支。
+- 2026-05-20 review 修正：
+  - `ChatTurnRuntime` 已移除 AuraBot 专属 tool type / preview marker 判断，改由 generic `ToolResultDisposition` callbacks 承接 adapter-specific pending 行为。
+  - `AgentTurnRouter` 的 decision reason / policy signal 已改为执行语义命名，不再使用 AuraBot/light/contextual 场景命名。
+  - 已新增架构测试防止 generic runtime 重新引入 adapter-specific 分支。
 - 当前通用 runtime 架构基线已按本方案收敛；剩余不再是本轮通用 runtime 架构缺口，而是后续产品/业务扩展与更大范围 gate：
   - 接入具体业务补偿 handler。
   - 为非 pageContext 来源继续扩展结构化 RAG/schema/record provenance。

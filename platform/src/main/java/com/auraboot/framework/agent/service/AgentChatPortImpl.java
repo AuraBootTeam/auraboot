@@ -487,6 +487,23 @@ public class AgentChatPortImpl implements AgentChatPort {
             }
 
             @Override
+            public boolean deferPolicyUntilToolResult(ChatTurnRuntime.ChatToolCall call, ToolDefinition definition) {
+                return AgentChatPortImpl.this.defersPolicyUntilToolResult(definition);
+            }
+
+            @Override
+            public ChatTurnRuntime.ToolResultDisposition classifyToolResult(ChatTurnRuntime.ChatToolCall call,
+                                                                            Map<String, Object> result) {
+                if (isPreviewConfirmationResult(result)) {
+                    return ChatTurnRuntime.ToolResultDisposition.REQUIRE_USER_CONFIRMATION;
+                }
+                if (result != null && Boolean.TRUE.equals(result.get("approvalRequired"))) {
+                    return ChatTurnRuntime.ToolResultDisposition.REQUIRE_APPROVAL;
+                }
+                return ChatTurnRuntime.ToolResultDisposition.CONTINUE;
+            }
+
+            @Override
             public List<AgentContextBlock> contextBlocks(ChatTurnRuntime.ChatToolLoopRound round) {
                 return contextBlocks != null ? contextBlocks : List.of();
             }
@@ -530,14 +547,18 @@ public class AgentChatPortImpl implements AgentChatPort {
             }
 
             @Override
-            public void storeAuraBotSkillPending(ChatTurnRuntime.PendingChatTool pending,
-                                                 Map<String, Object> result) {
-                storeAuraBotSkillPendingTool(result, pending.ctx(), pending.agentCode(), pending.sessionId(),
-                        pending.toolId(), pending.toolName(), pending.input(), pending.toolDefinitions(),
-                        pending.contextBlocks(),
-                        pending.messages(), pending.providerCode(), pending.model(), pending.systemPrompt(),
-                        pending.runtimeSystemPrompt(), pending.maxTokens(), pending.round(), pending.toolChoice(),
-                        pending.persistTape());
+            public void storeToolResultConfirmationPending(ChatTurnRuntime.PendingChatTool pending,
+                                                           Map<String, Object> result) {
+                if (isPreviewConfirmationResult(result)) {
+                    storeAuraBotSkillPendingTool(result, pending.ctx(), pending.agentCode(), pending.sessionId(),
+                            pending.toolId(), pending.toolName(), pending.input(), pending.toolDefinitions(),
+                            pending.contextBlocks(),
+                            pending.messages(), pending.providerCode(), pending.model(), pending.systemPrompt(),
+                            pending.runtimeSystemPrompt(), pending.maxTokens(), pending.round(), pending.toolChoice(),
+                            pending.persistTape());
+                    return;
+                }
+                storeConfirmationPending(pending);
             }
 
             @Override
@@ -574,6 +595,29 @@ public class AgentChatPortImpl implements AgentChatPort {
                 return AgentChatPortImpl.this.buildToolDescription(toolName, input);
             }
         };
+    }
+
+    private boolean defersPolicyUntilToolResult(ToolDefinition definition) {
+        if (definition == null) {
+            return false;
+        }
+        if ("AURABOT_SKILL".equals(definition.getToolType())) {
+            return true;
+        }
+        String code = definition.getToolCode();
+        return code != null && code.startsWith("aurabot:");
+    }
+
+    private boolean isPreviewConfirmationResult(Map<String, Object> result) {
+        if (result == null) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(result.get("_aurabot_skill_pending"))) {
+            return true;
+        }
+        return Boolean.TRUE.equals(result.get("approvalRequired"))
+                && result.get("previewToken") instanceof String token
+                && !token.isBlank();
     }
 
     private boolean allowToolInCatalog(ChatTurnRuntime.ChatToolLoopRound round, ToolDefinition definition) {
@@ -1120,7 +1164,12 @@ public class AgentChatPortImpl implements AgentChatPort {
     private ToolDefinition findToolDef(List<ToolDefinition> defs, String toolName) {
         if (defs == null || toolName == null) return null;
         for (ToolDefinition def : defs) {
-            if (toolName.equals(def.getToolCode())) {
+            if (def == null) {
+                continue;
+            }
+            if (toolName.equals(def.getToolCode())
+                    || toolName.equals(def.getToolName())
+                    || toolName.equals(toLlmSafeToolName(def.getToolCode()))) {
                 return def;
             }
         }

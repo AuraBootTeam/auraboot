@@ -16,11 +16,11 @@ class AgentTurnRouterTest {
     void routesAurabotAcpBucketsToDurableRuntime() {
         AgentTurnRouter.RuntimeDecision acp = router.decide("aurabot", TriageBucket.ACP_RUN);
         assertThat(acp.route()).isEqualTo(AgentTurnRouter.RuntimeRoute.DURABLE_RUN);
-        assertThat(acp.reason()).isEqualTo(AgentTurnRouter.DecisionReason.AURABOT_DURABLE_BUCKET);
+        assertThat(acp.reason()).isEqualTo(AgentTurnRouter.DecisionReason.DURABLE_TRIAGE_SIGNAL);
         assertThat(acp.durableLifecycleRequired()).isTrue();
         assertThat(acp.policySignals())
                 .containsExactlyInAnyOrder(
-                        AgentTurnRouter.PolicySignal.AURABOT_ALIAS,
+                        AgentTurnRouter.PolicySignal.DEFAULT_AGENT_PROFILE,
                         AgentTurnRouter.PolicySignal.DURABLE_TRIAGE_BUCKET);
 
         assertThat(router.decide("AuraBot", TriageBucket.CONTEXTUAL_ANSWER).route())
@@ -41,7 +41,7 @@ class AgentTurnRouterTest {
                 false));
 
         assertThat(contextual.route()).isEqualTo(AgentTurnRouter.RuntimeRoute.CHAT_TURN);
-        assertThat(contextual.reason()).isEqualTo(AgentTurnRouter.DecisionReason.AURABOT_CONTEXTUAL_READ_ONLY);
+        assertThat(contextual.reason()).isEqualTo(AgentTurnRouter.DecisionReason.SYNC_READ_ONLY_TURN);
         assertThat(contextual.policySignals())
                 .contains(AgentTurnRouter.PolicySignal.READ_ONLY_CONTEXT);
     }
@@ -51,10 +51,10 @@ class AgentTurnRouterTest {
     void routesAurabotLightBucketsToChatRuntime() {
         AgentTurnRouter.RuntimeDecision light = router.decide("aurabot", TriageBucket.LIGHT_CHAT);
         assertThat(light.route()).isEqualTo(AgentTurnRouter.RuntimeRoute.CHAT_TURN);
-        assertThat(light.reason()).isEqualTo(AgentTurnRouter.DecisionReason.AURABOT_LIGHT_OR_ABSENT_BUCKET);
+        assertThat(light.reason()).isEqualTo(AgentTurnRouter.DecisionReason.SYNC_CHAT_TURN);
         assertThat(light.policySignals())
                 .containsExactlyInAnyOrder(
-                        AgentTurnRouter.PolicySignal.AURABOT_ALIAS,
+                        AgentTurnRouter.PolicySignal.DEFAULT_AGENT_PROFILE,
                         AgentTurnRouter.PolicySignal.CHAT_TRIAGE_BUCKET);
 
         assertThat(router.decide(null, null).route())
@@ -75,7 +75,7 @@ class AgentTurnRouterTest {
                 false));
 
         assertThat(decision.route()).isEqualTo(AgentTurnRouter.RuntimeRoute.CHAT_TURN);
-        assertThat(decision.reason()).isEqualTo(AgentTurnRouter.DecisionReason.AURABOT_LIGHT_OR_ABSENT_BUCKET);
+        assertThat(decision.reason()).isEqualTo(AgentTurnRouter.DecisionReason.SYNC_CHAT_TURN);
     }
 
     @Test
@@ -83,7 +83,7 @@ class AgentTurnRouterTest {
     void routesNamedAgentsToNamedAgentChatRuntime() {
         AgentTurnRouter.RuntimeDecision named = router.decide("sales_agent", TriageBucket.ACP_RUN);
         assertThat(named.route()).isEqualTo(AgentTurnRouter.RuntimeRoute.NAMED_AGENT_CHAT);
-        assertThat(named.reason()).isEqualTo(AgentTurnRouter.DecisionReason.NAMED_AGENT_CODE);
+        assertThat(named.reason()).isEqualTo(AgentTurnRouter.DecisionReason.NAMED_AGENT_PROFILE);
         assertThat(named.namedAgent()).isTrue();
         assertThat(named.policySignals())
                 .containsExactly(AgentTurnRouter.PolicySignal.EXPLICIT_NAMED_AGENT);
@@ -97,5 +97,16 @@ class AgentTurnRouterTest {
     void routeReturnsDecisionRouteForLegacyCallers() {
         assertThat(router.route("aurabot", TriageBucket.ACP_RUN))
                 .isEqualTo(router.decide("aurabot", TriageBucket.ACP_RUN).route());
+    }
+
+    @Test
+    @DisplayName("decision reasons are execution-semantics based, not scenario names")
+    void decisionReasonsDoNotEncodeBusinessScenarios() {
+        assertThat(AgentTurnRouter.DecisionReason.values())
+                .extracting(Enum::name)
+                .allSatisfy(reason -> assertThat(reason)
+                        .doesNotContain("AURABOT")
+                        .doesNotContain("CONTEXTUAL")
+                        .doesNotContain("LIGHT"));
     }
 }
