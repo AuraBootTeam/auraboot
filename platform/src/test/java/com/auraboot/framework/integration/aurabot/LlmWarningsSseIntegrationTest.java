@@ -1,32 +1,34 @@
 package com.auraboot.framework.integration.aurabot;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.ResultContract;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
+import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
+import com.auraboot.framework.agent.service.ToolLoopService;
 import com.auraboot.framework.agent.trace.AiTraceService;
-import com.auraboot.framework.aurabot.service.AuraBotChatService;
+import com.auraboot.framework.aurabot.service.AuraBotPendingContinuationService;
 import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.aurabot.service.ChatToolExecutor;
 import com.auraboot.framework.aurabot.service.ChatToolResolver;
-import com.auraboot.framework.aurabot.service.PromptTemplateService;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.SseResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
-import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -55,7 +57,7 @@ import static org.mockito.Mockito.when;
  *   <li>{@code SseResponseSink.onWarnings} is a no-op when the list is
  *       null/empty, so the chokepoint cannot accidentally spam empty
  *       {@code warning} frames.</li>
- *   <li>The chokepoint ({@code AuraBotChatService} resume path) calls
+ *   <li>The pending continuation boundary calls
  *       {@code sink.onWarnings(...)} for every {@link LlmProvider#chat
  *       provider.chat()} round whose response carries a non-empty
  *       {@code warnings} list, BEFORE the corresponding {@code done} so the
@@ -106,7 +108,7 @@ class LlmWarningsSseIntegrationTest {
     }
 
     // =========================================================================
-    // Chokepoint integration — AuraBotChatService.resume calls sink.onWarnings
+    // Chokepoint integration — pending continuation resume calls sink.onWarnings
     // when provider.chat() returns a non-empty LlmChatResponse.warnings.
     // =========================================================================
 
@@ -133,23 +135,26 @@ class LlmWarningsSseIntegrationTest {
         when(toolResolver.resolveTools(any(), any(), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         ChatToolExecutor toolExecutor = mock(ChatToolExecutor.class);
-        when(toolExecutor.execute(anyString(), any(), any()))
+        when(toolExecutor.executeConfirmed(anyString(), any(), any(), any(), any(), any()))
                 .thenReturn(Map.of("success", true, "data", "ok"));
+        ToolLoopService toolLoopService = mock(ToolLoopService.class);
+        when(toolLoopService.executeToolCall(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn("{\"success\":true,\"data\":\"ok\"}");
 
         AiTraceService traceService = mock(AiTraceService.class);
         when(traceService.findActiveTrace(any())).thenReturn(null);
         when(traceService.startSpan(any(), any(), anyString(), anyString(), any())).thenReturn(null);
 
-        AuraBotChatService service = new AuraBotChatService(
+        AuraBotPendingContinuationService service = new AuraBotPendingContinuationService(
                 llmProviderFactory,
-                mock(PromptTemplateService.class),
                 toolResolver,
                 toolExecutor,
                 mock(ChatSessionStore.class),
                 new ObjectMapper(),
                 traceService,
-                mock(MetaModelService.class),
-                (Executor) Runnable::run);
+                toolLoopService,
+                new ChatTurnRuntime(),
+                new PendingToolSnapshotFactory(new AgentRuntimeStateFactory()));
         setMaxToolRounds(service, 20);
 
         // --- Build a TurnContext + PendingTool that bypass tool confirmation ---
@@ -164,11 +169,12 @@ class LlmWarningsSseIntegrationTest {
                 /*conversationId*/ null,
                 /*inboundMessageId*/ null,
                 /*triageBucket*/ null,
+                /*allowedReadOnlyTools*/ java.util.Set.of(),
                 /*traceId*/ null,
                 /*taskPid*/ null,
                 Instant.now());
 
-        ChatSessionStore.PendingTool pending = ChatSessionStore.PendingTool.builder()
+        PendingToolSnapshot pending = PendingToolSnapshot.builder()
                 .turnId("tn_test_warnings")
                 .tenantId(1L)
                 .userId(1L)
@@ -185,11 +191,12 @@ class LlmWarningsSseIntegrationTest {
                 .systemPrompt("system")
                 .maxTokens(4096)
                 .currentLoop(0)
+                .agentToolDefinitions(List.of(dslQueryTool()))
                 .build();
 
         // --- Drive the resume path with a CapturingSink ---
         CapturingSink sink = new CapturingSink();
-        TurnOutcome outcome = service.resumeApprovedTurnFromPending(ctx, pending, sink);
+        TurnOutcome outcome = service.resumeApprovedChatTool(ctx, pending, sink);
 
         assertThat(outcome)
                 .as("end_turn round should drive a Success outcome — warnings must NOT short-circuit")
@@ -227,37 +234,42 @@ class LlmWarningsSseIntegrationTest {
         when(toolResolver.resolveTools(any(), any(), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         ChatToolExecutor toolExecutor = mock(ChatToolExecutor.class);
-        when(toolExecutor.execute(anyString(), any(), any()))
+        when(toolExecutor.executeConfirmed(anyString(), any(), any(), any(), any(), any()))
                 .thenReturn(Map.of("success", true));
+        ToolLoopService toolLoopService = mock(ToolLoopService.class);
+        when(toolLoopService.executeToolCall(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn("{\"success\":true}");
         AiTraceService traceService = mock(AiTraceService.class);
         when(traceService.findActiveTrace(any())).thenReturn(null);
         when(traceService.startSpan(any(), any(), anyString(), anyString(), any())).thenReturn(null);
 
-        AuraBotChatService service = new AuraBotChatService(
+        AuraBotPendingContinuationService service = new AuraBotPendingContinuationService(
                 llmProviderFactory,
-                mock(PromptTemplateService.class),
                 toolResolver,
                 toolExecutor,
                 mock(ChatSessionStore.class),
                 new ObjectMapper(),
                 traceService,
-                mock(MetaModelService.class),
-                (Executor) Runnable::run);
+                toolLoopService,
+                new ChatTurnRuntime(),
+                new PendingToolSnapshotFactory(new AgentRuntimeStateFactory()));
         setMaxToolRounds(service, 20);
 
         TurnContext ctx = new TurnContext(
                 "tn_no_warnings", 1L, 1L, null, null, "aurabot",
-                null, null, null, null, null, null, Instant.now());
-        ChatSessionStore.PendingTool pending = ChatSessionStore.PendingTool.builder()
+                null, null, null, null, java.util.Set.of(), null, null, Instant.now());
+        PendingToolSnapshot pending = PendingToolSnapshot.builder()
                 .turnId("tn_no_warnings").tenantId(1L).userId(1L).agentCode("aurabot")
                 .sessionId("sess_test").toolId("tool_1").toolName("dsl_query")
                 .input(Map.of()).messages(new ArrayList<>())
                 .providerCode("anthropic").apiKey("k").baseUrl("http://localhost")
                 .model("claude-sonnet-4-6").systemPrompt("system")
-                .maxTokens(4096).currentLoop(0).build();
+                .maxTokens(4096).currentLoop(0)
+                .agentToolDefinitions(List.of(dslQueryTool()))
+                .build();
 
         CapturingSink sink = new CapturingSink();
-        service.resumeApprovedTurnFromPending(ctx, pending, sink);
+        service.resumeApprovedChatTool(ctx, pending, sink);
 
         assertThat(sink.warnings)
                 .as("response.warnings == null → sink.onWarnings must not be invoked "
@@ -268,6 +280,16 @@ class LlmWarningsSseIntegrationTest {
     // =========================================================================
     // Test fixtures
     // =========================================================================
+
+    private AgentToolDefinition dslQueryTool() {
+        return AgentToolDefinition.builder()
+                .name("dsl_query")
+                .description("DSL query")
+                .toolType("dsl_query")
+                .sourceCode("demo:query")
+                .inputSchema(Map.of("type", "object", "properties", Map.of()))
+                .build();
+    }
 
     /**
      * Anonymous-class stub of {@link LlmProvider} (the interface has multiple
@@ -281,9 +303,9 @@ class LlmWarningsSseIntegrationTest {
      * Spring's {@code @Value("${aurabot.max-tool-rounds:20}")} default is unavailable
      * (we don't boot Spring here — see class javadoc).
      */
-    private static void setMaxToolRounds(AuraBotChatService service, int rounds) {
+    private static void setMaxToolRounds(AuraBotPendingContinuationService service, int rounds) {
         try {
-            Field f = AuraBotChatService.class.getDeclaredField("maxToolRounds");
+            java.lang.reflect.Field f = AuraBotPendingContinuationService.class.getDeclaredField("maxToolRounds");
             f.setAccessible(true);
             f.setInt(service, rounds);
         } catch (Exception e) {

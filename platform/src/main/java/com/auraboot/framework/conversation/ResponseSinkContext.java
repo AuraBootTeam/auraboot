@@ -6,8 +6,8 @@ package com.auraboot.framework.conversation;
  * {@link com.auraboot.framework.agent.service}) can publish events without
  * threading the sink as a parameter through every layer.
  *
- * <p>Set by the chat impl ({@code AuraBotChatService.executeAuraBotTurn} /
- * {@code resumeApprovedTurnFromPending}) at the start of a turn and cleared
+ * <p>Set by the chat impl ({@code AuraBotChatService.executeAuraBotTurn}) or
+ * pending-continuation implementation at the start of a turn and cleared
  * in finally. Read by {@code ResultContractEmitter}. When no context is set
  * (non-chat callers — ad-hoc skill invocations, tests), reads return
  * {@code null} and the emitter no-ops, preserving the safe-when-absent

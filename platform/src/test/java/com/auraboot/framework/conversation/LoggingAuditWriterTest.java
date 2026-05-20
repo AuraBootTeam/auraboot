@@ -57,7 +57,7 @@ class LoggingAuditWriterTest {
                 null,                                // agentCode (DC.3c)
                 "ch-1",                              // channelSessionId
                 999L,                                // conversationId
-                null, null, null,
+                null, null, java.util.Set.of(), null,
                 null,                                // taskPid (DC.3c)
                 Instant.now());
     }

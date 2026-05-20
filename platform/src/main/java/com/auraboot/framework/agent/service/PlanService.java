@@ -7,6 +7,7 @@ import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.StubLlmProvider;
+import com.auraboot.framework.agent.runtime.LlmResponseGuard;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,7 +58,9 @@ public class PlanService {
                 .build();
 
         try {
-            LlmChatResponse planResp = provider.chat(planReq, config.getApiKey(), config.getBaseUrl());
+            LlmChatResponse planResp = LlmResponseGuard.requireContent(
+                    provider.chat(planReq, config.getApiKey(), config.getBaseUrl()),
+                    "plan generation");
             String content = planResp.getContent().stream()
                     .filter(b -> "text".equals(b.getType()))
                     .map(LlmChatResponse.ContentBlock::getText)
@@ -77,9 +80,9 @@ public class PlanService {
                 if (!steps.isEmpty()) return steps;
             }
         } catch (Exception e) {
-            log.warn("Plan generation failed, falling back to direct execution: {}", e.getMessage());
+            throw new IllegalStateException("Plan generation failed: " + e.getMessage(), e);
         }
-        return List.of(new AgentPlanStep(0, "Execute task directly"));
+        throw new IllegalStateException("Plan generation failed: provider did not return a valid JSON plan");
     }
 
     /**
@@ -161,10 +164,16 @@ public class PlanService {
             data.put("execution_plan", planJson);
             data.put("current_step", currentStep);
             data.put("updated_at", LocalDateTime.now());
-            dynamicDataMapper.updateWithJsonb("ab_agent_run", data, Map.of("pid", runPid),
+            int updated = dynamicDataMapper.updateWithJsonb("ab_agent_run", data, Map.of("pid", runPid),
                     Set.of("execution_plan"));
+            if (updated <= 0) {
+                throw new IllegalStateException(
+                        "Plan persistence failed for runPid=" + runPid + ": run row was not updated");
+            }
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("Failed to persist plan for run {}: {}", runPid, e.getMessage());
+            throw new IllegalStateException("Plan persistence failed for runPid=" + runPid, e);
         }
     }
 
@@ -175,17 +184,24 @@ public class PlanService {
         try {
             String sql = "SELECT execution_plan FROM ab_agent_run WHERE pid = #{params.runPid}";
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("runPid", runPid));
-            if (!rows.isEmpty()) {
-                Object raw = rows.get(0).get("execution_plan");
-                String planJson = raw instanceof String s ? s : (raw != null ? objectMapper.writeValueAsString(raw) : null);
-                if (planJson != null) {
-                    return objectMapper.readValue(planJson, new TypeReference<>() {});
-                }
+            if (rows.isEmpty()) {
+                throw new IllegalStateException("Plan load failed for runPid=" + runPid + ": run row not found");
             }
+            Object raw = rows.get(0).get("execution_plan");
+            String planJson = raw instanceof String s ? s : (raw != null ? objectMapper.writeValueAsString(raw) : null);
+            if (planJson == null || planJson.isBlank()) {
+                throw new IllegalStateException("Plan load failed for runPid=" + runPid + ": execution_plan is empty");
+            }
+            List<AgentPlanStep> plan = objectMapper.readValue(planJson, new TypeReference<>() {});
+            if (plan == null || plan.isEmpty()) {
+                throw new IllegalStateException("Plan load failed for runPid=" + runPid + ": execution_plan is empty");
+            }
+            return plan;
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("Failed to load plan from run {}: {}", runPid, e.getMessage());
+            throw new IllegalStateException("Plan load failed for runPid=" + runPid, e);
         }
-        return List.of(new AgentPlanStep(0, "Execute task directly"));
     }
 
     /**
