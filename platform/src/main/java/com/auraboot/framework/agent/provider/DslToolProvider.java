@@ -103,6 +103,7 @@ public class DslToolProvider implements ToolProvider {
                         ? (String) row.get("agent_hint")
                         : (String) row.get("description");
                 Map<String, Object> executionConfig = parseExecutionConfig(row.get("execution_config"));
+                List<String> requiredPermissions = extractPermissions(executionConfig.get("permissions"));
                 if (!hasAnyDeclaredPermission(ctx.getUserId(), executionConfig.get("permissions"))) {
                     continue;
                 }
@@ -118,6 +119,7 @@ public class DslToolProvider implements ToolProvider {
                         .toolType(readQuery ? "dsl_query" : "dsl_command")
                         .sourceCode(code)
                         .riskLevel(riskLevel)
+                        .requiredPermissions(Set.copyOf(requiredPermissions))
                         .confirmationPolicy(confirmationPolicy(riskLevel))
                         .requiresApproval(isApprovalRisk(riskLevel))
                         .requiresConfirmation(isConfirmationRisk(riskLevel))

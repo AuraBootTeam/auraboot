@@ -1,22 +1,26 @@
 package com.auraboot.framework.aurabot.service;
 
+import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.dto.LlmChunk;
 import com.auraboot.framework.agent.dto.ResultContract;
+import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
 import com.auraboot.framework.agent.trace.AiTraceService;
+import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.SseResponseSink;
+import com.auraboot.framework.conversation.TurnContext;
+import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
 
-import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,19 +28,18 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
- * P0-2 Blocker B2 — full-stack proof that an Anthropic Extended Thinking
- * SSE stream (content_block_start/delta/stop with type=thinking) reaches the
- * ResponseSink as a single {@code onThinking} call per block.
+ * P0-2 Blocker B2 — proof that provider-level Extended Thinking streams reach
+ * the ResponseSink as a single {@code onThinking} call per aggregate block.
  *
- * <p>Spring is intentionally NOT bootstrapped here: the streaming code uses a
- * raw {@code HttpClient} (not WebClient through DI) and does not depend on
- * any Spring bean — the test wires the service by hand and stands up an
- * in-process {@link HttpServer} that mimics Anthropic's SSE shape. This is
- * the same pattern as
- * {@link AuraBotChatServiceTracePayloadTest#openAiCompatibleStreamHidesSplitThinkBlocksFromVisibleSseEvents()}.
+ * <p>Spring is intentionally NOT bootstrapped here: the test wires the service
+ * by hand and uses a mocked provider stream so the AuraBot adapter contract
+ * stays independent from provider-specific HTTP details.
  *
  * <p>Verifies:
  * <ul>
@@ -54,116 +57,78 @@ import static org.mockito.Mockito.mock;
  */
 class AuraBotChatServiceThinkingIntegrationTest {
 
-    private HttpServer server;
-    private int port;
-
-    @BeforeEach
-    void startServer() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        port = server.getAddress().getPort();
-    }
-
     @AfterEach
-    void stopServer() {
-        if (server != null) server.stop(0);
-    }
-
-    /**
-     * Anthropic SSE protocol fragment exercising:
-     *   block 0 — thinking (two thinking_delta + one signature_delta + stop)
-     *   block 1 — text     (one text_delta + stop)
-     *   message_stop
-     *
-     * <p>Each event has {@code event:} on its own line followed by
-     * {@code data:} JSON, terminated by an empty line — exactly what the
-     * Anthropic Messages API streaming contract emits.
-     */
-    private static String thinkingThenTextStream() {
-        return """
-                event: message_start
-                data: {"type":"message_start","message":{"id":"msg_x","model":"claude-sonnet-4-6"}}
-
-                event: content_block_start
-                data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}
-
-                event: content_block_delta
-                data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Let me think. "}}
-
-                event: content_block_delta
-                data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"The answer is 42."}}
-
-                event: content_block_delta
-                data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"sigABC"}}
-
-                event: content_block_stop
-                data: {"type":"content_block_stop","index":0}
-
-                event: content_block_start
-                data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}
-
-                event: content_block_delta
-                data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"42"}}
-
-                event: content_block_stop
-                data: {"type":"content_block_stop","index":1}
-
-                event: message_stop
-                data: {"type":"message_stop"}
-
-                """;
-    }
-
-    private AuraBotChatService buildService() {
-        return new AuraBotChatService(
-                mock(LlmProviderFactory.class),
-                mock(PromptTemplateService.class),
-                mock(ChatToolResolver.class),
-                mock(ChatToolExecutor.class),
-                mock(ChatSessionStore.class),
-                new ObjectMapper(),
-                mock(AiTraceService.class),
-                mock(MetaModelService.class),
-                (Executor) Runnable::run);
-    }
-
-    /**
-     * Reflective call into the package-private streamAnthropic method —
-     * production signature is {@code (baseUrl, apiKey, model, systemPrompt,
-     * history, userMessage, maxTokens, temperature, ResponseSink)}.
-     */
-    private void invokeStreamAnthropic(AuraBotChatService service, String baseUrl, ResponseSink sink) throws Exception {
-        Method method = AuraBotChatService.class.getDeclaredMethod(
-                "streamAnthropic",
-                String.class, String.class, String.class, String.class,
-                List.class, String.class, int.class, double.class, ResponseSink.class);
-        method.setAccessible(true);
-        method.invoke(service, baseUrl, "test-key", "claude-sonnet-4-6",
-                "system", List.of(), "hello", 4096, 0.2, sink);
+    void tearDown() {
+        MetaContext.clear();
     }
 
     // =========================================================================
-    // B2: streamAnthropic translates SSE thinking blocks into ResponseSink.onThinking
+    // B2: provider thinking blocks reach ResponseSink.onThinking
     // =========================================================================
 
     @Test
-    @DisplayName("streamAnthropic_thinkingBlocks_emitOneOnThinkingPerBlock")
-    void streamAnthropic_thinkingBlocks_emitOneOnThinkingPerBlock() throws Exception {
-        server.createContext("/v1/messages", exchange -> {
-            byte[] bytes = thinkingThenTextStream().getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
-            exchange.sendResponseHeaders(200, bytes.length);
-            exchange.getResponseBody().write(bytes);
-            exchange.close();
-        });
-        server.start();
-
-        AuraBotChatService service = buildService();
+    @DisplayName("provider thinking blocks emit one onThinking event per aggregate block")
+    void providerThinkingBlocksEmitOneOnThinkingPerAggregateBlock() {
+        MetaContext.setContext(1L, 100L, null, "tester");
+        LlmProviderFactory factory = mock(LlmProviderFactory.class);
+        PromptTemplateService promptTemplateService = mock(PromptTemplateService.class);
+        ChatToolResolver chatToolResolver = mock(ChatToolResolver.class);
+        LlmProvider provider = mock(LlmProvider.class);
+        AuraBotChatService service = new AuraBotChatService(
+                factory,
+                promptTemplateService,
+                chatToolResolver,
+                mock(ChatToolExecutor.class),
+                new ObjectMapper(),
+                mock(AiTraceService.class),
+                mock(MetaModelService.class),
+                new ChatTurnRuntime(),
+                (Executor) Runnable::run);
+        ChatRequest request = new ChatRequest();
+        request.setSessionId("session-1");
+        request.setMessage("hello");
+        ChatRequest.ChatOptions options = new ChatRequest.ChatOptions();
+        options.setProvider("anthropic");
+        request.setOptions(options);
+        when(factory.resolveConfig(eq(1L), eq("anthropic")))
+                .thenReturn(LlmProviderFactory.ProviderConfig.builder()
+                        .providerCode("anthropic")
+                        .apiKey("test-key")
+                        .baseUrl("stub://local")
+                        .defaultModel("claude-sonnet-4-6")
+                        .maxTokens(4096)
+                        .build());
+        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null)))
+                .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
+        when(factory.getProvider(eq("anthropic"))).thenReturn(provider);
+        when(provider.streamChat(any(), eq("test-key"), eq("stub://local")))
+                .thenReturn(Flux.just(
+                        LlmChunk.thinking(0, "Let me think. "),
+                        LlmChunk.thinking(1, "The answer is 42."),
+                        LlmChunk.delta(2, "42"),
+                        LlmChunk.done(3, LlmChatResponse.builder()
+                                .stopReason("end_turn")
+                                .content(List.of(
+                                        LlmChatResponse.ContentBlock.builder()
+                                                .type("thinking")
+                                                .thinking("Let me think. The answer is 42.")
+                                                .signature("sigABC")
+                                                .build(),
+                                        LlmChatResponse.ContentBlock.builder()
+                                                .type("text")
+                                                .text("42")
+                                                .build()))
+                                .build())));
         CapturingSink sink = new CapturingSink();
 
-        invokeStreamAnthropic(service, "http://127.0.0.1:" + port, sink);
+        TurnOutcome outcome = service.executeAuraBotTurn(
+                TurnContext.legacyDefault(1L, 100L, 100L),
+                request,
+                sink);
 
         // Exactly one thinking event — the two thinking_delta chunks were
-        // accumulated and the signature_delta piggy-backed onto the same block.
+        // accumulated by the provider and the signature piggy-backed onto the same block.
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
         assertThat(sink.thinkings)
                 .as("each {type:thinking} content block must produce one onThinking call, "
                         + "not one per delta")

@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agent.port.AgentTurnOverrides;
 import com.auraboot.framework.agent.provider.ToolDefinition;
+import com.auraboot.framework.agentchat.handoff.HandoffPermissionPolicy;
 import com.auraboot.framework.agentchat.handoff.HandoffToolProvider;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
@@ -29,6 +30,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Drives group-chat agent replies. After DC.3c (Q-DC.1=A' / design v5 §10.7
@@ -116,7 +118,7 @@ public class AgentReplyTask {
     public void executeReply(Long conversationId, Long tenantId, Long agentId,
                               String triggerContent, Long triggeringSeq) {
         executeReplyWithDepth(conversationId, tenantId, agentId, triggerContent, 0,
-                /*parentTaskPid=*/ null, triggeringSeq);
+                /*parentTaskPid=*/ null, triggeringSeq, null);
     }
 
     /**
@@ -129,7 +131,7 @@ public class AgentReplyTask {
      */
     private void executeReplyWithDepth(Long conversationId, Long tenantId, Long agentId,
                                         String triggerContent, int depth, String parentTaskPid,
-                                        Long triggeringSeq) {
+                                        Long triggeringSeq, Set<String> inheritedPermissions) {
         if (depth >= MAX_HANDOFF_DEPTH) {
             log.warn("Max handoff depth {} reached for conversation {}, agent {}",
                     MAX_HANDOFF_DEPTH, conversationId, agentId);
@@ -158,6 +160,12 @@ public class AgentReplyTask {
                         "agentName", agent.getName() != null ? agent.getName() : "AI"))
                 .build());
 
+        List<AgentMemberDto> roster = messagePort.getAgentMembers(conversationId, tenantId);
+        AgentMemberDto currentMember = resolveAgentById(roster, agentId);
+        Set<String> effectivePermissions = HandoffPermissionPolicy.intersect(
+                inheritedPermissions,
+                currentMember != null ? currentMember.getProfilePermissions() : null);
+
         // Compose group-chat context via the public assembler.
         int contextWindow = messagePort.getAiContextWindow(conversationId, tenantId);
         if (contextWindow <= 0) {
@@ -178,7 +186,7 @@ public class AgentReplyTask {
         // Build the handoff extra-tool (only when there are other agents to
         // hand off to). Convert HandoffToolProvider's LlmChatRequest.Tool
         // shape to the chokepoint's ToolDefinition shape.
-        List<ToolDefinition> extraTools = buildHandoffExtraTools(conversationId, tenantId, agentId);
+        List<ToolDefinition> extraTools = buildHandoffExtraTools(roster, agentId);
 
         AgentTurnOverrides overrides = AgentTurnOverrides.builder()
                 .systemPromptOverride(systemPrompt)
@@ -188,6 +196,7 @@ public class AgentReplyTask {
                 // extraTools". TODO(DC.3c+): wire agent.getTools() field properly.
                 .toolDefsOverride(List.of())
                 .extraTools(extraTools)
+                .effectivePermissions(effectivePermissions)
                 .persistSessionTape(false)            // group-chat history is in ab_im_message; no tape
                 .build();
 
@@ -220,7 +229,8 @@ public class AgentReplyTask {
         Long persistedSeq = broadcastPersistedAgentReply(conversationId, tenantId,
                 humanMemberIds, triggeringSeq, outcome);
 
-        handleOutcome(outcome, conversationId, tenantId, agent, humanMemberIds, depth, persistedSeq, triggeringSeq);
+        handleOutcome(outcome, conversationId, tenantId, agent, humanMemberIds, depth, persistedSeq, triggeringSeq,
+                roster, effectivePermissions);
     }
 
     /**
@@ -274,8 +284,10 @@ public class AgentReplyTask {
         return persisted.getSeq();
     }
 
-    private List<ToolDefinition> buildHandoffExtraTools(Long conversationId, Long tenantId, Long currentAgentId) {
-        List<AgentMemberDto> allAgents = messagePort.getAgentMembers(conversationId, tenantId);
+    private List<ToolDefinition> buildHandoffExtraTools(List<AgentMemberDto> allAgents, Long currentAgentId) {
+        if (allAgents == null || allAgents.isEmpty()) {
+            return List.of();
+        }
         List<AgentMemberDto> otherAgents = allAgents.stream()
                 .filter(a -> !a.getAgentId().equals(currentAgentId))
                 .toList();
@@ -323,12 +335,13 @@ public class AgentReplyTask {
      */
     private void handleOutcome(TurnOutcome outcome, Long conversationId, Long tenantId,
                                 AgentDefinition agent, List<Long> humanMemberIds, int depth,
-                                Long persistedSeq, Long triggeringSeq) {
+                                Long persistedSeq, Long triggeringSeq,
+                                List<AgentMemberDto> roster, Set<String> effectivePermissions) {
         if (outcome instanceof TurnOutcome.Success success && success.meta() != null) {
             Object handoffTo = success.meta().get("_handoff_to");
             if (handoffTo != null) {
                 String targetCode = String.valueOf(handoffTo);
-                AgentMemberDto targetAgent = resolveAgentByCode(tenantId, conversationId, targetCode);
+                AgentMemberDto targetAgent = resolveAgentByCode(roster, targetCode);
                 if (targetAgent == null || targetAgent.getAgentId() == null) {
                     log.warn("Handoff target agentCode '{}' not resolvable for tenant {}; stopping chain",
                             targetCode, tenantId);
@@ -344,8 +357,10 @@ public class AgentReplyTask {
                 // available, otherwise fall back to the parent's triggeringSeq
                 // (no rows persisted between hops).
                 Long childTriggeringSeq = persistedSeq != null ? persistedSeq : triggeringSeq;
+                Set<String> childPermissions = HandoffPermissionPolicy.intersect(
+                        effectivePermissions, targetAgent.getProfilePermissions());
                 executeReplyWithDepth(conversationId, tenantId, targetAgentId, childTrigger,
-                        depth + 1, parentTaskPidForChild, childTriggeringSeq);
+                        depth + 1, parentTaskPidForChild, childTriggeringSeq, childPermissions);
                 return;
             }
         }
@@ -379,11 +394,21 @@ public class AgentReplyTask {
      * roster (already known to the conversation) so we don't need a generic
      * by-code lookup on AgentDefinitionMapper.
      */
-    private AgentMemberDto resolveAgentByCode(Long tenantId, Long conversationId, String agentCode) {
+    private AgentMemberDto resolveAgentByCode(List<AgentMemberDto> roster, String agentCode) {
         if (agentCode == null) return null;
-        List<AgentMemberDto> roster = messagePort.getAgentMembers(conversationId, tenantId);
+        if (roster == null) return null;
         for (AgentMemberDto member : roster) {
             if (agentCode.equals(member.getAgentCode())) {
+                return member;
+            }
+        }
+        return null;
+    }
+
+    private AgentMemberDto resolveAgentById(List<AgentMemberDto> roster, Long agentId) {
+        if (roster == null || agentId == null) return null;
+        for (AgentMemberDto member : roster) {
+            if (agentId.equals(member.getAgentId())) {
                 return member;
             }
         }

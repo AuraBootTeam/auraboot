@@ -1,10 +1,11 @@
 package com.auraboot.framework.aurabot.service;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.runtime.ToolLoopResultNormalizer;
 import com.auraboot.framework.agent.service.ToolLoopService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.skill.provider.AuraBotSkillToolProvider;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,6 @@ public class ChatToolExecutor {
     private static final String DEFAULT_RUN_PID = "aurabot_chat";
     private static final String DEFAULT_AGENT_CODE = "aurabot";
     private static final String AURABOT_TOOL_PREFIX = AuraBotSkillToolProvider.PROVIDER_CODE + ":";
-    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final ToolLoopService toolLoopService;
     private final ChatToolResolver chatToolResolver;
@@ -104,10 +104,12 @@ public class ChatToolExecutor {
                     safeInput,
                     List.of(toolDef),
                     null);
-            return parseToolLoopResult(raw);
+            return ToolLoopResultNormalizer.normalize(objectMapper, raw, toolName, safeInput);
         } catch (Exception e) {
-            log.error("ToolLoopService execution failed for {}: {}", toolName, e.getMessage(), e);
-            return errorResult(e.getMessage());
+            String safeError = safeExceptionMessage(e);
+            log.error("ToolLoopService execution failed for {}: errorType={}, message={}",
+                    toolName, e.getClass().getSimpleName(), safeError);
+            return errorResult(safeError);
         }
     }
 
@@ -145,10 +147,12 @@ public class ChatToolExecutor {
                     List.of(toolDef),
                     previewToken,
                     null);
-            return parseToolLoopResult(raw);
+            return ToolLoopResultNormalizer.normalize(objectMapper, raw, toolName, safeInput);
         } catch (Exception e) {
-            log.error("ToolLoopService skill confirm failed for {}: {}", toolName, e.getMessage(), e);
-            return errorResult(e.getMessage());
+            String safeError = safeExceptionMessage(e);
+            log.error("ToolLoopService skill confirm failed for {}: errorType={}, message={}",
+                    toolName, e.getClass().getSimpleName(), safeError);
+            return errorResult(safeError);
         }
     }
 
@@ -315,25 +319,19 @@ public class ChatToolExecutor {
                 + llmSafeSkillCode.substring(namespaceEnd + 1);
     }
 
-    private Map<String, Object> parseToolLoopResult(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return errorResult("Empty tool result");
-        }
-        if (raw.startsWith("Error")) {
-            return errorResult(raw);
-        }
-        try {
-            return objectMapper.readValue(raw, MAP_TYPE);
-        } catch (Exception e) {
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("data", raw);
-            return result;
-        }
-    }
-
     private static String nonBlank(String value, String fallback) {
         return value != null && !value.isBlank() ? value : fallback;
+    }
+
+    private static String safeExceptionMessage(Exception e) {
+        if (e == null) {
+            return "Unknown error";
+        }
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            return e.getClass().getSimpleName();
+        }
+        return LogSanitizer.safe(message);
     }
 
     private static Map<String, Object> errorResult(String message) {

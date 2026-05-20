@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.skill.PreviewTokenStore;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
@@ -48,7 +49,7 @@ import static org.mockito.Mockito.when;
  * Plan §C-5 Task 6 — chat-skill end-to-end IT.
  *
  * <p>Drives the {@link ConversationTurnService#resumeTurn} chokepoint with a
- * pre-seeded {@link ChatSessionStore.PendingTool} carrying the
+ * pre-seeded {@link PendingToolSnapshot} carrying the
  * {@code _aurabot_skill=true} extension marker added in T5. This bypasses the
  * SSE-streaming first leg (which would require a real LLM tool_use round) and
  * exercises only the resume branch — the unit under test for T6.
@@ -208,7 +209,7 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
                 input, previewToken, "high", previewPayloadOf(pending));
 
         // 2) Resume(APPROVED) — chokepoint dispatches to
-        //    AuraBotChatService.resumeApprovedTurnFromPending → executeResumeTool
+        //    PendingContinuationService.resumeApprovedChatTool → executeResumeTool
         //    → ChatToolExecutor.confirmAuraBotSkill → ToolLoopService.confirmAuraBotSkill.
         CapturingSink sink = new CapturingSink();
         TurnOutcome outcome = turnService.resumeTurn(turnId, ConfirmDecision.APPROVED, sink);
@@ -266,8 +267,8 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
         CapturingSink sink = new CapturingSink();
         TurnOutcome outcome = turnService.resumeTurn(turnId, ConfirmDecision.CANCELLED, sink);
 
-        // resumeTurn short-circuits CANCELLED into TurnOutcome.Interrupted —
-        // chat impl never sees the pending entry, executeResumeTool never fires.
+        // resumeTurn short-circuits CANCELLED into TurnOutcome.Interrupted;
+        // pending continuation never sees the pending entry, executeResumeTool never fires.
         assertThat(outcome).isInstanceOf(TurnOutcome.Interrupted.class);
         TurnOutcome.Interrupted interrupted = (TurnOutcome.Interrupted) outcome;
         assertThat(interrupted.reason()).isEqualTo("user_cancelled");
@@ -301,7 +302,7 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
         // Force the token to "expire" by deleting it directly from Redis.
         // PreviewTokenStore.consume() will return Optional.empty(), which the
         // validator surfaces as SkillSpiException(PREVIEW_TOKEN_INVALID),
-        // which executeResumeTool catches and converts to {success:false,...}.
+        // which pending continuation converts to {success:false,...}.
         redisTemplate.delete(PreviewTokenStore.KEY_PREFIX + previewToken);
 
         String turnId = UniqueIdGenerator.generate();
@@ -366,7 +367,7 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
             extension.put("preview", preview);
         }
 
-        ChatSessionStore.PendingTool pendingTool = ChatSessionStore.PendingTool.builder()
+        PendingToolSnapshot pendingTool = PendingToolSnapshot.builder()
                 .turnId(turnId)
                 .tenantId(tenantId)
                 .userId(userId)

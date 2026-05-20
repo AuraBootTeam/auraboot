@@ -67,6 +67,25 @@ class ChatToolExecutorCanonicalRuntimeTest {
     }
 
     @Test
+    void execute_sanitizesToolLoopExceptionMessages() {
+        Map<String, Object> input = Map.of("keyword", "crm");
+        when(toolLoopService.executeToolCall(eq(7L), eq("aurabot_chat"), isNull(), eq("aurabot"),
+                eq("platform.list_models"), eq(input), any(), isNull()))
+                .thenThrow(new RuntimeException("apiKey=sk-live-secret\nAuthorization: Bearer bearer-secret"));
+
+        ChatToolExecutor executor = new ChatToolExecutor(toolLoopService, null, objectMapper);
+
+        MetaContext.setSystemTenantContext(7L);
+        Map<String, Object> result = executor.execute("platform_list_models", input, null);
+
+        assertThat(result).containsEntry("success", false);
+        assertThat((String) result.get("error"))
+                .contains("apiKey=[REDACTED]")
+                .contains("Authorization: Bearer [REDACTED]")
+                .doesNotContain("sk-live-secret", "bearer-secret", "\n");
+    }
+
+    @Test
     void discoveredTool_usesExactCanonicalDefinitionFromResolver() {
         AgentToolDefinition discovered = AgentToolDefinition.builder()
                 .name("cmd:crm:list_leads")

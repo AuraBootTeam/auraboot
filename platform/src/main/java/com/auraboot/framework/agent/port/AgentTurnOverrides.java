@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Server-only overrides bag for {@link AgentChatPort#runAgentTurn}. Lets a
@@ -50,10 +51,14 @@ import java.util.List;
  *       tools like {@code transfer_to_agent} where the input schema depends
  *       on conversation membership.</li>
  *   <li>{@link #persistSessionTape()} — controls whether AgentChatPortImpl
- *       writes the post-turn tape to {@code ChatSessionStore}. Default: yes
+ *       writes the post-turn tape to the chat message tape store. Default: yes
  *       (matches existing aurabot behavior). Group-chat callers typically
  *       set this to {@code false} because the conversation history already
  *       lives in {@code ab_im_message}.</li>
+ *   <li>{@link #effectivePermissions()} — optional server-computed permission
+ *       boundary for this turn. Handoff callers pass the inherited source/target
+ *       profile intersection here; the runtime uses it for tool catalog filtering
+ *       and final tool-call gating.</li>
  * </ul>
  *
  * <h2>Backward compat</h2>
@@ -80,12 +85,12 @@ import java.util.List;
  *       schemas without caller injection), and</li>
  *   <li>history-source unification (so AgentChatPortImpl can rehydrate
  *       group-chat history from {@code ab_im_message} the same way it
- *       rehydrates aurabot tape from {@code ChatSessionStore}),</li>
+ *       rehydrates aurabot tape from the chat message tape store),</li>
  * </ul>
- * the counter trends to zero across all five {@code field} tag values.
+ * the counter trends to zero across all override {@code field} tag values.
  *
  * <p>When the counter reads zero across an entire release window for all
- * five fields, the {@code overrides} parameter on
+ * fields, the {@code overrides} parameter on
  * {@link AgentChatPort#runAgentTurn} can be deprecated, the 3-arg variant
  * can become the only public surface, and this class can be removed. Until
  * then, {@code overrides=null} from REST callers is the fast path; the
@@ -98,6 +103,7 @@ public final class AgentTurnOverrides {
     private final List<ToolDefinition> toolDefsOverride;
     private final List<ToolDefinition> extraTools;
     private final Boolean persistSessionTape;
+    private final Set<String> effectivePermissions;
 
     private AgentTurnOverrides(Builder b) {
         this.systemPromptOverride = b.systemPromptOverride;
@@ -105,6 +111,7 @@ public final class AgentTurnOverrides {
         this.toolDefsOverride = b.toolDefsOverride;
         this.extraTools = b.extraTools;
         this.persistSessionTape = b.persistSessionTape;
+        this.effectivePermissions = b.effectivePermissions == null ? null : Set.copyOf(b.effectivePermissions);
     }
 
     public String systemPromptOverride() { return systemPromptOverride; }
@@ -118,6 +125,9 @@ public final class AgentTurnOverrides {
     /** {@code null} = default (persist), {@code true} / {@code false} = explicit. */
     public Boolean persistSessionTape() { return persistSessionTape; }
 
+    /** {@code null} = no server-computed permission boundary supplied. */
+    public Set<String> effectivePermissions() { return effectivePermissions; }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -128,6 +138,7 @@ public final class AgentTurnOverrides {
         private List<ToolDefinition> toolDefsOverride;
         private List<ToolDefinition> extraTools;
         private Boolean persistSessionTape;
+        private Set<String> effectivePermissions;
 
         private Builder() {}
 
@@ -136,6 +147,7 @@ public final class AgentTurnOverrides {
         public Builder toolDefsOverride(List<ToolDefinition> v) { this.toolDefsOverride = v; return this; }
         public Builder extraTools(List<ToolDefinition> v) { this.extraTools = v; return this; }
         public Builder persistSessionTape(Boolean v) { this.persistSessionTape = v; return this; }
+        public Builder effectivePermissions(Set<String> v) { this.effectivePermissions = v; return this; }
 
         public AgentTurnOverrides build() {
             return new AgentTurnOverrides(this);

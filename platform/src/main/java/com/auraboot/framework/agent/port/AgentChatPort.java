@@ -19,8 +19,8 @@ import java.util.Map;
  * features apply uniformly to both paths through one chokepoint.
  *
  * <p>Resume after confirmation goes through {@code ConversationTurnService.resumeTurn}
- * which dispatches into {@code AuraBotChatService.resumeApprovedTurnFromPending}.
- * That entry consumes the generic {@code ChatSessionStore.PendingTool} state
+ * which dispatches into the shared {@code PendingContinuationService} boundary.
+ * That entry consumes the generic {@code PendingToolSnapshot} state
  * (providerCode / model / systemPrompt are stored at suspend time; provider
  * credentials are resolved again on resume), so the resume path does not need
  * a port-specific override — the previous {@code resumeAgentToolAfterConfirmation}

@@ -1,13 +1,15 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.port.AgentChatPort;
+import com.auraboot.framework.agent.runtime.ChatMessageTapeStore;
+import com.auraboot.framework.agent.runtime.PendingContinuationService;
+import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
 import com.auraboot.framework.agent.service.AgentRunService;
 import com.auraboot.framework.agent.service.RunOutcome;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
-import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -44,7 +47,7 @@ import static org.mockito.Mockito.when;
  * approval-gate path. Verifies the dual-path resume contract:
  *
  * <ol>
- *     <li>{@code pendingTurnId} found in {@link ChatSessionStore} → goes to
+ *     <li>{@code pendingTurnId} found in {@link PendingToolStore} → goes to
  *         legacy chat-tool resume (covered by {@code ConversationTurnServiceImplResumeTest}).</li>
  *     <li>{@code pendingTurnId} found in {@code ab_agent_approval} (via
  *         {@link AgentApprovalGateService#findApproval}) → drives
@@ -71,7 +74,10 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
     private AuraBotChatService chatService;
 
     @MockitoBean
-    private ChatSessionStore chatSessionStore;
+    private PendingContinuationService pendingContinuationService;
+
+    @MockitoBean(extraInterfaces = ChatMessageTapeStore.class)
+    private PendingToolStore pendingToolStore;
 
     @MockitoBean
     private AgentApprovalGateService agentApprovalGateService;
@@ -82,15 +88,32 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
     @MockitoBean
     private AgentChatPort agentChatPort;
 
+    @MockitoBean(name = "turnSideEffects")
+    private TurnSideEffects sideEffects;
+
+    private TurnSideEffects.Persistence persistence;
+    private TurnSideEffects.EventEmitter eventEmitter;
+    private TurnSideEffects.AuditWriter auditWriter;
+    private TurnSideEffects.MetricsRecorder metricsRecorder;
+
     private ResponseSink sink;
 
     @BeforeEach
     void setUp() {
+        persistence = mock(TurnSideEffects.Persistence.class);
+        eventEmitter = mock(TurnSideEffects.EventEmitter.class);
+        auditWriter = mock(TurnSideEffects.AuditWriter.class);
+        metricsRecorder = mock(TurnSideEffects.MetricsRecorder.class);
+        when(sideEffects.persistence()).thenReturn(persistence);
+        when(sideEffects.eventEmitter()).thenReturn(eventEmitter);
+        when(sideEffects.auditWriter()).thenReturn(auditWriter);
+        when(sideEffects.metricsRecorder()).thenReturn(metricsRecorder);
+
         sink = mock(ResponseSink.class);
         when(sink.isClientConnected()).thenReturn(true);
-        // ChatSessionStore returns null for every lookup so the dispatcher
+        // PendingToolStore returns null for every lookup so the dispatcher
         // falls through to the approval path (path #2 above).
-        when(chatSessionStore.consumePending(anyString())).thenReturn(null);
+        when(pendingToolStore.consumePendingForOwner(anyString(), any(), any())).thenReturn(null);
         when(agentChatPort.executeApprovedPendingTool(anyLong(), anyString()))
                 .thenReturn(Map.of("handled", false));
     }
@@ -157,9 +180,11 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
             // executeTaskSync called with resumeFromRunPid=runPid
             verify(agentRunService, times(1))
                     .executeTaskSync(eq(tenantId), eq(taskPid), eq("aurabot"), eq(runPid));
+            verify(metricsRecorder, atLeastOnce())
+                    .recordTurnBegin(argThat(ctx -> taskPid.equals(ctx.taskPid())));
             verify(sink, times(1)).onDone(eq("Action completed."), any());
-            // legacy chat path NEVER triggered
-            verify(chatService, never()).resumeApprovedTurnFromPending(any(), any(), any());
+            // chat pending-continuation path NEVER triggered
+            verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
         });
     }
 
