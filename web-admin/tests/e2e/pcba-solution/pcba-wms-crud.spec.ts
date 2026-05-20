@@ -15,6 +15,7 @@ import { test, expect } from '../../fixtures';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 import {
   navigateToDynamicPage,
+  expectCollectionViewVisible,
   uniqueId,
   executeCommandViaApi,
   acceptConfirmDialog,
@@ -36,17 +37,17 @@ const PAGE_KEYS = {
 };
 
 const COMMANDS = {
-  createWhIn: 'pe:create_warehouse_in',
-  updateWhIn: 'pe:update_warehouse_in',
-  deleteWhIn: 'pe:delete_warehouse_in',
-  createWhOut: 'pe:create_warehouse_out',
-  updateWhOut: 'pe:update_warehouse_out',
-  deleteWhOut: 'pe:delete_warehouse_out',
-  createTransfer: 'pe:create_stock_transfer',
-  updateTransfer: 'pe:update_stock_transfer',
-  deleteTransfer: 'pe:delete_stock_transfer',
-  createWarehouse: 'pe:create_warehouse',
-  deleteWarehouse: 'pe:delete_warehouse',
+  createWhIn: 'inv:create_warehouse_in',
+  updateWhIn: 'inv:update_warehouse_in',
+  deleteWhIn: 'inv:delete_warehouse_in',
+  createWhOut: 'inv:create_warehouse_out',
+  updateWhOut: 'inv:update_warehouse_out',
+  deleteWhOut: 'inv:delete_warehouse_out',
+  createTransfer: 'inv:create_stock_transfer',
+  updateTransfer: 'inv:update_stock_transfer',
+  deleteTransfer: 'inv:delete_stock_transfer',
+  createWarehouse: 'inv:create_warehouse',
+  deleteWarehouse: 'inv:delete_warehouse',
 };
 
 // ---------------------------------------------------------------------------
@@ -160,12 +161,16 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
       const whResult = await executeCommandViaApi(
         page,
         COMMANDS.createWarehouse,
-        { inv_warehouse_name: whName, inv_warehouse_code: `WH-IN-${uniqueId()}` },
+        {
+          inv_warehouse_name: whName,
+          inv_warehouse_type: 'raw_material',
+          inv_warehouse_address: 'E2E inbound warehouse',
+        },
         undefined,
         'create',
         { allowHttpError: true },
       );
-      warehousePid = mustSucceed(whResult, 'pe:create_warehouse');
+      warehousePid = mustSucceed(whResult, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: warehousePid });
     }
 
@@ -181,10 +186,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
 
   test('PW-001: Inbound list page loads @smoke', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE_KEYS.warehouseIn);
-    const table = page.locator('table, [role="table"]');
-    await expect(table.first()).toBeVisible({ timeout: 15000 });
-    const headers = page.locator('thead th');
-    await expect(headers.first()).toBeVisible({ timeout: 5000 });
+    await expectCollectionViewVisible(page);
   });
 
   test('PW-002: Create inbound via API, verify in list', async ({ page }) => {
@@ -341,12 +343,16 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
       const whResult = await executeCommandViaApi(
         page,
         COMMANDS.createWarehouse,
-        { inv_warehouse_name: whName, inv_warehouse_code: `WH-OUT-${uniqueId()}` },
+        {
+          inv_warehouse_name: whName,
+          inv_warehouse_type: 'finished_goods',
+          inv_warehouse_address: 'E2E outbound warehouse',
+        },
         undefined,
         'create',
         { allowHttpError: true },
       );
-      warehousePid = mustSucceed(whResult, 'pe:create_warehouse');
+      warehousePid = mustSucceed(whResult, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: warehousePid });
     }
 
@@ -527,13 +533,14 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
         COMMANDS.createWarehouse,
         {
           inv_warehouse_name: `E2E TransferWH-To ${uniqueId()}`,
-          inv_warehouse_code: `WH-TO-${uniqueId()}`,
+          inv_warehouse_type: 'finished_goods',
+          inv_warehouse_address: 'E2E transfer warehouse',
         },
         undefined,
         'create',
         { allowHttpError: true },
       );
-      toWarehousePid = mustSucceed(whResult, 'pe:create_warehouse');
+      toWarehousePid = mustSucceed(whResult, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: toWarehousePid });
     } else {
       // Create both warehouses
@@ -542,13 +549,14 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
         COMMANDS.createWarehouse,
         {
           inv_warehouse_name: `E2E TransferWH-From ${uniqueId()}`,
-          inv_warehouse_code: `WH-FR-${uniqueId()}`,
+          inv_warehouse_type: 'raw_material',
+          inv_warehouse_address: 'E2E transfer warehouse',
         },
         undefined,
         'create',
         { allowHttpError: true },
       );
-      fromWarehousePid = mustSucceed(wh1Result, 'pe:create_warehouse');
+      fromWarehousePid = mustSucceed(wh1Result, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: fromWarehousePid });
 
       const wh2Result = await executeCommandViaApi(
@@ -556,13 +564,14 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
         COMMANDS.createWarehouse,
         {
           inv_warehouse_name: `E2E TransferWH-To ${uniqueId()}`,
-          inv_warehouse_code: `WH-TO-${uniqueId()}`,
+          inv_warehouse_type: 'finished_goods',
+          inv_warehouse_address: 'E2E transfer warehouse',
         },
         undefined,
         'create',
         { allowHttpError: true },
       );
-      toWarehousePid = mustSucceed(wh2Result, 'pe:create_warehouse');
+      toWarehousePid = mustSucceed(wh2Result, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: toWarehousePid });
     }
 

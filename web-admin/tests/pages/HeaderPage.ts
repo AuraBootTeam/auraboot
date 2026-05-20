@@ -322,10 +322,27 @@ export class HeaderPage {
     const logoutButton = this.page.locator('button:has-text("确认退出"), button:has-text("Log Out"), button[type="submit"]').first();
     const hasLogoutButton = await logoutButton.isVisible({ timeout: 5000 }).catch(() => false);
     if (hasLogoutButton) {
-      await Promise.all([
-        this.page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => {}),
-        logoutButton.click(),
-      ]);
+      await logoutButton.scrollIntoViewIfNeeded();
+      await Promise.race([
+        Promise.all([
+          this.page.waitForURL(/\/login/, { timeout: 10000 }),
+          logoutButton.click(),
+        ]),
+        this.page.locator('form').first().evaluate((form) => {
+          if (form instanceof HTMLFormElement) {
+            form.requestSubmit();
+          }
+        }),
+      ]).catch(() => {});
+
+      if (/\/logout([?#].*)?$/.test(this.page.url())) {
+        await this.page.locator('form').first().evaluate((form) => {
+          if (form instanceof HTMLFormElement) {
+            form.requestSubmit();
+          }
+        });
+      }
+      await this.page.waitForURL(/\/login/, { timeout: 10000 });
     }
   }
 }

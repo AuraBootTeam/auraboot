@@ -400,6 +400,30 @@ test.describe('PCBA CRM CRUD', () => {
 
   test.describe('Opportunity (crm_opportunity)', () => {
     const bucket = emptyBucket();
+    let opportunityCloseDateType: string | undefined;
+
+    async function opportunityCloseDateValue(page: any, date: string): Promise<string> {
+      if (!opportunityCloseDateType) {
+        const modelResp = await page.request.get('/api/meta/models/code/crm_opportunity');
+        const modelJson = await modelResp.json().catch(() => ({}));
+        const modelPid = modelJson?.data?.pid ?? modelJson?.pid;
+        if (modelPid) {
+          const fieldsResp = await page.request.get(`/api/meta/models/${modelPid}/fields`);
+          const fieldsJson = await fieldsResp.json().catch(() => ({}));
+          const fieldsData = fieldsJson?.data ?? fieldsJson;
+          const fields = Array.isArray(fieldsData)
+            ? fieldsData
+            : (fieldsData?.records ?? fieldsData?.items ?? fieldsData?.content ?? []);
+          const field = fields.find((item: any) => (
+            item?.code === 'crm_opp_expected_close_date' ||
+            item?.fieldCode === 'crm_opp_expected_close_date' ||
+            item?.field?.code === 'crm_opp_expected_close_date'
+          ));
+          opportunityCloseDateType = field?.dataType ?? field?.data_type ?? field?.field?.dataType ?? field?.field?.data_type;
+        }
+      }
+      return opportunityCloseDateType === 'datetime' ? `${date}T09:00:00+08:00` : date;
+    }
 
     test.afterAll(async ({ browser }) => {
       const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
@@ -426,7 +450,7 @@ test.describe('PCBA CRM CRUD', () => {
           crm_opp_account_id: accountPid,
           crm_opp_expected_amount: 50000,
           crm_opp_probability: 60,
-          crm_opp_expected_close_date: new Date().toISOString(),
+          crm_opp_expected_close_date: await opportunityCloseDateValue(page, new Date().toISOString().slice(0, 10)),
         },
         undefined,
         'create',

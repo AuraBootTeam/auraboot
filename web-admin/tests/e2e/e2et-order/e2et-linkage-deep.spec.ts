@@ -160,7 +160,7 @@ test.describe('Field Linkage Depth', () => {
     const pid = await order.createViaApi({
       e2et_order_title: `LinkEdit_${uniqueId()}`,
       e2et_order_type: 'bulk',
-      e2et_order_discount: 10,
+      e2et_order_discount: 0.1,
     });
     try {
       const formPage = await order.gotoEditForm(pid);

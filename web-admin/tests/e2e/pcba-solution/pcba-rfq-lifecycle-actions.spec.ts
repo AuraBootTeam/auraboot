@@ -21,7 +21,7 @@ import {
 type RfqStatus = 'draft' | 'submitted' | 'clarification' | 'finalized';
 
 const NAV_TIMEOUT = 15_000;
-const ENTERPRISE_PLUGIN_ROOT = '/Users/ghj/work/auraboot/auraboot-enterprise/plugins';
+const ENTERPRISE_PLUGIN_ROOT = process.env.ENTERPRISE_PLUGIN_ROOT ?? '/app/plugins-enterprise';
 const REQUIRED_PLUGINS = ['pcba-solution', 'pcba-crm'];
 
 const RFQ_ENTRY = {

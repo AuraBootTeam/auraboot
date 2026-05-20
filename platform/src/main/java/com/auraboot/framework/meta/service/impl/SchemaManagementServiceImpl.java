@@ -1232,8 +1232,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         if (!"PostgreSQL".equalsIgnoreCase(ddlDialectProvider.getDialect().getName())) {
             return;
         }
+        var connection = DataSourceUtils.getConnection(dataSource);
         try {
-            var connection = DataSourceUtils.getConnection(dataSource);
             try (var statement = connection.createStatement()) {
                 statement.execute("DEALLOCATE ALL");
             }
@@ -1243,6 +1243,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             // would self-evict on next prepare. Logged at warn so a recurring
             // failure can be picked up by ops.
             log.warn("Failed to clear PostgreSQL prepared plans after DDL: {}", logSafe(e.getMessage()), e);
+        } finally {
+            DataSourceUtils.releaseConnection(connection, dataSource);
         }
     }
 

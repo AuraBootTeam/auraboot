@@ -258,6 +258,30 @@ export async function waitForTableHydration(
     });
 }
 
+export function collectionViewLocator(page: Page): Locator {
+  return page
+    .locator(
+      [
+        'table',
+        '[role="table"]',
+        '[data-testid*="table"]',
+        '[data-testid*="kanban"]',
+        '[data-testid*="board"]',
+        '[class*="kanban"]',
+        '[class*="board"]',
+        'main:has-text("Count:")',
+        'main:has-text("Total Value")',
+        'main:has-text("暂无")',
+        'main:has-text("No data")',
+      ].join(', '),
+    )
+    .first();
+}
+
+export async function expectCollectionViewVisible(page: Page, timeout = 15000): Promise<void> {
+  await expect(collectionViewLocator(page)).toBeVisible({ timeout });
+}
+
 /**
  * Wait for space-selection UI hydration after login/navigation.
  *

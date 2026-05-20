@@ -731,13 +731,13 @@ test.describe('PCBA Base — Warehouse CRUD', () => {
 
   test('PB-016: Create warehouse, verify in list', async ({ page }) => {
     const name = `E2E Warehouse ${uniqueId()}`;
-    const result = await executeCommandViaApi(page, 'pe:create_warehouse', {
+    const result = await executeCommandViaApi(page, 'inv:create_warehouse', {
       inv_warehouse_name: name,
       inv_warehouse_type: 'finished_goods',
     });
     expect(result.code).toBe(ErrorCodes.SUCCESS);
     expect(result.recordId).toBeTruthy();
-    createdPids.push({ commandCode: 'pe:delete_warehouse', pid: result.recordId });
+    createdPids.push({ commandCode: 'inv:delete_warehouse', pid: result.recordId });
 
     // Use API-based verification to avoid pagination issues
     const records = await queryFilteredList(page, 'inv-warehouse', 'inv_warehouse_name', name);
@@ -751,12 +751,12 @@ test.describe('PCBA Base — Warehouse CRUD', () => {
     const originalName = `E2E WhEdit ${uniqueId()}`;
     const updatedName = `E2E WhUpd ${uniqueId()}`;
 
-    const result = await executeCommandViaApi(page, 'pe:create_warehouse', {
+    const result = await executeCommandViaApi(page, 'inv:create_warehouse', {
       inv_warehouse_name: originalName,
       inv_warehouse_type: 'raw_material',
     });
     expect(result.code).toBe(ErrorCodes.SUCCESS);
-    createdPids.push({ commandCode: 'pe:delete_warehouse', pid: result.recordId });
+    createdPids.push({ commandCode: 'inv:delete_warehouse', pid: result.recordId });
 
     await navigateAndSearchByName(page, 'inv-warehouse', originalName);
     const row = page.locator('tbody tr', { hasText: originalName }).first();
@@ -769,7 +769,7 @@ test.describe('PCBA Base — Warehouse CRUD', () => {
       // Fallback when deployed DSL still uses legacy blockType and form fields are not rendered.
       const apiUpdate = await executeCommandViaApi(
         page,
-        'pe:update_warehouse',
+        'inv:update_warehouse',
         {
           inv_warehouse_name: updatedName,
         },
@@ -804,7 +804,7 @@ test.describe('PCBA Base — Warehouse CRUD', () => {
   test('PB-018: Delete warehouse via UI', async ({ page }) => {
     const name = `E2E WhDel ${uniqueId()}`;
 
-    const result = await executeCommandViaApi(page, 'pe:create_warehouse', {
+    const result = await executeCommandViaApi(page, 'inv:create_warehouse', {
       inv_warehouse_name: name,
       inv_warehouse_type: 'finished_goods',
     });
