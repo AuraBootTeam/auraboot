@@ -663,7 +663,7 @@ test.describe(
       if (sourcePid) {
         const src = await undeployProcess(request, adminToken, sourcePid);
         expect(
-          [200, 204, 400, 404, 500],
+          [200, 204, 400, 404, 409, 500],
           `source undeploy status ${src.status} must be one of ok/expected`,
         ).toContain(src.status);
       }
@@ -671,7 +671,7 @@ test.describe(
       if (importedPid) {
         const imp = await undeployProcess(request, adminToken, importedPid);
         expect(
-          [200, 204, 400, 404, 500],
+          [200, 204, 400, 404, 409, 500],
           `imported undeploy status ${imp.status} must be one of ok/expected`,
         ).toContain(imp.status);
       }

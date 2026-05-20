@@ -70,11 +70,11 @@ test.describe('Sales Dashboard @smoke', () => {
     await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
     await menuBtn.click();
 
-    const dashLink = page.locator('a[href="/sales/dashboard"]');
+    const dashLink = page.locator('a[href="/dashboards/view/sales_dashboard"]');
     await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await dashLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/sales\/dashboard/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboards\/view\/sales_dashboard/, { timeout: 10000 });
 
     // Wait for dashboard data to load
     await Promise.all([

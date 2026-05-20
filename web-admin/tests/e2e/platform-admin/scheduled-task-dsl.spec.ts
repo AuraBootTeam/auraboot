@@ -501,6 +501,11 @@ test.describe('Scheduled Task DSL Page (/p/scheduled_task)', () => {
         r.status() === 200,
       { timeout: 15_000 },
     );
+    const listRefresh = page
+      .waitForResponse((r) => r.url().includes(API_LIST) && r.status() === 200, {
+        timeout: 10_000,
+      })
+      .catch(() => null);
 
     const okBtn = page
       .locator('[data-testid="confirm-ok"]')
@@ -520,11 +525,9 @@ test.describe('Scheduled Task DSL Page (/p/scheduled_task)', () => {
     // Toast feedback (best effort — not all stacks emit one)
     await waitForToast(page, undefined, 3_000).catch(() => null);
 
-    // Wait for list refresh
-    await page.waitForResponse(
-      (r) => r.url().includes(API_LIST) && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    // Wait for list refresh if the UI issued one. The listener is armed before
+    // confirmation because fast refreshes can otherwise be missed.
+    await listRefresh;
 
     // [#4 regression — anti "fake success"] Total must decrement
     const totalAfterDelete = await fetchTotal(page);

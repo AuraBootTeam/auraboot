@@ -455,7 +455,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
     /**
      * Resolve the actual table name from model code using MetaModelService.
-     * Falls back to SystemFieldConstants.generateTableName for dynamic models.
+     * Dynamic model table names must come from published metadata; blindly
+     * guessing mt_{modelCode} turns missing tenant/plugin models into SQL 500s.
      */
     private String resolveTableName(String modelCode) {
         try {
@@ -470,7 +471,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         if (modelCode.startsWith("ns_") || modelCode.startsWith("sys_") || modelCode.startsWith("ab_")) {
             return modelCode;
         }
-        return com.auraboot.framework.meta.constant.SystemFieldConstants.generateTableName(modelCode);
+        throw new MetaServiceException("Model not found or not published for aggregate query: " + modelCode);
     }
 
     /**

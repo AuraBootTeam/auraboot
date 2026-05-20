@@ -44,6 +44,10 @@ function emptyBucket(): Bucket {
   return { accounts: [], journalEntries: [], journalLines: [], fiscalPeriods: [] };
 }
 
+function shortFacCode(prefix = 'E2EFAC'): string {
+  return `${prefix}${Date.now().toString(36).slice(-8)}`.slice(0, 20);
+}
+
 async function deleteRecord(
   page: import('@playwright/test').Page,
   pageKey: string,
@@ -148,9 +152,8 @@ async function createJournalEntryViaApi(
   bucket: Bucket,
   overrides: Record<string, unknown> = {},
 ): Promise<{ recordId: string; code: string }> {
-  const periodName = `E2E FP ${uniqueId()}`;
-  // fin_fp_period is constrained to 1-12; use a random year to avoid (year, period) collisions across tests
-  const fpYear = 3000 + Math.floor(Math.random() * 6000);
+  const periodName = `E2E FP ${shortFacCode('FP')}`;
+  const fpYear = 2099;
   const fpPeriod = Math.floor(Math.random() * 12) + 1;
   const fiscalPeriod = await executeCommandViaApi(
     page,
@@ -219,7 +222,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
     });
 
     test('FAC-002: Create account via API, verify in list @smoke', async ({ page }) => {
-      const accCode = `E2E-FAC-${uniqueId()}`;
+      const accCode = shortFacCode();
       const accName = `E2E Account ${uniqueId()}`;
       const result = await executeCommandViaApi(
         page,

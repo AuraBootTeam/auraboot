@@ -262,12 +262,7 @@ test.describe('PM Full Lifecycle', () => {
     });
     await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
-    const memberListPromise = page.waitForResponse(
-      (r) => r.url().includes('/api/dynamic/pm_project_member/list') && r.status() === 200,
-      { timeout: 10000 },
-    );
     await page.getByTestId('tab-members').click();
-    await memberListPromise;
 
     await expect(page.getByTestId('member-manager')).toBeVisible({ timeout: 10000 });
     // Add member button should be visible

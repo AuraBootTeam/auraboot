@@ -90,6 +90,7 @@ export async function startProcessInstance(
 ): Promise<StartInstanceResult> {
   const resp = await request.post('/api/bpm/process-instances', {
     headers: authHeaders(token),
+    timeout: 15_000,
     data: {
       processDefinitionId: args.processDefinitionId,
       businessKey: args.businessKey,

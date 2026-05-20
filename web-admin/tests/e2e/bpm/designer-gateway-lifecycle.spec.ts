@@ -657,12 +657,12 @@ test.describe('BPM Designer Gateway Full Lifecycle', { tag: ['@bpm-regression'] 
   test('B2c: undeploy test process (cleanup, best-effort)', async ({ request }) => {
     expect(processPid, 'processPid must be set from B1').toBeTruthy();
     // Best-effort: backend rejects undeploy while running instances remain
-    // (500: "Cannot undeploy: N running instance(s)"). That's expected for
+    // (409/500: "Cannot undeploy: N running instance(s)"). That's expected for
     // this suite — the 2 instances started in B2 + B2b are still at their
     // respective userTask nodes. Just record the outcome; env-reset handles
     // true cleanup between runs.
     const { ok, status } = await undeployProcess(request, adminToken, processPid);
-    expect([200, 204, 500], `undeploy response ${status} must be ok-or-running-blocked`).toContain(
+    expect([200, 204, 409, 500], `undeploy response ${status} must be ok-or-running-blocked`).toContain(
       status,
     );
     if (!ok) {

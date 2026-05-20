@@ -4,7 +4,7 @@
  * Coverage:
  * - D1 Menu Navigation: sidebar click from PCBA role workspaces, not direct business route goto
  * - D2 List Rendering: dynamic list shell renders table/header signals
- * - Dashboard Contract: dashboards use config/dashboards/*.json and /dashboards?code={code}
+ * - Dashboard Contract: dashboards use config/dashboards/*.json and /dashboards/view/{code}
  * - UX Guardrails: no 403/404 shell and no raw i18n/model keys in visible content
  */
 
@@ -28,7 +28,9 @@ type PcbaEntry = {
 };
 
 const NAV_TIMEOUT = 15_000;
-const ENTERPRISE_PLUGIN_ROOT = '/Users/ghj/work/auraboot/auraboot-enterprise/plugins';
+const ENTERPRISE_PLUGIN_ROOT = process.env.AURA_ENTERPRISE_PROJECT_ROOT
+  ? `${process.env.AURA_ENTERPRISE_PROJECT_ROOT}/plugins`
+  : (process.env.ENTERPRISE_PLUGIN_ROOT ?? '/Users/ghj/work/auraboot/auraboot-enterprise/plugins');
 
 const REQUIRED_PLUGINS = [
   'product-catalog',
@@ -50,9 +52,9 @@ const REQUIRED_PLUGINS = [
 
 const DASHBOARD_ENTRY: PcbaEntry = {
   id: 'executive-overview',
-  href: '/dashboards?code=pe_executive_dashboard',
+  href: '/dashboards/view/pe_executive_dashboard',
   label: /经营概览|Overview/i,
-  route: /\/dashboards\?code=pe_executive_dashboard(?:$|[&#])/,
+  route: /\/dashboards\/view\/pe_executive_dashboard(?:$|[?#])/,
   dashboardTitle: /经营概览仪表盘|Executive KPI|经营概览/i,
 };
 
@@ -94,10 +96,10 @@ const SALES_AND_PROCUREMENT_ENTRIES: PcbaEntry[] = [
 const PLANNING_AND_PRODUCTION_ENTRIES: PcbaEntry[] = [
   {
     id: 'mrp-workspace',
-    href: '/dashboards?code=pe_mrp_dashboard',
+    href: '/dashboards/view/pe_mrp_dashboard',
     label: /MRP工作台|MRP Workspace/i,
     parentLabel: /计划排程|Planning/i,
-    route: /\/dashboards\?code=pe_mrp_dashboard(?:$|[&#])/,
+    route: /\/dashboards\/view\/pe_mrp_dashboard(?:$|[?#])/,
     dashboardTitle: /MRP看板|MRP/i,
   },
   {
@@ -110,10 +112,10 @@ const PLANNING_AND_PRODUCTION_ENTRIES: PcbaEntry[] = [
   },
   {
     id: 'shop-floor',
-    href: '/dashboards?code=pe_shop_floor_dashboard',
+    href: '/dashboards/view/pe_shop_floor_dashboard',
     label: /车间执行|Shop Floor/i,
     parentLabel: /生产执行|Production/i,
-    route: /\/dashboards\?code=pe_shop_floor_dashboard(?:$|[&#])/,
+    route: /\/dashboards\/view\/pe_shop_floor_dashboard(?:$|[?#])/,
     dashboardTitle: /车间看板|Shop Floor/i,
   },
   {

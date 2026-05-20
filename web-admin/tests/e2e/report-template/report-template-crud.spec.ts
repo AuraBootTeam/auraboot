@@ -29,17 +29,15 @@ test.describe('Report Template Management @smoke', () => {
   test('RPT-01: Report Templates page is accessible via sidebar menu', async ({ page }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
 
-    // Navigate via sidebar: Meta Management → Report Templates
-    const metaMenu = page.locator('button', { hasText: /元数据管理|Meta/ }).first();
-    await metaMenu.waitFor({ state: 'visible', timeout: 10000 });
-    await metaMenu.evaluate((el: HTMLElement) => el.click());
-
-    const reportLink = page.locator('a[href="/report-templates"]');
+    // Navigate via the enterprise tenant sidebar entry.
+    const reportLink = page.locator('a[href="/finance/report-templates"]');
     await reportLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await reportLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/report-templates/, { timeout: 10000 });
-    await expect(page.locator('text=Report Templates')).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/\/finance\/report-templates/, { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /Report Templates|报表模板/ })).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('RPT-02: Can create a new report template via API', async ({ page }) => {

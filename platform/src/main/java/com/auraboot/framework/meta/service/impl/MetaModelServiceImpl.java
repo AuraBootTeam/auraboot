@@ -751,7 +751,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         // model creation and must not block deletion of an otherwise empty model.
         int boundFieldCount = fieldBindingMapper.countUserFieldsByModelId(model.getId());
         if (boundFieldCount > 0) {
-            throw new IllegalStateException("Cannot delete model with bound fields. Found " + boundFieldCount + " bound fields.");
+            throw new MetaServiceException("Cannot delete model with bound fields. Found " + boundFieldCount + " bound fields.");
         }
     }
     

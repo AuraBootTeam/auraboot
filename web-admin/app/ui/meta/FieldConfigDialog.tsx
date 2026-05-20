@@ -27,6 +27,7 @@ export function FieldConfigDialog({ field, onSave, onClose }: FieldConfigDialogP
   const { t } = useI18n();
   const [config, setConfig] = useState<FieldBindingConfig>(() => bindingToConfig(field));
   const [saving, setSaving] = useState(false);
+  const fieldCode = field.fieldCode || field.code || field.fieldName || '';
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -50,7 +51,7 @@ export function FieldConfigDialog({ field, onSave, onClose }: FieldConfigDialogP
       <div className="relative flex max-h-[80vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl">
         <div className="border-b px-6 py-4">
           <h2 className="text-lg font-semibold">
-            {t('field.dialog.title', { code: field.fieldCode }, `配置字段 ${field.fieldCode}`)}
+            {t('field.dialog.title', { code: fieldCode }, `配置字段 ${fieldCode}`)}
           </h2>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4">

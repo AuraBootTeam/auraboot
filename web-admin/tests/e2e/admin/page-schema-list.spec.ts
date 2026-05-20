@@ -260,7 +260,12 @@ test.describe.serial('Page Schema List (DSL)', () => {
     await expect(page.getByText('基本信息').or(page.getByText('Basic Information')).first()).toBeVisible({ timeout: 8000 });
 
     // D5: Verify form fields are present using stable field labels in the current DSL form.
-    await expect(page.getByText('名称').or(page.getByText('页面名称')).first()).toBeVisible({ timeout: 3000 });
+    await expect(
+      page
+        .getByLabel(/^(Name|名称|页面名称)\*?$/)
+        .or(page.getByText('名称').or(page.getByText('页面名称')).or(page.getByText('Name')).first())
+        .first(),
+    ).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('页面标识').or(page.getByText('Page Key')).first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('页面类型').or(page.getByText('Page Kind')).first()).toBeVisible({ timeout: 3000 });
 

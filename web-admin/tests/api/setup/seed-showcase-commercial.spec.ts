@@ -46,6 +46,42 @@ function datetimeAt(monthOffset: number, dayOffset = 0, hour = 9): string {
   return d.toISOString();
 }
 
+function recordId(record: any): string {
+  return String(record?.pid ?? record?.id ?? record?.recordId ?? '');
+}
+
+function refId(value: any): string {
+  if (value && typeof value === 'object') {
+    return String(value.pid ?? value.id ?? value.value ?? value.recordId ?? '');
+  }
+  return String(value ?? '');
+}
+
+async function runPsql(sql: string): Promise<void> {
+  const { execFileSync } = await import('child_process');
+  execFileSync(
+    'psql',
+    [
+      '-h',
+      process.env.PGHOST ?? 'localhost',
+      '-p',
+      process.env.PGPORT ?? '5432',
+      '-U',
+      process.env.PGUSER ?? 'ghj',
+      '-d',
+      process.env.PGDATABASE ?? 'aura_boot',
+      '-P',
+      'pager=off',
+      '-c',
+      sql,
+    ],
+    {
+      timeout: 5000,
+      stdio: 'pipe',
+    },
+  );
+}
+
 async function cmd(
   page: any,
   commandCode: string,
@@ -339,30 +375,43 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
 
   test('Phase C3: Create OppContact Associations', async ({ page }) => {
     const roles = ['decision_maker', 'technical', 'procurement', 'influencer'];
+    const attemptedPairs = new Set<string>();
 
     // For each opportunity, associate 2-3 contacts from same account
-    const topOpps = opportunities.slice(0, 6);
+    const topOpps = opportunities.slice(0, 12);
     for (const opp of topOpps) {
+      const oppId = recordId(opp);
+      const oppAccountId = refId(opp.crm_opp_account_id);
+      if (!oppId) continue;
+
       const accountContacts = contacts.filter(
-        (c: any) => c.crm_ct_account_id === opp.crm_opp_account_id,
+        (c: any) => refId(c.crm_ct_account_id) === oppAccountId,
       );
-      if (accountContacts.length === 0) continue;
+      const candidates = accountContacts.length > 0 ? accountContacts : contacts;
 
       // Associate up to 2 contacts per opportunity
-      const toAssociate = accountContacts.slice(0, Math.min(2, accountContacts.length));
+      const toAssociate = candidates.slice(0, Math.min(2, candidates.length));
       for (let j = 0; j < toAssociate.length; j++) {
+        const contactId = recordId(toAssociate[j]);
+        const pairKey = `${oppId}:${contactId}`;
+        if (!contactId || attemptedPairs.has(pairKey)) continue;
+        attemptedPairs.add(pairKey);
+
         try {
           const ocId = await cmd(page, 'crm:add_opp_contact', {
-            crm_oc_opportunity_id: opp.id,
-            crm_oc_contact_id: toAssociate[j].id,
+            crm_oc_opportunity_id: oppId,
+            crm_oc_contact_id: contactId,
             crm_oc_role: roles[j % roles.length],
             crm_oc_is_primary: j === 0,
           });
           ids.oppContacts.push(ocId);
-        } catch {
-          // Skip if association already exists
+        } catch (e) {
+          console.warn(
+            `  Opp-contact association skipped: ${(e as Error).message?.slice(0, 120)}`,
+          );
         }
       }
+      if (ids.oppContacts.length >= 12) break;
     }
 
     console.log(`  Created: ${ids.oppContacts.length} opp-contact associations`);
@@ -587,9 +636,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
     }
     const subPid = sub.pid || sub.id || 'unknown';
     const subUrl = sub.targetUrl || sub.target_url || 'https://webhook.example.com/auraboot';
-    // Webhook delivery logs require direct DB insert (no public API)
-    // Use psql to insert demo delivery records
-    const { execSync } = await import('child_process');
+    // Webhook delivery logs require direct DB insert (no public API).
     const deliveryLogs = [
       { status: 'delivered', httpStatus: 200, month: 15, day: 5 },
       { status: 'delivered', httpStatus: 200, month: 15, day: 12 },
@@ -604,6 +651,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       { status: 'delivered', httpStatus: 201, month: 17, day: 7 },
     ];
 
+    let inserted = 0;
     for (let i = 0; i < deliveryLogs.length; i++) {
       const log = deliveryLogs[i];
       const eventTs = datetimeAt(log.month, log.day);
@@ -614,7 +662,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
           request_url, request_body, response_status, response_body,
           delivery_status, retry_count, error_message, delivered_at, created_at
         ) VALUES (
-          nextval('hibernate_sequence'), '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${subPid}',
+          DEFAULT, '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${subPid}',
           'evt_opp_stage_${Date.now()}_${i}',
           '${subUrl}',
           '{"event":"entity.updated","model":"crm_opportunity","recordId":"demo-${i}"}',
@@ -629,13 +677,8 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       `.trim();
 
       try {
-        execSync(
-          `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
-          {
-            timeout: 5000,
-            stdio: 'pipe',
-          },
-        );
+        await runPsql(sql);
+        inserted += 1;
       } catch (e) {
         console.warn(
           `  Webhook delivery log ${i} insert failed: ${(e as Error).message?.slice(0, 80)}`,
@@ -643,7 +686,8 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       }
     }
 
-    console.log(`  Inserted: ${deliveryLogs.length} webhook delivery logs`);
+    console.log(`  Inserted: ${inserted} webhook delivery logs`);
+    expect(inserted).toBeGreaterThanOrEqual(3);
   });
 
   test('Phase C7: Seed Automation Execution Logs via SQL', async ({ page }) => {
@@ -657,7 +701,6 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       return;
     }
 
-    const { execSync } = await import('child_process');
     const execLogs = [
       { status: 'success', trigger: 'ON_RECORD_CREATE', month: 14, day: 8, duration: 230 },
       { status: 'success', trigger: 'ON_RECORD_CREATE', month: 15, day: 15, duration: 180 },
@@ -673,6 +716,7 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       { status: 'success', trigger: 'SCHEDULED', month: 17, day: 1, duration: 890 },
     ];
 
+    let inserted = 0;
     for (let i = 0; i < execLogs.length; i++) {
       const log = execLogs[i];
       const auto = automations[i % automations.length];
@@ -680,38 +724,34 @@ test.describe.serial('Showcase Seed — Commercial Data', () => {
       const autoId = auto.pid || auto.id || 'unknown';
       const startTs = datetimeAt(log.month, log.day);
       const endTs = datetimeAt(log.month, log.day, 9);
-      const pid = `autolog_seed_${Date.now()}_${i}`;
+      const pid = `al_${Date.now().toString(36)}_${i}`;
 
       const sql = `
         INSERT INTO ab_automation_log (
           id, pid, tenant_id, automation_id,
           trigger_type, trigger_record_id, trigger_payload,
-          status, started_at, completed_at, error_message, execution_log, created_at
+          status, started_at, completed_at, error_message, action_results, created_at
         ) VALUES (
-          nextval('hibernate_sequence'), '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${autoId}',
+          nextval('ab_automation_log_id_seq'), '${pid}', (SELECT id FROM ab_tenant WHERE name = 'AuraBoot Dev' LIMIT 1), '${autoId}',
           '${log.trigger}', 'demo_record_${i}',
           '{"model":"crm_opportunity","field":"crm_opp_stage","oldValue":"proposal","newValue":"negotiation"}'::jsonb,
           '${log.status}', '${startTs}', '${endTs}',
           ${log.error ? `'${log.error}'` : 'NULL'},
-          'Step 1: Trigger matched → Step 2: Condition evaluated (true) → Step 3: Action executed (${log.status === 'success' ? 'notification sent' : 'FAILED: ' + (log.error || '')})',
+          '{"steps":["trigger matched","condition evaluated","action executed"],"status":"${log.status}"}'::jsonb,
           '${startTs}'
         ) ON CONFLICT DO NOTHING;
       `.trim();
 
       try {
-        execSync(
-          `psql -h ${process.env.PGHOST ?? 'localhost'} -p ${process.env.PGPORT ?? '5432'} -U ${process.env.PGUSER ?? 'ghj'} -d ${process.env.PGDATABASE ?? 'aura_boot'} -P pager=off -c "${sql.replace(/"/g, '\\"')}"`,
-          {
-            timeout: 5000,
-            stdio: 'pipe',
-          },
-        );
+        await runPsql(sql);
+        inserted += 1;
       } catch (e) {
         console.warn(`  Automation log ${i} insert failed: ${(e as Error).message?.slice(0, 80)}`);
       }
     }
 
-    console.log(`  Inserted: ${execLogs.length} automation execution logs`);
+    console.log(`  Inserted: ${inserted} automation execution logs`);
+    expect(inserted).toBeGreaterThanOrEqual(3);
   });
 
   // ═════════════════════════════════════════════════════════════════════════

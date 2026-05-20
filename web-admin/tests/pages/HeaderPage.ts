@@ -303,29 +303,28 @@ export class HeaderPage {
     const logoutVisible = await this.logoutLink.isVisible({ timeout: 3000 }).catch(() => false);
     if (logoutVisible) {
       await Promise.all([
-        this.page.waitForURL(/\/logout/, { timeout: 8000 }).catch(() => {}),
+        this.page.waitForURL(/\/(logout|login)/, { timeout: 10000 }),
         this.logoutLink.click(),
       ]);
     } else {
       // Fallback: try button with logout text
       const logoutBtn = this.page.locator('button:has-text("退出")');
       await Promise.all([
-        this.page.waitForURL(/\/logout/, { timeout: 8000 }).catch(() => {}),
+        this.page.waitForURL(/\/(logout|login)/, { timeout: 10000 }),
         logoutBtn.click(),
       ]);
     }
 
-    // Wait for navigation to logout/login page
-    await this.page.waitForURL(/\/(logout|login)/, { timeout: 8000 }).catch(() => {});
+    if (/\/login(?:[/?#]|$)/.test(this.page.url())) {
+      return;
+    }
 
     // Handle logout confirmation page if present (button text is "确认退出" in Chinese UI)
     const logoutButton = this.page.locator('button:has-text("确认退出"), button:has-text("Log Out"), button[type="submit"]').first();
-    const hasLogoutButton = await logoutButton.isVisible({ timeout: 5000 }).catch(() => false);
-    if (hasLogoutButton) {
-      await Promise.all([
-        this.page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => {}),
-        logoutButton.click(),
-      ]);
-    }
+    await expect(logoutButton).toBeVisible({ timeout: 8000 });
+    await Promise.all([
+      this.page.waitForURL(/\/login/, { timeout: 15000 }),
+      logoutButton.click(),
+    ]);
   }
 }

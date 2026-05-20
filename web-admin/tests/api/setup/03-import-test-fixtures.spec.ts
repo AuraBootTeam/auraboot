@@ -23,7 +23,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
@@ -31,7 +31,25 @@ import { BACKEND_URL } from '../../helpers/environments';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const PLUGIN_DIR = resolve(__dirname, '../../../../plugins/test-fixtures');
+const pluginDirCandidates = [
+  process.env.AURA_CORE_PROJECT_ROOT
+    ? resolve(process.env.AURA_CORE_PROJECT_ROOT, 'plugins/test-fixtures')
+    : '',
+  // Core source checkout: auraboot/web-admin/tests/api/setup -> auraboot/plugins/test-fixtures
+  resolve(__dirname, '../../../../plugins/test-fixtures'),
+  // Enterprise staging: auraboot-enterprise/build/web-admin-overlaid/tests/api/setup
+  // -> sibling auraboot/plugins/test-fixtures
+  resolve(__dirname, '../../../../../../auraboot/plugins/test-fixtures'),
+  process.env.AURA_ENTERPRISE_PROJECT_ROOT
+    ? resolve(process.env.AURA_ENTERPRISE_PROJECT_ROOT, 'plugins/test-fixtures')
+    : '',
+  // Enterprise staging: auraboot-enterprise/build/web-admin-overlaid/tests/api/setup
+  // -> auraboot-enterprise/plugins/test-fixtures
+  resolve(__dirname, '../../../../../plugins/test-fixtures'),
+].filter(Boolean);
+const PLUGIN_DIR =
+  pluginDirCandidates.find((candidate) => existsSync(resolve(candidate, 'plugin.json'))) ??
+  pluginDirCandidates[0];
 const PLUGIN_MANIFEST = resolve(PLUGIN_DIR, 'plugin.json');
 
 const AURA_ENV = process.env.AURA_ENV ?? '';
@@ -52,27 +70,27 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
   expect(existsSync(PLUGIN_MANIFEST), `plugin manifest missing: ${PLUGIN_MANIFEST}`).toBe(true);
 
   // Acquire a JWT against the live backend.
-  const loginRes = await request.post(`${BACKEND_URL}/api/login`, {
+  const loginRes = await request.post(`${BACKEND_URL}/api/auth/login`, {
     data: {
       email: DEFAULT_TEST_ACCOUNT.email,
       password: DEFAULT_TEST_ACCOUNT.password,
     },
   });
   expect(loginRes.ok(), `login failed: ${loginRes.status()}`).toBe(true);
-  const loginBody = (await loginRes.json()) as { data?: { token?: string } };
-  const token = loginBody?.data?.token;
-  expect(token, 'login response missing token').toBeTruthy();
-
-  // The plugin manifest is the canonical import payload.
-  const manifest = JSON.parse(readFileSync(PLUGIN_MANIFEST, 'utf-8'));
+  const loginBody = (await loginRes.json()) as { data?: { jwt?: string } };
+  const jwt = loginBody?.data?.jwt;
+  expect(jwt, 'login response missing jwt').toBeTruthy();
 
   const importRes = await request.post(
-    `${BACKEND_URL}/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE`,
+    `${BACKEND_URL}/api/plugins/import/import-directory-sync`,
     {
-      data: manifest,
+      data: {
+        path: PLUGIN_DIR,
+        overwrite: true,
+      },
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${jwt}`,
       },
       timeout: 60_000,
     },
@@ -80,11 +98,17 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
 
   expect(importRes.ok(), `import returned HTTP ${importRes.status()}`).toBe(true);
   const result = (await importRes.json()) as {
-    data?: { status?: string; errorMessage?: string; totalResourceCount?: number };
+    status?: string;
+    success?: boolean;
+    errorMessage?: string;
+    totalResourceCount?: number;
+    data?: { status?: string; success?: boolean; errorMessage?: string; totalResourceCount?: number };
   };
-  const status = result?.data?.status;
+  const status = result.status ?? result?.data?.status;
+  const success = result.success ?? result?.data?.success;
+  const errorMessage = result.errorMessage ?? result?.data?.errorMessage;
   expect(
-    status,
-    `import status not SUCCESS (got ${status}, msg=${result?.data?.errorMessage ?? '?'})`,
-  ).toBe('SUCCESS');
+    status === 'SUCCESS' || success === true,
+    `import status not SUCCESS (got ${status}, success=${success}, msg=${errorMessage ?? '?'})`,
+  ).toBe(true);
 });

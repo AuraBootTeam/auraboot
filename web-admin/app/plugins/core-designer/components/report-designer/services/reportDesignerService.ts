@@ -86,6 +86,7 @@ export const reportDesignerService = {
 
     const payload = {
       pageKey,
+      modelCode: 'report',
       kind: 'list',
       profile: 'report',
       title: report.title,

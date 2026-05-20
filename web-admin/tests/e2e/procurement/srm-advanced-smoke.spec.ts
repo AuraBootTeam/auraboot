@@ -316,8 +316,8 @@ test.describe('SRM Advanced Capabilities @smoke', () => {
       page,
       /Spend Analysis/,
       /Spend Dashboard/,
-      /\/procurement\/spend\/dashboard/,
-      '/procurement/spend/dashboard',
+      /\/dashboards\/view\/pr_spend_analysis_dashboard/,
+      '/dashboards/view/pr_spend_analysis_dashboard',
     );
 
     // Wait for datasource API calls
@@ -342,8 +342,8 @@ test.describe('SRM Advanced Capabilities @smoke', () => {
       page,
       /Spend Analysis/,
       /Spend Dashboard/,
-      /\/procurement\/spend\/dashboard/,
-      '/procurement/spend/dashboard',
+      /\/dashboards\/view\/pr_spend_analysis_dashboard/,
+      '/dashboards/view/pr_spend_analysis_dashboard',
     );
 
     await page.waitForResponse(
@@ -351,9 +351,15 @@ test.describe('SRM Advanced Capabilities @smoke', () => {
       { timeout: 15000 },
     ).catch(() => null);
 
-    // Verify stat cards render
-    const statCards = page.locator('[class*="stat-card"], [class*="StatCard"], [class*="kpi"]');
-    await expect(statCards.first()).toBeVisible({ timeout: 10000 });
+    // The spend dashboard uses the smart-number-card widget. Some imported
+    // dashboard snapshots render configured labels, while legacy snapshots fall
+    // back to metric field names.
+    await expect(page.getByText(/采购总额|Total Spend|total_spend/).first()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByText(/生效合同数|Active Contracts|active_contracts/).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('Spend dashboard has chart blocks', async ({ page }) => {
@@ -361,8 +367,8 @@ test.describe('SRM Advanced Capabilities @smoke', () => {
       page,
       /Spend Analysis/,
       /Spend Dashboard/,
-      /\/procurement\/spend\/dashboard/,
-      '/procurement/spend/dashboard',
+      /\/dashboards\/view\/pr_spend_analysis_dashboard/,
+      '/dashboards/view/pr_spend_analysis_dashboard',
     );
 
     await page.waitForResponse(
@@ -370,9 +376,14 @@ test.describe('SRM Advanced Capabilities @smoke', () => {
       { timeout: 15000 },
     ).catch(() => null);
 
-    // Verify chart containers
-    const charts = page.locator('[class*="chart"], canvas, svg');
-    await expect(charts.first()).toBeVisible({ timeout: 15000 });
+    // The chart widgets may render an empty/awaiting-data state when the
+    // named query has no rows, but their configured blocks must still render.
+    await expect(page.getByText(/供应商采购额 TOP10|Top 10 Suppliers/i).first()).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByText(/月度采购趋势|Monthly Procurement Trend/i).first()).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   // =========================================================================

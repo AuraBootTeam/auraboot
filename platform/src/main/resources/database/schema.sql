@@ -6992,7 +6992,7 @@ CREATE TABLE IF NOT EXISTS ab_agent_bif (
     -- execution context (run_id may be null when BIF computed pre-run)
     run_id                 VARCHAR(26),
     step_index             INTEGER,
-    conversation_id        VARCHAR(26),
+    conversation_id        VARCHAR(64),
 
     nl_input               TEXT NOT NULL,
 
@@ -7041,6 +7041,7 @@ COMMENT ON TABLE ab_agent_bif IS 'ACP D1 Grounding: Business Intent Frame IR per
 -- different profiles / channels don't collapse.
 ALTER TABLE ab_agent_bif ADD COLUMN IF NOT EXISTS profile_id VARCHAR(26);
 ALTER TABLE ab_agent_bif ADD COLUMN IF NOT EXISTS channel    VARCHAR(32);
+ALTER TABLE ab_agent_bif ALTER COLUMN conversation_id TYPE VARCHAR(64);
 CREATE INDEX IF NOT EXISTS idx_bif_profile ON ab_agent_bif(profile_id) WHERE profile_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_bif_channel ON ab_agent_bif(channel)    WHERE channel IS NOT NULL;
 
@@ -8083,6 +8084,7 @@ CREATE TABLE IF NOT EXISTS ab_announcement (
     title           VARCHAR(256) NOT NULL,
     content         TEXT,
     priority        VARCHAR(16)  NOT NULL DEFAULT 'normal',
+    announcement_priority VARCHAR(16) NOT NULL DEFAULT 'normal',
     status          VARCHAR(16)  NOT NULL DEFAULT 'draft',
     pinned          BOOLEAN      NOT NULL DEFAULT FALSE,
     published_by    BIGINT,

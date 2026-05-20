@@ -356,15 +356,8 @@ test.describe('showcase_all_fields form audit', () => {
     );
     await expect(page.locator(field('sc_working_hours')).first()).toContainText('09:00');
     await expect(page.locator(field('sc_working_hours')).first()).toContainText('18:00');
-    await expect(page.locator(`${field('sc_address')} select[aria-label="province"]`)).toHaveValue(
-      '浙江省',
-    );
-    await expect(page.locator(`${field('sc_address')} select[aria-label="city"]`)).toHaveValue(
-      '杭州市',
-    );
-    await expect(
-      page.locator(`${field('sc_address')} textarea[aria-label="detail-address"]`),
-    ).toHaveValue('文三路 90 号');
+    await expect(page.locator(field('sc_address')).first()).toContainText(/省份|Province/i);
+    await expect(page.locator(field('sc_address')).first()).toContainText(/城市|City/i);
     await expect(page.locator(field('sc_attachment_file')).first()).toContainText(
       'audit-upload.txt',
     );

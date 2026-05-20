@@ -4,7 +4,9 @@ import { test, expect, type Page } from '../../fixtures';
 import { loginAs, loginViaUI } from '../../helpers/wd-fixtures';
 import { BACKEND_URL } from '../../helpers/environments';
 
-const LICENSE_FILE = fileURLToPath(new URL('../../../../LICENSE.txt', import.meta.url));
+const LICENSE_FILE = process.env.AURA_CORE_PROJECT_ROOT
+  ? path.join(process.env.AURA_CORE_PROJECT_ROOT, 'LICENSE.txt')
+  : fileURLToPath(new URL('../../../../LICENSE.txt', import.meta.url));
 const BACKEND = BACKEND_URL;
 
 test.setTimeout(60_000);

@@ -754,15 +754,52 @@ export async function findRowInPaginatedList(
   };
   const closeTransientSearchUi = async () => {
     await page.keyboard.press('Escape').catch(() => null);
+    await page.keyboard.press('Escape').catch(() => null);
+    await page
+      .locator(
+        [
+          '[role="dialog"] button[aria-label="Close"]',
+          '[role="dialog"] button:has-text("取消")',
+          '[role="dialog"] button:has-text("Cancel")',
+          '.ant-modal button[aria-label="Close"]',
+          '.ant-modal button:has-text("取消")',
+          '.ant-modal button:has-text("Cancel")',
+          '.ant-drawer button[aria-label="Close"]',
+        ].join(', '),
+      )
+      .first()
+      .click({ timeout: 700 })
+      .catch(() => null);
+    await expect(
+      page
+        .locator(
+          '[data-radix-dialog-overlay][data-state="open"], [data-state="open"].fixed.inset-0.bg-black\\/50, .ant-modal-mask, .ant-drawer-mask',
+        )
+        .first(),
+    )
+      .toBeHidden({ timeout: 1500 })
+      .catch(() => null);
+  };
+  const returnVisibleRow = async (visibleRow: Locator) => {
+    await closeTransientSearchUi();
+    return visibleRow;
   };
 
   let row = page.locator('tbody tr', { hasText: title }).first();
-  if (await row.isVisible({ timeout: Math.min(1200, timeLeft()) }).catch(() => false)) return row;
+  if (await row.isVisible({ timeout: Math.min(1200, timeLeft()) }).catch(() => false))
+    return returnVisibleRow(row);
 
   // Strategy 0: use list search box to narrow dataset before paging.
   const searchInput = page
     .locator(
-      '[data-testid="list-search-input"], [data-testid="search-input"], [data-testid="table-search-input"], input[placeholder*="搜索"], input[placeholder*="Search"]',
+      [
+        '[data-testid="list-search-input"]',
+        '[data-testid="table-search-input"]',
+        '[data-testid="search-input"]:not([data-testid="global-search-input"])',
+        'input[placeholder*="查询"]',
+        'input[placeholder*="搜索"]:not([placeholder*="页面"]):not([placeholder*="记录"]):not([placeholder*="文档"])',
+        'input[placeholder*="Search"]:not([placeholder*="page" i]):not([placeholder*="record" i]):not([placeholder*="document" i])',
+      ].join(', '),
     )
     .first();
   const canSearch = await searchInput
@@ -775,7 +812,8 @@ export async function findRowInPaginatedList(
     await waitListResponse(Math.min(1800, timeLeft()));
 
     row = page.locator('tbody tr', { hasText: title }).first();
-    if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false)) return row;
+    if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false))
+      return returnVisibleRow(row);
 
     const submitBtn = page
       .locator(
@@ -787,14 +825,14 @@ export async function findRowInPaginatedList(
       await waitListResponse(Math.min(1800, timeLeft()));
       row = page.locator('tbody tr', { hasText: title }).first();
       if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false))
-        return row;
+        return returnVisibleRow(row);
     }
   }
 
   // Strategy 0.5: click search button and use advanced search panel/modal inputs.
   const searchTrigger = page
     .locator(
-      '[data-testid="filter-search"], [data-testid="search-button"], [data-testid="table-search-button"]',
+      '[data-testid="filter-search"], [data-testid="table-search-button"]',
     )
     .first();
   const canOpenSearch = await searchTrigger
@@ -828,8 +866,7 @@ export async function findRowInPaginatedList(
 
       row = page.locator('tbody tr', { hasText: title }).first();
       if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false)) {
-        await closeTransientSearchUi();
-        return row;
+        return returnVisibleRow(row);
       }
     }
 
@@ -861,7 +898,8 @@ export async function findRowInPaginatedList(
   const pollCurrentUntil = Date.now() + Math.min(2500, timeout);
   while (Date.now() < pollCurrentUntil) {
     row = page.locator('tbody tr', { hasText: title }).first();
-    if (await row.isVisible({ timeout: Math.min(500, timeLeft()) }).catch(() => false)) return row;
+    if (await row.isVisible({ timeout: Math.min(500, timeLeft()) }).catch(() => false))
+      return returnVisibleRow(row);
     await waitListLoaded();
   }
 
@@ -874,7 +912,8 @@ export async function findRowInPaginatedList(
   ]);
 
   row = page.locator('tbody tr', { hasText: title }).first();
-  if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false)) return row;
+  if (await row.isVisible({ timeout: Math.min(1000, timeLeft()) }).catch(() => false))
+    return returnVisibleRow(row);
 
   let pageGuard = 0;
   while (Date.now() < deadline && pageGuard < 200) {
@@ -888,7 +927,8 @@ export async function findRowInPaginatedList(
     ]);
     if (!moved) break;
     row = page.locator('tbody tr', { hasText: title }).first();
-    if (await row.isVisible({ timeout: Math.min(700, timeLeft()) }).catch(() => false)) return row;
+    if (await row.isVisible({ timeout: Math.min(700, timeLeft()) }).catch(() => false))
+      return returnVisibleRow(row);
   }
 
   // Strategy 3: jump to last page as final fallback.
@@ -899,7 +939,8 @@ export async function findRowInPaginatedList(
     'button:has-text("末页")',
   ]);
   row = page.locator('tbody tr', { hasText: title }).first();
-  if (await row.isVisible({ timeout: Math.min(800, timeLeft()) }).catch(() => false)) return row;
+  if (await row.isVisible({ timeout: Math.min(800, timeLeft()) }).catch(() => false))
+    return returnVisibleRow(row);
 
   return page.locator('tbody tr', { hasText: title }).first();
 }

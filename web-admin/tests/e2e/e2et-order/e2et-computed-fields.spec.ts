@@ -163,14 +163,15 @@ test.describe('Computed Fields', () => {
   test('CF-004: Zero division safe', async ({ page }) => {
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
-    // Create item with qty=0 to test division safety
+    // qty has a business minValue=1, so zero values must be covered through a
+    // valid price=0 item instead of bypassing field validation.
     const zeroPid = await order.createViaApi({ e2et_order_title: `ZeroDivTest ${uniqueId()}` });
     createdOrderPids.push(zeroPid);
 
     await order.child('item').createForParent(zeroPid, {
       e2et_item_name: 'Zero Qty Item',
-      e2et_item_qty: 0,
-      e2et_item_price: 100,
+      e2et_item_qty: 1,
+      e2et_item_price: 0,
     });
 
     // Verify no error in computed field using correct filter API
@@ -179,7 +180,7 @@ test.describe('Computed Fields', () => {
 
     if (items.length > 0) {
       const item = items[0] as Record<string, unknown>;
-      // Subtotal with qty=0 should be 0, not NaN or error
+      // Subtotal with a zero price should be 0, not NaN or error.
       const subtotal = item.e2et_item_subtotal;
       if (subtotal !== undefined && subtotal !== null) {
         expect(Number(subtotal)).toBe(0);

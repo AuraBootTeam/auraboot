@@ -27,6 +27,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Async;
@@ -61,6 +62,7 @@ public class AgentRunService {
     private final GroundingService groundingService;
     private final AgentSkillService skillService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ApplicationContext applicationContext;
 
     /**
      * User Soul Profile grounding reader (plan §5.5 / PR-77).
@@ -747,7 +749,7 @@ public class AgentRunService {
             String childAgentCode = (String) first.get("assignee_id");
             log.info("Sequential dispatch: first child task {} for parent {}", childPid, parentTaskPid);
             try {
-                executeTask(tenantId, childPid, childAgentCode);
+                agentRunExecutor().executeTask(tenantId, childPid, childAgentCode);
             } catch (Exception e) {
                 log.error("Failed to dispatch child task {}: {}", childPid, e.getMessage());
             }
@@ -760,7 +762,7 @@ public class AgentRunService {
                 String childPid = (String) child.get("pid");
                 String childAgentCode = (String) child.get("assignee_id");
                 try {
-                    executeTask(tenantId, childPid, childAgentCode);
+                    agentRunExecutor().executeTask(tenantId, childPid, childAgentCode);
                 } catch (Exception e) {
                     log.error("Failed to dispatch child task {}: {}", childPid, e.getMessage());
                 }
@@ -769,6 +771,10 @@ public class AgentRunService {
                     Map.of("child_count", children.size(), "mode", "parallel",
                            "child_pids", children.stream().map(c -> (String) c.get("pid")).toList()));
         }
+    }
+
+    private AgentRunService agentRunExecutor() {
+        return applicationContext.getBean(AgentRunService.class);
     }
 
     // =========================================================================
