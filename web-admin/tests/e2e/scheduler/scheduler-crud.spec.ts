@@ -31,7 +31,7 @@ const TEST_PREFIX = `e2e-sched-${Date.now()}`;
 /** Task data for the CRUD flow */
 const TEST_TASK = {
   name: `${TEST_PREFIX}-cron-task`,
-  description: 'Created by E2E test — scheduler CRUD',
+  description: 'Created by E2E test - scheduler CRUD',
   taskType: 'cron' as const,
   cronExpression: '0 30 2 * * *',
   handlerBean: 'e2eTestHandler',

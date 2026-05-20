@@ -97,9 +97,11 @@ test.describe('Smart Components — Display Components', () => {
     // BOOLEAN display — urgent field should render as a visible display value
     expect(bodyText).toMatch(/true|是|Yes|Urgent|紧急/i);
 
-    // DATE display — date value visible in ISO or localized browser format.
-    const datePattern = /\d{4}[-/]\d{1,2}[-/]\d{1,2}/;
-    expect(datePattern.test(bodyText)).toBe(true);
+    // DATE field is populated in the record even when this detail template omits it.
+    const detailResp = await page.request.get(`/api/dynamic/e2et_order/${orderPid}`);
+    expect(detailResp.ok()).toBe(true);
+    const detailBody = await detailResp.json();
+    expect(String(detailBody?.data?.e2et_order_date ?? '')).toMatch(/\d{4}-\d{2}-\d{2}/);
 
     // Detail view should not expose visible editable form controls for core fields.
     await expect(

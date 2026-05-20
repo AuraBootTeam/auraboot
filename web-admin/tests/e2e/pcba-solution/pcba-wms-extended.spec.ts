@@ -41,18 +41,18 @@ const PAGE_KEYS = {
 
 const COMMANDS = {
   // Stock Check
-  createStockCheck: 'pe:create_stock_check',
-  updateStockCheck: 'pe:update_stock_check',
-  deleteStockCheck: 'pe:delete_stock_check',
-  submitStockCheck: 'pe:submit_stock_check',
-  confirmStockCheck: 'pe:confirm_stock_check',
-  cancelStockCheck: 'pe:cancel_stock_check',
+  createStockCheck: 'inv:create_stock_check',
+  updateStockCheck: 'inv:update_stock_check',
+  deleteStockCheck: 'inv:delete_stock_check',
+  submitStockCheck: 'inv:submit_stock_check',
+  confirmStockCheck: 'inv:confirm_stock_check',
+  cancelStockCheck: 'inv:cancel_stock_check',
   // Lot
-  createLot: 'pe:create_lot',
-  updateLot: 'pe:update_lot',
-  deleteLot: 'pe:delete_lot',
-  quarantineLot: 'pe:quarantine_lot',
-  scrapLot: 'pe:scrap_lot',
+  createLot: 'inv:create_lot',
+  updateLot: 'inv:update_lot',
+  deleteLot: 'inv:delete_lot',
+  quarantineLot: 'inv:quarantine_lot',
+  scrapLot: 'inv:scrap_lot',
 };
 
 // ---------------------------------------------------------------------------

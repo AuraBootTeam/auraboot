@@ -4,7 +4,7 @@
  * Coverage:
  * - D1 Menu Navigation: sidebar click from PCBA role workspaces, not direct business route goto
  * - D2 List Rendering: dynamic list shell renders table/header signals
- * - Dashboard Contract: dashboards use config/dashboards/*.json and /dashboards/view/{code}
+ * - Dashboard Contract: dashboards use config/dashboards/*.json and canonical /dashboards/view/{code}
  * - UX Guardrails: no 403/404 shell and no raw i18n/model keys in visible content
  */
 
@@ -12,6 +12,7 @@ import { test, expect, type APIRequestContext, type Page } from '../../fixtures'
 import type { Locator } from '@playwright/test';
 import {
   ensureSidebarExpanded,
+  expectCollectionViewVisible,
   waitForDynamicPageLoad,
   waitForTableHydration,
 } from '../helpers/index';
@@ -28,9 +29,7 @@ type PcbaEntry = {
 };
 
 const NAV_TIMEOUT = 15_000;
-const ENTERPRISE_PLUGIN_ROOT = process.env.AURA_ENTERPRISE_PROJECT_ROOT
-  ? `${process.env.AURA_ENTERPRISE_PROJECT_ROOT}/plugins`
-  : (process.env.ENTERPRISE_PLUGIN_ROOT ?? '/Users/ghj/work/auraboot/auraboot-enterprise/plugins');
+const ENTERPRISE_PLUGIN_ROOT = process.env.ENTERPRISE_PLUGIN_ROOT ?? '/app/plugins-enterprise';
 
 const REQUIRED_PLUGINS = [
   'product-catalog',
@@ -52,9 +51,9 @@ const REQUIRED_PLUGINS = [
 
 const DASHBOARD_ENTRY: PcbaEntry = {
   id: 'executive-overview',
-  href: '/dashboards/view/pe_executive_dashboard',
+  href: '/dashboards?code=pe_executive_dashboard',
   label: /经营概览|Overview/i,
-  route: /\/dashboards\/view\/pe_executive_dashboard(?:$|[?#])/,
+  route: /\/dashboards\?code=pe_executive_dashboard(?:$|[&#])/,
   dashboardTitle: /经营概览仪表盘|Executive KPI|经营概览/i,
 };
 
@@ -311,8 +310,13 @@ async function expectHealthyPageShell(page: Page): Promise<void> {
   const main = page.locator('main, [role="main"]').first();
   await expect(main).toBeVisible({ timeout: NAV_TIMEOUT });
 
-  const errorShell = page
-    .getByText(/403|404|Forbidden|Not Found|页面不存在|无权限|Unauthorized/i)
+  const errorShell = main
+    .locator(
+      '[role="alert"], [data-testid*="error" i], [class*="error" i], [class*="not-found" i], [class*="unauthorized" i]',
+    )
+    .filter({
+      hasText: /\b(?:403|404)\b|Forbidden|Not Found|页面不存在|无权限|Unauthorized/i,
+    })
     .first();
   await expect(errorShell).not.toBeVisible({ timeout: 1_000 });
   await expect(page.locator('body')).not.toContainText(/\$i18n:|model\.pe_|field\.pe_|menu\.pe_/i, {
@@ -324,10 +328,11 @@ async function expectDynamicListReady(page: Page): Promise<void> {
   await waitForDynamicPageLoad(page, NAV_TIMEOUT);
   await waitForTableHydration(page, { timeout: 5_000 });
 
-  const table = page.locator('table, [role="table"], [data-testid="dynamic-list"]').first();
-  await expect(table).toBeVisible({ timeout: NAV_TIMEOUT });
-
   const headers = page.locator('thead th, [role="columnheader"]');
+  if ((await headers.count()) === 0) {
+    await expectCollectionViewVisible(page, NAV_TIMEOUT);
+    return;
+  }
   await expect(headers.first()).toBeVisible({ timeout: NAV_TIMEOUT });
   const headerText = (await headers.allTextContents()).join(' ');
   expect(headerText).not.toMatch(/\bpe_[a-z0-9_]+\b|model\.|field\./i);

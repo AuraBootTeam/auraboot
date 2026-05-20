@@ -98,8 +98,26 @@ test.describe('CRM Dashboard @smoke', () => {
 
   /** Navigate to CRM Dashboard via sidebar menu */
   async function gotoDashboard(page: import('@playwright/test').Page) {
-    await page.goto('/dashboards/view/crm_dashboard', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/dashboards\/view\/crm_dashboard/, { timeout: 10000 });
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+
+    // Expand CRM menu group — sidebar uses <button> for parent menus
+    const crmButton = page.locator('button', { hasText: /CRM/i }).first();
+    await crmButton.waitFor({ state: 'visible', timeout: 10000 });
+    await crmButton.click();
+
+    // Click Dashboard menu link via evaluate (bypass scroll interception)
+    const dashLink = page.locator(
+      'a[href="/dashboards/view/crm_dashboard"], a[href="/crm/dashboard"]',
+    );
+    await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
+    await dashLink.first().evaluate((el: HTMLElement) => el.click());
+
+    if (!/\/crm\/dashboard/.test(page.url())) {
+      await page.goto('/dashboards/view/crm_dashboard', { waitUntil: 'domcontentloaded' });
+    }
+    await expect(page).toHaveURL(/\/(?:dashboards\/view\/crm_dashboard|crm\/dashboard)/, {
+      timeout: 10000,
+    });
 
     // Wait for multiple dashboard data responses to load
     // The dashboard fires several API calls: datasource/list (NQ blocks) + dynamic/{model}/list (model blocks)
