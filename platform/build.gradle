@@ -197,7 +197,7 @@ ext {
     jacksonVersion = '2.21.3'
     sentryVersion = '6.28.0'
     jwtVersion = '0.13.0'
-    mybatisPlusVersion = '3.5.14'
+    mybatisPlusVersion = '3.5.16'
     lombokVersion = '1.18.40'
     aspectjVersion = '1.9.22'
     reflectasmVersion = '1.11.3'
