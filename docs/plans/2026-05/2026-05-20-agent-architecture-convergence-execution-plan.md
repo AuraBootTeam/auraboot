@@ -102,6 +102,8 @@
 
 - `ChatTurnRuntime` 已保持 adapter-neutral：不再直接命名 AuraBot 专属 tool type 或 preview-pending marker。Adapter-specific preview confirmation 统一通过 generic `ToolResultDisposition` callbacks 承接。
 - `AgentTurnRouter` decision reason 已改为执行语义命名（`DURABLE_TRIAGE_SIGNAL`、`DURABLE_EXECUTION_POLICY`、`SYNC_READ_ONLY_TURN`、`SYNC_CHAT_TURN`），不再使用 AuraBot/light/contextual 场景命名。
+- `统计 / 查询 / list / count` 等只读分析意图已从 mutation triage 中拆出，进入 `CONTEXTUAL_ANSWER + readonly tools`；`CONTEXTUAL_ANSWER` 不再因为缺少 readonly whitelist 自动升级 durable。
+- 主 `application.yml` 已取消缺省 stub sentinel；stub LLM 改为 test profile、`AGENT_LLM_STUB_MODE=true` 或显式 sentinel opt-in。
 - `AgentRuntimeArchitectureTest` 已锁住这两个边界，防止后续在 generic runtime 重新引入 AuraBot 分支，或在 router reason 中重新引入 scenario 命名。
 - Review fix verification 已覆盖：
   - `./gradlew :test --tests 'com.auraboot.framework.agent.runtime.ChatTurnRuntimeTest' --tests 'com.auraboot.framework.agent.runtime.AgentTurnRouterTest' --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*' --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceResumeSnapshotTest' --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest'`

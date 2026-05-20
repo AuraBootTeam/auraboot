@@ -93,6 +93,17 @@ class AgentRuntimeArchitectureTest {
     }
 
     @Test
+    @DisplayName("production LLM config must not default missing keys to the stub provider")
+    void productionLlmConfigDoesNotDefaultToStubProvider() throws Exception {
+        String config = Files.readString(Path.of("src/main/resources/application.yml"));
+
+        assertThat(config)
+                .as("Stub LLM must be an explicit test/dev opt-in, not the production default for a missing key")
+                .doesNotContain("${ANTHROPIC_API_KEY:stub_key_for_no_llm_paths}")
+                .contains("api-key: ${ANTHROPIC_API_KEY:}");
+    }
+
+    @Test
     @DisplayName("external side-effect tools must claim durable execution before provider dispatch")
     void externalSideEffectToolsClaimDurableExecutionBeforeProviderDispatch() throws Exception {
         Path toolLoop = MAIN_SOURCES.resolve("agent/service/ToolLoopService.java");

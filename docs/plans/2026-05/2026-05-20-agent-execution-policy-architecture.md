@@ -1300,6 +1300,9 @@ runtime 只执行通用状态机。
 - 已让 simple write tool 通过 policy late binding 进入 `PendingConfirmation`，而不是 turn 开始前硬路由。
 - 已让 existing approval-required tool 继续走现有 approval gate 创建 `approvalPid`，避免出现“需要审批但没有审批单”的中间态。
 - 已修正 router：`requiresApproval=true` 单独出现时不升级 durable；只有 explicit durable、external side effect、batch 等 durable 语义才触发 durable route。
+- 已修正只读平台问题的 triage 边界：
+  - `统计 / 查询 / list / count` 等只读分析意图进入 `CONTEXTUAL_ANSWER + readonly tools`，不再被当作 ACP durable action。
+  - `CONTEXTUAL_ANSWER` 不再因为缺少 readonly whitelist 自动升级 durable；durable 仍由 `ACP_RUN` 或 explicit durable / external side effect / batch 等执行语义触发。
 - 已扩展 `PendingToolSnapshot`：
   - `channel`
   - `profileId`
@@ -1515,6 +1518,8 @@ docker compose -f docker-compose.yml -f docker-compose.skills-c2.override.yml -p
   - `ChatTurnRuntime` 已移除 AuraBot 专属 tool type / preview marker 判断，改由 generic `ToolResultDisposition` callbacks 承接 adapter-specific pending 行为。
   - `AgentTurnRouter` 的 decision reason / policy signal 已改为执行语义命名，不再使用 AuraBot/light/contextual 场景命名。
   - 已新增架构测试防止 generic runtime 重新引入 adapter-specific 分支。
+  - `统计客户信息` 已补回归测试，确认只读统计走 chat runtime，而不是 ACP durable runtime。
+  - 主 `application.yml` 已取消缺省 stub sentinel；stub LLM 只能通过 test profile、`AGENT_LLM_STUB_MODE=true` 或显式 sentinel opt-in。
 - 当前通用 runtime 架构基线已按本方案收敛；剩余不再是本轮通用 runtime 架构缺口，而是后续产品/业务扩展与更大范围 gate：
   - 接入具体业务补偿 handler。
   - 为非 pageContext 来源继续扩展结构化 RAG/schema/record provenance。

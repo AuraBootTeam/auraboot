@@ -12,7 +12,7 @@ class AgentTurnRouterTest {
     private final AgentTurnRouter router = new AgentTurnRouter();
 
     @Test
-    @DisplayName("routes aurabot ACP and ownerless contextual buckets to durable runtime")
+    @DisplayName("routes aurabot ACP bucket to durable runtime")
     void routesAurabotAcpBucketsToDurableRuntime() {
         AgentTurnRouter.RuntimeDecision acp = router.decide("aurabot", TriageBucket.ACP_RUN);
         assertThat(acp.route()).isEqualTo(AgentTurnRouter.RuntimeRoute.DURABLE_RUN);
@@ -22,10 +22,6 @@ class AgentTurnRouterTest {
                 .containsExactlyInAnyOrder(
                         AgentTurnRouter.PolicySignal.DEFAULT_AGENT_PROFILE,
                         AgentTurnRouter.PolicySignal.DURABLE_TRIAGE_BUCKET);
-
-        assertThat(router.decide("AuraBot", TriageBucket.CONTEXTUAL_ANSWER).route())
-                .as("AuraBot alias matching must be case-insensitive")
-                .isEqualTo(AgentTurnRouter.RuntimeRoute.DURABLE_RUN);
     }
 
     @Test
@@ -44,6 +40,18 @@ class AgentTurnRouterTest {
         assertThat(contextual.reason()).isEqualTo(AgentTurnRouter.DecisionReason.SYNC_READ_ONLY_TURN);
         assertThat(contextual.policySignals())
                 .contains(AgentTurnRouter.PolicySignal.READ_ONLY_CONTEXT);
+    }
+
+    @Test
+    @DisplayName("routes contextual buckets without durable semantics to chat runtime")
+    void routesContextualBucketsWithoutDurableSemanticsToChatRuntime() {
+        AgentTurnRouter.RuntimeDecision contextual = router.decide("AuraBot", TriageBucket.CONTEXTUAL_ANSWER);
+
+        assertThat(contextual.route())
+                .as("AuraBot alias matching must be case-insensitive")
+                .isEqualTo(AgentTurnRouter.RuntimeRoute.CHAT_TURN);
+        assertThat(contextual.reason()).isEqualTo(AgentTurnRouter.DecisionReason.SYNC_CHAT_TURN);
+        assertThat(contextual.durableLifecycleRequired()).isFalse();
     }
 
     @Test

@@ -137,14 +137,6 @@ public class AgentTurnRouter {
                     EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.READ_ONLY_CONTEXT,
                             PolicySignal.CHAT_TRIAGE_BUCKET));
         }
-        if (effective.triageBucket() == TriageBucket.CONTEXTUAL_ANSWER) {
-            return new RuntimeDecision(
-                    RuntimeRoute.DURABLE_RUN,
-                    DecisionReason.DURABLE_TRIAGE_SIGNAL,
-                    normalizedAgentCode,
-                    effective.triageBucket(),
-                    EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.DURABLE_TRIAGE_BUCKET));
-        }
         return new RuntimeDecision(
                 RuntimeRoute.CHAT_TURN,
                 DecisionReason.SYNC_CHAT_TURN,
