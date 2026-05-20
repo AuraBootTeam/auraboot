@@ -29,9 +29,24 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
 const runProfile = process.env.PW_PROFILE || 'fast';
 const enableRoleProjects = process.env.PW_ROLE_PROJECTS === '1';
 const skipWebServer = process.env.PW_SKIP_WEBSERVER === '1';
-const adminStorageState = process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json';
-const operatorStorageState = process.env.PW_OPERATOR_STORAGE_STATE || './tests/storage/operator.json';
-const viewerStorageState = process.env.PW_VIEWER_STORAGE_STATE || './tests/storage/viewer.json';
+const storageDir = process.env.PW_STORAGE_DIR;
+const storageStatePath = (envName: string, fileName: string, fallback: string) =>
+  process.env[envName] || (storageDir ? `${storageDir}/${fileName}` : fallback);
+const adminStorageState = storageStatePath(
+  'PW_ADMIN_STORAGE_STATE',
+  'admin.json',
+  './tests/storage/admin.json',
+);
+const operatorStorageState = storageStatePath(
+  'PW_OPERATOR_STORAGE_STATE',
+  'operator.json',
+  './tests/storage/operator.json',
+);
+const viewerStorageState = storageStatePath(
+  'PW_VIEWER_STORAGE_STATE',
+  'viewer.json',
+  './tests/storage/viewer.json',
+);
 const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
 const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';

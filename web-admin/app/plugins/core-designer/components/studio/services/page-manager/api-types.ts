@@ -64,6 +64,7 @@ export interface PageSchemaCreateRequest {
   description?: string;
   kind: ApiPageType;
   blocks?: unknown[];
+  schemaVersion?: number;
   metaInfo?: Record<string, unknown>;
   isTemplate?: boolean;
   templateCategory?: string;
