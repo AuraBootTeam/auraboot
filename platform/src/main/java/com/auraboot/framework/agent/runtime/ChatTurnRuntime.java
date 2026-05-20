@@ -476,7 +476,13 @@ public class ChatTurnRuntime {
                     }
                     if (!policyDeferredUntilResult && policyDef != null) {
                         ToolPolicyDecision policyDecision = evaluateToolPolicy(
-                                envelope, roundContext, toolName, input, policyDef, spec.actorPermissions());
+                                envelope,
+                                roundContext,
+                                toolName,
+                                input,
+                                policyDef,
+                                spec.actorPermissions(),
+                                callbacks.contextBlocks(roundContext));
                         if (policyDecision.type() == ToolPolicyDecision.Type.DENY) {
                             Map<String, Object> deniedResult = deniedToolResult(policyDecision);
                             spec.sink().onToolResult(toolId, deniedResult, false);
@@ -807,14 +813,15 @@ public class ChatTurnRuntime {
                                                   String toolName,
                                                   Map<String, Object> input,
                                                   ToolDefinition def,
-                                                  Set<String> actorPermissions) {
+                                                  Set<String> actorPermissions,
+                                                  List<AgentContextBlock> contextBlocks) {
         if (def == null) {
             return ToolPolicyDecision.deny("missing_tool_metadata",
                     "Tool is not available in the current execution envelope: " + toolName);
         }
         ToolMetadata metadata = toolMetadataRegistry.from(def, trustLevelFor(def));
         return toolPolicyEngine.evaluate(
-                new ToolPolicyCall(toolName, input),
+                new ToolPolicyCall(toolName, input, contextBlocks),
                 envelope,
                 metadata,
                 new ToolPolicyActor(

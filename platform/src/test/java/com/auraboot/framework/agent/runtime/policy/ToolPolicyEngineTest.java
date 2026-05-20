@@ -1,5 +1,9 @@
 package com.auraboot.framework.agent.runtime.policy;
 
+import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
+import com.auraboot.framework.agent.runtime.context.AgentContextProvenance;
+import com.auraboot.framework.agent.runtime.context.AgentContextSensitivity;
+import com.auraboot.framework.agent.runtime.context.AgentContextSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -114,6 +118,42 @@ class ToolPolicyEngineTest {
     }
 
     @Test
+    @DisplayName("denies write tools when args target a record outside read-write context provenance")
+    void writeToolOutsideContextScopeIsDenied() {
+        ToolMetadata metadata = ToolMetadata.builder()
+                .toolName("cmd:crm_customer_update")
+                .toolVersion("v1")
+                .effectType(ToolEffectType.INTERNAL_WRITE)
+                .riskLevel("L1")
+                .metadataTrustLevel(ToolMetadataTrustLevel.ADMIN_APPROVED)
+                .approvalRequirement(ApprovalRequirement.USER_CONFIRMATION)
+                .durabilityRequirement(DurabilityRequirement.NONE)
+                .build();
+        AgentContextBlock currentRecord = new AgentContextBlock(
+                "Current Record Data",
+                "{}",
+                new AgentContextProvenance(
+                        AgentContextSource.RECORD,
+                        "crm_customer/C-1",
+                        "CLIENT_SNAPSHOT",
+                        "PAGE_CONTEXT",
+                        AgentContextSensitivity.CONFIDENTIAL,
+                        List.of("C-1"),
+                        1L,
+                        "web",
+                        true));
+
+        ToolPolicyDecision decision = policyEngine.evaluate(
+                new ToolPolicyCall("cmd:crm_customer_update", Map.of("recordId", "C-2"), List.of(currentRecord)),
+                ExecutionEnvelope.writeCatalogWithGate(),
+                metadata,
+                new ToolPolicyActor(1L, 2L, Set.of()));
+
+        assertThat(decision.type()).isEqualTo(ToolPolicyDecision.Type.DENY);
+        assertThat(decision.reasonCode()).isEqualTo("context_scope_violation");
+    }
+
+    @Test
     @DisplayName("filters tool catalog before model calls")
     void filtersToolCatalogBeforeModelCalls() {
         ToolMetadata read = ToolMetadata.builder()
@@ -134,5 +174,28 @@ class ToolPolicyEngineTest {
 
         assertThat(filtered).extracting(ToolMetadata::getToolName)
                 .containsExactly("nq:crm_customer_stats");
+    }
+
+    @Test
+    @DisplayName("tenant catalog policy never makes all tools durable just because one visible tool is durable")
+    void tenantCatalogPolicyDoesNotPromoteWholeCatalogToRequiredDurability() {
+        ToolMetadata read = ToolMetadata.builder()
+                .toolName("nq:crm_customer_stats")
+                .effectType(ToolEffectType.INTERNAL_READ)
+                .durabilityRequirement(DurabilityRequirement.NONE)
+                .metadataTrustLevel(ToolMetadataTrustLevel.VERIFIED)
+                .build();
+        ToolMetadata external = ToolMetadata.builder()
+                .toolName("mcp:send_email")
+                .effectType(ToolEffectType.EXTERNAL_ACTION)
+                .durabilityRequirement(DurabilityRequirement.REQUIRED)
+                .metadataTrustLevel(ToolMetadataTrustLevel.ADMIN_APPROVED)
+                .build();
+
+        AgentTenantPolicy tenantPolicy = AgentTenantPolicy.fromCatalog(List.of(read, external));
+
+        assertThat(tenantPolicy.capabilityCeiling()).isEqualTo(ToolCapabilityCeiling.WRITE_CAPABLE);
+        assertThat(tenantPolicy.toolExposure()).isEqualTo(ToolExposure.WRITE_CATALOG_WITH_GATE);
+        assertThat(tenantPolicy.durabilityPreference()).isEqualTo(DurabilityPreference.ALLOWED);
     }
 }

@@ -245,6 +245,30 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
 
     @Test
     @Order(7)
+    @DisplayName("simple write triage -> chat runtime for late tool-policy confirmation, not ACP durable run")
+    void simpleWriteTriage_dispatchesToChatServiceForLatePolicyBinding() {
+        withTestIdentity(() -> {
+            when(chatService.executeAuraBotTurn(any(), any(), any()))
+                    .thenReturn(new TurnOutcome.Success("write-intent-ok", java.util.Map.of()));
+
+            TurnOutcome outcome = turnService.runTurn(buildTurnRequest(
+                    "aurabot",
+                    "创建客户",
+                    java.util.Map.of("pageKey", "crm_customer_list")), sink);
+
+            assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+            verify(chatService, times(1)).executeAuraBotTurn(
+                    argThat(ctx -> ctx.triageBucket() == com.auraboot.framework.agent.triage.TriageBucket.LIGHT_CHAT
+                            && ctx.allowedReadOnlyTools().isEmpty()),
+                    any(),
+                    any());
+            verify(agentChatPort, never()).runAgentTurn(any(), any(), any(),
+                    org.mockito.ArgumentMatchers.<com.auraboot.framework.agent.port.AgentTurnOverrides>any());
+        });
+    }
+
+    @Test
+    @Order(9)
     @DisplayName("agentCode='test_agent' -> agentChatPort.runAgentTurn dispatched")
     void agentExists_dispatchesToAgentChatPort() {
         withTestIdentity(() -> {
@@ -290,7 +314,7 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Order(9)
+    @Order(10)
     @DisplayName("GAP-295: TurnContext.channelSessionId resolved on aurabot dispatch")
     void channelSessionId_resolvedOnAurabotDispatch() {
         withTestIdentity(() -> {
@@ -312,7 +336,7 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Order(10)
+    @Order(11)
     @DisplayName("GAP-295: TurnContext.channelSessionId resolved on named-agent dispatch")
     void channelSessionId_resolvedOnNamedAgentDispatch() {
         withTestIdentity(() -> {
@@ -338,7 +362,7 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Order(11)
+    @Order(12)
     @DisplayName("TurnContext.profileId resolves from ab_agent_user_profile")
     void profileId_resolvedFromAgentUserProfile() {
         withTestIdentity(() -> {
@@ -368,7 +392,7 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Order(12)
+    @Order(13)
     @DisplayName("named-agent existence lookup failure is surfaced through sink")
     void namedAgentExistenceLookupFailure_surfacesThroughSink() {
         withTestIdentity(() -> {
