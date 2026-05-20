@@ -404,7 +404,9 @@ export default function ModelDetailPage() {
       if (!configField) return;
 
       try {
-        await modelService.updateFieldBinding(pid!, configField.fieldCode, binding);
+        const fieldCode = configField.fieldCode || configField.code || configField.fieldName;
+        if (!fieldCode) throw new Error('Missing field code for binding update');
+        await modelService.updateFieldBinding(pid!, fieldCode, binding);
 
         // 更新本地状态
         setFields(fields.map((f) => (f.id === configField.id ? { ...f, ...binding } : f)));

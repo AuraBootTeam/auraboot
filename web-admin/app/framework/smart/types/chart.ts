@@ -98,7 +98,11 @@ export interface AggregateQueryResponse {
  */
 export interface ChartDataSource {
   /** Data source type */
-  type: 'aggregate' | 'namedQuery' | 'static';
+  type: 'aggregate' | 'namedQuery' | 'static' | 'api';
+  /** API URL for table/list style data sources */
+  url?: string;
+  /** Query parameters for API data sources */
+  params?: Record<string, unknown>;
   /** Model code for aggregate queries */
   modelCode?: string;
   /** Query code for named queries */

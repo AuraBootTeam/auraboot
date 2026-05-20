@@ -143,6 +143,14 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
               params[k] = interpolateRecordValue(String(v));
             }
           }
+          const hasUnresolvedRequiredParam = Object.values(params).some(
+            (value) => typeof value === 'string' && value.trim() === '',
+          );
+          if (hasUnresolvedRequiredParam) {
+            setRows([]);
+            setLoading(false);
+            return;
+          }
           if ((ds.kind === 'namedQuery' || ds.type === 'namedQuery') && ds.queryCode) {
             params.datasourceId = `nq:${String(ds.queryCode)}`;
             params.format = params.format || 'records';

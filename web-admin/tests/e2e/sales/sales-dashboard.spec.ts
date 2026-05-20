@@ -14,7 +14,13 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, todayStr, dateOffsetStr, executeCommandViaApi } from '../helpers/index';
+import {
+  uniqueId,
+  todayStr,
+  dateOffsetStr,
+  executeCommandViaApi,
+  expectCollectionViewVisible,
+} from '../helpers/index';
 
 test.describe('Sales Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -70,11 +76,11 @@ test.describe('Sales Dashboard @smoke', () => {
     await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
     await menuBtn.click();
 
-    const dashLink = page.locator('a[href="/sales/dashboard"]');
+    const dashLink = page.locator('a[href="/dashboards/view/sales_dashboard"]');
     await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await dashLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/sales\/dashboard/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboards\/view\/sales_dashboard/, { timeout: 10000 });
 
     // Wait for dashboard data to load
     await Promise.all([
@@ -142,8 +148,6 @@ test.describe('Sales Dashboard @smoke', () => {
   test('SL-DASH-05: Dashboard renders data-table blocks', async ({ page }) => {
     await gotoDashboard(page);
 
-    const tables = page.locator('table, [role="table"]');
-    const tableCount = await tables.count();
-    expect(tableCount, 'Dashboard should render data tables').toBeGreaterThanOrEqual(1);
+    await expectCollectionViewVisible(page);
   });
 });

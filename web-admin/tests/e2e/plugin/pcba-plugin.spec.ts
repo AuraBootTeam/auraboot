@@ -16,7 +16,10 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { navigateToDynamicPage, waitForDynamicPageLoad } from '../helpers/index';
+import {
+  navigateToDynamicPage,
+  expectCollectionViewVisible,
+} from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -28,10 +31,7 @@ import { navigateToDynamicPage, waitForDynamicPageLoad } from '../helpers/index'
  */
 async function assertListPageLoads(page: import('@playwright/test').Page, pageKey: string) {
   await navigateToDynamicPage(page, pageKey);
-
-  const table = page.locator('table, [role="table"]');
-  const empty = page.locator('text=/no data|暂无/i');
-  await expect(table.or(empty).first()).toBeVisible({ timeout: 10000 });
+  await expectCollectionViewVisible(page, 10000);
 }
 
 // ---------------------------------------------------------------------------

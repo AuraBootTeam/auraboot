@@ -143,3 +143,20 @@ describe('useBPMNStore.setProcessDefinition', () => {
     expect(useBPMNStore.getState().isDirty).toBe(false);
   });
 });
+
+describe('useBPMNStore.importFromJSON', () => {
+  beforeEach(() => {
+    useBPMNStore.getState().reset();
+  });
+
+  it('rejects imported BPMN JSON when a node has no render position', () => {
+    expect(() =>
+      useBPMNStore.getState().importFromJSON({
+        nodes: [
+          { id: 'start', type: BPMNNodeType.START_EVENT, data: { type: BPMNNodeType.START_EVENT } },
+        ],
+        edges: [],
+      }),
+    ).toThrow('designerJson.nodes[0].position must be an object');
+  });
+});

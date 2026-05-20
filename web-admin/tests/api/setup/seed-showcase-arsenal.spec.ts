@@ -1362,8 +1362,12 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
     <endEvent id="end" name="结束"/>
     <sequenceFlow id="f1" sourceRef="start" targetRef="ut_apply"/>
     <sequenceFlow id="f2" sourceRef="ut_apply" targetRef="xgw"/>
-    <sequenceFlow id="f3" sourceRef="xgw" targetRef="st_auto" name="金额&lt;5万"/>
-    <sequenceFlow id="f4" sourceRef="xgw" targetRef="pgw_split" name="金额>=5万"/>
+    <sequenceFlow id="f3" sourceRef="xgw" targetRef="st_auto" name="金额&lt;5万">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${'$'}{amount &lt; 50000}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="f4" sourceRef="xgw" targetRef="pgw_split" name="金额>=5万">
+      <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${'$'}{amount &gt;= 50000}</conditionExpression>
+    </sequenceFlow>
     <sequenceFlow id="f5" sourceRef="st_auto" targetRef="end"/>
     <sequenceFlow id="f6" sourceRef="pgw_split" targetRef="ut_tech"/>
     <sequenceFlow id="f7" sourceRef="pgw_split" targetRef="ut_finance"/>
@@ -1457,30 +1461,36 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         },
       ],
       edges: [
-        { id: 'f1', source: 'start', target: 'ut_apply', type: 'smoothstep' },
-        { id: 'f2', source: 'ut_apply', target: 'xgw', type: 'smoothstep' },
+        { id: 'f1', source: 'start', target: 'ut_apply', type: 'smoothstep', data: {} },
+        { id: 'f2', source: 'ut_apply', target: 'xgw', type: 'smoothstep', data: {} },
         {
           id: 'f3',
           source: 'xgw',
           target: 'st_auto',
           type: 'smoothstep',
-          data: { label: '金额<5万' },
+          data: {
+            label: '金额<5万',
+            condition: { type: 'expression', content: '${amount < 50000}' },
+          },
         },
         {
           id: 'f4',
           source: 'xgw',
           target: 'pgw_split',
           type: 'smoothstep',
-          data: { label: '金额>=5万' },
+          data: {
+            label: '金额>=5万',
+            condition: { type: 'expression', content: '${amount >= 50000}' },
+          },
         },
-        { id: 'f5', source: 'st_auto', target: 'end', type: 'smoothstep' },
-        { id: 'f6', source: 'pgw_split', target: 'ut_tech', type: 'smoothstep' },
-        { id: 'f7', source: 'pgw_split', target: 'ut_finance', type: 'smoothstep' },
-        { id: 'f8', source: 'ut_tech', target: 'igw', type: 'smoothstep' },
-        { id: 'f9', source: 'ut_finance', target: 'igw', type: 'smoothstep' },
-        { id: 'f10', source: 'igw', target: 'rt_wait', type: 'smoothstep' },
-        { id: 'f11', source: 'rt_wait', target: 'ca_sub', type: 'smoothstep' },
-        { id: 'f12', source: 'ca_sub', target: 'end', type: 'smoothstep' },
+        { id: 'f5', source: 'st_auto', target: 'end', type: 'smoothstep', data: {} },
+        { id: 'f6', source: 'pgw_split', target: 'ut_tech', type: 'smoothstep', data: {} },
+        { id: 'f7', source: 'pgw_split', target: 'ut_finance', type: 'smoothstep', data: {} },
+        { id: 'f8', source: 'ut_tech', target: 'igw', type: 'smoothstep', data: {} },
+        { id: 'f9', source: 'ut_finance', target: 'igw', type: 'smoothstep', data: {} },
+        { id: 'f10', source: 'igw', target: 'rt_wait', type: 'smoothstep', data: {} },
+        { id: 'f11', source: 'rt_wait', target: 'ca_sub', type: 'smoothstep', data: {} },
+        { id: 'f12', source: 'ca_sub', target: 'end', type: 'smoothstep', data: {} },
       ],
     });
 

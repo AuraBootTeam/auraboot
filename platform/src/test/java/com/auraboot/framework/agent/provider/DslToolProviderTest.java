@@ -362,15 +362,28 @@ class DslToolProviderTest extends BaseIntegrationTest {
     @Test
     void execute_listWithRealModel_returnsRecords() {
         // Find a tenant + model that has a physical table
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(
-                "SELECT DISTINCT tenant_id, model_code FROM ab_command_definition " +
-                "WHERE (deleted_flag = FALSE OR deleted_flag IS NULL) LIMIT 1", Map.of());
+        Long tenantId = getTestTenant().getId();
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(
+                "SELECT DISTINCT cmd.tenant_id, cmd.model_code FROM ab_command_definition cmd " +
+                "JOIN ab_meta_model model " +
+                "  ON model.tenant_id = cmd.tenant_id " +
+                "  AND model.code = cmd.model_code " +
+                "  AND model.is_current = TRUE " +
+                "  AND model.status = 'published' " +
+                "  AND model.deleted_flag = FALSE " +
+                "WHERE cmd.model_code IS NOT NULL " +
+                "AND (cmd.deleted_flag = FALSE OR cmd.deleted_flag IS NULL) " +
+                "AND cmd.tenant_id = #{params.tenantId} " +
+                "AND EXISTS (" +
+                "  SELECT 1 FROM information_schema.tables t " +
+                "  WHERE t.table_schema = 'public' " +
+                "  AND t.table_name = CONCAT('mt_', cmd.model_code)" +
+                ") LIMIT 1", Map.of("tenantId", tenantId));
 
         if (rows.isEmpty()) {
             return;
         }
 
-        Long tenantId = ((Number) rows.get(0).get("tenant_id")).longValue();
         String modelCode = (String) rows.get(0).get("model_code");
 
         var result = dslToolProvider.execute(tenantId, "list:" + modelCode,

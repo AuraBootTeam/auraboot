@@ -31,9 +31,9 @@ const TEST_PREFIX = `e2e-sched-${Date.now()}`;
 /** Task data for the CRUD flow */
 const TEST_TASK = {
   name: `${TEST_PREFIX}-cron-task`,
-  description: 'Created by E2E test — scheduler CRUD',
+  description: 'Created by E2E test - scheduler CRUD',
   taskType: 'cron' as const,
-  cronExpression: '0 30 2 * *',
+  cronExpression: '0 30 2 * * *',
   handlerBean: 'e2eTestHandler',
   handlerMethod: 'execute',
   params: '{"source": "e2e"}',
@@ -82,6 +82,7 @@ async function findTestTaskPids(page: Page): Promise<string[]> {
 test.describe.serial('Scheduler CRUD Management', () => {
   /** PID of the task created in SC-002, used across subsequent tests */
   let createdTaskPid: string | undefined;
+  let currentTaskName = TEST_TASK.name;
 
   // -------------------------------------------------------------------------
   // Pre-cleanup: delete leftover test tasks from previous runs
@@ -294,6 +295,7 @@ test.describe.serial('Scheduler CRUD Management', () => {
     );
     await modal.locator('button[type="submit"]', { hasText: /更新|Update/ }).click();
     await updateResponse;
+    currentTaskName = EDITED_NAME;
 
     // Modal should close
     await expect(modal).toBeHidden({ timeout: 5000 });
@@ -314,7 +316,7 @@ test.describe.serial('Scheduler CRUD Management', () => {
   test('SC-004: should disable a scheduled task', async ({ page }) => {
     await gotoScheduler(page);
 
-    const taskRow = page.locator('tr', { hasText: EDITED_NAME });
+    const taskRow = page.locator('tr', { hasText: currentTaskName });
     await expect(taskRow).toBeVisible({ timeout: 15000 });
 
     // Verify the task is currently Enabled (bilingual: "启用" or "Enabled")
@@ -341,7 +343,7 @@ test.describe.serial('Scheduler CRUD Management', () => {
   test('SC-005: should enable a disabled scheduled task', async ({ page }) => {
     await gotoScheduler(page);
 
-    const taskRow = page.locator('tr', { hasText: EDITED_NAME });
+    const taskRow = page.locator('tr', { hasText: currentTaskName });
     await expect(taskRow).toBeVisible({ timeout: 10000 });
 
     // Verify the task is currently Disabled (bilingual: "停用" or "Disabled")
@@ -368,7 +370,7 @@ test.describe.serial('Scheduler CRUD Management', () => {
   test('SC-006: should trigger a task manually', async ({ page }) => {
     await gotoScheduler(page);
 
-    const taskRow = page.locator('tr', { hasText: EDITED_NAME });
+    const taskRow = page.locator('tr', { hasText: currentTaskName });
     await expect(taskRow).toBeVisible({ timeout: 10000 });
 
     // Click the Trigger button (bilingual title: "立即触发" or "Trigger Now")
@@ -395,7 +397,7 @@ test.describe.serial('Scheduler CRUD Management', () => {
   test('SC-007: should open execution logs modal', async ({ page }) => {
     await gotoScheduler(page);
 
-    const taskRow = page.locator('tr', { hasText: EDITED_NAME });
+    const taskRow = page.locator('tr', { hasText: currentTaskName });
     await expect(taskRow).toBeVisible({ timeout: 10000 });
 
     // Click "View Logs" button (bilingual title: "查看日志" or "View Logs")

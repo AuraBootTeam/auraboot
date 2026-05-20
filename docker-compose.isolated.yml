@@ -154,7 +154,7 @@ services:
           # was getting starved while spec workers competed. Bump still
           # leaves 4 stacks fitting in a 16 GB Docker VM.
           cpus: '${FE_CPUS:-2.0}'
-          memory: ${FE_MEM:-2g}
+          memory: ${FE_MEM:-4g}
     working_dir: /repo/web-admin
     ports:
       - "${VITE_PORT:-5174}:5173"

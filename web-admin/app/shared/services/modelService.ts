@@ -382,7 +382,7 @@ export class ModelService implements IModelService {
     // Convert pid to id for API call
     // Find the binding by fieldCode
     const fields = await this.getModelFields(pid, request);
-    const binding = fields.find((f) => f.fieldCode === fieldCode);
+    const binding = fields.find((f) => (f.fieldCode || f.code || f.fieldName) === fieldCode);
 
     if (!binding) {
       throw new Error(`Field binding not found: ${fieldCode}`);
@@ -390,10 +390,18 @@ export class ModelService implements IModelService {
 
     // Update the binding
     const result = await put<ModelFieldBinding>(
-      `/api/meta/model-field-bindings/${binding.id}`,
+      `/api/meta/models/${pid}/field-bindings/${binding.id}`,
       {
-        ...binding,
-        ...config,
+        required: config.required,
+        readonly: config.readonly,
+        visible: config.visible,
+        editable: config.editable,
+        defaultValue: config.defaultValue == null ? undefined : String(config.defaultValue),
+        dictOverrideCode: config.dictCode,
+        validationOverride: config.validationRules
+          ? JSON.stringify(config.validationRules)
+          : undefined,
+        fieldOrder: config.displayOrder,
       },
       undefined,
       request,

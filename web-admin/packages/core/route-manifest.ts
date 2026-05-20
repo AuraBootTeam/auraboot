@@ -60,6 +60,19 @@ export function adminRuntimeEngineRoutes() {
     // the menu-driven catch-all route.
     route('/inbox', './routes/inbox/index.tsx'),
 
+    // Enterprise/custom TSX pages that are present in the OSS source tree must
+    // be registered before the catch-all menu route. Their plugin menus either
+    // have no low-code pageKey or navigate by deep link, so falling through to
+    // /* incorrectly renders "Page Unavailable".
+    route('/executive-dashboard', './routes/executive-dashboard/index.tsx'),
+    route('/crm/merge-queue', './routes/crm/merge-queue.tsx'),
+    route('/crm/settings/inbound-channels', './routes/crm/settings/inbound-channels.tsx'),
+    route('/crm/settings/web-forms', './routes/crm/settings/web-forms.tsx'),
+    route('/crm/settings/web-form-editor/:pid', './routes/crm/settings/web-form-editor.$pid.tsx'),
+    route('/crm/settings/calendar-sync', './routes/crm/settings/calendar-sync.tsx'),
+    route('/project-management/projects/:projectId', './routes/project-management/projects.$projectId.tsx'),
+    route('/project-management/my-tasks', './routes/project-management/my-tasks.tsx'),
+
     // Page routes — /p/:pageKey based (V2, underscores)
     route('/p/:pageKey', './routes/p.$pageKey.tsx'),
     route('/p/:pageKey/new', './routes/p.$pageKey.new.tsx'),

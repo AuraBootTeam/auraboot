@@ -10,7 +10,12 @@
  */
 
 import { fetchResult } from '~/shared/services/http-client';
-import type { BPMNProcessDefinition } from '~/plugins/core-designer/components/bpmn-designer/types';
+import {
+  BPMNNodeType,
+  type BPMNEdge,
+  type BPMNNode,
+  type BPMNProcessDefinition,
+} from '~/plugins/core-designer/components/bpmn-designer/types';
 
 const BASE_PATH = '/api/bpm/process-definitions';
 
@@ -96,34 +101,227 @@ export function resolveLocalizedField(
   return undefined;
 }
 
-function normalizeNode(node: Record<string, any>) {
-  const data = (node.data ?? {}) as Record<string, unknown>;
+const BPMN_NODE_TYPES = new Set<string>(Object.values(BPMNNodeType));
+
+function readRecord(value: unknown, path: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${path} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function readRequiredString(record: Record<string, unknown>, key: string, path: string): string {
+  const value = record[key];
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${path}.${key} must be a non-empty string`);
+  }
+  return value;
+}
+
+function readNodeType(record: Record<string, unknown>, path: string): BPMNNodeType {
+  const type = readRequiredString(record, 'type', path);
+  if (!BPMN_NODE_TYPES.has(type)) {
+    throw new Error(`${path}.type must be a known BPMN node type`);
+  }
+  return type as BPMNNodeType;
+}
+
+function readFiniteNumber(record: Record<string, unknown>, key: string, path: string): number {
+  const value = record[key];
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${path}.${key} must be a finite number`);
+  }
+  return value;
+}
+
+function normalizeNodePosition(position: unknown, path: string) {
+  const record = readRecord(position, path);
+
+  return {
+    x: readFiniteNumber(record, 'x', path),
+    y: readFiniteNumber(record, 'y', path),
+  };
+}
+
+function assertServiceDelegateNodeData(
+  nodeType: BPMNNodeType,
+  data: Record<string, unknown>,
+  path: string,
+) {
+  switch (nodeType) {
+    case BPMNNodeType.RULE_TASK:
+      readRequiredString(data, 'ruleCode', path);
+      break;
+    case BPMNNodeType.NOTIFICATION_TASK:
+      readRequiredString(data, 'eventCode', path);
+      break;
+    case BPMNNodeType.RECORD_UPDATE_TASK:
+      readRequiredString(data, 'modelCode', path);
+      readRequiredString(data, 'fieldName', path);
+      readRequiredString(data, 'fieldValue', path);
+      break;
+    default:
+      break;
+  }
+}
+
+function normalizeNode(nodeValue: unknown, index: number) {
+  const path = `designerJson.nodes[${index}]`;
+  const node = readRecord(nodeValue, path);
+  const nodeType = readNodeType(node, path);
+  const data = readRecord(node.data, `${path}.data`);
+  const dataType = readNodeType(data, `${path}.data`);
+  if (dataType !== nodeType) {
+    throw new Error(`${path}.data.type must match ${path}.type`);
+  }
+  assertServiceDelegateNodeData(nodeType, data, `${path}.data`);
+
   const label =
     resolveLocalizedField(data, 'label') ??
     resolveLocalizedField((data.config ?? null) as Record<string, unknown> | null, 'name') ??
     String(node.id ?? '');
 
+  const {
+    measured: _measured,
+    selected: _selected,
+    dragging: _dragging,
+    resizing: _resizing,
+    handleBounds: _handleBounds,
+    positionAbsolute: _positionAbsolute,
+    computed: _computed,
+    internals: _internals,
+    id: _id,
+    type: _type,
+    position: _position,
+    data: _data,
+    ...persistedNode
+  } = node;
+
   return {
-    ...node,
+    ...persistedNode,
+    id: readRequiredString(node, 'id', path),
+    type: nodeType,
+    position: normalizeNodePosition(node.position, `${path}.position`),
     data: {
       ...data,
+      type: dataType,
       label,
     },
-  };
+  } as BPMNNode;
 }
 
-function normalizeEdge(edge: Record<string, any>) {
-  const data = (edge.data ?? {}) as Record<string, unknown>;
+function normalizeEdge(edgeValue: unknown, index: number, nodeIds: Set<string>) {
+  const path = `designerJson.edges[${index}]`;
+  const edge = readRecord(edgeValue, path);
+  const id = readRequiredString(edge, 'id', path);
+  const source = readRequiredString(edge, 'source', path);
+  const target = readRequiredString(edge, 'target', path);
+  if (!nodeIds.has(source)) {
+    throw new Error(`${path}.source must reference an existing node`);
+  }
+  if (!nodeIds.has(target)) {
+    throw new Error(`${path}.target must reference an existing node`);
+  }
+
+  const data = readRecord(edge.data, `${path}.data`);
   const label = resolveLocalizedField(data, 'label');
 
+  const {
+    selected: _selected,
+    interactionWidth: _interactionWidth,
+    id: _id,
+    source: _source,
+    target: _target,
+    data: _data,
+    ...persistedEdge
+  } = edge;
+
   return {
-    ...edge,
+    ...persistedEdge,
+    id,
+    source,
+    target,
     ...(label ? { label } : {}),
     data: {
       ...data,
       ...(label ? { label } : {}),
     },
+  } as BPMNEdge;
+}
+
+function assertExclusiveGatewayConditions(nodes: BPMNNode[], edges: BPMNEdge[]) {
+  const nodeTypeById = new Map(nodes.map((node) => [node.id, node.data.type]));
+  edges.forEach((edge, index) => {
+    if (nodeTypeById.get(edge.source) !== BPMNNodeType.EXCLUSIVE_GATEWAY) {
+      return;
+    }
+    const path = `designerJson.edges[${index}].data.condition`;
+    const condition = readRecord(edge.data?.condition, path);
+    readRequiredString(condition, 'content', path);
+  });
+}
+
+function assertUnique(value: string, seen: Set<string>, path: string) {
+  if (seen.has(value)) {
+    throw new Error(`${path} must be unique`);
+  }
+  seen.add(value);
+}
+
+export function normalizeDesignerJsonPayload(payload: unknown): {
+  nodes: BPMNNode[];
+  edges: BPMNEdge[];
+  aura?: BPMNProcessDefinition['aura'];
+} {
+  const root = readRecord(payload, 'designerJson');
+  if (!Array.isArray(root.nodes)) {
+    throw new Error('designerJson.nodes must be an array');
+  }
+  if (!Array.isArray(root.edges)) {
+    throw new Error('designerJson.edges must be an array');
+  }
+
+  const nodeIds = new Set<string>();
+  const nodes = root.nodes.map((node, index) => {
+    const normalized = normalizeNode(node, index);
+    assertUnique(normalized.id, nodeIds, `designerJson.nodes[${index}].id`);
+    return normalized;
+  });
+
+  const edgeIds = new Set<string>();
+  const edges = root.edges.map((edge, index) => {
+    const normalized = normalizeEdge(edge, index, nodeIds);
+    assertUnique(normalized.id, edgeIds, `designerJson.edges[${index}].id`);
+    return normalized;
+  });
+  assertExclusiveGatewayConditions(nodes, edges);
+
+  let aura: BPMNProcessDefinition['aura'];
+  if (root.aura !== undefined) {
+    aura = readRecord(root.aura, 'designerJson.aura') as BPMNProcessDefinition['aura'];
+  }
+
+  return {
+    nodes,
+    edges,
+    ...(aura ? { aura } : {}),
   };
+}
+
+function buildDesignerJsonPayload(
+  definition: Pick<BPMNProcessDefinition, 'nodes' | 'edges' | 'aura'>,
+) {
+  return normalizeDesignerJsonPayload({
+    nodes: definition.nodes ?? [],
+    edges: definition.edges ?? [],
+    ...(definition.aura !== undefined ? { aura: definition.aura } : {}),
+  });
+}
+
+export function serializeDesignerJson(
+  definition: Pick<BPMNProcessDefinition, 'nodes' | 'edges' | 'aura'>,
+): string {
+  return JSON.stringify(buildDesignerJsonPayload(definition));
 }
 
 /**
@@ -138,12 +336,13 @@ export function toFrontend(dto: ProcessDefinitionDTO): BPMNProcessDefinition {
   if (dto.designerJson) {
     try {
       const parsed = JSON.parse(dto.designerJson);
-      nodes = Array.isArray(parsed.nodes) ? parsed.nodes.map(normalizeNode) : [];
-      edges = Array.isArray(parsed.edges) ? parsed.edges.map(normalizeEdge) : [];
-      // Restore process-level AuraBoot policies if present.
-      if (parsed.aura && typeof parsed.aura === 'object') aura = parsed.aura;
-    } catch {
-      // Ignore malformed designerJson
+      const normalized = normalizeDesignerJsonPayload(parsed);
+      nodes = normalized.nodes;
+      edges = normalized.edges;
+      aura = normalized.aura;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid BPMN designerJson for process "${dto.processKey}": ${message}`);
     }
   }
 
@@ -254,6 +453,7 @@ export async function getDeployedProcesses() {
  * the field names to the backend CreateProcessRequest format.
  */
 export async function createProcessDefinition(definition: Omit<BPMNProcessDefinition, 'id'>) {
+  const designerPayload = buildDesignerJsonPayload(definition);
   const body: CreateProcessRequest & { designerJson?: string } = {
     processKey: definition.key,
     processName: definition.name,
@@ -264,11 +464,7 @@ export async function createProcessDefinition(definition: Omit<BPMNProcessDefini
     bpmnContent: undefined,
     // Persist designer canvas state (nodes/edges/aura) so it can be restored on reload
     // and compiled into BPMN <smart:properties> at deploy time.
-    designerJson: JSON.stringify({
-      nodes: definition.nodes || [],
-      edges: definition.edges || [],
-      ...(definition.aura ? { aura: definition.aura } : {}),
-    }),
+    designerJson: JSON.stringify(designerPayload),
   };
 
   const result = await fetchResult<ProcessDefinitionDTO>(BASE_PATH, {
@@ -278,8 +474,9 @@ export async function createProcessDefinition(definition: Omit<BPMNProcessDefini
   if (result.data) {
     // Merge back the designer nodes/edges that we sent
     const frontendDef = toFrontend(result.data);
-    frontendDef.nodes = definition.nodes || [];
-    frontendDef.edges = definition.edges || [];
+    frontendDef.nodes = designerPayload.nodes;
+    frontendDef.edges = designerPayload.edges;
+    frontendDef.aura = designerPayload.aura;
     return { ...result, data: frontendDef };
   }
   return { ...result, data: null } as typeof result & { data: BPMNProcessDefinition | null };
@@ -301,10 +498,13 @@ export async function updateProcessDefinition(
   if (definition.category !== undefined) body.category = definition.category;
   // Always persist designer canvas state on update (nodes/edges/aura)
   if (definition.nodes || definition.edges || definition.aura !== undefined) {
-    body.designerJson = JSON.stringify({
-      nodes: definition.nodes || [],
-      edges: definition.edges || [],
-      ...(definition.aura ? { aura: definition.aura } : {}),
+    if (!definition.nodes || !definition.edges) {
+      throw new Error('definition.nodes and definition.edges are required when updating designerJson');
+    }
+    body.designerJson = serializeDesignerJson({
+      nodes: definition.nodes,
+      edges: definition.edges,
+      aura: definition.aura,
     });
   }
 
@@ -315,8 +515,14 @@ export async function updateProcessDefinition(
   if (result.data) {
     const frontendDef = toFrontend(result.data);
     // Preserve designer nodes/edges from the caller
-    if (definition.nodes) frontendDef.nodes = definition.nodes;
-    if (definition.edges) frontendDef.edges = definition.edges;
+    if (body.designerJson) {
+      const designerPayload = JSON.parse(body.designerJson) as ReturnType<
+        typeof normalizeDesignerJsonPayload
+      >;
+      frontendDef.nodes = designerPayload.nodes;
+      frontendDef.edges = designerPayload.edges;
+      frontendDef.aura = designerPayload.aura;
+    }
     return { ...result, data: frontendDef };
   }
   return { ...result, data: null } as typeof result & { data: BPMNProcessDefinition | null };

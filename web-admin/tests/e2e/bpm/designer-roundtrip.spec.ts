@@ -42,7 +42,7 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from '../../fixtures';
-import { loginAsAdmin, undeployProcess } from './_helpers/bpm-lifecycle';
+import { deleteProcessDefinition, loginAsAdmin } from './_helpers/bpm-lifecycle';
 
 // ---------------------------------------------------------------------------
 // Serial mode — all four tests share the PID seeded in B4.1
@@ -768,13 +768,13 @@ test.describe('BPM Designer designerJson round-trip (Epic B4)', { tag: ['@bpm-re
   // =========================================================================
   test('B4.4: cleanup — undeploy test process (best-effort, idempotent)', async ({ request }) => {
     expect(processPid, 'processPid must be set from B4.1').toBeTruthy();
-    // Process is in draft state (never deployed) — undeploy may no-op or
-    // return 400/500; just verify the endpoint is reachable. Env reset
-    // handles long-term cleanup.
-    const { status } = await undeployProcess(request, adminToken, processPid);
+    // Process is in draft state (never deployed), so delete it directly.
+    // Calling undeploy here exercises a known negative path and pollutes
+    // backend error logs with an expected 500.
+    const { status } = await deleteProcessDefinition(request, adminToken, processPid);
     expect(
-      [200, 204, 400, 404, 500],
-      `undeploy response ${status} must be one of ok/not-found/already-drafted`,
+      [200, 204, 404],
+      `delete response ${status} must be one of ok/not-found`,
     ).toContain(status);
   });
 });

@@ -653,37 +653,39 @@ test.describe('BPM Form Integration (BFI)', () => {
     console.log(`BFI-005: Initial pending task rows: ${initialRowCount}`);
     expect(initialRowCount).toBeGreaterThan(0);
 
-    // Click the first task name button to open the detail drawer
-    const taskNameBtn = page.locator('tbody tr td button').filter({ hasText: /.+/ }).first();
-    await expect(taskNameBtn).toBeVisible({ timeout: 5000 });
-    await taskNameBtn.click();
+    const moreButtons = page
+      .locator('table button')
+      .filter({ has: page.locator('svg.lucide-ellipsis') });
+    await expect(moreButtons.first()).toBeVisible({ timeout: 5000 });
+    await moreButtons.first().click();
 
-    // Wait for drawer / detail panel to open (基本信息 tab appears in drawer)
-    const infoTab = page.locator('button').filter({ hasText: '基本信息' });
-    await expect(infoTab.first()).toBeVisible({ timeout: 8000 });
-    console.log('BFI-005: Task detail drawer opened');
-
-    // Click "通过" (Approve) button and wait for API response
-    const approveBtn = page.locator('button').filter({ hasText: /^通过$/ });
-    const hasApproveBtn = await approveBtn
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
+    const menu = page.locator('.absolute.right-0.z-10');
+    await expect(menu).toBeVisible({ timeout: 3000 });
+    const approveBtn = menu.locator('button:has-text("通过")').first();
+    const hasApproveBtn = await approveBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasApproveBtn) {
-      const [submitResponse] = await Promise.all([
-        page
-          .waitForResponse(
-            (resp: any) =>
-              resp.url().includes('/api/bpm/') &&
-              (resp.url().includes('/submit') ||
-                resp.url().includes('/complete') ||
-                resp.url().includes('/approve')),
-            { timeout: 15000 },
-          )
-          .catch(() => null),
-        approveBtn.first().click(),
-      ]);
+      await approveBtn.click();
+      const dialog = page.locator('[role="dialog"]');
+      await expect(dialog).toBeVisible({ timeout: 5000 });
+      const textarea = dialog.locator('textarea');
+      if (await textarea.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await textarea.fill('BFI-005 E2E approval');
+      }
+      const submit = dialog.locator('[data-testid="dialog-confirm"], button:has-text("确认")').first();
+      await expect(submit).toBeVisible({ timeout: 3000 });
+      const submitResponsePromise = page
+        .waitForResponse(
+          (resp: any) =>
+            resp.url().includes('/api/bpm/') &&
+            (resp.url().includes('/submit') ||
+              resp.url().includes('/complete') ||
+              resp.url().includes('/approve')),
+          { timeout: 15000 },
+        )
+        .catch(() => null);
+      await submit.click();
+      const submitResponse = await submitResponsePromise;
 
       if (submitResponse) {
         const status = submitResponse.status();

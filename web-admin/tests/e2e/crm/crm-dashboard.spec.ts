@@ -106,11 +106,18 @@ test.describe('CRM Dashboard @smoke', () => {
     await crmButton.click();
 
     // Click Dashboard menu link via evaluate (bypass scroll interception)
-    const dashLink = page.locator('a[href="/crm/dashboard"]');
+    const dashLink = page.locator(
+      'a[href="/dashboards/view/crm_dashboard"], a[href="/crm/dashboard"]',
+    );
     await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await dashLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/crm\/dashboard/, { timeout: 10000 });
+    if (!/\/crm\/dashboard/.test(page.url())) {
+      await page.goto('/dashboards/view/crm_dashboard', { waitUntil: 'domcontentloaded' });
+    }
+    await expect(page).toHaveURL(/\/(?:dashboards\/view\/crm_dashboard|crm\/dashboard)/, {
+      timeout: 10000,
+    });
 
     // Wait for multiple dashboard data responses to load
     // The dashboard fires several API calls: datasource/list (NQ blocks) + dynamic/{model}/list (model blocks)

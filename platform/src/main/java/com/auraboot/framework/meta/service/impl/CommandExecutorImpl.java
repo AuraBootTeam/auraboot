@@ -199,7 +199,8 @@ public class CommandExecutorImpl implements CommandExecutor {
                     phaseTimings.put(ctx.getCurrentPhase(), System.currentTimeMillis() - ctx.getCurrentPhaseStart());
                 }
                 effectExecutor.saveAuditLog(tenantId, commandCode, null, userId,
-                        request.getPayload(), null, false, e.getMessage(), executionTimeMs, phaseReached, phaseTimings);
+                        CommandAuditPayloads.withAuditContext(request.getPayload(), request.getAuditContext()),
+                        null, false, e.getMessage(), executionTimeMs, phaseReached, phaseTimings);
             }
 
             if (e instanceof BusinessException || e instanceof ValidationException) {

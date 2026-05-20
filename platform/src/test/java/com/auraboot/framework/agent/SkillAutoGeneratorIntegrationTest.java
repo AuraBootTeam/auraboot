@@ -3,7 +3,6 @@ package com.auraboot.framework.agent;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.agent.service.AgentSkillService;
 import com.auraboot.framework.agent.service.SkillAutoGenerator;
-import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import org.junit.jupiter.api.*;
@@ -13,8 +12,8 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,15 +42,6 @@ class SkillAutoGeneratorIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void seedTestData() {
         tenantId = getTestTenant().getId();
-        seedPublishedModel("crm_lead");
-        seedCommand("crm_lead_create", "crm_lead", "create");
-        seedCommand("crm_lead_update", "crm_lead", "update");
-        seedCommand("crm_lead_delete", "crm_lead", "delete");
-        seedNamedQuery("crm_lead_list", "crm_lead");
-        seedAgentTool("crm_lead_create", "crm_lead_create");
-        seedAgentTool("crm_lead_update", "crm_lead_update");
-        seedAgentTool("crm_lead_delete", "crm_lead_delete");
-        seedAgentTool("nq_crm_lead_list", null); // NQ tool, no source_code match needed
     }
 
     @Test
@@ -121,72 +111,4 @@ class SkillAutoGeneratorIntegrationTest extends BaseIntegrationTest {
         assertThat(contract.get("idempotency_mode")).isEqualTo("not_idempotent");
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Seed helpers — insert minimal rows needed by SkillAutoGenerator
-    // ──────────────────────────────────────────────────────────────
-
-    private void seedPublishedModel(String code) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("pid", UniqueIdGenerator.generate());
-        data.put("tenant_id", tenantId);
-        data.put("code", code);
-        data.put("status", "published");
-        data.put("model_category", "business");
-        data.put("extension", "{}");
-        data.put("version", 1);
-        data.put("is_current", true);
-        data.put("row_version", 1);
-        data.put("deleted_flag", false);
-        data.put("created_at", LocalDateTime.now());
-        data.put("updated_at", LocalDateTime.now());
-        dynamicDataMapper.insertWithJsonb("ab_meta_model", data, Set.of("extension"));
-    }
-
-    private void seedCommand(String code, String modelCode, String execType) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("pid", UniqueIdGenerator.generate());
-        data.put("tenant_id", tenantId);
-        data.put("code", code);
-        data.put("model_code", modelCode);
-        data.put("display_name", code);
-        data.put("input_schema", "{}");
-        data.put("target_models", "[]");
-        data.put("execution_config", "{\"type\":\"" + execType + "\"}");
-        data.put("extension", "{}");
-        data.put("deleted_flag", false);
-        data.put("created_at", LocalDateTime.now());
-        data.put("updated_at", LocalDateTime.now());
-
-        Set<String> jsonbCols = Set.of("input_schema", "target_models", "execution_config", "extension");
-        dynamicDataMapper.insertWithJsonb("ab_command_definition", data, jsonbCols);
-    }
-
-    private void seedNamedQuery(String code, String modelCode) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("pid", UniqueIdGenerator.generate());
-        data.put("tenant_id", tenantId);
-        data.put("code", code);
-        data.put("title", "List " + modelCode);
-        data.put("base_where", "[]");
-        dynamicDataMapper.insertWithJsonb("ab_named_query", data, Set.of("base_where"));
-    }
-
-    private void seedAgentTool(String toolCode, String sourceCode) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("pid", UniqueIdGenerator.generate());
-        data.put("tenant_id", tenantId);
-        data.put("tool_code", toolCode);
-        data.put("tool_type", "command");
-        data.put("tool_name", "Tool " + toolCode);
-        data.put("tool_description", "Auto-generated tool for " + toolCode);
-        data.put("tool_status", "active");
-        data.put("auto_generated", true);
-        data.put("deleted_flag", false);
-        data.put("created_at", LocalDateTime.now());
-        data.put("updated_at", LocalDateTime.now());
-        if (sourceCode != null) {
-            data.put("source_code", sourceCode);
-        }
-        dynamicDataMapper.insert("ab_agent_tool", data);
-    }
 }

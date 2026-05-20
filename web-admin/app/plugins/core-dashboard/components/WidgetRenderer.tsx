@@ -8,7 +8,7 @@
 
 import React, { Suspense } from 'react';
 import type { Widget, WidgetType } from '../types';
-import type { FilterConfig } from '~/framework/smart/types/chart';
+import type { DrillDownConfig, FilterConfig } from '~/framework/smart/types/chart';
 import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
 import { useI18n } from '~/contexts/I18nContext';
 import {
@@ -75,7 +75,7 @@ interface WidgetRenderProps {
   /** Callback when the widget emits linkage filters */
   onLinkageEmit?: (filters: FilterConfig[]) => void;
   /** Callback when drill-down is triggered */
-  onDrillDown?: (filters: FilterConfig[]) => void;
+  onDrillDown?: (payload: DrillDownConfig | FilterConfig[]) => void;
 }
 
 /**

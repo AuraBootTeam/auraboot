@@ -5,7 +5,7 @@
  * to the target page with correct filter_* URL params (drill-down with
  * paramMapping).
  *
- * Dashboard page: /p/qo_dashboard_data
+ * Dashboard page: /dashboards/view/qo_dashboard_data
  * KPI blocks with drillDown + paramMapping:
  *   kpi_contract_total  -> cc-contract   ?filter_cc_contract_status=active
  *   kpi_contract_count  -> cc-contract   ?filter_cc_contract_status=active
@@ -20,16 +20,12 @@ const DASHBOARD_PAGE = 'qo_dashboard_data';
  * Navigate to the dashboard and wait for it to render.
  */
 async function gotoDashboard(page: import('@playwright/test').Page) {
-  await page.goto(`/p/${DASHBOARD_PAGE}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`/dashboards/view/${DASHBOARD_PAGE}`, { waitUntil: 'domcontentloaded' });
   // Wait for the dashboard UI to actually render instead of racing with API responses
   await page.locator('[data-testid^="dashboard-block-"]').first().waitFor({ timeout: 20000 });
 }
 
 test.describe('QO Dashboard KPI Drill-Down @smoke', () => {
-  // Dashboard page qo_dashboard_data with kind=dashboard does not exist in the DB.
-  // Only list/form/detail pages exist. These tests require a dashboard page to be configured.
-  test.fixme(true, 'Dashboard page qo_dashboard_data (kind=dashboard) not configured — only list/form/detail exist');
-
   test('DD-001: Dashboard renders all KPI blocks with drill-down', async ({ page }) => {
     await gotoDashboard(page);
 
@@ -68,8 +64,7 @@ test.describe('QO Dashboard KPI Drill-Down @smoke', () => {
     await expect(clickable).toBeVisible({ timeout: 5000 });
     await clickable.click();
 
-    // Should navigate to cc-contract with filter_cc_contract_status=active
-    await expect(page).toHaveURL(/\/dynamic\/cc-contract/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/contract-cost\/contracts/, { timeout: 10000 });
     await expect(page).toHaveURL(/filter_cc_contract_status=active/);
   });
 
@@ -85,8 +80,7 @@ test.describe('QO Dashboard KPI Drill-Down @smoke', () => {
     await expect(clickable).toBeVisible({ timeout: 5000 });
     await clickable.click();
 
-    // Same target page as contract total, same filter
-    await expect(page).toHaveURL(/\/dynamic\/cc-contract/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/contract-cost\/contracts/, { timeout: 10000 });
     await expect(page).toHaveURL(/filter_cc_contract_status=active/);
   });
 
@@ -100,8 +94,7 @@ test.describe('QO Dashboard KPI Drill-Down @smoke', () => {
     await expect(clickable).toBeVisible({ timeout: 5000 });
     await clickable.click();
 
-    // Should navigate to dp-issue with filter_dp_issue_status=open
-    await expect(page).toHaveURL(/\/dynamic\/dp-issue/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dual-prevention\/issues/, { timeout: 10000 });
     await expect(page).toHaveURL(/filter_dp_issue_status=open/);
   });
 
@@ -117,8 +110,7 @@ test.describe('QO Dashboard KPI Drill-Down @smoke', () => {
     await expect(clickable).toBeVisible({ timeout: 5000 });
     await clickable.click();
 
-    // Should navigate to qm-checkpoint with filter_qm_check_status=completed
-    await expect(page).toHaveURL(/\/dynamic\/qm-checkpoint/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dual-prevention\/quality-checkpoints/, { timeout: 10000 });
     await expect(page).toHaveURL(/filter_qm_check_status=completed/);
   });
 
@@ -126,7 +118,7 @@ test.describe('QO Dashboard KPI Drill-Down @smoke', () => {
     test.setTimeout(30000);
     // dp-issue is always published in the test environment (dual-prevention plugin).
     // Navigate directly with filter param (simulating drill-down landing).
-    await page.goto('/p/dp_issue?filter_dp_issue_status=open', {
+    await page.goto('/dual-prevention/issues?filter_dp_issue_status=open', {
       waitUntil: 'domcontentloaded',
     });
 
@@ -150,8 +142,7 @@ test.describe('QO Dashboard KPI Drill-Down @smoke', () => {
     const clickable = safetyBlock.locator('[role="button"]');
     await clickable.click();
 
-    // Wait for navigation to dp-issue with filter param
-    await expect(page).toHaveURL(/\/dynamic\/dp-issue/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dual-prevention\/issues/, { timeout: 10000 });
     await expect(page).toHaveURL(/filter_dp_issue_status=open/);
 
     // Wait for the target page to load (table content)

@@ -18,10 +18,10 @@ import {
   type BPMNProcessDefinition,
   type ValidationResult,
 } from '~/plugins/core-designer/components/bpmn-designer/types';
-import { DEFAULT_NODE_CONFIGS } from '~/plugins/core-designer/components/bpmn-designer/constants';
 import {
   deployProcessDefinition,
   getProcessInstanceStatus,
+  normalizeDesignerJsonPayload,
   type ProcessInstanceNodeStatus,
 } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
 
@@ -661,63 +661,8 @@ export const useBPMNStore = create<BPMNStore>()(
         },
 
         importFromJSON: (json) => {
+          const { nodes: cleanNodes, edges: cleanEdges, aura } = normalizeDesignerJsonPayload(json);
           set((state) => {
-            // Clean and normalize node data
-            const cleanNodes: BPMNNode[] = (json.nodes || []).map((node: any) => {
-              const {
-                measured: _measured,
-                selected: _selected,
-                dragging: _dragging,
-                ...cleanNode
-              } = node;
-              const nodeType = (cleanNode.type ||
-                cleanNode.data?.type ||
-                BPMNNodeType.USER_TASK) as BPMNNodeType;
-              const defaultConfig = DEFAULT_NODE_CONFIGS[nodeType] || {};
-
-              return {
-                id: cleanNode.id,
-                type: nodeType,
-                position: cleanNode.position || { x: 0, y: 0 },
-                data: {
-                  type: nodeType,
-                  label: cleanNode.data?.label || 'Unnamed',
-                  config: cleanNode.data?.config || defaultConfig,
-                },
-              };
-            });
-
-            // Clean and normalize edge data
-            const cleanEdges: BPMNEdge[] = (json.edges || []).map((edge: any) => {
-              // Remove React Flow internal fields
-              const { selected: _selected, ...cleanEdge } = edge;
-
-              return {
-                id: cleanEdge.id,
-                source: cleanEdge.source,
-                target: cleanEdge.target,
-                type: cleanEdge.type || 'smoothstep',
-                animated: cleanEdge.animated || false,
-                label: cleanEdge.label || cleanEdge.data?.label || '',
-                labelStyle: cleanEdge.labelStyle || {
-                  fill: '#374151',
-                  fontSize: 12,
-                  fontWeight: 500,
-                },
-                labelBgStyle: cleanEdge.labelBgStyle || {
-                  fill: '#ffffff',
-                  fillOpacity: 0.9,
-                },
-                labelBgPadding: cleanEdge.labelBgPadding || [8, 4],
-                labelBgBorderRadius: cleanEdge.labelBgBorderRadius || 4,
-                style: cleanEdge.style || { stroke: '#94a3b8', strokeWidth: 2 },
-                data: {
-                  label: cleanEdge.label || cleanEdge.data?.label || '',
-                  condition: cleanEdge.data?.condition,
-                },
-              } as BPMNEdge;
-            });
-
             state.nodes = cleanNodes;
             state.edges = cleanEdges;
 
@@ -731,6 +676,7 @@ export const useBPMNStore = create<BPMNStore>()(
                 status: json.status || 'draft',
                 nodes: cleanNodes as BPMNNode[],
                 edges: cleanEdges as BPMNEdge[],
+                aura,
                 createdAt: json.createdAt,
                 updatedAt: json.updatedAt,
               };

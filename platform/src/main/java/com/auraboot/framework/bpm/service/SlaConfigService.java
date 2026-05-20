@@ -10,10 +10,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -40,6 +44,17 @@ public class SlaConfigService {
 
     public List<SlaConfigEntity> findByTarget(String targetType, String targetKey) {
         return slaConfigMapper.findByTarget(MetaContext.getCurrentTenantId(), targetType, targetKey);
+    }
+
+    public List<SlaConfigEntity> findByTargetAnyCase(String targetType, String targetKey) {
+        if (!StringUtils.hasText(targetType)) {
+            return List.of();
+        }
+        Set<String> variants = new LinkedHashSet<>();
+        variants.add(targetType);
+        variants.add(targetType.toUpperCase(Locale.ROOT));
+        variants.add(targetType.toLowerCase(Locale.ROOT));
+        return slaConfigMapper.findByTargetTypes(MetaContext.getCurrentTenantId(), variants, targetKey);
     }
 
     public List<SlaConfigEntity> findByDomain(String domainCode) {

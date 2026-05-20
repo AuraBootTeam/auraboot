@@ -66,7 +66,34 @@ function annotateFallback(description: string) {
  * Wait for form page to be ready after navigation.
  * Create routes to /p/{model}/new, edit routes to /p/{model}/{id}/edit.
  */
-async function waitForFormReady(page: import('@playwright/test').Page) {
+function formFieldLocator(scope: import('@playwright/test').Locator, fieldCode: string) {
+  return scope
+    .locator(
+      [
+        `[data-testid="form-field-${fieldCode}"] input:not([type="hidden"])`,
+        `[data-testid="form-field-${fieldCode}"] textarea`,
+        `[data-testid="form-field-${fieldCode}"] select`,
+        `[data-testid="form-field-${fieldCode}"] button[role="switch"]`,
+        `[data-testid="field-${fieldCode}"] input:not([type="hidden"])`,
+        `[data-testid="field-${fieldCode}"] textarea`,
+        `[data-testid="field-${fieldCode}"] select`,
+        `[data-testid="field-${fieldCode}"] button[role="switch"]`,
+        `[data-field="${fieldCode}"] input:not([type="hidden"])`,
+        `[data-field="${fieldCode}"] textarea`,
+        `[data-field="${fieldCode}"] select`,
+        `[data-field="${fieldCode}"] button[role="switch"]`,
+        `input[name="${fieldCode}"]:not([type="hidden"])`,
+        `textarea[name="${fieldCode}"]`,
+        `select[name="${fieldCode}"]`,
+      ].join(', '),
+    )
+    .first();
+}
+
+async function waitForFormReady(
+  page: import('@playwright/test').Page,
+  expectedFieldCodes: string[] = [],
+) {
   // Wait for URL to include /new or /edit
   await expect(page).toHaveURL(/\/(new|edit)/, { timeout: 10000 });
 
@@ -79,10 +106,23 @@ async function waitForFormReady(page: import('@playwright/test').Page) {
     throw new Error('Form failed to load due to backend/schema error');
   }
 
-  await page
-    .locator('button[role="switch"], input, select, textarea')
+  const main = page.locator('main, [role="main"]').first();
+  await expect(main).toBeVisible({ timeout: 10000 });
+
+  for (const fieldCode of expectedFieldCodes) {
+    await expect(formFieldLocator(main, fieldCode)).toBeVisible({ timeout: 15000 });
+  }
+
+  if (expectedFieldCodes.length > 0) {
+    return;
+  }
+
+  await main
+    .locator(
+      '[data-testid^="form-field-"] input:not([type="hidden"]), [data-testid^="form-field-"] textarea, [data-testid^="form-field-"] select, [data-testid^="form-field-"] button[role="switch"], [data-testid^="field-"] input:not([type="hidden"]), [data-testid^="field-"] textarea, [data-testid^="field-"] select, [data-testid^="field-"] button[role="switch"], [data-field] input:not([type="hidden"]), [data-field] textarea, [data-field] select, [data-field] button[role="switch"], form input:not([type="hidden"]), form select, form textarea, form button[role="switch"]',
+    )
     .first()
-    .waitFor({ state: 'visible', timeout: 8000 });
+    .waitFor({ state: 'visible', timeout: 15000 });
 }
 
 /** Fill a text input field on the form page */
@@ -121,6 +161,8 @@ async function fillFormField(
   }
   // Strategy 4: find by visible label text as a last resort
   const labelCandidates: Record<string, RegExp> = {
+    domain_code: /域编码|Domain Code/i,
+    domain_name: /域名称|Domain Name/i,
     name: /名称|Name/i,
     target_url: /目标.*URL|回调.*URL|Target URL|Webhook URL/i,
     event_type: /事件类型|Event Type/i,
@@ -517,7 +559,7 @@ test.describe('PA: BPM Domain Configuration CRUD', () => {
 
     await navigateToDynamicPage(page, 'bpm-domain-config');
     await clickCreateButton(page);
-    await waitForFormReady(page);
+    await waitForFormReady(page, ['domain_code', 'domain_name']);
 
     await fillFormField(page, 'domain_code', domainCode);
     await fillFormField(page, 'domain_name', domainName);

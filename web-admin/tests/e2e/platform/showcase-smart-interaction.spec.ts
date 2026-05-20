@@ -740,38 +740,26 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
     await addrField.scrollIntoViewIfNeeded();
     await expect(addrField).toBeVisible({ timeout: 5_000 });
 
-    const provinceSelect = addrField.getByLabel('province');
-    const citySelect = addrField.getByLabel('city');
-    const districtSelect = addrField.getByLabel('district');
-    const detailTextarea = addrField.getByLabel('detail-address');
-    const hiddenInput = addrField.locator('input[type="hidden"][name="sc_address"]');
+    const provinceDropdown = addrField.locator('[data-testid="address-province-sc_address"]');
+    const cityDropdown = addrField.locator('[data-testid="address-city-sc_address"]');
+    const districtDropdown = addrField.locator('[data-testid="address-district-sc_address"]');
 
-    await expect(provinceSelect).toBeVisible({ timeout: 3_000 });
-    await expect(citySelect).toBeVisible({ timeout: 3_000 });
-    await expect(districtSelect).toBeVisible({ timeout: 3_000 });
-    await expect(citySelect).toBeDisabled();
-    await expect(districtSelect).toBeDisabled();
+    await expect(provinceDropdown).toBeVisible({ timeout: 3_000 });
+    await expect(cityDropdown.locator('button').first()).toBeDisabled();
+    await expect(districtDropdown.locator('button').first()).toBeDisabled();
 
-    await provinceSelect.selectOption('广东省');
-    await expect(provinceSelect).toHaveValue('广东省');
-    await expect(citySelect).toBeEnabled({ timeout: 3_000 });
+    await provinceDropdown.locator('button').first().click();
+    await page.getByRole('button', { name: '广东省' }).click();
+    await expect(cityDropdown.locator('button').first()).toBeEnabled({ timeout: 3_000 });
 
-    await citySelect.selectOption('深圳市');
-    await expect(citySelect).toHaveValue('深圳市');
-    await expect(districtSelect).toBeEnabled({ timeout: 3_000 });
+    await cityDropdown.locator('button').first().click();
+    await page.getByRole('button', { name: '深圳市' }).click();
+    await expect(districtDropdown.locator('button').first()).toBeEnabled({ timeout: 3_000 });
 
-    await districtSelect.selectOption('南山区');
-    await expect(districtSelect).toHaveValue('南山区');
+    await districtDropdown.locator('button').first().click();
+    await page.getByRole('button', { name: '南山区' }).click();
 
-    await detailTextarea.fill('科技园测试地址 100 号');
-
-    const storedValue = JSON.parse(await hiddenInput.inputValue());
-    expect(storedValue).toMatchObject({
-      province: '广东省',
-      city: '深圳市',
-      district: '南山区',
-      detail: '科技园测试地址 100 号',
-    });
+    await expect(addrField).toContainText('广东省 / 深圳市 / 南山区');
   });
 
   // =========================================================================

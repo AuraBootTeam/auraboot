@@ -204,8 +204,8 @@ test.describe('BPMN Designer UI', () => {
       const processKey = `d2e04_${Date.now()}`;
       const createResponse = await page.request.post('/api/bpm/process-definitions', {
         data: {
-          key: processKey,
-          name: `D2-E04 ${Date.now()}`,
+          processKey,
+          processName: `D2-E04 ${Date.now()}`,
           category: 'e2e',
         },
       });

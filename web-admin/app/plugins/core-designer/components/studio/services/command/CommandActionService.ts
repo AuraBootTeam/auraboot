@@ -1,4 +1,5 @@
 import { get, post } from '~/shared/services/http-client';
+import type { Result } from '~/shared/services/http-client';
 import type { CommandDefinitionDTO, BindingRuleDTO } from '~/plugins/core-designer/components/studio/workbench/panels/actions/types';
 
 /**
@@ -56,6 +57,7 @@ export class CommandActionService {
       targetRecordPid?: string;
       targetRecordId?: string;
       operationType?: 'create' | 'update' | 'delete';
+      auditContext?: Record<string, unknown>;
     },
   ): Promise<CommandExecuteResult> {
     const normalizedOptions = options
@@ -68,11 +70,27 @@ export class CommandActionService {
       payload,
       ...normalizedOptions,
     });
-    if (!result?.data) {
-      throw new Error('Command execution failed: no response');
+    if (!isSuccessCode(result?.code) || !result?.data) {
+      throw createCommandServiceError(result, 'Command execution failed');
     }
     return result.data;
   }
+}
+
+function isSuccessCode(code: unknown): boolean {
+  return code === '0' || code === 0;
+}
+
+function createCommandServiceError(
+  result: Result<CommandExecuteResult> | undefined,
+  fallback: string,
+): Error {
+  const error = new Error(result?.message || result?.desc || fallback);
+  Object.assign(error, {
+    code: result?.code,
+    context: result?.context ?? null,
+  });
+  return error;
 }
 
 export interface CommandExecuteResult {

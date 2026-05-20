@@ -60,30 +60,20 @@ public class ProcessEventListener implements Listener {
             switch (event) {
                 case PROCESS_START, start -> {
                     if (activityId == null) {
-                        bpmAuditService.recordProcessEvent(processInstanceId, "process_start",
-                                "Process started", startUserId, tenantId);
-                        eventBusService.publishProcessEvent("process_started", null, processInstanceId,
+                        // ProcessEngineService records the canonical process_start audit
+                        // after SmartEngine returns; avoid duplicating it as process_event.
+                        eventBusService.publishTransientProcessEvent("process_started", null, processInstanceId,
                                 new HashMap<>(Map.of("startUserId", startUserId != null ? startUserId : "")));
-                    } else {
-                        bpmAuditService.recordActivityEvent(processInstanceId, activityId, "activity_start",
-                                "Activity started", startUserId, tenantId);
                     }
                 }
                 case PROCESS_END, end -> {
                     if (activityId == null) {
                         bpmAuditService.recordProcessEvent(processInstanceId, "process_end",
                                 "Process ended", null, tenantId);
-                        eventBusService.publishProcessEvent("process_ended", null, processInstanceId, Map.of());
-                    } else {
-                        bpmAuditService.recordActivityEvent(processInstanceId, activityId, "activity_end",
-                                "Activity ended", null, tenantId);
-                        eventBusService.publishProcessEvent("activity_completed", null, processInstanceId,
-                                new HashMap<>(Map.of("activityId", activityId != null ? activityId : "")));
+                        eventBusService.publishTransientProcessEvent("process_ended", null, processInstanceId, Map.of());
                     }
                 }
                 case ACTIVITY_START -> {
-                    bpmAuditService.recordActivityEvent(processInstanceId, activityId, "activity_start",
-                            "Activity started", startUserId, tenantId);
                     // Execute pre-check hooks
                     if (activityId != null) {
                         try {
@@ -104,10 +94,6 @@ public class ProcessEventListener implements Listener {
                     }
                 }
                 case ACTIVITY_END -> {
-                    bpmAuditService.recordActivityEvent(processInstanceId, activityId, "activity_end",
-                            "Activity ended", null, tenantId);
-                    eventBusService.publishProcessEvent("activity_completed", null, processInstanceId,
-                            new HashMap<>(Map.of("activityId", activityId != null ? activityId : "")));
                     // Execute post-action hooks
                     if (activityId != null) {
                         try {
