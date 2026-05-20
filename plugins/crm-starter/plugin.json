@@ -1,6 +1,6 @@
 {
   "pluginId": "com.auraboot.crm-starter",
-  "namespace": "crm",
+  "namespace": "crms",
   "version": "1.0.0",
   "dslVersion": 1,
   "pluginType": "config",
