@@ -208,7 +208,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
-    "@types/react": "^19.0.1",
+    "@types/react": "^19.2.15",
     "@types/react-dom": "^19.0.1",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
