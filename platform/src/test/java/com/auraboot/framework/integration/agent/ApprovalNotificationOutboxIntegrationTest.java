@@ -133,14 +133,14 @@ class ApprovalNotificationOutboxIntegrationTest extends BaseIntegrationTest {
     void future_retry_not_due() {
         List<String> sent = new ArrayList<>();
         var outbox = newOutbox((ch, kind, id, av, pl) -> sent.add(av));
-        String pid = outbox.enqueue(tenantId, approvalPid, "user", "u1", "inbox", Map.of());
+        String futureApproverValue = "future-" + approvalPid;
+        String pid = outbox.enqueue(tenantId, approvalPid, "user", futureApproverValue, "inbox", Map.of());
         // Push next_retry into the future.
         jdbc.update("UPDATE ab_agent_approval_notification_outbox " +
                         "SET next_retry_at = NOW() + INTERVAL '1 hour' WHERE pid = ?", pid);
 
-        int dispatched = outbox.processDue();
-        assertThat(dispatched).isZero();
-        assertThat(sent).isEmpty();
+        outbox.processDue();
+        assertThat(sent).doesNotContain(futureApproverValue);
 
         Map<String, Object> row = outbox.peek(pid);
         assertThat(row.get("status")).isEqualTo("pending");

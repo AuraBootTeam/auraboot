@@ -100,14 +100,14 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
                 tenantId, "tn_" + tenantId, "usp_test_" + tenantId);
         jdbc.update("INSERT INTO ab_role (id, pid, tenant_id, name, code, status, deleted_flag) " +
                         "VALUES (?, ?, ?, ?, 'tenant_admin', 'active', FALSE)",
-                adminRoleId, "role_admin_" + adminRoleId, tenantId, "Tenant Admin " + adminRoleId);
+                adminRoleId, UniqueIdGenerator.generate(), tenantId, "Tenant Admin " + adminRoleId);
         jdbc.update("INSERT INTO ab_tenant_member (id, pid, tenant_id, user_id, status, deleted_flag) " +
                         "VALUES (?, ?, ?, ?, 'active', FALSE)",
-                adminMemberId, "mem_" + adminMemberId, tenantId, testUser.getId());
+                adminMemberId, UniqueIdGenerator.generate(), tenantId, testUser.getId());
         jdbc.update("INSERT INTO ab_user_role (id, pid, member_id, tenant_id, role_id, status, deleted_flag) " +
                         "VALUES (?, ?, ?, ?, ?, 'active', FALSE)",
                 System.nanoTime() & 0x7fffffffffffffffL,
-                "ur_" + adminRoleId, adminMemberId, tenantId, adminRoleId);
+                UniqueIdGenerator.generate(), adminMemberId, tenantId, adminRoleId);
     }
 
     private void revokeTenantAdmin() {

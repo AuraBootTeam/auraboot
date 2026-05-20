@@ -752,7 +752,7 @@ export function extractRecordId(body: any): string {
  * Find a table row by its text content. Returns the row Locator.
  * Preferred over positional first()/last() for robustness.
  */
-export async function findRowByContent(page: Page, text: string): Promise<Locator> {
+export async function findRowByContent(page: Page, text: string | RegExp): Promise<Locator> {
   const row = page.locator('tbody tr', { hasText: text }).first();
   await row.waitFor({ state: 'attached', timeout: 5000 });
   return row;

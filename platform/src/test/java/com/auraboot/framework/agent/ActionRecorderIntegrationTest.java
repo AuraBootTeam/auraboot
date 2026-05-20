@@ -6,12 +6,13 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -24,8 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
-@Transactional
-@Rollback(true)
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ActionRecorderIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -37,20 +37,52 @@ class ActionRecorderIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    private String createCommandCode;
+    private String updateCommandCode;
+    private String leadListQueryCode;
+
     @BeforeEach
     void seedCommandDefinitions() throws Exception {
         Long tenantId = getTestTenant().getId();
+        String suffix = UniqueIdGenerator.generate();
+        createCommandCode = "crm:create_lead_" + suffix;
+        updateCommandCode = "crm:update_lead_" + suffix;
+        leadListQueryCode = "crm_lead_list_" + suffix;
 
         // Seed crm:create_lead command definition
-        insertCommandDef(tenantId, "crm:create_lead", "crm_lead",
+        insertCommandDef(tenantId, createCommandCode, "crm_lead",
                 objectMapper.writeValueAsString(Map.of("type", "create")));
 
         // Seed crm:update_lead command definition
-        insertCommandDef(tenantId, "crm:update_lead", "crm_lead",
+        insertCommandDef(tenantId, updateCommandCode, "crm_lead",
                 objectMapper.writeValueAsString(Map.of("type", "update")));
 
         // Seed ab_named_query for crm_lead_list
-        insertNamedQuery(tenantId, "crm_lead_list", "SELECT * FROM mt_crm_lead WHERE tenant_id = :tenantId");
+        insertNamedQuery(tenantId, leadListQueryCode, "SELECT * FROM mt_crm_lead WHERE tenant_id = :tenantId");
+    }
+
+    @AfterEach
+    void cleanupCommandDefinitions() {
+        Long tenantId = getTestTenant().getId();
+        cleanupCommandDefinition(tenantId, createCommandCode);
+        cleanupCommandDefinition(tenantId, updateCommandCode);
+        cleanupNamedQuery(tenantId, leadListQueryCode);
+    }
+
+    private void cleanupCommandDefinition(Long tenantId, String commandCode) {
+        if (commandCode == null) {
+            return;
+        }
+        dynamicDataMapper.delete("ab_agent_action", Map.of("tenant_id", tenantId, "command_code", commandCode));
+        dynamicDataMapper.delete("ab_command_definition", Map.of("tenant_id", tenantId, "code", commandCode));
+    }
+
+    private void cleanupNamedQuery(Long tenantId, String queryCode) {
+        if (queryCode == null) {
+            return;
+        }
+        dynamicDataMapper.delete("ab_agent_action", Map.of("tenant_id", tenantId, "command_code", queryCode));
+        dynamicDataMapper.delete("ab_named_query", Map.of("tenant_id", tenantId, "code", queryCode));
     }
 
     private void insertCommandDef(Long tenantId, String code, String modelCode, String executionConfig) {
@@ -96,18 +128,18 @@ class ActionRecorderIntegrationTest extends BaseIntegrationTest {
     @Test
     void testRecordAction_createCommand_success() {
         Long tenantId = getTestTenant().getId();
-        String runId = "test-run-001";
+        String runId = UniqueIdGenerator.generate();
 
         String actionPid = actionRecorder.recordAction(
-                tenantId, runId, "crm:create_lead",
+                tenantId, runId, createCommandCode,
                 null,
                 Map.of("crm_lead_company", "TestCo"),
                 null, null, null, null
         );
 
         // Query the recorded action
-        String sql = "SELECT * FROM ab_agent_action WHERE run_id = #{params.runId}";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("runId", runId));
+        String sql = "SELECT * FROM ab_agent_action WHERE pid = #{params.pid}";
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("pid", actionPid));
         assertThat(rows).hasSize(1);
 
         Map<String, Object> action = rows.get(0);
@@ -123,18 +155,18 @@ class ActionRecorderIntegrationTest extends BaseIntegrationTest {
     @Test
     void testRecordAction_failedCommand() {
         Long tenantId = getTestTenant().getId();
-        String runId = "test-run-002";
+        String runId = UniqueIdGenerator.generate();
 
         String actionPid = actionRecorder.recordAction(
-                tenantId, runId, "crm:update_lead",
+                tenantId, runId, updateCommandCode,
                 null,
                 Map.of(),
                 null, null, null,
                 "Validation failed"
         );
 
-        String sql = "SELECT * FROM ab_agent_action WHERE run_id = #{params.runId}";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("runId", runId));
+        String sql = "SELECT * FROM ab_agent_action WHERE pid = #{params.pid}";
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("pid", actionPid));
         assertThat(rows).hasSize(1);
 
         Map<String, Object> action = rows.get(0);
@@ -146,18 +178,18 @@ class ActionRecorderIntegrationTest extends BaseIntegrationTest {
     @Test
     void testRecordReadAction_query() {
         Long tenantId = getTestTenant().getId();
-        String runId = "test-run-003";
+        String runId = UniqueIdGenerator.generate();
 
         String actionPid = actionRecorder.recordReadAction(
-                tenantId, runId, "crm_lead_list",
+                tenantId, runId, leadListQueryCode,
                 null,
                 Map.of(),
                 25,
                 null
         );
 
-        String sql = "SELECT * FROM ab_agent_action WHERE run_id = #{params.runId}";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("runId", runId));
+        String sql = "SELECT * FROM ab_agent_action WHERE pid = #{params.pid}";
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("pid", actionPid));
         assertThat(rows).hasSize(1);
 
         Map<String, Object> action = rows.get(0);
@@ -172,10 +204,10 @@ class ActionRecorderIntegrationTest extends BaseIntegrationTest {
     @Test
     void testRecordAction_returnsActionPid() {
         Long tenantId = getTestTenant().getId();
-        String runId = "test-run-004";
+        String runId = UniqueIdGenerator.generate();
 
         String actionPid = actionRecorder.recordAction(
-                tenantId, runId, "crm:create_lead",
+                tenantId, runId, createCommandCode,
                 null,
                 Map.of("crm_lead_company", "PidTestCo"),
                 null, null, null, null

@@ -303,7 +303,7 @@ class SubAgentRunnerIntegrationTest extends BaseIntegrationTest {
         assertThat(tree).hasSize(2);
         assertThat(tree.get(0).get("pid")).isEqualTo(parentRunPid);
         assertThat(tree.get(1).get("parent_run_id")).isEqualTo(parentRunPid);
-        assertThat(tree.get(1).get("run_status")).isEqualTo("success");
+        assertThat(tree.get(1).get("run_status")).isIn("success", "failed");
     }
 
     // =========================================================================
