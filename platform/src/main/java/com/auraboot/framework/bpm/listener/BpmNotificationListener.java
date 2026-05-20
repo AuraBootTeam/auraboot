@@ -1,11 +1,14 @@
 package com.auraboot.framework.bpm.listener;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.event.BpmEvent;
 import com.auraboot.framework.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Listens to BPM events and sends in-app notifications via NotificationService.
@@ -23,8 +26,13 @@ public class BpmNotificationListener {
 
     private final NotificationService notificationService;
 
-    @EventListener
+    @Async("eventTaskExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onBpmEvent(BpmEvent event) {
+        boolean boundTenantContext = !MetaContext.exists() && event.getTenantId() != null;
+        if (boundTenantContext) {
+            MetaContext.setSystemTenantContext(event.getTenantId());
+        }
         try {
             Long userId = resolveRecipient(event);
             if (userId == null) {
@@ -41,6 +49,10 @@ public class BpmNotificationListener {
             log.debug("BPM notification sent: type={}, recipient={}", event.getBpmEventType(), userId);
         } catch (Exception e) {
             log.error("BPM notification failed: type={}, error={}", event.getBpmEventType(), e.getMessage(), e);
+        } finally {
+            if (boundTenantContext) {
+                MetaContext.clear();
+            }
         }
     }
 
