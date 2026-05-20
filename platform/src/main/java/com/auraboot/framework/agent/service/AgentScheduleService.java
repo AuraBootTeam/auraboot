@@ -140,7 +140,7 @@ public class AgentScheduleService {
             // (would always set run_count = 0 + 1 = 1). Querying current row
             // ensures monotonic increment + correct max_runs expiry.
             List<Map<String, Object>> currentRows = dynamicDataMapper.selectByQueryWithoutTenant(
-                    "SELECT run_count FROM ab_agent_schedule WHERE pid = #{pid} AND deleted_flag = false",
+                    "SELECT run_count FROM ab_agent_schedule WHERE pid = #{params.pid} AND deleted_flag = false",
                     Map.of("pid", schedulePid));
             int currentRunCount = currentRows.isEmpty() || currentRows.get(0).get("run_count") == null
                     ? 0

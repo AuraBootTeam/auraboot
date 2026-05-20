@@ -398,12 +398,16 @@ setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
   const user = TEST_USERS[0];
   const storagePath = path.join(STORAGE_DIR, user.storageFile);
 
-  // Skip re-login only if the session is not expired AND still works against backend.
-  // After reset-and-init.sh the user PID changes — must validate against live API.
+  // Full local suites can run for hours. Reusing a still-valid cookie whose
+  // embedded JWT is close to expiry causes mid-run 401 cascades, so admin
+  // storage is refreshed by default at the start of every run.
+  const allowReuse = process.env.PW_REUSE_AUTH_STATE === '1';
   if (
+    allowReuse &&
     !isStorageExpired(storagePath) &&
     (await verifyStorageStateWorks(page, storagePath, baseURL))
   ) {
+    patchStorageStateCookies(storagePath);
     return;
   }
 

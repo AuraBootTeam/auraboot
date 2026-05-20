@@ -268,7 +268,7 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
     const warehouseName = `E2E WMS Warehouse ${uniqueId()}`;
     const warehouseResult = await executeCommandViaApi(
       page,
-      'pe:create_warehouse',
+      'inv:create_warehouse',
       {
         inv_warehouse_name: warehouseName,
         inv_warehouse_type: 'raw_material',
@@ -278,8 +278,8 @@ test.describe('PCBA WMS Extended — Stock Check (inv_stock_check)', () => {
       'create',
       { allowHttpError: true },
     );
-    const warehousePid = mustSucceed(warehouseResult, 'pe:create_warehouse');
-    created.push({ commandCode: 'pe:delete_warehouse', pid: warehousePid });
+    const warehousePid = mustSucceed(warehouseResult, 'inv:create_warehouse');
+    created.push({ commandCode: 'inv:delete_warehouse', pid: warehousePid });
     sharedRefs.warehouseName = warehouseName;
     sharedRefs.warehousePid = warehousePid;
 

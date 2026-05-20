@@ -44,7 +44,7 @@ type DemoEntry = SeedMenu & {
 };
 
 const NAV_TIMEOUT = 15_000;
-const ENTERPRISE_ROOT = '/Users/ghj/work/auraboot/auraboot-enterprise';
+const ENTERPRISE_ROOT = process.env.AURA_ENTERPRISE_PROJECT_ROOT ?? '/Users/ghj/work/auraboot/auraboot-enterprise';
 const ENTERPRISE_PLUGIN_ROOT = `${ENTERPRISE_ROOT}/plugins`;
 const SEED_FILE = `${ENTERPRISE_PLUGIN_ROOT}/pcba-solution/config/demo-data/pcba-demo-20260426.json`;
 const MENU_FILE = `${ENTERPRISE_PLUGIN_ROOT}/pcba-solution/config/menus.json`;

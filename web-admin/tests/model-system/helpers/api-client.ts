@@ -215,6 +215,15 @@ export class ApiClient {
     return response.json();
   }
 
+  /**
+   * Remove a field binding from a model by the field PID returned by
+   * GET /api/meta/models/{pid}/fields.
+   */
+  async deleteModelField(modelPid: string, fieldPid: string): Promise<ApiResponse<void>> {
+    const response = await this.request.delete(`/api/meta/models/${modelPid}/fields/${fieldPid}`);
+    return response.json();
+  }
+
   // ============================================================================
   // Field APIs
   // ============================================================================

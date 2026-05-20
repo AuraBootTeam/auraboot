@@ -49,12 +49,12 @@ const KEY_PAGES: Array<{ pageKey: string; area: string }> = [
 
 /** Representative commands spanning different operation types. */
 const KEY_COMMANDS: Array<{ code: string; type: string }> = [
-  { code: 'pe:create_warehouse', type: 'create' },
-  { code: 'pe:update_warehouse', type: 'update' },
-  { code: 'pe:delete_warehouse', type: 'delete' },
-  { code: 'pe:confirm_warehouse_in', type: 'state_transition' },
-  { code: 'pe:confirm_warehouse_out', type: 'state_transition' },
-  { code: 'pe:allocate_inventory', type: 'action' },
+  { code: 'inv:create_warehouse', type: 'create' },
+  { code: 'inv:update_warehouse', type: 'update' },
+  { code: 'inv:delete_warehouse', type: 'delete' },
+  { code: 'inv:confirm_warehouse_in', type: 'state_transition' },
+  { code: 'inv:confirm_warehouse_out', type: 'state_transition' },
+  { code: 'inv:allocate_inventory', type: 'action' },
   { code: 'pe:hold_inventory', type: 'action' },
   { code: 'pe:auto_putaway', type: 'action' },
 ];

@@ -66,7 +66,9 @@ type FixtureData = {
 
 const NAV_TIMEOUT = 15_000;
 const PASSWORD = 'Test2026x';
-const ENTERPRISE_PLUGIN_ROOT = '/Users/ghj/work/auraboot/auraboot-enterprise/plugins';
+const ENTERPRISE_PLUGIN_ROOT = process.env.AURA_ENTERPRISE_PROJECT_ROOT
+  ? `${process.env.AURA_ENTERPRISE_PROJECT_ROOT}/plugins`
+  : (process.env.ENTERPRISE_PLUGIN_ROOT ?? '/Users/ghj/work/auraboot/auraboot-enterprise/plugins');
 
 const BACKEND_PLUGIN_JARS = [
   'pcba-solution/backend/build/libs/pcba-solution-plugin-1.1.0.jar',
@@ -485,12 +487,12 @@ async function createFixtureData(
   );
 
   const warehouseId = mustSucceed(
-    await executeCommand(request, headers, 'pe:create_warehouse', {
+    await executeCommand(request, headers, 'inv:create_warehouse', {
       inv_warehouse_name: `E2E Role Warehouse ${uid}`,
       inv_warehouse_type: 'finished_goods',
       inv_warehouse_address: 'E2E PCBA role permission flow',
     }),
-    'pe:create_warehouse',
+    'inv:create_warehouse',
   );
 
   const bomId = await createBom(request, headers, finishedProductId, materialProductId, uid);
@@ -529,13 +531,13 @@ async function createFixtureData(
   );
 
   const inboundId = mustSucceed(
-    await executeCommand(request, headers, 'pe:create_warehouse_in', {
+    await executeCommand(request, headers, 'inv:create_warehouse_in', {
       inv_in_type: 'purchase',
       inv_in_date: today,
       inv_in_source_no: `ROLE-IN-${uid}`,
       inv_in_warehouse_id: warehouseId,
     }),
-    'pe:create_warehouse_in',
+    'inv:create_warehouse_in',
   );
   mustSucceed(
     await executeCommand(
@@ -814,7 +816,7 @@ test.describe('PCBA-011 - Demo Flow business role permissions @critical', () => 
     const page = await newRolePage(browser, users.pe_sales);
     await openEntryAndFindRow(page, DEMO_ENTRIES.rfq, fixtures.rfqSearch);
     await expectAllowedCommand(page, 'pe:submit_rfq', fixtures.rfqId);
-    await expectForbiddenCommand(page, 'pe:confirm_warehouse_in', fixtures.inboundId);
+    await expectForbiddenCommand(page, 'inv:confirm_warehouse_in', fixtures.inboundId);
     await page.context().close();
   });
 
@@ -833,7 +835,7 @@ test.describe('PCBA-011 - Demo Flow business role permissions @critical', () => 
   }) => {
     const page = await newRolePage(browser, users.pe_warehouse);
     await openEntryAndFindRow(page, DEMO_ENTRIES.inbound, fixtures.inboundCode);
-    await expectAllowedCommand(page, 'pe:confirm_warehouse_in', fixtures.inboundId);
+    await expectAllowedCommand(page, 'inv:confirm_warehouse_in', fixtures.inboundId);
     await expectForbiddenCommand(page, 'pe:confirm_production', fixtures.blockedProductionPlanId);
     await page.context().close();
   });

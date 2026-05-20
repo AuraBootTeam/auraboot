@@ -210,6 +210,9 @@ test.describe('Block Renderer — Block Type Tests', () => {
     await page.goto(`/p/e2et_order/view/${orderPid}`);
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('main').first()).toContainText(/订单|BlockTest|明细|详情/, {
+      timeout: 10000,
+    });
 
     // Find tab buttons scoped to main content area (not sidebar nav)
     // The detail page tabs are inside main > ... > navigation
@@ -217,7 +220,6 @@ test.describe('Block Renderer — Block Type Tests', () => {
     const tabCount = await detailTabs.count();
 
     if (tabCount < 2) {
-      await expect(page.locator('main').first()).toContainText(/订单|BlockTest|明细|详情/);
       return;
     }
 

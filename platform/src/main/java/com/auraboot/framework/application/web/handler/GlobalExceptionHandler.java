@@ -18,6 +18,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.core.annotation.Order;
@@ -26,6 +28,8 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -112,6 +116,13 @@ public class GlobalExceptionHandler {
     public void handleAsyncRequestNotUsable(AsyncRequestNotUsableException ex) {
         // 客户端断开连接是正常行为，不需要记录为 ERROR
         log.debug("Client disconnected from async request: {}", ex.getMessage());
+    }
+
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public void handleAsyncRequestTimeout(AsyncRequestTimeoutException ex) {
+        // SSE/long-polling timeouts are expected idle-connection lifecycle events.
+        // Do not write an ApiResponse because the response may already be text/event-stream.
+        log.debug("Async request timed out: {}", ex.getMessage());
     }
 
     /**
@@ -326,6 +337,45 @@ public class GlobalExceptionHandler {
         }
 
         ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, detail);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Handle requests using an unsupported HTTP method.
+     * Returns HTTP 405 instead of falling through to a generic 500.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex) {
+        log.warn("HTTP method not supported: method={}, supported={}",
+                ex.getMethod(), ex.getSupportedHttpMethods());
+        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+    }
+
+    /**
+     * Handle Accept headers that cannot consume the controller's declared
+     * response type, e.g. requesting JSON from an SSE-only endpoint.
+     */
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleMediaTypeNotAcceptable(
+            HttpMediaTypeNotAcceptableException ex) {
+        log.warn("HTTP media type not acceptable: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(response);
+    }
+
+    /**
+     * Handle non-multipart or malformed multipart requests.
+     * Returns HTTP 400 because the route exists but the request shape is invalid.
+     */
+    @ExceptionHandler(MultipartException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleMultipartException(MultipartException ex) {
+        log.warn("Multipart request error: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.BadParam, ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 

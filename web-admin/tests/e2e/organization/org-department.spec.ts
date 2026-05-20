@@ -15,7 +15,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { navigateToDynamicPage, uniqueId, acceptConfirmDialog, executeCommandViaApi, findRowInPaginatedList, extractRecordId, clickRowActionByLocator } from '../helpers';
+import { navigateToDynamicPage, uniqueId, acceptConfirmDialog, executeCommandViaApi, findRowInPaginatedList, extractRecordId, clickRowActionByLocator, normalizeDynamicPageKey, queryFilteredList } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 import { BASE_URL } from '../../helpers/environments';
 
@@ -238,17 +238,30 @@ test.describe('Organization Department', () => {
     // Track for cleanup in case UI delete fails
     createdPids.push(result.recordId);
 
-    // Navigate with large pageSize to load all records (avoids pagination through large datasets)
-    // NOTE: ?keyword= is not a supported URL param; use ?pageSize=200 to expand visible rows
+    const normalizedPageKey = normalizeDynamicPageKey(DEPT_PAGE_KEY);
+    const detailResp = await page.request.get(`/api/dynamic/${normalizedPageKey}/${result.recordId}`);
+    expect(detailResp.ok()).toBe(true);
+    const detailBody = await detailResp.json().catch(() => ({}));
+    const detail = detailBody.data ?? detailBody;
+    const actualDeptName = String(detail.org_dept_name ?? deptName);
+
+    const apiRows = await queryFilteredList(page, normalizedPageKey, 'org_dept_name', actualDeptName, {
+      operator: 'EQ',
+      pageSize: 10,
+    });
+    expect(apiRows.some((row) => String(row.pid ?? row.id) === result.recordId)).toBe(true);
+
+    // Navigate through the canonical dynamic route with a large page size so
+    // the UI delete path is verified against the row created above.
     const listResponsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/list') && resp.status() === 200,
       { timeout: 10000 },
     ).catch(() => null);
-    await page.goto(`/dynamic/${DEPT_PAGE_KEY}?pageSize=200`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/dynamic/${normalizedPageKey}?pageNum=1&pageSize=200`, { waitUntil: 'domcontentloaded' });
     await listResponsePromise;
 
     // Find the row using search box or pagination
-    const row = await findRowInPaginatedList(page, deptName, 15000);
+    const row = await findRowInPaginatedList(page, actualDeptName, 15000);
     const hasRow = await row.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (!hasRow) {
@@ -270,7 +283,7 @@ test.describe('Organization Department', () => {
     await deleteCommandPromise;
 
     // Row should be removed after list refresh
-    await expect(page.locator('tbody tr', { hasText: deptName })).toHaveCount(0, { timeout: 10000 });
+    await expect(page.locator('tbody tr', { hasText: actualDeptName })).toHaveCount(0, { timeout: 10000 });
 
     // Remove from cleanup list since delete succeeded
     const idx = createdPids.indexOf(result.recordId);

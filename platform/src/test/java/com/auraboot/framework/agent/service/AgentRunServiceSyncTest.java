@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.ArrayList;
@@ -80,6 +81,7 @@ class AgentRunServiceSyncTest {
     @Mock private GroundingService groundingService;
     @Mock private AgentSkillService skillService;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private ApplicationContext applicationContext;
     @Mock private LlmProvider provider;
 
     private AgentRunService service;
@@ -110,7 +112,8 @@ class AgentRunServiceSyncTest {
                 runLifecycleService,
                 groundingService,
                 skillService,
-                eventPublisher
+                eventPublisher,
+                applicationContext
         );
         // executeTaskSync explicitly does NOT manage MetaContext — caller's
         // job. Bind a system tenant for tests so the deeper code paths that

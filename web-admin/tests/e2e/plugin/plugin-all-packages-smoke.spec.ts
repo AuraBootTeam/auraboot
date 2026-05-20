@@ -30,7 +30,7 @@ const PLUGIN_CASES: PluginSmokeCase[] = [
   },
   { pluginId: 'com.auraboot.annual-plan', pluginDir: 'annual-plan', modelCode: 'ap_annual_plan' },
   { pluginId: 'com.auraboot.dual-prevention', pluginDir: 'dual-prevention', modelCode: 'dp_issue' },
-  { pluginId: 'com.test.e2e-order', pluginDir: 'e2e-test-order', modelCode: 'e2et_order' },
+  { pluginId: 'com.auraboot.test-fixtures', pluginDir: 'test-fixtures', modelCode: 'e2et_order' },
   { pluginId: 'com.auraboot.asset-management', pluginDir: 'asset-management', modelCode: 'asset' },
   { pluginId: 'com.auraboot.crm', pluginDir: 'crm', modelCode: 'crm_lead' },
   { pluginId: 'com.auraboot.sales', pluginDir: 'sales', modelCode: 'sl_sales_quotation' },

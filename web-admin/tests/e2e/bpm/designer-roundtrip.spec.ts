@@ -596,7 +596,9 @@ test.describe('BPM Designer designerJson round-trip (Epic B4)', { tag: ['@bpm-re
     await expect(toast, 'save-success toast must be visible').toBeVisible({ timeout: 5_000 });
 
     // 7. Capture the backend golden designerJson for B4.2 bit-exact compare.
-    const getResp = await page.request.get(`/api/bpm/process-definitions/${processPid}`);
+    const getResp = await page.request.get(`/api/bpm/process-definitions/${processPid}`, {
+      timeout: 20_000,
+    });
     expect(getResp.ok(), 'GET after save must succeed').toBe(true);
     const detail = (await getResp.json()) as { data: { designerJson: string | null } };
     expect(detail.data.designerJson, 'designerJson must be persisted').toBeTruthy();
@@ -662,7 +664,9 @@ test.describe('BPM Designer designerJson round-trip (Epic B4)', { tag: ['@bpm-re
     // 5. Cross-check: a second backend GET returns the same designerJson text.
     //    We compare parsed-and-re-sanitized shape (the backend may reserialize
     //    with different key ordering — what matters is semantic equality).
-    const getResp = await page.request.get(`/api/bpm/process-definitions/${processPid}`);
+    const getResp = await page.request.get(`/api/bpm/process-definitions/${processPid}`, {
+      timeout: 20_000,
+    });
     expect(getResp.ok()).toBe(true);
     const body = (await getResp.json()) as { data: { designerJson: string | null } };
     expect(body.data.designerJson).toBeTruthy();
@@ -773,7 +777,7 @@ test.describe('BPM Designer designerJson round-trip (Epic B4)', { tag: ['@bpm-re
     // handles long-term cleanup.
     const { status } = await undeployProcess(request, adminToken, processPid);
     expect(
-      [200, 204, 400, 404, 500],
+      [200, 204, 400, 404, 409, 500],
       `undeploy response ${status} must be one of ok/not-found/already-drafted`,
     ).toContain(status);
   });

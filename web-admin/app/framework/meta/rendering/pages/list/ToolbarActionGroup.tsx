@@ -14,6 +14,9 @@ import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { ToolbarActionConfig } from '~/framework/smart/types/savedView';
 import { cn } from '~/utils/cn';
 import { ActionConfigPanel } from './ActionConfigPanel';
+import { reportTemplateService, type ReportTemplateDTO } from '~/shared/services/reportTemplateService';
+import { ResultHelper } from '~/utils/type';
+import { useToastContext } from '~/contexts/ToastContext';
 
 export interface ToolbarActionGroupProps {
   buttons: ButtonConfig[];
@@ -91,15 +94,19 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
   onImport,
   onExport,
   onPrint,
-  modelCode: _modelCode,
-  filters: _filters,
+  modelCode,
+  filters,
   hideBuiltInImport,
   hideBuiltInExport,
   hideBuiltInPrint,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [configPanelOpen, setConfigPanelOpen] = useState(false);
+  const [reportTemplates, setReportTemplates] = useState<ReportTemplateDTO[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { showErrorToast, showSuccessToast } = useToastContext();
 
   const effectiveConfig = useMemo(
     () => mergeConfig(buttons, toolbarActions),
@@ -166,6 +173,55 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
     }
   }, [onPrint]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    let cancelled = false;
+    setLoadingReports(true);
+    reportTemplateService
+      .getPublished()
+      .then((resp) => {
+        if (cancelled) return;
+        if (ResultHelper.isSuccess(resp) && resp.data) {
+          setReportTemplates(
+            resp.data.filter((tpl) => !tpl.category || tpl.category === modelCode),
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setReportTemplates([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingReports(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [menuOpen, modelCode]);
+
+  const handleGenerateReport = useCallback(
+    async (template: ReportTemplateDTO) => {
+      setGeneratingReport(true);
+      setMenuOpen(false);
+      try {
+        const blob = await reportTemplateService.generate(template.code, { filters });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${template.name || template.code}.${template.outputFormat || 'pdf'}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showSuccessToast(`Report generated: ${template.name}`);
+      } catch (err) {
+        showErrorToast(err instanceof Error ? err.message : 'Report generation failed');
+      } finally {
+        setGeneratingReport(false);
+      }
+    },
+    [filters, showErrorToast, showSuccessToast],
+  );
+
   return (
     <>
       {/* Pinned buttons rendered directly in toolbar */}
@@ -194,16 +250,22 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
           type="button"
           data-testid="toolbar-more-menu"
           onClick={() => setMenuOpen(!menuOpen)}
+          disabled={generatingReport}
           className={cn(
             'inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-500',
             'hover:bg-gray-50 hover:text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none',
+            'disabled:cursor-not-allowed disabled:opacity-50',
             'transition-colors duration-150',
           )}
           title="More actions"
         >
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-          </svg>
+          {generatingReport ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
+          ) : (
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+            </svg>
+          )}
         </button>
 
         {menuOpen && (
@@ -330,6 +392,41 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                 </svg>
                 Print
               </button>
+            )}
+
+            {(loadingReports || reportTemplates.length > 0) && (
+              <>
+                <div className="mx-2 my-1 h-px bg-gray-100" />
+                {loadingReports ? (
+                  <div className="px-3.5 py-2 text-center text-xs text-gray-400">
+                    Loading reports...
+                  </div>
+                ) : (
+                  reportTemplates.map((tpl) => (
+                    <button
+                      key={tpl.pid}
+                      type="button"
+                      data-testid={`more-menu-report-${tpl.code}`}
+                      onClick={() => handleGenerateReport(tpl)}
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <span className="truncate">{tpl.name}</span>
+                      <span
+                        className={cn(
+                          'ml-auto inline-flex shrink-0 items-center rounded px-1 py-0.5 text-[10px] font-medium',
+                          tpl.outputFormat === 'pdf'
+                            ? 'bg-red-50 text-red-600'
+                            : tpl.outputFormat === 'xlsx'
+                              ? 'bg-green-50 text-green-600'
+                              : 'bg-blue-50 text-blue-600',
+                        )}
+                      >
+                        {tpl.outputFormat}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </>
             )}
 
             <div className="mx-2 my-1 h-px bg-gray-100" />

@@ -20,7 +20,7 @@ export interface ColumnSettingsPanelProps {
   /** Current column config from SavedView (may be empty) */
   viewColumns?: ViewColumnConfig[];
   /** Callback when column config changes */
-  onSave: (columns: ViewColumnConfig[]) => void;
+  onSave: (columns: ViewColumnConfig[]) => void | Promise<void>;
   /** Whether the panel is open */
   open: boolean;
   /** Close the panel */
@@ -39,6 +39,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
 }) => {
   // Build initial state from viewColumns or allColumns
   const [columns, setColumns] = useState<Array<ViewColumnConfig & { label: string }>>([]);
+  const [saving, setSaving] = useState(false);
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
@@ -98,15 +99,21 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
     dragOverItem.current = null;
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const result: ViewColumnConfig[] = columns.map((col, idx) => ({
       fieldCode: col.fieldCode,
       visible: col.visible,
       width: col.width,
       order: idx,
     }));
-    onSave(result);
-    onClose();
+    setSaving(true);
+    try {
+      await onSave(result);
+      onClose();
+    } catch (error) {
+      console.error('Failed to save column settings', error);
+      setSaving(false);
+    }
   }, [columns, onSave, onClose]);
 
   const handleSelectAll = useCallback(() => {
@@ -257,7 +264,11 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
           <button
             type="button"
             onClick={handleSave}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+            disabled={saving}
+            className={cn(
+              'rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700',
+              saving && 'cursor-not-allowed opacity-60 hover:bg-blue-600',
+            )}
             data-testid="column-settings-save"
           >
             {t('action.save') !== 'action.save' ? t('action.save') : 'Save'}

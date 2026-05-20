@@ -36,17 +36,17 @@ const PAGE_KEYS = {
 };
 
 const COMMANDS = {
-  createWhIn: 'pe:create_warehouse_in',
-  updateWhIn: 'pe:update_warehouse_in',
-  deleteWhIn: 'pe:delete_warehouse_in',
-  createWhOut: 'pe:create_warehouse_out',
-  updateWhOut: 'pe:update_warehouse_out',
-  deleteWhOut: 'pe:delete_warehouse_out',
+  createWhIn: 'inv:create_warehouse_in',
+  updateWhIn: 'inv:update_warehouse_in',
+  deleteWhIn: 'inv:delete_warehouse_in',
+  createWhOut: 'inv:create_warehouse_out',
+  updateWhOut: 'inv:update_warehouse_out',
+  deleteWhOut: 'inv:delete_warehouse_out',
   createTransfer: 'pe:create_stock_transfer',
   updateTransfer: 'pe:update_stock_transfer',
   deleteTransfer: 'pe:delete_stock_transfer',
-  createWarehouse: 'pe:create_warehouse',
-  deleteWarehouse: 'pe:delete_warehouse',
+  createWarehouse: 'inv:create_warehouse',
+  deleteWarehouse: 'inv:delete_warehouse',
 };
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ test.describe('PCBA WMS — Warehouse Inbound CRUD', () => {
         'create',
         { allowHttpError: true },
       );
-      warehousePid = mustSucceed(whResult, 'pe:create_warehouse');
+      warehousePid = mustSucceed(whResult, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: warehousePid });
     }
 
@@ -346,7 +346,7 @@ test.describe('PCBA WMS — Warehouse Outbound CRUD', () => {
         'create',
         { allowHttpError: true },
       );
-      warehousePid = mustSucceed(whResult, 'pe:create_warehouse');
+      warehousePid = mustSucceed(whResult, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: warehousePid });
     }
 
@@ -533,7 +533,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
         'create',
         { allowHttpError: true },
       );
-      toWarehousePid = mustSucceed(whResult, 'pe:create_warehouse');
+      toWarehousePid = mustSucceed(whResult, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: toWarehousePid });
     } else {
       // Create both warehouses
@@ -548,7 +548,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
         'create',
         { allowHttpError: true },
       );
-      fromWarehousePid = mustSucceed(wh1Result, 'pe:create_warehouse');
+      fromWarehousePid = mustSucceed(wh1Result, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: fromWarehousePid });
 
       const wh2Result = await executeCommandViaApi(
@@ -562,7 +562,7 @@ test.describe('PCBA WMS — Stock Transfer CRUD', () => {
         'create',
         { allowHttpError: true },
       );
-      toWarehousePid = mustSucceed(wh2Result, 'pe:create_warehouse');
+      toWarehousePid = mustSucceed(wh2Result, 'inv:create_warehouse');
       created.push({ commandCode: COMMANDS.deleteWarehouse, pid: toWarehousePid });
     }
 

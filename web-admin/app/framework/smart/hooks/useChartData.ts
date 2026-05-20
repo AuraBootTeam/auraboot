@@ -153,7 +153,7 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
     try {
       // Build the request from data source configuration
       const request: AggregateQueryRequest = {
-        type: dataSource.type,
+        type: dataSource.type === 'namedQuery' ? 'namedQuery' : 'aggregate',
         modelCode: dataSource.modelCode,
         queryCode: dataSource.queryCode,
         dimensions: dataSource.dimensions,

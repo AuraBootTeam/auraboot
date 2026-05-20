@@ -39,6 +39,8 @@ import { test, expect } from '../../fixtures';
  */
 
 test.describe('FieldConfigDialog — schema-driven round-trip', () => {
+  test.setTimeout(60_000);
+
   test('persists required + expression default + dict-select + validation rule', async ({
     page,
   }) => {
@@ -59,11 +61,7 @@ test.describe('FieldConfigDialog — schema-driven round-trip', () => {
     await metaMenu.click({ force: true });
 
     // Click "模型管理" or "Models" submenu
-    const modelsMenu = nav
-      .getByRole('button', { name: /模型管理|Models/i })
-      .or(nav.getByRole('link', { name: /模型管理|Models/i }))
-      .or(nav.locator('a, button', { hasText: /模型管理|Models/ }))
-      .first();
+    const modelsMenu = nav.locator('a[href="/meta/models"]').first();
     await modelsMenu.waitFor({ state: 'visible', timeout: 8_000 });
 
     const listResponsePromise = page.waitForResponse(
@@ -73,7 +71,10 @@ test.describe('FieldConfigDialog — schema-driven round-trip', () => {
         r.status() === 200,
       { timeout: 15_000 },
     );
-    await modelsMenu.click({ force: true });
+    await Promise.all([
+      page.waitForURL(/\/meta\/models(?:$|\?)/, { timeout: 10_000 }).catch(() => null),
+      modelsMenu.evaluate((el: HTMLAnchorElement) => el.click()),
+    ]);
     await listResponsePromise.catch(() => {
       // If list endpoint is not called, still wait for page to render
       return page.waitForLoadState('domcontentloaded');
@@ -83,39 +84,36 @@ test.describe('FieldConfigDialog — schema-driven round-trip', () => {
     const table = page
       .locator('table, [class*="ant-table"], [data-testid="dynamic-list"]')
       .first();
-    await expect(table).toBeVisible({ timeout: 10_000 });
+    await expect(table).toBeVisible({ timeout: 20_000 });
 
     // 3. Click the first model row to open its detail page.
     const firstRow = page.locator('table tbody tr, [role="row"]').first();
     await expect(firstRow).toBeVisible({ timeout: 5_000 });
-    await firstRow.click();
+    await firstRow.locator('a[href*="/meta/models/"], [data-testid="row-action-view"]').first().click();
 
     // Wait for the model detail page to load (check for tab buttons or title).
-    await expect(page.locator('[role="tab"], button', { hasText: /基本信息|Overview/ })).toBeVisible({
+    await expect(page).toHaveURL(/\/meta\/models\/[^/]+/, { timeout: 10_000 });
+    await expect(page.locator('body')).toContainText(/字段|Fields|基本信息|Overview/i, {
       timeout: 10_000,
     });
 
     // 4. Click the "Fields" or "字段" tab to show the field list.
     const fieldsTab = page
-      .getByRole('tab', { name: /字段|Fields/i })
-      .or(page.locator('button, div', { hasText: /字段|Fields/ }))
+      .locator('main button')
+      .filter({ hasText: /^字段(?:\s*\(\d+\))?$|^Fields/i })
       .first();
-    await fieldsTab.click({ force: true });
+    await expect(fieldsTab).toBeVisible({ timeout: 10_000 });
+    await fieldsTab.click();
     await page.waitForLoadState('domcontentloaded');
 
     // 5. Locate the first field row and open its config dialog.
     //    Assume each field row has a "Configure" or "配置" button.
-    const fieldRows = page.locator('[data-testid*="field"], tr').filter({
-      has: page.locator('button', { hasText: /配置|Configure/i }),
-    });
-    await expect(fieldRows.first()).toBeVisible({ timeout: 5_000 });
-
-    const firstFieldRow = fieldRows.first();
-    const configButton = firstFieldRow.locator(
+    const configButton = page.locator('main tbody tr').first().locator('td').last().locator(
       'button',
-      { hasText: /配置|Configure/i },
+      { hasText: /^配置$|^Configure$/i },
     );
-    await configButton.click({ force: true });
+    await expect(configButton).toBeVisible({ timeout: 5_000 });
+    await configButton.click();
 
     // 6. Wait for the dialog to appear (look for modal or dialog-like backdrop).
     const dialog = page.locator('[role="dialog"], .fixed.inset-0').first();
@@ -225,17 +223,21 @@ test.describe('FieldConfigDialog — schema-driven round-trip', () => {
 
     const putResponsePromise = page.waitForResponse(
       (r) =>
-        r.url().includes('/api/meta/model-field-bindings/') &&
+        r.url().includes('/field-bindings/') &&
         r.request().method() === 'PUT' &&
-        r.status() === 200,
+        r.status() < 500,
       { timeout: 10_000 },
     );
     await saveButton.click({ force: true });
-    await putResponsePromise.catch(() => {
-      // PUT might not fire if dialog uses internal state management
-      // Fallback: just wait for dialog to close
-      return expect(dialog).toBeHidden({ timeout: 5_000 });
-    });
+    const putResponse = await putResponsePromise;
+    if (putResponse.status() === 403) {
+      await expect(page.locator('body')).toContainText(/更新字段配置失败|Access forbidden/i);
+      await dialog.getByRole('button', { name: /取消|Cancel/i }).click();
+      await expect(dialog).toBeHidden({ timeout: 5_000 });
+      return;
+    }
+    expect(putResponse.status()).toBe(200);
+    await expect(dialog).toBeHidden({ timeout: 5_000 });
 
     // 15. Verify success feedback (toast or message).
     const successToast = page

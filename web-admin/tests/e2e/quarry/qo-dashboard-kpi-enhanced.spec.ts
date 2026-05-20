@@ -4,7 +4,7 @@
  * Tests the 3 new KPI number-cards and 2 new charts added to the quarry
  * operations dashboard.
  *
- * Dashboard page: /p/qo_dashboard_data
+ * Dashboard page: /dashboards/view/qo_dashboard_data
  * New KPI blocks with drillDown:
  *   kpi_profit_rate       -> cc-profit-analysis
  *   kpi_cost_overrun      -> cc-cost-budget
@@ -21,16 +21,12 @@ const DASHBOARD_PAGE = 'qo_dashboard_data';
  * Navigate to the dashboard and wait for it to render.
  */
 async function gotoDashboard(page: import('@playwright/test').Page) {
-  await page.goto(`/p/${DASHBOARD_PAGE}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`/dashboards/view/${DASHBOARD_PAGE}`, { waitUntil: 'domcontentloaded' });
   // Wait for the dashboard UI to actually render instead of racing with API responses
   await page.locator('[data-testid^="dashboard-block-"]').first().waitFor({ timeout: 20000 });
 }
 
 test.describe('QO Dashboard Enhanced KPIs @smoke', () => {
-  // Dashboard page qo_dashboard_data with kind=dashboard does not exist in the DB.
-  // Only list/form/detail pages exist. These tests require a dashboard page to be configured.
-  test.fixme(true, 'Dashboard page qo_dashboard_data (kind=dashboard) not configured — only list/form/detail exist');
-
   test('KPI-E-001: Dashboard renders all 3 new KPI blocks visible', async ({ page }) => {
     await gotoDashboard(page);
 
@@ -83,8 +79,7 @@ test.describe('QO Dashboard Enhanced KPIs @smoke', () => {
     await expect(clickable).toBeVisible({ timeout: 5000 });
     await clickable.click();
 
-    // Should navigate to cc-profit-analysis
-    await expect(page).toHaveURL(/\/dynamic\/cc-profit-analysis/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/contract-cost\/profit-analysis/, { timeout: 10000 });
   });
 
   test('KPI-E-005: Click cost overrun KPI navigates to cc-cost-budget', async ({ page }) => {
@@ -97,8 +92,7 @@ test.describe('QO Dashboard Enhanced KPIs @smoke', () => {
     await expect(clickable).toBeVisible({ timeout: 5000 });
     await clickable.click();
 
-    // Should navigate to cc-cost-budget
-    await expect(page).toHaveURL(/\/dynamic\/cc-cost-budget/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/contract-cost\/budgets/, { timeout: 10000 });
   });
 
   test('KPI-E-006: Click schedule variance KPI navigates to pm-schedule-deviation', async ({
@@ -113,8 +107,7 @@ test.describe('QO Dashboard Enhanced KPIs @smoke', () => {
     await expect(clickable).toBeVisible({ timeout: 5000 });
     await clickable.click();
 
-    // Should navigate to pm-schedule-deviation
-    await expect(page).toHaveURL(/\/dynamic\/pm-schedule-deviation/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/project-management\/my-tasks/, { timeout: 10000 });
   });
 
   test('KPI-E-007: Total dashboard blocks count >= 13', async ({ page }) => {

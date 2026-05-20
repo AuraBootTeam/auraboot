@@ -131,15 +131,15 @@ test.describe('PM Portfolio CRUD', () => {
   test('PORTFOLIO-02 @smoke: Portfolio list renders with seeded data', async ({ page }) => {
     await navigateToPortfolios(page);
 
-    // Rows visible (beforeAll created 2)
-    const rows = page.locator('tbody tr');
-    await expect(rows.first()).toBeVisible({ timeout: 8000 });
+    const primaryRow = await findRowInPaginatedList(page, `E2E Portfolio ${UID}`, 12_000);
+    await expect(primaryRow).toBeVisible();
 
-    const rowCount = await rows.count();
-    expect(
-      rowCount,
-      'Should have at least 2 portfolio rows (seeded in beforeAll)',
-    ).toBeGreaterThanOrEqual(2);
+    const holdResp = await page.request.get(`/api/dynamic/pm_portfolio/${holdPortfolioPid}`);
+    expect(holdResp.ok(), 'Second seeded portfolio should exist for lifecycle follow-up tests').toBe(
+      true,
+    );
+    const holdBody = await holdResp.json();
+    expect(JSON.stringify(holdBody)).toContain(`E2E PfHold ${UID}`);
 
     // i18n: no raw field code leak
     const headerRow = page.locator('thead tr').first();

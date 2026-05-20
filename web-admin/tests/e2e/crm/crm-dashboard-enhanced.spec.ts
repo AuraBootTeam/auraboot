@@ -97,19 +97,8 @@ test.describe('CRM Dashboard Enhanced @smoke', () => {
   // =========================================================================
 
   async function gotoDashboard(page: import('@playwright/test').Page) {
-    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-
-    // Expand CRM menu group
-    const crmButton = page.locator('button', { hasText: /CRM/i }).first();
-    await crmButton.waitFor({ state: 'visible', timeout: 10000 });
-    await crmButton.click();
-
-    // Click Dashboard link via evaluate (bypass scroll interception)
-    const dashLink = page.locator('a[href="/crm/dashboard"]');
-    await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
-    await dashLink.first().evaluate((el: HTMLElement) => el.click());
-
-    await expect(page).toHaveURL(/\/crm\/dashboard/, { timeout: 10000 });
+    await page.goto('/dashboards/view/crm_dashboard', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/dashboards\/view\/crm_dashboard/, { timeout: 10000 });
 
     // Wait for dashboard data to load
     await page
@@ -184,9 +173,7 @@ test.describe('CRM Dashboard Enhanced @smoke', () => {
     // Verify on page
     await gotoDashboard(page);
 
-    const opportunityTable = page
-      .locator('h3:has-text("最新商机"), h3:has-text("Recent Opportunities")')
-      .first();
+    const opportunityTable = page.getByText(/最新商机|Recent Opportunities/).first();
     await expect(opportunityTable).toBeVisible({ timeout: 15000 });
 
     await expect

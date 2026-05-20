@@ -143,10 +143,29 @@ async function cleanupTempModels(baseURL: string, cookieHeader: string): Promise
       const pid = model.pid;
       if (!pid) continue;
 
-      await fetch(`${baseURL}/api/meta/models/${pid}`, {
+      const fieldsResp = await fetch(`${baseURL}/api/meta/models/${pid}/fields`, {
+        headers: { Cookie: cookieHeader },
+      }).catch(() => null);
+      const fieldsBody = fieldsResp?.ok ? await fieldsResp.json().catch(() => null) : null;
+      const fields = fieldsBody?.data?.records || fieldsBody?.data?.list || fieldsBody?.data || [];
+      if (Array.isArray(fields)) {
+        for (const field of fields) {
+          const fieldPid = field?.pid;
+          if (!fieldPid) continue;
+          await fetch(`${baseURL}/api/meta/models/${pid}/fields/${fieldPid}`, {
+            method: 'delete',
+            headers: { Cookie: cookieHeader },
+          }).catch(() => {});
+        }
+      }
+
+      const deleteResp = await fetch(`${baseURL}/api/meta/models/${pid}`, {
         method: 'delete',
         headers: { Cookie: cookieHeader },
       }).catch(() => {});
+      if (deleteResp && !deleteResp.ok) {
+        console.log(`  ⚠️ Temp model cleanup skipped ${String(model.code || pid)}: HTTP ${deleteResp.status}`);
+      }
     }
   } catch {
     // Silently ignore

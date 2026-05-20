@@ -1518,7 +1518,7 @@ test.describe.serial('Showcase Seed Data', () => {
         crm_opp_name: opp.name,
         crm_opp_account_id: accountId,
         crm_opp_expected_amount: opp.amount,
-        crm_opp_expected_close_date: opp.closeDate,
+        crm_opp_expected_close_date: `${opp.closeDate}T09:00:00Z`,
         crm_opp_notes: opp.notes,
       });
 

@@ -89,6 +89,7 @@ function isDataSourceConfigured(
   if (ds) {
     if (ds.type === 'aggregate') return !!(ds.modelCode && ds.metrics?.length);
     if (ds.type === 'namedQuery') return !!ds.queryCode;
+    if (ds.type === 'api') return !!ds.url;
     if (ds.type === 'static') return true;
   }
   // Model-driven shorthand: modelCode + table.columns is enough to render a
@@ -120,7 +121,8 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   const isConfigured = isDataSourceConfigured(dataSource, modelCode, tableColumns);
 
   // Standard chart datasource branch (aggregate / namedQuery / static).
-  const useChartBranch = !!dataSource;
+  const useApiBranch = dataSource?.type === 'api' && !!dataSource.url;
+  const useChartBranch = !!dataSource && !useApiBranch;
   const {
     data: chartData,
     loading: chartLoading,
@@ -140,6 +142,41 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   const [modelLoading, setModelLoading] = useState(false);
   const [modelError, setModelError] = useState<Error | null>(null);
   const useModelBranch = !useChartBranch && !!modelCode && !!tableColumns?.length;
+  const [apiRows, setApiRows] = useState<Record<string, unknown>[]>([]);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!useApiBranch || !dataSource?.url) return;
+    let cancelled = false;
+    setApiLoading(true);
+    setApiError(null);
+    const params = Object.fromEntries(
+      Object.entries(dataSource.params ?? {}).map(([key, value]) => [key, String(value)]),
+    );
+    fetchResult<{ records?: Record<string, unknown>[]; rows?: Record<string, unknown>[] }>(
+      dataSource.url,
+      { method: 'get', params },
+    )
+      .then((result) => {
+        if (cancelled) return;
+        if (ResultHelper.isSuccess(result)) {
+          setApiRows(result.data?.records ?? result.data?.rows ?? []);
+        } else {
+          setApiRows([]);
+        }
+        setApiLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiError(err instanceof Error ? err : new Error(String(err)));
+        setApiRows([]);
+        setApiLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [useApiBranch, dataSource?.url, dataSource?.params]);
 
   useEffect(() => {
     if (!useModelBranch || !modelCode) return;
@@ -176,6 +213,15 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
 
   const data = useChartBranch
     ? chartData
+    : useApiBranch
+      ? {
+          rows: apiRows,
+          summary: {},
+          meta: {
+            dimensions: tableColumns?.map((c) => c.field) ?? [],
+            metrics: [] as string[],
+          },
+        }
     : useModelBranch
       ? {
           rows: modelRows,
@@ -186,8 +232,8 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
           },
         }
       : null;
-  const loading = useChartBranch ? chartLoading : modelLoading;
-  const error = useChartBranch ? chartError : modelError;
+  const loading = useChartBranch ? chartLoading : useApiBranch ? apiLoading : modelLoading;
+  const error = useChartBranch ? chartError : useApiBranch ? apiError : modelError;
 
   const [currentPage, setCurrentPage] = useState(0);
   const [sortKey, setSortKey] = useState<string | null>(null);
