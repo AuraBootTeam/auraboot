@@ -58,6 +58,42 @@
 
 ## Latest Targeted Evidence
 
+- Unified Designer Workbench V3 helper permission evidence (2026-05-20 CST):
+  - Worktree: `/Users/ghj/work/auraboot/.worktrees/unified-designer-workbench-v3/auraboot`
+  - Ports: frontend `5237`, BFF `3564`.
+  - Health check: `curl -fsS http://localhost:3564/health` returned BFF healthy and backend UP; `curl -fsS -I http://localhost:5237/unified-designer` returned HTTP 302 to login, proving the feature-worktree frontend is reachable.
+  - TypeScript command: `cd web-admin && pnpm typecheck`
+  - TypeScript result: passed.
+  - Unit command: `cd web-admin && pnpm exec vitest run app/plugins/core-designer/components/unified-designer/__tests__`
+  - Unit result: `10 passed / 137 passed`.
+  - Targeted E2E command: `cd web-admin && NO_PROXY=localhost,127.0.0.1 PLAYWRIGHT_BASE_URL=http://localhost:5237 VITE_PORT=5237 BFF_PORT=3564 PW_PROFILE=full PW_WORKERS=1 pnpm exec playwright test -c playwright.config.ts tests/e2e/designer/unified-designer-workbench.spec.ts --project=chromium --grep "UDW-052" --reporter=line --no-deps`
+  - Targeted E2E result: `1 passed`.
+  - Helper/detail slice command: `cd web-admin && NO_PROXY=localhost,127.0.0.1 PLAYWRIGHT_BASE_URL=http://localhost:5237 VITE_PORT=5237 BFF_PORT=3564 PW_PROFILE=full PW_WORKERS=1 pnpm exec playwright test -c playwright.config.ts tests/e2e/designer/unified-designer-workbench.spec.ts --project=chromium --grep "UDW-049|UDW-050|UDW-051|UDW-052" --reporter=line --no-deps`
+  - Helper/detail slice result: `4 passed`.
+  - Workbench full-slice command: `cd web-admin && NO_PROXY=localhost,127.0.0.1 PLAYWRIGHT_BASE_URL=http://localhost:5237 VITE_PORT=5237 BFF_PORT=3564 PW_PROFILE=full PW_WORKERS=1 pnpm exec playwright test -c playwright.config.ts tests/e2e/designer/unified-designer-workbench.spec.ts --project=chromium --reporter=line --no-deps`
+  - Workbench full-slice result: `52 passed`.
+  - Workbench with setup/auth command: `cd web-admin && NO_PROXY=localhost,127.0.0.1 PLAYWRIGHT_BASE_URL=http://localhost:5237 VITE_PORT=5237 BFF_PORT=3564 PW_PROFILE=full PW_ROLE_PROJECTS=1 PW_WORKERS=1 pnpm exec playwright test -c playwright.config.ts tests/e2e/designer/unified-designer-workbench.spec.ts --project=chromium --reporter=line`
+  - Workbench with setup/auth result: `70 passed / 1 skipped`.
+  - E2E truth audit for `web-admin/tests/e2e/designer/unified-designer-workbench.spec.ts`: `click/fill/drag/select=709`, `page.request/request=21`, `skip/fixme=0`, `waitForTimeout=0`, `page.goto('/p/')=0`, `threshold/retries=0`. One `page.request.put` remains in beforeAll named-query-field idempotent setup and is not a product-path PUT bypass.
+
+- Unified Designer Workbench V3 subform evidence (2026-05-20 CST):
+  - Worktree: `/Users/ghj/work/auraboot/.worktrees/unified-designer-workbench-v3/auraboot`
+  - Stack: `auraboot-unified-v3-api`
+  - Ports: frontend `5185`, BFF `3512`, backend `6455`, postgres `5444`, redis `6490`
+  - Health check: backend `http://localhost:6455/actuator/health` returned `UP`; frontend `http://localhost:5185/unified-designer` reachable and mounted to the feature worktree.
+  - Unit command: `cd web-admin && pnpm exec vitest run app/plugins/core-designer/components/unified-designer/__tests__/RecursiveBlockRenderer.test.tsx app/plugins/core-designer/components/unified-designer/__tests__/UnifiedDesignerWorkbench.test.tsx app/plugins/core-designer/components/unified-designer/__tests__/v3-utils.test.ts`
+  - Unit result: `97 passed / 0 failed`.
+  - Targeted E2E command: `cd web-admin && NO_PROXY=localhost,127.0.0.1 PW_SKIP_WEBSERVER=1 PLAYWRIGHT_BASE_URL=http://localhost:5185 PW_STORAGE_DIR=tests/storage/unified-v3-api PW_ARTIFACT_DIR=test-results/unified-designer-subform-e2e PW_RESULTS_JSON=test-results/unified-designer-subform-e2e/results.json PW_REPORT_DIR=test-results/unified-designer-subform-e2e/html PW_WORKERS=1 pnpm exec playwright test tests/e2e/designer/unified-designer-workbench.spec.ts --project=chromium --grep "UDW-039"`
+  - Targeted E2E result: `19 passed / 1 skipped / 0 failed` including setup/auth dependencies and `UDW-039`.
+  - Workbench full-slice command: `cd web-admin && NO_PROXY=localhost,127.0.0.1 PW_SKIP_WEBSERVER=1 PLAYWRIGHT_BASE_URL=http://localhost:5185 PW_STORAGE_DIR=tests/storage/unified-v3-api PW_ARTIFACT_DIR=test-results/unified-designer-workbench-subform-full PW_RESULTS_JSON=test-results/unified-designer-workbench-subform-full/results.json PW_REPORT_DIR=test-results/unified-designer-workbench-subform-full/html PW_WORKERS=1 pnpm exec playwright test tests/e2e/designer/unified-designer-workbench.spec.ts --project=chromium`
+  - Workbench full-slice result: `57 passed / 1 skipped / 0 failed`.
+  - TypeScript command: `cd web-admin && pnpm typecheck`
+  - TypeScript result: passed.
+  - E2E truth audit for `web-admin/tests/e2e/designer/unified-designer-workbench.spec.ts`: `click/fill=396`, `page.request/request=17`, `skip/fixme=0`, `waitForTimeout=0`, `request.put=0`, `threshold/retries=0`, `git diff --check` passed.
+  - Visual evidence:
+    - `/Users/ghj/work/auraboot/unified-designer-subform-visual-20260520.png`
+    - `/Users/ghj/work/auraboot/unified-designer-subform-runtime-visual-20260520.png`
+
 - Auth/setup command:
   `cd web-admin && PLAYWRIGHT_BASE_URL=http://localhost:5174 BACKEND_URL=http://localhost:6444 BFF_URL=http://localhost:3501 BE_PORT=6444 VITE_PORT=5174 BFF_PORT=3501 PG_HOST=localhost PG_PORT=5433 PG_USER=auraboot PG_DB=aura_boot PGPASSWORD=auraboot_dev PW_SKIP_WEBSERVER=1 NO_PROXY=localhost PW_WORKERS=1 pnpm exec playwright test --project=auth --reporter=line`
 - Log: `/tmp/oss-e2e-logs/auth-host-20260512-223450.log`
@@ -105,6 +141,10 @@
 
 ## Next Action
 
+- Unified Designer Workbench V3 next action:
+  - Remove generated `web-admin/tests/storage/unified-v3-api` after final evidence review.
+  - Keep expanding V3 runtime coverage toward production relation subform persistence, relation picker, and richer nested form validation; current `subform` evidence covers designer authoring, row editor preview, payload writeback, and persistence.
+  - Before any completion claim for the whole Unified Designer effort, run `/e2e-truth` discipline against the final diff and then decide whether a broader OSS/enterprise gate is required beyond the workbench full-slice.
 - E2E truth audit completed:
   - No new `test.skip` / `test.fixme` / `retries` / `waitForTimeout`.
   - No new PUT-bypass helper (`request.put` / `page.request.put`) in the diff.

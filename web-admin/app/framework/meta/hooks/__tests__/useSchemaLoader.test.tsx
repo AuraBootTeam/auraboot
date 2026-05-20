@@ -87,4 +87,40 @@ describe('useSchemaLoader', () => {
     });
     expect(column.valueType).toBeUndefined();
   });
+
+  it('does not reuse stale cached schema outside production', async () => {
+    mockFetchResult
+      .mockResolvedValueOnce({
+        code: '0',
+        message: '',
+        data: {
+          pageKey: 'cache_contract_list',
+          modelCode: 'cache_contract',
+          kind: 'list',
+          title: 'Old schema',
+          blocks: [],
+        },
+      } as any)
+      .mockResolvedValueOnce({
+        code: '0',
+        message: '',
+        data: {
+          pageKey: 'cache_contract_list',
+          modelCode: 'cache_contract',
+          kind: 'list',
+          title: 'Fresh schema',
+          blocks: [],
+        },
+      } as any);
+
+    const first = renderHook(() => useSchemaLoader({ pageKey: 'cache_contract_list' }));
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    first.unmount();
+
+    const second = renderHook(() => useSchemaLoader({ pageKey: 'cache_contract_list' }));
+    await waitFor(() => expect(second.result.current.loading).toBe(false));
+
+    expect(mockFetchResult).toHaveBeenCalledTimes(2);
+    expect(second.result.current.schema?.title).toBe('Fresh schema');
+  });
 });

@@ -5,6 +5,7 @@ import com.auraboot.framework.connector.service.ApiConnectorService;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.meta.service.InvariantEngine;
+import com.auraboot.framework.meta.service.impl.CommandAuditPayloads;
 import com.auraboot.framework.meta.service.impl.CommandEffectExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -129,7 +130,8 @@ public class CompletionPhase implements CommandPhase {
         final long execTimeMs = System.currentTimeMillis() - ctx.getStartTime();
         ctx.getPhaseTimings().put(ctx.getCurrentPhase(), System.currentTimeMillis() - ctx.getCurrentPhaseStart());
         final var auditTimings = new LinkedHashMap<>(ctx.getPhaseTimings());
-        final var auditPayload = new HashMap<>(ctx.getPayload());
+        final var auditPayload = CommandAuditPayloads.withAuditContext(
+                ctx.getPayload(), ctx.getRequest().getAuditContext());
         final var auditResult = new HashMap<>(ctx.getFieldMapResults());
         auditResult.putAll(ctx.getHandlerResults());
         final var tenantId = ctx.getTenantId();
