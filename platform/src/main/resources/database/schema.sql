@@ -754,14 +754,14 @@ CREATE TABLE ab_page_schema (
 
     -- Page identification
     page_key VARCHAR(200) NOT NULL,
-    model_code VARCHAR(100) NOT NULL,
+    model_code VARCHAR(100),
 
     -- Basic info
     name VARCHAR(200) NOT NULL,
     description TEXT,
 
     -- Page kind (replaces page_type + page_category)
-    kind VARCHAR(50) NOT NULL,              -- list/form/detail/composite (dashboards live in ab_dashboard)
+    kind VARCHAR(50) NOT NULL,              -- list/form/detail/dashboard/composite
 
     -- Flat schema fields (replaces dsl_schema JSONB blob)
     schema_version INTEGER NOT NULL DEFAULT 2,

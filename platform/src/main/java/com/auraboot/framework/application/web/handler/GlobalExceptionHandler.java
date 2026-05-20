@@ -247,9 +247,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleBusinessException(BusinessException ex) {
         log.error("Business exception:", ex);
 
+        ResponseCode responseCode = ex.getResponseCode() != null
+                ? ex.getResponseCode()
+                : ResponseCode.BUSINESS_ERROR;
         Object detail = isDevEnvironment() ? buildDevDetail(ex) : ex.getMessage();
-        ApiResponse<Object> response = ApiResponse.errorWithContext(ex.getResponseCode(), detail);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+        ApiResponse<Object> response = ApiResponse.errorWithContext(responseCode, detail);
+        return ResponseEntity.status(mapResponseCodeToStatus(responseCode)).body(response);
     }
 
     /**

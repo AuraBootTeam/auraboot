@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.PageSchemaVersionService;
+import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.plugin.service.PluginResourceTracker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,23 +21,22 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Validates that {@code kind=dashboard} is rejected at the DTO boundary.
+ * Validates PageSchema kind values at the DTO boundary.
  *
  * <p>Uses Mockito standaloneSetup so we can test the {@code @Pattern} constraint on
  * {@link com.auraboot.framework.meta.dto.PageSchemaCreateRequest#kind} without needing
- * a running DB, JWT auth, or permission interceptor.  The assertion we care about is
- * purely structural: the regex {@code ^(list|form|detail|composite)$} must not include
- * {@code dashboard}.
- *
- * <p>Plan 3a – Task 7.
+ * a running DB, JWT auth, or permission interceptor. The assertion we care about is
+ * purely structural: V3 authoring allows {@code dashboard} and {@code composite}.
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("PageSchema kind=dashboard rejected at API boundary (Plan 3a T7)")
+@DisplayName("PageSchema kind validation at API boundary")
 class PageSchemaKindValidationIntegrationTest {
 
     @Mock
@@ -76,18 +76,15 @@ class PageSchemaKindValidationIntegrationTest {
     // ── PS-VAL-01 ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("PS-VAL-01: kind=dashboard returns 400 with validation error on 'kind' field")
-    void ps_val_01_kindDashboard_returns400() throws Exception {
+    @DisplayName("PS-VAL-01: kind=dashboard passes DTO validation")
+    void ps_val_01_kindDashboard_passesValidation() throws Exception {
         var body = validBody("dashboard");
 
         mockMvc.perform(post("/api/pages")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(result -> assertTrue(
-                        result.getResolvedException() instanceof MethodArgumentNotValidException,
-                        "Expected MethodArgumentNotValidException for kind=dashboard"));
+                .andExpect(status().is2xxSuccessful());
     }
 
     // ── PS-VAL-02 ────────────────────────────────────────────────────────────
@@ -118,5 +115,54 @@ class PageSchemaKindValidationIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andDo(print())
                 .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("PS-VAL-04: kind=composite passes DTO validation")
+    void ps_val_04_kindComposite_passesValidation() throws Exception {
+        var body = validBody("composite");
+
+        mockMvc.perform(post("/api/pages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andDo(print())
+                .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("PS-VAL-05: unknown kind returns 400 with validation error on 'kind' field")
+    void ps_val_05_unknownKind_returns400() throws Exception {
+        var body = validBody("unknown");
+
+        mockMvc.perform(post("/api/pages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(result -> assertTrue(
+                        result.getResolvedException() instanceof MethodArgumentNotValidException,
+                        "Expected MethodArgumentNotValidException for unknown kind"));
+    }
+
+    @Test
+    @DisplayName("PS-VAL-06: GET /api/pages/page-key/{pageKey} returns a V3 dashboard page")
+    void ps_val_06_findByPageKey_returnsV3Dashboard() throws Exception {
+        PageSchemaDTO dto = new PageSchemaDTO();
+        dto.setPid("page_pid");
+        dto.setPageKey("system_overview");
+        dto.setName("system_overview");
+        dto.setKind("dashboard");
+        dto.setSchemaVersion(3);
+        dto.setBlocks(List.of(Map.of("id", "dashboard_system_overview", "blockType", "dashboard")));
+        when(pageSchemaService.findAnyByPageKey("system_overview")).thenReturn(dto);
+
+        mockMvc.perform(get("/api/pages/page-key/system_overview")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pid").value("page_pid"))
+                .andExpect(jsonPath("$.data.pageKey").value("system_overview"))
+                .andExpect(jsonPath("$.data.kind").value("dashboard"))
+                .andExpect(jsonPath("$.data.schemaVersion").value(3));
     }
 }

@@ -26,6 +26,15 @@ const noProxyHttpsAgent = new https.Agent({
 
 type ResponseHeaderValue = string | number | readonly string[];
 
+const BROWSER_ONLY_PROXY_HEADERS = new Set([
+  'access-control-request-headers',
+  'access-control-request-method',
+  'connection',
+  'host',
+  'origin',
+  'referer',
+]);
+
 function toResponseHeaderValue(value: unknown): ResponseHeaderValue | undefined {
   if (typeof value === 'string' || typeof value === 'number') {
     return value;
@@ -550,6 +559,10 @@ export class BffProxyService {
 
       // 跳过 cookie 头，我们会单独处理
       if (lowerKey === 'cookie') {
+        return;
+      }
+
+      if (BROWSER_ONLY_PROXY_HEADERS.has(lowerKey) || lowerKey.startsWith('sec-fetch-')) {
         return;
       }
 

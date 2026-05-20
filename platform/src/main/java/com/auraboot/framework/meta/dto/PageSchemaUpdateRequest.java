@@ -55,10 +55,10 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
     private String description;
 
     /**
-     * Page kind (list, form, detail).
+     * Page kind.
      */
-    @Pattern(regexp = "^(list|form|detail)$",
-        message = "Invalid kind: must be one of list, form, detail")
+    @Pattern(regexp = "^(list|form|detail|dashboard|composite)$",
+        message = "Invalid kind: must be one of list, form, detail, dashboard, composite")
     @JsonProperty("kind")
     private String kind;
 
@@ -79,6 +79,14 @@ public class PageSchemaUpdateRequest extends AbstractUpdateRequest {
      */
     @JsonProperty("blocks")
     private List<Object> blocks;
+
+    /**
+     * DSL schema format version. Omitted values keep the existing version.
+     */
+    @Min(value = 1, message = "Schema version must be at least 1")
+    @Max(value = 99, message = "Schema version must not exceed 99")
+    @JsonProperty("schemaVersion")
+    private Integer schemaVersion;
 
     /**
      * 元信息（JSON格式）
