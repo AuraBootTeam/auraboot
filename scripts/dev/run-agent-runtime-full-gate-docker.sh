@@ -206,8 +206,8 @@ run_frontend_phase() {
                 PG_USER=auraboot \
                 PG_PASSWORD=auraboot_dev \
                 PG_DB=aura_boot \
-                OSS_PLUGIN_ROOT="$PROJECT_ROOT/plugins" \
-                ENTERPRISE_PLUGIN_ROOT="$ENTERPRISE_PLUGINS_DIR" \
+                OSS_PLUGIN_ROOT="/app/plugins" \
+                ENTERPRISE_PLUGIN_ROOT="/app/plugins-enterprise" \
                 bash -lc "$command"
         ) 2>&1 | tee "$log"
     else

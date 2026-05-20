@@ -7,7 +7,7 @@ import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
 import com.auraboot.framework.agent.runtime.DurableWorkflowEngine;
-import com.auraboot.framework.agent.runtime.AgentTurnRouter;
+import com.auraboot.framework.agent.runtime.TurnExecutionPlanner;
 import com.auraboot.framework.agent.runtime.ContextConflictPolicy;
 import com.auraboot.framework.agent.runtime.PendingContextFreshnessDecision;
 import com.auraboot.framework.agent.runtime.PendingContextFreshnessValidator;
@@ -64,7 +64,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
     private final AuraBotChatService chatService;
     private final PendingContinuationService pendingContinuationService;
-    private final AgentTurnRouter agentTurnRouter;
+    private final TurnExecutionPlanner turnExecutionPlanner;
     private final TurnSideEffects sideEffects;
     private final PendingToolStore pendingToolStore;
     private final ObjectMapper objectMapper;
@@ -127,13 +127,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
     public ConversationTurnServiceImpl(AuraBotChatService chatService,
                                         PendingContinuationService pendingContinuationService,
-                                        AgentTurnRouter agentTurnRouter,
+                                        TurnExecutionPlanner turnExecutionPlanner,
                                         @Qualifier("turnSideEffects") TurnSideEffects sideEffects,
                                         PendingToolStore pendingToolStore,
                                         ObjectMapper objectMapper) {
         this.chatService = chatService;
         this.pendingContinuationService = pendingContinuationService;
-        this.agentTurnRouter = agentTurnRouter;
+        this.turnExecutionPlanner = turnExecutionPlanner;
         this.sideEffects = sideEffects;
         this.pendingToolStore = pendingToolStore;
         this.objectMapper = objectMapper;
@@ -153,8 +153,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             ChatRequest legacyRequest = request.legacyRequest();
             String agentCode = request.agentCode();
-            AgentTurnRouter.RuntimeDecision decision = agentTurnRouter.decide(
-                    new AgentTurnRouter.RuntimePolicyInput(
+            TurnExecutionPlanner.TurnExecutionPlan turnPlan = turnExecutionPlanner.decide(
+                    new TurnExecutionPlanner.TurnExecutionInput(
                             agentCode,
                             ctx.triageBucket(),
                             ctx.allowedReadOnlyTools(),
@@ -162,13 +162,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                             optionFlag(request, "requiresApproval"),
                             optionFlag(request, "externalSideEffect"),
                             optionFlag(request, "batch")));
-            AgentTurnRouter.RuntimeRoute route = decision.route();
-            log.debug("Agent turn route decision: turnId={}, route={}, reason={}, signals={}",
-                    ctx.turnId(), route, decision.reason(), decision.policySignals());
-            if (route == AgentTurnRouter.RuntimeRoute.NAMED_AGENT_CHAT) {
+            TurnExecutionPlanner.InitialExecutionMode initialMode = turnPlan.initialMode();
+            log.debug("Agent turn execution plan: turnId={}, initialMode={}, reason={}, signals={}",
+                    ctx.turnId(), initialMode, turnPlan.reason(), turnPlan.policySignals());
+            if (initialMode == TurnExecutionPlanner.InitialExecutionMode.NAMED_AGENT_TURN) {
                 outcome = dispatchToNamedAgent(ctx, request, legacyRequest, capturingSink, agentCode);
             } else {
-                if (route == AgentTurnRouter.RuntimeRoute.DURABLE_RUN) {
+                if (initialMode == TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW) {
                     outcome = isAcpRuntimeWired()
                             ? dispatchToAcpRun(ctx, legacyRequest, capturingSink)
                             : acpRuntimeUnavailableOutcome(ctx, capturingSink);

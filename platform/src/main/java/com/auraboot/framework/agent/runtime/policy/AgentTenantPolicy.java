@@ -23,7 +23,6 @@ public record AgentTenantPolicy(
         }
         boolean hasRead = false;
         boolean hasWrite = false;
-        boolean requiresDurable = false;
         boolean allowsDurable = false;
         for (ToolMetadata tool : visibleTools) {
             if (tool == null) {
@@ -39,9 +38,8 @@ public record AgentTenantPolicy(
             if (effectType == ToolEffectType.INTERNAL_READ || effectType == ToolEffectType.NONE) {
                 hasRead = true;
             }
-            if (tool.getDurabilityRequirement() == DurabilityRequirement.REQUIRED) {
-                requiresDurable = true;
-            } else if (tool.getDurabilityRequirement() == DurabilityRequirement.ALLOWED) {
+            if (tool.getDurabilityRequirement() == DurabilityRequirement.REQUIRED
+                    || tool.getDurabilityRequirement() == DurabilityRequirement.ALLOWED) {
                 allowsDurable = true;
             }
         }
@@ -49,14 +47,13 @@ public record AgentTenantPolicy(
             return new AgentTenantPolicy(
                     ToolCapabilityCeiling.WRITE_CAPABLE,
                     ToolExposure.WRITE_CATALOG_WITH_GATE,
-                    requiresDurable ? DurabilityPreference.REQUIRED : DurabilityPreference.ALLOWED);
+                    DurabilityPreference.ALLOWED);
         }
         if (hasRead) {
             return new AgentTenantPolicy(
                     ToolCapabilityCeiling.READ_ONLY,
                     ToolExposure.READ_ONLY_CATALOG,
-                    requiresDurable ? DurabilityPreference.REQUIRED
-                            : allowsDurable ? DurabilityPreference.ALLOWED : DurabilityPreference.NONE);
+                    allowsDurable ? DurabilityPreference.ALLOWED : DurabilityPreference.NONE);
         }
         return new AgentTenantPolicy(
                 ToolCapabilityCeiling.NO_TOOLS,

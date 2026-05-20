@@ -9,6 +9,7 @@ public class ToolPolicyEngine {
 
     private final ToolCapabilityPolicy capabilityPolicy = new ToolCapabilityPolicy();
     private final ToolArgumentPolicy argumentPolicy = new ToolArgumentPolicy();
+    private final ToolContextPolicy contextPolicy = new ToolContextPolicy();
     private final ToolRiskPolicy riskPolicy = new ToolRiskPolicy();
     private final ToolDurabilityPolicy durabilityPolicy = new ToolDurabilityPolicy(riskPolicy);
     private final ToolApprovalPolicy approvalPolicy = new ToolApprovalPolicy(riskPolicy);
@@ -32,6 +33,11 @@ public class ToolPolicyEngine {
         }
 
         Map<String, Object> normalizedArgs = argumentPolicy.normalize(call.args());
+        ToolContextPolicy.ContextDecision contextDecision =
+                contextPolicy.evaluate(metadata, normalizedArgs, call.contextBlocks(), actor);
+        if (!contextDecision.allowed()) {
+            return ToolPolicyDecision.deny(contextDecision.reasonCode(), contextDecision.userSafeMessage());
+        }
         ToolDurabilityPolicy.DurabilityDecision durabilityDecision =
                 durabilityPolicy.evaluate(metadata, effectiveEnvelope);
         if (durabilityDecision.required()) {

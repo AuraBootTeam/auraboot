@@ -472,6 +472,160 @@ class ChatTurnRuntimeTest {
     }
 
     @Test
+    @DisplayName("runToolLoop passes context provenance into policy and denies out-of-scope writes")
+    void runToolLoop_deniesOutOfScopeWriteUsingContextProvenance() throws Exception {
+        LlmProvider provider = mock(LlmProvider.class);
+        RecordingSink sink = new RecordingSink();
+        List<LlmChatRequest.Message> messages = new ArrayList<>();
+        messages.add(LlmChatRequest.Message.builder().role("user").content("update current customer").build());
+        LlmChatRequest.Tool writeTool = LlmChatRequest.Tool.builder()
+                .name("cmd:crm_customer_update")
+                .description("Update customer")
+                .inputSchema(Map.of("type", "object"))
+                .build();
+        ToolDefinition writeDefinition = ToolDefinition.builder()
+                .toolCode("cmd:crm_customer_update")
+                .toolType("dsl_command")
+                .riskLevel("L1")
+                .build();
+        when(provider.chat(any(LlmChatRequest.class), eq("sk-test"), eq("https://llm.test")))
+                .thenReturn(LlmChatResponse.builder()
+                        .stopReason("tool_use")
+                        .content(List.of(LlmChatResponse.ContentBlock.builder()
+                                .type("tool_use")
+                                .id("tool-out-of-scope")
+                                .name("cmd:crm_customer_update")
+                                .input(Map.of("recordId", "C-2", "name", "Renamed"))
+                                .build()))
+                        .build())
+                .thenReturn(response("I cannot update a record outside the current context."));
+        List<AgentContextBlock> contextBlocks = List.of(new AgentContextBlock(
+                "Current Record Data",
+                "{}",
+                new AgentContextProvenance(
+                        AgentContextSource.RECORD,
+                        "crm_customer/C-1",
+                        "CLIENT_SNAPSHOT",
+                        "PAGE_CONTEXT",
+                        AgentContextSensitivity.CONFIDENTIAL,
+                        List.of("C-1"),
+                        1L,
+                        "web",
+                        true)));
+        PolicyCallbacks callbacks = new PolicyCallbacks(ExecutionEnvelope.writeCatalogWithGate(), contextBlocks);
+
+        TurnOutcome outcome = runtime.runToolLoop(
+                new ChatTurnRuntime.ChatToolLoopSpec(
+                        new TurnContext("turn-context-policy", 1L, 2L, null, null, "aurabot",
+                                null, null, null, null, java.util.Set.of(), null, null, Instant.now()),
+                        "aurabot",
+                        provider,
+                        "test",
+                        "sk-test",
+                        "https://llm.test",
+                        "context policy test",
+                        "test-model",
+                        "system",
+                        256,
+                        messages,
+                        List.of(writeTool),
+                        List.of(writeDefinition),
+                        null,
+                        null,
+                        "session-context-policy",
+                        sink,
+                        false,
+                        false,
+                        2,
+                        null,
+                        "trace-context-policy",
+                        null),
+                callbacks);
+
+        assertThat(callbacks.executeCalls).isZero();
+        assertThat(sink.toolResults).hasSize(1);
+        assertThat(sink.toolResults.get(0))
+                .containsEntry("success", false)
+                .containsEntry("reasonCode", "context_scope_violation");
+        assertThat(outcome).isEqualTo(new TurnOutcome.Success(
+                "I cannot update a record outside the current context.", Map.of()));
+    }
+
+    @Test
+    @DisplayName("runToolLoop does not escalate a read tool just because another catalog tool is durable")
+    void runToolLoop_readToolInMixedCatalogDoesNotInheritDurableRequirement() throws Exception {
+        LlmProvider provider = mock(LlmProvider.class);
+        RecordingSink sink = new RecordingSink();
+        List<LlmChatRequest.Message> messages = new ArrayList<>();
+        messages.add(LlmChatRequest.Message.builder().role("user").content("summarize customers").build());
+        LlmChatRequest.Tool readTool = LlmChatRequest.Tool.builder()
+                .name("nq:crm_customer_stats")
+                .description("Customer stats")
+                .inputSchema(Map.of("type", "object"))
+                .build();
+        LlmChatRequest.Tool externalTool = LlmChatRequest.Tool.builder()
+                .name("mcp:send_email")
+                .description("Send external email")
+                .inputSchema(Map.of("type", "object"))
+                .build();
+        ToolDefinition readDefinition = ToolDefinition.builder()
+                .toolCode("nq:crm_customer_stats")
+                .toolType("dsl_query")
+                .riskLevel("L0")
+                .build();
+        ToolDefinition externalDefinition = ToolDefinition.builder()
+                .toolCode("mcp:send_email")
+                .toolType("mcp")
+                .riskLevel("L2")
+                .build();
+        when(provider.chat(any(LlmChatRequest.class), eq("sk-test"), eq("https://llm.test")))
+                .thenReturn(LlmChatResponse.builder()
+                        .stopReason("tool_use")
+                        .content(List.of(LlmChatResponse.ContentBlock.builder()
+                                .type("tool_use")
+                                .id("tool-read")
+                                .name("nq:crm_customer_stats")
+                                .input(Map.of("groupBy", "industry"))
+                                .build()))
+                        .build())
+                .thenReturn(response("Customer stats are ready."));
+        PolicyCallbacks callbacks = new PolicyCallbacks(null);
+
+        TurnOutcome outcome = runtime.runToolLoop(
+                new ChatTurnRuntime.ChatToolLoopSpec(
+                        new TurnContext("turn-mixed-catalog", 1L, 2L, null, null, "aurabot",
+                                null, null, null, null, java.util.Set.of(), null, null, Instant.now()),
+                        "aurabot",
+                        provider,
+                        "test",
+                        "sk-test",
+                        "https://llm.test",
+                        "mixed catalog policy test",
+                        "test-model",
+                        "system",
+                        256,
+                        messages,
+                        List.of(readTool, externalTool),
+                        List.of(readDefinition, externalDefinition),
+                        null,
+                        null,
+                        "session-mixed-catalog",
+                        sink,
+                        false,
+                        false,
+                        2,
+                        null,
+                        "trace-mixed-catalog",
+                        null),
+                callbacks);
+
+        assertThat(callbacks.executeCalls).isEqualTo(1);
+        assertThat(callbacks.confirmationPendings).isEmpty();
+        assertThat(outcome).isEqualTo(new TurnOutcome.Success("Customer stats are ready.", Map.of()));
+        verify(provider, times(2)).chat(any(LlmChatRequest.class), eq("sk-test"), eq("https://llm.test"));
+    }
+
+    @Test
     @DisplayName("runToolLoop passes policy decision fields into pending confirmation snapshot context")
     void runToolLoop_passesPolicyDecisionFieldsIntoPendingContext() throws Exception {
         LlmProvider provider = mock(LlmProvider.class);

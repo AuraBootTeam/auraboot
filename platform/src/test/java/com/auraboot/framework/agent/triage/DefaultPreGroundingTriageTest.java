@@ -42,23 +42,37 @@ class DefaultPreGroundingTriageTest {
     }
 
     @Test
-    @DisplayName("Rule 3 break: platform keyword overrides streak")
+    @DisplayName("Rule 3 break: durable platform keyword overrides streak")
     void rule3_platformKeywordBreaksStreak() {
         TriageVerdict v = triage.triage(new TriageRequest(
-                100L, 1L, "web", null, "更新本月销售记录", false, false, 6));
+                100L, 1L, "web", null, "批量导出本月销售记录", false, false, 6));
         assertThat(v.bucket()).isEqualTo(TriageBucket.ACP_RUN);
-        assertThat(v.reasonCodes()).contains("rule:keyword_platform_verb");
+        assertThat(v.reasonCodes()).contains("rule:keyword_platform_durable");
     }
 
     @Test
-    @DisplayName("Rule 4: CRUD verb in message → ACP_RUN")
-    void rule4_crudVerbAcpRun() {
-        for (String msg : new String[] {"创建客户", "delete record", "更新订单", "导出客户"}) {
+    @DisplayName("Rule 4: simple write intent stays in chat runtime for late tool-policy binding")
+    void rule4_simpleWriteIntentStaysInChatTurn() {
+        for (String msg : new String[] {"创建客户", "新增跟进任务", "更新订单", "create customer"}) {
+            TriageVerdict v = triage.triage(new TriageRequest(
+                    100L, 1L, "web", null, msg, true, false, 0));
+            assertThat(v.bucket())
+                    .as("message: %s", msg)
+                    .isEqualTo(TriageBucket.LIGHT_CHAT);
+            assertThat(v.reasonCodes()).contains("rule:keyword_platform_action_sync");
+        }
+    }
+
+    @Test
+    @DisplayName("Rule 4: explicitly durable platform work still enters ACP_RUN")
+    void rule4_durablePlatformIntentAcpRun() {
+        for (String msg : new String[] {"批量删除客户", "导出客户", "sync customers to external system", "bulk update records"}) {
             TriageVerdict v = triage.triage(new TriageRequest(
                     100L, 1L, "web", null, msg, true, false, 0));
             assertThat(v.bucket())
                     .as("message: %s", msg)
                     .isEqualTo(TriageBucket.ACP_RUN);
+            assertThat(v.reasonCodes()).contains("rule:keyword_platform_durable");
         }
     }
 
