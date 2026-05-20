@@ -12,9 +12,9 @@ import java.util.Set;
  *
  * <p>The router owns platform control flow. LLM triage may supply a
  * {@link TriageBucket}, but this class decides which runtime lifecycle handles
- * the turn. Named-agent turns keep the named-agent chat path. AuraBot
- * {@code ACP_RUN} and durable policy signals use the durable runtime; read-only
- * contextual answers and {@code LIGHT_CHAT} use the chat runtime.
+ * the turn. Named-agent turns keep the named-agent chat path. Durable lifecycle
+ * signals use the durable runtime; otherwise the turn stays in the synchronous
+ * chat runtime.
  */
 @Component
 public class AgentTurnRouter {
@@ -26,16 +26,16 @@ public class AgentTurnRouter {
     }
 
     public enum DecisionReason {
-        NAMED_AGENT_CODE,
-        AURABOT_DURABLE_BUCKET,
-        AURABOT_DURABLE_POLICY,
-        AURABOT_CONTEXTUAL_READ_ONLY,
-        AURABOT_LIGHT_OR_ABSENT_BUCKET
+        NAMED_AGENT_PROFILE,
+        DURABLE_TRIAGE_SIGNAL,
+        DURABLE_EXECUTION_POLICY,
+        SYNC_READ_ONLY_TURN,
+        SYNC_CHAT_TURN
     }
 
     public enum PolicySignal {
         EXPLICIT_NAMED_AGENT,
-        AURABOT_ALIAS,
+        DEFAULT_AGENT_PROFILE,
         DURABLE_TRIAGE_BUCKET,
         EXPLICIT_DURABLE_REQUEST,
         DURABLE_LIFECYCLE_SIGNAL,
@@ -97,10 +97,10 @@ public class AgentTurnRouter {
                 ? new RuntimePolicyInput(null, null, Set.of(), false, false, false, false)
                 : input;
         String normalizedAgentCode = normalizeAgentCode(effective.agentCode());
-        if (!isAuraBotPath(effective.agentCode())) {
+        if (!isDefaultAgentPath(effective.agentCode())) {
             return new RuntimeDecision(
                     RuntimeRoute.NAMED_AGENT_CHAT,
-                    DecisionReason.NAMED_AGENT_CODE,
+                    DecisionReason.NAMED_AGENT_PROFILE,
                     normalizedAgentCode,
                     effective.triageBucket(),
                     EnumSet.of(PolicySignal.EXPLICIT_NAMED_AGENT));
@@ -108,13 +108,13 @@ public class AgentTurnRouter {
         if (effective.triageBucket() == TriageBucket.ACP_RUN) {
             return new RuntimeDecision(
                     RuntimeRoute.DURABLE_RUN,
-                    DecisionReason.AURABOT_DURABLE_BUCKET,
+                    DecisionReason.DURABLE_TRIAGE_SIGNAL,
                     normalizedAgentCode,
                     effective.triageBucket(),
-                    EnumSet.of(PolicySignal.AURABOT_ALIAS, PolicySignal.DURABLE_TRIAGE_BUCKET));
+                    EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.DURABLE_TRIAGE_BUCKET));
         }
         if (effective.durablePolicyRequired()) {
-            EnumSet<PolicySignal> signals = EnumSet.of(PolicySignal.AURABOT_ALIAS);
+            EnumSet<PolicySignal> signals = EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE);
             if (effective.explicitDurableRequest()) {
                 signals.add(PolicySignal.EXPLICIT_DURABLE_REQUEST);
             }
@@ -123,7 +123,7 @@ public class AgentTurnRouter {
             }
             return new RuntimeDecision(
                     RuntimeRoute.DURABLE_RUN,
-                    DecisionReason.AURABOT_DURABLE_POLICY,
+                    DecisionReason.DURABLE_EXECUTION_POLICY,
                     normalizedAgentCode,
                     effective.triageBucket(),
                     signals);
@@ -131,29 +131,29 @@ public class AgentTurnRouter {
         if (effective.readOnlyContextualAnswer()) {
             return new RuntimeDecision(
                     RuntimeRoute.CHAT_TURN,
-                    DecisionReason.AURABOT_CONTEXTUAL_READ_ONLY,
+                    DecisionReason.SYNC_READ_ONLY_TURN,
                     normalizedAgentCode,
                     effective.triageBucket(),
-                    EnumSet.of(PolicySignal.AURABOT_ALIAS, PolicySignal.READ_ONLY_CONTEXT,
+                    EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.READ_ONLY_CONTEXT,
                             PolicySignal.CHAT_TRIAGE_BUCKET));
         }
         if (effective.triageBucket() == TriageBucket.CONTEXTUAL_ANSWER) {
             return new RuntimeDecision(
                     RuntimeRoute.DURABLE_RUN,
-                    DecisionReason.AURABOT_DURABLE_BUCKET,
+                    DecisionReason.DURABLE_TRIAGE_SIGNAL,
                     normalizedAgentCode,
                     effective.triageBucket(),
-                    EnumSet.of(PolicySignal.AURABOT_ALIAS, PolicySignal.DURABLE_TRIAGE_BUCKET));
+                    EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.DURABLE_TRIAGE_BUCKET));
         }
         return new RuntimeDecision(
                 RuntimeRoute.CHAT_TURN,
-                DecisionReason.AURABOT_LIGHT_OR_ABSENT_BUCKET,
+                DecisionReason.SYNC_CHAT_TURN,
                 normalizedAgentCode,
                 effective.triageBucket(),
-                EnumSet.of(PolicySignal.AURABOT_ALIAS, PolicySignal.CHAT_TRIAGE_BUCKET));
+                EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.CHAT_TRIAGE_BUCKET));
     }
 
-    public static boolean isAuraBotPath(String agentCode) {
+    public static boolean isDefaultAgentPath(String agentCode) {
         String normalized = normalizeAgentCode(agentCode);
         return normalized == null || "aurabot".equals(normalized);
     }

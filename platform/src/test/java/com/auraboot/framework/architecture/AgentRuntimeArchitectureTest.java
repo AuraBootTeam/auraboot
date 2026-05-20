@@ -375,6 +375,20 @@ class AgentRuntimeArchitectureTest {
     }
 
     @Test
+    @DisplayName("ChatTurnRuntime must stay adapter-neutral")
+    void chatTurnRuntimeDoesNotOwnAdapterSpecificToolBranches() throws Exception {
+        String runtime = Files.readString(MAIN_SOURCES.resolve("agent/runtime/ChatTurnRuntime.java"));
+
+        assertThat(runtime)
+                .as("ChatTurnRuntime is the generic state machine; adapter-specific tool semantics must live in callbacks")
+                .doesNotContain(
+                        "AuraBot",
+                        "AURABOT_SKILL",
+                        "aurabot:",
+                        "storeAuraBotSkillPending");
+    }
+
+    @Test
     @DisplayName("named-agent adapter must not own chat tool-loop control flow")
     void namedAgentAdapterDoesNotOwnChatToolLoopControlFlow() {
         Path namedAgentAdapter = MAIN_SOURCES.resolve("agent/service/AgentChatPortImpl.java");

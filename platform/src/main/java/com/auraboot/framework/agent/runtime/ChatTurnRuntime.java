@@ -134,6 +134,12 @@ public class ChatTurnRuntime {
             boolean persistTape) {
     }
 
+    public enum ToolResultDisposition {
+        CONTINUE,
+        REQUIRE_USER_CONFIRMATION,
+        REQUIRE_APPROVAL
+    }
+
     public interface ChatToolLoopCallbacks {
         AgentExecutionState buildRoundState(ChatToolLoopRound round);
 
@@ -142,8 +148,6 @@ public class ChatTurnRuntime {
         Map<String, Object> executeTool(ChatToolCall call);
 
         void storeConfirmationPending(PendingChatTool pending);
-
-        void storeAuraBotSkillPending(PendingChatTool pending, Map<String, Object> result);
 
         void storeApprovalPending(PendingChatTool pending, Map<String, Object> result);
 
@@ -180,6 +184,20 @@ public class ChatTurnRuntime {
 
         default boolean allowToolInCatalog(ChatToolLoopRound round, ToolDefinition definition) {
             return true;
+        }
+
+        default boolean deferPolicyUntilToolResult(ChatToolCall call, ToolDefinition definition) {
+            return false;
+        }
+
+        default ToolResultDisposition classifyToolResult(ChatToolCall call, Map<String, Object> result) {
+            return result != null && Boolean.TRUE.equals(result.get("approvalRequired"))
+                    ? ToolResultDisposition.REQUIRE_APPROVAL
+                    : ToolResultDisposition.CONTINUE;
+        }
+
+        default void storeToolResultConfirmationPending(PendingChatTool pending, Map<String, Object> result) {
+            storeConfirmationPending(pending);
         }
 
         default List<AgentContextBlock> contextBlocks(ChatToolLoopRound round) {
@@ -442,7 +460,9 @@ public class ChatTurnRuntime {
                     ToolDefinition def = findToolDef(roundContext.toolDefinitions(), toolName);
                     ToolDefinition originalDef = findToolDef(spec.toolDefinitions(), toolName);
                     ToolDefinition policyDef = def != null ? def : originalDef;
-                    boolean auraBotSkill = isAuraBotSkillTool(def);
+                    ChatToolCall toolCall = new ChatToolCall(spec.ctx(), spec.agentCode(), toolId, toolName, input,
+                            spec.toolDefinitions());
+                    boolean policyDeferredUntilResult = callbacks.deferPolicyUntilToolResult(toolCall, policyDef);
                     if (spec.handoffToolName() != null && spec.handoffToolName().equals(toolName)) {
                         runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolUseRequested(
                                 round, toolId, toolName, input, def != null && def.isRequiresConfirmation()));
@@ -454,8 +474,8 @@ public class ChatTurnRuntime {
                         }
                         return callbacks.buildHandoffOutcome(response, spec.sink(), input);
                     }
-                    if (!auraBotSkill && policyDef != null) {
-                            ToolPolicyDecision policyDecision = evaluateToolPolicy(
+                    if (!policyDeferredUntilResult && policyDef != null) {
+                        ToolPolicyDecision policyDecision = evaluateToolPolicy(
                                 envelope, roundContext, toolName, input, policyDef, spec.actorPermissions());
                         if (policyDecision.type() == ToolPolicyDecision.Type.DENY) {
                             Map<String, Object> deniedResult = deniedToolResult(policyDecision);
@@ -506,50 +526,12 @@ public class ChatTurnRuntime {
                             }
                         }
                     }
-                    boolean requiresConfirmation = def != null && def.isRequiresConfirmation();
+                    boolean requiresConfirmation = !policyDeferredUntilResult
+                            && def != null
+                            && def.isRequiresConfirmation();
                     runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolUseRequested(
                             round, toolId, toolName, input, requiresConfirmation));
                     lastRuntimeState = runtimeState;
-
-                    if (auraBotSkill) {
-                        spec.sink().onToolStart(toolId, toolName, input);
-                        Map<String, Object> result = callbacks.executeTool(
-                                new ChatToolCall(spec.ctx(), spec.agentCode(), toolId, toolName, input,
-                                        spec.toolDefinitions()));
-                        boolean success = Boolean.TRUE.equals(result.get("success"));
-                        if (isAuraBotSkillPreviewPending(result)) {
-                            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolResultRecorded(
-                                    round, toolId, toolName, result));
-                            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
-                                    round, toolId, toolName, input));
-                            lastRuntimeState = runtimeState;
-                            spec.sink().onConfirmRequired(toolId, toolName,
-                                    callbacks.buildToolDescription(toolName, input), input, spec.ctx().turnId());
-                            callbacks.storeAuraBotSkillPending(pendingContext(spec, callbacks, roundContext, toolId, toolName, input,
-                                    effectiveSystemPrompt, toolChoice, null), result);
-                            confirmationRequired = true;
-                            pendingToolId = toolId;
-                            break;
-                        }
-                        spec.sink().onToolResult(toolId, result, success);
-                        runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolResultRecorded(
-                                round, toolId, toolName, result));
-                        lastRuntimeState = runtimeState;
-                        if (isApprovalRequiredResult(result)) {
-                            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
-                                    round, toolId, toolName, input));
-                            lastRuntimeState = runtimeState;
-                            callbacks.storeApprovalPending(pendingContext(spec, callbacks, roundContext, toolId, toolName, input,
-                                    effectiveSystemPrompt, toolChoice, null), result);
-                            if (spec.persistTape()) {
-                                callbacks.persistMessages(spec.sessionId(), spec.messages());
-                            }
-                            return callbacks.buildApprovalRequiredOutcome(result, toolName, input, spec.sink());
-                        }
-                        toolResultBlocks.add(LlmMessageTapeSupport.buildToolResultBlock(
-                                spec.objectMapper(), toolId, result));
-                        continue;
-                    }
 
                     if (requiresConfirmation) {
                         String description = callbacks.buildToolDescription(toolName, input);
@@ -569,15 +551,29 @@ public class ChatTurnRuntime {
                     }
 
                     spec.sink().onToolStart(toolId, toolName, input);
-                    Map<String, Object> result = callbacks.executeTool(
-                            new ChatToolCall(spec.ctx(), spec.agentCode(), toolId, toolName, input,
-                                    spec.toolDefinitions()));
+                    Map<String, Object> result = callbacks.executeTool(toolCall);
                     boolean success = Boolean.TRUE.equals(result.get("success"));
                     spec.sink().onToolResult(toolId, result, success);
                     runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolResultRecorded(
                             round, toolId, toolName, result));
                     lastRuntimeState = runtimeState;
-                    if (isApprovalRequiredResult(result)) {
+                    ToolResultDisposition resultDisposition = callbacks.classifyToolResult(toolCall, result);
+                    if (resultDisposition == ToolResultDisposition.REQUIRE_USER_CONFIRMATION) {
+                        runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                round, toolId, toolName, input));
+                        lastRuntimeState = runtimeState;
+                        spec.sink().onConfirmRequired(toolId, toolName,
+                                callbacks.buildToolDescription(toolName, input), input, spec.ctx().turnId());
+                        callbacks.storeToolResultConfirmationPending(pendingContext(spec, callbacks, roundContext,
+                                toolId, toolName, input, effectiveSystemPrompt, toolChoice, null), result);
+                        if (spec.persistTape()) {
+                            callbacks.persistMessages(spec.sessionId(), spec.messages());
+                        }
+                        confirmationRequired = true;
+                        pendingToolId = toolId;
+                        break;
+                    }
+                    if (resultDisposition == ToolResultDisposition.REQUIRE_APPROVAL) {
                         runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
                                 round, toolId, toolName, input));
                         lastRuntimeState = runtimeState;
@@ -963,38 +959,16 @@ public class ChatTurnRuntime {
             return null;
         }
         for (ToolDefinition def : defs) {
-            if (def != null && toolName.equals(def.getToolCode())) {
+            if (def == null) {
+                continue;
+            }
+            if (toolName.equals(def.getToolCode())
+                    || toolName.equals(def.getToolName())
+                    || toolName.equals(sanitizeToolName(def.getToolCode()))) {
                 return def;
             }
         }
         return null;
-    }
-
-    private boolean isAuraBotSkillTool(ToolDefinition def) {
-        if (def == null) {
-            return false;
-        }
-        if ("AURABOT_SKILL".equals(def.getToolType())) {
-            return true;
-        }
-        String code = def.getToolCode();
-        return code != null && code.startsWith("aurabot:");
-    }
-
-    private boolean isAuraBotSkillPreviewPending(Map<String, Object> result) {
-        if (result == null) {
-            return false;
-        }
-        if (Boolean.TRUE.equals(result.get("_aurabot_skill_pending"))) {
-            return true;
-        }
-        return Boolean.TRUE.equals(result.get("approvalRequired"))
-                && result.get("previewToken") instanceof String token
-                && !token.isBlank();
-    }
-
-    private boolean isApprovalRequiredResult(Map<String, Object> result) {
-        return result != null && Boolean.TRUE.equals(result.get("approvalRequired"));
     }
 
     private void emitThinkingBlocks(LlmChatResponse aggregate, StringBuilder fallback, ResponseSink sink) {

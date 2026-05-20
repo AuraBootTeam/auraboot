@@ -334,10 +334,31 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
             }
 
             @Override
-            public void storeAuraBotSkillPending(ChatTurnRuntime.PendingChatTool pending,
-                                                 Map<String, Object> result) {
-                suspendForAurabotSkill(ctx, basis, pending.messages(), pending.toolId(),
-                        pending.toolName(), pending.input(), result, pending.round());
+            public boolean deferPolicyUntilToolResult(ChatTurnRuntime.ChatToolCall call, ToolDefinition definition) {
+                return isAurabotSkillTool(call != null ? call.toolName() : null);
+            }
+
+            @Override
+            public ChatTurnRuntime.ToolResultDisposition classifyToolResult(ChatTurnRuntime.ChatToolCall call,
+                                                                            Map<String, Object> result) {
+                if (isAurabotSkillPreviewPending(call != null ? call.toolName() : null, result)) {
+                    return ChatTurnRuntime.ToolResultDisposition.REQUIRE_USER_CONFIRMATION;
+                }
+                if (result != null && Boolean.TRUE.equals(result.get("approvalRequired"))) {
+                    return ChatTurnRuntime.ToolResultDisposition.REQUIRE_APPROVAL;
+                }
+                return ChatTurnRuntime.ToolResultDisposition.CONTINUE;
+            }
+
+            @Override
+            public void storeToolResultConfirmationPending(ChatTurnRuntime.PendingChatTool pending,
+                                                           Map<String, Object> result) {
+                if (isAurabotSkillPreviewPending(pending.toolName(), result)) {
+                    suspendForAurabotSkill(ctx, basis, pending.messages(), pending.toolId(),
+                            pending.toolName(), pending.input(), result, pending.round());
+                    return;
+                }
+                storeConfirmationPending(pending);
             }
 
             @Override

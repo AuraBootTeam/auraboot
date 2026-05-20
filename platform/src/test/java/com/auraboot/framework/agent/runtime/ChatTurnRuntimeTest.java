@@ -675,10 +675,6 @@ class ChatTurnRuntimeTest {
         }
 
         @Override
-        public void storeAuraBotSkillPending(ChatTurnRuntime.PendingChatTool pending, Map<String, Object> result) {
-        }
-
-        @Override
         public void storeApprovalPending(ChatTurnRuntime.PendingChatTool pending, Map<String, Object> result) {
         }
 
