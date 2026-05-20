@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.cache.MetaCacheKeyGenerator;
+import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
@@ -123,6 +124,21 @@ public class UserPermissionServiceImpl implements UserPermissionService {
             memberId, userId, permissionIds.size());
 
         return permissionIds;
+    }
+
+    @Override
+    public Set<String> getUserPermissionCodes(Long userId) {
+        if (userId == null) {
+            return Collections.emptySet();
+        }
+        Set<Long> permissionIds = getUserPermissionIds(userId);
+        if (permissionIds == null || permissionIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return permissionMapper.findByIds(new ArrayList<>(permissionIds)).stream()
+                .map(Permission::getCode)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
     
     /**

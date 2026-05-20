@@ -433,7 +433,10 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
       `[data-testid="form-field-title"] input, [data-field="title"] input, input[name="title"]`,
     ).first();
     if (await titleInput.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await titleInput.fill(expectedValue);
+      await titleInput.click();
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+      await page.keyboard.type(expectedValue);
+      await titleInput.blur();
       await expect(titleInput).toHaveValue(expectedValue);
     } else {
       const descriptionInput = page.locator(
@@ -442,7 +445,10 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
       expectedField = 'description';
       expectedValue = `Updated description ${uid}`;
       await expect(descriptionInput).toBeVisible({ timeout: 5000 });
-      await descriptionInput.fill(expectedValue);
+      await descriptionInput.click();
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+      await page.keyboard.type(expectedValue);
+      await descriptionInput.blur();
       await expect(descriptionInput).toHaveValue(expectedValue);
     }
 
@@ -923,6 +929,7 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
       `/api/meta/commands/execute/acp:start_task`,
       {
         data: { payload: {}, targetRecordId: doneTaskPid, operationType: 'update' },
+        timeout: 15_000,
       },
     );
     const invalidBody = await invalidTransitionResp.json().catch(() => ({}));

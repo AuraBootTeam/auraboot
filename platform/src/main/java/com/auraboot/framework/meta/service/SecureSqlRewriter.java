@@ -79,9 +79,17 @@ public class SecureSqlRewriter {
             
             Select select = (Select) stmt;
             
+            PlainSelect plainSelect;
+            try {
+                plainSelect = select.getPlainSelect();
+            } catch (ClassCastException e) {
+                String wrappedSql = "SELECT COUNT(*) FROM (" + originalSql + ") AS count_subquery";
+                log.debug("Wrapped non-plain SELECT for COUNT: {}", wrappedSql);
+                return wrappedSql;
+            }
+
             // 获取SelectBody - 使用新API
-            if (select.getPlainSelect() != null) {
-                PlainSelect plainSelect = select.getPlainSelect();
+            if (plainSelect != null) {
                 
                 // 创建COUNT(*)函数
                 Function countFunction = new Function();
@@ -275,7 +283,9 @@ public class SecureSqlRewriter {
             return sql;
         }
         String restored = sql;
-        for (Map.Entry<String, String> entry : placeholderMap.entrySet()) {
+        List<Map.Entry<String, String>> entries = new ArrayList<>(placeholderMap.entrySet());
+        entries.sort((left, right) -> Integer.compare(right.getKey().length(), left.getKey().length()));
+        for (Map.Entry<String, String> entry : entries) {
             restored = restored.replace(entry.getKey(), entry.getValue());
         }
         return restored;

@@ -1,5 +1,8 @@
 package com.auraboot.framework.view.service;
 
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.DataNotFoundException;
+import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -109,7 +112,7 @@ public class ViewShareService {
         // PostgreSQL returns column aliases in lowercase
         Map<String, Object> viewMeta = savedViewMapper.findRawViewByShareToken(shareToken);
         if (viewMeta == null || viewMeta.isEmpty()) {
-            throw new RuntimeException("Share link not found");
+            throw new DataNotFoundException(ResponseCode.NOT_FOUND, "Share link not found");
         }
 
         // Parse raw view_config JSON to access __share metadata
@@ -119,20 +122,20 @@ public class ViewShareService {
         @SuppressWarnings("unchecked")
         Map<String, Object> share = (Map<String, Object>) config.get("__share");
         if (share == null || !Boolean.TRUE.equals(share.get("active"))) {
-            throw new RuntimeException("Share link has been revoked");
+            throw new ValidationException(ResponseCode.BadParam, "Share link has been revoked");
         }
 
         // Check expiration
         String expiresAt = (String) share.get("expiresAt");
         if (expiresAt != null && Instant.parse(expiresAt).isBefore(Instant.now())) {
-            throw new RuntimeException("Share link has expired");
+            throw new ValidationException(ResponseCode.BadParam, "Share link has expired");
         }
 
         // Check password
         String storedHash = (String) share.get("passwordHash");
         if (storedHash != null) {
             if (password == null || !hashPassword(password).equals(storedHash)) {
-                throw new RuntimeException("Invalid password");
+                throw new ValidationException(ResponseCode.BadParam, "Invalid password");
             }
         }
 

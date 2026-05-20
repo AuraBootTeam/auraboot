@@ -171,6 +171,7 @@ async function fillField(page: Page, fieldCode: string, value: string): Promise<
   await input.waitFor({ state: 'visible', timeout: 10_000 });
   await input.click();
   await input.fill(value);
+  await input.blur();
 }
 
 async function clickSubmit(page: Page): Promise<unknown> {
@@ -385,15 +386,30 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     await expect(cronInput).toBeVisible({ timeout: 10_000 });
     await expect(cronInput).toHaveValue(/0 0 2/, { timeout: 5_000 });
 
-    await cronInput.click();
-    await cronInput.fill(CRON_EDITED);
+    await fillField(page, 'cron_expression', CRON_EDITED);
+    await expect(cronInput).toHaveValue(CRON_EDITED, { timeout: 5_000 });
     await fillField(page, 'description', TASK_DESCRIPTION_EDITED);
 
     const commandResponse = await clickSubmit(page);
     const body = await (commandResponse as any).json().catch(() => ({}));
     expect(String(body?.code), 'update command should succeed').toBe('0');
 
-    // Reopen detail and verify
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get(`/api/dynamic/scheduled_task/${taskPid}`);
+          if (!resp.ok()) return null;
+          const json = await resp.json().catch(() => null);
+          return {
+            cron: json?.data?.cron_expression ?? null,
+            description: json?.data?.description ?? null,
+          };
+        },
+        { timeout: 10_000, message: 'scheduled_task update should persist in backend' },
+      )
+      .toEqual({ cron: CRON_EDITED, description: TASK_DESCRIPTION_EDITED });
+
+    // Reopen detail and verify visible business values.
     await navigateToScheduledTaskDetail(page, taskPid);
     const main = page.locator('main, [role="main"]').first();
     await expect(main.getByText(/0 30 3 \* \* \?/).first()).toBeVisible({ timeout: 5_000 });

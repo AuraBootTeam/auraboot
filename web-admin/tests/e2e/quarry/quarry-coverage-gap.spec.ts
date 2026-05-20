@@ -83,7 +83,7 @@ test.describe('Quarry Coverage Gap Guards @smoke', () => {
     // TODO: implement schedule-deviation, milestone, client, subcontractor models and tabs
   });
 
-  test.fixme('CG-003: CC contract lifecycle tabs and row actions are all operable', async ({ page }) => {
+  test('CG-003: CC contract lifecycle tabs and row actions are all operable', async ({ page }) => {
     const name = `CG CC ${uniqueId()}`;
     const create = await executeCommandViaApi(page, 'cc:create_contract', {
       cc_contract_name: name,

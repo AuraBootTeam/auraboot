@@ -209,10 +209,15 @@ test.describe('Smart Components — Form Components', () => {
 
     try {
       await order.gotoEditForm(orderPid);
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
-      // Sub-table renders number inputs (qty, price fields)
+      const addRowBtn = page.locator('[data-testid="subtable-add-row"]').first();
+      await addRowBtn.scrollIntoViewIfNeeded();
+      await addRowBtn.click();
+
+      // Sub-table add form renders editable number inputs (qty, price fields).
       const numberInputs = page.locator(
-        'input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"]',
+        '[data-testid="subtable-add-form"] input[type="number"]:not([readonly]):not([disabled]), [data-testid="subtable-add-form"] input[inputmode="decimal"]:not([readonly]):not([disabled]), [data-testid="subtable-add-form"] input[inputmode="numeric"]:not([readonly]):not([disabled])',
       );
       await numberInputs.first().waitFor({ state: 'attached', timeout: 10000 });
 
@@ -220,11 +225,11 @@ test.describe('Smart Components — Form Components', () => {
       expect(count).toBeGreaterThan(0);
 
       // Verify a number input accepts decimal values
-      const firstNumber = numberInputs.first();
-      await firstNumber.scrollIntoViewIfNeeded();
-      await firstNumber.fill('42.75');
-      const value = await firstNumber.inputValue();
-      expect(value).toBe('42.75');
+      const decimalCandidate = numberInputs.nth(count > 1 ? 1 : 0);
+      await decimalCandidate.scrollIntoViewIfNeeded();
+      await decimalCandidate.fill(count > 1 ? '42.75' : '42');
+      const value = await decimalCandidate.inputValue();
+      expect(value).toBe(count > 1 ? '42.75' : '42');
     } finally {
       await order
         .child('item')

@@ -148,7 +148,7 @@ test.describe('Sales — Shipment Lifecycle', () => {
       if (!warehousePid) {
         const whResult = await executeCommandViaApi(
           page,
-          'pe:create_warehouse',
+          'inv:create_warehouse',
           {
             inv_warehouse_name: `SHTestWarehouse_${UID}`,
             inv_warehouse_code: `WH${UID}`,

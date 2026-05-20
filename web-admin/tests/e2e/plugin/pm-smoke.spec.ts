@@ -168,23 +168,13 @@ test.describe('PM Smoke Tests', () => {
   // PM-SMOKE-06: Switch to list view → at least 1 row visible
   test('project workspace list view shows task rows', async ({ page }) => {
     // Navigate directly to project workspace
-    const taskListPromise = page.waitForResponse(
-      (resp) => resp.url().includes('/api/dynamic/pm_task/list') && resp.status() === 200,
-      { timeout: 10000 },
-    );
     await page.goto(`/project-management/projects/${projectPid}`, {
       waitUntil: 'domcontentloaded',
     });
-    await taskListPromise;
+    await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
-    // Click "List" tab — set up response listener BEFORE clicking
-    const listTab = page.locator('button', { hasText: /List|列表/ });
-    const listViewPromise = page.waitForResponse(
-      (resp) => resp.url().includes('/api/dynamic/pm_task/list') && resp.status() === 200,
-      { timeout: 10000 },
-    );
-    await listTab.first().click();
-    await listViewPromise;
+    await page.getByTestId('view-list').click();
+    await expect(page.getByTestId('task-list-view')).toBeVisible({ timeout: 10000 });
 
     // Should show task row(s)
     const taskRow = page.locator('text=SmokeTask');
@@ -194,23 +184,14 @@ test.describe('PM Smoke Tests', () => {
   // PM-SMOKE-07: Members tab shows member list
   test('project workspace members tab shows members', async ({ page }) => {
     // Navigate to project workspace
-    const taskListPromise = page.waitForResponse(
-      (resp) => resp.url().includes('/api/dynamic/pm_task/list') && resp.status() === 200,
-      { timeout: 10000 },
-    );
     await page.goto(`/project-management/projects/${projectPid}`, {
       waitUntil: 'domcontentloaded',
     });
-    await taskListPromise;
+    await expect(page.getByTestId('project-workspace')).toBeVisible({ timeout: 15000 });
 
     // Click "Members" tab
     const membersTab = page.locator('button', { hasText: /Members|成员/ });
-    const memberListPromise = page.waitForResponse(
-      (resp) => resp.url().includes('/api/dynamic/pm_project_member/list') && resp.status() === 200,
-      { timeout: 10000 },
-    );
     await membersTab.first().click();
-    await memberListPromise;
 
     // Members tab should render — show member list or empty state + add button
     const memberContent = page.locator('text=/项目成员|Members|暂无|添加成员|Add Member/i');

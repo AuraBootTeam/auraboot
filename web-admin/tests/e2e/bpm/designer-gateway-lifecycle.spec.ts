@@ -62,6 +62,39 @@ const COND_HIGH = '${amount > 100}';
 // ---------------------------------------------------------------------------
 let processPid = '';
 let adminToken = '';
+const startedInstanceIds: string[] = [];
+
+function isTerminalInstanceStatus(status: unknown): boolean {
+  return /^(completed|terminated|aborted|cancelled|canceled|withdrawn)$/i.test(String(status ?? ''));
+}
+
+async function terminateInstanceIfActive(
+  request: APIRequestContext,
+  token: string,
+  instanceId: string,
+): Promise<void> {
+  const statusResp = await request.get(`/api/bpm/process-instances/${instanceId}/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (statusResp.ok()) {
+    const statusBody = await statusResp.json();
+    if (isTerminalInstanceStatus(statusBody?.data?.status)) {
+      return;
+    }
+  }
+
+  const terminateResp = await request.post(`/api/bpm/process-instances/${instanceId}/terminate`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    data: { reason: 'E2E cleanup' },
+  });
+  expect(
+    terminateResp.ok(),
+    `terminate ${instanceId} before undeploy must succeed: ${terminateResp.status()} ${await terminateResp.text()}`,
+  ).toBe(true);
+}
 
 // ---------------------------------------------------------------------------
 // Helper: sidebar navigation to the BPM process list
@@ -183,8 +216,8 @@ function buildGatewayBpmnXml(processKey: string, processName: string): string {
 
 /**
  * Designer JSON (React Flow nodes + edges) matching the BPMN above.
- * Conditions start empty on the gateway edges so B1 can fill them via
- * the real UI ConditionExpressionEditor.
+ * Gateway edges carry explicit conditions because the designer now rejects
+ * incomplete exclusiveGateway definitions before they reach React Flow.
  */
 function buildGatewayDesignerJson() {
   return {
@@ -197,8 +230,20 @@ function buildGatewayDesignerJson() {
     ],
     edges: [
       { id: 'e_start_gw', source: 'start', target: 'gw', type: 'smoothstep', data: { label: '' } },
-      { id: 'e_gw_hr', source: 'gw', target: 'hr_approve', type: 'conditional', data: { label: 'low' } },
-      { id: 'e_gw_manager', source: 'gw', target: 'manager_approve', type: 'conditional', data: { label: 'high' } },
+      {
+        id: 'e_gw_hr',
+        source: 'gw',
+        target: 'hr_approve',
+        type: 'conditional',
+        data: { label: 'low', condition: { type: 'expression', content: COND_LOW } },
+      },
+      {
+        id: 'e_gw_manager',
+        source: 'gw',
+        target: 'manager_approve',
+        type: 'conditional',
+        data: { label: 'high', condition: { type: 'expression', content: COND_HIGH } },
+      },
       { id: 'e_hr_end', source: 'hr_approve', target: 'end', type: 'smoothstep', data: { label: '' } },
       { id: 'e_manager_end', source: 'manager_approve', target: 'end', type: 'smoothstep', data: { label: '' } },
     ],
@@ -260,8 +305,20 @@ async function seedGatewayGraph(page: Page): Promise<void> {
     // Edges — no condition on structural edges, conditions only on gateway outs
     state.addEdge({ id: 'e_start_submit', source: 'start', target: 'submit_form', type: 'smoothstep', data: { label: '' } });
     state.addEdge({ id: 'e_submit_gw', source: 'submit_form', target: 'gw', type: 'smoothstep', data: { label: '' } });
-    state.addEdge({ id: 'e_gw_hr', source: 'gw', target: 'hr_approve', type: 'conditional', data: { label: 'low' } });
-    state.addEdge({ id: 'e_gw_manager', source: 'gw', target: 'manager_approve', type: 'conditional', data: { label: 'high' } });
+    state.addEdge({
+      id: 'e_gw_hr',
+      source: 'gw',
+      target: 'hr_approve',
+      type: 'conditional',
+      data: { label: 'low', condition: { type: 'expression', content: COND_LOW } },
+    });
+    state.addEdge({
+      id: 'e_gw_manager',
+      source: 'gw',
+      target: 'manager_approve',
+      type: 'conditional',
+      data: { label: 'high', condition: { type: 'expression', content: COND_HIGH } },
+    });
     state.addEdge({ id: 'e_hr_end', source: 'hr_approve', target: 'end', type: 'smoothstep', data: { label: '' } });
     state.addEdge({ id: 'e_manager_end', source: 'manager_approve', target: 'end', type: 'smoothstep', data: { label: '' } });
   });
@@ -536,6 +593,7 @@ test.describe('BPM Designer Gateway Full Lifecycle', { tag: ['@bpm-regression'] 
       variables: { amount: 50 },
     });
     expect(started.instanceId).toBeTruthy();
+    startedInstanceIds.push(started.instanceId);
 
     // UI nav: sidebar → Task Center
     await navigateToTaskCenter(page);
@@ -606,6 +664,7 @@ test.describe('BPM Designer Gateway Full Lifecycle', { tag: ['@bpm-regression'] 
       variables: { amount: 500 },
     });
     expect(started.instanceId).toBeTruthy();
+    startedInstanceIds.push(started.instanceId);
 
     await navigateToTaskCenter(page);
 
@@ -652,41 +711,17 @@ test.describe('BPM Designer Gateway Full Lifecycle', { tag: ['@bpm-regression'] 
   });
 
   // =========================================================================
-  // B2c: cleanup — undeploy test process (idempotent)
+  // B2c: cleanup — terminate started instances, then undeploy test process
   // =========================================================================
-  test('B2c: undeploy test process (cleanup, best-effort)', async ({ request }) => {
+  test('B2c: terminate instances and undeploy test process (cleanup)', async ({ request }) => {
     expect(processPid, 'processPid must be set from B1').toBeTruthy();
-    // Best-effort: backend rejects undeploy while running instances remain
-    // (500: "Cannot undeploy: N running instance(s)"). That's expected for
-    // this suite — the 2 instances started in B2 + B2b are still at their
-    // respective userTask nodes. Just record the outcome; env-reset handles
-    // true cleanup between runs.
-    const { ok, status } = await undeployProcess(request, adminToken, processPid);
-    expect([200, 204, 500], `undeploy response ${status} must be ok-or-running-blocked`).toContain(
-      status,
-    );
-    if (!ok) {
-      // Terminate known instances so later CI runs don't accumulate debt.
-      // Terminate endpoint: POST /api/bpm/process-instances/{id}/terminate
-      for (const bk of [BK_LOW, BK_HIGH]) {
-        const statusResp = await request.get(
-          `/api/bpm/process-instances/by-business-key/status?businessKey=${encodeURIComponent(bk)}&processKey=${encodeURIComponent(PROCESS_KEY)}`,
-          { headers: { Authorization: `Bearer ${adminToken}` } },
-        );
-        if (!statusResp.ok()) continue;
-        const body = await statusResp.json();
-        const instanceId = body?.data?.instanceId ?? body?.data?.processInstanceId;
-        if (!instanceId) continue;
-        await request.post(`/api/bpm/process-instances/${instanceId}/terminate`, {
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-            'Content-Type': 'application/json',
-          },
-          data: { reason: 'E2E cleanup' },
-        });
-      }
-      // Retry undeploy once; still best-effort if it fails.
-      await undeployProcess(request, adminToken, processPid);
+
+    for (const instanceId of startedInstanceIds) {
+      await terminateInstanceIfActive(request, adminToken, instanceId);
     }
+
+    const { ok, status } = await undeployProcess(request, adminToken, processPid);
+    expect(ok, `undeploy after terminate must succeed: ${status}`).toBe(true);
+    expect([200, 204], `undeploy response ${status} must be successful`).toContain(status);
   });
 });

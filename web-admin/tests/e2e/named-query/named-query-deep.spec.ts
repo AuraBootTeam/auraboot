@@ -31,7 +31,8 @@ test.describe('Named Query Deep', () => {
   let queryPid: string | null = null;
   let queryCode: string | null = null;
   const testCode = generateCode();
-  const joinSql = 'ab_meta_model m LEFT JOIN ab_meta_field f ON m.id = f.model_id';
+  const joinSql =
+    'ab_meta_model m LEFT JOIN ab_meta_model_field_binding b ON m.id = b.model_id LEFT JOIN ab_meta_field f ON f.id = b.field_id';
 
   async function ensureBaseQuery(page: import('@playwright/test').Page): Promise<void> {
     if (queryPid && queryCode) return;
@@ -138,7 +139,7 @@ test.describe('Named Query Deep', () => {
     await expect(nq.codeInput).toBeVisible({ timeout: 10000 });
 
     const aggSql =
-      'SELECT COUNT(*) AS total_count, COUNT(DISTINCT model_type) AS type_count FROM ab_meta_model';
+      'SELECT COUNT(*) AS total_count, COUNT(DISTINCT source_type) AS type_count FROM ab_meta_model';
     await nq.fillCreateForm(aggCode, 'E2E Aggregate Test', 'Aggregate query', aggSql);
 
     const resp = await nq.submitCreate();
@@ -171,8 +172,8 @@ test.describe('Named Query Deep', () => {
     await page.request
       .post(`/api/meta/named-queries/${queryCode}/fields`, {
         data: {
-          fieldCode: 'model_type',
-          columnExpr: 'm.model_type',
+          fieldCode: 'source_type',
+          columnExpr: 'm.source_type',
           dataType: 'string',
           searchable: true,
           sortable: true,
@@ -193,7 +194,7 @@ test.describe('Named Query Deep', () => {
     const fieldsData = await fieldsResp.json().catch(() => ({}) as any);
     const fields = Array.isArray(fieldsData?.data) ? fieldsData.data : [];
     const hasField = fields.some(
-      (f: any) => String(f?.fieldCode ?? f?.code ?? '') === 'model_type',
+      (f: any) => String(f?.fieldCode ?? f?.code ?? '') === 'source_type',
     );
     expect(hasField).toBe(true);
 
@@ -205,7 +206,7 @@ test.describe('Named Query Deep', () => {
       .catch(() => false);
     const hasFieldText = await page
       .locator('main')
-      .getByText(/model_type|模型类型|Model Type/i)
+      .getByText(/source_type|来源类型|Source Type/i)
       .first()
       .isVisible({ timeout: 3000 })
       .catch(() => false);
@@ -482,7 +483,7 @@ test.describe('Named Query Deep', () => {
       data: {
         page: 1,
         size: 5,
-        params: { model_type: "'; DROP TABLE ab_meta_model; --" },
+        params: { source_type: "'; DROP TABLE ab_meta_model; --" },
       },
     });
 
@@ -572,7 +573,7 @@ test.describe('Named Query Deep', () => {
 
       if (queryCode) {
         await request
-          .delete(`/api/meta/named-queries/${queryCode}/fields/model_type`)
+          .delete(`/api/meta/named-queries/${queryCode}/fields/source_type`)
           .catch(() => {});
         await request.delete(`/api/meta/named-queries/${queryCode}/fields/code`).catch(() => {});
       }

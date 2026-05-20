@@ -1250,6 +1250,13 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
      * 将MetaModel实体转换为MetaModelDTO
      */
     private MetaModelDTO convertToMetaModelDTO(Model model) {
+        Integer fieldCount = model.getId() != null
+                ? fieldBindingMapper.countUserFieldsByModelId(model.getId())
+                : 0;
+        return convertToMetaModelDTO(model, fieldCount);
+    }
+
+    private MetaModelDTO convertToMetaModelDTO(Model model, Integer fieldCount) {
         return MetaModelDTO.builder()
                 .id(model.getId())
                 .pid(model.getPid())
@@ -1264,15 +1271,31 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .sourceType(model.getSourceType())
                 .sourceRef(model.getSourceRef())
                 .extension(convertExtensionToMap(model.getExtension()))
-                .fieldCount(model.getId() != null
-                        ? fieldBindingMapper.countUserFieldsByModelId(model.getId())
-                        : 0)
+                .fieldCount(fieldCount != null ? fieldCount : 0)
                 .version(model.getVersion())
                 .isCurrent(model.getIsCurrent())
                 .status(model.getStatus() != null ? model.getStatus() : null)
                 .createdAt(DateUtil.toUtcLocalDateTime(model.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(model.getUpdatedAt()))
                 .build();
+    }
+
+    private Map<Long, Integer> loadUserFieldCountsByModelId(List<Model> models) {
+        List<Long> modelIds = models.stream()
+                .map(Model::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (modelIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return fieldBindingMapper.countUserFieldsByModelIds(modelIds).stream()
+                .filter(row -> row.getModelId() != null)
+                .collect(Collectors.toMap(
+                        MetaModelFieldBindingMapper.ModelFieldCount::getModelId,
+                        row -> row.getFieldCount() != null ? row.getFieldCount() : 0,
+                        (left, right) -> right
+                ));
     }
 
     /**
@@ -1933,9 +1956,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 searchKeyword, modelType, status, sourceType, sortField, sortOrder, currentOnly, offset, size
         );
 
+        Map<Long, Integer> fieldCountsByModelId = loadUserFieldCountsByModelId(models);
+
         // Convert to DTOs
         List<MetaModelDTO> dtos = models.stream()
-                .map(this::convertToMetaModelDTO)
+                .map(model -> convertToMetaModelDTO(
+                        model,
+                        model.getId() != null ? fieldCountsByModelId.getOrDefault(model.getId(), 0) : 0
+                ))
                 .collect(Collectors.toList());
 
         // Build page result

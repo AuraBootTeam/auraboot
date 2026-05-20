@@ -26,9 +26,81 @@
  * from this file. New code should import from `helpers/environments`.
  */
 
-const BE_PORT = process.env.BE_PORT ?? '6443';
-const VITE_PORT = process.env.VITE_PORT ?? '5173';
-const BFF_PORT = process.env.BFF_PORT ?? '3500';
+const DEFAULT_BE_PORT = '6443';
+const DEFAULT_VITE_PORT = '5173';
+const DEFAULT_BFF_PORT = '3500';
+
+const BE_PORT = process.env.BE_PORT ?? DEFAULT_BE_PORT;
+const VITE_PORT = process.env.VITE_PORT ?? DEFAULT_VITE_PORT;
+const BFF_PORT = process.env.BFF_PORT ?? DEFAULT_BFF_PORT;
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+function hasEnv(name: string): boolean {
+  return typeof process.env[name] === 'string' && process.env[name]!.trim().length > 0;
+}
+
+function localhostPort(urlValue: string | undefined): string | null {
+  if (!urlValue) {
+    return null;
+  }
+  try {
+    const url = new URL(urlValue);
+    if (!LOCAL_HOSTS.has(url.hostname)) {
+      return null;
+    }
+    if (url.port) {
+      return url.port;
+    }
+    if (url.protocol === 'https:') {
+      return '443';
+    }
+    if (url.protocol === 'http:') {
+      return '80';
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function assertMatchingLocalPort(urlName: string, portName: string): void {
+  const port = process.env[portName];
+  const urlPort = localhostPort(process.env[urlName]);
+  if (port && urlPort && urlPort !== port) {
+    throw new Error(
+      `[E2E env] ${urlName} port ${urlPort} does not match ${portName}=${port}. ` +
+        'Use one coherent targeted Docker env block.',
+    );
+  }
+}
+
+function assertTargetedDockerEnvContract(): void {
+  if (process.env.PW_SKIP_WEBSERVER !== '1' || !hasEnv('PLAYWRIGHT_BASE_URL')) {
+    return;
+  }
+
+  const basePort = localhostPort(process.env.PLAYWRIGHT_BASE_URL);
+  if (!basePort || basePort === DEFAULT_VITE_PORT) {
+    return;
+  }
+
+  const missing = ['BACKEND_URL', 'BE_PORT', 'BFF_PORT'].filter((name) => !hasEnv(name));
+  if (missing.length > 0) {
+    throw new Error(
+      `[E2E env] Targeted Docker Playwright run against ${process.env.PLAYWRIGHT_BASE_URL} ` +
+        `requires ${missing.join(', ')}. Example: ` +
+        'PLAYWRIGHT_BASE_URL=http://localhost:<vite> ' +
+        'BACKEND_URL=http://localhost:<backend> ' +
+        'BE_PORT=<backend> BFF_PORT=<bff> PW_SKIP_WEBSERVER=1',
+    );
+  }
+
+  assertMatchingLocalPort('BACKEND_URL', 'BE_PORT');
+  assertMatchingLocalPort('BFF_URL', 'BFF_PORT');
+}
+
+assertTargetedDockerEnvContract();
 
 function envValue(primary: string, alias: string, fallback: string): string {
   return process.env[primary] ?? process.env[alias] ?? fallback;

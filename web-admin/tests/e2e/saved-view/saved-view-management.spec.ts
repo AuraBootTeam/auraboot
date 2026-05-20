@@ -34,8 +34,17 @@ async function createViewViaApi(
   return body.data?.pid ?? body.pid ?? '';
 }
 
-async function deleteViewViaApi(page: Page, pid: string): Promise<void> {
-  await page.request.delete(`/api/views/${pid}`).catch(() => {});
+async function deleteViewViaApi(
+  page: Page,
+  pid: string,
+  options: { allowMissing?: boolean } = {},
+): Promise<void> {
+  const resp = await page.request.delete(`/api/views/${pid}`);
+  if (resp.ok() || (options.allowMissing && resp.status() === 404)) {
+    return;
+  }
+  const body = await resp.text().catch(() => '<body unavailable>');
+  throw new Error(`deleteViewViaApi(${pid}) failed: HTTP ${resp.status()} ${body}`);
 }
 
 async function listViewsViaApi(page: Page, modelCode: string): Promise<any[]> {
@@ -51,7 +60,7 @@ test.describe('SavedView — Management', () => {
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
     for (const pid of createdViewPids) {
-      await deleteViewViaApi(page, pid);
+      await deleteViewViaApi(page, pid, { allowMissing: true }).catch(() => {});
     }
     await page.close();
   });
@@ -73,6 +82,7 @@ test.describe('SavedView — Management', () => {
     const pid = await createViewViaApi(page, 'e2et_order', viewName);
     expect(pid).toBeTruthy();
     if (pid) {
+      createdViewPids.push(pid);
       await deleteViewViaApi(page, pid);
       // Verify it's gone
       const views = await listViewsViaApi(page, 'e2et_order');

@@ -295,10 +295,15 @@ export async function startProcessFromAction(
   };
   const result = await post<Record<string, unknown>>('/api/bpm/process-instances', body);
   if (!isSuccess(result.code) || !result.data) {
-    throw new Error(
+    const error = new Error(
       result.desc ||
         `BPM start failed: empty response for processDefinitionKey=${request.processDefinitionKey}`,
     );
+    Object.assign(error, {
+      code: result.code,
+      context: result.context ?? null,
+    });
+    throw error;
   }
   const data = result.data;
   const processInstanceId = data.instanceId as string | undefined;
