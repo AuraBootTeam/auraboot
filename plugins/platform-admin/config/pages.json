@@ -1815,7 +1815,8 @@
             "action": {
               "type": "command",
               "command": "admin:delete_scheduled_task"
-            }
+            },
+            "type": "command"
           }
         ],
         "defaultSort": {

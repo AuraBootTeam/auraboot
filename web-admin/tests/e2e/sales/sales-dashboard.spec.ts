@@ -14,7 +14,13 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, todayStr, dateOffsetStr, executeCommandViaApi } from '../helpers/index';
+import {
+  uniqueId,
+  todayStr,
+  dateOffsetStr,
+  executeCommandViaApi,
+  expectCollectionViewVisible,
+} from '../helpers/index';
 
 test.describe('Sales Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -142,8 +148,6 @@ test.describe('Sales Dashboard @smoke', () => {
   test('SL-DASH-05: Dashboard renders data-table blocks', async ({ page }) => {
     await gotoDashboard(page);
 
-    const tables = page.locator('table, [role="table"]');
-    const tableCount = await tables.count();
-    expect(tableCount, 'Dashboard should render data tables').toBeGreaterThanOrEqual(1);
+    await expectCollectionViewVisible(page);
   });
 });

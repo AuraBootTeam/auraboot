@@ -33,15 +33,6 @@ function dateAt(monthOffset: number, dayOffset = 0): string {
   return d.toISOString().split('T')[0];
 }
 
-/** Return full ISO-8601 datetime for DATETIME fields */
-function dateTimeAt(monthOffset: number, dayOffset = 0): string {
-  const d = new Date(baseDate());
-  d.setMonth(d.getMonth() + monthOffset);
-  d.setDate(d.getDate() + dayOffset);
-  d.setHours(9, 0, 0, 0);
-  return d.toISOString();
-}
-
 /** Return a datetime string */
 function datetimeAt(monthOffset: number, dayOffset = 0, hour = 9): string {
   const d = new Date(baseDate());
@@ -49,6 +40,40 @@ function datetimeAt(monthOffset: number, dayOffset = 0, hour = 9): string {
   d.setDate(d.getDate() + dayOffset);
   d.setHours(hour, Math.floor(Math.random() * 60), 0, 0);
   return d.toISOString();
+}
+
+let opportunityCloseDateType: string | undefined;
+
+async function getModelFieldDataType(page: any, modelCode: string, fieldCode: string): Promise<string | undefined> {
+  const modelResp = await page.request.get(`/api/meta/models/code/${encodeURIComponent(modelCode)}`);
+  const modelJson = await modelResp.json().catch(() => ({}));
+  const model = modelJson?.data ?? modelJson;
+  const modelPid = model?.pid ?? model?.modelPid;
+  if (!modelPid) {
+    return undefined;
+  }
+
+  const fieldsResp = await page.request.get(`/api/meta/models/${modelPid}/fields`);
+  const fieldsJson = await fieldsResp.json().catch(() => ({}));
+  const fieldsData = fieldsJson?.data ?? fieldsJson;
+  const fields = Array.isArray(fieldsData)
+    ? fieldsData
+    : (fieldsData?.records ?? fieldsData?.items ?? fieldsData?.content ?? []);
+  const field = fields.find((item: any) => (
+    item?.code === fieldCode ||
+    item?.fieldCode === fieldCode ||
+    item?.field?.code === fieldCode
+  ));
+  return field?.dataType ?? field?.data_type ?? field?.field?.dataType ?? field?.field?.data_type;
+}
+
+async function opportunityCloseDateValue(page: any, date: string): Promise<string> {
+  opportunityCloseDateType ??= await getModelFieldDataType(
+    page,
+    'crm_opportunity',
+    'crm_opp_expected_close_date',
+  );
+  return opportunityCloseDateType === 'datetime' ? `${date}T09:00:00+08:00` : date;
 }
 
 /** Random int between min and max inclusive */
@@ -1518,7 +1543,7 @@ test.describe.serial('Showcase Seed Data', () => {
         crm_opp_name: opp.name,
         crm_opp_account_id: accountId,
         crm_opp_expected_amount: opp.amount,
-        crm_opp_expected_close_date: `${opp.closeDate}T09:00:00Z`,
+        crm_opp_expected_close_date: await opportunityCloseDateValue(page, opp.closeDate),
         crm_opp_notes: opp.notes,
       });
 

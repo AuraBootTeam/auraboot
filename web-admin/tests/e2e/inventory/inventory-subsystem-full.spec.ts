@@ -52,9 +52,9 @@ const KEY_COMMANDS: Array<{ code: string; type: string }> = [
   { code: 'inv:create_warehouse', type: 'create' },
   { code: 'inv:update_warehouse', type: 'update' },
   { code: 'inv:delete_warehouse', type: 'delete' },
-  { code: 'inv:confirm_warehouse_in', type: 'state_transition' },
-  { code: 'inv:confirm_warehouse_out', type: 'state_transition' },
-  { code: 'inv:allocate_inventory', type: 'action' },
+  { code: 'pe:confirm_warehouse_in', type: 'state_transition' },
+  { code: 'pe:confirm_warehouse_out', type: 'state_transition' },
+  { code: 'pe:allocate_inventory', type: 'action' },
   { code: 'pe:hold_inventory', type: 'action' },
   { code: 'pe:auto_putaway', type: 'action' },
 ];

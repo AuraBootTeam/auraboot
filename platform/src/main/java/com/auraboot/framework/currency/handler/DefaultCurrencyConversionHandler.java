@@ -9,6 +9,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -32,9 +34,12 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
 
     private static final String DEFAULT_BASE_CURRENCY = "CNY";
     private static final int DEFAULT_SCALE = 2;
+    private static final String FIN_CURRENCY_TABLE = "mt_fin_currency";
+    private static final String FIN_RATE_TABLE = "mt_fin_exchange_rate";
 
     private final ObjectMapper objectMapper;
     private final ObjectProvider<CurrencyConversionSpi> currencyConversionSpiProvider;
+    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
     @Override
     public String getHandlerName() {
@@ -75,7 +80,7 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
             docCurrency = baseCurrency;
         }
 
-        ExchangeRateResult rateResult = resolveRate(docCurrency, baseCurrency);
+        ExchangeRateResult rateResult = resolveRate(docCurrency, baseCurrency, tenantId);
         BigDecimal rate = rateResult != null && rateResult.getRate() != null
                 ? rateResult.getRate()
                 : BigDecimal.ONE;
@@ -100,40 +105,132 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
         applyBaseAmounts(payload, updates, amountFields, rate);
     }
 
-    private ExchangeRateResult resolveRate(String fromCurrency, String toCurrency) {
+    private ExchangeRateResult resolveRate(String fromCurrency, String toCurrency, Long tenantId) {
         if (fromCurrency == null || toCurrency == null || fromCurrency.equalsIgnoreCase(toCurrency)) {
             return ExchangeRateResult.identity();
         }
 
         CurrencyConversionSpi spi = currencyConversionSpiProvider.getIfAvailable();
-        if (spi == null) {
-            log.debug("currencyConversionHandler: no CurrencyConversionSpi for {}->{}, using identity rate",
-                    fromCurrency, toCurrency);
-            return ExchangeRateResult.identity();
+        if (spi != null) {
+            try {
+                ExchangeRateResult result = spi.getRate(fromCurrency, toCurrency, LocalDate.now(), "spot");
+                return result != null ? result : ExchangeRateResult.identity();
+            } catch (RuntimeException e) {
+                log.warn("currencyConversionHandler: rate lookup failed for {}->{}: {}; trying DSL table fallback",
+                        fromCurrency, toCurrency, e.getMessage());
+            }
         }
 
-        try {
-            ExchangeRateResult result = spi.getRate(fromCurrency, toCurrency, LocalDate.now(), "spot");
-            return result != null ? result : ExchangeRateResult.identity();
-        } catch (RuntimeException e) {
-            log.warn("currencyConversionHandler: rate lookup failed for {}->{}: {}; using identity rate",
-                    fromCurrency, toCurrency, e.getMessage());
-            return ExchangeRateResult.identity();
+        ExchangeRateResult dslRate = resolveRateFromDslTable(fromCurrency, toCurrency, tenantId);
+        if (dslRate != null) {
+            return dslRate;
         }
+
+        ExchangeRateResult inverse = resolveRateFromDslTable(toCurrency, fromCurrency, tenantId);
+        if (inverse != null && inverse.getRate() != null && inverse.getRate().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal rate = BigDecimal.ONE.divide(inverse.getRate(), 8, RoundingMode.HALF_UP);
+            return new ExchangeRateResult(rate, inverse.getRateId(), true);
+        }
+
+        if (spi == null) {
+            log.debug("currencyConversionHandler: no CurrencyConversionSpi or DSL rate for {}->{}, using identity rate",
+                    fromCurrency, toCurrency);
+        } else {
+            log.warn("currencyConversionHandler: rate lookup failed for {}->{}: {}; using identity rate",
+                    fromCurrency, toCurrency, "rate not found");
+        }
+        return ExchangeRateResult.identity();
     }
 
     private String resolveBaseCurrency(Long tenantId) {
         CurrencyConversionSpi spi = currencyConversionSpiProvider.getIfAvailable();
-        if (spi == null) {
-            return DEFAULT_BASE_CURRENCY;
+        if (spi != null) {
+            try {
+                String baseCurrency = tenantId != null ? spi.getBaseCurrency(tenantId) : spi.getBaseCurrency();
+                return baseCurrency != null && !baseCurrency.isBlank() ? baseCurrency : DEFAULT_BASE_CURRENCY;
+            } catch (RuntimeException e) {
+                log.debug("currencyConversionHandler: base currency lookup failed: {}", e.getMessage());
+            }
+        }
+        String dslBaseCurrency = resolveBaseCurrencyFromDslTable(tenantId);
+        if (dslBaseCurrency != null && !dslBaseCurrency.isBlank()) {
+            return dslBaseCurrency;
+        }
+        return DEFAULT_BASE_CURRENCY;
+    }
+
+    private ExchangeRateResult resolveRateFromDslTable(String fromCurrency, String toCurrency, Long tenantId) {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null || tenantId == null) {
+            return null;
         }
         try {
-            String baseCurrency = tenantId != null ? spi.getBaseCurrency(tenantId) : spi.getBaseCurrency();
-            return baseCurrency != null && !baseCurrency.isBlank() ? baseCurrency : DEFAULT_BASE_CURRENCY;
-        } catch (RuntimeException e) {
-            log.debug("currencyConversionHandler: base currency lookup failed: {}", e.getMessage());
-            return DEFAULT_BASE_CURRENCY;
+            if (!tableExists(jdbcTemplate, FIN_RATE_TABLE)) {
+                return null;
+            }
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                    SELECT id, fin_exr_rate
+                    FROM mt_fin_exchange_rate
+                    WHERE tenant_id = ?
+                      AND fin_exr_from_currency = ?
+                      AND fin_exr_to_currency = ?
+                      AND fin_exr_effective_date <= ?
+                      AND fin_exr_rate_type = ?
+                    ORDER BY fin_exr_effective_date DESC, updated_at DESC, id DESC
+                    LIMIT 1
+                    """,
+                    tenantId,
+                    normalizeCurrency(fromCurrency),
+                    normalizeCurrency(toCurrency),
+                    LocalDate.now(),
+                    "spot");
+            if (rows.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> row = rows.get(0);
+            BigDecimal rate = toBigDecimal(row.get("fin_exr_rate"));
+            if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0) {
+                return null;
+            }
+            Long rateId = row.get("id") instanceof Number n ? n.longValue() : null;
+            return new ExchangeRateResult(rate, rateId, false);
+        } catch (DataAccessException e) {
+            log.debug("currencyConversionHandler: DSL rate fallback unavailable: {}", e.getMessage());
+            return null;
         }
+    }
+
+    private String resolveBaseCurrencyFromDslTable(Long tenantId) {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null || tenantId == null) {
+            return null;
+        }
+        try {
+            if (!tableExists(jdbcTemplate, FIN_CURRENCY_TABLE)) {
+                return null;
+            }
+            List<String> rows = jdbcTemplate.queryForList("""
+                    SELECT fin_cur_code
+                    FROM mt_fin_currency
+                    WHERE tenant_id = ? AND fin_cur_is_base = true
+                    ORDER BY updated_at DESC, id DESC
+                    LIMIT 1
+                    """,
+                    String.class,
+                    tenantId);
+            return rows.isEmpty() ? null : normalizeCurrency(rows.get(0));
+        } catch (DataAccessException e) {
+            log.debug("currencyConversionHandler: DSL base currency fallback unavailable: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private boolean tableExists(JdbcTemplate jdbcTemplate, String tableName) {
+        Boolean exists = jdbcTemplate.queryForObject(
+                "SELECT to_regclass(?) IS NOT NULL",
+                Boolean.class,
+                tableName);
+        return Boolean.TRUE.equals(exists);
     }
 
     private void applyBaseAmounts(Map<String, Object> payload,
@@ -182,6 +279,10 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
         }
         String text = ref.toString().trim();
         return text.isEmpty() ? null : text;
+    }
+
+    private static String normalizeCurrency(String value) {
+        return value == null ? null : value.trim().toLowerCase();
     }
 
     private static BigDecimal toBigDecimal(Object value) {

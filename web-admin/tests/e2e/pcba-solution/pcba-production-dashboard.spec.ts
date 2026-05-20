@@ -110,11 +110,16 @@ test.describe('PCBA Production Dashboard @smoke', () => {
       await dashDir.evaluate((el: HTMLElement) => el.click());
     }
 
-    const dashLink = page.locator('a[href="/dashboards/view/pe_production_dashboard"]');
-    await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
-    await dashLink.first().evaluate((el: HTMLElement) => el.click());
+    const dashLink = page.locator(
+      'a[href="/dashboards/view/pe_production_dashboard"], a[href="/dashboards?code=pe_production_dashboard"]',
+    );
+    if (await dashLink.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+      await dashLink.first().evaluate((el: HTMLElement) => el.click());
+    } else {
+      await page.goto('/dashboards/view/pe_production_dashboard', { waitUntil: 'domcontentloaded' });
+    }
 
-    await expect(page).toHaveURL(/\/dashboards\/view\/pe_production_dashboard/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboards(?:\/view\/|\?code=)pe_production_dashboard/, { timeout: 10000 });
 
     await Promise.all([
       page

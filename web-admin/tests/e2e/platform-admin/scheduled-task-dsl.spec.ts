@@ -199,7 +199,7 @@ test.describe('Scheduled Task DSL Page (/p/scheduled_task)', () => {
   test('ST-002 @smoke — Create cron task via toolbar → row appears in list', async ({ page }) => {
     await navigateToScheduledTaskList(page);
 
-    totalBeforeCreate = await fetchTotal(page);
+    totalBeforeCreate = await fetchTotal(page, TASK_NAME);
     expect(totalBeforeCreate, 'Baseline total must be readable').toBeGreaterThanOrEqual(0);
 
     // Click "新建" — DSL toolbar emits data-testid="toolbar-btn-create"
@@ -334,7 +334,7 @@ test.describe('Scheduled Task DSL Page (/p/scheduled_task)', () => {
     );
 
     // [D6] List total has incremented and the new row carries our values
-    totalAfterCreate = await fetchTotal(page);
+    totalAfterCreate = await fetchTotal(page, TASK_NAME);
     expect(
       totalAfterCreate,
       'List total must increment by 1 after UI create',
@@ -478,7 +478,7 @@ test.describe('Scheduled Task DSL Page (/p/scheduled_task)', () => {
     expect(createdPid, 'ST-005 requires the record from ST-002').toBeTruthy();
 
     await navigateToScheduledTaskList(page);
-    const totalBeforeDelete = await fetchTotal(page);
+    const totalBeforeDelete = await fetchTotal(page, TASK_NAME);
     expect(totalBeforeDelete).toBe(totalAfterCreate);
 
     const row = await findRowInPaginatedList(page, TASK_NAME, 12_000);
@@ -501,11 +501,6 @@ test.describe('Scheduled Task DSL Page (/p/scheduled_task)', () => {
         r.status() === 200,
       { timeout: 15_000 },
     );
-    const listRefresh = page
-      .waitForResponse((r) => r.url().includes(API_LIST) && r.status() === 200, {
-        timeout: 10_000,
-      })
-      .catch(() => null);
 
     const okBtn = page
       .locator('[data-testid="confirm-ok"]')
@@ -525,12 +520,14 @@ test.describe('Scheduled Task DSL Page (/p/scheduled_task)', () => {
     // Toast feedback (best effort — not all stacks emit one)
     await waitForToast(page, undefined, 3_000).catch(() => null);
 
-    // Wait for list refresh if the UI issued one. The listener is armed before
-    // confirmation because fast refreshes can otherwise be missed.
-    await listRefresh;
-
     // [#4 regression — anti "fake success"] Total must decrement
-    const totalAfterDelete = await fetchTotal(page);
+    await expect
+      .poll(() => fetchTotal(page, TASK_NAME), {
+        timeout: 10_000,
+        message: 'Scheduled task list total should refresh after delete',
+      })
+      .toBe(totalBeforeDelete - 1);
+    const totalAfterDelete = await fetchTotal(page, TASK_NAME);
     expect(
       totalAfterDelete,
       'List total must decrement by 1 after UI delete (regression: silent no-op)',

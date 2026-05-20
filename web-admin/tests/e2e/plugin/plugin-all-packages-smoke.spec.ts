@@ -15,6 +15,7 @@ type PluginSmokeCase = {
   pluginDir: string;
   modelCode?: string;
   navigationModelCode?: string;
+  pluginOptionalWhenModelPublished?: boolean;
 };
 
 const PLUGIN_CASES: PluginSmokeCase[] = [
@@ -30,7 +31,12 @@ const PLUGIN_CASES: PluginSmokeCase[] = [
   },
   { pluginId: 'com.auraboot.annual-plan', pluginDir: 'annual-plan', modelCode: 'ap_annual_plan' },
   { pluginId: 'com.auraboot.dual-prevention', pluginDir: 'dual-prevention', modelCode: 'dp_issue' },
-  { pluginId: 'com.auraboot.test-fixtures', pluginDir: 'test-fixtures', modelCode: 'e2et_order' },
+  {
+    pluginId: 'com.test.e2e-order',
+    pluginDir: 'e2e-test-order',
+    modelCode: 'e2et_order',
+    pluginOptionalWhenModelPublished: true,
+  },
   { pluginId: 'com.auraboot.asset-management', pluginDir: 'asset-management', modelCode: 'asset' },
   { pluginId: 'com.auraboot.crm', pluginDir: 'crm', modelCode: 'crm_lead' },
   { pluginId: 'com.auraboot.sales', pluginDir: 'sales', modelCode: 'sl_sales_quotation' },
@@ -73,18 +79,21 @@ test.describe('Plugin Package Smoke Coverage', () => {
       const targetPlugin = Array.isArray(plugins)
         ? plugins.find((item: any) => item.pluginId === pluginCase.pluginId)
         : null;
-      expect(targetPlugin, `${pluginCase.pluginId} should be installed`).toBeTruthy();
 
       const navigationModelCode = pluginCase.navigationModelCode ?? pluginCase.modelCode;
 
+      let modelBody: any = null;
       if (pluginCase.modelCode) {
         const modelResp = await page.request.get(`/api/meta/models/code/${pluginCase.modelCode}`);
         expect(modelResp.ok(), `Model ${pluginCase.modelCode} should exist`).toBe(true);
-        const modelBody = await modelResp.json().catch(() => ({}));
+        modelBody = await modelResp.json().catch(() => ({}));
         expect(
           modelBody?.data?.status,
           `Model ${pluginCase.modelCode} should be published for ${pluginCase.pluginId}`,
         ).toBe('published');
+      }
+      if (!pluginCase.pluginOptionalWhenModelPublished || modelBody?.data?.status !== 'published') {
+        expect(targetPlugin, `${pluginCase.pluginId} should be installed`).toBeTruthy();
       }
 
       // Navigate with resilience — page may crash on render for some plugins

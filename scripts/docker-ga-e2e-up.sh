@@ -74,6 +74,18 @@ case "$GA_E2E_BACKEND_BUILD_MODE" in
     ;;
 esac
 
+if [ "${GA_E2E_BUILD_ENTERPRISE_PLUGIN_JARS:-0}" = "1" ]; then
+  ENTERPRISE_ROOT="${AURA_ENTERPRISE_ROOT:-../auraboot-enterprise}"
+  if [ ! -f "$ENTERPRISE_ROOT/build.gradle" ]; then
+    echo "[ga-e2e] enterprise root not found: $ENTERPRISE_ROOT" >&2
+    exit 1
+  fi
+  echo "[ga-e2e] publishing plugin API for enterprise plugin backend builds..."
+  (cd platform && ./gradlew :platform-plugin-api:publishToMavenLocal --no-daemon)
+  echo "[ga-e2e] building enterprise plugin backend jars..."
+  (cd "$ENTERPRISE_ROOT" && gradle :buildAllPluginJars --no-daemon)
+fi
+
 echo "[ga-e2e] starting stack (project=$COMPOSE_PROJECT_NAME)..."
 docker compose \
   -f docker-compose.yml \

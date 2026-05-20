@@ -10,7 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, todayStr, executeCommandViaApi } from '../helpers/index';
+import { uniqueId, todayStr, executeCommandViaApi, expectCollectionViewVisible } from '../helpers/index';
 
 test.describe('Finance Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -30,13 +30,13 @@ test.describe('Finance Dashboard @smoke', () => {
         page,
         'fin:create_account',
         {
-          fin_acc_code: `AC${uid.slice(-10)}`,
+          fin_acc_code: `A${uid.slice(-12)}`,
           fin_acc_name: `DashAccount_${uid}`,
           fin_acc_type: 'asset',
           fin_acc_level: 1,
           fin_acc_is_detail: true,
           fin_acc_balance_direction: 'debit',
-          fin_acc_description: `E2E test account ${uid}`,
+          fin_acc_description: `E2E account ${uid.slice(-8)}`,
         },
         undefined,
         'create',
@@ -56,11 +56,11 @@ test.describe('Finance Dashboard @smoke', () => {
     await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
     await menuBtn.click();
 
-    const dashLink = page.locator('a[href="/dashboards/view/fin_financial_dashboard"]');
+    const dashLink = page.locator('a[href="/finance/financial-dashboard"]');
     await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await dashLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/dashboards\/view\/fin_financial_dashboard/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/finance\/financial-dashboard/, { timeout: 10000 });
 
     await Promise.all([
       page
@@ -127,8 +127,6 @@ test.describe('Finance Dashboard @smoke', () => {
 
   test('FIN-DASH-05: Dashboard renders data-table blocks', async ({ page }) => {
     await gotoDashboard(page);
-    const tables = page.locator('table, [role="table"]');
-    const tableCount = await tables.count();
-    expect(tableCount, 'Dashboard should render data tables').toBeGreaterThanOrEqual(1);
+    await expectCollectionViewVisible(page);
   });
 });

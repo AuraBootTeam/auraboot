@@ -44,10 +44,6 @@ function emptyBucket(): Bucket {
   return { accounts: [], journalEntries: [], journalLines: [], fiscalPeriods: [] };
 }
 
-function shortFacCode(prefix = 'E2EFAC'): string {
-  return `${prefix}${Date.now().toString(36).slice(-8)}`.slice(0, 20);
-}
-
 async function deleteRecord(
   page: import('@playwright/test').Page,
   pageKey: string,
@@ -89,6 +85,10 @@ function mustSucceed(result: { code: string; recordId: string }, command: string
   return result.recordId;
 }
 
+function shortId(prefix = 'FAC'): string {
+  return `${prefix}${uniqueId().replace(/[^A-Za-z0-9]/g, '').slice(-8)}`;
+}
+
 async function clickRowActionAndGetBody(
   page: import('@playwright/test').Page,
   row: import('@playwright/test').Locator,
@@ -122,7 +122,7 @@ async function createAccountViaApi(
   bucket: Bucket,
   overrides: Record<string, unknown> = {},
 ): Promise<{ recordId: string; accCode: string }> {
-  const accCode = `E2E-FAC-${uniqueId()}`;
+  const accCode = shortId();
   const defaults: Record<string, unknown> = {
     fin_acc_code: accCode,
     fin_acc_name: `E2E Account ${uniqueId()}`,
@@ -152,8 +152,9 @@ async function createJournalEntryViaApi(
   bucket: Bucket,
   overrides: Record<string, unknown> = {},
 ): Promise<{ recordId: string; code: string }> {
-  const periodName = `E2E FP ${shortFacCode('FP')}`;
-  const fpYear = 2099;
+  const periodName = `E2E FP ${uniqueId()}`;
+  // fin_fp_period is constrained to 1-12; use a random year to avoid (year, period) collisions across tests
+  const fpYear = 2090 + Math.floor(Math.random() * 10);
   const fpPeriod = Math.floor(Math.random() * 12) + 1;
   const fiscalPeriod = await executeCommandViaApi(
     page,
@@ -222,7 +223,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
     });
 
     test('FAC-002: Create account via API, verify in list @smoke', async ({ page }) => {
-      const accCode = shortFacCode();
+      const accCode = shortId();
       const accName = `E2E Account ${uniqueId()}`;
       const result = await executeCommandViaApi(
         page,
@@ -259,7 +260,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
     });
 
     test('FAC-003: Edit account name via UI @critical', async ({ page }) => {
-      const accCode = `E2E-FAC-EDIT-${uniqueId()}`;
+      const accCode = shortId('FCE');
       const accName = `E2E Account Edit ${uniqueId()}`;
       const result = await executeCommandViaApi(
         page,
@@ -326,7 +327,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
     });
 
     test('FAC-004: Delete account via UI @critical', async ({ page }) => {
-      const accCode = `E2E-FAC-DEL-${uniqueId()}`;
+      const accCode = shortId('FCD');
       const result = await executeCommandViaApi(
         page,
         'fin:create_account',
@@ -392,7 +393,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       };
 
       for (const accType of accountTypes) {
-        const accCode = `E2E-TYPE-${accType}-${uniqueId()}`;
+        const accCode = shortId(`F${accType.slice(0, 2).toUpperCase()}`);
         const result = await executeCommandViaApi(
           page,
           'fin:create_account',
@@ -429,7 +430,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
     test('FAC-006: Account hierarchy — create parent and child accounts', async ({ page }) => {
       // Create parent account (non-leaf)
-      const parentCode = `E2E-PARENT-${uniqueId()}`;
+      const parentCode = shortId('FPA');
       const parentResult = await executeCommandViaApi(
         page,
         'fin:create_account',
@@ -453,7 +454,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       bucket.accounts.push(parentResult.recordId);
 
       // Create child account (leaf, linked to parent via fin_acc_parent_id)
-      const childCode = `E2E-CHILD-${uniqueId()}`;
+      const childCode = shortId('FCH');
       const childResult = await executeCommandViaApi(
         page,
         'fin:create_account',
@@ -522,7 +523,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
     });
 
     test('FAC-008: Account code uniqueness — duplicate code rejected', async ({ page }) => {
-      const accCode = `E2E-DUP-${uniqueId()}`;
+      const accCode = shortId('FDU');
 
       // Create first account
       const firstResult = await executeCommandViaApi(
@@ -580,7 +581,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
     test('FAC-009: Account with DEBIT vs CREDIT direction', async ({ page }) => {
       // Create DEBIT direction account
-      const debitCode = `E2E-DIR-DR-${uniqueId()}`;
+      const debitCode = shortId('FDR');
       const debitResult = await executeCommandViaApi(
         page,
         'fin:create_account',
@@ -604,7 +605,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
       bucket.accounts.push(debitResult.recordId);
 
       // Create CREDIT direction account
-      const creditCode = `E2E-DIR-CR-${uniqueId()}`;
+      const creditCode = shortId('FCR');
       const creditResult = await executeCommandViaApi(
         page,
         'fin:create_account',
@@ -641,7 +642,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
     });
 
     test('FAC-010: Deactivate account (active -> inactive) via UI', async ({ page }) => {
-      const accCode = `E2E-DEACT-${uniqueId()}`;
+      const accCode = shortId('FDA');
       const result = await executeCommandViaApi(
         page,
         'fin:create_account',
@@ -797,7 +798,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
     test('FAC-012: Filter accounts by type/status if tabs exist', async ({ page }) => {
       // Create accounts with different types for filter testing
-      const assetCode = `E2E-FILT-A-${uniqueId()}`;
+      const assetCode = shortId('FFA');
       const assetResult = await createAccountViaApi(page, bucket, {
         fin_acc_code: assetCode,
         fin_acc_name: `E2E Filter Asset ${uniqueId()}`,
