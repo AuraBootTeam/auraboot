@@ -79,25 +79,21 @@ function nameInput(page: Page) {
   // ab_meta_field stores generic displayName "名称" (not page-manager-specific
   // "页面名称"); fields.json `displayName:zh-CN` localized variant is not
   // currently picked up by the import. Match both for forward-compat.
-  return page.getByLabel(/^名称\*?$|^页面名称\*?$|^Name$|^Page Name$/).first();
+  return page.getByTestId('field-name').locator('input, textarea').first();
 }
 function pageKeyInput(page: Page) {
-  return page.getByLabel(/^页面标识\*?$|^Page Key$/).first();
+  return page.getByTestId('field-page_key').locator('input, textarea').first();
 }
 function modelCodeInput(page: Page) {
   // Generic displayName is "模型编码"; "主 Model" / "Primary Model" not active.
-  return page.getByLabel(/^模型编码\*?$|^Model Code$|主\s*Model|Primary Model/).first();
+  return page.getByTestId('field-model_code').locator('input, textarea').first();
 }
 function descriptionInput(page: Page) {
-  return page.getByLabel(/^描述$|^Description$/).first();
+  return page.getByTestId('field-description').locator('input, textarea').first();
 }
 function kindCombobox(page: Page) {
   // Two comboboxes per <select> (visible + native): we want the native <select>.
-  return page
-    .locator('label:has-text("页面类型"), label:has-text("Page Kind")')
-    .locator('..')
-    .locator('select')
-    .first();
+  return page.getByTestId('field-kind').locator('select').first();
 }
 
 /**

@@ -18,8 +18,6 @@ import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,9 +47,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * REST surface for the AuraBot Skill SPI (Plan §Step 7 / SPI Contract §2).
@@ -90,7 +86,6 @@ public class AuraBotSkillController {
     // Optional: only present when redis is configured (RedisOptionalConfig).
     private final ObjectProvider<PreviewTokenStore> previewTokenStoreProvider;
     private final UserPermissionService userPermissionService;
-    private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
 
     public AuraBotSkillController(AuraBotSkillRegistry registry,
@@ -98,14 +93,12 @@ public class AuraBotSkillController {
                                   SkillRunRepository repository,
                                   ObjectProvider<PreviewTokenStore> previewTokenStoreProvider,
                                   UserPermissionService userPermissionService,
-                                  PermissionMapper permissionMapper,
                                   ObjectMapper objectMapper) {
         this.registry = registry;
         this.validator = validator;
         this.repository = repository;
         this.previewTokenStoreProvider = previewTokenStoreProvider;
         this.userPermissionService = userPermissionService;
-        this.permissionMapper = permissionMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -378,19 +371,10 @@ public class AuraBotSkillController {
         if (userId == null) {
             return Collections.emptySet();
         }
-        Set<Long> ids = userPermissionService.getUserPermissionIds(userId);
-        if (ids == null || ids.isEmpty()) {
-            return Collections.emptySet();
-        }
-        List<Permission> perms = permissionMapper.findByIds(new ArrayList<>(ids));
-        Set<String> codes = perms.stream()
-                .map(Permission::getCode)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
         // Permission code alias resolver was dropped from main (zombie alias
         // cleanup, OSS commit 6bb0a30d). Permission codes are now canonical;
         // pass through as-is.
-        return codes;
+        return userPermissionService.getUserPermissionCodes(userId);
     }
 
     /** SHA-256 of serialised meta list. Quote-wrapped per RFC 7232. */

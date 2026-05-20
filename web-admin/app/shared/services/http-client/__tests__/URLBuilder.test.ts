@@ -152,6 +152,16 @@ describe('buildRequest', () => {
     expect(init.body).toBeUndefined();
   });
 
+  it('should append GET params with ampersand when path already has a query string', () => {
+    const options: FetchOptions = {
+      method: 'get',
+      params: { datasourceId: 'execution_logs_dataSource' },
+    };
+    const { url } = buildRequest('/api/scheduled-tasks/task-1/logs?limit=50', options, serverContext);
+    expect(url).toContain('/api/scheduled-tasks/task-1/logs?limit=50&datasourceId=execution_logs_dataSource');
+    expect(url).not.toContain('limit=50?datasourceId=');
+  });
+
   it('should build POST request with JSON body', () => {
     const options: FetchOptions = {
       method: 'post',

@@ -65,6 +65,7 @@ PATH_HITS=$(grep -rEn \
   | grep -v 'CLAUDE.md\|AGENTS.md' \
   | grep -v 'scripts/publish-repos\.sh' \
   | grep -v 'scripts/env/reset-and-init\.sh' \
+  | grep -v 'scripts/docker-ga-e2e-up\.sh' \
   | grep -v 'permission-codes\.yml' \
   | grep -v 'docker-compose\.cleanup-batch\.override\.yml' \
   | grep -v 'docker-compose\.ga-e2e\.override\.yml' \
@@ -74,6 +75,8 @@ PATH_HITS=$(grep -rEn \
   #  - publish-repos.sh: multi-repo release script (OSS + enterprise sync)
   #  - reset-and-init.sh: normalized local lifecycle entrypoint can target
   #    side-by-side OSS/enterprise checkouts without importing enterprise code
+  #  - docker-ga-e2e-up.sh: optional local GA E2E helper can build enterprise
+  #    plugin jars only when GA_E2E_BUILD_ENTERPRISE_PLUGIN_JARS=1 is set
   #  - permission-codes.yml: CI references enterprise repo in comments only
   #  - docker-compose.{cleanup-batch,ga-e2e,isolated}.yml: dev/test compose mounts enterprise plugins
   #    when both repos are checked out side-by-side (no-op in pure OSS clones)

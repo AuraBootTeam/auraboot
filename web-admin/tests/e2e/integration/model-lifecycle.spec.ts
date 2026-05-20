@@ -106,6 +106,17 @@ test.describe('Model Lifecycle UI', () => {
   test.afterAll(async ({ request }) => {
     if (modelPid) {
       try {
+        const fieldsResp = await request.get(`/api/meta/models/${modelPid}/fields`);
+        if (fieldsResp.ok()) {
+          const fieldsBody = await fieldsResp.json().catch(() => ({}));
+          const fields = Array.isArray(fieldsBody?.data) ? fieldsBody.data : [];
+          for (const field of fields) {
+            const fieldPid = field?.pid;
+            if (fieldPid) {
+              await request.delete(`/api/meta/models/${modelPid}/fields/${fieldPid}`).catch(() => {});
+            }
+          }
+        }
         await request.delete(`/api/meta/models/${modelPid}`);
       } catch {
         console.warn(`[Cleanup] Failed to delete model ${modelPid}`);

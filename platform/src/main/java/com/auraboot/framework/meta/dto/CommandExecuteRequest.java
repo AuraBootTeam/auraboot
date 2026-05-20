@@ -34,6 +34,12 @@ public class CommandExecuteRequest {
     private String targetRecordId;
 
     /**
+     * Optional execution-source metadata for audit logs.
+     * This is not merged into the business payload seen by command handlers.
+     */
+    private Map<String, Object> auditContext;
+
+    /**
      * Expected row version for optimistic locking (optional)
      */
     private Integer expectedVersion;

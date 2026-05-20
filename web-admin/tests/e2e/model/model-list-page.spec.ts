@@ -162,6 +162,14 @@ test.describe('Model List Page', () => {
   test.afterEach(async ({ api }) => {
     while (createdModels.length > 0) {
       const model = createdModels.pop()!;
+      const fields = await api.getModelFields(model.pid).catch(() => null);
+      const boundFields = Array.isArray(fields?.data) ? fields.data : [];
+      for (const field of boundFields) {
+        const fieldPid = field?.pid;
+        if (fieldPid) {
+          await api.deleteModelField(model.pid, fieldPid).catch(() => null);
+        }
+      }
       await api.deleteModel(model.pid).catch(() => null);
       if (model.fieldPid) {
         await api.deleteField(model.fieldPid).catch(() => null);

@@ -15,6 +15,7 @@
  * @since 7.0.0
  */
 
+import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 
@@ -130,7 +131,7 @@ async function createAndDeployProcess(
 }
 
 async function startProcessInstance(
-  page: import('@playwright/test').Page,
+  page: Page,
   processKey: string,
   variables: Record<string, unknown> = {},
 ): Promise<string | null> {
@@ -160,6 +161,28 @@ async function startProcessInstance(
   } catch (e) {
     console.warn('BPM startProcessInstance error:', e);
     return null;
+  }
+}
+
+async function terminateInstanceForCleanup(page: Page, processInstanceId: string): Promise<boolean> {
+  try {
+    const resp = await page.request.post(
+      `/api/bpm/process-instances/${processInstanceId}/terminate`,
+      {
+        data: { reason: 'e2e-cleanup' },
+      },
+    );
+    if (resp.ok()) {
+      return true;
+    }
+    const body = await resp.text().catch(() => '');
+    console.warn(
+      `BPM cleanup skipped undeploy because terminate failed: ${resp.status()} ${body.slice(0, 200)}`,
+    );
+    return false;
+  } catch (error) {
+    console.warn('BPM cleanup skipped undeploy because terminate threw:', error);
+    return false;
   }
 }
 
@@ -202,10 +225,22 @@ test.describe('BPM Deep Tests', () => {
     const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     try {
-      await page.request
-        .post(`/api/bpm/process-definitions/${processPid}/undeploy`)
-        .catch(() => {});
-      await page.request.delete(`/api/bpm/process-definitions/${processPid}`).catch(() => {});
+      const canRemoveDefinition = instanceId
+        ? await terminateInstanceForCleanup(page, instanceId)
+        : true;
+      if (canRemoveDefinition) {
+        const undeployResp = await page.request.post(
+          `/api/bpm/process-definitions/${processPid}/undeploy`,
+        );
+        if (undeployResp.ok()) {
+          await page.request.delete(`/api/bpm/process-definitions/${processPid}`);
+        } else {
+          const body = await undeployResp.text().catch(() => '');
+          console.warn(
+            `BPM cleanup skipped delete: undeploy failed ${undeployResp.status()} ${body.slice(0, 200)}`,
+          );
+        }
+      }
     } catch {
       /* ignore */
     }
@@ -617,23 +652,14 @@ test.describe('BPM Deep Tests', () => {
     }
 
     try {
-      const instanceId = await startProcessInstance(page, parentKey, {});
-      // SmartEngine CallActivity may throw 500 in current runtime.
-      if (!instanceId) {
-        const fallbackResp = await page.request.post('/api/bpm/process-instances', {
-          data: {
-            processDefinitionKey: parentKey,
-            businessKey: `ca-fallback-${Date.now().toString(36)}`,
-            variables: {},
-          },
-        });
-        expect(
-          fallbackResp.status(),
-          'CallActivity should either start successfully or fail with backend limitation (>=500)',
-        ).toBeGreaterThanOrEqual(500);
-        return;
-      }
-      expect(instanceId).not.toBeNull();
+      // Runtime CallActivity coverage lives in designer-callactivity.spec.ts.
+      // This older deep case keeps deploy/detail coverage only so it does not
+      // intentionally exercise a known backend 500 path as a "passing" result.
+      const detailResp = await page.request.get(`/api/bpm/process-definitions/${parentPid}`);
+      expect(detailResp.ok()).toBe(true);
+      const detail = await detailResp.json().catch(() => ({}) as any);
+      const payload = detail.data || detail;
+      expect(String(payload?.processKey ?? '')).toContain(parentKey);
     } finally {
       await page.request.post(`/api/bpm/process-definitions/${parentPid}/undeploy`).catch(() => {});
       await page.request.delete(`/api/bpm/process-definitions/${parentPid}`).catch(() => {});

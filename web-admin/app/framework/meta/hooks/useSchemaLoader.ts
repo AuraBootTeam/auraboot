@@ -22,13 +22,19 @@ import {
  * Cache is per-session only (cleared on page refresh).
  */
 const SCHEMA_CACHE_MAX = 50;
+const SCHEMA_CACHE_TTL_MS = 5 * 60 * 1000;
 const schemaCache = new Map<string, { schema: UnifiedSchema; timestamp: number }>();
 
+function shouldUseSchemaCache(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
 function getCachedSchema(pageKey: string): UnifiedSchema | null {
+  if (!shouldUseSchemaCache()) return null;
+
   const entry = schemaCache.get(pageKey);
   if (!entry) return null;
-  // Expire after 5 minutes to pick up schema changes during dev
-  if (Date.now() - entry.timestamp > 5 * 60 * 1000) {
+  if (Date.now() - entry.timestamp > SCHEMA_CACHE_TTL_MS) {
     schemaCache.delete(pageKey);
     return null;
   }
@@ -39,6 +45,8 @@ function getCachedSchema(pageKey: string): UnifiedSchema | null {
 }
 
 function setCachedSchema(pageKey: string, schema: UnifiedSchema): void {
+  if (!shouldUseSchemaCache()) return;
+
   // Evict oldest if at capacity
   if (schemaCache.size >= SCHEMA_CACHE_MAX) {
     const oldest = schemaCache.keys().next().value;

@@ -155,13 +155,15 @@ test.describe('PM Master Data — Project Role CRUD', () => {
     await editBtn.evaluate((el) => (el as HTMLButtonElement).click());
 
     // Wait for edit form page (URL uses underscores: pm_project_role)
-    await expect(page).toHaveURL(/\/p\/pm_project_role\/.*\/edit/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/p\/pm_project_role\/edit\/.+/, { timeout: 15000 });
     await expect(page.getByTestId('form-field-pm_role_name')).toBeVisible({ timeout: 15000 });
 
     // Update name
     const nameInput = page.getByTestId('form-field-pm_role_name').locator('input');
-    await nameInput.clear();
-    await nameInput.fill(updatedRoleName);
+    await nameInput.click();
+    await nameInput.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+    await nameInput.type(updatedRoleName);
+    await expect(nameInput).toHaveValue(updatedRoleName);
 
     // Submit and wait for the edit command response.
     const submitPromise = page.waitForResponse(
@@ -197,7 +199,7 @@ test.describe('PM Master Data — Project Role CRUD', () => {
         { timeout: 10000 },
       )
       .catch(() => null);
-    await clickRowActionByLocator(page, roleRow, 'delete_project_role', 'Delete');
+    await clickRowActionByLocator(page, roleRow, 'delete', '删除');
 
     await acceptConfirmDialog(page).catch(async () => {
       const confirmBtn = page

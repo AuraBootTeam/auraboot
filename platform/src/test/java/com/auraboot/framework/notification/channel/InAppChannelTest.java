@@ -48,6 +48,8 @@ class InAppChannelTest {
                 .sourceType("task")
                 .sourceId("t-1")
                 .build();
+        when(sseService.getActiveConnectionCount(1L)).thenReturn(1);
+        when(sseService.getActiveConnectionCount(2L)).thenReturn(1);
         when(queryService.getUnreadCount(1L)).thenReturn(3);
         when(queryService.getUnreadCount(2L)).thenReturn(5);
 
@@ -65,6 +67,23 @@ class InAppChannelTest {
         assertThat(saved.get(0).getIsRead()).isFalse();
         verify(sseService).pushUnreadCount(1L, 3);
         verify(sseService).pushUnreadCount(2L, 5);
+    }
+
+    @Test
+    void send_skipsUnreadCountQueryWhenUserHasNoActiveSseConnection() {
+        NotificationMessage msg = NotificationMessage.builder()
+                .tenantId(10L)
+                .recipientUserIds(List.of(1L))
+                .body("Hi")
+                .build();
+        when(sseService.getActiveConnectionCount(1L)).thenReturn(0);
+
+        NotificationResult result = channel().send(msg);
+
+        assertTrue(result.isSuccess());
+        verify(mapper).insert(any(Notification.class));
+        verify(queryService, never()).getUnreadCount(1L);
+        verify(sseService, never()).pushUnreadCount(anyLong(), anyInt());
     }
 
     @Test
@@ -105,6 +124,7 @@ class InAppChannelTest {
                 .recipientUserIds(List.of(1L))
                 .body("Hi")
                 .build();
+        when(sseService.getActiveConnectionCount(1L)).thenReturn(1);
         when(queryService.getUnreadCount(1L)).thenThrow(new RuntimeException("sse down"));
 
         NotificationResult result = channel().send(msg);

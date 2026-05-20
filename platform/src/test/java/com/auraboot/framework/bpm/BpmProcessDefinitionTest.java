@@ -2,6 +2,7 @@ package com.auraboot.framework.bpm;
 
 import com.auraboot.framework.bpm.converter.JsonToBpmnConverter;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
@@ -226,13 +227,13 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
     @Order(6)
     @DisplayName("D1-06: Suspend definition - status becomes SUSPENDED")
     void d1_06_suspendDefinition() {
-        // Test that suspending a non-deployed (DRAFT) process throws IllegalStateException
+        // Test that suspending a non-deployed (DRAFT) process throws a 409-domain conflict.
         BpmProcessDefinition created = createTestDefinition("d106");
         assertEquals("draft", created.getStatus());
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(ConflictException.class,
                 () -> deploymentService.suspend(created.getPid()),
-                "Should throw IllegalStateException for non-deployed process");
+                "Should throw ConflictException for non-deployed process");
         log.info("D1-06 PASSED: Correct exception for suspend on non-deployed process");
     }
 
@@ -240,13 +241,13 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
     @Order(7)
     @DisplayName("D1-07: Resume definition - status becomes DEPLOYED again")
     void d1_07_resumeDefinition() {
-        // Test that resuming a non-suspended (DRAFT) process throws IllegalStateException
+        // Test that resuming a non-suspended (DRAFT) process throws a 409-domain conflict.
         BpmProcessDefinition created = createTestDefinition("d107");
         assertEquals("draft", created.getStatus());
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(ConflictException.class,
                 () -> deploymentService.resume(created.getPid()),
-                "Should throw IllegalStateException for non-suspended process");
+                "Should throw ConflictException for non-suspended process");
         log.info("D1-07 PASSED: Correct exception for resume on non-suspended process");
     }
 
@@ -254,13 +255,13 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
     @Order(8)
     @DisplayName("D1-08: Undeploy - status becomes ARCHIVED")
     void d1_08_undeploy() {
-        // Test that undeploying a non-deployed (DRAFT) process throws IllegalStateException
+        // Test that undeploying a non-deployed (DRAFT) process throws a 409-domain conflict.
         BpmProcessDefinition created = createTestDefinition("d108");
         assertEquals("draft", created.getStatus());
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(ConflictException.class,
                 () -> deploymentService.undeploy(created.getPid()),
-                "Should throw IllegalStateException for non-deployed process");
+                "Should throw ConflictException for non-deployed process");
         log.info("D1-08 PASSED: Correct exception for undeploy on non-deployed process");
     }
 

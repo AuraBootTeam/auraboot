@@ -90,7 +90,11 @@ export class LoginPage extends BasePage {
 
   /** Wait for email input to become visible (form ready) */
   async waitForFormReady(): Promise<void> {
+    await this.page
+      .locator('[data-testid="login-page-root"][data-hydrated="true"]')
+      .waitFor({ state: 'visible', timeout: 5000 });
     await this.emailInput.waitFor({ state: 'visible', timeout: 5000 });
+    await this.passwordInput.waitFor({ state: 'visible', timeout: 5000 });
   }
 
   // --- Assertions ---

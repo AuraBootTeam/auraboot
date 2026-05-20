@@ -33,6 +33,8 @@ import { dictService } from '~/shared/services/dictService';
 import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import type { PropertySchema } from './types';
+import { getLocalizedText } from '~/utils/i18n';
+import { useI18n } from '~/contexts/I18nContext';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -54,9 +56,14 @@ export interface PropertyFieldRendererProps {
  *  - Evaluating `dependsOn` visibility (keep at panel level)
  */
 export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRendererProps) {
-  const label = schema.label as string;
-  const placeholder = schema.placeholder as string | undefined;
-  const helpText = schema.description as string | undefined;
+  const { locale } = useI18n();
+  const label = getLocalizedText(schema.label as string | Record<string, string>, locale);
+  const placeholder = schema.placeholder
+    ? getLocalizedText(schema.placeholder as string | Record<string, string>, locale)
+    : undefined;
+  const helpText = schema.description
+    ? getLocalizedText(schema.description as string | Record<string, string>, locale)
+    : undefined;
 
   switch (schema.type) {
     // ---- Text-like inputs ----
@@ -143,7 +150,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           placeholder={placeholder}
           helpText={helpText}
           options={(schema.options || []).map((opt) => ({
-            label: opt.label as string,
+            label: getLocalizedText(opt.label as string | Record<string, string>, locale),
             value: opt.value,
           }))}
         />
@@ -159,7 +166,7 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
             placeholder={placeholder}
             helpText={helpText}
             options={schema.options.map((opt) => ({
-              label: opt.label as string,
+              label: getLocalizedText(opt.label as string | Record<string, string>, locale),
               value: opt.value,
             }))}
           />

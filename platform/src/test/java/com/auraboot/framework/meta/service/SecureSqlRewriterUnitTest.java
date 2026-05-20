@@ -89,7 +89,7 @@ class SecureSqlRewriterUnitTest {
         Optional<Expression> where = rewriter.extractWhereClause(
                 "SELECT * FROM users WHERE tenant_id = #{params.tenantId}");
         assertThat(where).isPresent();
-        assertThat(where.get().toString()).contains("#{params.tenantId}");
+        assertThat(where.get().toString()).contains(":_ptenantId");
     }
 
     // ---------- rewriteForCount: wrapping path (UNION) ----------
@@ -127,6 +127,18 @@ class SecureSqlRewriterUnitTest {
         String result = rewriter.rewriteForCount(sql);
         assertThat(result).contains("#{params.tenantId}");
         assertThat(result.toUpperCase()).contains("COUNT");
+    }
+
+    @Test
+    void rewriteForCount_preserves_overlapping_mybatis_param_names() {
+        String sql = "SELECT id FROM t WHERE code IN (#{params.param1}, #{params.param10}) AND tenant_id = #{params.param11}";
+        String result = rewriter.rewriteForCount(sql);
+
+        assertThat(result).contains("#{params.param1}");
+        assertThat(result).contains("#{params.param10}");
+        assertThat(result).contains("#{params.param11}");
+        assertThat(result).doesNotContain("#{params.param1}0");
+        assertThat(result).doesNotContain("#{params.param1}1");
     }
 
     // ---------- rewriteForDelete: argument validation ----------

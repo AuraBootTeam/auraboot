@@ -405,24 +405,7 @@ public class ActionRecorder {
             meta.modelCode = (String) row.get("model_code");
 
             // Parse execution_config.type
-            Object execConfig = row.get("execution_config");
-            if (execConfig != null) {
-                try {
-                    Map<String, Object> config;
-                    if (execConfig instanceof String s) {
-                        config = objectMapper.readValue(s, Map.class);
-                    } else if (execConfig instanceof Map<?, ?> m) {
-                        config = (Map<String, Object>) m;
-                    } else {
-                        config = Map.of();
-                    }
-                    meta.executionType = (String) config.getOrDefault("type", "update");
-                } catch (Exception e) {
-                    meta.executionType = "update";
-                }
-            } else {
-                meta.executionType = "update";
-            }
+            meta.executionType = resolveExecutionType(row.get("execution_config"));
         } else {
             log.warn("Command not found in ab_command_definition: {}", commandCode);
             meta.modelCode = "unknown";
@@ -430,6 +413,29 @@ public class ActionRecorder {
         }
 
         return meta;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String resolveExecutionType(Object execConfig) {
+        if (execConfig == null) {
+            return "update";
+        }
+        try {
+            Map<String, Object> config;
+            if (execConfig instanceof Map<?, ?> m) {
+                config = (Map<String, Object>) m;
+            } else {
+                String raw = String.valueOf(execConfig);
+                config = raw == null || raw.isBlank()
+                        ? Map.of()
+                        : objectMapper.readValue(raw, Map.class);
+            }
+            Object type = config.getOrDefault("type", "update");
+            return type == null ? "update" : String.valueOf(type);
+        } catch (Exception e) {
+            log.warn("Failed to parse command execution_config, defaulting executionType=update: {}", execConfig, e);
+            return "update";
+        }
     }
 
     /**

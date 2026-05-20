@@ -148,6 +148,8 @@ export default function TaskListView({
         if (!ResultHelper.isSuccess(result)) {
           showErrorToast(l('更新失败', 'Update failed'));
           fetchTasks();
+        } else {
+          fetchTasks();
         }
       } catch {
         showErrorToast(l('更新失败', 'Update failed'));

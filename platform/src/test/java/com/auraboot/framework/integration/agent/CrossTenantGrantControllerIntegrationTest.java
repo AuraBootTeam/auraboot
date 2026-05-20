@@ -7,6 +7,7 @@ import com.auraboot.framework.agent.crosstenant.CrossTenantGrantType;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.permission.enums.RoleCodes;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
@@ -261,8 +262,8 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
                         + " child_run_pid, decision, spawn_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, now())",
                 grantId, parentTenant, childTenant,
-                "pid_parent_" + System.nanoTime(),
-                "pid_child_" + System.nanoTime(),
+                UniqueIdGenerator.generate(),
+                UniqueIdGenerator.generate(),
                 CrossTenantDecision.ALLOWED);
 
         ApiResponse<Map<String, Object>> audit = controller.audit(grantId, 1, 50);

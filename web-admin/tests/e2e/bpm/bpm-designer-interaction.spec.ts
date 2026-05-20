@@ -29,7 +29,7 @@
  * @see thr-leave-request-lifecycle.spec.ts (gold standard)
  */
 
-import { test, expect, type Page } from '../../fixtures';
+import { test, expect, type Locator, type Page } from '../../fixtures';
 import { uniqueId, waitForToast, findRowInPaginatedList, clickRowActionByLocator } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
@@ -112,6 +112,29 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
   }
 }
 
+async function fillToolbarInput(input: Locator, value: string): Promise<void> {
+  await expect(input).toBeVisible({ timeout: 8_000 });
+  await expect(input).toBeEditable({ timeout: 5_000 });
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await input.click();
+    await input.fill(value);
+
+    try {
+      await expect(input).toHaveValue(value, { timeout: 2_000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      await input.page().waitForTimeout(250);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Toolbar input did not retain value "${value}"`);
+}
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -170,19 +193,11 @@ test.describe('BPMN Designer — Deep Interaction', () => {
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 10_000 });
 
     const nameInput = page.locator('[data-testid="bpmn-field-name"]');
-    await expect(nameInput).toBeVisible({ timeout: 8_000 });
-
-    // Fill process name
-    await nameInput.click();
-    await nameInput.fill(PROCESS_NAME);
-    await expect(nameInput).toHaveValue(PROCESS_NAME);
+    await fillToolbarInput(nameInput, PROCESS_NAME);
 
     // Fill process key (editable for new process)
     const keyInput = page.locator('[data-testid="bpmn-field-key"]');
-    await expect(keyInput).toBeVisible();
-    await keyInput.click();
-    await keyInput.fill(PROCESS_KEY);
-    await expect(keyInput).toHaveValue(PROCESS_KEY);
+    await fillToolbarInput(keyInput, PROCESS_KEY);
   });
 
   // =========================================================================
@@ -474,12 +489,7 @@ test.describe('BPMN Designer — Deep Interaction', () => {
       .catch(() => null);
 
     const nameInput = page.locator('[data-testid="bpmn-field-name"]');
-    await expect(nameInput).toBeVisible({ timeout: 5_000 });
-
-    // Modify name
-    await nameInput.click();
-    await nameInput.fill(PROCESS_NAME_MODIFIED);
-    await expect(nameInput).toHaveValue(PROCESS_NAME_MODIFIED);
+    await fillToolbarInput(nameInput, PROCESS_NAME_MODIFIED);
 
     // Save via Ctrl+S
     const saveResponsePromise = page.waitForResponse(

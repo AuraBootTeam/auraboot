@@ -35,11 +35,13 @@ class CommandExecuteRequestDryRunTest {
         CommandExecuteRequest req = new CommandExecuteRequest();
         req.setDryRun(true);
         req.setPayload(java.util.Map.of("x", 1));
+        req.setAuditContext(java.util.Map.of("source", "unified-designer-runtime-preview"));
         req.setTargetRecordId("ID123");
         req.setOperationType("UPDATE");
         // All fields preserved, dryRun still true
         assertThat(req.isDryRun()).isTrue();
         assertThat(req.getPayload()).containsEntry("x", 1);
+        assertThat(req.getAuditContext()).containsEntry("source", "unified-designer-runtime-preview");
         assertThat(req.getTargetRecordId()).isEqualTo("ID123");
         assertThat(req.getOperationType()).isEqualTo("UPDATE");
     }

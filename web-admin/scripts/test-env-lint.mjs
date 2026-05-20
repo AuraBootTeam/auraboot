@@ -62,12 +62,18 @@ const ROOTS = [
   'playwright.team-test.config.ts',
 ];
 
+const ALLOWED_ENV_CONTRACT_FILES = new Set([
+  'tests/helpers/environments.ts',
+]);
+
 function collect(pattern, kind) {
   const hits = [];
   for (const root of ROOTS) {
     const abs = resolve(ROOT, root);
     const files = walk(abs);
     for (const abs of files) {
+      const relativeFile = relative(ROOT, abs);
+      if (ALLOWED_ENV_CONTRACT_FILES.has(relativeFile)) continue;
       const text = readFileSync(abs, 'utf-8');
       const lines = text.split('\n');
       lines.forEach((line, idx) => {
@@ -75,7 +81,7 @@ function collect(pattern, kind) {
         let m;
         while ((m = re.exec(line)) !== null) {
           hits.push({
-            file: relative(ROOT, abs),
+            file: relativeFile,
             line: idx + 1,
             match: m[0],
             kind,

@@ -141,8 +141,8 @@ test.describe('Procurement — Three-Way Match', () => {
     const rows = page.locator('tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 8_000 });
 
-    // Page URL must reflect the route
-    expect(page.url()).toContain('/procurement/three-way-match');
+    // The current enterprise menu points at the canonical dynamic-page route.
+    expect(page.url()).toMatch(/\/(procurement\/three-way-match|p\/pr_three_way_match)([/?#].*)?$/);
   });
 
   // -------------------------------------------------------------------------
