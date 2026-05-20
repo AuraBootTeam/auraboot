@@ -223,6 +223,16 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
       records.length,
       `Exchange rate ${fromCurrency}/${toCurrency} must exist after setup`,
     ).toBeGreaterThan(0);
+
+    const expectedRate = Number(payload.fin_exr_rate);
+    for (const record of records) {
+      const pid = String(record.pid ?? record.id ?? '');
+      if (!pid) continue;
+      if (Number(record.fin_exr_rate) === expectedRate) continue;
+      await executeCommandViaApi(page, 'fin:update_exchange_rate', payload, pid, 'update', {
+        allowHttpError: true,
+      });
+    }
   }
 
   async function openOpportunityListViaSidebar(page: import('@playwright/test').Page) {

@@ -2813,7 +2813,10 @@ export function ListPageContent(props: PageContentProps) {
                 t={t}
                 onInlineSave={handleInlineSave}
                 dictDataCache={dictDataCache.current}
-                enableSelection={!!tableBlock?.table?.selection && !listExtensions?.disableRowSelection}
+                enableSelection={
+                  !!((tableBlock as any)?.table?.selection || (tableBlock as any)?.selection) &&
+                  !listExtensions?.disableRowSelection
+                }
               />
 
               {/* G7 — misc blocks (chart / description / rich-text / divider /

@@ -40,7 +40,7 @@ async function gotoInboundDetail(page: import('@playwright/test').Page, pid: str
 async function createDraftInbound(page: import('@playwright/test').Page): Promise<string> {
   const result = await executeCommandViaApi(
     page,
-    'pe:create_warehouse_in',
+    'inv:create_warehouse_in',
     {
       inv_in_type: 'purchase',
       inv_in_date: todayStr(),
@@ -103,7 +103,7 @@ test.describe('Inbound Receipt — SubTable Line Item CRUD', () => {
     // Create a warehouse
     const whResult = await executeCommandViaApi(
       page,
-      'pe:create_warehouse',
+      'inv:create_warehouse',
       {
         inv_warehouse_name: `WH_${uid}`,
         inv_warehouse_type: 'raw_material',

@@ -47,6 +47,14 @@ function captureDashboardConsoleErrors(page: Page): string[] {
   return errors;
 }
 
+async function hasCrmStarterDashboard(page: Page): Promise<boolean> {
+  const resp = await page.request.get('/api/dashboards?status=published');
+  if (!resp.ok()) return false;
+  const body = await resp.json().catch(() => ({}));
+  const dashboards = body?.data?.records ?? body?.data ?? [];
+  return Array.isArray(dashboards) && dashboards.some((d: any) => d?.code === 'crm_overview');
+}
+
 // ---------------------------------------------------------------------------
 // Sidebar navigation — clicks "CRM 演示 → 驾驶舱" / "CRM Demo → Dashboard"
 // ---------------------------------------------------------------------------
@@ -82,6 +90,7 @@ test.describe('CRM Starter Demo — Lightweight Dashboard', () => {
   test('DASH-001 @smoke — sidebar → dashboard renders both smart-table-chart widgets', async ({
     page,
   }) => {
+    test.skip(!(await hasCrmStarterDashboard(page)), 'crm-starter dashboard is not imported in this profile');
     await gotoCrmDashboardViaSidebar(page);
     await expect(page).toHaveURL(/\/dashboards\/view\/crm_overview/);
 
@@ -126,6 +135,7 @@ test.describe('CRM Starter Demo — Lightweight Dashboard', () => {
   test('DASH-002 @smoke — /dashboards resolves default CRM dashboard with seeded rows', async ({
     page,
   }) => {
+    test.skip(!(await hasCrmStarterDashboard(page)), 'crm-starter dashboard is not imported in this profile');
     const consoleErrors = captureDashboardConsoleErrors(page);
     const dashboardList = page.waitForResponse(
       (response) =>

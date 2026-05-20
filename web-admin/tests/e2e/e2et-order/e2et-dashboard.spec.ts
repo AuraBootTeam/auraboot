@@ -11,7 +11,11 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { navigateToDynamicPage, waitForDynamicPageLoad } from '../helpers';
+import {
+  navigateToDynamicPage,
+  waitForDynamicPageLoad,
+  expectCollectionViewVisible,
+} from '../helpers';
 
 test.describe('E2E Test Dashboard', () => {
   /**
@@ -21,13 +25,7 @@ test.describe('E2E Test Dashboard', () => {
     await navigateToDynamicPage(page, 'e2et-order-dashboard');
     await waitForDynamicPageLoad(page);
 
-    // Dashboard should render at least one data-table block
-    const tables = page.locator('table, [role="table"], [data-testid*="table"]');
-    await expect(tables.first()).toBeVisible({ timeout: 10000 });
-
-    // Should have multiple data-table blocks (3 configured: recent orders, pending payments, customers)
-    const tableCount = await tables.count();
-    expect(tableCount).toBeGreaterThanOrEqual(1);
+    await expectCollectionViewVisible(page, 10000);
   });
 
   /**

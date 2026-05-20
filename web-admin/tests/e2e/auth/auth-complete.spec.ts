@@ -1091,12 +1091,23 @@ test.describe('Security Settings — Sessions', () => {
 // ===========================================================================
 
 test.describe('Logout Flow', () => {
+  test.setTimeout(30000);
+
   test('LO-001: should logout and redirect to login @smoke', async ({ page }) => {
     // Start authenticated — wait for full page load
     await page.goto('/dashboards', { waitUntil: 'load' });
     const header = new HeaderPage(page);
     await header.userMenuButton.waitFor({ state: 'visible', timeout: 20000 });
     await header.logout();
+
+    if (/\/logout([?#].*)?$/.test(page.url())) {
+      const confirmButton = page.getByRole('button', { name: /确认退出|Log Out/i });
+      await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
+      await Promise.all([
+        page.waitForURL(/login/, { timeout: 15000 }),
+        confirmButton.click(),
+      ]);
+    }
 
     // After Form POST, should redirect to /login (increase timeout for batch runs)
     await expect(page).toHaveURL(/login/, { timeout: 20000 });

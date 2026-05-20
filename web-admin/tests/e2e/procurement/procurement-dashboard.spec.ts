@@ -59,11 +59,11 @@ test.describe('Procurement Dashboard @smoke', () => {
     await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
     await menuBtn.click();
 
-    const dashLink = page.locator('a[href="/procurement/dashboard"]');
+    const dashLink = page.locator('a[href="/dashboards/view/proc_dashboard"]');
     await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await dashLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/procurement\/dashboard/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboards\/view\/proc_dashboard/, { timeout: 10000 });
 
     await Promise.all([
       page.waitForResponse(

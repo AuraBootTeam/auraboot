@@ -10,7 +10,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { uniqueId, executeCommandViaApi } from '../helpers/index';
+import { uniqueId, executeCommandViaApi, expectCollectionViewVisible } from '../helpers/index';
 
 test.describe('Inventory Dashboard @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -28,7 +28,7 @@ test.describe('Inventory Dashboard @smoke', () => {
       // Create warehouse
       await executeCommandViaApi(
         page,
-        'pe:create_warehouse',
+        'inv:create_warehouse',
         {
           inv_warehouse_name: `DashWH_${uid}`,
           inv_warehouse_type: 'raw_material',
@@ -129,8 +129,6 @@ test.describe('Inventory Dashboard @smoke', () => {
 
   test('INV-DASH-05: Dashboard renders data-table blocks', async ({ page }) => {
     await gotoDashboard(page);
-    const tables = page.locator('table, [role="table"]');
-    const tableCount = await tables.count();
-    expect(tableCount, 'Dashboard should render data tables').toBeGreaterThanOrEqual(1);
+    await expectCollectionViewVisible(page);
   });
 });
