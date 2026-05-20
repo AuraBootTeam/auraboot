@@ -110,6 +110,7 @@ class AuraBotChatThinkingPersistenceIntegrationTest extends BaseIntegrationTest 
                 conversationId,
                 null,
                 null,
+                java.util.Set.of(),
                 null,
                 null,
                 Instant.now());

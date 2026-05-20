@@ -90,6 +90,16 @@ public class SkillEngine {
         String failureMode = resolveString(skill.get("failure_mode"), "fail_fast");
         int maxRetry = resolveInt(skill.get("max_retry"), 0);
         List<String> toolCodes = parseToolCodes(skill.get("skill_tools"));
+
+        if (!isSupportedExecutionMode(executionMode)) {
+            return SkillResult.builder()
+                    .skillCode(skillCode)
+                    .status(SkillResult.Status.FAILED)
+                    .errorMessage("Unsupported skill execution mode: " + executionMode)
+                    .durationMs(System.currentTimeMillis() - startMs)
+                    .build();
+        }
+
         List<AgentToolDefinition> tools = agentSkillService.resolveSkillTools(tenantId, skillCode);
 
         if (tools.isEmpty() && !"dsl_dispatch".equals(executionMode)) {
@@ -152,10 +162,7 @@ public class SkillEngine {
                     case "sequential" -> executeSequential(tenantId, runPid, skill, toolCodes, tools, input, traceCtx);
                     case "orchestration" -> executeOrchestration(tenantId, runPid, skill, toolCodes, tools, input, traceCtx, provider, config);
                     case "dsl_dispatch" -> executeDslDispatch(tenantId, runPid, skill, input, traceCtx);
-                    default -> {
-                        log.warn("Unknown execution mode '{}', falling back to template", executionMode);
-                        yield executeTemplate(tenantId, runPid, toolCodes, tools, input, traceCtx);
-                    }
+                    default -> throw new IllegalArgumentException("Unsupported skill execution mode: " + executionMode);
                 };
 
                 // If success or partial_success, return immediately
@@ -201,6 +208,13 @@ public class SkillEngine {
                 .status(SkillResult.Status.FAILED)
                 .errorMessage("Exhausted all retries")
                 .build();
+    }
+
+    private boolean isSupportedExecutionMode(String executionMode) {
+        return "template".equals(executionMode)
+                || "sequential".equals(executionMode)
+                || "orchestration".equals(executionMode)
+                || "dsl_dispatch".equals(executionMode);
     }
 
     /**

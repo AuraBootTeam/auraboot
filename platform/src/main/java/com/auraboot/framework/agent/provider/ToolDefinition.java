@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import java.util.Map;
+import java.util.Set;
 
 @Data
 @Builder
@@ -19,6 +20,7 @@ public class ToolDefinition {
     private String toolType;       // dsl_command, dsl_query, platform, custom, mcp
     private String sourceCode;     // underlying command/query/platform code
     private String riskLevel;      // L0-L4
+    private Set<String> requiredPermissions;
     private String confirmationPolicy;
     private boolean requiresApproval;
     private boolean requiresConfirmation;

@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.metrics.ParallelToolMetrics;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.runtime.DurableWorkflowCheckpointStore;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -80,7 +81,8 @@ class StepLoopParallelToolTest {
                 approvalGate,
                 agentProperties,
                 executor,
-                parallelToolMetrics);
+                parallelToolMetrics,
+                org.mockito.Mockito.mock(DurableWorkflowCheckpointStore.class));
     }
 
     @AfterEach

@@ -9,8 +9,13 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
+import com.auraboot.framework.agent.runtime.ChatMessageTapeStore;
+import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.runtime.DefaultAgentReducer;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
+import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
-import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
@@ -57,7 +62,7 @@ import static org.mockito.Mockito.when;
  *       the override (REPLACING ToolProviderRegistry.discoverAll), then extraTools
  *       still merges on top per DC.1 contract.</li>
  *   <li>{@code overrides.persistSessionTape == false} → AgentChatPortImpl skips
- *       writes to ChatSessionStore.storeConversationMessages.</li>
+ *       writes to the chat message tape store.</li>
  *   <li>Default: when overrides is null, behavior is identical to the 3-arg
  *       overload (regression guard for aurabot main path).</li>
  * </ol>
@@ -74,7 +79,9 @@ class AgentChatPortImplOverridesTest {
     @Mock private AgentSkillService skillService;
     @Mock private LlmProvider provider;
     @Mock private ResponseSink sink;
-    @Mock private ChatSessionStore chatSessionStore;
+    @Mock private ChatMessageTapeStore chatMessageTapeStore;
+    @Mock private PendingToolStore pendingToolStore;
+    @Mock private ToolLoopService toolLoopService;
 
     private AgentChatPortImpl service;
 
@@ -87,7 +94,9 @@ class AgentChatPortImplOverridesTest {
     void setUp() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         service = new AgentChatPortImpl(dynamicDataMapper, providerFactory, toolProviderRegistry,
-                groundingService, skillService, mapper, chatSessionStore);
+                groundingService, skillService, mapper, chatMessageTapeStore, pendingToolStore,
+                toolLoopService, new AgentRuntimeStateFactory(), new DefaultAgentReducer(),
+                new ChatTurnRuntime(), new PendingToolSnapshotFactory(new AgentRuntimeStateFactory()));
 
         when(dynamicDataMapper.selectByQuery(any(), anyMap())).thenReturn(List.of(Map.of(
                 "agent_code", AGENT_CODE,
@@ -108,7 +117,7 @@ class AgentChatPortImplOverridesTest {
                         .intent("query").object("test").riskLevel("L0").actionability("read_only")
                         .confidence(ConfidenceScore.of(0.9, 0.9)).build());
 
-        when(chatSessionStore.loadConversationMessages(anyString())).thenReturn(List.of());
+        when(chatMessageTapeStore.loadConversationMessages(anyString())).thenReturn(List.of());
         when(toolProviderRegistry.discoverAll(any())).thenReturn(List.of(
                 ToolDefinition.builder().toolCode("nq_registry_default").description("registry tool")
                         .toolType("dsl_query").sourceCode("registry").riskLevel("L0").build()));
@@ -179,7 +188,7 @@ class AgentChatPortImplOverridesTest {
                 .extracting(LlmChatRequest.Message::getContent)
                 .containsExactly("group chat msg 1", "agent beta said x", "group chat msg 2 - to alpha");
         // session tape NOT loaded when messages override present
-        verify(chatSessionStore, never()).loadConversationMessages(anyString());
+        verify(chatMessageTapeStore, never()).loadConversationMessages(anyString());
     }
 
     @Test
@@ -209,7 +218,7 @@ class AgentChatPortImplOverridesTest {
     }
 
     @Test
-    @DisplayName("persistSessionTape=false -> AgentChatPortImpl skips ChatSessionStore.storeConversationMessages")
+    @DisplayName("persistSessionTape=false -> AgentChatPortImpl skips chat message tape store writes")
     void persistSessionTapeFalse_skipsTapeWrite() throws Exception {
         AgentTurnOverrides overrides = AgentTurnOverrides.builder()
                 .persistSessionTape(false)
@@ -217,7 +226,7 @@ class AgentChatPortImplOverridesTest {
 
         service.runAgentTurn(newCtx(), newRequest(), sink, overrides);
 
-        verify(chatSessionStore, never()).storeConversationMessages(anyString(), any());
+        verify(chatMessageTapeStore, never()).storeConversationMessages(anyString(), any());
     }
 
     @Test
@@ -229,7 +238,7 @@ class AgentChatPortImplOverridesTest {
 
         service.runAgentTurn(newCtx(), newRequest(), sink, overrides);
 
-        verify(chatSessionStore, times(1)).storeConversationMessages(eq(SESSION_ID), any());
+        verify(chatMessageTapeStore, times(1)).storeConversationMessages(eq(SESSION_ID), any());
     }
 
     @Test
@@ -245,7 +254,7 @@ class AgentChatPortImplOverridesTest {
         assertThat(sent.getTools()).extracting(LlmChatRequest.Tool::getName)
                 .containsExactly("nq_registry_default");
         // Tape persisted by default
-        verify(chatSessionStore, times(1)).storeConversationMessages(eq(SESSION_ID), any());
+        verify(chatMessageTapeStore, times(1)).storeConversationMessages(eq(SESSION_ID), any());
     }
 
     @Test

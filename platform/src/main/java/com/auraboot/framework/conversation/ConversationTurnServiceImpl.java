@@ -1,11 +1,19 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.identity.ChannelSessionResolver;
+import com.auraboot.framework.agent.identity.AgentUserProfileResolver;
+import com.auraboot.framework.agent.identity.AuraBotAgentResolver;
 import com.auraboot.framework.agent.port.AgentChatPort;
-import com.auraboot.framework.agent.service.ActiveMemoryService;
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
-import com.auraboot.framework.agent.service.AgentRunService;
-import com.auraboot.framework.agent.service.RunOutcome;
+import com.auraboot.framework.agent.runtime.DurableWorkflowEngine;
+import com.auraboot.framework.agent.runtime.AgentTurnRouter;
+import com.auraboot.framework.agent.runtime.ContextConflictPolicy;
+import com.auraboot.framework.agent.runtime.PendingContextFreshnessDecision;
+import com.auraboot.framework.agent.runtime.PendingContextFreshnessValidator;
+import com.auraboot.framework.agent.runtime.PendingContinuationService;
+import com.auraboot.framework.agent.runtime.PendingToolStore;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
 import com.auraboot.framework.agent.triage.PreGroundingTriage;
 import com.auraboot.framework.agent.triage.TriageBucket;
 import com.auraboot.framework.agent.triage.TriageRequest;
@@ -13,20 +21,22 @@ import com.auraboot.framework.agent.triage.TriageVerdict;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
-import com.auraboot.framework.aurabot.service.ChatSessionStore;
-import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Phase A.4 / B.0 implementation of {@link ConversationTurnService}. Synchronous core
@@ -49,9 +59,14 @@ import java.util.Map;
 @Service
 public class ConversationTurnServiceImpl implements ConversationTurnService {
 
+    private static final ObjectMapper HASH_MAPPER = new ObjectMapper()
+            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+
     private final AuraBotChatService chatService;
+    private final PendingContinuationService pendingContinuationService;
+    private final AgentTurnRouter agentTurnRouter;
     private final TurnSideEffects sideEffects;
-    private final ChatSessionStore chatSessionStore;
+    private final PendingToolStore pendingToolStore;
     private final ObjectMapper objectMapper;
 
     /** Optional named-agent port. When the bean is absent, named-agent traffic
@@ -70,32 +85,32 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     private PreGroundingTriage preGroundingTriage;
 
     /**
-     * Phase C.3c: ACP runtime entry point used when {@link TriageBucket#ACP_RUN}
-     * fires. Optional only because some test contexts may construct the
-     * chokepoint without the full ACP wiring; in production this bean is
-     * always present. When absent, ACP_RUN turns fall back to the legacy
-     * aurabot chat path so users are never broken by partial wiring.
+     * Durable substrate used when a turn requires checkpointable ACP execution.
+     * Optional so OSS/test contexts without the ACP runtime fail closed instead
+     * of silently falling back to the legacy aurabot chat path.
      */
     @Autowired(required = false)
-    private AgentRunService agentRunService;
+    private DurableWorkflowEngine durableWorkflowEngine;
 
     /**
-     * Phase C.3c: needed to write the {@code ab_agent_task} row that ACP runs
-     * are keyed off (Q-C3.1=A "per-turn task model"). Optional in the same
-     * sense as {@link #agentRunService} — mocking-friendly and OSS-safe.
+     * Phase C.3c: needed for named-agent task chain persistence. ACP durable
+     * task/run creation is owned by {@link DurableWorkflowEngine}.
      */
     @Autowired(required = false)
     private DynamicDataMapper dynamicDataMapper;
 
     /**
      * Phase C.3d (Q-C3.3=α): approval-gate convergence. {@link #resumeTurn}
-     * dispatches a resume call to either the legacy {@link ChatSessionStore}
+     * dispatches a resume call to either the legacy {@link PendingToolStore}
      * pending-tool path or the ACP {@code ab_agent_approval} path; this bean
      * services the latter. Optional so OSS deployments without the ACP
      * runtime keep building.
      */
     @Autowired(required = false)
     private AgentApprovalGateService agentApprovalGateService;
+
+    @Autowired(required = false)
+    private PendingContextFreshnessValidator pendingContextFreshnessValidator;
 
     /**
      * GAP-295: 4-tuple session resolution. Optional bean — when absent, every
@@ -107,13 +122,20 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     @Autowired(required = false)
     private ChannelSessionResolver channelSessionResolver;
 
+    @Autowired(required = false)
+    private AgentUserProfileResolver agentUserProfileResolver;
+
     public ConversationTurnServiceImpl(AuraBotChatService chatService,
+                                        PendingContinuationService pendingContinuationService,
+                                        AgentTurnRouter agentTurnRouter,
                                         @Qualifier("turnSideEffects") TurnSideEffects sideEffects,
-                                        ChatSessionStore chatSessionStore,
+                                        PendingToolStore pendingToolStore,
                                         ObjectMapper objectMapper) {
         this.chatService = chatService;
+        this.pendingContinuationService = pendingContinuationService;
+        this.agentTurnRouter = agentTurnRouter;
         this.sideEffects = sideEffects;
-        this.chatSessionStore = chatSessionStore;
+        this.pendingToolStore = pendingToolStore;
         this.objectMapper = objectMapper;
     }
 
@@ -131,14 +153,28 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             ChatRequest legacyRequest = request.legacyRequest();
             String agentCode = request.agentCode();
-            if (isAuraBotPath(agentCode)) {
-                if (shouldDispatchToAcpRuntime(ctx)) {
-                    outcome = dispatchToAcpRun(ctx, legacyRequest, capturingSink);
+            AgentTurnRouter.RuntimeDecision decision = agentTurnRouter.decide(
+                    new AgentTurnRouter.RuntimePolicyInput(
+                            agentCode,
+                            ctx.triageBucket(),
+                            ctx.allowedReadOnlyTools(),
+                            optionFlag(request, "explicitDurableRequest", "durableWorkflow", "durable"),
+                            optionFlag(request, "requiresApproval"),
+                            optionFlag(request, "externalSideEffect"),
+                            optionFlag(request, "batch")));
+            AgentTurnRouter.RuntimeRoute route = decision.route();
+            log.debug("Agent turn route decision: turnId={}, route={}, reason={}, signals={}",
+                    ctx.turnId(), route, decision.reason(), decision.policySignals());
+            if (route == AgentTurnRouter.RuntimeRoute.NAMED_AGENT_CHAT) {
+                outcome = dispatchToNamedAgent(ctx, request, legacyRequest, capturingSink, agentCode);
+            } else {
+                if (route == AgentTurnRouter.RuntimeRoute.DURABLE_RUN) {
+                    outcome = isAcpRuntimeWired()
+                            ? dispatchToAcpRun(ctx, legacyRequest, capturingSink)
+                            : acpRuntimeUnavailableOutcome(ctx, capturingSink);
                 } else {
                     outcome = chatService.executeAuraBotTurn(ctx, legacyRequest, capturingSink);
                 }
-            } else {
-                outcome = dispatchToNamedAgent(ctx, request, legacyRequest, capturingSink, agentCode);
             }
             if (outcome == null) {
                 // Defensive: chat impls always return non-null, but if a future
@@ -149,7 +185,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             }
         } catch (Exception e) {
             log.error("runTurn caught chat impl exception: {}", e.getMessage(), e);
-            outcome = new TurnOutcome.Failed(e.getMessage(), e);
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            try {
+                capturingSink.onError(msg, null);
+            } catch (Exception sinkEx) {
+                log.warn("runTurn failed to emit sink error after chat impl exception: {}", sinkEx.getMessage(), sinkEx);
+            }
+            outcome = new TurnOutcome.Failed(msg, e);
         }
 
         try {
@@ -175,7 +217,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
 
         // Phase C.3d (Q-C3.3=α): the resumption token is opaque to the
-        // frontend — it can be either (a) a ChatSessionStore.PendingTool key
+        // frontend — it can be either (a) a PendingToolSnapshot key
         // (legacy chat tool-loop suspension) or (b) an ab_agent_approval.pid
         // (ACP approval gate and approval-keyed chat pending tools). Approval
         // lookup must win when both stores contain the same token; otherwise a
@@ -191,7 +233,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             }
         }
 
-        ChatSessionStore.PendingTool pending = chatSessionStore.consumePending(pendingTurnId);
+        PendingToolSnapshot pending = pendingToolStore.consumePendingForOwner(
+                pendingTurnId, MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId());
         if (pending != null) {
             return resumeChatPendingTool(pending, decision, sink);
         }
@@ -205,13 +248,30 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
     /** Legacy chat tool-loop suspension resume (Phase B.6 path). Behaviour
      *  is unchanged from pre-C.3d. */
-    private TurnOutcome resumeChatPendingTool(ChatSessionStore.PendingTool pending,
+    private TurnOutcome resumeChatPendingTool(PendingToolSnapshot pending,
                                                ConfirmDecision decision, ResponseSink sink) {
         // 1. Identity validation: the caller must own the suspended turn.
         TurnOutcome identityFailure = validateIdentity(pending);
         if (identityFailure != null) {
             sink.onError(((TurnOutcome.Failed) identityFailure).errorMessage(), null);
             return identityFailure;
+        }
+        TurnOutcome expirationFailure = validatePendingNotExpired(pending);
+        if (expirationFailure != null) {
+            sink.onError(((TurnOutcome.Failed) expirationFailure).errorMessage(), null);
+            return expirationFailure;
+        }
+        if (decision == ConfirmDecision.APPROVED) {
+            TurnOutcome integrityFailure = validatePendingIntegrity(pending);
+            if (integrityFailure != null) {
+                sink.onError(((TurnOutcome.Failed) integrityFailure).errorMessage(), null);
+                return integrityFailure;
+            }
+            TurnOutcome freshnessFailure = validatePendingContextFreshness(pending);
+            if (freshnessFailure != null) {
+                sink.onError(((TurnOutcome.Failed) freshnessFailure).errorMessage(), null);
+                return freshnessFailure;
+            }
         }
 
         // 2. Rebuild TurnContext from the saved pending state.
@@ -226,7 +286,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         TurnOutcome outcome;
         try {
             outcome = switch (decision) {
-                case APPROVED -> chatService.resumeApprovedTurnFromPending(ctx, pending, capturingSink);
+                case APPROVED -> pendingContinuationService.resumeApprovedChatTool(ctx, pending, capturingSink);
                 case DENIED -> {
                     String reason = "User denied the operation";
                     capturingSink.onDone("", null);
@@ -239,12 +299,12 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 }
             };
             if (outcome == null) {
-                String msg = "resumeTurn chat impl returned null outcome";
+                String msg = "resumeTurn pending continuation returned null outcome";
                 log.error(msg);
                 outcome = new TurnOutcome.Failed(msg, null);
             }
         } catch (Exception e) {
-            log.error("resumeTurn caught chat impl exception: {}", e.getMessage(), e);
+            log.error("resumeTurn caught pending continuation exception: {}", e.getMessage(), e);
             outcome = new TurnOutcome.Failed(e.getMessage(), e);
         }
 
@@ -257,13 +317,35 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         return outcome;
     }
 
+    private boolean optionFlag(TurnRequest request, String... keys) {
+        Map<String, Object> options = request != null ? request.options() : null;
+        if (options == null || options.isEmpty() || keys == null) {
+            return false;
+        }
+        for (String key : keys) {
+            if (key == null) {
+                continue;
+            }
+            Object value = options.get(key);
+            if (value instanceof Boolean b && b) {
+                return true;
+            }
+            if (value instanceof Number n && n.longValue() != 0L) {
+                return true;
+            }
+            if (value instanceof String s && Boolean.parseBoolean(s.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Phase C.3d (Q-C3.3=α): ACP approval resume. Drives the approve / reject
      * decision through {@link AgentApprovalGateService} (with the auto-resume
-     * @Async dispatch suppressed) and then synchronously calls
-     * {@link AgentRunService#executeTaskSync} with {@code resumeFromRunPid}
-     * so the resulting {@link RunOutcome} streams back through the SSE sink
-     * the user is still listening on.
+     * @Async dispatch suppressed) and then delegates the continuation to the
+     * durable workflow substrate so the resume outcome streams back through
+     * the SSE sink the user is still listening on.
      *
      * <p>Tenant identity is checked at the {@code findApproval} call site —
      * the lookup is scoped by tenant — so callers from another tenant get a
@@ -301,13 +383,14 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 approverId,
                 MetaContext.getCurrentMemberId(),
                 null,                                         // agentId
-                null,                                         // agentCode (DC.3c)
+                AuraBotAgentResolver.DEFAULT_AGENT_CODE,        // agentCode (ACP resume)
                 null,                                         // channelSessionId
                 null,                                         // conversationId — not stored on approval row
                 null,                                         // inboundMessageId
                 null,                                         // triageBucket — N/A on resume
+                Set.of(),                                     // allowedReadOnlyTools — N/A on resume
                 null,                                         // traceId
-                null,                                         // taskPid (DC.3c)
+                taskPid,                                      // taskPid from approval row
                 java.time.Instant.now());
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
 
@@ -377,28 +460,20 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     }
 
     /**
-     * Drive a synchronous ACP run resume from an approved approval. Mirrors
-     * {@link #dispatchToAcpRun}'s ResponseSinkContext binding so any
-     * {@code result_contract} events emitted during the resumed step still
-     * stream to the same SSE sink.
+     * Drive a durable ACP run resume from an approved approval. The durable
+     * substrate owns the ACP run loop and result streaming.
      */
     private TurnOutcome syncResumeAcpRun(TurnContext ctx, String taskPid, String runPid,
                                           ResponseSink sink) {
-        if (agentRunService == null || taskPid == null || runPid == null) {
-            String msg = "ACP resume blocked: missing wiring (taskPid=" + taskPid
-                    + ", runPid=" + runPid + ", agentRunService=" + (agentRunService != null) + ")";
+        if (durableWorkflowEngine == null || taskPid == null || runPid == null) {
+            String msg = "ACP resume blocked: DurableWorkflowEngine is not available (taskPid=" + taskPid
+                    + ", runPid=" + runPid
+                    + ", durableWorkflowEngine=" + (durableWorkflowEngine != null) + ")";
             log.error(msg);
             sink.onError(msg, null);
             return new TurnOutcome.Failed(msg, null);
         }
-        ResponseSinkContext.set(sink);
-        try {
-            RunOutcome resumeOutcome = agentRunService.executeTaskSync(
-                    ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, runPid);
-            return mapRunToTurnOutcome(ctx, resumeOutcome, sink);
-        } finally {
-            ResponseSinkContext.clear();
-        }
+        return durableWorkflowEngine.resumeConversationRun(ctx, taskPid, runPid, sink);
     }
 
     /**
@@ -408,7 +483,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
      * via SSE, an attacker who guesses or sniffs one should not be able to
      * execute the pending tool).
      */
-    private TurnOutcome validateIdentity(ChatSessionStore.PendingTool pending) {
+    private TurnOutcome validateIdentity(PendingToolSnapshot pending) {
         Long currentTenantId = MetaContext.getCurrentTenantId();
         Long currentUserId = MetaContext.getCurrentUserId();
         if (pending.getTenantId() == null || pending.getUserId() == null) {
@@ -433,7 +508,137 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         return null;
     }
 
-    private TurnContext rebuildContext(ChatSessionStore.PendingTool pending) {
+    private TurnOutcome validatePendingNotExpired(PendingToolSnapshot pending) {
+        Long expiresAt = pending.getExpiresAt();
+        if (expiresAt == null) {
+            return null;
+        }
+        long now = java.time.Instant.now().toEpochMilli();
+        if (expiresAt > now) {
+            return null;
+        }
+        String msg = "pending tool entry expired — refusing resume";
+        log.warn("{} (turnId={}, toolName={}, expiresAt={})",
+                msg,
+                pending.getTurnId(),
+                pending.getToolName(),
+                expiresAt);
+        return new TurnOutcome.Failed(msg, null);
+    }
+
+    private TurnOutcome validatePendingIntegrity(PendingToolSnapshot pending) {
+        if (hasText(pending.getArgsHash())) {
+            String expectedArgsHash = hashMap(pending.getInput());
+            if (!pending.getArgsHash().equals(expectedArgsHash)) {
+                String msg = "pending tool args hash mismatch — refusing resume";
+                log.warn("{} (turnId={}, toolName={})", msg, pending.getTurnId(), pending.getToolName());
+                return new TurnOutcome.Failed(msg, null);
+            }
+        }
+        if (hasText(pending.getToolSchemaHash())) {
+            Map<String, Object> schema = resolvePendingToolSchema(pending);
+            if (schema != null) {
+                String expectedSchemaHash = hashMap(schema);
+                if (!pending.getToolSchemaHash().equals(expectedSchemaHash)) {
+                    String msg = "pending tool schema hash mismatch — refusing resume";
+                    log.warn("{} (turnId={}, toolName={})", msg, pending.getTurnId(), pending.getToolName());
+                    return new TurnOutcome.Failed(msg, null);
+                }
+            }
+        }
+        if (hasText(pending.getPreviewHash())) {
+            String expectedPreviewHash = hashText(pending.getPreview());
+            if (!pending.getPreviewHash().equals(expectedPreviewHash)) {
+                String msg = "pending tool preview hash mismatch — refusing resume";
+                log.warn("{} (turnId={}, toolName={})", msg, pending.getTurnId(), pending.getToolName());
+                return new TurnOutcome.Failed(msg, null);
+            }
+        }
+        return null;
+    }
+
+    private TurnOutcome validatePendingContextFreshness(PendingToolSnapshot pending) {
+        if (pendingContextFreshnessValidator == null) {
+            return null;
+        }
+        PendingContextFreshnessDecision decision;
+        try {
+            decision = pendingContextFreshnessValidator.validate(pending);
+        } catch (RuntimeException e) {
+            // CATCH: validator is a non-transactional guard; fail closed before executing side effects.
+            String msg = "pending context freshness validation failed — refusing resume";
+            log.warn("{} (turnId={}, toolName={}, error={})",
+                    msg, pending.getTurnId(), pending.getToolName(), e.getClass().getSimpleName());
+            return new TurnOutcome.Failed(msg, e);
+        }
+        if (decision == null || decision.fresh()) {
+            return null;
+        }
+        ContextConflictPolicy policy = decision.conflictPolicy() != null
+                ? decision.conflictPolicy()
+                : ContextConflictPolicy.REJECT_AND_REPLAN;
+        if (policy == ContextConflictPolicy.ALLOW_IF_NON_CRITICAL) {
+            log.info("Pending context freshness conflict allowed as non-critical: turnId={}, toolName={}, reason={}",
+                    pending.getTurnId(), pending.getToolName(), decision.reasonCode());
+            return null;
+        }
+        String msg = "pending context freshness conflict — refusing resume"
+                + (hasText(decision.reasonCode()) ? ": " + decision.reasonCode() : "");
+        log.warn("{} (turnId={}, toolName={}, policy={}, message={})",
+                msg, pending.getTurnId(), pending.getToolName(), policy, decision.message());
+        return new TurnOutcome.Failed(msg, null);
+    }
+
+    private Map<String, Object> resolvePendingToolSchema(PendingToolSnapshot pending) {
+        if (pending.getAgentToolDefinitions() == null || pending.getAgentToolDefinitions().isEmpty()) {
+            return null;
+        }
+        for (AgentToolDefinition definition : pending.getAgentToolDefinitions()) {
+            if (definition == null || !equalsAny(pending.getToolName(), definition.getName(), definition.getSourceCode())) {
+                continue;
+            }
+            return definition.getInputSchema() != null ? definition.getInputSchema() : Map.of();
+        }
+        return null;
+    }
+
+    private String hashMap(Map<String, Object> value) {
+        try {
+            byte[] bytes = HASH_MAPPER.writeValueAsBytes(value == null ? Map.of() : value);
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (Exception e) {
+            return HexFormat.of().formatHex(String.valueOf(value).getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private String hashText(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(
+                    digest.digest(String.valueOf(value).getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            return HexFormat.of().formatHex(String.valueOf(value).getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private boolean equalsAny(String target, String... values) {
+        if (target == null || values == null) {
+            return false;
+        }
+        for (String value : values) {
+            if (target.equals(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private TurnContext rebuildContext(PendingToolSnapshot pending) {
         // GAP-295 resume path: re-attach the channel session captured at
         // suspend. We trust the stored pid (PendingTool already passed
         // identity validation in validateIdentity) but defensively use
@@ -448,12 +653,15 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 pending.getHumanMemberId(),
                 null,                                  // agentId — Phase B/B+ AuraBotAgentResolver
                 pending.getAgentCode(),                // DC.3c Fix 2: preserve named-agent identity across resume
+                pending.getChannel(),                  // preserve channel for downstream policy gates
+                pending.getProfileId(),                // preserve user profile for downstream policy gates
                 channelSessionId,                      // GAP-295 resume: re-attached via findByPid
                 pending.getConversationId(),
                 null,                                  // inboundMessageId — already persisted at suspend time
                 null,                                  // triageBucket
+                Set.of(),                              // allowedReadOnlyTools — already suspended
                 null,                                  // traceId — chat impl re-attaches via aiTraceService.findActiveTrace
-                null,                                  // taskPid — resume reuses original task on chokepoint side; DC.3c+ closure protocol
+                pending.getTaskPid(),                  // DC.3c: resume finalization closes the original named-agent task
                 java.time.Instant.now());
     }
 
@@ -478,15 +686,6 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                     channelSessionPid, tenantId, e.getMessage());
             return null;
         }
-    }
-
-    /**
-     * The aurabot main path covers explicit {@code "aurabot"} as well as null /
-     * blank agentCode (default fallthrough — frontend sends agentCode only when
-     * the user explicitly selected a named agent).
-     */
-    private static boolean isAuraBotPath(String agentCode) {
-        return agentCode == null || agentCode.isBlank() || "aurabot".equals(agentCode);
     }
 
     /**
@@ -521,7 +720,17 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             sink.onError(msg, null);
             return new TurnOutcome.Failed(msg, null);
         }
-        if (!agentChatPort.agentExists(ctx.tenantId(), agentCode)) {
+        boolean agentExists;
+        try {
+            agentExists = agentChatPort.agentExists(ctx.tenantId(), agentCode);
+        } catch (Exception e) {
+            String msg = safeExceptionMessage(e);
+            log.warn("Named-agent existence lookup failed: agentCode={}, errorType={}",
+                    agentCode, e.getClass().getSimpleName());
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, e);
+        }
+        if (!agentExists) {
             String msg = "Agent not found or inactive: " + agentCode;
             sink.onError(msg, null);
             return new TurnOutcome.Failed(msg, null);
@@ -529,7 +738,16 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
         // DC.3c Fix 3: create ab_agent_task row before invoking AgentChatPort,
         // with parent_id linking to the upstream hop on a handoff chain.
-        String taskPid = createNamedAgentTask(ctx, request, agentCode);
+        String taskPid;
+        try {
+            taskPid = createNamedAgentTask(ctx, request, agentCode);
+        } catch (Exception e) {
+            String msg = safeExceptionMessage(e);
+            log.error("Named-agent task creation failed: agentCode={}, errorType={}",
+                    agentCode, e.getClass().getSimpleName());
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, e);
+        }
         TurnContext ctxWithTask = (taskPid != null) ? ctx.withTaskPid(taskPid) : ctx;
 
         log.info("Chat request delegated to named agent: agentCode={}, tenantId={}, turnId={}, taskPid={}, parentTaskPid={}, overrides={}",
@@ -546,13 +764,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
     /**
      * DC.3c Fix 3: create an {@code ab_agent_task} row for a named-agent turn
-     * dispatched through the chokepoint. Returns the pid; null when
-     * {@code dynamicDataMapper} is unbound (test contexts) so the rest of the
-     * dispatch still works without observability rows.
+     * dispatched through the chokepoint. Returns the pid. Missing or failing task
+     * persistence fails the turn before {@link AgentChatPort} runs so the task
+     * chain cannot silently disappear.
      */
     private String createNamedAgentTask(TurnContext ctx, TurnRequest request, String agentCode) {
         if (dynamicDataMapper == null) {
-            return null;
+            throw new IllegalStateException("Named-agent task persistence is unavailable");
         }
         try {
             String taskPid = com.auraboot.framework.common.util.UniqueIdGenerator.generate();
@@ -585,9 +803,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             dynamicDataMapper.insert("ab_agent_task", row);
             return taskPid;
         } catch (Exception e) {
-            // Observability row write failure must not break the user-visible turn.
-            log.warn("createNamedAgentTask failed for agentCode={}: {}", agentCode, e.getMessage());
-            return null;
+            throw new IllegalStateException("Named-agent task creation failed: " + safeExceptionMessage(e), e);
         }
     }
 
@@ -615,216 +831,39 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         return new TurnOutcome.Success(success.finalResponse(), meta);
     }
 
-    /**
-     * Phase C.3c (Q-C3.5=β step1) extended by C.3e (step2): ACP_RUN AND
-     * CONTEXTUAL_ANSWER buckets dispatch to the ACP runtime for the aurabot
-     * main path. After C.3e only LIGHT_CHAT (and the {@code null} bucket
-     * defensive fallback when triage SPI is absent) continues to flow
-     * through the legacy chat path — that path serves trivial chat
-     * (greeting / thanks) where ACP's task / run / action machinery would
-     * be pure overhead.
-     *
-     * <p>Per design §3.6 CONTEXTUAL_ANSWER turns benefit from ACP because:
-     * <ul>
-     *     <li>D1 grounding compiles the user's "explain this page" question
-     *         into a {@code BusinessIntentFrame} that {@code GroundingService}
-     *         already produces in the chat path — moving it under ACP keeps
-     *         the BIF + skill-routing + tool-discovery work in one place.</li>
-     *     <li>The read-only tools (e.g. {@code schema.lookup}, {@code record.view})
-     *         the explanation-bucket triage advertises are exactly the read-
-     *         only tools ACP discovers via {@code ToolProviderRegistry}.</li>
-     *     <li>Result rendering: explanation answers are structured (page
-     *         schema, field meanings) — {@code result_contract} renders them
-     *         consistently with the action-bucket flow.</li>
-     * </ul>
-     *
-     * <p>Falls back to the legacy chat path when:
-     * <ul>
-     *     <li>{@link #agentRunService} is unbound — partial wiring or test context</li>
-     *     <li>{@link #dynamicDataMapper} is unbound — same</li>
-     * </ul>
-     * Both fall-throughs log at WARN; never silent.
-     */
-    private boolean shouldDispatchToAcpRuntime(TurnContext ctx) {
-        TriageBucket bucket = ctx.triageBucket();
-        if (bucket != TriageBucket.ACP_RUN && bucket != TriageBucket.CONTEXTUAL_ANSWER) {
-            return false;
-        }
-        if (agentRunService == null || dynamicDataMapper == null) {
-            log.warn("triageBucket={} but ACP runtime wiring is incomplete "
-                            + "(agentRunService={}, dynamicDataMapper={}); falling back to chat path",
-                    bucket, agentRunService != null, dynamicDataMapper != null);
-            return false;
-        }
-        return true;
+    private boolean isAcpRuntimeWired() {
+        return durableWorkflowEngine != null && durableWorkflowEngine.isAvailable();
+    }
+
+    private TurnOutcome acpRuntimeUnavailableOutcome(TurnContext ctx, ResponseSink sink) {
+        String msg = "ACP runtime wiring is incomplete for triageBucket=" + ctx.triageBucket()
+                + " (durableWorkflowEngine=" + (durableWorkflowEngine != null)
+                + ", available=" + (durableWorkflowEngine != null && durableWorkflowEngine.isAvailable()) + ")";
+        log.error(msg);
+        sink.onError(msg, null);
+        return new TurnOutcome.Failed(msg, null);
     }
 
     /**
-     * Per Q-C3.1=A, every ACP_RUN turn creates an {@code ab_agent_task} row
-     * with {@code assignee_type='ai'} so the ACP run / step / action /
-     * approval rows downstream all attach to the same task pid. The task
-     * carries the chat turn's identity in {@code input_data} so the run
-     * record can be correlated back to the conversation turn for cross-
-     * feature observability (Q-C3.1 rationale).
-     *
-     * <p>SSE byte note: the chat path emits {@code chunk} text-streaming
-     * events as the LLM types. The ACP path is action-oriented — it emits
-     * {@code result_contract} per tool call (via {@code ResultContractEmitter}
-     * → {@link ResponseSinkContext}) and a single {@code done} event at the
-     * end. Frontend rendering still works because both event types are
-     * supported, but the typing animation is absent for ACP_RUN turns. This
-     * is the intentional UX consequence of routing action verbs through
-     * ACP per design §3.6.
-     *
-     * <p>Approval gate handling: per Q-C3.5=β step1 scope, a
-     * {@link RunOutcome.PendingApproval} surfaces here as a
-     * {@link TurnOutcome.Failed} with a clear "approval pending" message.
-     * The full approve / reject flow over {@code ab_agent_approval} is
-     * Phase C.3d (Q-C3.3=α). Wiring it earlier would force a frontend
-     * contract change in this PR; deferring keeps C.3c reviewable.
+     * Delegate ACP_RUN turns to the durable workflow substrate. The
+     * chokepoint owns lifecycle, persistence, and audit; ACP task creation
+     * and run outcome mapping live behind {@link DurableWorkflowEngine}.
      */
     private TurnOutcome dispatchToAcpRun(TurnContext ctx, ChatRequest legacyRequest, ResponseSink sink) {
-        // Bind the sink so any ResultContract emitted from inside the ACP
-        // run loop (ToolLoopService -> ResultContractEmitter -> sink) flows
-        // out the same SSE stream the chokepoint already started.
-        ResponseSinkContext.set(sink);
-        try {
-            String taskPid = createAcpTaskRow(ctx, legacyRequest);
-            log.info("ACP_RUN dispatch: tenantId={}, turnId={}, taskPid={}",
-                    ctx.tenantId(), ctx.turnId(), taskPid);
-
-            RunOutcome runOutcome = agentRunService.executeTaskSync(
-                    ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, null);
-
-            return mapRunToTurnOutcome(ctx, runOutcome, sink);
-        } catch (Exception e) {
-            log.error("dispatchToAcpRun failed: {}", e.getMessage(), e);
-            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            sink.onError(msg, null);
-            return new TurnOutcome.Failed(msg, e);
-        } finally {
-            ResponseSinkContext.clear();
+        if (!isAcpRuntimeWired()) {
+            return acpRuntimeUnavailableOutcome(ctx, sink);
         }
-    }
-
-    /**
-     * Insert an {@code ab_agent_task} row carrying the chat turn's identity
-     * tuple. Returns the task pid so the caller can hand it to
-     * {@code AgentRunService.executeTaskSync}. Never falls back — a DB
-     * failure here surfaces as a runtime exception which the caller maps
-     * into {@link TurnOutcome.Failed}.
-     */
-    private String createAcpTaskRow(TurnContext ctx, ChatRequest legacyRequest) {
-        String taskPid = UniqueIdGenerator.generate();
-        Map<String, Object> task = new HashMap<>();
-        task.put("pid", taskPid);
-        task.put("tenant_id", ctx.tenantId());
-        task.put("title", buildTaskTitle(legacyRequest));
-        task.put("description", legacyRequest != null ? legacyRequest.getMessage() : "");
-        task.put("task_status", "in_progress");
-        task.put("task_priority", "normal");
-        task.put("assignee_type", "ai");
-        task.put("assignee_id", ActiveMemoryService.DEFAULT_AGENT);
-        task.put("created_at", LocalDateTime.now());
-        task.put("updated_at", LocalDateTime.now());
-
-        Map<String, Object> inputData = new LinkedHashMap<>();
-        inputData.put("turnId", ctx.turnId());
-        inputData.put("conversationId", ctx.conversationId());
-        inputData.put("inboundMessageId", ctx.inboundMessageId());
-        inputData.put("triageBucket", ctx.triageBucket() != null ? ctx.triageBucket().name() : null);
-        inputData.put("userMessage", legacyRequest != null ? legacyRequest.getMessage() : null);
-        try {
-            task.put("input_data", objectMapper.writeValueAsString(inputData));
-        } catch (JsonProcessingException ex) {
-            // Don't block the run — fall back to a minimal payload. The user
-            // message in `description` is the same content the LLM sees.
-            task.put("input_data", "{}");
-        }
-
-        dynamicDataMapper.insert("ab_agent_task", task);
-        return taskPid;
-    }
-
-    private static String buildTaskTitle(ChatRequest legacyRequest) {
-        if (legacyRequest == null || legacyRequest.getMessage() == null) {
-            return "Aurabot turn";
-        }
-        String msg = legacyRequest.getMessage().trim();
-        if (msg.length() > 80) {
-            return msg.substring(0, 80) + "...";
-        }
-        return msg.isEmpty() ? "Aurabot turn" : msg;
-    }
-
-    /**
-     * Map ACP {@link RunOutcome} → chokepoint {@link TurnOutcome} and emit
-     * the corresponding terminal SSE event so the frontend's
-     * {@code reader.readChat} loop terminates cleanly.
-     */
-    private TurnOutcome mapRunToTurnOutcome(TurnContext ctx, RunOutcome ro, ResponseSink sink) {
-        return switch (ro) {
-            case RunOutcome.Success s -> {
-                String response = s.finalResponse() != null ? s.finalResponse() : "";
-                sink.onDone(response, null);
-                Map<String, Object> meta = new LinkedHashMap<>();
-                meta.put("runPid", s.runPid());
-                meta.put("inputTokens", s.inputTokens());
-                meta.put("outputTokens", s.outputTokens());
-                meta.put("totalCost", s.totalCost());
-                yield new TurnOutcome.Success(response, meta);
-            }
-            case RunOutcome.PendingApproval pa -> {
-                // Phase C.3d (Q-C3.3=α): convergence to ACP approval gate.
-                // approvalPid identifies the ab_agent_approval row; we surface
-                // it on the confirm_required SSE event as the resumption token
-                // (replacing pendingTurnId for ACP_RUN turns) and return a
-                // PendingConfirmation outcome so finalizeTurn fires the
-                // suspension event chain (TurnSuspendedEvent + ChatSessionStore
-                // savePending stays unwired for ACP path — the approval row IS
-                // the persisted pending state).
-                if (pa.approvalPid() == null) {
-                    // Pre-C.3d throw site: no approvalPid available — fall back
-                    // to Failed so the user is not silently stuck.
-                    String msg = "Approval required but no approval pid available "
-                            + "(run " + pa.runPid() + "): "
-                            + (pa.message() != null ? pa.message() : "<no detail>");
-                    sink.onError(msg, null);
-                    yield new TurnOutcome.Failed(msg, null);
-                }
-                sink.onConfirmRequired(
-                        pa.approvalPid(),                   // toolId — frontend uses for action correlation
-                        "agent_approval_gate",              // toolName — generic ACP gate marker
-                        pa.message() != null ? pa.message() : "Approval required",
-                        Map.of("runPid", pa.runPid()),
-                        pa.approvalPid());                  // pendingTurnId — resumption token
-                yield new TurnOutcome.PendingConfirmation(
-                        pa.approvalPid(),                   // pendingTurnId in TurnOutcome
-                        "",                                 // partialResponse — ACP run does not stream prose
-                        pa.approvalPid());                  // pendingToolId
-            }
-            case RunOutcome.Failed f -> {
-                String msg = f.errorMessage() != null ? f.errorMessage() : "ACP run failed";
-                sink.onError(msg, null);
-                yield new TurnOutcome.Failed(msg, null);
-            }
-            case RunOutcome.Skipped sk -> {
-                // Skipped means a pre-execution gate (agent runtime disabled)
-                // fired. Surface as Failed so the user sees a clear message.
-                String msg = sk.reason() != null ? sk.reason() : "ACP run skipped";
-                sink.onError(msg, null);
-                yield new TurnOutcome.Failed(msg, null);
-            }
-        };
+        return durableWorkflowEngine.startConversationRun(ctx, legacyRequest, sink);
     }
 
     private TurnContext beginTurn(TurnRequest request) {
+        String profileId = resolveProfileId(request);
         // Phase C.1: Stage 2.5 Pre-Grounding Triage runs BEFORE persistence so the
         // verdict can be written onto the inbound row + carried in TurnContext.
         // Caller-supplied precomputedBucket (set by webhook / event adapters) wins
         // over the SPI verdict per design — same semantic as channel override
         // in DefaultPreGroundingTriage.
-        TriageVerdict verdict = runTriage(request);
+        TriageVerdict verdict = runTriage(request, profileId);
         TriageBucket effectiveBucket = request.precomputedBucket() != null
                 ? request.precomputedBucket()
                 : (verdict != null ? verdict.bucket() : null);
@@ -837,7 +876,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         // session row so EffectLifetime.PER_SESSION (and downstream session-
         // scoped state) has a stable scope key. {@code profileId=null} means
         // "tenant default profile" per the SPI contract — not "no profile".
-        String channelSessionId = resolveChannelSessionId(request);
+        String channelSessionId = resolveChannelSessionId(request, profileId);
         return new TurnContext(
                 com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
                 request.tenantId(),
@@ -845,13 +884,24 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 request.humanMemberId(),
                 null,                                // agentId — Phase B's AuraBotAgentResolver
                 request.agentCode(),                 // DC.3c Fix 2: drives outbound sender_id resolution
+                request.channel(),                   // execution-policy channel source
+                profileId,                           // resolved user profile id for policy/session scope
                 channelSessionId,                    // GAP-295: resolved above
                 request.conversationId(),
                 inboundMessageId,
                 effectiveBucket,
+                allowedReadOnlyToolsFor(effectiveBucket, verdict),
                 null,                                // traceId — set inside chat impl (kept null on TurnContext for Phase A)
                 null,                                // taskPid — chokepoint dispatch later fills via withTaskPid (DC.3c)
                 java.time.Instant.now());
+    }
+
+    private static Set<String> allowedReadOnlyToolsFor(TriageBucket effectiveBucket, TriageVerdict verdict) {
+        if (effectiveBucket != TriageBucket.CONTEXTUAL_ANSWER || verdict == null
+                || verdict.allowedReadOnlyTools() == null) {
+            return Set.of();
+        }
+        return verdict.allowedReadOnlyTools();
     }
 
     /**
@@ -863,7 +913,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
      * a turn that can otherwise execute should not be aborted because session
      * accounting was unavailable.
      */
-    private String resolveChannelSessionId(TurnRequest request) {
+    private String resolveChannelSessionId(TurnRequest request, String profileId) {
         if (channelSessionResolver == null) {
             return null;
         }
@@ -877,7 +927,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                             request.tenantId(),
                             request.channel(),
                             String.valueOf(request.userId()),
-                            /*profileId=*/ null,           // tenant default
+                            profileId,
                             request.userId(),              // acpUserId
                             /*createIfAbsent=*/ true));
             return session != null ? session.pid() : null;
@@ -888,17 +938,31 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
     }
 
+    private String resolveProfileId(TurnRequest request) {
+        if (agentUserProfileResolver == null || request == null) {
+            return null;
+        }
+        try {
+            return agentUserProfileResolver.resolveProfileId(request.tenantId(), request.userId())
+                    .orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("Agent user profile resolve failed for tenant={} userId={}: {}",
+                    request.tenantId(), request.userId(), e.getMessage());
+            return null;
+        }
+    }
+
     /**
-     * Phase C.1: invoke the Pre-Grounding Triage SPI. Fail-closed to ACP_RUN
-     * (per the SPI contract: "Failure must fall back to ACP_RUN, never
-     * LIGHT_CHAT") so a misbehaving classifier cannot accidentally route a
+     * Phase C.1: invoke the Pre-Grounding Triage SPI. Fail closed to ACP_RUN
+     * (per the SPI contract: a classifier failure must choose ACP_RUN, never
+     * LIGHT_CHAT) so a misbehaving classifier cannot accidentally route a
      * platform-action turn to the no-platform light path.
      *
      * @return the verdict, or null when the SPI bean is absent (preserves
      *         pre-C.1 behavior — no triage_bucket column write, TurnContext
      *         falls back to caller-supplied precomputedBucket)
      */
-    private TriageVerdict runTriage(TurnRequest request) {
+    private TriageVerdict runTriage(TurnRequest request, String profileId) {
         if (preGroundingTriage == null) {
             return null;
         }
@@ -906,7 +970,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 request.tenantId(),
                 request.userId(),
                 request.channel(),
-                null,                                // profileId — Phase C+ tenant-profile policy hook
+                profileId,
                 request.userMessage(),
                 request.pageContext() != null && !request.pageContext().isEmpty(),
                 hasRecordContext(request),
@@ -915,7 +979,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             return preGroundingTriage.triage(tr);
         } catch (Exception e) {
-            log.warn("PreGroundingTriage threw, falling back to ACP_RUN: {}", e.getMessage());
+            log.warn("PreGroundingTriage threw; failing closed to ACP_RUN: {}", e.getMessage());
             return new TriageVerdict(
                     TriageBucket.ACP_RUN,
                     0.0,
@@ -952,12 +1016,14 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             }
             case TurnOutcome.Failed f -> {
                 sideEffects.auditWriter().writeFailure(ctx, f);
+                sideEffects.persistence().persistOutbound(ctx, f, effective);
                 sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, f));
             }
             case TurnOutcome.PendingConfirmation pc -> {
                 // suspendTurn semantics (P1.4 fix): only persist outbound when there is a
                 // partial response worth keeping; otherwise skip persistence and just emit
-                // the suspension event. Phase B will additionally chatSessionStore.savePending
+                // the suspension event. Phase B additionally stores pending
+                // payloads through PendingToolStore.
                 // the pending tool payload keyed by ctx.turnId().
                 if (pc.partialResponse() != null && !pc.partialResponse().isBlank()) {
                     sideEffects.persistence().persistOutbound(ctx, pc, effective);
@@ -987,7 +1053,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
      * </ul>
      */
     private void closeNamedAgentTask(TurnContext ctx, TurnOutcome outcome) {
-        if (dynamicDataMapper == null || ctx.taskPid() == null) {
+        String taskPid = namedAgentTaskPid(ctx, outcome);
+        if (dynamicDataMapper == null || taskPid == null) {
             return;
         }
         try {
@@ -1017,9 +1084,40 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 }
             }
             dynamicDataMapper.update("ab_agent_task", updates,
-                    java.util.Map.of("pid", ctx.taskPid()));
+                    java.util.Map.of("pid", taskPid));
         } catch (Exception e) {
-            log.warn("closeNamedAgentTask failed for taskPid={}: {}", ctx.taskPid(), e.getMessage());
+            String msg = "Named-agent task close failed: " + safeExceptionMessage(e);
+            log.warn("closeNamedAgentTask failed for taskPid={}: {}", taskPid, safeExceptionMessage(e));
+            try {
+                sideEffects.auditWriter().writeFailure(ctx, new TurnOutcome.Failed(msg, e));
+            } catch (Exception auditEx) {
+                log.warn("closeNamedAgentTask audit write failed for taskPid={}: {}",
+                        taskPid, safeExceptionMessage(auditEx));
+            }
         }
+    }
+
+    private String namedAgentTaskPid(TurnContext ctx, TurnOutcome outcome) {
+        if (ctx != null && ctx.taskPid() != null) {
+            return ctx.taskPid();
+        }
+        if (outcome instanceof TurnOutcome.Success success && success.meta() != null) {
+            Object taskPid = success.meta().get("_taskPid");
+            if (taskPid instanceof String s && !s.isBlank()) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    private String safeExceptionMessage(Exception e) {
+        if (e == null) {
+            return "Unknown error";
+        }
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            return e.getClass().getSimpleName();
+        }
+        return LogSanitizer.safe(message);
     }
 }

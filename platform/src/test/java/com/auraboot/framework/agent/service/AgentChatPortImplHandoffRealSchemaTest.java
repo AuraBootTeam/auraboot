@@ -11,8 +11,13 @@ import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agentchat.handoff.HandoffToolProvider;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
+import com.auraboot.framework.agent.runtime.ChatMessageTapeStore;
+import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.runtime.DefaultAgentReducer;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
+import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
-import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
@@ -76,7 +81,9 @@ class AgentChatPortImplHandoffRealSchemaTest {
     @Mock private AgentSkillService skillService;
     @Mock private LlmProvider provider;
     @Mock private ResponseSink sink;
-    @Mock private ChatSessionStore chatSessionStore;
+    @Mock private ChatMessageTapeStore chatMessageTapeStore;
+    @Mock private PendingToolStore pendingToolStore;
+    @Mock private ToolLoopService toolLoopService;
 
     private AgentChatPortImpl service;
     private HandoffToolProvider handoffProvider;
@@ -90,7 +97,9 @@ class AgentChatPortImplHandoffRealSchemaTest {
     void setUp() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         service = new AgentChatPortImpl(dynamicDataMapper, providerFactory, toolProviderRegistry,
-                groundingService, skillService, mapper, chatSessionStore);
+                groundingService, skillService, mapper, chatMessageTapeStore, pendingToolStore,
+                toolLoopService, new AgentRuntimeStateFactory(), new DefaultAgentReducer(),
+                new ChatTurnRuntime(), new PendingToolSnapshotFactory(new AgentRuntimeStateFactory()));
         handoffProvider = new HandoffToolProvider();
 
         when(dynamicDataMapper.selectByQuery(any(), anyMap())).thenReturn(List.of(Map.of(
@@ -112,7 +121,7 @@ class AgentChatPortImplHandoffRealSchemaTest {
                         .intent("query").object("test").riskLevel("L0").actionability("read_only")
                         .confidence(ConfidenceScore.of(0.9, 0.9)).build());
 
-        when(chatSessionStore.loadConversationMessages(anyString())).thenReturn(List.of());
+        when(chatMessageTapeStore.loadConversationMessages(anyString())).thenReturn(List.of());
         when(toolProviderRegistry.discoverAll(any())).thenReturn(List.of());
     }
 

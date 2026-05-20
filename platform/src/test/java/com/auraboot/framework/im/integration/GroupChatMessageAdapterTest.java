@@ -159,6 +159,27 @@ class GroupChatMessageAdapterTest {
         assertThat(dto.getSoulProfile()).contains("trait");
     }
 
+    @Test
+    void getAgentMembers_parsesProfilePermissionsFromGuardrails() {
+        ImConversationMember mem = member(1001L);
+        AgentDefinition agent = new AgentDefinition();
+        agent.setId(1001L);
+        agent.setAgentCode("planner");
+        agent.setName("Planner");
+        agent.setGuardrails("""
+                {"profilePermissions":["crm.customer.read","finance.invoice.read"]}
+                """);
+
+        when(memberMapper.findAgentMembers(1L, 100L)).thenReturn(List.of(mem));
+        when(agentDefinitionMapper.selectById(1001L)).thenReturn(agent);
+
+        List<AgentMemberDto> result = adapter.getAgentMembers(1L, 100L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getProfilePermissions())
+                .containsExactlyInAnyOrder("crm.customer.read", "finance.invoice.read");
+    }
+
     // ---------- hasAgentMembers ----------
 
     @Test
