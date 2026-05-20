@@ -106,7 +106,14 @@ public class AuraPluginManager extends SpringPluginManager {
     @PreDestroy
     public void cleanup() {
         log.info("Shutting down plugin manager...");
-        stopPlugins();
+        for (PluginWrapper wrapper : new ArrayList<>(getStartedPlugins())) {
+            try {
+                stopPlugin(wrapper.getPluginId());
+            } catch (Exception e) {
+                log.warn("Failed to stop plugin {} during shutdown: {}",
+                        wrapper.getPluginId(), e.getMessage(), e);
+            }
+        }
         log.info("Plugin manager shutdown complete");
     }
 

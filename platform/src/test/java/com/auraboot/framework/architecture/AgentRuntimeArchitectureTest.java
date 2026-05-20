@@ -927,8 +927,12 @@ class AgentRuntimeArchitectureTest {
         assertThat(aurabot)
                 .as("AuraBot must not keep adding unlabeled page/RAG prompt strings")
                 .contains(
-                        "AgentContextBundle contextBundle = new AgentContextAssembler(objectMapper).assemble(",
+                        "private final AgentContextAssembler contextAssembler;",
+                        "contextAssembler.assemble(",
                         "contextBundle.renderPromptSection()");
+        assertThat(aurabot)
+                .as("Context assembly should be injected instead of reconstructed inside the turn path")
+                .doesNotContain("new AgentContextAssembler(objectMapper)");
         assertThat(assembler)
                 .as("ContextAssembler must produce provenance labels that policy/evals can inspect")
                 .contains(
@@ -943,6 +947,30 @@ class AgentRuntimeArchitectureTest {
                         "freshness",
                         "permission",
                         "recordIds");
+    }
+
+    @Test
+    @DisplayName("named-agent context adapter must use injected context assembler")
+    void namedAgentContextAdapterUsesInjectedContextAssembler() throws Exception {
+        String adapter = Files.readString(MAIN_SOURCES.resolve("agent/service/AgentChatContextAdapter.java"));
+
+        assertThat(adapter)
+                .as("AgentChatContextAdapter should stay a thin adapter over the shared assembler")
+                .contains("private final AgentContextAssembler contextAssembler;")
+                .contains("contextAssembler.assemble(")
+                .doesNotContain("new AgentContextAssembler(");
+    }
+
+    @Test
+    @DisplayName("plugin manager shutdown must snapshot started plugins before stopping")
+    void pluginManagerShutdownSnapshotsStartedPlugins() throws Exception {
+        String manager = Files.readString(MAIN_SOURCES.resolve("plugin/pf4j/AuraPluginManager.java"));
+
+        assertThat(manager)
+                .as("PreDestroy cleanup should not call PF4J stopPlugins directly because it can iterate a mutating collection")
+                .contains("new ArrayList<>(getStartedPlugins())")
+                .contains("stopPlugin(wrapper.getPluginId())")
+                .doesNotContain("stopPlugins();");
     }
 
     @Test
