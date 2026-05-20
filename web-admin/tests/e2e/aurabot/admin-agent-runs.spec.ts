@@ -470,7 +470,7 @@ async function navigateAgentRunsViaSidebar(page: Page): Promise<void> {
       if (attempt === 3) {
         throw error;
       }
-      await page.waitForTimeout(500);
+      await page.locator('nav').first().waitFor({ state: 'visible', timeout: 1_000 }).catch(() => undefined);
     }
   }
 
