@@ -181,7 +181,7 @@ test.describe.serial('Webhook Lifecycle', () => {
       .first();
     await urlInput.fill('https://example.com/webhook-e2e');
 
-    await selectFormField(page, 'event_type', 'CommandExecuted');
+    await selectFormField(page, 'event_type', 'record_created');
 
     await clickSaveButton(page);
     await waitForToast(page, undefined, 5_000).catch(() => null);

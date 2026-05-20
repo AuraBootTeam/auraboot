@@ -168,7 +168,7 @@ async function pickTreeSelect(page: Page, value: string): Promise<void> {
 
   const opt = page.locator(`[data-testid="tree-select-option-${value}"]`).first();
   await expect(opt).toBeVisible({ timeout: 5_000 });
-  await opt.click();
+  await opt.evaluate((node: HTMLElement) => node.click());
 }
 
 async function pickMember(page: Page, memberId: string): Promise<void> {
@@ -216,11 +216,20 @@ async function submitForm(page: Page): Promise<void> {
   await page.keyboard.press('Escape').catch(() => null);
   const saveBtn = page.locator('[data-testid="form-btn-submit"]');
   await saveBtn.scrollIntoViewIfNeeded();
+  await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
 
-  // Capture ALL commands/execute responses so we can diagnose validation rejections
-  // (which return 400/422 and would otherwise time out the happy-path listener).
+  // The runtime may submit through either a form command or the dynamic CRUD
+  // endpoint, depending on the page schema imported by the current OSS profile.
   const saveResp = page.waitForResponse(
-    (r) => r.url().includes('/api/meta/commands/execute'),
+    (r) => {
+      const url = r.url();
+      const method = r.request().method();
+      return (
+        method === 'POST' &&
+        (url.includes('/api/meta/commands/execute') ||
+          url.includes('/api/dynamic/showcase_all_fields'))
+      );
+    },
     { timeout: 20_000 },
   );
   await saveBtn.click();
@@ -232,7 +241,7 @@ async function submitForm(page: Page): Promise<void> {
   ).toBeTruthy();
   expect(
     body?.code === '0' || body?.code === 0,
-    `Save command must return code=0 (got ${body?.code}, message=${body?.message})`,
+    `Save response must return code=0 (got ${body?.code}, message=${body?.message})`,
   ).toBeTruthy();
 }
 
