@@ -11,7 +11,7 @@ import 'react-resizable/css/styles.css';
 import { renderWidget } from './WidgetRenderer';
 import type { Widget, LayoutConfig } from '../types';
 import type { Layout } from '~/framework/smart/types/dashboard';
-import type { FilterConfig } from '~/framework/smart/types/chart';
+import type { DrillDownConfig, FilterConfig } from '~/framework/smart/types/chart';
 import { ChartWidgetWrapper } from '~/framework/smart/components/dashboard/ChartWidgetWrapper';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { DashboardExportExcel } from './DashboardExportExcel';
@@ -21,6 +21,7 @@ import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
+type DrillDownPayload = DrillDownConfig | FilterConfig[];
 
 interface DashboardViewerProps {
   widgets: Widget[];
@@ -102,14 +103,24 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
         ? (filters: FilterConfig[]) => handleLinkageEmit(groupId, filters)
         : undefined,
       onDrillDown: drillDownConfig?.enabled
-        ? (filters: FilterConfig[]) => {
-            if (drillDownConfig.action === 'navigate' && drillDownConfig.targetPage) {
+        ? (payload: DrillDownPayload) => {
+            const activeDrillDownConfig = Array.isArray(payload) ? drillDownConfig : payload;
+            if (activeDrillDownConfig.action === 'navigate' && activeDrillDownConfig.targetPage) {
               const params = new URLSearchParams();
-              filters.forEach((f) => {
-                const paramName = drillDownConfig.paramMapping?.[f.field] || f.field;
-                params.set(paramName, String(f.value));
-              });
-              window.location.href = `${drillDownConfig.targetPage}?${params.toString()}`;
+              if (Array.isArray(payload)) {
+                payload.forEach((f) => {
+                  const paramName = activeDrillDownConfig.paramMapping?.[f.field] || f.field;
+                  params.set(paramName, String(f.value));
+                });
+              } else {
+                Object.entries(activeDrillDownConfig.paramMapping ?? {}).forEach(([field, value]) => {
+                  params.set(`filter_${field}`, String(value));
+                });
+              }
+              const query = params.toString();
+              window.location.href = query
+                ? `${activeDrillDownConfig.targetPage}?${query}`
+                : activeDrillDownConfig.targetPage;
             }
           }
         : undefined,
@@ -181,7 +192,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
         } as any)}
       >
         {widgets.map((widget) => (
-          <div key={widget.id}>
+          <div key={widget.id} data-testid={`dashboard-block-${widget.id}`}>
             <div className="h-full overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.08)] backdrop-blur-sm">
               {renderViewerWidget(widget)}
             </div>

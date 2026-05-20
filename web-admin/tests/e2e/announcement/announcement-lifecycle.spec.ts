@@ -57,12 +57,15 @@ async function navigateToAnnouncementList(page: Page): Promise<void> {
 }
 
 /** Click a row action from overflow menu, handle optional confirm dialog */
-async function clickRowAction(page: Page, title: string, actionLabel: string): Promise<void> {
+async function clickRowAction(page: Page, title: string | RegExp, actionLabel: string | RegExp): Promise<void> {
   const row = await findRowByContent(page, title);
   const moreBtn = row.locator('button:has-text("More"), [data-testid="row-action-more"]').first();
   await moreBtn.click();
 
-  const actionBtn = page.locator(`button:has-text("${actionLabel}")`).first();
+  const actionBtn =
+    typeof actionLabel === 'string'
+      ? page.locator(`button:has-text("${actionLabel}")`).first()
+      : page.getByRole('button', { name: actionLabel }).first();
   await expect(actionBtn).toBeVisible({ timeout: 3_000 });
   await actionBtn.click();
 
@@ -191,7 +194,7 @@ test('archive and delete announcement', async ({ page }) => {
   await expectRowStatus(page, TITLE, /archived|已撤回/i);
 
   // Delete
-  await clickRowAction(page, TITLE, 'delete');
+  await clickRowAction(page, TITLE, /delete|删除/i);
 
   // Verify record is gone
   const gone = page.locator('table').getByText(TITLE);

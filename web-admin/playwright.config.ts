@@ -36,6 +36,67 @@ const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
 const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
 
+const enterpriseScopeDirs = [
+  'annual-plan',
+  'asset-management',
+  'construction-process',
+  'contract-cost',
+  'doc-knowledge',
+  'dual-prevention',
+  'enterprise',
+  'finance',
+  'finance-accounting',
+  'inventory',
+  'license',
+  'logistics',
+  'maintenance',
+  'marketplace',
+  'pcba',
+  'pcba-solution',
+  'payment',
+  'procurement',
+  'product-catalog',
+  'project-management',
+  'quality',
+  'quarry',
+  'sales',
+  'sales-templates',
+  'tax',
+  'templates',
+];
+const contractScopeDirs = [
+  'action-system',
+  'activity',
+  'agent-control-plane',
+  'approval',
+  'bpm',
+  'command',
+  'dashboard',
+  'data-tools',
+  'e2et-order',
+  'integration',
+  'model',
+  'named-query',
+  'plugin',
+  'query-builder',
+  'scheduler',
+  'search',
+  'smart-components',
+];
+const scopeRegex = (dirs: string[]) => new RegExp(`.*\\/(${dirs.join('|')})\\/.*\\.spec\\.ts$`);
+const enterpriseScopeFilePatterns = [
+  /.*\/aurabot\/pcba-.*\.spec\.ts$/,
+  /.*\/plugin\/asset-.*\.spec\.ts$/,
+  /.*\/plugin\/pcba-.*\.spec\.ts$/,
+  /.*\/plugin\/pm-.*\.spec\.ts$/,
+  /.*\/plugin\/plugin-all-packages-smoke\.spec\.ts$/,
+];
+const enterpriseScopeRegex = scopeRegex(enterpriseScopeDirs);
+const enterpriseProfileRegex = scopeRegex([...enterpriseScopeDirs, 'plugin']);
+const enterpriseScopeRegexes = [enterpriseScopeRegex, ...enterpriseScopeFilePatterns];
+const enterpriseProfileMatch = [enterpriseProfileRegex, ...enterpriseScopeFilePatterns];
+const contractScopeRegex = scopeRegex(contractScopeDirs);
+
 /**
  * Playwright E2E Test Configuration
  *
@@ -164,6 +225,77 @@ export default defineConfig({
               storageState: adminStorageState,
               actionTimeout: 30_000,
               navigationTimeout: 60_000,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'oss'
+      ? [
+          {
+            name: 'oss',
+            testDir: './tests/e2e',
+            testIgnore: [/.*-deep\.spec\.ts$/, ...enterpriseScopeRegexes],
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+          {
+            name: 'oss-deep',
+            testDir: './tests/e2e',
+            testMatch: /.*-deep\.spec\.ts$/,
+            testIgnore: enterpriseScopeRegexes,
+            dependencies: ['oss'],
+            timeout: 120_000,
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+              actionTimeout: 30_000,
+              navigationTimeout: 60_000,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'contract'
+      ? [
+          {
+            name: 'contract',
+            testDir: './tests/e2e',
+            testMatch: contractScopeRegex,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'enterprise-smoke'
+      ? [
+          {
+            name: 'enterprise-smoke',
+            testDir: './tests/e2e',
+            testMatch: enterpriseProfileMatch,
+            grep: /@smoke/,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'enterprise-full'
+      ? [
+          {
+            name: 'enterprise-full',
+            testDir: './tests/e2e',
+            testMatch: enterpriseProfileMatch,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
             },
           },
         ]

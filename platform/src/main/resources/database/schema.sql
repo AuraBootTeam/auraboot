@@ -4765,7 +4765,7 @@ CREATE TABLE IF NOT EXISTS ab_mission (
   description     TEXT,
   mission_status  VARCHAR(20) DEFAULT 'active',
   owner_id        BIGINT,
-  acp_priority INTEGER DEFAULT 0,
+  priority     INTEGER DEFAULT 0,
   target_date  TIMESTAMPTZ,
   kpis         TEXT,
   tags         TEXT,
@@ -4855,25 +4855,6 @@ CREATE INDEX IF NOT EXISTS idx_agent_run_agent ON ab_agent_run (agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_run_status ON ab_agent_run (tenant_id, run_status);
 CREATE INDEX IF NOT EXISTS idx_agent_run_parent ON ab_agent_run (parent_run_id) WHERE parent_run_id IS NOT NULL;
 COMMENT ON TABLE ab_agent_run IS 'Agent execution session records (audit log, never deleted)';
-
--- Append-only durable workflow checkpoints for ACP plan execution.
-CREATE TABLE IF NOT EXISTS ab_agent_run_checkpoint (
-  id              BIGSERIAL PRIMARY KEY,
-  pid             VARCHAR(26) UNIQUE NOT NULL,
-  tenant_id       BIGINT NOT NULL,
-  run_pid         VARCHAR(26) NOT NULL,
-  checkpoint_type VARCHAR(32) NOT NULL,
-  step_index      INTEGER NOT NULL DEFAULT 0,
-  reason          VARCHAR(80),
-  plan_snapshot   JSONB,
-  state_snapshot  JSONB,
-  created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_agent_run_checkpoint_run
-    ON ab_agent_run_checkpoint (tenant_id, run_pid, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_agent_run_checkpoint_step
-    ON ab_agent_run_checkpoint (tenant_id, run_pid, step_index);
-COMMENT ON TABLE ab_agent_run_checkpoint IS 'Append-only checkpoint history for durable agent workflow runs';
 
 -- ACP §6.10: subtask_origin audit-label whitelist. Keeps free-text drift out
 -- of the column so dashboards / SQL reports can rely on the enum.
@@ -6844,7 +6825,7 @@ CREATE TABLE IF NOT EXISTS ab_object_alias (
     model_code  VARCHAR(100) NOT NULL,
     alias       VARCHAR(200) NOT NULL,
     language    VARCHAR(10) DEFAULT 'zh-CN',
-    acp_priority INTEGER DEFAULT 0,
+    priority    INTEGER DEFAULT 0,
     created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     created_by  BIGINT,
@@ -6863,7 +6844,7 @@ CREATE TABLE IF NOT EXISTS ab_semantic_term (
     term_type   VARCHAR(20) NOT NULL,         -- filter | time_range | metric | segment
     resolution  JSONB,
     description VARCHAR(500),
-    acp_priority INTEGER DEFAULT 0,
+    priority    INTEGER DEFAULT 0,
     created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     created_by  BIGINT,
@@ -7011,7 +6992,7 @@ CREATE TABLE IF NOT EXISTS ab_agent_bif (
     -- execution context (run_id may be null when BIF computed pre-run)
     run_id                 VARCHAR(26),
     step_index             INTEGER,
-    conversation_id        VARCHAR(26),
+    conversation_id        VARCHAR(64),
 
     nl_input               TEXT NOT NULL,
 
@@ -7060,6 +7041,7 @@ COMMENT ON TABLE ab_agent_bif IS 'ACP D1 Grounding: Business Intent Frame IR per
 -- different profiles / channels don't collapse.
 ALTER TABLE ab_agent_bif ADD COLUMN IF NOT EXISTS profile_id VARCHAR(26);
 ALTER TABLE ab_agent_bif ADD COLUMN IF NOT EXISTS channel    VARCHAR(32);
+ALTER TABLE ab_agent_bif ALTER COLUMN conversation_id TYPE VARCHAR(64);
 CREATE INDEX IF NOT EXISTS idx_bif_profile ON ab_agent_bif(profile_id) WHERE profile_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_bif_channel ON ab_agent_bif(channel)    WHERE channel IS NOT NULL;
 
@@ -8101,7 +8083,8 @@ CREATE TABLE IF NOT EXISTS ab_announcement (
     tenant_id       BIGINT       NOT NULL,
     title           VARCHAR(256) NOT NULL,
     content         TEXT,
-    announcement_priority VARCHAR(16)  NOT NULL DEFAULT 'normal',
+    priority        VARCHAR(16)  NOT NULL DEFAULT 'normal',
+    announcement_priority VARCHAR(16) NOT NULL DEFAULT 'normal',
     status          VARCHAR(16)  NOT NULL DEFAULT 'draft',
     pinned          BOOLEAN      NOT NULL DEFAULT FALSE,
     published_by    BIGINT,

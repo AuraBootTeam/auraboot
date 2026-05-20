@@ -1813,7 +1813,7 @@
             "label": "delete",
             "confirm": "delete.confirm",
             "action": {
-              "type": "state_transition",
+              "type": "command",
               "command": "admin:delete_scheduled_task"
             }
           }

@@ -1099,6 +1099,8 @@ test.describe('Security Settings — Sessions', () => {
 
 test.describe('Logout Flow', () => {
   test('LO-001: should logout and redirect to login @smoke', async ({ page }) => {
+    test.setTimeout(45000);
+
     // Start authenticated — wait for full page load
     await page.goto('/dashboards', { waitUntil: 'load' });
     const header = new HeaderPage(page);

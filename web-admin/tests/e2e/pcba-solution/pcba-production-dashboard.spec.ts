@@ -110,11 +110,11 @@ test.describe('PCBA Production Dashboard @smoke', () => {
       await dashDir.evaluate((el: HTMLElement) => el.click());
     }
 
-    const dashLink = page.locator('a[href="/pcba-erp/production-dashboard"]');
+    const dashLink = page.locator('a[href="/dashboards/view/pe_production_dashboard"]');
     await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
     await dashLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/pcba-erp\/production-dashboard/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboards\/view\/pe_production_dashboard/, { timeout: 10000 });
 
     await Promise.all([
       page

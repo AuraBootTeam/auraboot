@@ -51,10 +51,12 @@ const SHOWCASE_MODEL_CODE = 'showcase_all_fields';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const REFERENCE_PATH = path.resolve(
-  __dirname,
-  '../../../../plugins/showcase/config/pages/showcase_all_fields_form.json',
-);
+const REFERENCE_PATH = process.env.AURA_CORE_PROJECT_ROOT
+  ? path.resolve(
+      process.env.AURA_CORE_PROJECT_ROOT,
+      'plugins/showcase/config/pages/showcase_all_fields_form.json',
+    )
+  : path.resolve(__dirname, '../../../../plugins/showcase/config/pages/showcase_all_fields_form.json');
 
 const IGNORED_KEYS = new Set([
   'id',

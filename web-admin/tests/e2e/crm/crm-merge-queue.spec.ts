@@ -104,7 +104,9 @@ test.describe('CRM Lead Merge Queue @critical', () => {
       const probeBody = await probeResp.json();
       const existingItems = probeBody.data ?? [];
       if (Array.isArray(existingItems) && existingItems.length > 0) {
-        hasMergeQueueItems = true;
+        hasMergeQueueItems = existingItems.some(
+          (it: { status?: string }) => it.status === 'pending',
+        );
       }
 
       // 2. Create existing lead via dynamic API (uses actual DB column names)
@@ -147,7 +149,7 @@ test.describe('CRM Lead Merge Queue @critical', () => {
 
       // 4. Submit 3 inbound leads with SAME company but DIFFERENT email
       //    → no exact email/phone match → fuzzy company+name triggers merge queue
-      //    Need 3 entries so mq-05 (reject) and mq-06 (merge) both have pending items
+      //    Need 2 pending entries so mq-05 (reject) and mq-06 (merge) both have isolated data.
       if (channelPid) {
         for (let i = 1; i <= 3; i++) {
           await page.request.post(`/api/crm/inbound/${channelPid}/webhook`, {
@@ -320,7 +322,12 @@ test.describe('CRM Lead Merge Queue @critical', () => {
     await navigateToMergeQueue(page);
 
     // Switch to Pending tab
+    const pendingResponse = page.waitForResponse(
+      (r) => r.url().includes('/api/crm/merge-queue?status=pending') && r.status() === 200,
+      { timeout: 10_000 },
+    );
     await page.locator('[data-testid="merge-tab-pending"]').click();
+    await pendingResponse.catch(() => null);
 
     // Wait for list
     const list = page.locator('[data-testid="merge-queue-list"]');
@@ -328,6 +335,7 @@ test.describe('CRM Lead Merge Queue @critical', () => {
     await expect(list.or(empty).first()).toBeVisible({ timeout: 10000 });
 
     const pendingRows = page.locator('[data-testid="merge-queue-row"]');
+    await expect(pendingRows.first()).toBeVisible({ timeout: 10_000 });
     const pendingCount = await pendingRows.count();
     expect(pendingCount, 'Should have at least 1 pending item to reject').toBeGreaterThan(0);
 
@@ -373,15 +381,24 @@ test.describe('CRM Lead Merge Queue @critical', () => {
     await navigateToMergeQueue(page);
 
     // Switch to Pending tab
+    const pendingResponse = page.waitForResponse(
+      (r) => r.url().includes('/api/crm/merge-queue?status=pending') && r.status() === 200,
+      { timeout: 10_000 },
+    );
     await page.locator('[data-testid="merge-tab-pending"]').click();
+    await pendingResponse.catch(() => null);
 
     const list = page.locator('[data-testid="merge-queue-list"]');
     const empty = page.locator('[data-testid="merge-queue-empty"]');
     await expect(list.or(empty).first()).toBeVisible({ timeout: 10000 });
 
     const pendingRows = page.locator('[data-testid="merge-queue-row"]');
+    await expect(pendingRows.first()).toBeVisible({ timeout: 10_000 });
     const pendingCount = await pendingRows.count();
-    expect(pendingCount, 'Should have at least 1 pending item to merge').toBeGreaterThan(0);
+    expect(
+      pendingCount,
+      'Should have at least 1 pending item to merge after mq-05 consumed a separate row',
+    ).toBeGreaterThan(0);
 
     // Click a pending row
     const detailResponse = page.waitForResponse(

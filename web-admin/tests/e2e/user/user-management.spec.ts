@@ -70,7 +70,8 @@ test.describe('User List', () => {
    * UM-002A: User datetime format preference should override system/default display
    */
   test('UM-002A: should apply user datetime format on created_at column', async ({ page }) => {
-    const customFormat = 'YYYY/MM/DD HH:mm';
+    const preferredFormat = 'YYYY/MM/DD HH:mm';
+    const alternateFormat = 'YYYY/MM/DD HH:mm:ss';
     const defaultFormat = 'YYYY-MM-DD HH:mm:ss';
 
     try {
@@ -80,6 +81,8 @@ test.describe('User List', () => {
       const input = page.locator('[data-testid="user-datetime-format-input"]');
       const saveBtn = page.locator('[data-testid="user-datetime-format-save"]');
       await expect(input).toBeVisible({ timeout: 8000 });
+      const currentFormat = await input.inputValue();
+      const customFormat = currentFormat === preferredFormat ? alternateFormat : preferredFormat;
 
       const saveResp = page.waitForResponse(
         (r) =>
@@ -88,7 +91,10 @@ test.describe('User List', () => {
           r.status() < 400,
         { timeout: 10000 },
       );
-      await input.fill(customFormat);
+      await input.click();
+      await input.press('ControlOrMeta+A');
+      await input.type(customFormat);
+      await input.blur();
       await saveBtn.click();
       await saveResp;
       const prefResp = await page.request.get('/api/user-preferences/ui.datetime.format');
@@ -199,18 +205,15 @@ test.describe('Role Assignment', () => {
       await expect(assignmentTab).toBeVisible();
     }
 
-    // Click the first role card to select it
-    await expect(page.locator('[data-testid="role-search-input"]')).toBeVisible({ timeout: 8000 });
-    const roleCards = page.locator('[data-testid^="role-item-"]');
-    await expect.poll(async () => roleCards.count(), { timeout: 10000 }).toBeGreaterThanOrEqual(0);
+    const roleCards = page.locator('[data-testid^="assignment-role-"]');
+    await expect.poll(async () => roleCards.count(), { timeout: 10000 }).toBeGreaterThan(0);
     const roleCount = await roleCards.count();
 
     if (roleCount > 0) {
       await roleCards.first().click();
       const assignmentPanel = page
-        .locator(
-          '[data-testid="assignment-tab"], text=/请选择一个角色来分配权限|Please select a role|Permissions/i',
-        )
+        .getByTestId('assignment-tab')
+        .or(page.getByText(/请选择一个角色来分配权限|Please select a role|Permissions/i))
         .first();
       await expect(assignmentPanel).toBeVisible({ timeout: 5000 });
       return;

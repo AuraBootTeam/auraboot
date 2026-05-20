@@ -5,7 +5,7 @@
  * Supports number/currency/percent formatting with loading and error states.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type {
   ChartDataSource,
@@ -13,6 +13,8 @@ import type {
   FilterConfig,
   DrillDownConfig,
 } from '~/framework/smart/types/chart';
+import { fetchResult } from '~/shared/services/http-client';
+import { ResultHelper } from '~/utils/type';
 import { cn } from '~/utils/cn';
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -34,6 +36,15 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = (int >> 8) & 255;
   const b = int & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+interface NumberCardItem {
+  field: string;
+  label?: string | Record<string, string>;
+  color?: string;
+  format?: 'number' | 'currency' | 'percent';
+  prefix?: string;
+  suffix?: string;
 }
 
 /**
@@ -62,8 +73,10 @@ export interface SmartNumberCardProps {
    * Pick a specific column from the response when the data source returns multiple
    * (e.g. a single named query feeding multiple KPI cards). When set, the card reads
    * `data.rows[0][metricField]` instead of `data.rows[0][data.meta.metrics[0]]`.
-   */
+  */
   metricField?: string;
+  /** Multi-KPI card configuration backed by the first returned row */
+  cards?: NumberCardItem[];
   /** Accent color used by the card chrome */
   color?: string;
   /** Trend comparison configuration */
@@ -128,6 +141,8 @@ function isDataSourceConfigured(dataSource: ChartDataSource): boolean {
       return !!(dataSource.modelCode && dataSource.metrics?.length);
     case 'namedQuery':
       return !!dataSource.queryCode;
+    case 'api':
+      return !!dataSource.url;
     case 'static':
       return true;
     default:
@@ -146,6 +161,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   prefix,
   suffix,
   metricField,
+  cards,
   color = '#2563EB',
   trend,
   linkage,
@@ -158,13 +174,58 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   onDrillDown,
 }) => {
   const isConfigured = isDataSourceConfigured(dataSource);
+  const useApiBranch = dataSource?.type === 'api' && !!dataSource.url;
+  const [apiRows, setApiRows] = useState<Record<string, unknown>[]>([]);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState<Error | null>(null);
 
-  const { data, loading, error } = useChartData({
+  useEffect(() => {
+    if (!useApiBranch || !dataSource?.url) return;
+    let cancelled = false;
+    setApiLoading(true);
+    setApiError(null);
+    const params = Object.fromEntries(
+      Object.entries(dataSource.params ?? {}).map(([key, value]) => [key, String(value)]),
+    );
+    fetchResult<{ records?: Record<string, unknown>[]; rows?: Record<string, unknown>[] }>(
+      dataSource.url,
+      { method: 'get', params },
+    )
+      .then((result) => {
+        if (cancelled) return;
+        if (ResultHelper.isSuccess(result)) {
+          setApiRows(result.data?.records ?? result.data?.rows ?? []);
+        } else {
+          setApiRows([]);
+        }
+        setApiLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setApiError(err instanceof Error ? err : new Error(String(err)));
+        setApiRows([]);
+        setApiLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [useApiBranch, dataSource?.url, dataSource?.params]);
+
+  const chartState = useChartData({
     dataSource,
     linkageFilters: linkage?.receiveFilter ? linkageFilters : undefined,
     refreshInterval,
-    enabled: isConfigured,
+    enabled: isConfigured && !useApiBranch,
   });
+  const data = useApiBranch
+    ? {
+        rows: apiRows,
+        summary: {},
+        meta: { dimensions: [] as string[], metrics: cards?.map((card) => card.field) ?? [] },
+      }
+    : chartState.data;
+  const loading = useApiBranch ? apiLoading : chartState.loading;
+  const error = useApiBranch ? apiError : chartState.error;
   const accentLine = hexToRgba(color, 0.22);
   const cardLabel = label || title;
   const isEmpty = !loading && !error && !data?.rows?.length;
@@ -203,6 +264,45 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   };
 
   const formattedValue = `${prefix || ''}${formatValue(getValue())}${suffix || ''}`;
+  const firstRow = data?.rows?.[0] ?? {};
+  const effectiveCards: NumberCardItem[] | undefined =
+    cards?.length
+      ? cards
+      : useApiBranch && Object.keys(firstRow).length > 1
+        ? Object.keys(firstRow).slice(0, 6).map((field) => ({ field, label: field }))
+        : undefined;
+
+  const formatCardValue = (
+    raw: unknown,
+    cardFormat: 'number' | 'currency' | 'percent' = format,
+    cardPrefix?: string,
+    cardSuffix?: string,
+  ): string => {
+    const value = Number(raw) || 0;
+    const nextPrefix = cardPrefix ?? prefix ?? '';
+    const nextSuffix = cardSuffix ?? suffix ?? '';
+    if (cardFormat === 'currency') {
+      return `${nextPrefix}${new Intl.NumberFormat('zh-CN', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: precision,
+        maximumFractionDigits: precision,
+      }).format(value)}${nextSuffix}`;
+    }
+    if (cardFormat === 'percent') {
+      return `${nextPrefix}${(value * 100).toFixed(precision)}%${nextSuffix}`;
+    }
+    return `${nextPrefix}${new Intl.NumberFormat('zh-CN', {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision,
+    }).format(value)}${nextSuffix}`;
+  };
+
+  const resolveCardLabel = (card: NumberCardItem) => {
+    if (!card.label) return card.field;
+    if (typeof card.label === 'string') return card.label;
+    return card.label['zh-CN'] ?? card.label.en ?? card.field;
+  };
 
   /**
    * Handle click event for linkage
@@ -246,6 +346,33 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
         <div className="mb-2 text-3xl text-gray-400">🔢</div>
         <div className="text-sm font-medium text-gray-500">{title || '数字卡片'}</div>
         <div className="mt-1 text-xs text-gray-400">请配置数据源</div>
+      </div>
+    );
+  }
+
+  if (effectiveCards?.length) {
+    return (
+      <div
+        className={cn('grid h-full grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6', className)}
+        style={style}
+      >
+        {effectiveCards.map((card) => (
+          <div key={card.field} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-slate-500">{resolveCardLabel(card)}</div>
+            <div className="mt-3 text-2xl font-semibold text-slate-950 tabular-nums">
+              {loading
+                ? '...'
+                : error
+                  ? 'Error'
+                  : formatCardValue(firstRow[card.field], card.format, card.prefix, card.suffix)}
+            </div>
+            <div
+              className="mt-3 h-1 w-8 rounded-full"
+              style={{ backgroundColor: card.color ?? color }}
+              aria-hidden="true"
+            />
+          </div>
+        ))}
       </div>
     );
   }

@@ -295,11 +295,14 @@ async function saveProcess(page: Page) {
       category: valueOf('[data-testid="prop-panel-category"]') ?? state.processDefinition?.category,
     };
   });
-  const currentResp = await page.request.get(`/api/bpm/process-definitions/${processPid}`);
+  const currentResp = await page.request.get(`/api/bpm/process-definitions/${processPid}`, {
+    timeout: 20_000,
+  });
   expect(currentResp.status()).toBeLessThan(400);
   const currentBody = await currentResp.json();
 
   const resp = await page.request.put(`/api/bpm/process-definitions/${processPid}`, {
+    timeout: 20_000,
     data: {
       processName: snapshot.processName ?? PROCESS_NAME,
       description: snapshot.description ?? 'E2E node properties test',

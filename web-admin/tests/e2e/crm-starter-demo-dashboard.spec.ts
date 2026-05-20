@@ -79,6 +79,14 @@ test.describe('CRM Starter Demo — Lightweight Dashboard', () => {
   test.setTimeout(60_000);
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
+  test.beforeEach(async ({ page }) => {
+    const response = await page.request
+      .get('/api/dashboards/code/crm_overview')
+      .catch(() => null);
+    const body = response?.ok() ? await response.json().catch(() => null) : null;
+    test.skip(body?.code !== '0', 'crm-starter dashboard is not imported in this environment');
+  });
+
   test('DASH-001 @smoke — sidebar → dashboard renders both smart-table-chart widgets', async ({
     page,
   }) => {

@@ -54,6 +54,13 @@ const EDIT_COMMAND_BY_PAGE_KEY: Record<string, string> = {
   webhook: 'admin:update_webhook',
   'api-connector': 'admin:update_api_connector',
 };
+const FIRST_FORM_FIELD_BY_PAGE_KEY: Record<string, string> = {
+  'sla-config': 'name',
+  'bpm-domain-config': 'domain_code',
+  'data-permission': 'name',
+  webhook: 'target_url',
+  'api-connector': 'name',
+};
 
 function annotateFallback(description: string) {
   test.info().annotations.push({
@@ -66,7 +73,20 @@ function annotateFallback(description: string) {
  * Wait for form page to be ready after navigation.
  * Create routes to /p/{model}/new, edit routes to /p/{model}/{id}/edit.
  */
-async function waitForFormReady(page: import('@playwright/test').Page) {
+function formFieldSelector(fieldCode: string): string {
+  return [
+    `[data-testid="form-field-${fieldCode}"] input:not([type="hidden"])`,
+    `[data-testid="form-field-${fieldCode}"] textarea`,
+    `[data-testid="field-${fieldCode}"] input:not([type="hidden"])`,
+    `[data-testid="field-${fieldCode}"] textarea`,
+    `[data-field="${fieldCode}"] input:not([type="hidden"])`,
+    `[data-field="${fieldCode}"] textarea`,
+    `input[name="${fieldCode}"]:not([type="hidden"])`,
+    `textarea[name="${fieldCode}"]`,
+  ].join(', ');
+}
+
+async function waitForFormReady(page: import('@playwright/test').Page, expectedField?: string) {
   // Wait for URL to include /new or /edit
   await expect(page).toHaveURL(/\/(new|edit)/, { timeout: 10000 });
 
@@ -77,6 +97,14 @@ async function waitForFormReady(page: import('@playwright/test').Page) {
     .first();
   if (await errorAlert.isVisible({ timeout: 1000 }).catch(() => false)) {
     throw new Error('Form failed to load due to backend/schema error');
+  }
+
+  if (expectedField) {
+    await page.locator(formFieldSelector(expectedField)).first().waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    });
+    return;
   }
 
   await page
@@ -92,32 +120,20 @@ async function fillFormField(
   value: string,
 ) {
   // Strategy 1: data-testid
-  const byTestId = page
-    .locator(
-      `[data-testid="form-field-${fieldCode}"] input:not([type="hidden"]), [data-testid="form-field-${fieldCode}"] textarea, [data-testid="field-${fieldCode}"] input:not([type="hidden"]), [data-testid="field-${fieldCode}"] textarea`,
-    )
-    .first();
-  if (await byTestId.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await byTestId.fill(value);
-    return;
-  }
-  // Strategy 2: data-field attribute
-  const byField = page
-    .locator(
-      `[data-field="${fieldCode}"] input:not([type="hidden"]), [data-field="${fieldCode}"] textarea`,
-    )
-    .first();
-  if (await byField.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await byField.fill(value);
-    return;
-  }
-  // Strategy 3: name attribute
-  const byName = page
-    .locator(`input[name="${fieldCode}"]:not([type="hidden"]), textarea[name="${fieldCode}"]`)
-    .first();
-  if (await byName.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await byName.fill(value);
-    return;
+  const directSelector = formFieldSelector(fieldCode);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const input = page.locator(directSelector).first();
+    if (await input.isVisible({ timeout: 5000 }).catch(() => false)) {
+      try {
+        await input.fill(value, { timeout: 8000 });
+        await expect(input).toHaveValue(value, { timeout: 3000 });
+        await input.blur().catch(() => null);
+        return;
+      } catch (error) {
+        if (attempt === 3) throw error;
+        await page.waitForTimeout(250);
+      }
+    }
   }
   // Strategy 4: find by visible label text as a last resort
   const labelCandidates: Record<string, RegExp> = {
@@ -127,12 +143,10 @@ async function fillFormField(
   };
   const labelPattern = labelCandidates[fieldCode];
   if (labelPattern) {
-    const byAccessibleLabel = page
-      .getByLabel(labelPattern)
-      .locator('input:not([type="hidden"]), textarea')
-      .first();
+    const byAccessibleLabel = page.getByLabel(labelPattern).first();
     if (await byAccessibleLabel.isVisible({ timeout: 5000 }).catch(() => false)) {
       await byAccessibleLabel.fill(value);
+      await expect(byAccessibleLabel).toHaveValue(value, { timeout: 3000 });
       return;
     }
     const label = page.locator('label').filter({ hasText: labelPattern }).first();
@@ -141,6 +155,7 @@ async function fillFormField(
       const input = container.locator('input:not([type="hidden"]), textarea').first();
       if (await input.isVisible({ timeout: 3000 }).catch(() => false)) {
         await input.fill(value);
+        await expect(input).toHaveValue(value, { timeout: 3000 });
         return;
       }
     }
@@ -161,23 +176,30 @@ async function selectFormField(
     .first();
   await anyField.waitFor({ state: 'attached', timeout: 12000 }).catch(() => null);
 
-  const select = page
-    .locator(
-      `[data-testid="form-field-${fieldCode}"] select, [data-testid="field-${fieldCode}"] select, [data-field="${fieldCode}"] select, select[name="${fieldCode}"]`,
-    )
-    .first();
-  if (await select.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await select.selectOption(value);
-    return;
-  }
-  const input = page
-    .locator(
-      `[data-testid="form-field-${fieldCode}"] input:not([type="hidden"]), [data-testid="form-field-${fieldCode}"] textarea, [data-testid="field-${fieldCode}"] input:not([type="hidden"]), [data-testid="field-${fieldCode}"] textarea, [data-field="${fieldCode}"] input:not([type="hidden"]), [data-field="${fieldCode}"] textarea, input[name="${fieldCode}"]:not([type="hidden"]), textarea[name="${fieldCode}"]`,
-    )
-    .first();
-  if (await input.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await input.fill(value);
-    return;
+  const selectSelector = `[data-testid="form-field-${fieldCode}"] select, [data-testid="field-${fieldCode}"] select, [data-field="${fieldCode}"] select, select[name="${fieldCode}"]`;
+  const inputSelector = `[data-testid="form-field-${fieldCode}"] input:not([type="hidden"]), [data-testid="form-field-${fieldCode}"] textarea, [data-testid="field-${fieldCode}"] input:not([type="hidden"]), [data-testid="field-${fieldCode}"] textarea, [data-field="${fieldCode}"] input:not([type="hidden"]), [data-field="${fieldCode}"] textarea, input[name="${fieldCode}"]:not([type="hidden"]), textarea[name="${fieldCode}"]`;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const select = page.locator(selectSelector).first();
+    if (await select.isVisible({ timeout: 5000 }).catch(() => false)) {
+      try {
+        await select.selectOption(value, { timeout: 8000 });
+        return;
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await page.waitForTimeout(250);
+        continue;
+      }
+    }
+    const input = page.locator(inputSelector).first();
+    if (await input.isVisible({ timeout: 5000 }).catch(() => false)) {
+      try {
+        await input.fill(value, { timeout: 8000 });
+        return;
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await page.waitForTimeout(250);
+      }
+    }
   }
   const hiddenInput = page
     .locator(
@@ -331,11 +353,12 @@ async function clickRowDeleteAndConfirm(
   await clickRowActionByLocator(page, row, 'delete');
   // The delete action uses confirmMessageKey which shows a custom ConfirmDialog
   await acceptConfirmDialog(page);
-  // Wait for command response or list refresh (whichever comes first).
-  const listPromise = page
+  // A list refresh can race ahead of the command completion. The record is not
+  // safe to verify until the delete command itself has returned.
+  await cmdPromise;
+  await page
     .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
     .catch(() => null);
-  await Promise.race([cmdPromise, listPromise]).catch(() => null);
 }
 
 /** Navigate to edit form by recordId (UI route), with standard form readiness checks. */
@@ -349,7 +372,7 @@ async function openEditFormByPid(
   await page.goto(`/p/${normalizeDynamicPageKey(pageKey)}/${pid}/edit${cmdQuery}`, {
     waitUntil: 'domcontentloaded',
   });
-  await waitForFormReady(page);
+  await waitForFormReady(page, FIRST_FORM_FIELD_BY_PAGE_KEY[pageKey]);
   await expect(page).toHaveURL(/\/edit(?:\?|$)/, { timeout: 5000 });
   if (cmd) {
     const currentUrl = new URL(page.url());
@@ -411,7 +434,15 @@ test.describe('PA: SLA Configuration CRUD', () => {
 
     await navigateToDynamicPage(page, 'sla-config');
     await clickCreateButton(page);
-    await waitForFormReady(page);
+    await waitForFormReady(page, 'name');
+    await expect(
+      page
+        .locator(
+          '[data-testid="form-field-name"] input, [data-field="name"] input, input[name="name"]',
+        )
+        .first(),
+      'SLA create form should finish loading the name field before filling',
+    ).toBeVisible({ timeout: 20_000 });
 
     // Fill required fields
     await fillFormField(page, 'name', name);
@@ -441,10 +472,7 @@ test.describe('PA: SLA Configuration CRUD', () => {
     await openEditFormByPid(page, 'sla-config', pid);
 
     // Update name field
-    const nameInput = page
-      .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
-      .first();
-    await nameInput.fill(updatedName);
+    await fillFormField(page, 'name', updatedName);
     await clickSaveAndWait(page, { expectedCommandCode: 'admin:update_sla_config' });
 
     // Backend truth for this record id is the assertion source of truth.
@@ -517,7 +545,7 @@ test.describe('PA: BPM Domain Configuration CRUD', () => {
 
     await navigateToDynamicPage(page, 'bpm-domain-config');
     await clickCreateButton(page);
-    await waitForFormReady(page);
+    await waitForFormReady(page, 'domain_code');
 
     await fillFormField(page, 'domain_code', domainCode);
     await fillFormField(page, 'domain_name', domainName);
@@ -543,12 +571,7 @@ test.describe('PA: BPM Domain Configuration CRUD', () => {
     // Use stable edit route with explicit update command to avoid row-action variance.
     await openEditFormByPid(page, 'bpm-domain-config', pid);
 
-    const nameInput = page
-      .locator(
-        '[data-testid="form-field-domain_name"] input, [data-field="domain_name"] input, [name="domain_name"]',
-      )
-      .first();
-    await nameInput.fill(updatedName);
+    await fillFormField(page, 'domain_name', updatedName);
     await clickSaveAndWait(page, { expectedCommandCode: 'admin:update_bpm_domain_config' });
 
     const updated = await helper.fetchViaApi(pid).catch(() => null);
@@ -603,7 +626,7 @@ test.describe('PA: Data Permission CRUD', () => {
 
     await navigateToDynamicPage(page, 'data-permission');
     await clickCreateButton(page);
-    await waitForFormReady(page);
+    await waitForFormReady(page, 'name');
     {
       const currentUrl = new URL(page.url());
       expect(currentUrl.pathname).toBe('/p/data_permission/new');
@@ -646,10 +669,7 @@ test.describe('PA: Data Permission CRUD', () => {
 
     await openEditFormByPid(page, 'data-permission', pid);
 
-    const nameInput = page
-      .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
-      .first();
-    await nameInput.fill(updatedName);
+    await fillFormField(page, 'name', updatedName);
     await clickSaveAndWait(page);
 
     const updated = await helper.fetchViaApi(pid).catch(() => null);
@@ -711,7 +731,7 @@ test.describe('PA: Webhook Subscription CRUD', () => {
 
     await navigateToDynamicPage(page, 'webhook');
     await clickCreateButton(page);
-    await waitForFormReady(page);
+    await waitForFormReady(page, 'target_url');
 
     await fillFormField(page, 'name', name);
     await fillFormField(page, 'target_url', targetUrl);
@@ -743,7 +763,7 @@ test.describe('PA: Webhook Subscription CRUD', () => {
       annotateFallback('Webhook row edit action unavailable, fallback to edit form by recordId');
       await openEditFormByPid(page, 'webhook', pid);
     }
-    await waitForFormReady(page);
+    await waitForFormReady(page, 'name');
 
     const nameInput = page
       .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
@@ -752,10 +772,9 @@ test.describe('PA: Webhook Subscription CRUD', () => {
     // name before filling — otherwise an early fill() can be overwritten by
     // the async record-load that completes after waitForFormReady().
     await expect(nameInput).toHaveValue(originalName, { timeout: 10_000 });
-    await nameInput.fill(updatedName);
-    await nameInput.blur();
+    await fillFormField(page, 'name', updatedName);
     // Confirm the controlled input picked up the new value before clicking save.
-    await expect(nameInput).toHaveValue(updatedName);
+    await expect(nameInput).toHaveValue(updatedName, { timeout: 10_000 });
     await clickSaveAndWait(page);
 
     await expect
@@ -827,7 +846,7 @@ test.describe('PA: API Connector CRUD', () => {
 
     await navigateToDynamicPage(page, 'api-connector');
     await clickCreateButton(page);
-    await waitForFormReady(page);
+    await waitForFormReady(page, 'name');
 
     await fillFormField(page, 'name', name);
     await fillFormField(page, 'base_url', baseUrl);
@@ -862,12 +881,9 @@ test.describe('PA: API Connector CRUD', () => {
       );
       await openEditFormByPid(page, 'api-connector', pid);
     }
-    await waitForFormReady(page);
+    await waitForFormReady(page, 'name');
 
-    const nameInput = page
-      .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
-      .first();
-    await nameInput.fill(updatedName);
+    await fillFormField(page, 'name', updatedName);
     await clickSaveAndWait(page);
 
     const records = await queryFilteredList(page, 'api-connector', 'name', updatedName, {

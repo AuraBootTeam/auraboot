@@ -54,7 +54,7 @@ test.describe('MEMBER-MENU: Sidebar Organization menu', () => {
       (r) => r.url().includes('/api/dynamic/tenant-member') && r.status() === 200,
       { timeout: 10000 },
     ).catch(() => null);
-    await page.goto('/dynamic/tenant-member', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/tenant_member', { waitUntil: 'domcontentloaded' });
     await listResp;
 
     const nav = page.locator('nav');
@@ -65,12 +65,12 @@ test.describe('MEMBER-MENU: Sidebar Organization menu', () => {
     await expect(orgGroupBtn).toBeVisible({ timeout: 10000 });
 
     // Members should be visible under Organization
-    const membersLink = nav.locator('a[href="/dynamic/tenant-member"]');
+    const membersLink = nav.locator('a[href="/p/tenant_member"]');
     await expect(membersLink).toBeVisible();
 
     // Departments, Positions, Teams should be visible
-    await expect(nav.locator('a[href="/dynamic/org-department"]')).toBeVisible();
-    await expect(nav.locator('a[href="/dynamic/org-position"]')).toBeVisible();
+    await expect(nav.locator('a[href="/p/org_department"]')).toBeVisible();
+    await expect(nav.locator('a[href="/p/org_position"]')).toBeVisible();
     await expect(nav.locator('a[href="/organization/teams"]')).toBeVisible();
 
     // Employees should NOT be visible (hidden menu item)
@@ -220,7 +220,7 @@ test.describe('MEMBER-DETAIL: Detail page', () => {
     await expect(backBtn).toBeVisible({ timeout: 10000 });
     await backBtn.click();
 
-    await expect(page).toHaveURL(/\/dynamic\/tenant-member/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/p\/tenant_member/, { timeout: 10000 });
   });
 });
 

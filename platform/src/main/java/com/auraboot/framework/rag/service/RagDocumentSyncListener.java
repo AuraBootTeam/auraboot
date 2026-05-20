@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
 
@@ -50,7 +51,16 @@ public class RagDocumentSyncListener {
 
         String opType = event.getOperationType();
         try {
-            switch (opType) {
+            if (opType == null || opType.isBlank()) {
+                String commandCode = event.getCommandCode();
+                if (commandCode != null && commandCode.toLowerCase(Locale.ROOT).contains("delete")) {
+                    handleDelete(event);
+                } else {
+                    handleCreateOrUpdate(event);
+                }
+                return;
+            }
+            switch (opType.toLowerCase(Locale.ROOT)) {
                 case "create", "update" -> handleCreateOrUpdate(event);
                 case "delete" -> handleDelete(event);
                 default -> {}
@@ -217,14 +227,17 @@ public class RagDocumentSyncListener {
     }
 
     private String sha256(String content) {
+        if (content == null) {
+            return "";
+        }
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(content.getBytes());
+            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
             StringBuilder hex = new StringBuilder();
             for (byte b : hash) hex.append(String.format("%02x", b));
             return hex.toString();
         } catch (Exception e) {
-            return String.valueOf(content.hashCode());
+            return String.valueOf(Objects.hashCode(content));
         }
     }
 }

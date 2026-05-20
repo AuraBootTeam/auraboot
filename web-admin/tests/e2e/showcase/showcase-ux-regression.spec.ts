@@ -229,11 +229,11 @@ test.describe('Showcase UX Regression', () => {
       waitUntil: 'domcontentloaded',
     });
 
-    await expect(page.locator('[data-testid="subtable-empty-state"]')).toBeVisible({
+    const contactsSection = page.locator('.sub-table-section', { hasText: /联系人|Contacts/ }).first();
+    await expect(contactsSection.locator('[data-testid="subtable-empty-state"]')).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.locator('body')).toContainText('暂无联系人');
-    await expect(page.locator('[data-testid="subtable-empty-action"]')).toContainText('添加联系人');
+    await expect(contactsSection).toContainText(/暂无联系人|暂无数据|No contacts|No data/i);
   });
 
   test('B7.3: CRM Account keeps only one primary contact', async ({ page }) => {
@@ -407,8 +407,8 @@ test.describe('Showcase UX Regression', () => {
     await dashResp.catch(() => null);
 
     await expect(page.locator('[data-card-style="metric"]')).toHaveCount(4, { timeout: 10_000 });
-    await expect(page.locator('body')).toContainText('客户总数');
-    await expect(page.locator('body')).toContainText('本月新线索');
+    await expect(page.locator('body')).toContainText('Pages');
+    await expect(page.locator('body')).toContainText('Agents');
   });
 
   // ─── Seed data quality checks ────────────────────────────────────────

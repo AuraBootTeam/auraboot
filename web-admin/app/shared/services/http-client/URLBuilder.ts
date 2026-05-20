@@ -65,7 +65,8 @@ export function buildRequest(
   if (method === 'get' && Object.keys(remainingParams).length > 0) {
     const queryString = buildQueryString(remainingParams);
     if (queryString) {
-      fullUrl += '?' + queryString;
+      const separator = fullUrl.includes('?') ? '&' : '?';
+      fullUrl += separator + queryString;
     }
   }
 

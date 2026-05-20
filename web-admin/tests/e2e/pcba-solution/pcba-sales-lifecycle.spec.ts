@@ -323,7 +323,7 @@ async function ensureWarehouse(
 
   const createResult = await executeCommandViaApi(
     page,
-    'pe:create_warehouse',
+    'inv:create_warehouse',
     {
       inv_warehouse_name: `${prefix} ${uniqueId('WH')}`,
       inv_warehouse_type: 'finished_goods',
@@ -336,7 +336,7 @@ async function ensureWarehouse(
   if (!createResult.recordId || createResult.code !== ErrorCodes.SUCCESS) {
     throw new Error('Warehouse creation failed for sales lifecycle prerequisites');
   }
-  created.push({ commandCode: 'pe:delete_warehouse', pid: createResult.recordId });
+  created.push({ commandCode: 'inv:delete_warehouse', pid: createResult.recordId });
   return createResult.recordId;
 }
 
