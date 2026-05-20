@@ -97,8 +97,8 @@ test.describe('Smart Components — Display Components', () => {
     // BOOLEAN display — urgent field should render as a visible display value
     expect(bodyText).toMatch(/true|是|Yes|Urgent|紧急/i);
 
-    // DATE display — date string visible (YYYY-MM-DD format)
-    const datePattern = /\d{4}-\d{2}-\d{2}/;
+    // DATE display — date value visible in ISO or localized browser format.
+    const datePattern = /\d{4}[-/]\d{1,2}[-/]\d{1,2}/;
     expect(datePattern.test(bodyText)).toBe(true);
 
     // Detail view should not expose visible editable form controls for core fields.

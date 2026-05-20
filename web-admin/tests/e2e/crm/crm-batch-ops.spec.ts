@@ -53,7 +53,9 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
         expect(publishResp.ok(), 'crm_lead model should publish successfully').toBe(true);
       }
 
-      const syncResp = await page.request.post(`/api/meta/models/${model.pid}/sync-schema`);
+      const syncResp = await page.request.post(`/api/meta/models/${model.pid}/sync-schema`, {
+        timeout: 30000,
+      });
       expect(syncResp.ok(), 'crm_lead schema should sync successfully').toBe(true);
 
       for (let i = 1; i <= 2; i++) {

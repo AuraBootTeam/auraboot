@@ -210,9 +210,15 @@ test.describe('Smart Components — Form Components', () => {
     try {
       await order.gotoEditForm(orderPid);
 
-      // Sub-table renders number inputs (qty, price fields)
+      // Sub-table number fields are rendered as inputs after entering inline edit mode.
+      await page.getByTestId('subtable-edit-0').click();
+
       const numberInputs = page.locator(
-        'input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"]',
+        [
+          'input:not([readonly]):not([disabled])[type="number"]',
+          'input:not([readonly]):not([disabled])[inputmode="decimal"]',
+          'input:not([readonly]):not([disabled])[inputmode="numeric"]',
+        ].join(', '),
       );
       await numberInputs.first().waitFor({ state: 'attached', timeout: 10000 });
 
@@ -511,7 +517,9 @@ test.describe('Smart Components — Form Components', () => {
 
     // Currency fields render as number inputs with inputmode="decimal"
     const currencyInputs = page.locator(
-      'input[inputmode="decimal"], input[type="number"], [data-testid*="currency"]',
+      'input:not([readonly]):not([disabled])[inputmode="decimal"], ' +
+        'input:not([readonly]):not([disabled])[type="number"], ' +
+        '[data-testid*="currency"] input:not([readonly]):not([disabled])',
     );
     const count = await currencyInputs.count();
 

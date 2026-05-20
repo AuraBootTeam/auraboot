@@ -330,7 +330,11 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <GridLayout {...(gridLayoutProps as any)}>
         {schema.cells.map((cell) => (
-          <div key={cell.id} className="overflow-hidden rounded-lg border bg-white shadow-sm">
+          <div
+            key={cell.id}
+            data-testid={`dashboard-block-${cell.id}`}
+            className="overflow-hidden rounded-lg border bg-white shadow-sm"
+          >
             {renderCell(cell)}
           </div>
         ))}

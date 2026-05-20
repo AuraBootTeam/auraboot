@@ -8,6 +8,7 @@ import com.auraboot.framework.bpm.entity.BpmNodeHook;
 import com.auraboot.framework.bpm.mapper.BpmNodeHookMapper;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.auraboot.framework.common.util.UlidGenerator;
@@ -249,7 +250,7 @@ public class ProcessDeploymentService {
         }
 
         if (existing.isDeployed()) {
-            throw new IllegalStateException("Cannot update deployed process. Create a new version instead.");
+            throw new ConflictException("Cannot update deployed process. Create a new version instead.");
         }
 
         if (request.processName() != null) {
@@ -485,7 +486,7 @@ public class ProcessDeploymentService {
         }
 
         if (!definition.isDeployed()) {
-            throw new IllegalStateException("Process is not deployed: " + definition.getProcessKey());
+            throw new ConflictException("Process is not deployed: " + definition.getProcessKey());
         }
 
         // Check for running instances
@@ -500,7 +501,7 @@ public class ProcessDeploymentService {
                     .filter(pi -> definition.getProcessKey().equals(pi.getProcessDefinitionId()))
                     .count();
             if (count > 0) {
-                throw new IllegalStateException(
+                throw new ConflictException(
                         "Cannot undeploy: " + count + " running instance(s) for " + definition.getProcessKey());
             }
         }
@@ -532,7 +533,7 @@ public class ProcessDeploymentService {
         }
 
         if (!definition.isDeployed()) {
-            throw new IllegalStateException("Can only suspend deployed processes");
+            throw new ConflictException("Can only suspend deployed processes");
         }
 
         processDefinitionMapper.updateStatus(pid, "suspended");
@@ -557,7 +558,7 @@ public class ProcessDeploymentService {
         }
 
         if (!definition.isSuspended()) {
-            throw new IllegalStateException("Process is not suspended");
+            throw new ConflictException("Process is not suspended");
         }
 
         processDefinitionMapper.updateStatus(pid, "deployed");
@@ -584,7 +585,7 @@ public class ProcessDeploymentService {
         }
 
         if (definition.isDeployed()) {
-            throw new IllegalStateException("Cannot delete deployed process. Undeploy first.");
+            throw new ConflictException("Cannot delete deployed process. Undeploy first.");
         }
 
         // Use MyBatis Plus deleteById which respects @TableLogic for soft delete

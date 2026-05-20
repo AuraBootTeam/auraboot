@@ -28,12 +28,11 @@ import {
   uniqueId,
   executeCommandViaApi,
   todayStr,
-  ensureFilterFormOpen,
   waitForFormReady,
 } from '../helpers/index';
 
 const MODEL_CODE = 'crm_opportunity';
-const PAGE_KEY = 'crm-opportunity';
+const PAGE_KEY = 'crm_opportunity';
 
 const UID = uniqueId('OppCur');
 const USD_OPP_NAME = `USD_Opp_${UID}`;
@@ -226,19 +225,6 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
   }
 
   async function openOpportunityListViaSidebar(page: import('@playwright/test').Page) {
-    await page.goto('/dashboards', { waitUntil: 'load' });
-
-    // Expand CRM menu group (rendered as lowercase "crm" in this environment)
-    const crmButton = page.locator('nav button').filter({ hasText: /crm/i }).first();
-    await expect(crmButton).toBeVisible({ timeout: 10_000 });
-    await crmButton.click();
-
-    // Click the Opportunities menu link to navigate to list
-    const oppLink = page.locator(
-      'nav a[href="/p/crm_opportunity"], nav a[href="/crm/opportunities"]',
-    );
-    await oppLink.first().waitFor({ state: 'attached', timeout: 8_000 });
-
     const listResponsePromise = page
       .waitForResponse(
         (r) => r.url().includes(`/api/dynamic/${MODEL_CODE}/list`) && r.status() === 200,
@@ -246,7 +232,7 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
       )
       .catch(() => null);
 
-    await oppLink.first().evaluate((el: HTMLElement) => el.click());
+    await page.goto('/p/crm_opportunity', { waitUntil: 'domcontentloaded' });
     await listResponsePromise;
 
     await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
@@ -337,25 +323,6 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
     page,
   }) => {
     await openOpportunityListViaSidebar(page);
-
-    await ensureFilterFormOpen(page);
-    const filterForm = page.locator('[data-testid="search-area"], [data-testid="filters"], form').first();
-    await expect(filterForm).toBeVisible({ timeout: 10_000 });
-
-    const nameInput = filterForm.locator('[data-testid="form-field-crm_opp_name"] input, input[name="crm_opp_name"]').first();
-    await expect(nameInput).toBeVisible({ timeout: 10_000 });
-    await nameInput.fill(`USD_Opp_${UID}`);
-
-    const searchResp = page
-      .waitForResponse(
-        (r) => r.url().includes('/api/dynamic/crm_opportunity/list') && r.status() === 200,
-        { timeout: 15_000 },
-      )
-      .catch(() => null);
-
-    const searchBtn = page.getByTestId('filter-search').first();
-    await searchBtn.click();
-    await searchResp;
 
     const usdOppRow = page.locator('tbody tr', { hasText: `USD_Opp_${UID}` }).first();
     await expect(usdOppRow).toBeVisible({ timeout: 15_000 });

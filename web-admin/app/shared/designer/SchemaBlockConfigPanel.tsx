@@ -103,11 +103,14 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-slate-800">
-                          {schema.label}
+                          {getLocalizedText(schema.label as string | Record<string, string>, locale)}
                         </div>
                         {schema.description ? (
                           <div className="mt-1 text-xs leading-5 text-slate-500">
-                            {schema.description}
+                            {getLocalizedText(
+                              schema.description as string | Record<string, string>,
+                              locale,
+                            )}
                           </div>
                         ) : null}
                       </div>

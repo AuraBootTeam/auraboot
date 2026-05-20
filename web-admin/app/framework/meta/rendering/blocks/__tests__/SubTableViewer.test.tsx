@@ -117,7 +117,7 @@ describe('SubTableViewer', () => {
     expect(screen.getByTestId('subtable-viewer').textContent).toContain('pending');
   });
 
-  it('falls back to empty string for unknown ${field} placeholders instead of leaking template text', async () => {
+  it('skips data loading when a ${field} placeholder resolves to empty', async () => {
     fetchResultMock.mockResolvedValue({
       code: '0',
       data: {
@@ -144,17 +144,10 @@ describe('SubTableViewer', () => {
     );
 
     await waitFor(() => {
-      expect(fetchResultMock).toHaveBeenCalledWith('/api/datasource/list', {
-        method: 'get',
-        params: {
-          datasourceId: 'nq:wd_leave_request_approval_history',
-          format: 'records',
-          processInstanceId: '',
-        },
-        token: undefined,
-      });
+      expect(screen.getByTestId('subtable-viewer').textContent).toMatch(/No data|暂无数据/i);
     });
 
+    expect(fetchResultMock).not.toHaveBeenCalled();
     expect(screen.getByTestId('subtable-viewer').textContent).toMatch(/No data|暂无数据/i);
   });
 

@@ -451,9 +451,17 @@ test.describe('Plugin System Deep', () => {
     // The backend resolves the path on its own filesystem, so a host path will
     // not exist when the backend runs in docker. Try host path first, fall
     // back to the canonical container path used by the docker E2E stack.
-    const hostPluginDir = path.resolve(process.cwd(), '../plugins/project-management');
+    const enterprisePluginDir = process.env.AURA_ENTERPRISE_PROJECT_ROOT
+      ? path.resolve(process.env.AURA_ENTERPRISE_PROJECT_ROOT, 'plugins/project-management')
+      : null;
+    const corePluginDir = process.env.AURA_CORE_PROJECT_ROOT
+      ? path.resolve(process.env.AURA_CORE_PROJECT_ROOT, 'plugins/project-management')
+      : null;
+    const hostPluginDir = path.resolve(process.cwd(), '../../plugins/project-management');
     const candidatePaths = [
       process.env.E2E_BACKEND_PLUGIN_DIR,
+      enterprisePluginDir,
+      corePluginDir,
       hostPluginDir,
       '/app/plugins/project-management',
     ].filter((p): p is string => Boolean(p));

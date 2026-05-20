@@ -75,7 +75,7 @@ export default function SchedulerManagement() {
       name: '',
       description: '',
       taskType: 'cron',
-      cronExpression: '0 0 * * *',
+      cronExpression: '0 0 0 * * *',
       intervalMs: 60000,
       handlerBean: '',
       handlerMethod: 'execute',
@@ -444,13 +444,13 @@ export default function SchedulerManagement() {
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, cronExpression: e.target.value }))
                     }
-                    placeholder="0 0 * * *"
+                    placeholder="0 0 0 * * *"
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     {l(
-                      '标准 cron 格式：分 时 日 月 周',
-                      'Standard cron format: minute hour day month weekday',
+                      '标准 cron 格式：秒 分 时 日 月 周',
+                      'Standard cron format: second minute hour day month weekday',
                     )}
                   </p>
                 </div>

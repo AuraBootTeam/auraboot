@@ -598,20 +598,22 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
       .isVisible({ timeout: 8_000 })
       .catch(() => false);
     if (tabBarVisible) {
-      // Confirm at least 2 tab items render (overview + one more).
+      // Confirm at least 2 tab items render (overview + one more). The detail
+      // schema can grow additional tabs as field groups are added.
       const tabCount = await tabItems.count();
-      expect(tabCount, 'detail page must render exactly 2 tabs (overview + selectors_people)').toBe(
+      expect(tabCount, 'detail page must render at least 2 tabs').toBeGreaterThanOrEqual(
         2,
       );
 
       // Switch to the second tab and assert section content updates.
       const secondTab = tabItems.nth(1);
-      const overviewSectionsBefore = await page.locator('.form-section').count();
+      const visibleSections = page.locator('.form-section:visible');
+      const overviewSectionsBefore = await visibleSections.count();
       await secondTab.click().catch(() => null);
-      await expect(page.locator('.form-section').first()).toBeVisible({
+      await expect(visibleSections.first()).toBeVisible({
         timeout: 5_000,
       });
-      const sectionsAfter = await page.locator('.form-section').count();
+      const sectionsAfter = await visibleSections.count();
       // Tab switch should keep the page populated (count > 0). Counts may
       // differ between tabs but both must show content.
       expect(sectionsAfter, 'second tab should still render at least one section').toBeGreaterThan(
@@ -633,7 +635,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     }
 
     // Assert at least one form-section renders with our seeded value visible.
-    const detailSections = page.locator('.form-section');
+    const detailSections = page.locator('.form-section:visible');
     await expect(detailSections.first()).toBeVisible({ timeout: 10_000 });
     const detailSectionCount = await detailSections.count();
     expect(detailSectionCount, 'detail overview tab should expose ≥1 form-section').toBeGreaterThan(

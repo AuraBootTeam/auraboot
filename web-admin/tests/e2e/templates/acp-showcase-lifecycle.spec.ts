@@ -21,6 +21,7 @@
  * @since 11.0.0
  */
 
+import { existsSync } from 'node:fs';
 import { test, expect, type Page } from '../../fixtures';
 import {
   uniqueId,
@@ -32,6 +33,15 @@ import {
 } from '../helpers/index';
 
 test.describe.configure({ mode: 'serial' });
+
+const ENTERPRISE_PLUGIN_ROOT =
+  process.env.AURA_ENTERPRISE_PROJECT_ROOT ||
+  '/Users/ghj/work/auraboot/auraboot-enterprise';
+
+test.skip(
+  !existsSync(`${ENTERPRISE_PLUGIN_ROOT}/plugins/acp-showcase/plugin.json`),
+  'acp-showcase plugin is not present in this enterprise distribution',
+);
 
 const UID = uniqueId('ACS');
 const REQ_TITLE = `E2E AI Request ${UID}`;

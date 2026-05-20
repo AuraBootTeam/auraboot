@@ -163,7 +163,7 @@ test.describe('PM Dashboard @smoke', () => {
   /** Navigate to PM Dashboard via sidebar menu */
   async function gotoDashboard(page: import('@playwright/test').Page) {
     // Navigate to dashboard page
-    await page.goto('/project-management/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/dashboards/view/pm_dashboard', { waitUntil: 'domcontentloaded' });
 
     // Wait for dashboard data to load — multiple API calls fire in parallel
     await Promise.all([
@@ -202,12 +202,12 @@ test.describe('PM Dashboard @smoke', () => {
     await pmMenuButton.first().click();
 
     // Wait for submenu to expand
-    const dashLink = page.locator('a[href="/project-management/dashboard"]');
+    const dashLink = page.locator('a[href="/dashboards/view/pm_dashboard"]');
     await dashLink.first().waitFor({ state: 'attached', timeout: 5000 });
     // Use evaluate to bypass potential CSS animation issues (max-h transition)
     await dashLink.first().evaluate((el: HTMLElement) => el.click());
 
-    await expect(page).toHaveURL(/\/project-management\/dashboard/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboards\/view\/pm_dashboard/, { timeout: 10000 });
 
     // Dashboard title visible
     const title = page.locator('text=项目管理仪表盘').or(page.locator('text=PM Dashboard'));

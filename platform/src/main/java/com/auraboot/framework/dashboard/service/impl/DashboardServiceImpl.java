@@ -626,28 +626,24 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private static boolean hasNonBlankField(JsonNode node, String field) {
-        if (node == null || !node.has(field)) {
-            return false;
-        }
-        return hasNonBlankText(node.get(field));
+        return node != null && node.has(field) && hasNonBlankText(node.get(field));
     }
 
-    private static boolean hasNonBlankText(JsonNode value) {
-        if (value == null || value.isNull()) {
+    private static boolean hasNonBlankText(JsonNode node) {
+        if (node == null || node.isNull()) {
             return false;
         }
-        if (value.isTextual()) {
-            return StringUtils.hasText(value.asText());
+        if (node.isTextual() || node.isNumber() || node.isBoolean()) {
+            return StringUtils.hasText(node.asText());
         }
-        if (value.isObject()) {
-            for (JsonNode child : value) {
+        if (node.isObject() || node.isArray()) {
+            for (JsonNode child : node) {
                 if (hasNonBlankText(child)) {
                     return true;
                 }
             }
-            return false;
         }
-        return StringUtils.hasText(value.asText());
+        return false;
     }
 
     private void validateCreateRequest(DashboardCreateRequest request) {

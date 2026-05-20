@@ -652,23 +652,14 @@ test.describe('BPM Deep Tests', () => {
     }
 
     try {
-      const instanceId = await startProcessInstance(page, parentKey, {});
-      // SmartEngine CallActivity may throw 500 in current runtime.
-      if (!instanceId) {
-        const fallbackResp = await page.request.post('/api/bpm/process-instances', {
-          data: {
-            processDefinitionKey: parentKey,
-            businessKey: `ca-fallback-${Date.now().toString(36)}`,
-            variables: {},
-          },
-        });
-        expect(
-          fallbackResp.status(),
-          'CallActivity should either start successfully or fail with backend limitation (>=500)',
-        ).toBeGreaterThanOrEqual(500);
-        return;
-      }
-      expect(instanceId).not.toBeNull();
+      // Runtime CallActivity coverage lives in designer-callactivity.spec.ts.
+      // This older deep case keeps deploy/detail coverage only so it does not
+      // intentionally exercise a known backend 500 path as a "passing" result.
+      const detailResp = await page.request.get(`/api/bpm/process-definitions/${parentPid}`);
+      expect(detailResp.ok()).toBe(true);
+      const detail = await detailResp.json().catch(() => ({}) as any);
+      const payload = detail.data || detail;
+      expect(String(payload?.processKey ?? '')).toContain(parentKey);
     } finally {
       await page.request.post(`/api/bpm/process-definitions/${parentPid}/undeploy`).catch(() => {});
       await page.request.delete(`/api/bpm/process-definitions/${parentPid}`).catch(() => {});

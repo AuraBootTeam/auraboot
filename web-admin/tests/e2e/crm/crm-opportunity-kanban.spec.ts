@@ -110,7 +110,7 @@ test.describe('CRM Opportunity Kanban @smoke', () => {
     page,
   }) => {
     await gotoOpportunityList(page);
-    await expect(page.getByRole('heading', { name: 'crm_opportunity' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /商机列表|Opportunities|crm_opportunity/ })).toBeVisible();
     await expect(page.locator('button[aria-haspopup="listbox"]').first()).toBeVisible();
   });
 

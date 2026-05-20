@@ -1015,7 +1015,7 @@ test.describe('E2E Test Fixtures Setup', () => {
       const commandExists = async (commandCode: string) => !!(await getCommandMeta(commandCode));
 
       if (isInstalledPublished && pluginName === 'inventory') {
-        const requiredCommands = ['pe:create_warehouse', 'pe:allocate_inventory'];
+        const requiredCommands = ['inv:create_warehouse', 'inv:allocate_inventory'];
         for (const commandCode of requiredCommands) {
           if (!(await commandExists(commandCode))) {
             reimportReason = `missing command ${commandCode}`;
@@ -1024,7 +1024,7 @@ test.describe('E2E Test Fixtures Setup', () => {
         }
         if (!reimportReason) {
           const expectedCommandTypes: Record<string, string> = {
-            'pe:allocate_inventory': 'action',
+            'inv:allocate_inventory': 'action',
             'pe:hold_inventory': 'action',
             'pe:auto_putaway': 'action',
           };

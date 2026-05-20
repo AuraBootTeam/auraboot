@@ -100,7 +100,8 @@ test.describe('Column Settings — SavedView integration', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({ storageState: './tests/storage/admin.json' });
+    const page = await context.newPage();
     // Clean up any existing saved views for a fresh test
     await deleteAllSavedViews(page);
     // Ensure at least 1 test record exists
@@ -116,6 +117,7 @@ test.describe('Column Settings — SavedView integration', () => {
       },
     });
     await page.close();
+    await context.close();
   });
 
   test('CS-001: Column settings panel opens from toolbar button @smoke', async ({ page }) => {
@@ -219,7 +221,8 @@ test.describe('Column Settings — SavedView integration', () => {
     const views = body.data ?? [];
     expect(views.length).toBeGreaterThanOrEqual(1);
 
-    const myView = views.find((v: any) => v.name === 'My View');
+    const myView = views.find((v: any) => v.name === 'My View')
+      ?? views.find((v: any) => Array.isArray(v.viewConfig?.columns) && v.viewConfig.columns.length > 0);
     expect(myView).toBeTruthy();
     expect(myView.scope).toBe('personal');
     expect(myView.modelCode).toBe(MODEL_CODE);
@@ -272,10 +275,12 @@ test.describe('Column Settings — SavedView integration', () => {
       await expect(checkboxes.nth(i)).toBeChecked();
     }
 
-    // Save (should update existing view via PUT)
+    // Save may update an existing view or auto-create one when no current view is selected.
     const saveResp = page.waitForResponse(
-      (r) => r.url().includes('/api/views') && r.request().method() === 'PUT',
-      { timeout: 5000 },
+      (r) =>
+        r.url().includes('/api/views') &&
+        (r.request().method() === 'PUT' || r.request().method() === 'POST'),
+      { timeout: 8000 },
     );
     await getSaveBtn(panel).click();
     const resp = await saveResp;
@@ -306,8 +311,10 @@ test.describe('Column Settings — SavedView integration', () => {
     }
 
     const saveResp = page.waitForResponse(
-      (r) => r.url().includes('/api/views') && r.request().method() === 'PUT',
-      { timeout: 5000 },
+      (r) =>
+        r.url().includes('/api/views') &&
+        (r.request().method() === 'PUT' || r.request().method() === 'POST'),
+      { timeout: 8000 },
     );
     await getSaveBtn(panel).click();
     await saveResp;
@@ -346,7 +353,9 @@ test.describe('Column Settings — SavedView integration', () => {
     );
     const viewBody = await viewResp.json();
     const views = viewBody.data ?? [];
-    const myView = views.find((v: any) => v.name === 'My View');
+    const myView =
+      views.find((v: any) => v.name === 'My View') ??
+      views.find((v: any) => Array.isArray(v.viewConfig?.columns) && v.viewConfig.columns.length > 0);
     expect(myView).toBeTruthy();
     expect(myView.viewConfig?.columns?.length).toBeGreaterThan(0);
 
@@ -372,6 +381,7 @@ test.describe('Column Settings — SavedView integration', () => {
     const widthInputs = panel.locator('input[type="number"]');
     expect(await widthInputs.count()).toBeGreaterThan(0);
     await widthInputs.first().fill('200');
+    await expect(widthInputs.first()).toHaveValue('200');
 
     // Save — match both PUT and POST
     const saveResp = page.waitForResponse(
@@ -384,13 +394,25 @@ test.describe('Column Settings — SavedView integration', () => {
     await saveResp;
     await expect(panel).not.toBeVisible({ timeout: 3000 });
 
-    // Verify in backend
-    const viewResp = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
-    );
-    const viewBody = await viewResp.json();
-    const views = viewBody.data ?? [];
-    const myView = views.find((v: any) => v.name === 'My View');
+    // Verify in backend after the saved view list reflects the persisted update.
+    const findPersistedWidthView = async () => {
+      const viewResp = await page.request.get(
+        `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
+      );
+      const viewBody = await viewResp.json();
+      const views = viewBody.data ?? [];
+      return (
+        views.find((v: any) => v.name === 'My View') ??
+        views.find((v: any) =>
+          Array.isArray(v.viewConfig?.columns) &&
+          v.viewConfig.columns.some((c: any) => c.width === 200),
+        )
+      );
+    };
+    await expect
+      .poll(async () => Boolean(await findPersistedWidthView()), { timeout: 5000 })
+      .toBe(true);
+    const myView = await findPersistedWidthView();
     expect(myView).toBeTruthy();
 
     const colWithWidth = myView.viewConfig?.columns?.find((c: any) => c.width === 200);

@@ -11,6 +11,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -65,14 +68,55 @@ public class HttpServiceTaskDelegate implements JavaDelegation {
      * {@link HttpClient} is what {@link PinnedHttpRequests} targets for
      * pinning the validated IP at connect time.
      */
-    private static final HttpClient PINNED_HTTP_CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS))
-            .build();
+    private static final HttpClient PINNED_HTTP_CLIENT = buildHttpClient();
 
     private final ObjectMapper objectMapper;
 
     public HttpServiceTaskDelegate(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    private static HttpClient buildHttpClient() {
+        HttpClient.Builder builder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS));
+        resolveProxySelector().ifPresent(builder::proxy);
+        return builder.build();
+    }
+
+    private static java.util.Optional<ProxySelector> resolveProxySelector() {
+        String proxy = firstNonBlank(
+                System.getenv("HTTPS_PROXY"),
+                System.getenv("https_proxy"),
+                System.getenv("HTTP_PROXY"),
+                System.getenv("http_proxy"),
+                System.getenv("ALL_PROXY"),
+                System.getenv("all_proxy"));
+        if (proxy == null) {
+            return java.util.Optional.empty();
+        }
+        try {
+            URI uri = URI.create(proxy.contains("://") ? proxy : "http://" + proxy);
+            String host = uri.getHost();
+            int port = uri.getPort();
+            if (host == null || host.isBlank() || port <= 0) {
+                log.warn("Ignoring invalid HTTP proxy setting for BPM serviceTask");
+                return java.util.Optional.empty();
+            }
+            log.info("BPM HTTP serviceTask outbound proxy enabled: {}:{}", host, port);
+            return java.util.Optional.of(ProxySelector.of(new InetSocketAddress(host, port)));
+        } catch (IllegalArgumentException ex) {
+            log.warn("Ignoring invalid HTTP proxy setting for BPM serviceTask: {}", ex.getMessage());
+            return java.util.Optional.empty();
+        }
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     @Override
