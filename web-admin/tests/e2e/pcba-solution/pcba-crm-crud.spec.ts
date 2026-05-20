@@ -426,7 +426,7 @@ test.describe('PCBA CRM CRUD', () => {
           crm_opp_account_id: accountPid,
           crm_opp_expected_amount: 50000,
           crm_opp_probability: 60,
-          crm_opp_expected_close_date: new Date().toISOString(),
+          crm_opp_expected_close_date: new Date().toISOString().slice(0, 10),
         },
         undefined,
         'create',

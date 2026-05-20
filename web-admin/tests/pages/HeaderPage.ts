@@ -319,13 +319,13 @@ export class HeaderPage {
     await this.page.waitForURL(/\/(logout|login)/, { timeout: 8000 }).catch(() => {});
 
     // Handle logout confirmation page if present (button text is "确认退出" in Chinese UI)
-    const logoutButton = this.page.locator('button:has-text("确认退出"), button:has-text("Log Out"), button[type="submit"]').first();
-    const hasLogoutButton = await logoutButton.isVisible({ timeout: 5000 }).catch(() => false);
-    if (hasLogoutButton) {
-      await Promise.all([
-        this.page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => {}),
-        logoutButton.click(),
-      ]);
+    if (this.page.url().includes('/logout')) {
+      const logoutButton = this.page
+        .locator('button:has-text("确认退出"), button:has-text("Log Out"), button[type="submit"]')
+        .first();
+      await logoutButton.waitFor({ state: 'visible', timeout: 10000 });
+      await logoutButton.click();
+      await this.page.waitForURL(/\/login/, { timeout: 10000 });
     }
   }
 }

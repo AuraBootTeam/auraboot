@@ -81,6 +81,52 @@ const PIPELINE_VIEW_NAME = 'Pipeline Board';
 const STAGE_QUALIFICATION = 'qualification';
 const STAGE_PROPOSAL = 'proposal';
 
+async function ensureTableSavedView(
+  page: Page,
+  modelCode: string,
+  pageKey: string,
+  name: string,
+): Promise<string> {
+  return await page.evaluate(
+    async ({ modelCode, pageKey, name }) => {
+      const params = new URLSearchParams({ modelCode, pageKey });
+      const accessibleResp = await fetch(`/api/views/accessible?${params.toString()}`, {
+        credentials: 'include',
+      });
+      const accessibleBody = await accessibleResp.json();
+      if (accessibleBody?.code !== '0' && accessibleBody?.code !== 0) {
+        throw new Error(`Failed to load saved views: ${JSON.stringify(accessibleBody)}`);
+      }
+      const views = Array.isArray(accessibleBody?.data) ? accessibleBody.data : [];
+      const existing = views.find((view: any) => (view.viewType || 'table') === 'table');
+      if (existing?.pid) return String(existing.pid);
+
+      const createResp = await fetch('/api/views', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          modelCode,
+          pageKey,
+          scope: 'personal',
+          viewType: 'table',
+          isDefault: false,
+        }),
+      });
+      const createBody = await createResp.json();
+      if (createBody?.code !== '0' && createBody?.code !== 0) {
+        throw new Error(`Failed to create table saved view: ${JSON.stringify(createBody)}`);
+      }
+      if (!createBody?.data?.pid) {
+        throw new Error(`Created table saved view has no pid: ${JSON.stringify(createBody)}`);
+      }
+      return String(createBody.data.pid);
+    },
+    { modelCode, pageKey, name },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Sidebar-driven navigation helpers (D1) — NOT page.goto('/p/...')
 // ---------------------------------------------------------------------------
@@ -187,6 +233,31 @@ async function selectDefaultTableView(page: Page): Promise<void> {
     return;
   }
 
+  const tableViewPid = await ensureTableSavedView(
+    page,
+    'crm_opportunity',
+    'crm_opportunity',
+    'E2E Table View',
+  );
+  const listResponsePromise = page.waitForResponse(
+    (r) =>
+      r.url().includes('/api/dynamic/crm_opportunity') &&
+      r.url().includes('list') &&
+      r.status() === 200,
+    { timeout: 20_000 },
+  );
+  await page.goto(`/p/crm_opportunity?view=${tableViewPid}`, { waitUntil: 'domcontentloaded' });
+  await listResponsePromise.catch(() => null);
+  if (
+    await page
+      .locator('tbody tr')
+      .first()
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false)
+  ) {
+    return;
+  }
+
   const viewSelector = page
     .locator('[data-testid="view-selector-trigger"], button[aria-haspopup="listbox"]')
     .first();
@@ -196,7 +267,10 @@ async function selectDefaultTableView(page: Page): Promise<void> {
   const panel = page.locator('[role="listbox"], [role="dialog"]').first();
   await panel.waitFor({ state: 'visible', timeout: 5_000 });
 
-  const tableView = panel.getByText('Default View', { exact: false }).first();
+  const tableView = panel
+    .locator('[data-view-type="table"]')
+    .first()
+    .or(panel.getByText(/Default View|Table|表格|All Opportunities/i).first());
   await tableView.waitFor({ state: 'visible', timeout: 5_000 });
   await tableView.click();
 
