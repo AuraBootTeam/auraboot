@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: 60
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: auraboot
           POSTGRES_PASSWORD: auraboot_dev
@@ -115,7 +115,7 @@ jobs:
       - name: Reset backend test database
         run: |
           set -euo pipefail
-          yes y | env \
+          printf 'y\n' | env \
             PG_HOST=localhost \
             PG_PORT=5432 \
             PG_USER=auraboot \
