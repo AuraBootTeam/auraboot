@@ -9,11 +9,13 @@ import com.auraboot.framework.agent.service.StepLoopService;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +52,7 @@ import static org.mockito.Mockito.when;
  */
 @DisplayName("H.3: StepLoopService.executePlanSteps Extended Thinking propagation")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
+@ActiveProfiles({"integration-test", "skills-c2-test"})
 class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -57,6 +60,32 @@ class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    private final List<String> seededRunPids = new ArrayList<>();
+    private final List<String> seededTaskPids = new ArrayList<>();
+    private final List<String> seededAgentCodes = new ArrayList<>();
+
+    @AfterEach
+    void cleanupSeededRows() {
+        Long tenantId = getTestTenant().getId();
+        for (String runPid : seededRunPids) {
+            jdbcTemplate.update("DELETE FROM ab_agent_run_checkpoint WHERE tenant_id = ? AND run_pid = ?",
+                    tenantId, runPid);
+            jdbcTemplate.update("DELETE FROM ab_agent_run WHERE tenant_id = ? AND pid = ?",
+                    tenantId, runPid);
+        }
+        for (String taskPid : seededTaskPids) {
+            jdbcTemplate.update("DELETE FROM ab_agent_task WHERE tenant_id = ? AND pid = ?",
+                    tenantId, taskPid);
+        }
+        for (String agentCode : seededAgentCodes) {
+            jdbcTemplate.update("DELETE FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = ?",
+                    tenantId, agentCode);
+        }
+        seededRunPids.clear();
+        seededTaskPids.clear();
+        seededAgentCodes.clear();
+    }
 
     private Map<String, Object> insertAgentDef(String suffix, String executionConfigJson) {
         String pid = UniqueIdGenerator.generate();
@@ -76,6 +105,7 @@ class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT * FROM ab_agent_definition WHERE pid = ?", pid);
         assertThat(rows).hasSize(1);
+        seededAgentCodes.add(agentCode);
         return rows.get(0);
     }
 
@@ -126,6 +156,30 @@ class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
         return Map.of(skillCode, skillRow);
     }
 
+    private RunIds seedRun(String agentCode) {
+        String runPid = UniqueIdGenerator.generate();
+        String taskPid = UniqueIdGenerator.generate();
+        Long tenantId = getTestTenant().getId();
+        jdbcTemplate.update(
+                "INSERT INTO ab_agent_task (pid, tenant_id, title, task_status, "
+                        + "assignee_type, assignee_id, created_at, updated_at, created_by) "
+                        + "VALUES (?, ?, 'H3 thinking task', 'in_progress', 'agent', ?, "
+                        + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)",
+                taskPid, tenantId, agentCode, testUser.getId());
+        jdbcTemplate.update(
+                "INSERT INTO ab_agent_run (pid, tenant_id, task_id, agent_id, run_status, "
+                        + "started_at, created_at, updated_at, created_by) "
+                        + "VALUES (?, ?, ?, ?, 'running', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, "
+                        + "CURRENT_TIMESTAMP, ?)",
+                runPid, tenantId, taskPid, agentCode, testUser.getId());
+        seededRunPids.add(runPid);
+        seededTaskPids.add(taskPid);
+        return new RunIds(runPid, taskPid);
+    }
+
+    private record RunIds(String runPid, String taskPid) {
+    }
+
     // ========================================================================
     // Case A — agent empty, skill enables thinking → propagates to LLM request
     // ========================================================================
@@ -140,10 +194,11 @@ class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
 
         LlmProvider provider = mockProviderEndTurn();
         List<AgentPlanStep> plan = twoStepPlan(skillCode);
+        RunIds ids = seedRun((String) agentDef.get("agent_code"));
 
         stepLoopService.executePlanSteps(plan, 0,
-                getTestTenant().getId(), "run-h3-a-" + System.nanoTime(),
-                "task-h3-a-" + System.nanoTime(),
+                getTestTenant().getId(), ids.runPid(),
+                ids.taskPid(),
                 (String) agentDef.get("agent_code"),
                 "system prompt", "user message",
                 java.util.Collections.<com.auraboot.framework.agent.dto.AgentToolDefinition>emptyList(), agentDef, skillByCode,
@@ -200,14 +255,15 @@ class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
                 .thenReturn(replanResponse);
 
         List<AgentPlanStep> plan = twoStepPlan(skillCode);
+        RunIds ids = seedRun((String) agentDef.get("agent_code"));
 
         // Empty replan array → replanned=false → original exception is rethrown.
         // We assert the assertion AFTER catching, so the test still inspects
         // the captured replan request below.
         try {
             stepLoopService.executePlanSteps(plan, 0,
-                    getTestTenant().getId(), "run-h3-b-" + System.nanoTime(),
-                    "task-h3-b-" + System.nanoTime(),
+                    getTestTenant().getId(), ids.runPid(),
+                    ids.taskPid(),
                     (String) agentDef.get("agent_code"),
                     "system prompt", "user message",
                     java.util.Collections.<com.auraboot.framework.agent.dto.AgentToolDefinition>emptyList(), agentDef, skillByCode,
@@ -248,10 +304,11 @@ class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
 
         LlmProvider provider = mockProviderEndTurn();
         List<AgentPlanStep> plan = twoStepPlan("unused_skill_code");
+        RunIds ids = seedRun((String) agentDef.get("agent_code"));
 
         stepLoopService.executePlanSteps(plan, 0,
-                getTestTenant().getId(), "run-h3-c-" + System.nanoTime(),
-                "task-h3-c-" + System.nanoTime(),
+                getTestTenant().getId(), ids.runPid(),
+                ids.taskPid(),
                 (String) agentDef.get("agent_code"),
                 "system prompt", "user message",
                 java.util.Collections.<com.auraboot.framework.agent.dto.AgentToolDefinition>emptyList(), agentDef, null,
@@ -285,10 +342,11 @@ class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
 
         LlmProvider provider = mockProviderEndTurn();
         List<AgentPlanStep> plan = twoStepPlan(skillCode);
+        RunIds ids = seedRun((String) agentDef.get("agent_code"));
 
         stepLoopService.executePlanSteps(plan, 0,
-                getTestTenant().getId(), "run-h3-d-" + System.nanoTime(),
-                "task-h3-d-" + System.nanoTime(),
+                getTestTenant().getId(), ids.runPid(),
+                ids.taskPid(),
                 (String) agentDef.get("agent_code"),
                 "system prompt", "user message",
                 java.util.Collections.<com.auraboot.framework.agent.dto.AgentToolDefinition>emptyList(), agentDef, skillByCode,
