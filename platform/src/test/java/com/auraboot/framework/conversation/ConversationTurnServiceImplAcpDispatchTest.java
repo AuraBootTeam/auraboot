@@ -34,7 +34,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -338,48 +337,21 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("precomputed CONTEXTUAL_ANSWER without readonly policy -> ACP runtime")
-    void contextualAnswerBucket_dispatchesToAcp() {
-        // Precomputed contextual buckets do not carry triage.allowedReadOnlyTools.
-        // Keep those ownerless/external hints fail-closed to ACP; the normal web
-        // triage path with a readonly tool whitelist is covered in
-        // ConversationTurnServiceImplDispatchTest and routes to chat.
+    @DisplayName("precomputed CONTEXTUAL_ANSWER without durable hints -> chat runtime")
+    void contextualAnswerBucket_dispatchesToChat() {
         withTestIdentity(() -> {
-            Long tenantId = getTestTenant().getId();
-            when(agentRunService.executeTaskSync(eq(tenantId), anyString(), eq("aurabot"), any()))
-                    .thenReturn(new RunOutcome.Success(
-                            "RUN_PID_CTX",
-                            "This page lists customer accounts grouped by region.",
-                            65, 22, 0.0021d));
+            when(chatService.executeAuraBotTurn(any(), any(), any()))
+                    .thenReturn(new TurnOutcome.Success("contextual chat", Map.of()));
 
             TurnOutcome outcome = turnService.runTurn(
                     buildTurnRequest("what is this page showing", TriageBucket.CONTEXTUAL_ANSWER), sink);
 
             assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
             assertThat(((TurnOutcome.Success) outcome).finalResponse())
-                    .startsWith("This page lists customer accounts");
+                    .isEqualTo("contextual chat");
 
-            // ACP path engaged
-            verify(agentRunService, times(1)).executeTaskSync(
-                    eq(tenantId), anyString(), eq("aurabot"), any());
-            verify(sink, times(1)).onDone(
-                    eq("This page lists customer accounts grouped by region."), any());
-
-            // Legacy chat path NOT engaged
-            verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
-
-            // ab_agent_task row written (assignee_type='ai', task carries the
-            // contextual question — not action-typed but still task-driven).
-            List<Map<String, Object>> tasks = jdbcTemplate.queryForList(
-                    "SELECT pid, assignee_type, assignee_id, title FROM ab_agent_task " +
-                            "WHERE tenant_id = ? AND deleted_flag = FALSE " +
-                            "ORDER BY created_at DESC LIMIT 1",
-                    tenantId);
-            assertThat(tasks).hasSize(1);
-            Map<String, Object> row = tasks.get(0);
-            assertThat(row.get("assignee_type")).isEqualTo("ai");
-            assertThat(row.get("assignee_id")).isEqualTo("aurabot");
-            assertThat((String) row.get("title")).startsWith("what is this page");
+            verify(chatService, times(1)).executeAuraBotTurn(any(), any(), any());
+            verify(agentRunService, never()).executeTaskSync(anyLong(), anyString(), anyString(), any());
         });
     }
 

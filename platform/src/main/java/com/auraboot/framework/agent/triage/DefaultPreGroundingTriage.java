@@ -29,10 +29,16 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
     private static final Set<String> LIGHT_PROFILES = Set.of("support_chat");
     private static final int HISTORY_LIGHT_THRESHOLD = 5;
 
-    /** CJK + English platform action verbs / nouns hinting at CRUD or workflow. */
-    private static final Pattern PLATFORM_VERB_PATTERN = Pattern.compile(
-            "(创建|新建|新增|添加|编辑|修改|更新|删除|审批|查询|搜索|统计|筛选|分组|导出|" +
-                    "create|add|edit|update|delete|approve|query|search|filter|export|count|list|view all)",
+    /** CJK + English platform action verbs that imply mutation, approval, export, or durable work. */
+    private static final Pattern PLATFORM_MUTATION_PATTERN = Pattern.compile(
+            "(创建|新建|新增|添加|编辑|修改|更新|删除|审批|导出|" +
+                    "create|add|edit|update|delete|approve|export)",
+            Pattern.CASE_INSENSITIVE);
+
+    /** CJK + English platform read verbs that should stay in a policy-gated read-only turn. */
+    private static final Pattern PLATFORM_READONLY_PATTERN = Pattern.compile(
+            "(查询|搜索|统计|筛选|分组|查看|列出|" +
+                    "query|search|filter|count|list|view all|show)",
             Pattern.CASE_INSENSITIVE);
 
     /** Pure-explanation verbs: ask about page / record meaning, no platform action. */
@@ -62,11 +68,14 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
         }
 
         String message = request.userMessage() == null ? "" : request.userMessage();
-        boolean platformKeyword = PLATFORM_VERB_PATTERN.matcher(message).find();
+        boolean platformMutationKeyword = PLATFORM_MUTATION_PATTERN.matcher(message).find();
+        boolean platformReadOnlyKeyword = PLATFORM_READONLY_PATTERN.matcher(message).find();
         boolean explainKeyword = EXPLAIN_VERB_PATTERN.matcher(message).find();
 
         // Rule 3: history hotness — sustained light_chat continues unless platform keyword breaks streak
-        if (request.recentLightTurnCount() >= HISTORY_LIGHT_THRESHOLD && !platformKeyword) {
+        if (request.recentLightTurnCount() >= HISTORY_LIGHT_THRESHOLD
+                && !platformMutationKeyword
+                && !platformReadOnlyKeyword) {
             return new TriageVerdict(
                     TriageBucket.LIGHT_CHAT, 0.85,
                     List.of("rule:history_light_streak", "streak:" + request.recentLightTurnCount()),
@@ -74,11 +83,17 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
         }
 
         // Rule 4: keyword match
-        if (platformKeyword) {
+        if (platformMutationKeyword) {
             return new TriageVerdict(
                     TriageBucket.ACP_RUN, 0.85,
                     List.of("rule:keyword_platform_verb"),
                     Set.of());
+        }
+        if (platformReadOnlyKeyword) {
+            return new TriageVerdict(
+                    TriageBucket.CONTEXTUAL_ANSWER, 0.80,
+                    List.of("rule:keyword_readonly_platform"),
+                    READONLY_CONTEXT_TOOLS);
         }
         if (explainKeyword) {
             // Explanation needing context → contextual_answer with readonly tools
