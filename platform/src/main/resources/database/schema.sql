@@ -4856,6 +4856,25 @@ CREATE INDEX IF NOT EXISTS idx_agent_run_status ON ab_agent_run (tenant_id, run_
 CREATE INDEX IF NOT EXISTS idx_agent_run_parent ON ab_agent_run (parent_run_id) WHERE parent_run_id IS NOT NULL;
 COMMENT ON TABLE ab_agent_run IS 'Agent execution session records (audit log, never deleted)';
 
+-- Append-only durable workflow checkpoints for ACP plan execution.
+CREATE TABLE IF NOT EXISTS ab_agent_run_checkpoint (
+  id              BIGSERIAL PRIMARY KEY,
+  pid             VARCHAR(26) UNIQUE NOT NULL,
+  tenant_id       BIGINT NOT NULL,
+  run_pid         VARCHAR(26) NOT NULL,
+  checkpoint_type VARCHAR(32) NOT NULL,
+  step_index      INTEGER NOT NULL DEFAULT 0,
+  reason          VARCHAR(80),
+  plan_snapshot   JSONB,
+  state_snapshot  JSONB,
+  created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_agent_run_checkpoint_run
+    ON ab_agent_run_checkpoint (tenant_id, run_pid, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_run_checkpoint_step
+    ON ab_agent_run_checkpoint (tenant_id, run_pid, step_index);
+COMMENT ON TABLE ab_agent_run_checkpoint IS 'Append-only checkpoint history for durable agent workflow runs';
+
 -- ACP §6.10: subtask_origin audit-label whitelist. Keeps free-text drift out
 -- of the column so dashboards / SQL reports can rely on the enum.
 DO $$

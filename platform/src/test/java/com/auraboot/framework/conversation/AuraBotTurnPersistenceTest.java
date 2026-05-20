@@ -94,6 +94,7 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
                 conversationId,
                 null,
                 null,
+                java.util.Set.of(),
                 null,
                 null,                                // taskPid (DC.3c)
                 Instant.now());

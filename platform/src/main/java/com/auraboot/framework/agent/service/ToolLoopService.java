@@ -7,12 +7,20 @@ import com.auraboot.framework.agent.authorization.RuntimeAuthorizationService;
 import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
 import com.auraboot.framework.agent.provider.ProviderExecutionResult;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.AgentErrorFrame;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionClaim;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionLedger;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionRecord;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionRequest;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionStatus;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor;
+import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
@@ -71,6 +79,9 @@ public class ToolLoopService {
 
     @Autowired(required = false)
     private AgentRuntimeObservabilityService observabilityService;
+
+    @Autowired(required = false)
+    private DurableToolExecutionLedger durableToolExecutionLedger;
 
     /**
      * Execute a tool call within an agent run.
@@ -209,12 +220,40 @@ public class ToolLoopService {
         try {
             spanCtx = aiTraceService.startSpan(traceCtx, null, "tool", toolName, input);
         } catch (Exception e) {
-            log.debug("Failed to start span for tool {}: {}", toolName, e.getMessage());
+            log.debug("Failed to start span for tool {}: {}", toolName, safeExceptionMessage(e));
         }
 
         long startMs = System.currentTimeMillis();
+        DurableToolExecutionRequest durableExecutionRequest = null;
+        String durableExecutionKey = null;
+        boolean durableReplay = false;
         try {
             String toolType = toolDef.getToolType();
+            Set<EffectClass> effects = deriveEffects(toolName, toolDef);
+            if (requiresDurableExecutionBoundary(effects)) {
+                if (durableToolExecutionLedger == null) {
+                    String result = toJsonResult(Map.of(
+                            "success", false,
+                            "error", "Durable tool execution ledger is not available. No external side effect was executed."));
+                    resultContractEmitter.emitProviderResult(toolName, toolDef, result,
+                            System.currentTimeMillis() - startMs, false);
+                    try { aiTraceService.endSpan(spanCtx, result, "error"); }
+                    catch (Exception traceEx) { log.debug("Failed to end span for tool {}: {}", toolName, safeExceptionMessage(traceEx)); }
+                    return result;
+                }
+                durableExecutionRequest = durableExecutionRequest(
+                        tenantId, runPid, taskPid, agentCode, toolName, toolDef, input, effects);
+                DurableToolExecutionClaim claim = durableToolExecutionLedger.claim(durableExecutionRequest);
+                durableExecutionKey = claim.executionKey();
+                if (!claim.acquired()) {
+                    durableReplay = true;
+                    String replayed = replayDurableToolExecution(claim.record());
+                    log.info("Durable tool execution replay: tenant={} run={} tool={} key={}",
+                            tenantId, runPid, LogSanitizer.safe(toolName), LogSanitizer.safe(durableExecutionKey));
+                    return emitDurableReplay(toolName, toolDef, replayed, startMs, spanCtx);
+                }
+            }
+
             String result;
             if ("dsl_command".equals(toolType)) {
                 result = executeDslCommandWithAction(toolDef.getSourceCode(), input, tenantId, runPid, toolDef);
@@ -228,14 +267,14 @@ public class ToolLoopService {
                 result = executeApiCall(toolDef.getSourceCode(), input);
             } else if ("llm_native".equals(toolType)) {
                 try { aiTraceService.endSpan(spanCtx, Map.of("status", "delegated"), "success"); }
-                catch (Exception traceEx) { log.debug("Failed to end span: {}", traceEx.getMessage()); }
+                catch (Exception traceEx) { log.debug("Failed to end span: {}", safeExceptionMessage(traceEx)); }
                 recordToolExecution(toolType, true, "delegated");
                 return objectMapper.writeValueAsString(Map.of(
                         "status", "delegated",
                         "message", "This tool is handled natively by the LLM provider."));
             } else {
                 try { aiTraceService.endSpan(spanCtx, "Unsupported tool type: " + toolType, "error"); }
-                catch (Exception traceEx) { log.debug("Failed to end span: {}", traceEx.getMessage()); }
+                catch (Exception traceEx) { log.debug("Failed to end span: {}", safeExceptionMessage(traceEx)); }
                 recordUnsupportedToolType(toolType);
                 recordToolExecution(toolType, false, "unsupported_type");
                 log.error("agent-runtime-unsupported-tool-type tenantId={} runId={} toolName={} toolType={} sourceCode={}",
@@ -252,6 +291,13 @@ public class ToolLoopService {
             boolean success = isToolResultSuccess(result);
             updateToolStats(tenantId, toolName, success, latencyMs, success ? null : result);
             recordToolExecution(toolType, success, "executed");
+            if (durableExecutionRequest != null && !durableReplay) {
+                if (success) {
+                    durableToolExecutionLedger.complete(durableExecutionRequest, durableExecutionKey, result);
+                } else {
+                    durableToolExecutionLedger.fail(durableExecutionRequest, durableExecutionKey, result, result);
+                }
+            }
 
             // Emit ResultContract for structured frontend rendering (PR-11). No-op if
             // ResponseSinkContext has no sink bound (non-chat callers: tests, ad-hoc skill runs).
@@ -263,43 +309,54 @@ public class ToolLoopService {
             } else if (isProviderBackedTool(toolDef) || auraBotSkill) {
                 resultContractEmitter.emitProviderResult(toolName, toolDef, result, latencyMs, success);
                 Map<String, Object> parsedResult = parseToolResultMap(result);
-                if (success || !auraBotSkill) {
+                if (!durableReplay && (success || !auraBotSkill)) {
                     actionRecorder.recordProviderAction(tenantId, runPid, toolRef(toolName, toolDef),
                             toolDef, input != null ? input : Map.of(), parsedResult,
-                            success ? null : result, deriveEffects(toolName, toolDef));
+                            success ? null : result, effects);
                 }
             }
 
             try { aiTraceService.endSpan(spanCtx, result, success ? "success" : "error"); }
-            catch (Exception traceEx) { log.debug("Failed to end span for tool {}: {}", toolName, traceEx.getMessage()); }
+            catch (Exception traceEx) { log.debug("Failed to end span for tool {}: {}", toolName, safeExceptionMessage(traceEx)); }
 
             return result;
         } catch (Exception e) {
             long latencyMs = System.currentTimeMillis() - startMs;
-            updateToolStats(tenantId, toolName, false, latencyMs, e.getMessage());
+            String safeError = safeExceptionMessage(e);
+            if (durableExecutionRequest != null && durableExecutionKey != null) {
+                try {
+                    durableToolExecutionLedger.fail(durableExecutionRequest, durableExecutionKey,
+                            "Error: " + safeError, safeError);
+                } catch (Exception ledgerError) {
+                    log.error("Durable tool execution terminal write failed: key={}, error={}",
+                            LogSanitizer.safe(durableExecutionKey), safeExceptionMessage(ledgerError), ledgerError);
+                }
+            }
+            updateToolStats(tenantId, toolName, false, latencyMs, safeError);
             recordToolExecution(toolDef != null ? toolDef.getToolType() : null, false, "exception");
-            log.error("Tool execution failed: tool={}, error={}", toolName, e.getMessage());
+            log.error("Tool execution failed: tool={}, errorType={}, message={}",
+                    toolName, e.getClass().getSimpleName(), safeError);
 
             if (toolDef != null) {
                 String type = toolDef.getToolType();
                 if ("dsl_query".equals(type)) {
-                    resultContractEmitter.emitQueryResult(toolName, toolDef, "Error: " + e.getMessage(), latencyMs, false);
+                    resultContractEmitter.emitQueryResult(toolName, toolDef, "Error: " + safeError, latencyMs, false);
                 } else if ("dsl_command".equals(type)) {
-                    resultContractEmitter.emitCommandResult(toolName, toolDef, null, latencyMs, false, e.getMessage());
+                    resultContractEmitter.emitCommandResult(toolName, toolDef, null, latencyMs, false, safeError);
                 } else if (isProviderBackedTool(toolDef) || isAuraBotSkill(toolDef)) {
                     resultContractEmitter.emitProviderResult(toolName, toolDef, null, latencyMs, false);
                     if (!isAuraBotSkill(toolDef)) {
                         actionRecorder.recordProviderAction(tenantId, runPid, toolRef(toolName, toolDef),
                                 toolDef, input != null ? input : Map.of(), Map.of(),
-                                e.getMessage(), deriveEffects(toolName, toolDef));
+                                safeError, deriveEffects(toolName, toolDef));
                     }
                 }
             }
 
-            try { aiTraceService.endSpan(spanCtx, e.getMessage(), "error"); }
-            catch (Exception traceEx) { log.debug("Failed to end span for tool {}: {}", toolName, traceEx.getMessage()); }
+            try { aiTraceService.endSpan(spanCtx, safeError, "error"); }
+            catch (Exception traceEx) { log.debug("Failed to end span for tool {}: {}", toolName, safeExceptionMessage(traceEx)); }
 
-            return "Error: " + e.getMessage();
+            return "Error: " + safeError;
         }
     }
 
@@ -417,7 +474,7 @@ public class ToolLoopService {
         try {
             spanCtx = aiTraceService.startSpan(traceCtx, null, "tool_confirm", toolName, input);
         } catch (Exception e) {
-            log.debug("Failed to start confirm span for tool {}: {}", toolName, e.getMessage());
+            log.debug("Failed to start confirm span for tool {}: {}", toolName, safeExceptionMessage(e));
         }
 
         try {
@@ -446,7 +503,7 @@ public class ToolLoopService {
                         toolDef, input != null ? input : Map.of(), response,
                         null, deriveEffects(toolName, toolDef));
                 try { aiTraceService.endSpan(spanCtx, response, "success"); }
-                catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", traceEx.getMessage()); }
+                catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", safeExceptionMessage(traceEx)); }
                 return resultJson;
             }
 
@@ -459,17 +516,16 @@ public class ToolLoopService {
             resultContractEmitter.emitProviderResult(
                     toolName, toolDef, objectMapper.writeValueAsString(response), latencyMs, false);
             try { aiTraceService.endSpan(spanCtx, response, "error"); }
-            catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", traceEx.getMessage()); }
+            catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", safeExceptionMessage(traceEx)); }
             return objectMapper.writeValueAsString(response);
         } catch (Exception e) {
             long latencyMs = System.currentTimeMillis() - startMs;
-            updateToolStats(tenantId, toolName, false, latencyMs, e.getMessage());
+            String safeError = safeExceptionMessage(e);
+            updateToolStats(tenantId, toolName, false, latencyMs, safeError);
             recordToolExecution(toolDef.getToolType(), false, "confirm_exception");
-            try { aiTraceService.endSpan(spanCtx, e.getMessage(), "error"); }
-            catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", traceEx.getMessage()); }
-            return toJsonResult(Map.of(
-                    "success", false,
-                    "error", e.getMessage() != null ? e.getMessage() : "Skill confirm failed"));
+            try { aiTraceService.endSpan(spanCtx, safeError, "error"); }
+            catch (Exception traceEx) { log.debug("Failed to end confirm span: {}", safeExceptionMessage(traceEx)); }
+            return toJsonResult(buildAuraBotSkillConfirmError(toolName, input, e, safeError));
         }
     }
 
@@ -565,6 +621,87 @@ public class ToolLoopService {
         return objectMapper.writeValueAsString(response);
     }
 
+    private boolean requiresDurableExecutionBoundary(Set<EffectClass> effects) {
+        if (effects == null || !effects.contains(EffectClass.EXTERNAL_NETWORK)) {
+            return false;
+        }
+        return effects.contains(EffectClass.WRITE_PLATFORM_STATE)
+                || effects.contains(EffectClass.WRITE_DRAFT)
+                || effects.contains(EffectClass.FILE_WRITE)
+                || effects.contains(EffectClass.TERMINAL_EXEC)
+                || effects.contains(EffectClass.SECRET_ACCESS);
+    }
+
+    private DurableToolExecutionRequest durableExecutionRequest(Long tenantId,
+                                                                String runPid,
+                                                                String taskPid,
+                                                                String agentCode,
+                                                                String toolName,
+                                                                AgentToolDefinition toolDef,
+                                                                Map<String, Object> input,
+                                                                Set<EffectClass> effects) {
+        return new DurableToolExecutionRequest(
+                tenantId,
+                runPid,
+                taskPid,
+                agentCode,
+                toolName,
+                toolRef(toolName, toolDef),
+                hashArgs(input),
+                toolDef.getToolType(),
+                effects,
+                input != null ? input : Map.of());
+    }
+
+    private String replayDurableToolExecution(DurableToolExecutionRecord record) {
+        if (record == null) {
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "error", "Durable tool execution replay record is missing."));
+        }
+        if (record.status() == DurableToolExecutionStatus.RUNNING) {
+            return toJsonResult(Map.of(
+                    "success", false,
+                    "error", "Durable tool execution is already running. No duplicate external side effect was executed."));
+        }
+        if (record.status() == DurableToolExecutionStatus.FAILED
+                || record.status() == DurableToolExecutionStatus.COMPENSATION_REQUIRED) {
+            return "Error: " + (record.errorMessage() != null
+                    ? record.errorMessage()
+                    : "previous durable tool execution failed");
+        }
+        if (record.status() == DurableToolExecutionStatus.COMPENSATED) {
+            return "Error: previous durable tool execution was compensated. Original side effect must not be replayed.";
+        }
+        if (record.rawResult() != null && !record.rawResult().isBlank()) {
+            return record.rawResult();
+        }
+        return toJsonResult(record.result());
+    }
+
+    private String emitDurableReplay(String toolName,
+                                     AgentToolDefinition toolDef,
+                                     String result,
+                                     long startMs,
+                                     SpanContext spanCtx) {
+        long latencyMs = System.currentTimeMillis() - startMs;
+        boolean success = isToolResultSuccess(result);
+        recordToolExecution(toolDef != null ? toolDef.getToolType() : null, success, "replay");
+        if (toolDef != null) {
+            if ("dsl_query".equals(toolDef.getToolType())) {
+                resultContractEmitter.emitQueryResult(toolName, toolDef, result, latencyMs, success);
+            } else if ("dsl_command".equals(toolDef.getToolType())) {
+                resultContractEmitter.emitCommandResult(toolName, toolDef, result, latencyMs, success,
+                        success ? null : result);
+            } else if (isProviderBackedTool(toolDef) || isAuraBotSkill(toolDef)) {
+                resultContractEmitter.emitProviderResult(toolName, toolDef, result, latencyMs, success);
+            }
+        }
+        try { aiTraceService.endSpan(spanCtx, result, success ? "success" : "error"); }
+        catch (Exception traceEx) { log.debug("Failed to end span for tool {}: {}", toolName, safeExceptionMessage(traceEx)); }
+        return result;
+    }
+
     // ========== DSL Command ==========
 
     String executeDslCommand(String commandCode, Map<String, Object> input) {
@@ -619,12 +756,12 @@ public class ToolLoopService {
             return jsonResult;
 
         } catch (Exception e) {
-            error = e.getMessage();
+            error = safeExceptionMessage(e);
             if (tenantId != null) {
                 actionRecorder.recordAction(tenantId, runPid, commandCode,
                         toolDef, input, cmdResult, beforeData, null, error);
             }
-            return "Error executing command " + commandCode + ": " + e.getMessage();
+            return "Error executing command " + commandCode + ": " + error;
         }
     }
 
@@ -656,11 +793,12 @@ public class ToolLoopService {
                     "returned", records.size(),
                     "records", records));
         } catch (Exception e) {
+            String safeError = safeExceptionMessage(e);
             if (tenantId != null) {
                 actionRecorder.recordReadAction(tenantId, runPid,
-                        queryCode, toolDef, input, 0, e.getMessage());
+                        queryCode, toolDef, input, 0, safeError);
             }
-            return "Error executing query " + queryCode + ": " + e.getMessage();
+            return "Error executing query " + queryCode + ": " + safeError;
         }
     }
 
@@ -690,7 +828,7 @@ public class ToolLoopService {
                 return objectMapper.writeValueAsString(Map.of("error", "POST API_CALL requires a valid command path"));
             }
         } catch (Exception e) {
-            return "Error executing API call " + apiPath + ": " + e.getMessage();
+            return "Error executing API call " + apiPath + ": " + safeExceptionMessage(e);
         }
     }
 
@@ -855,7 +993,7 @@ public class ToolLoopService {
                     Map.of("tenantId", tenantId, "code", commandCode));
             if (!rows.isEmpty()) return (String) rows.get(0).get("model_code");
         } catch (Exception e) {
-            log.debug("Cannot resolve model for command {}: {}", commandCode, e.getMessage());
+            log.debug("Cannot resolve model for command {}: {}", commandCode, safeExceptionMessage(e));
         }
         return null;
     }
@@ -906,7 +1044,7 @@ public class ToolLoopService {
             dynamicDataMapper.update("ab_agent_tool", update,
                     Map.of("tenant_id", tenantId, "tool_code", toolCode));
         } catch (Exception e) {
-            log.debug("Failed to update tool stats for {}: {}", toolCode, e.getMessage());
+            log.debug("Failed to update tool stats for {}: {}", toolCode, safeExceptionMessage(e));
         }
     }
 
@@ -928,6 +1066,42 @@ public class ToolLoopService {
         } catch (Exception e) {
             return String.valueOf(result);
         }
+    }
+
+    private Map<String, Object> buildAuraBotSkillConfirmError(String toolName,
+                                                              Map<String, Object> input,
+                                                              Exception cause,
+                                                              String safeError) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", false);
+        response.put("error", safeError);
+
+        String errorClass = cause != null ? cause.getClass().getSimpleName() : "UnknownError";
+        if (cause instanceof SkillSpiException skillException
+                && skillException.getErrorCode() != null) {
+            errorClass = skillException.getErrorCode().code();
+            response.put("errorCode", errorClass);
+            if (skillException.getFieldPath() != null && !skillException.getFieldPath().isBlank()) {
+                response.put("fieldPath", skillException.getFieldPath());
+            }
+        }
+
+        response.put("errorFrame", AgentErrorFrame.of(
+                AgentErrorFrame.CATEGORY_TOOL,
+                toolName,
+                input != null ? input : Map.of(),
+                errorClass,
+                false,
+                safeError,
+                recoveryHintForAuraBotSkillConfirm(errorClass)).toSnapshotMap());
+        return response;
+    }
+
+    private String recoveryHintForAuraBotSkillConfirm(String errorClass) {
+        if ("PREVIEW_TOKEN_INVALID".equals(errorClass)) {
+            return "Ask the user to rerun the preview and approve the fresh result.";
+        }
+        return "Summarize the skill confirmation failure to the user.";
     }
 
     private boolean isToolResultSuccess(String result) {
@@ -998,6 +1172,17 @@ public class ToolLoopService {
         } catch (Exception ignored) {}
     }
 
+    private String safeExceptionMessage(Exception e) {
+        if (e == null) {
+            return "Unknown error";
+        }
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            return e.getClass().getSimpleName();
+        }
+        return LogSanitizer.safe(message);
+    }
+
     // ========== Package-local DSL helpers for legacy kernel tests only ==========
 
     Map<String, Object> executeDslCommand(Long tenantId, String runId, String commandCode, Map<String, Object> input) {
@@ -1005,7 +1190,7 @@ public class ToolLoopService {
             String result = executeDslCommandWithAction(commandCode, input, tenantId, runId, null);
             return objectMapper.readValue(result, MAP_TYPE);
         } catch (Exception e) {
-            return Map.of("success", false, "error", e.getMessage());
+            return Map.of("success", false, "error", safeExceptionMessage(e));
         }
     }
 
@@ -1014,7 +1199,7 @@ public class ToolLoopService {
             String result = executeDslQueryWithAction(queryCode, input, tenantId, runId, null);
             return objectMapper.readValue(result, MAP_TYPE);
         } catch (Exception e) {
-            return Map.of("success", false, "error", e.getMessage());
+            return Map.of("success", false, "error", safeExceptionMessage(e));
         }
     }
 

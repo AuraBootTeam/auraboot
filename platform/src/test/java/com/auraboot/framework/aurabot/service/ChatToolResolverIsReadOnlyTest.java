@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link ChatToolResolver#isReadOnly(String)}.
@@ -131,5 +132,45 @@ class ChatToolResolverIsReadOnlyTest {
         assertThat(resolved.tools()).extracting(com.auraboot.framework.agent.dto.LlmChatRequest.Tool::getName)
                 .contains("list_crm_lead")
                 .doesNotContain("platform_execute_sql");
+    }
+
+    @Test
+    void resolveTools_propagatesGroundingFailureInsteadOfReturningEmptyTools() {
+        GroundingPort groundingPort = (tenantId, userMessage, pageModel, recordId) -> {
+            throw new IllegalStateException("grounding unavailable");
+        };
+        ToolDiscoveryPort toolDiscoveryPort = (tenantId, candidateSkills, modelHint, intentHint, maxTools) ->
+                List.of();
+        ChatToolResolver mappedResolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
+
+        MetaContext.setSystemTenantContext(1L);
+        try {
+            assertThatThrownBy(() -> mappedResolver.resolveTools("list leads", "crm_lead", null))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("AuraBot tool resolution failed")
+                    .hasRootCauseMessage("grounding unavailable");
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    void resolveTools_propagatesToolDiscoveryFailureInsteadOfReturningEmptyTools() {
+        GroundingPort groundingPort = (tenantId, userMessage, pageModel, recordId) ->
+                new GroundingPort.GroundingResult("query", "crm_lead", 0.9, List.of("list:crm_lead"), true);
+        ToolDiscoveryPort toolDiscoveryPort = (tenantId, candidateSkills, modelHint, intentHint, maxTools) -> {
+            throw new IllegalStateException("tool registry unavailable");
+        };
+        ChatToolResolver mappedResolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
+
+        MetaContext.setSystemTenantContext(1L);
+        try {
+            assertThatThrownBy(() -> mappedResolver.resolveTools("list leads", "crm_lead", null))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("AuraBot tool resolution failed")
+                    .hasRootCauseMessage("tool registry unavailable");
+        } finally {
+            MetaContext.clear();
+        }
     }
 }

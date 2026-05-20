@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -38,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -110,7 +113,8 @@ class AgentRunServiceSyncTest {
                 runLifecycleService,
                 groundingService,
                 skillService,
-                eventPublisher
+                eventPublisher,
+                new AgentRuntimeStateFactory()
         );
         // executeTaskSync explicitly does NOT manage MetaContext — caller's
         // job. Bind a system tenant for tests so the deeper code paths that
@@ -153,6 +157,7 @@ class AgentRunServiceSyncTest {
         when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
                 anyMap()))
                 .thenReturn(List.of(agentDef));
+        when(providerFactory.resolveProviderByModel("claude-test")).thenReturn("anthropic");
         when(providerFactory.getDefaultModel(anyString())).thenReturn("claude-test");
         when(runLifecycleService.countActiveRuns(eq(TENANT_ID), eq(AGENT_CODE), anyString()))
                 .thenReturn(99); // way over cap
@@ -182,6 +187,7 @@ class AgentRunServiceSyncTest {
         when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
                 anyMap()))
                 .thenReturn(List.of(baseAgentDef()));
+        when(providerFactory.resolveProviderByModel("claude-test")).thenReturn("anthropic");
         when(providerFactory.getDefaultModel(anyString())).thenReturn("claude-test");
         when(runLifecycleService.countActiveRuns(any(), any(), any())).thenReturn(0);
         // Every provider in the chain returns null — none configured
@@ -195,6 +201,114 @@ class AgentRunServiceSyncTest {
         assertThat(failed.errorMessage()).contains("No LLM provider configured");
         verify(runLifecycleService, times(1)).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID),
                 any(), argThat(msg -> msg != null && msg.contains("No LLM provider configured")));
+        verifyNoInteractions(stepLoopService);
+    }
+
+    @Test
+    @DisplayName("configured provider without runtime bean fails before step loop")
+    void configuredProviderWithoutRuntimeBeanFailsBeforeStepLoop() {
+        primeHappyPath();
+        when(providerFactory.getProvider(anyString())).thenReturn(null);
+
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.Failed.class);
+        assertThat(((RunOutcome.Failed) outcome).errorMessage())
+                .contains("LLM provider not available: anthropic");
+        verify(runLifecycleService, times(1)).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID),
+                any(), argThat(msg -> msg != null && msg.contains("LLM provider not available: anthropic")));
+        verifyNoInteractions(stepLoopService);
+    }
+
+    @Test
+    @DisplayName("missing agent definition fails before provider resolution")
+    void missingAgentDefinitionFailsBeforeProviderResolution() {
+        when(agentProperties.isEnabled()).thenReturn(true);
+        when(aiTraceService.createTrace(any(), anyString(), anyString(), any(), anyMap()))
+                .thenReturn(TraceContext.builder().build());
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
+                anyMap()))
+                .thenReturn(List.of());
+
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.Failed.class);
+        assertThat(((RunOutcome.Failed) outcome).errorMessage())
+                .contains("Agent not found: " + AGENT_CODE);
+        verify(runLifecycleService).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID), any(),
+                argThat(msg -> msg != null && msg.contains("Agent not found: " + AGENT_CODE)));
+        verify(providerFactory, never()).resolveConfig(any(), anyString());
+        verify(providerFactory, never()).getProvider(anyString());
+        verifyNoInteractions(stepLoopService);
+    }
+
+    @Test
+    @DisplayName("unresolved agent provider fails before concurrency checks")
+    void unresolvedAgentProviderFailsBeforeConcurrencyChecks() {
+        when(agentProperties.isEnabled()).thenReturn(true);
+        when(aiTraceService.createTrace(any(), anyString(), anyString(), any(), anyMap()))
+                .thenReturn(TraceContext.builder().build());
+        Map<String, Object> agentDef = baseAgentDef();
+        agentDef.put("model", "unknown-model");
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
+                anyMap()))
+                .thenReturn(List.of(agentDef));
+        when(runLifecycleService.countActiveRuns(eq(TENANT_ID), eq(AGENT_CODE), anyString()))
+                .thenReturn(99);
+
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.Failed.class);
+        assertThat(((RunOutcome.Failed) outcome).errorMessage())
+                .contains("No LLM provider configured for agent: " + AGENT_CODE)
+                .contains("known model");
+        verify(runLifecycleService).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID), any(),
+                argThat(msg -> msg != null && msg.contains("No LLM provider configured for agent")));
+        verify(runLifecycleService, never()).countActiveRuns(any(), any(), any());
+        verify(providerFactory, never()).resolveConfig(any(), anyString());
+        verifyNoInteractions(stepLoopService);
+    }
+
+    @Test
+    @DisplayName("missing preferred provider fails instead of using unrelated configured provider")
+    void missingPreferredProviderDoesNotUseUnrelatedConfiguredProvider() {
+        when(agentProperties.isEnabled()).thenReturn(true);
+        when(aiTraceService.createTrace(any(), anyString(), anyString(), any(), anyMap()))
+                .thenReturn(TraceContext.builder().build());
+        Map<String, Object> agentDef = baseAgentDef();
+        agentDef.put("model", "gpt-4o");
+        agentDef.put("guardrails", "{\"provider\":\"openai\"}");
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
+                anyMap()))
+                .thenReturn(List.of(agentDef));
+        when(providerFactory.getDefaultModel(anyString())).thenReturn("gpt-4o");
+        when(runLifecycleService.countActiveRuns(any(), any(), any())).thenReturn(0);
+
+        LlmProviderFactory.ProviderConfig anthropicConfig = LlmProviderFactory.ProviderConfig.builder()
+                .providerCode("anthropic")
+                .apiKey("sk-anthropic")
+                .baseUrl("https://api.anthropic.example")
+                .defaultModel("claude-test")
+                .maxTokens(4000)
+                .build();
+        when(providerFactory.resolveConfig(eq(TENANT_ID), eq("openai"))).thenReturn(null);
+        when(providerFactory.resolveConfig(eq(TENANT_ID), eq("anthropic"))).thenReturn(anthropicConfig);
+        when(providerFactory.listConfiguredProviders(eq(TENANT_ID))).thenReturn(List.of(
+                LlmProviderFactory.ProviderInfo.builder()
+                        .providerCode("anthropic")
+                        .displayName("Anthropic")
+                        .apiFormat("messages")
+                        .configured(true)
+                        .build()));
+        when(providerFactory.getProvider("anthropic")).thenReturn(provider);
+
+        RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.Failed.class);
+        assertThat(((RunOutcome.Failed) outcome).errorMessage())
+                .contains("No LLM provider configured")
+                .contains("openai");
+        verify(providerFactory, never()).getProvider("anthropic");
         verifyNoInteractions(stepLoopService);
     }
 
@@ -224,6 +338,59 @@ class AgentRunServiceSyncTest {
         assertThat(success.outputTokens()).isEqualTo(45);
         assertThat(success.totalCost()).isEqualTo(0.0123d);
         assertThat(success.runPid()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("plan setup writes secret-free runtime state and fallback audit into run metadata")
+    void planSetupPersistsRuntimeStateMetadata() throws Exception {
+        primeHappyPath();
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "All steps completed.";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenReturn(ok);
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(true);
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper, atLeastOnce()).update(eq("ab_agent_run"), updateCaptor.capture(), anyMap());
+        String metadata = updateCaptor.getAllValues().stream()
+                .filter(update -> update.containsKey("metadata"))
+                .map(update -> String.valueOf(update.get("metadata")))
+                .findFirst()
+                .orElse(null);
+
+        assertThat(metadata).isNotBlank();
+        Map<String, Object> parsed = new ObjectMapper().readValue(metadata, Map.class);
+        assertThat(parsed).containsKeys("runtimeState", "fallbackAudit");
+        Map<String, Object> runtimeState = (Map<String, Object>) parsed.get("runtimeState");
+        assertThat(runtimeState)
+                .containsEntry("schemaVersion", "agent-runtime-state/v1")
+                .containsEntry("executionKind", "acp_run")
+                .containsEntry("agentCode", AGENT_CODE)
+                .containsEntry("providerCode", "anthropic")
+                .containsEntry("model", "claude-test");
+        assertThat((String) runtimeState.get("stateHash")).hasSize(64);
+        assertThat(runtimeState.get("context")).isInstanceOf(Map.class);
+
+        Map<String, Object> fallbackAudit = (Map<String, Object>) parsed.get("fallbackAudit");
+        Map<String, Object> providerAudit = (Map<String, Object>) fallbackAudit.get("provider");
+        assertThat(providerAudit)
+                .containsEntry("preferred", "anthropic")
+                .containsEntry("resolved", "anthropic")
+                .containsEntry("fallbackUsed", false);
+        assertThat((List<Object>) providerAudit.get("chain")).contains("anthropic");
+        Map<String, Object> toolDiscovery = (Map<String, Object>) fallbackAudit.get("toolDiscovery");
+        assertThat(toolDiscovery).containsEntry("mode", "registry_all");
+
+        assertThat(metadata)
+                .doesNotContain("sk-test")
+                .doesNotContain("https://api.example.com")
+                .doesNotContain("You are a test agent.")
+                .doesNotContain("Test description");
     }
 
     @Test
@@ -341,6 +508,7 @@ class AgentRunServiceSyncTest {
         when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_memory")),
                 anyMap()))
                 .thenReturn(List.of());
+        when(providerFactory.resolveProviderByModel("claude-test")).thenReturn("anthropic");
         when(providerFactory.getDefaultModel(anyString())).thenReturn("claude-test");
         when(runLifecycleService.countActiveRuns(any(), any(), any())).thenReturn(0);
         // First provider in chain has a usable api key

@@ -1,10 +1,16 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.identity.ChannelSessionResolver;
+import com.auraboot.framework.agent.runtime.ChatMessageTapeStore;
+import com.auraboot.framework.agent.runtime.ContextConflictPolicy;
+import com.auraboot.framework.agent.runtime.PendingContinuationService;
+import com.auraboot.framework.agent.runtime.PendingContextFreshnessDecision;
+import com.auraboot.framework.agent.runtime.PendingContextFreshnessValidator;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
+import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.aurabot.service.AuraBotChatService;
-import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,14 +39,14 @@ import static org.mockito.Mockito.*;
  * and identity-mismatch edge cases:
  *
  * <ol>
- *     <li>APPROVED + valid pending      -> chatService.resumeApprovedTurnFromPending called;
+ *     <li>APPROVED + valid pending      -> PendingContinuationService called;
  *                                         finalizeTurn fires for the returned outcome</li>
  *     <li>DENIED                         -> Interrupted outcome (reason=user_denied);
- *                                         chatService never called</li>
+ *                                         continuation service never called</li>
  *     <li>CANCELLED                      -> Interrupted outcome (reason=user_cancelled);
- *                                         chatService never called</li>
+ *                                         continuation service never called</li>
  *     <li>pendingTurnId not in store     -> Failed; sink.onError fires</li>
- *     <li>Tenant/user mismatch on resume -> Failed; chatService never called</li>
+ *     <li>Tenant/user mismatch on resume -> Failed; continuation service never called</li>
  *     <li>null pendingTurnId             -> Failed (defensive)</li>
  * </ol>
  */
@@ -56,10 +63,13 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
     private ConversationTurnService turnService;
 
     @MockitoBean
-    private AuraBotChatService chatService;
+    private PendingContinuationService pendingContinuationService;
+
+    @MockitoBean(extraInterfaces = ChatMessageTapeStore.class)
+    private PendingToolStore pendingToolStore;
 
     @MockitoBean
-    private ChatSessionStore chatSessionStore;
+    private PendingContextFreshnessValidator pendingContextFreshnessValidator;
 
     @Autowired
     private ChannelSessionResolver channelSessionResolver;
@@ -85,9 +95,9 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
         MetaContext.clear();
     }
 
-    private ChatSessionStore.PendingTool buildPending(String turnId, String toolId,
+    private PendingToolSnapshot buildPending(String turnId, String toolId,
                                                        Long ownerTenantId, Long ownerUserId) {
-        return ChatSessionStore.PendingTool.builder()
+        return PendingToolSnapshot.builder()
                 .turnId(turnId)
                 .tenantId(ownerTenantId)
                 .userId(ownerUserId)
@@ -106,31 +116,144 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("APPROVED + valid pending -> chatService.resumeApprovedTurnFromPending called; outcome propagated")
-    void approved_dispatchesToChatService() {
+    @DisplayName("APPROVED + valid pending -> PendingContinuationService called; outcome propagated")
+    void approved_dispatchesToPendingContinuationService() {
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
         String pendingTurnId = "01HW3KAPPROVED";
-        ChatSessionStore.PendingTool pending = buildPending(pendingTurnId, "tool-a", tenantId, userId);
-        when(chatSessionStore.consumePending(eq(pendingTurnId))).thenReturn(pending);
+        PendingToolSnapshot pending = buildPending(pendingTurnId, "tool-a", tenantId, userId);
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
         TurnOutcome.Success expected = new TurnOutcome.Success("done", Map.of());
-        when(chatService.resumeApprovedTurnFromPending(any(), same(pending), any()))
+        when(pendingContinuationService.resumeApprovedChatTool(any(), same(pending), any()))
                 .thenReturn(expected);
 
         TurnOutcome outcome = turnService.resumeTurn(
                 pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
 
         assertThat(outcome).isSameAs(expected);
-        verify(chatService, times(1)).resumeApprovedTurnFromPending(any(), same(pending), any());
+        verify(pendingContinuationService, times(1)).resumeApprovedChatTool(any(), same(pending), any());
     }
 
     @Test
-    @DisplayName("DENIED -> Interrupted outcome (user_denied); chatService never called")
+    @DisplayName("APPROVED + expired pending -> Failed; continuation service never called")
+    void approvedExpiredPendingFailsBeforeContinuation() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        String pendingTurnId = "01HW3KEXPIRED";
+        PendingToolSnapshot pending = buildPending(pendingTurnId, "tool-expired", tenantId, userId);
+        pending.setExpiresAt(System.currentTimeMillis() - 1);
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
+
+        TurnOutcome outcome = turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("expired");
+        verify(sink).onError(contains("expired"), eq(null));
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("APPROVED + args hash mismatch -> Failed; continuation service never called")
+    void approvedArgsHashMismatchFailsBeforeContinuation() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        String pendingTurnId = "01HW3KARGHASH";
+        PendingToolSnapshot pending = buildPending(pendingTurnId, "tool-args", tenantId, userId);
+        pending.setArgsHash("stale-args-hash");
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
+
+        TurnOutcome outcome = turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("args hash mismatch");
+        verify(sink).onError(contains("args hash mismatch"), eq(null));
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("APPROVED + tool schema hash mismatch -> Failed; continuation service never called")
+    void approvedToolSchemaHashMismatchFailsBeforeContinuation() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        String pendingTurnId = "01HW3KSCHEMA";
+        PendingToolSnapshot pending = buildPending(pendingTurnId, "tool-schema", tenantId, userId);
+        pending.setToolSchemaHash("stale-schema-hash");
+        pending.setAgentToolDefinitions(List.of(AgentToolDefinition.builder()
+                .name("cmd_test")
+                .inputSchema(Map.of("type", "object", "required", List.of("foo")))
+                .build()));
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
+
+        TurnOutcome outcome = turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("tool schema hash mismatch");
+        verify(sink).onError(contains("tool schema hash mismatch"), eq(null));
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("APPROVED + preview hash mismatch -> Failed; continuation service never called")
+    void approvedPreviewHashMismatchFailsBeforeContinuation() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        String pendingTurnId = "01HW3KPREVIEW";
+        PendingToolSnapshot pending = buildPending(pendingTurnId, "tool-preview", tenantId, userId);
+        pending.setPreview("Preview shown to user");
+        pending.setPreviewHash("stale-preview-hash");
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
+
+        TurnOutcome outcome = turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("preview hash mismatch");
+        verify(sink).onError(contains("preview hash mismatch"), eq(null));
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("APPROVED + stale context reject policy -> Failed; continuation service never called")
+    void approvedStaleContextRejectsBeforeContinuation() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        String pendingTurnId = "01HW3KSTALECTX";
+        PendingToolSnapshot pending = buildPending(pendingTurnId, "tool-stale-context", tenantId, userId);
+        pending.setContextVersion("customer:C-1:v1");
+        pending.setRecordVersion("v1");
+        pending.setContextConflictPolicy(ContextConflictPolicy.REJECT_AND_REPLAN.name());
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
+        when(pendingContextFreshnessValidator.validate(same(pending)))
+                .thenReturn(PendingContextFreshnessDecision.stale(
+                        ContextConflictPolicy.REJECT_AND_REPLAN,
+                        "record_version_changed",
+                        "Customer C-1 changed after preview"));
+
+        TurnOutcome outcome = turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("context freshness");
+        verify(sink).onError(contains("context freshness"), eq(null));
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("DENIED -> Interrupted outcome (user_denied); continuation service never called")
     void denied_returnsInterruptedWithoutChatImpl() {
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
         String pendingTurnId = "01HW3KDENIED";
-        when(chatSessionStore.consumePending(eq(pendingTurnId)))
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
                 .thenReturn(buildPending(pendingTurnId, "tool-d", tenantId, userId));
 
         TurnOutcome outcome = turnService.resumeTurn(
@@ -139,17 +262,17 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
         assertThat(outcome).isInstanceOf(TurnOutcome.Interrupted.class);
         TurnOutcome.Interrupted i = (TurnOutcome.Interrupted) outcome;
         assertThat(i.reason()).isEqualTo("user_denied");
-        verify(chatService, never()).resumeApprovedTurnFromPending(any(), any(), any());
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
         verify(sink, atLeastOnce()).onDone(any(), any());
     }
 
     @Test
-    @DisplayName("CANCELLED -> Interrupted outcome (user_cancelled); chatService never called")
+    @DisplayName("CANCELLED -> Interrupted outcome (user_cancelled); continuation service never called")
     void cancelled_returnsInterruptedWithoutChatImpl() {
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
         String pendingTurnId = "01HW3KCANCELLED";
-        when(chatSessionStore.consumePending(eq(pendingTurnId)))
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
                 .thenReturn(buildPending(pendingTurnId, "tool-c", tenantId, userId));
 
         TurnOutcome outcome = turnService.resumeTurn(
@@ -157,13 +280,14 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Interrupted.class);
         assertThat(((TurnOutcome.Interrupted) outcome).reason()).isEqualTo("user_cancelled");
-        verify(chatService, never()).resumeApprovedTurnFromPending(any(), any(), any());
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
     }
 
     @Test
     @DisplayName("pendingTurnId not in store -> Failed + sink.onError")
     void pendingMissing_returnsFailed() {
-        when(chatSessionStore.consumePending(eq("missing"))).thenReturn(null);
+        when(pendingToolStore.consumePendingForOwner(eq("missing"), eq(getTestTenant().getId()), eq(getTestUser().getId())))
+                .thenReturn(null);
 
         TurnOutcome outcome = turnService.resumeTurn(
                 "missing", ConversationTurnService.ConfirmDecision.APPROVED, sink);
@@ -174,24 +298,42 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
         assertThat(((TurnOutcome.Failed) outcome).errorMessage())
                 .contains("No pending tool or approval found");
         verify(sink, atLeastOnce()).onError(contains("No pending"), any());
-        verify(chatService, never()).resumeApprovedTurnFromPending(any(), any(), any());
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
     }
 
     @Test
-    @DisplayName("Tenant/user mismatch -> Failed; chatService never called")
+    @DisplayName("Tenant/user mismatch -> Failed; continuation service never called")
     void identityMismatch_returnsFailed() {
-        Long ownerTenantId = getTestTenant().getId() + 999L; // different tenant
-        Long ownerUserId = getTestUser().getId() + 999L;
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
         String pendingTurnId = "01HW3KMISMATCH";
-        when(chatSessionStore.consumePending(eq(pendingTurnId)))
-                .thenReturn(buildPending(pendingTurnId, "tool-m", ownerTenantId, ownerUserId));
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(null);
 
         TurnOutcome outcome = turnService.resumeTurn(
                 pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
-        assertThat(((TurnOutcome.Failed) outcome).errorMessage()).containsAnyOf("tenant mismatch", "user mismatch");
-        verify(chatService, never()).resumeApprovedTurnFromPending(any(), any(), any());
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("No pending tool or approval found");
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("identity mismatch does not consume pending payload through legacy consumePending")
+    void identityMismatch_doesNotConsumePendingPayload() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        String pendingTurnId = "01HW3KMISMATCHSAFE";
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(null);
+
+        TurnOutcome outcome = turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage())
+                .contains("No pending tool or approval found");
+        verify(pendingContinuationService, never()).resumeApprovedChatTool(any(), any(), any());
     }
 
     @Test
@@ -202,7 +344,7 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
         assertThat(((TurnOutcome.Failed) outcome).errorMessage()).contains("pendingTurnId");
-        verify(chatSessionStore, never()).consumePending(any());
+        verify(pendingToolStore, never()).consumePendingForOwner(any(), any(), any());
     }
 
     // =========================================================================
@@ -229,25 +371,28 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
 
         // 2. Build a PendingTool carrying that pid
         String pendingTurnId = "01HW3KGAP295";
-        ChatSessionStore.PendingTool pending = ChatSessionStore.PendingTool.builder()
+        PendingToolSnapshot pending = PendingToolSnapshot.builder()
                 .turnId(pendingTurnId)
                 .tenantId(tenantId)
                 .userId(userId)
                 .humanMemberId(getTestTenantMember().getId())
                 .conversationId(1L)
                 .agentCode("aurabot")
+                .channel("web")
+                .profileId("profile-resume")
                 .channelSessionPid(seeded.pid())
                 .toolId("tool-gap295")
                 .toolName("cmd_test")
                 .input(Map.of())
                 .description("gap295")
                 .build();
-        when(chatSessionStore.consumePending(eq(pendingTurnId))).thenReturn(pending);
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
 
-        // 3. Capture the TurnContext that resumeApprovedTurnFromPending sees
+        // 3. Capture the TurnContext that PendingContinuationService sees
         org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
                 org.mockito.ArgumentCaptor.forClass(TurnContext.class);
-        when(chatService.resumeApprovedTurnFromPending(ctxCaptor.capture(), same(pending), any()))
+        when(pendingContinuationService.resumeApprovedChatTool(ctxCaptor.capture(), same(pending), any()))
                 .thenReturn(new TurnOutcome.Success("ok", Map.of()));
 
         // 4. Resume
@@ -256,9 +401,50 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
 
         // 5. Assert ctx.channelSessionId() matches the seeded pid
         TurnContext ctx = ctxCaptor.getValue();
+        assertThat(ctx.channel())
+                .as("rebuildContext should preserve the pending channel for downstream policy gates")
+                .isEqualTo("web");
+        assertThat(ctx.profileId())
+                .as("rebuildContext should preserve the pending profile id for downstream policy gates")
+                .isEqualTo("profile-resume");
         assertThat(ctx.channelSessionId())
                 .as("rebuildContext should re-attach channel session via findByPid")
                 .isEqualTo(seeded.pid());
+    }
+
+    @Test
+    @DisplayName("named-agent pending resume preserves taskPid for finalization")
+    void resume_preservesTaskPidFromPendingSnapshot() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        String pendingTurnId = "01HW3KTASKPID";
+        PendingToolSnapshot pending = PendingToolSnapshot.builder()
+                .turnId(pendingTurnId)
+                .tenantId(tenantId)
+                .userId(userId)
+                .humanMemberId(getTestTenantMember().getId())
+                .conversationId(1L)
+                .agentCode("pcba_procurement_comparison_agent")
+                .taskPid("task-resume-1")
+                .toolId("tool-taskpid")
+                .toolName("cmd_test")
+                .input(Map.of())
+                .description("task pid resume")
+                .build();
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
+
+        org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
+                org.mockito.ArgumentCaptor.forClass(TurnContext.class);
+        when(pendingContinuationService.resumeApprovedChatTool(ctxCaptor.capture(), same(pending), any()))
+                .thenReturn(new TurnOutcome.Success("ok", Map.of()));
+
+        turnService.resumeTurn(
+                pendingTurnId, ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        assertThat(ctxCaptor.getValue().taskPid())
+                .as("resume finalization must be able to close the original named-agent task")
+                .isEqualTo("task-resume-1");
     }
 
     @Test
@@ -267,14 +453,15 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
         String pendingTurnId = "01HW3KGAP295LEGACY";
-        ChatSessionStore.PendingTool pending = buildPending(pendingTurnId, "tool-l", tenantId, userId);
+        PendingToolSnapshot pending = buildPending(pendingTurnId, "tool-l", tenantId, userId);
         // channelSessionPid intentionally not set on the pending payload
         assertThat(pending.getChannelSessionPid()).isNull();
-        when(chatSessionStore.consumePending(eq(pendingTurnId))).thenReturn(pending);
+        when(pendingToolStore.consumePendingForOwner(eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
 
         org.mockito.ArgumentCaptor<TurnContext> ctxCaptor =
                 org.mockito.ArgumentCaptor.forClass(TurnContext.class);
-        when(chatService.resumeApprovedTurnFromPending(ctxCaptor.capture(), same(pending), any()))
+        when(pendingContinuationService.resumeApprovedChatTool(ctxCaptor.capture(), same(pending), any()))
                 .thenReturn(new TurnOutcome.Success("ok", Map.of()));
 
         turnService.resumeTurn(

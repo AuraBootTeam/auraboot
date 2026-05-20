@@ -148,10 +148,10 @@ public class AuraBotController {
                 if (memberId != null) {
                     MetaContext.setMemberId(memberId);
                 }
-                // Phase B.6: ChatSessionStore is keyed solely by turnId so the
+                // Phase B.6: pending tool storage is keyed solely by turnId, so the
                 // resumeTurn SPI signature {pendingTurnId, decision, sink}
-                // (per design v3.3 §3.4) is sufficient — toolId in the request
-                // is informational (the persisted PendingTool already carries it).
+                // (per design v3.3 §3.4) is sufficient. toolId in the request
+                // is informational because the persisted pending tool already carries it.
                 turnService.resumeTurn(request.getPendingTurnId(), decision, sink);
             } catch (Exception e) {
                 log.error("execute resume failed: {}", e.getMessage(), e);

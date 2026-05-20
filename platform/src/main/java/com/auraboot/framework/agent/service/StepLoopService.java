@@ -8,6 +8,9 @@ import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.metrics.ParallelToolMetrics;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.runtime.LlmResponseGuard;
+import com.auraboot.framework.agent.runtime.LlmRuntimeResolver;
+import com.auraboot.framework.agent.runtime.DurableWorkflowCheckpointStore;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -45,6 +48,7 @@ public class StepLoopService {
     private final AgentProperties agentProperties;
     private final Executor asyncTaskExecutor;
     private final ParallelToolMetrics parallelToolMetrics;
+    private final DurableWorkflowCheckpointStore checkpointStore;
 
     static final int MAX_TOOL_LOOPS = 20;
 
@@ -56,7 +60,8 @@ public class StepLoopService {
                            AgentApprovalGateService approvalGate,
                            AgentProperties agentProperties,
                            @Qualifier("asyncTaskExecutor") Executor asyncTaskExecutor,
-                           ParallelToolMetrics parallelToolMetrics) {
+                           ParallelToolMetrics parallelToolMetrics,
+                           DurableWorkflowCheckpointStore checkpointStore) {
         this.toolLoopService = toolLoopService;
         this.dynamicDataMapper = dynamicDataMapper;
         this.objectMapper = objectMapper;
@@ -66,6 +71,7 @@ public class StepLoopService {
         this.agentProperties = agentProperties;
         this.asyncTaskExecutor = asyncTaskExecutor;
         this.parallelToolMetrics = parallelToolMetrics;
+        this.checkpointStore = checkpointStore;
     }
 
     // =========================================================================
@@ -129,7 +135,8 @@ public class StepLoopService {
             } catch (Exception ignored) {}
         }
 
-        String model = resolveModel(agentDef, config.getProviderCode());
+        String model = LlmRuntimeResolver.resolveAgentModelForProvider(
+                providerFactory, agentDef, config.getProviderCode());
         int maxTokens = config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
         // P0-2 / F.2: per-skill execution_config overlays the per-agent one
         // (skill wins). When {@code skillDef} is null we degrade to agent-only,
@@ -185,7 +192,9 @@ public class StepLoopService {
                     .thinking(thinkingConfig)
                     .build();
 
-            LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
+            LlmChatResponse response = LlmResponseGuard.requireContent(
+                    provider.chat(request, config.getApiKey(), config.getBaseUrl()),
+                    "ACP agent loop");
 
             totalInputTokens += response.getInputTokens();
             totalOutputTokens += response.getOutputTokens();
@@ -291,7 +300,8 @@ public class StepLoopService {
                                                       LlmProvider provider, LlmProviderFactory.ProviderConfig config,
                                                       TraceContext traceCtx,
                                                       boolean skipApprovalForResumedStep) throws Exception {
-        String model = resolveModel(agentDef, config.getProviderCode());
+        String model = LlmRuntimeResolver.resolveAgentModelForProvider(
+                providerFactory, agentDef, config.getProviderCode());
         int maxTokens = config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
         // P0-2 baseline = agent-only thinking config. Per-step we may
         // overlay the matching ab_agent_skill.execution_config (H.3 wiring).
@@ -333,6 +343,7 @@ public class StepLoopService {
             return result;
         }
 
+        try {
         for (int i = startStep; i < plan.size(); i++) {
             // Bind the current step index so ActionRecorder stamps every Action
             // produced during this step with the matching execution_plan[i] index.
@@ -364,7 +375,7 @@ public class StepLoopService {
                         step.getDescription(), Map.of("stepIndex", i), true);
                 if (approvalPid != null) {
                     step.setStatus(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
-                    persistPlan(runPid, plan, i);
+                    persistPlan(tenantId, runPid, plan, i, "approval_pending");
                     // Phase C.3d: pass approvalPid through the exception so the
                     // chokepoint can surface it as the resumption token on the
                     // confirm_required SSE event.
@@ -385,6 +396,7 @@ public class StepLoopService {
 
             try {
                 // Inner tool-calling loop for this step (max 5 calls per step)
+                boolean reachedFinalAnswer = false;
                 for (int toolTurn = 0; toolTurn < 5; toolTurn++) {
                     List<LlmChatRequest.Tool> llmTools = tools.stream()
                             .map(t -> {
@@ -413,7 +425,9 @@ public class StepLoopService {
                             .thinking(thinkingConfig)
                             .build();
 
-                    LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
+                    LlmChatResponse response = LlmResponseGuard.requireContent(
+                            provider.chat(request, config.getApiKey(), config.getBaseUrl()),
+                            "ACP plan step");
                     totalInputTokens += response.getInputTokens();
                     totalOutputTokens += response.getOutputTokens();
                     totalCacheCreationTokens += response.getCacheCreationInputTokens();
@@ -446,8 +460,12 @@ public class StepLoopService {
                         for (LlmChatResponse.ContentBlock block : response.getContent()) {
                             if ("text".equals(block.getType())) lastTextResponse = block.getText();
                         }
+                        reachedFinalAnswer = true;
                         break;
                     }
+                }
+                if (!reachedFinalAnswer) {
+                    throw new IllegalStateException("Tool loop exceeded maximum rounds for plan step " + i);
                 }
 
                 step.setStatus(AgentPlanStep.StepStatus.COMPLETED);
@@ -465,7 +483,7 @@ public class StepLoopService {
                     for (int j = i + 1; j < plan.size(); j++) plan.get(j).setStatus(AgentPlanStep.StepStatus.SKIPPED);
                     break;
                 }
-                persistPlan(runPid, plan, i + 1);
+                persistPlan(tenantId, runPid, plan, i + 1, "step_completed");
 
             } catch (AgentApprovalPendingException e) {
                 throw e;
@@ -485,14 +503,13 @@ public class StepLoopService {
                 // thinking budget — not a hoisted agent-only value.
                 boolean replanned = attemptReplan(plan, i, e.getMessage(), provider, config, model, systemPrompt, tools, messages, thinkingConfig);
                 if (!replanned) {
-                    persistPlan(runPid, plan, i);
+                    persistPlan(tenantId, runPid, plan, i, "step_failed");
                     throw e;
                 }
                 log.info("Re-planned after step {} failure, {} steps remaining", i, plan.size() - i - 1);
-                persistPlan(runPid, plan, i + 1);
+                persistPlan(tenantId, runPid, plan, i + 1, "replanned");
             }
         }
-        StepContext.clear();
 
         updateRunToolCalls(runPid, toolCallLog);
 
@@ -503,6 +520,9 @@ public class StepLoopService {
         result.totalCost = totalCost;
         result.lastResponse = lastTextResponse;
         return result;
+        } finally {
+            StepContext.clear();
+        }
     }
 
     // =========================================================================
@@ -530,7 +550,9 @@ public class StepLoopService {
                     // knob flow through.
                     .thinking(thinkingConfig).build();
 
-            LlmChatResponse resp = provider.chat(req, config.getApiKey(), config.getBaseUrl());
+            LlmChatResponse resp = LlmResponseGuard.requireContent(
+                    provider.chat(req, config.getApiKey(), config.getBaseUrl()),
+                    "ACP replan");
             String content = resp.getContent().stream()
                     .filter(b -> "text".equals(b.getType()))
                     .map(LlmChatResponse.ContentBlock::getText)
@@ -602,7 +624,7 @@ public class StepLoopService {
     }
 
     // =========================================================================
-    // Private helpers (duplicated from AgentRunService to keep extraction clean)
+    // Private helpers for ACP step-loop execution.
     // =========================================================================
 
     /**
@@ -735,21 +757,6 @@ public class StepLoopService {
         }
     }
 
-    private String resolveModel(Map<String, Object> agentDef, String providerCode) {
-        if (agentDef != null) {
-            String agentModel = (String) agentDef.get("model");
-            if (agentModel != null && !agentModel.isBlank()) {
-                // Check if the agent model belongs to the resolved provider
-                String inferredProvider = providerFactory.resolveProviderByModel(agentModel);
-                if (inferredProvider != null && inferredProvider.equals(providerCode)) {
-                    return agentModel;
-                }
-                // Model doesn't match provider (e.g. agent has claude but using minimax) — use provider default
-            }
-        }
-        return providerFactory.getDefaultModel(providerCode);
-    }
-
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseJsonSafe(String json) {
         if (json == null || json.isBlank()) return null;
@@ -774,17 +781,24 @@ public class StepLoopService {
         return null;
     }
 
-    private void persistPlan(String runPid, List<AgentPlanStep> plan, int currentStep) {
+    private void persistPlan(Long tenantId, String runPid, List<AgentPlanStep> plan, int currentStep, String reason) {
         try {
             String planJson = objectMapper.writeValueAsString(plan);
             Map<String, Object> data = new HashMap<>();
             data.put("execution_plan", planJson);
             data.put("current_step", currentStep);
             data.put("updated_at", LocalDateTime.now());
-            dynamicDataMapper.updateWithJsonb("ab_agent_run", data, Map.of("pid", runPid),
+            int updated = dynamicDataMapper.updateWithJsonb("ab_agent_run", data, Map.of("pid", runPid),
                     Set.of("execution_plan"));
+            if (updated <= 0) {
+                throw new IllegalStateException(
+                        "Plan persistence failed for runPid=" + runPid + ": run row was not updated");
+            }
+            checkpointStore.recordPlanCheckpoint(tenantId, runPid, currentStep, plan, reason);
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("Failed to persist plan for run {}: {}", runPid, e.getMessage());
+            throw new IllegalStateException("Plan persistence failed for runPid=" + runPid, e);
         }
     }
 
@@ -991,7 +1005,8 @@ public class StepLoopService {
             }
 
             try {
-                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                CompletableFuture<?>[] batch = futures.toArray(CompletableFuture<?>[]::new);
+                CompletableFuture.allOf(batch)
                         .get(totalTimeoutMs, TimeUnit.MILLISECONDS);
                 // P0-5 metric: emit max per-tool latency on the happy path. We
                 // report max(duration) rather than sum because the user-perceived
