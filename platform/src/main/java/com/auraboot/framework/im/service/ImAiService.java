@@ -30,7 +30,7 @@ import java.util.Map;
  *
  * <ul>
  *   <li>Pre-Grounding Triage (light_chat / contextual_answer / acp_run buckets)</li>
- *   <li>ACP runtime dispatch when triage routes to acp_run / contextual_answer</li>
+ *   <li>runtime dispatch by policy: acp_run / durable signals to ACP, read-only contextual answers to chat</li>
  *   <li>{@code ab_agent_task} / {@code ab_agent_run} writes for cross-channel observability</li>
  *   <li>Memory L1 writeback (Phase C.2 listener)</li>
  *   <li>Approval gate convergence (Phase C.3d)</li>

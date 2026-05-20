@@ -196,6 +196,41 @@ class AgentReplyTaskChokepointTest {
     }
 
     @Test
+    @DisplayName("Handoff child turn inherits only source/target permission intersection")
+    void successWithHandoff_intersectsEffectivePermissionsForChildTurn() {
+        when(messagePort.getAgentMembers(any(), any())).thenReturn(List.of(
+                AgentMemberDto.builder()
+                        .agentId(ALPHA_ID)
+                        .agentCode("agent_alpha")
+                        .name("Alpha")
+                        .profilePermissions(Set.of("crm.customer.read"))
+                        .build(),
+                AgentMemberDto.builder()
+                        .agentId(BETA_ID)
+                        .agentCode("agent_beta")
+                        .name("Beta")
+                        .profilePermissions(Set.of("crm.customer.read", "finance.invoice.read"))
+                        .build()));
+        when(turnService.runTurn(any(), any(ResponseSink.class)))
+                .thenReturn(successWith(Map.of(
+                        "_handoff_to", "agent_beta",
+                        "_handoff_context", "needs sales follow-up",
+                        "_taskPid", "TASK_ALPHA")))
+                .thenReturn(successWith(Map.of()));
+
+        service.executeReply(CONV_ID, TENANT_ID, ALPHA_ID, "@alpha hi", TRIGGERING_SEQ);
+
+        ArgumentCaptor<TurnRequest> reqCaptor = ArgumentCaptor.forClass(TurnRequest.class);
+        verify(turnService, times(2)).runTurn(reqCaptor.capture(), any(ResponseSink.class));
+        List<TurnRequest> all = reqCaptor.getAllValues();
+        assertThat(all.get(0).overrides().effectivePermissions())
+                .containsExactly("crm.customer.read");
+        assertThat(all.get(1).overrides().effectivePermissions())
+                .as("handoff must not inherit target-only finance permission")
+                .containsExactly("crm.customer.read");
+    }
+
+    @Test
     @DisplayName("Plain Success (no handoff) -> single dispatch, no recursion")
     void plainSuccess_noRecursion() {
         when(turnService.runTurn(any(), any(ResponseSink.class)))

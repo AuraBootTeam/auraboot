@@ -2,6 +2,7 @@ package com.auraboot.framework.im.integration;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.agent.runtime.policy.AgentProfilePermissionExtractor;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.ChatMessageDto;
 import com.auraboot.framework.agentchat.spi.ConfirmationPayload;
@@ -113,6 +114,7 @@ public class GroupChatMessageAdapter implements GroupChatMessagePort {
                     .systemPrompt(agent.getSystemPrompt())
                     .soulProfile(soulProfileJson)
                     .tools(agent.getTools())
+                    .profilePermissions(AgentProfilePermissionExtractor.extract(objectMapper, agent.getGuardrails()))
                     .build());
         }
         return result;

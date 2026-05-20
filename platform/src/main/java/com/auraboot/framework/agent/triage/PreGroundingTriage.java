@@ -8,8 +8,8 @@ package com.auraboot.framework.agent.triage;
  * yields same {@link TriageVerdict}. Implementations must NOT write to
  * {@code ab_agent_run / ab_agent_bif / ab_agent_action}.
  *
- * <p>Failure (timeout / error) must fall back to {@link TriageBucket#ACP_RUN}, never
- * {@link TriageBucket#LIGHT_CHAT} (fail-closed for safety).
+ * <p>Failure (timeout / error) must fail closed to {@link TriageBucket#ACP_RUN},
+ * never {@link TriageBucket#LIGHT_CHAT}.
  *
  * <p>Contract: enterprise/docs/agent/contracts/pre-grounding-triage.md
  */

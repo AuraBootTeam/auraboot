@@ -1,28 +1,40 @@
 package com.auraboot.framework.aurabot.service;
 
-import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.dto.LlmChatRequest;
+import com.auraboot.framework.agent.dto.LlmChunk;
+import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.conversation.ResponseSink;
+import com.auraboot.framework.conversation.TurnContext;
+import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import reactor.core.publisher.Flux;
 
 class AuraBotChatServiceTracePayloadTest {
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
+    }
 
     @Test
     @DisplayName("prompt span output keeps full prompt text alongside char count")
@@ -33,35 +45,6 @@ class AuraBotChatServiceTracePayloadTest {
 
         assertThat(payload).containsEntry("system_prompt", prompt);
         assertThat(payload).containsEntry("char_count", prompt.length());
-    }
-
-    @Test
-    @DisplayName("generation span input keeps model, system prompt, messages and tools")
-    void buildGenerationSpanInput_keepsRequestDetails() {
-        LlmChatRequest request = LlmChatRequest.builder()
-                .model("gpt-test")
-                .systemPrompt("system prompt")
-                .messages(List.of(
-                        LlmChatRequest.Message.builder()
-                                .role("user")
-                                .content("hello")
-                                .build()))
-                .tools(List.of(
-                        LlmChatRequest.Tool.builder()
-                                .name("lookup_account")
-                                .description("Lookup account")
-                                .inputSchema(Map.of("type", "object"))
-                                .build()))
-                .maxTokens(2048)
-                .build();
-
-        Map<String, Object> payload = AuraBotChatService.buildGenerationSpanInput(request);
-
-        assertThat(payload).containsEntry("model", "gpt-test");
-        assertThat(payload).containsEntry("system_prompt", "system prompt");
-        assertThat(payload).containsEntry("max_tokens", 2048);
-        assertThat((List<?>) payload.get("messages")).hasSize(1);
-        assertThat((List<?>) payload.get("tools")).hasSize(1);
     }
 
     @Test
@@ -82,119 +65,67 @@ class AuraBotChatServiceTracePayloadTest {
     }
 
     @Test
-    @DisplayName("generation span output keeps full response content and token metadata")
-    void buildGenerationSpanOutput_keepsResponseDetails() {
-        LlmChatResponse response = LlmChatResponse.builder()
-                .stopReason("tool_use")
-                .inputTokens(321)
-                .outputTokens(654)
-                .content(List.of(
-                        LlmChatResponse.ContentBlock.builder()
-                                .type("text")
-                                .text("thinking")
-                                .build(),
-                        LlmChatResponse.ContentBlock.builder()
-                                .type("tool_use")
-                                .id("tool_1")
-                                .name("lookup_account")
-                                .input(Map.of("accountId", "A-001"))
-                                .build()))
-                .build();
+    @DisplayName("provider stream hides split think blocks from visible SSE events")
+    void providerStreamHidesSplitThinkBlocksFromVisibleSseEvents() {
+        MetaContext.setContext(1L, 100L, null, "tester");
+        LlmProviderFactory factory = mock(LlmProviderFactory.class);
+        PromptTemplateService promptTemplateService = mock(PromptTemplateService.class);
+        ChatToolResolver chatToolResolver = mock(ChatToolResolver.class);
+        LlmProvider provider = mock(LlmProvider.class);
+        AuraBotChatService service = new AuraBotChatService(
+                factory,
+                promptTemplateService,
+                chatToolResolver,
+                mock(ChatToolExecutor.class),
+                new ObjectMapper(),
+                mock(AiTraceService.class),
+                mock(MetaModelService.class),
+                new ChatTurnRuntime(),
+                (Executor) Runnable::run);
+        ChatRequest request = new ChatRequest();
+        request.setSessionId("session-1");
+        request.setMessage("hello");
+        ChatRequest.ChatOptions options = new ChatRequest.ChatOptions();
+        options.setProvider("openai");
+        request.setOptions(options);
 
-        Map<String, Object> payload = AuraBotChatService.buildGenerationSpanOutput(response);
+        when(factory.resolveConfig(eq(1L), eq("openai")))
+                .thenReturn(LlmProviderFactory.ProviderConfig.builder()
+                        .providerCode("openai")
+                        .apiKey("test-key")
+                        .baseUrl("stub://local")
+                        .defaultModel("MiniMax-M2.5")
+                        .maxTokens(128)
+                        .build());
+        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null)))
+                .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
+        when(factory.getProvider(eq("openai"))).thenReturn(provider);
+        when(provider.streamChat(any(), eq("test-key"), eq("stub://local")))
+                .thenReturn(Flux.just(
+                        LlmChunk.delta(0, "Visible <thi"),
+                        LlmChunk.delta(1, "nk>hidden"),
+                        LlmChunk.delta(2, " reasoning</thi"),
+                        LlmChunk.delta(3, "nk> answer"),
+                        LlmChunk.done(4, LlmChatResponse.builder()
+                                .stopReason("end_turn")
+                                .content(List.of(LlmChatResponse.ContentBlock.builder()
+                                        .type("text")
+                                        .text("Visible <think>hidden reasoning</think> answer")
+                                        .build()))
+                                .build())));
 
-        assertThat(payload).containsEntry("stop_reason", "tool_use");
-        assertThat(payload).containsEntry("input_tokens", 321);
-        assertThat(payload).containsEntry("output_tokens", 654);
-        assertThat((List<?>) payload.get("content")).hasSize(2);
-    }
+        CapturingResponseSink sink = new CapturingResponseSink();
+        service.executeAuraBotTurn(TurnContext.legacyDefault(1L, 100L, 100L), request, sink);
 
-    @Test
-    @DisplayName("tool execution allowlist rejects names that were not exposed to the LLM")
-    void isToolOffered_rejectsUnavailableToolName() {
-        List<LlmChatRequest.Tool> tools = List.of(
-                LlmChatRequest.Tool.builder().name("nq_crm_lead_pipeline_stats").build(),
-                LlmChatRequest.Tool.builder().name("platform_fill_form").build());
-
-        assertThat(AuraBotChatService.isToolOffered(tools, "nq_crm_lead_pipeline_stats")).isTrue();
-        assertThat(AuraBotChatService.isToolOffered(tools, "platform_execute_sql")).isFalse();
-        assertThat(AuraBotChatService.isToolOffered(tools, null)).isFalse();
-    }
-
-    @Test
-    @DisplayName("OpenAI-compatible stream hides split think blocks from visible SSE events")
-    void openAiCompatibleStreamHidesSplitThinkBlocksFromVisibleSseEvents() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/v1/chat/completions", exchange -> {
-            String body = """
-                    data: {"choices":[{"delta":{"content":"Visible <thi"}}]}
-
-                    data: {"choices":[{"delta":{"content":"nk>hidden"}}]}
-
-                    data: {"choices":[{"delta":{"content":" reasoning</thi"}}]}
-
-                    data: {"choices":[{"delta":{"content":"nk> answer"}}]}
-
-                    data: [DONE]
-
-                    """;
-            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
-            exchange.sendResponseHeaders(200, bytes.length);
-            exchange.getResponseBody().write(bytes);
-            exchange.close();
-        });
-        server.start();
-
-        try {
-            AuraBotChatService service = new AuraBotChatService(
-                    mock(LlmProviderFactory.class),
-                    mock(PromptTemplateService.class),
-                    mock(ChatToolResolver.class),
-                    mock(ChatToolExecutor.class),
-                    mock(ChatSessionStore.class),
-                    new ObjectMapper(),
-                    mock(AiTraceService.class),
-                    mock(MetaModelService.class),
-                    (Executor) Runnable::run);
-            Method method = AuraBotChatService.class.getDeclaredMethod(
-                    "streamOpenAiCompatible",
-                    String.class,
-                    String.class,
-                    String.class,
-                    String.class,
-                    List.class,
-                    String.class,
-                    int.class,
-                    double.class,
-                    ResponseSink.class);
-            method.setAccessible(true);
-
-            CapturingResponseSink sink = new CapturingResponseSink();
-            method.invoke(
-                    service,
-                    "http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
-                    "test-key",
-                    "MiniMax-M2.5",
-                    "system",
-                    List.of(),
-                    "hello",
-                    128,
-                    0.2,
-                    sink);
-
-            List<CapturedEvent> visibleEvents = sink.events.stream()
-                    .filter(event -> "chunk".equals(event.name) || "done".equals(event.name))
-                    .toList();
-            assertThat(visibleEvents)
-                    .isNotEmpty()
-                    .allSatisfy(event -> assertThat(event.payload)
-                            .doesNotContain("<think>", "</think>", "hidden", "reasoning"));
-            assertThat(visibleEvents.stream().map(CapturedEvent::payload).toList().toString())
-                    .contains("Visible ", "answer");
-        } finally {
-            server.stop(0);
-        }
+        List<CapturedEvent> visibleEvents = sink.events.stream()
+                .filter(event -> "chunk".equals(event.name) || "done".equals(event.name))
+                .toList();
+        assertThat(visibleEvents)
+                .isNotEmpty()
+                .allSatisfy(event -> assertThat(event.payload)
+                        .doesNotContain("<think>", "</think>", "hidden", "reasoning"));
+        assertThat(visibleEvents.stream().map(CapturedEvent::payload).toList().toString())
+                .contains("Visible ", "answer");
     }
 
     private static class CapturingResponseSink implements ResponseSink {

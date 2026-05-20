@@ -41,6 +41,7 @@ class TurnCompletionMemoryListenerTest {
                 999L,                                // conversationId
                 null,
                 bucket,
+                java.util.Set.of(),
                 null,
                 null,                                // taskPid (DC.3c)
                 Instant.now());

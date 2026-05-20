@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Represents a tool that an agent can call, in Anthropic tool_use format.
@@ -25,6 +26,7 @@ public class AgentToolDefinition {
     private boolean requiresApproval;
     private boolean requiresConfirmation;
     private String riskLevel;
+    private Set<String> requiredPermissions;
     private String confirmationPolicy;
     private String nativeToolConfig; // JSON string, e.g. {"type":"web_search_preview"}
 }

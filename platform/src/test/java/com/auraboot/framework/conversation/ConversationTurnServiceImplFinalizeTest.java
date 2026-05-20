@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
  * <ol>
  *     <li>{@link TurnOutcome.Success}            -> persistOutbound + TurnCompletedEvent</li>
  *     <li>{@link TurnOutcome.Interrupted}        -> persistOutbound + TurnCompletedEvent</li>
- *     <li>{@link TurnOutcome.Failed}             -> auditWriter.writeFailure + TurnCompletedEvent</li>
+ *     <li>{@link TurnOutcome.Failed}             -> persistOutbound + auditWriter.writeFailure + TurnCompletedEvent</li>
  *     <li>{@link TurnOutcome.PendingConfirmation} with empty partial
  *                                                -> NO persistOutbound + TurnSuspendedEvent</li>
  *     <li>{@link TurnOutcome.PendingConfirmation} with non-blank partial
@@ -179,7 +179,7 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
 
     @Test
     @Order(3)
-    @DisplayName("Failed -> auditWriter.writeFailure + TurnCompletedEvent (no persistOutbound)")
+    @DisplayName("Failed -> persistOutbound + auditWriter.writeFailure + TurnCompletedEvent")
     void failedBranch_firesAuditAndCompletedEvent() {
         withTestIdentity(() -> {
             TurnOutcome.Failed failed = new TurnOutcome.Failed("LLM timeout", new RuntimeException("boom"));
@@ -188,10 +188,10 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
             TurnOutcome outcome = turnService.runTurn(auraBotTurn("hi"), sink);
 
             assertThat(outcome).isSameAs(failed);
+            verify(persistence, times(1)).persistOutbound(any(), same(failed), any());
             verify(auditWriter, times(1)).writeFailure(any(), same(failed));
             verify(eventEmitter, times(1)).emit(isA(TurnCompletedEvent.class));
             verify(eventEmitter, never()).emit(isA(TurnSuspendedEvent.class));
-            verify(persistence, never()).persistOutbound(any(), any(), any());
             verify(metricsRecorder, times(1)).recordTurnEnd(any(), same(failed));
         });
     }

@@ -9,10 +9,17 @@ import com.auraboot.framework.agent.authorization.RuntimeAuthorizationService;
 import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
 import com.auraboot.framework.agent.provider.ProviderExecutionResult;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionClaim;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionLedger;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionRecord;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionRequest;
+import com.auraboot.framework.agent.runtime.DurableToolExecutionStatus;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.aurabot.skill.RiskLevel;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillResult;
+import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
+import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
 import com.auraboot.framework.aurabot.skill.provider.SkillToolExecutor;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
@@ -53,6 +60,7 @@ class ToolLoopServiceSafetyTest {
     @Mock private RuntimeAuthorizationService runtimeAuthorizationService;
     @Mock private SkillToolExecutor skillToolExecutor;
     @Mock private AgentRuntimeObservabilityService observabilityService;
+    @Mock private DurableToolExecutionLedger durableToolExecutionLedger;
 
     private ToolLoopService service;
 
@@ -213,6 +221,113 @@ class ToolLoopServiceSafetyTest {
                 eq(1L), eq("run-platform"), eq("platform.list_models"), same(tool),
                 eq(input), anyMap(), isNull(), eq(Set.of(EffectClass.READ_PLATFORM_DATA)));
         verifyNoInteractions(commandExecutor, namedQueryService);
+    }
+
+    @Test
+    @DisplayName("external provider side effects claim durable execution before dispatch")
+    void externalProviderSideEffectsClaimDurableExecutionBeforeDispatch() {
+        ReflectionTestUtils.setField(service, "durableToolExecutionLedger", durableToolExecutionLedger);
+        Map<String, Object> input = Map.of("ticketId", "T-100", "status", "closed");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("custom:close_ticket")
+                .description("Close external ticket")
+                .toolType("custom")
+                .sourceCode("custom:close_ticket")
+                .riskLevel("L3")
+                .requiresApproval(false)
+                .build();
+        when(durableToolExecutionLedger.claim(any()))
+                .thenReturn(DurableToolExecutionClaim.acquired("agent.tool_execution:run-external:custom:close_ticket:hash"));
+        when(toolProviderRegistry.execute(eq(1L), eq("custom:close_ticket"), eq(input)))
+                .thenReturn(ProviderExecutionResult.builder()
+                        .success(true)
+                        .data(Map.of("externalId", "T-100", "status", "closed"))
+                        .durationMs(12)
+                        .build());
+
+        String result = service.executeToolCall(1L, "run-external", "task-external", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).contains("\"success\":true").contains("\"externalId\":\"T-100\"");
+        verify(durableToolExecutionLedger).claim(argThat(request ->
+                request.tenantId().equals(1L)
+                        && request.runPid().equals("run-external")
+                        && request.taskPid().equals("task-external")
+                        && request.toolRef().equals("custom:close_ticket")
+                        && request.requiredEffects().contains(EffectClass.EXTERNAL_NETWORK)));
+        verify(durableToolExecutionLedger).complete(any(DurableToolExecutionRequest.class),
+                eq("agent.tool_execution:run-external:custom:close_ticket:hash"),
+                contains("\"success\":true"));
+        verify(toolProviderRegistry, times(1)).execute(eq(1L), eq("custom:close_ticket"), eq(input));
+        verify(actionRecorder).recordProviderAction(
+                eq(1L), eq("run-external"), eq("custom:close_ticket"), same(tool),
+                eq(input), anyMap(), isNull(),
+                eq(Set.of(EffectClass.EXTERNAL_NETWORK, EffectClass.WRITE_PLATFORM_STATE)));
+    }
+
+    @Test
+    @DisplayName("external provider side effect replay does not call provider or duplicate action")
+    void externalProviderSideEffectReplaySkipsProviderAndActionRecording() {
+        ReflectionTestUtils.setField(service, "durableToolExecutionLedger", durableToolExecutionLedger);
+        Map<String, Object> input = Map.of("ticketId", "T-100", "status", "closed");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("custom:close_ticket")
+                .description("Close external ticket")
+                .toolType("custom")
+                .sourceCode("custom:close_ticket")
+                .riskLevel("L3")
+                .requiresApproval(false)
+                .build();
+        String rawResult = "{\"success\":true,\"externalId\":\"T-100\",\"status\":\"closed\"}";
+        when(durableToolExecutionLedger.claim(any()))
+                .thenReturn(DurableToolExecutionClaim.replay(new DurableToolExecutionRecord(
+                        "agent.tool_execution:run-external:custom:close_ticket:hash",
+                        DurableToolExecutionStatus.SUCCEEDED,
+                        rawResult,
+                        Map.of("success", true, "externalId", "T-100", "status", "closed"),
+                        null,
+                        1_000L)));
+
+        String result = service.executeToolCall(1L, "run-external", "task-external", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).isEqualTo(rawResult);
+        verify(toolProviderRegistry, never()).execute(anyLong(), anyString(), anyMap());
+        verify(actionRecorder, never()).recordProviderAction(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(durableToolExecutionLedger, never()).complete(any(), anyString(), anyString());
+        verify(durableToolExecutionLedger, never()).fail(any(), anyString(), anyString(), anyString());
+        verify(resultContractEmitter).emitProviderResult(
+                eq("custom:close_ticket"), same(tool), eq(rawResult), anyLong(), eq(true));
+    }
+
+    @Test
+    @DisplayName("compensated durable side effect replay fails closed instead of returning compensation result")
+    void compensatedDurableSideEffectReplayFailsClosed() {
+        ReflectionTestUtils.setField(service, "durableToolExecutionLedger", durableToolExecutionLedger);
+        Map<String, Object> input = Map.of("ticketId", "T-100", "status", "closed");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("custom:close_ticket")
+                .description("Close external ticket")
+                .toolType("custom")
+                .sourceCode("custom:close_ticket")
+                .riskLevel("L3")
+                .requiresApproval(false)
+                .build();
+        when(durableToolExecutionLedger.claim(any()))
+                .thenReturn(DurableToolExecutionClaim.replay(new DurableToolExecutionRecord(
+                        "agent.tool_execution:run-external:custom:close_ticket:hash",
+                        DurableToolExecutionStatus.COMPENSATED,
+                        "{\"compensated\":true}",
+                        Map.of("compensated", true),
+                        null,
+                        1_000L)));
+
+        String result = service.executeToolCall(1L, "run-external", "task-external", "agent",
+                tool.getName(), input, List.of(tool), null);
+
+        assertThat(result).contains("Error: previous durable tool execution was compensated");
+        verify(toolProviderRegistry, never()).execute(anyLong(), anyString(), anyMap());
+        verify(actionRecorder, never()).recordProviderAction(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -407,6 +522,34 @@ class ToolLoopServiceSafetyTest {
     }
 
     @Test
+    @DisplayName("AuraBot skill confirm preserves typed preview-token errors")
+    void aurabotSkillConfirmPreservesTypedPreviewTokenErrors() {
+        ReflectionTestUtils.setField(service, "skillToolExecutor", skillToolExecutor);
+        Map<String, Object> input = Map.of("code", "crm_customer");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("aurabot:model:create")
+                .description("Create model")
+                .toolType("AURABOT_SKILL")
+                .sourceCode("model:create")
+                .riskLevel("high")
+                .build();
+        when(skillToolExecutor.confirm(eq("model:create"), any(SkillRequest.class), eq("expired-token")))
+                .thenThrow(new SkillSpiException(
+                        SkillErrorCode.PREVIEW_TOKEN_INVALID,
+                        "Preview token is invalid or expired."));
+
+        String result = service.confirmAuraBotSkill(1L, "run-skill-expired", "task-skill-expired", "agent",
+                tool.getName(), input, List.of(tool), "expired-token", null);
+
+        assertThat(result)
+                .contains("\"success\":false")
+                .contains("\"error\":\"Preview token is invalid or expired.\"")
+                .contains("\"errorCode\":\"PREVIEW_TOKEN_INVALID\"")
+                .contains("\"errorFrame\"")
+                .contains("\"errorClass\":\"PREVIEW_TOKEN_INVALID\"");
+    }
+
+    @Test
     @DisplayName("runtime authorization rejects AuraBot skill confirmation before execution")
     void runtimeAuthorizationRejectsAurabotSkillConfirmBeforeExecution() {
         ReflectionTestUtils.setField(service, "skillToolExecutor", skillToolExecutor);
@@ -438,6 +581,7 @@ class ToolLoopServiceSafetyTest {
     @Test
     @DisplayName("custom provider api_call tools route through ToolProviderRegistry")
     void customProviderApiCallToolsRouteThroughRegistry() {
+        ReflectionTestUtils.setField(service, "durableToolExecutionLedger", durableToolExecutionLedger);
         Map<String, Object> input = Map.of("value", "ping");
         AgentToolDefinition tool = AgentToolDefinition.builder()
                 .name("custom:api_test_tool")
@@ -445,6 +589,8 @@ class ToolLoopServiceSafetyTest {
                 .toolType("api_call")
                 .riskLevel("L1")
                 .build();
+        when(durableToolExecutionLedger.claim(any()))
+                .thenReturn(DurableToolExecutionClaim.acquired("agent.tool_execution:run-custom:custom:api_test_tool:hash"));
         when(toolProviderRegistry.execute(eq(1L), eq("custom:api_test_tool"), eq(input)))
                 .thenReturn(ProviderExecutionResult.builder()
                         .success(true)
@@ -457,6 +603,12 @@ class ToolLoopServiceSafetyTest {
 
         assertThat(result).contains("\"success\":true").contains("\"body\":\"{\\\"ok\\\":true}\"");
         verify(toolProviderRegistry).execute(1L, "custom:api_test_tool", input);
+        verify(durableToolExecutionLedger).claim(argThat(request ->
+                request.requiredEffects().contains(EffectClass.EXTERNAL_NETWORK)
+                        && request.requiredEffects().contains(EffectClass.WRITE_PLATFORM_STATE)));
+        verify(durableToolExecutionLedger).complete(any(DurableToolExecutionRequest.class),
+                eq("agent.tool_execution:run-custom:custom:api_test_tool:hash"),
+                contains("\"success\":true"));
         verifyNoInteractions(commandExecutor, namedQueryService);
     }
 

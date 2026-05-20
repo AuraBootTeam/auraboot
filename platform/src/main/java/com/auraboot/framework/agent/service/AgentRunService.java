@@ -3,13 +3,14 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.config.AgentProperties;
 import com.auraboot.framework.agent.dto.AgentPlanStep;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
-import com.auraboot.framework.agent.dto.LlmChatRequest;
-import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.AgentExecutionState;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
+import com.auraboot.framework.agent.runtime.LlmRuntimeResolver;
 import com.auraboot.framework.agent.memory.SessionEndedEvent;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
@@ -23,7 +24,6 @@ import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +61,7 @@ public class AgentRunService {
     private final GroundingService groundingService;
     private final AgentSkillService skillService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AgentRuntimeStateFactory runtimeStateFactory;
 
     /**
      * User Soul Profile grounding reader (plan §5.5 / PR-77).
@@ -192,8 +193,17 @@ public class AgentRunService {
 
         try {
             Map<String, Object> agentDef = loadAgentDefinition(tenantId, agentCode);
-            String providerCode = resolveProviderCode(agentDef);
-            String model = resolveModel(agentDef, providerCode);
+            if (agentDef == null) {
+                String agentMissingMsg = "Agent not found: " + agentCode;
+                if (existingRunPid == null) {
+                    runLifecycleService.createRunRecord(tenantId, runPid, taskPid, agentCode, null, startedAt);
+                }
+                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, agentMissingMsg);
+                return new RunOutcome.Failed(runPid, agentMissingMsg);
+            }
+            String providerCode = LlmRuntimeResolver.resolveAgentProviderCode(objectMapper, providerFactory, agentDef);
+            String preferredProviderCode = providerCode;
+            String model = LlmRuntimeResolver.resolveAgentModel(providerFactory, agentDef, providerCode);
 
             // Create run record first (even if API key missing, we want the record).
             // When the caller pre-seeded the row (existingRunPid != null, e.g.
@@ -205,9 +215,12 @@ public class AgentRunService {
             } else {
                 // Refresh model + updated_at so the pre-seeded row reflects the
                 // executor's resolved configuration. run_status stays 'running'.
-                dynamicDataMapper.update("ab_agent_run",
-                        Map.of("run_model", model, "updated_at", LocalDateTime.now()),
-                        Map.of("pid", runPid));
+                Map<String, Object> runUpdate = new LinkedHashMap<>();
+                if (model != null) {
+                    runUpdate.put("run_model", model);
+                }
+                runUpdate.put("updated_at", LocalDateTime.now());
+                dynamicDataMapper.update("ab_agent_run", runUpdate, Map.of("pid", runPid));
             }
 
             // If resuming, link to original run
@@ -215,6 +228,13 @@ public class AgentRunService {
                 dynamicDataMapper.update("ab_agent_run",
                         Map.of("resumed_from", resumeFromRunPid, "updated_at", LocalDateTime.now()),
                         Map.of("pid", runPid));
+            }
+
+            if (providerCode == null || providerCode.isBlank()) {
+                String noProviderMsg = "No LLM provider configured for agent: " + agentCode +
+                        ". Define guardrails.provider, guardrails.preferredProvider, or a known model.";
+                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, noProviderMsg);
+                return new RunOutcome.Failed(runPid, noProviderMsg);
             }
 
             // Concurrency control: check active runs for this agent
@@ -233,23 +253,31 @@ public class AgentRunService {
                 return new RunOutcome.Failed(runPid, concurrencyMsg);
             }
 
-            // Resolve provider with fallback chain
+            // Resolve provider with the agent's explicit provider chain.
             LlmProvider provider = null;
             LlmProviderFactory.ProviderConfig config = null;
             String resolvedProviderCode = providerCode;
 
-            List<String> providerChain = buildProviderChain(agentDef, providerCode);
+            List<String> providerChain = LlmRuntimeResolver.resolveAgentProviderChain(
+                    objectMapper, agentDef, providerCode);
             for (String pc : providerChain) {
                 LlmProviderFactory.ProviderConfig candidateConfig = providerFactory.resolveConfig(tenantId, pc);
                 if (candidateConfig != null && candidateConfig.getApiKey() != null && !candidateConfig.getApiKey().isBlank()) {
                     String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(pc, candidateConfig);
-                    provider = providerFactory.getProvider(effectiveProviderCode);
+                    LlmProvider candidateProvider = providerFactory.getProvider(effectiveProviderCode);
+                    if (candidateProvider == null) {
+                        String noProviderMsg = "LLM provider not available: " + effectiveProviderCode;
+                        runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, noProviderMsg);
+                        return new RunOutcome.Failed(runPid, noProviderMsg);
+                    }
+                    provider = candidateProvider;
                     config = candidateConfig;
                     resolvedProviderCode = effectiveProviderCode;
                     if (!effectiveProviderCode.equals(providerCode)) {
                         log.info("Preferred provider '{}' resolved via '{}' to '{}'",
                                 providerCode, pc, effectiveProviderCode);
-                        model = resolveModel(agentDef, effectiveProviderCode, true);
+                        model = LlmRuntimeResolver.resolveAgentModel(
+                                providerFactory, agentDef, effectiveProviderCode, true);
                     }
                     break;
                 }
@@ -260,12 +288,6 @@ public class AgentRunService {
                         ". Add API key via Settings \u2192 Cloud Config \u2192 LLM.";
                 runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, noProviderMsg);
                 return new RunOutcome.Failed(runPid, noProviderMsg);
-            }
-
-            if (agentDef == null) {
-                String agentMissingMsg = "Agent not found: " + agentCode;
-                runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, agentMissingMsg);
-                return new RunOutcome.Failed(runPid, agentMissingMsg);
             }
 
             Map<String, Object> task = loadTask(tenantId, taskPid);
@@ -301,12 +323,14 @@ public class AgentRunService {
             // Quality gate: if D1 quality insufficient, discover all tools
             String qualityIssue = groundingService.checkQualityGate(bif);
             List<AgentToolDefinition> tools;
+            String toolDiscoveryMode;
             if (qualityIssue != null) {
                 log.info("D1 quality gate triggered: {}, discovering all tools", qualityIssue);
                 tools = toAgentToolDefinitions(toolProviderRegistry.discoverAll(discoveryCtx));
+                toolDiscoveryMode = "quality_gate_expanded";
             } else {
                 // Use BIF candidateSkills to narrow tool selection
-                List<String> candidateSkills = bif.getCandidateSkills();
+                List<String> candidateSkills = bif != null ? bif.getCandidateSkills() : null;
                 if (candidateSkills != null && !candidateSkills.isEmpty()) {
                     // Load tools from candidate skills
                     List<AgentToolDefinition> skillTools = new ArrayList<>();
@@ -314,11 +338,16 @@ public class AgentRunService {
                         skillTools.addAll(skillService.resolveSkillTools(tenantId, skillCode));
                     }
                     // If skill tools found, use them; otherwise discover all
-                    tools = skillTools.isEmpty()
-                            ? toAgentToolDefinitions(toolProviderRegistry.discoverAll(discoveryCtx))
-                            : skillTools;
+                    if (skillTools.isEmpty()) {
+                        tools = toAgentToolDefinitions(toolProviderRegistry.discoverAll(discoveryCtx));
+                        toolDiscoveryMode = "registry_all";
+                    } else {
+                        tools = skillTools;
+                        toolDiscoveryMode = "candidate_skills";
+                    }
                 } else {
                     tools = toAgentToolDefinitions(toolProviderRegistry.discoverAll(discoveryCtx));
+                    toolDiscoveryMode = "registry_all";
                 }
             }
             log.info("Agent {} tools: selected={}, d1={}, provider={}, model={}",
@@ -330,9 +359,16 @@ public class AgentRunService {
                     ? ((Number) agentDef.get("execution_timeout_seconds")).intValue()
                     : DEFAULT_TIMEOUT_SECONDS;
             LocalDateTime timeoutAt = startedAt.plusSeconds(timeoutSeconds);
-            dynamicDataMapper.update("ab_agent_run",
-                    Map.of("timeout_at", timeoutAt, "run_model", model, "updated_at", LocalDateTime.now()),
-                    Map.of("pid", runPid));
+            Map<String, Object> runtimeMetadata = buildRunRuntimeMetadata(
+                    tenantId, runPid, taskPid, agentCode, preferredProviderCode, resolvedProviderCode,
+                    providerChain, model, systemPrompt, userMessage, config, tools, toolDiscoveryMode,
+                    qualityIssue, bif);
+            Map<String, Object> runSetupUpdate = new LinkedHashMap<>();
+            runSetupUpdate.put("timeout_at", timeoutAt);
+            runSetupUpdate.put("run_model", model);
+            runSetupUpdate.put("metadata", objectMapper.writeValueAsString(runtimeMetadata));
+            runSetupUpdate.put("updated_at", LocalDateTime.now());
+            dynamicDataMapper.update("ab_agent_run", runSetupUpdate, Map.of("pid", runPid));
 
             // Generate or load plan
             List<AgentPlanStep> plan;
@@ -441,6 +477,74 @@ public class AgentRunService {
     }
 
 
+    private Map<String, Object> buildRunRuntimeMetadata(Long tenantId, String runPid, String taskPid,
+                                                         String agentCode, String preferredProviderCode,
+                                                         String resolvedProviderCode, List<String> providerChain,
+                                                         String model, String systemPrompt, String userMessage,
+                                                         LlmProviderFactory.ProviderConfig config,
+                                                         List<AgentToolDefinition> tools,
+                                                         String toolDiscoveryMode, String qualityIssue,
+                                                         com.auraboot.framework.agent.dto.BusinessIntentFrame bif) {
+        int maxTokens = config != null && config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
+        AgentExecutionState runtimeState = runtimeStateFactory.acpRunState(
+                tenantId,
+                MetaContext.exists() ? MetaContext.getCurrentUserId() : null,
+                runPid,
+                taskPid,
+                agentCode,
+                resolvedProviderCode,
+                model,
+                systemPrompt,
+                userMessage,
+                maxTokens,
+                tools,
+                Map.of("toolDiscoveryMode", toolDiscoveryMode));
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("runtimeState", runtimeState.toSnapshotMap());
+        metadata.put("fallbackAudit", buildFallbackAudit(
+                preferredProviderCode, resolvedProviderCode, providerChain,
+                toolDiscoveryMode, qualityIssue, bif, tools != null ? tools.size() : 0));
+        return metadata;
+    }
+
+    private Map<String, Object> buildFallbackAudit(String preferredProviderCode, String resolvedProviderCode,
+                                                   List<String> providerChain, String toolDiscoveryMode,
+                                                   String qualityIssue,
+                                                   com.auraboot.framework.agent.dto.BusinessIntentFrame bif,
+                                                   int selectedTools) {
+        Map<String, Object> provider = new LinkedHashMap<>();
+        provider.put("preferred", preferredProviderCode);
+        provider.put("resolved", resolvedProviderCode);
+        provider.put("chain", providerChain == null ? List.of() : List.copyOf(providerChain));
+        provider.put("fallbackUsed", preferredProviderCode != null && resolvedProviderCode != null
+                && !preferredProviderCode.equals(resolvedProviderCode));
+
+        Map<String, Object> toolDiscovery = new LinkedHashMap<>();
+        toolDiscovery.put("mode", toolDiscoveryMode);
+        toolDiscovery.put("selectedTools", selectedTools);
+        if (qualityIssue != null && !qualityIssue.isBlank()) {
+            toolDiscovery.put("qualityIssue", qualityIssue);
+        }
+        if (bif != null) {
+            putIfNotBlank(toolDiscovery, "bifObject", bif.getObject());
+            putIfNotBlank(toolDiscovery, "bifIntent", bif.getIntent());
+            putIfNotBlank(toolDiscovery, "bifRiskLevel", bif.getRiskLevel());
+        }
+
+        Map<String, Object> audit = new LinkedHashMap<>();
+        audit.put("provider", provider);
+        audit.put("toolDiscovery", toolDiscovery);
+        return audit;
+    }
+
+    private void putIfNotBlank(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value);
+        }
+    }
+
+
     /**
      * H.3 wiring: pre-load all skill rows referenced by the current plan, so
      * {@link StepLoopService#executePlanSteps} can overlay
@@ -471,136 +575,6 @@ public class AgentRunService {
             }
         }
         return out;
-    }
-
-    private boolean attemptReplan(List<AgentPlanStep> plan, int failedStepIndex, String errorMessage,
-                                   LlmProvider provider, LlmProviderFactory.ProviderConfig config,
-                                   String model, String systemPrompt, List<AgentToolDefinition> tools,
-                                   List<LlmChatRequest.Message> messages) {
-        String remaining = plan.subList(failedStepIndex + 1, plan.size()).stream()
-                .map(AgentPlanStep::getDescription).collect(Collectors.joining("\n- ", "- ", ""));
-        String replanPrompt = "## Re-Planning Required\nStep " + failedStepIndex + " failed: " + errorMessage
-                + "\n\nRemaining steps were:\n" + remaining
-                + "\n\nProvide a revised JSON array of steps for the remaining work. Empty array [] if cannot continue.";
-
-        try {
-            LlmChatRequest req = LlmChatRequest.builder()
-                    .model(model).systemPrompt(systemPrompt)
-                    .messages(List.of(LlmChatRequest.Message.builder().role("user").content(replanPrompt).build()))
-                    .maxTokens(2000).build();
-
-            LlmChatResponse resp = provider.chat(req, config.getApiKey(), config.getBaseUrl());
-            String content = resp.getContent().stream()
-                    .filter(b -> "text".equals(b.getType()))
-                    .map(LlmChatResponse.ContentBlock::getText)
-                    .collect(Collectors.joining());
-
-            String jsonStr = planService.extractJsonArray(content);
-            if (jsonStr != null) {
-                List<Map<String, Object>> rawSteps = objectMapper.readValue(jsonStr, new TypeReference<>() {});
-                if (rawSteps.isEmpty()) return false;
-                while (plan.size() > failedStepIndex + 1) plan.remove(plan.size() - 1);
-                int baseIndex = failedStepIndex + 1;
-                for (int j = 0; j < rawSteps.size(); j++) {
-                    Map<String, Object> raw = rawSteps.get(j);
-                    AgentPlanStep newStep = new AgentPlanStep(baseIndex + j, (String) raw.get("description"));
-                    newStep.setToolCode((String) raw.get("toolCode"));
-                    newStep.setRequiresApproval(Boolean.TRUE.equals(raw.get("requiresApproval")));
-                    plan.add(newStep);
-                }
-                return true;
-            }
-        } catch (Exception e) {
-            log.warn("Re-planning failed: {}", e.getMessage());
-        }
-        return false;
-    }
-
-
-
-    // =========================================================================
-    // Provider & Model resolution
-    // =========================================================================
-
-    private String resolveProviderCode(Map<String, Object> agentDef) {
-        if (agentDef == null) return "anthropic";
-
-        // 1. Explicit provider in guardrails
-        String guardrailsJson = (String) agentDef.get("guardrails");
-        if (guardrailsJson != null && !guardrailsJson.isBlank()) {
-            try {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> guardrails = objectMapper.readValue(guardrailsJson, Map.class);
-                String provider = (String) guardrails.get("provider");
-                if (provider != null && !provider.isBlank()) return provider;
-            } catch (Exception ignored) {}
-        }
-
-        // 2. Dynamic resolution from model name via CloudConfig + heuristics
-        String model = (String) agentDef.get("model");
-        if (model != null && !model.isBlank()) {
-            String matched = providerFactory.resolveProviderByModel(model);
-            if (matched != null) return matched;
-        }
-
-        return "anthropic"; // default
-    }
-
-    private String resolveModel(Map<String, Object> agentDef, String providerCode) {
-        return resolveModel(agentDef, providerCode, false);
-    }
-
-    /**
-     * Resolve model name for a provider.
-     * When forceFallback is true (provider changed during fallback), ignore agent def model
-     * because the model name (e.g. "claude-sonnet-4-6") may not be valid for the new provider.
-     */
-    private String resolveModel(Map<String, Object> agentDef, String providerCode, boolean forceFallback) {
-        if (!forceFallback && agentDef != null) {
-            String model = (String) agentDef.get("model");
-            if (model != null && !model.isBlank()) return model;
-        }
-        return providerFactory.getDefaultModel(providerCode);
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<String> buildProviderChain(Map<String, Object> agentDef, String preferredProvider) {
-        List<String> chain = new ArrayList<>();
-        chain.add(preferredProvider);
-
-        if (agentDef != null) {
-            String guardrailsJson = (String) agentDef.get("guardrails");
-            if (guardrailsJson != null && !guardrailsJson.isBlank()) {
-                try {
-                    Map<String, Object> guardrails = objectMapper.readValue(guardrailsJson, Map.class);
-                    Object fallbacks = guardrails.get("fallbackProviders");
-                    if (fallbacks instanceof List<?> list) {
-                        for (Object item : list) {
-                            String fb = String.valueOf(item);
-                            if (!chain.contains(fb)) chain.add(fb);
-                        }
-                    }
-                } catch (Exception ignored) {}
-            }
-        }
-
-        // Add all configured (enabled) providers as fallbacks
-        try {
-            Long tenantId = MetaContext.getCurrentTenantId();
-            List<LlmProviderFactory.ProviderInfo> configured = providerFactory.listConfiguredProviders(tenantId);
-            for (LlmProviderFactory.ProviderInfo info : configured) {
-                if (!chain.contains(info.getProviderCode())) {
-                    chain.add(info.getProviderCode());
-                }
-            }
-        } catch (Exception e) {
-            log.debug("Failed to list configured providers for fallback chain: {}", e.getMessage());
-        }
-
-        // Always add system default as last resort
-        if (!chain.contains("anthropic")) chain.add("anthropic");
-
-        return chain;
     }
 
     // =========================================================================
@@ -640,8 +614,9 @@ public class AgentRunService {
             String taskTitle = task != null ? (String) task.get("title") : null;
             if (agentCode != null) {
                 Map<String, Object> agentDef = loadAgentDefinition(tenantId, agentCode);
-                String providerCode = resolveProviderCode(agentDef);
-                String memModel = resolveModel(agentDef, providerCode);
+                String providerCode = LlmRuntimeResolver.resolveAgentProviderCode(
+                        objectMapper, providerFactory, agentDef);
+                String memModel = LlmRuntimeResolver.resolveAgentModel(providerFactory, agentDef, providerCode);
                 runLifecycleService.saveRunMemory(tenantId, runPid, taskPid, result,
                         agentCode, taskTitle, providerCode, memModel);
 

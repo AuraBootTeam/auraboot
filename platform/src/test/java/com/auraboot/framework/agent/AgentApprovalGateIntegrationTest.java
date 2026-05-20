@@ -51,17 +51,24 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
      * (the source is fail-secure on null/empty rules — see
      * {@link AgentApprovalGateService#isAuthorizedApprover}).
      */
-    @BeforeAll
+    @BeforeEach
     void seedWildcardPolicy() {
+        if (wildcardPolicyPid != null) {
+            return;
+        }
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
+        dynamicDataMapper.deleteByQuery(
+                "DELETE FROM ab_approval_policy WHERE tenant_id = #{params.tenantId} "
+                        + "AND policy_name LIKE 'wildcard-test-policy-%'",
+                Map.of("tenantId", tenantId));
         wildcardPolicyPid = UniqueIdGenerator.generate();
         Map<String, Object> policy = new HashMap<>();
         policy.put("pid", wildcardPolicyPid);
         policy.put("tenant_id", tenantId);
         policy.put("policy_name", "wildcard-test-policy-" + testRunId);
         policy.put("description", "Wildcard policy seeded by AgentApprovalGateIntegrationTest");
-        policy.put("trigger_rules", "[{\"type\":\"tool_call\",\"pattern\":\".*\"}]");
+        policy.put("trigger_rules", "[{\"type\":\"tool_call\",\"pattern\":\"^(?!read_file$).*\"}]");
         policy.put("approver_rules", "[{\"type\":\"USER\",\"userId\":" + userId + "}]");
         policy.put("auto_approve", false);
         policy.put("timeout_hours", 24);
@@ -71,6 +78,13 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         policy.put("created_at", LocalDateTime.now());
         policy.put("updated_at", LocalDateTime.now());
         dynamicDataMapper.insert("ab_approval_policy", policy);
+    }
+
+    @AfterEach
+    void cleanupApprovalNotificationOutbox() {
+        dynamicDataMapper.deleteByQuery(
+                "DELETE FROM ab_agent_approval_notification_outbox WHERE tenant_id = #{params.tenantId}",
+                Map.of("tenantId", getTestTenant().getId()));
     }
 
     // ========== Test 1: checkAndRequestApproval - tool requires approval ==========

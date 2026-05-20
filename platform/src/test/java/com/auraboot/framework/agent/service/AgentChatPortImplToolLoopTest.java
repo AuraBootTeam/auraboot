@@ -10,8 +10,18 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.AgentExecutionState;
+import com.auraboot.framework.agent.runtime.AgentRuntimeEvent;
+import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
+import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.runtime.DefaultAgentReducer;
+import com.auraboot.framework.agent.runtime.ChatMessageTapeStore;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
+import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
+import com.auraboot.framework.agent.runtime.PendingToolStore;
+import com.auraboot.framework.agent.runtime.PendingToolExecutionClaim;
+import com.auraboot.framework.agent.runtime.PendingToolExecutionRecord;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
-import com.auraboot.framework.aurabot.service.ChatSessionStore;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
@@ -39,6 +49,7 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,10 +75,12 @@ class AgentChatPortImplToolLoopTest {
     @Mock private ToolProviderRegistry toolProviderRegistry;
     @Mock private GroundingService groundingService;
     @Mock private AgentSkillService skillService;
-    @Mock private ChatSessionStore chatSessionStore;
+    @Mock private ChatMessageTapeStore chatMessageTapeStore;
+    @Mock private PendingToolStore pendingToolStore;
     @Mock private LlmProvider provider;
     @Mock private ResponseSink sink;
     @Mock private ToolLoopService toolLoopService;
+    @Mock private ToolAclChecker toolAclChecker;
 
     private AgentChatPortImpl service;
 
@@ -78,15 +91,24 @@ class AgentChatPortImplToolLoopTest {
 
     @BeforeEach
     void setUp() {
-        service = new AgentChatPortImpl(
+        service = newService(new DefaultAgentReducer());
+    }
+
+    private AgentChatPortImpl newService(DefaultAgentReducer reducer) {
+        return new AgentChatPortImpl(
                 dynamicDataMapper,
                 providerFactory,
                 toolProviderRegistry,
                 groundingService,
                 skillService,
                 new ObjectMapper(),
-                chatSessionStore);
-        ReflectionTestUtils.setField(service, "toolLoopService", toolLoopService);
+                chatMessageTapeStore,
+                pendingToolStore,
+                toolLoopService,
+                new AgentRuntimeStateFactory(),
+                reducer,
+                new ChatTurnRuntime(),
+                new PendingToolSnapshotFactory(new AgentRuntimeStateFactory()));
     }
 
     // =========================================================================
@@ -95,6 +117,30 @@ class AgentChatPortImplToolLoopTest {
 
     private TurnContext newTurnContext() {
         return TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID);
+    }
+
+    private TurnContext newTurnContext(String channel) {
+        return newTurnContext(channel, null);
+    }
+
+    private TurnContext newTurnContext(String channel, String profileId) {
+        return new TurnContext(
+                "turn-" + channel,
+                TENANT_ID,
+                USER_ID,
+                USER_ID,
+                null,
+                AGENT_CODE,
+                channel,
+                profileId,
+                null,
+                null,
+                null,
+                null,
+                java.util.Set.of(),
+                null,
+                null,
+                java.time.Instant.now());
     }
 
     private ChatRequest newRequest(String message) {
@@ -219,6 +265,42 @@ class AgentChatPortImplToolLoopTest {
                 .build();
     }
 
+    @SuppressWarnings("unchecked")
+    private void assertRuntimeStateExtension(PendingToolSnapshot stored) {
+        assertThat(stored.getExtension()).containsKey("_runtime_state");
+        Object runtimeState = stored.getExtension().get("_runtime_state");
+        assertThat(runtimeState).isInstanceOf(Map.class);
+        Map<String, Object> snapshot = (Map<String, Object>) runtimeState;
+        assertThat(snapshot)
+                .containsEntry("schemaVersion", "agent-runtime-state/v1")
+                .containsEntry("executionKind", "chat_turn")
+                .containsEntry("agentCode", AGENT_CODE)
+                .containsEntry("providerCode", "openai")
+                .containsEntry("model", "test-model")
+                .containsEntry("toolChoice", "required");
+        assertThat((String) snapshot.get("stateHash")).hasSize(64);
+        assertThat(snapshot.get("context")).isInstanceOf(Map.class);
+        Map<String, Object> context = (Map<String, Object>) snapshot.get("context");
+        assertThat(context)
+                .containsKeys("systemPromptHash", "messagesHash", "toolsHash", "contextHash");
+        assertThat(((Number) context.get("systemPromptChars")).intValue())
+                .isGreaterThan("Compare suppliers.".length());
+        assertThat(String.valueOf(snapshot))
+                .doesNotContain("test-key")
+                .doesNotContain("https://example.invalid")
+                .doesNotContain("Compare suppliers.");
+    }
+
+    private void assertProviderSecretNotPersisted(PendingToolSnapshot stored) {
+        assertThat(stored.getProviderCode()).isEqualTo("openai");
+        assertThat(stored.getModel()).isEqualTo("test-model");
+        assertThat(stored.getApiKey()).isNull();
+        assertThat(stored.getBaseUrl()).isNull();
+        assertThat(String.valueOf(stored))
+                .doesNotContain("test-key")
+                .doesNotContain("https://example.invalid");
+    }
+
     private LlmChatResponse toolUseResponse(String toolId, String toolName, Map<String, Object> input) {
         return LlmChatResponse.builder()
                 .stopReason("tool_use")
@@ -231,9 +313,52 @@ class AgentChatPortImplToolLoopTest {
                 .build();
     }
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> errorFrame(Map<String, Object> result) {
+        Object frame = result.get("errorFrame");
+        assertThat(frame).isInstanceOf(Map.class);
+        return (Map<String, Object>) frame;
+    }
+
+    private String firstToolResultPayload(LlmChatRequest request) {
+        for (LlmChatRequest.Message message : request.getMessages()) {
+            Object content = message.getContent();
+            if (!(content instanceof List<?> blocks)) {
+                continue;
+            }
+            for (Object block : blocks) {
+                if (block instanceof LlmChatRequest.ContentBlock contentBlock
+                        && "tool_result".equals(contentBlock.getType())) {
+                    return String.valueOf(contentBlock.getResult());
+                }
+                if (block instanceof Map<?, ?> raw && "tool_result".equals(String.valueOf(raw.get("type")))) {
+                    return String.valueOf(raw.get("result"));
+                }
+            }
+        }
+        return "";
+    }
+
     // =========================================================================
     // tests
     // =========================================================================
+
+    @Test
+    @DisplayName("agent definition query failure surfaces lookup failure instead of inactive-agent result")
+    void agentDefinitionQueryFailureSurfacesLookupFailure() throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenThrow(new RuntimeException("database unavailable"));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage())
+                .contains("Agent definition lookup failed")
+                .contains(AGENT_CODE);
+        verify(sink).onError(contains("Agent definition lookup failed"), isNull());
+        verify(providerFactory, never()).resolveConfig(any(), any());
+        verify(provider, never()).chat(any(), any(), any());
+    }
 
     @Test
     @DisplayName("end_turn yields TurnOutcome.Success and streams the assistant text through the sink")
@@ -253,7 +378,7 @@ class AgentChatPortImplToolLoopTest {
         verify(sink).onTextChunk("Acme PCB is available.");
         verify(sink).onDone("Acme PCB is available.", null);
         // Final-turn message tape persisted so the next turn can rehydrate.
-        verify(chatSessionStore).storeConversationMessages(eq(SESSION_ID), any());
+        verify(chatMessageTapeStore).storeConversationMessages(eq(SESSION_ID), any());
     }
 
     @Test
@@ -349,6 +474,123 @@ class AgentChatPortImplToolLoopTest {
                 .doesNotContain("Tool executed");
         // No confirm_required on a read-only tool.
         verify(sink, never()).onConfirmRequired(any(), any(), any(), anyMap(), any());
+    }
+
+    @Test
+    @DisplayName("tool catalog applies channel ACL before provider sees tools")
+    void toolCatalogAppliesChannelAclBeforeProviderSeesTools() throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "agent_code", AGENT_CODE,
+                        "name", "PCBA Procurement Advisor",
+                        "status", "active",
+                        "model", "test-model",
+                        "system_prompt", "Compare suppliers.",
+                        "guardrails", "{\"provider\":\"openai\"}")));
+        stubProvider();
+        stubGrounding();
+        ReflectionTestUtils.setField(service, "toolAclChecker", toolAclChecker);
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(readOnlyTool(), writeTool()));
+        when(toolAclChecker.check(eq(TENANT_ID), eq(AGENT_CODE), isNull(), eq("interactive"),
+                eq("nq_pe_procurement_comparison_supplier_options")))
+                .thenReturn(ToolAclChecker.Decision.builder()
+                        .allowed(true)
+                        .reason("allow_read")
+                        .build());
+        when(toolAclChecker.check(eq(TENANT_ID), eq(AGENT_CODE), isNull(), eq("interactive"),
+                eq("cmd_pe_create_procurement_comparison_draft")))
+                .thenReturn(ToolAclChecker.Decision.builder()
+                        .allowed(false)
+                        .reason("channel_write_denied")
+                        .build());
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(endTurnResponse("Only read tools are available."));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(requestCaptor.getValue().getTools())
+                .extracting(LlmChatRequest.Tool::getName)
+                .containsExactly("nq_pe_procurement_comparison_supplier_options");
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+    }
+
+    @Test
+    @DisplayName("tool catalog ACL uses TurnContext channel instead of a null fallback")
+    void toolCatalogAclUsesTurnContextChannel() throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "agent_code", AGENT_CODE,
+                        "name", "PCBA Procurement Advisor",
+                        "status", "active",
+                        "model", "test-model",
+                        "system_prompt", "Compare suppliers.",
+                        "guardrails", "{\"provider\":\"openai\"}")));
+        stubProvider();
+        stubGrounding();
+        ReflectionTestUtils.setField(service, "toolAclChecker", toolAclChecker);
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(readOnlyTool()));
+        when(toolAclChecker.check(eq(TENANT_ID), eq(AGENT_CODE), eq("im_group"), eq("interactive"),
+                eq("nq_pe_procurement_comparison_supplier_options")))
+                .thenReturn(ToolAclChecker.Decision.builder()
+                        .allowed(true)
+                        .reason("im_group_read")
+                        .build());
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(endTurnResponse("Only group-safe read tools are available."));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext("im_group"), newRequest("Compare suppliers"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(requestCaptor.getValue().getTools())
+                .extracting(LlmChatRequest.Tool::getName)
+                .containsExactly("nq_pe_procurement_comparison_supplier_options");
+        verify(toolAclChecker).check(eq(TENANT_ID), eq(AGENT_CODE), eq("im_group"), eq("interactive"),
+                eq("nq_pe_procurement_comparison_supplier_options"));
+    }
+
+    @Test
+    @DisplayName("tool catalog ACL uses TurnContext profile id before agent-code fallback")
+    void toolCatalogAclUsesTurnContextProfileId() throws Exception {
+        when(dynamicDataMapper.selectByQuery(contains("ab_agent_definition"), anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "agent_code", AGENT_CODE,
+                        "name", "PCBA Procurement Advisor",
+                        "status", "active",
+                        "model", "test-model",
+                        "system_prompt", "Compare suppliers.",
+                        "guardrails", "{\"provider\":\"openai\"}")));
+        stubProvider();
+        stubGrounding();
+        ReflectionTestUtils.setField(service, "toolAclChecker", toolAclChecker);
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(readOnlyTool()));
+        when(toolAclChecker.check(eq(TENANT_ID), eq("profile-abc"), eq("im_group"), eq("interactive"),
+                eq("nq_pe_procurement_comparison_supplier_options")))
+                .thenReturn(ToolAclChecker.Decision.builder()
+                        .allowed(true)
+                        .reason("profile_read")
+                        .build());
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(endTurnResponse("Only profile-safe read tools are available."));
+
+        TurnOutcome outcome = service.runAgentTurn(
+                newTurnContext("im_group", "profile-abc"), newRequest("Compare suppliers"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(requestCaptor.getValue().getTools())
+                .extracting(LlmChatRequest.Tool::getName)
+                .containsExactly("nq_pe_procurement_comparison_supplier_options");
+        verify(toolAclChecker).check(eq(TENANT_ID), eq("profile-abc"), eq("im_group"), eq("interactive"),
+                eq("nq_pe_procurement_comparison_supplier_options"));
     }
 
     @Test
@@ -467,16 +709,201 @@ class AgentChatPortImplToolLoopTest {
         ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
         verify(sink).onToolResult(eq("toolu-unknown"), resultCaptor.capture(), eq(false));
         assertThat(resultCaptor.getValue())
-                .containsEntry("success", false);
-        assertThat(String.valueOf(resultCaptor.getValue()))
-                .contains("Unknown tool")
+                .containsEntry("success", false)
+                .containsKey("errorFrame");
+        Map<String, Object> errorFrame = errorFrame(resultCaptor.getValue());
+        assertThat(errorFrame)
+                .containsEntry("category", "validation")
+                .containsEntry("toolName", "platform.create_model")
+                .containsEntry("errorClass", "UnknownTool")
+                .containsEntry("retryable", true)
+                .containsEntry("userSafeMessage", "The model requested an unavailable tool.");
+        assertThat((String) errorFrame.get("argsHash")).hasSize(64);
+        assertThat((String) errorFrame.get("modelRecoveryHint"))
                 .contains("nq_pe_procurement_comparison_supplier_options");
+        assertThat(String.valueOf(resultCaptor.getValue()))
+                .doesNotContain("Create a Customer table");
 
         ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
         verify(provider, times(2)).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
         assertThat(String.valueOf(requestCaptor.getAllValues().get(1).getMessages()))
                 .contains("tool_result")
-                .contains("Unknown tool");
+                .contains("errorFrame")
+                .contains("validation");
+    }
+
+    @Test
+    @DisplayName("tool execution failure feeds a retryable compact error frame back to the model")
+    void toolExecutionFailureFeedsRetryableErrorFrameBackToModel() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        Map<String, Object> input = Map.of("productId", "P-100", "note", "secret-note");
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(readOnlyTool()));
+        when(toolLoopService.executeToolCall(
+                eq(TENANT_ID),
+                anyString(),
+                isNull(),
+                eq(AGENT_CODE),
+                eq("nq_pe_procurement_comparison_supplier_options"),
+                eq(input),
+                anyList(),
+                isNull()))
+                .thenThrow(new IllegalStateException("database password=secret-db exploded"));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse(
+                        "toolu-fail",
+                        "nq_pe_procurement_comparison_supplier_options",
+                        input))
+                .thenReturn(endTurnResponse("I cannot load supplier options right now."));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers for P-100"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(sink).onToolResult(eq("toolu-fail"), resultCaptor.capture(), eq(false));
+        Map<String, Object> result = resultCaptor.getValue();
+        assertThat(result)
+                .containsEntry("success", false)
+                .containsKey("errorFrame");
+        Map<String, Object> errorFrame = errorFrame(result);
+        assertThat(errorFrame)
+                .containsEntry("category", "tool")
+                .containsEntry("toolName", "nq_pe_procurement_comparison_supplier_options")
+                .containsEntry("errorClass", "IllegalStateException")
+                .containsEntry("retryable", true)
+                .containsEntry("userSafeMessage", "Tool execution failed.");
+        assertThat((String) errorFrame.get("argsHash")).hasSize(64);
+        assertThat(String.valueOf(result))
+                .doesNotContain("secret-db")
+                .doesNotContain("secret-note");
+
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(2)).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        String toolResultPayload = firstToolResultPayload(requestCaptor.getAllValues().get(1));
+        assertThat(toolResultPayload)
+                .contains("errorFrame")
+                .contains("Tool execution failed.")
+                .doesNotContain("secret-db")
+                .doesNotContain("secret-note");
+    }
+
+    @Test
+    @DisplayName("tool returned Error string is compacted before sink and model retry")
+    void returnedErrorStringFeedsCompactErrorFrameBackToModel() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        Map<String, Object> input = Map.of("productId", "P-100", "note", "secret-note");
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(readOnlyTool()));
+        when(toolLoopService.executeToolCall(
+                eq(TENANT_ID),
+                anyString(),
+                isNull(),
+                eq(AGENT_CODE),
+                eq("nq_pe_procurement_comparison_supplier_options"),
+                eq(input),
+                anyList(),
+                isNull()))
+                .thenReturn("Error: database password=secret-db exploded apiKey=sk-secret");
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse(
+                        "toolu-returned-error",
+                        "nq_pe_procurement_comparison_supplier_options",
+                        input))
+                .thenReturn(endTurnResponse("I cannot load supplier options right now."));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers for P-100"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(sink).onToolResult(eq("toolu-returned-error"), resultCaptor.capture(), eq(false));
+        Map<String, Object> result = resultCaptor.getValue();
+        assertThat(result)
+                .containsEntry("success", false)
+                .containsEntry("error", "Tool execution failed.")
+                .containsKey("errorFrame");
+        Map<String, Object> errorFrame = errorFrame(result);
+        assertThat(errorFrame)
+                .containsEntry("category", "tool")
+                .containsEntry("toolName", "nq_pe_procurement_comparison_supplier_options")
+                .containsEntry("errorClass", "ToolReturnedError")
+                .containsEntry("retryable", true)
+                .containsEntry("userSafeMessage", "Tool execution failed.");
+        assertThat(String.valueOf(result))
+                .doesNotContain("secret-db")
+                .doesNotContain("sk-secret")
+                .doesNotContain("secret-note");
+
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(2)).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        String toolResultPayload = firstToolResultPayload(requestCaptor.getAllValues().get(1));
+        assertThat(toolResultPayload)
+                .contains("errorFrame")
+                .contains("Tool execution failed.")
+                .doesNotContain("secret-db")
+                .doesNotContain("sk-secret")
+                .doesNotContain("secret-note")
+                .doesNotContain("database password");
+    }
+
+    @Test
+    @DisplayName("tool returned JSON error is compacted before sink and model retry")
+    void returnedJsonErrorFeedsCompactErrorFrameBackToModel() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        Map<String, Object> input = Map.of("productId", "P-100", "note", "secret-note");
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(readOnlyTool()));
+        when(toolLoopService.executeToolCall(
+                eq(TENANT_ID),
+                anyString(),
+                isNull(),
+                eq(AGENT_CODE),
+                eq("nq_pe_procurement_comparison_supplier_options"),
+                eq(input),
+                anyList(),
+                isNull()))
+                .thenReturn("{\"success\":false,\"error\":\"database password=secret-db exploded\",\"durationMs\":12}");
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse(
+                        "toolu-json-error",
+                        "nq_pe_procurement_comparison_supplier_options",
+                        input))
+                .thenReturn(endTurnResponse("I cannot load supplier options right now."));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers for P-100"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(sink).onToolResult(eq("toolu-json-error"), resultCaptor.capture(), eq(false));
+        Map<String, Object> result = resultCaptor.getValue();
+        assertThat(result)
+                .containsEntry("success", false)
+                .containsEntry("error", "Tool execution failed.")
+                .containsKey("errorFrame");
+        assertThat(((Number) result.get("durationMs")).longValue()).isEqualTo(12L);
+        assertThat(errorFrame(result))
+                .containsEntry("errorClass", "ToolReturnedError")
+                .containsEntry("userSafeMessage", "Tool execution failed.");
+        assertThat(String.valueOf(result))
+                .doesNotContain("secret-db")
+                .doesNotContain("secret-note")
+                .doesNotContain("database password");
+
+        ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
+        verify(provider, times(2)).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
+        assertThat(firstToolResultPayload(requestCaptor.getAllValues().get(1)))
+                .contains("errorFrame")
+                .doesNotContain("secret-db")
+                .doesNotContain("secret-note")
+                .doesNotContain("database password");
     }
 
     @Test
@@ -515,10 +942,10 @@ class AgentChatPortImplToolLoopTest {
                 any(String.class),
                 eq(Map.of("toolName", "platform_create_model", "input", input)),
                 eq("approval-1"));
-        ArgumentCaptor<ChatSessionStore.PendingTool> pendingCaptor =
-                ArgumentCaptor.forClass(ChatSessionStore.PendingTool.class);
-        verify(chatSessionStore).storePending(eq("approval-1"), pendingCaptor.capture());
-        ChatSessionStore.PendingTool pendingTool = pendingCaptor.getValue();
+        ArgumentCaptor<PendingToolSnapshot> pendingCaptor =
+                ArgumentCaptor.forClass(PendingToolSnapshot.class);
+        verify(pendingToolStore).storePending(eq("approval-1"), pendingCaptor.capture());
+        PendingToolSnapshot pendingTool = pendingCaptor.getValue();
         assertThat(pendingTool.getTurnId()).isEqualTo(ctx.turnId());
         assertThat(pendingTool.getTenantId()).isEqualTo(TENANT_ID);
         assertThat(pendingTool.getUserId()).isEqualTo(USER_ID);
@@ -530,6 +957,8 @@ class AgentChatPortImplToolLoopTest {
         assertThat(pendingTool.getAgentToolDefinitions()).hasSize(1);
         assertThat(pendingTool.getAgentToolDefinitions().get(0).isRequiresApproval()).isTrue();
         assertThat(pendingTool.getAgentToolDefinitions().get(0).getSourceCode()).isEqualTo("platform.create_model");
+        assertProviderSecretNotPersisted(pendingTool);
+        assertRuntimeStateExtension(pendingTool);
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
     }
 
@@ -545,7 +974,7 @@ class AgentChatPortImplToolLoopTest {
                 .confirmationPolicy("approval_required")
                 .requiresApproval(true)
                 .build();
-        ChatSessionStore.PendingTool pending = ChatSessionStore.PendingTool.builder()
+        PendingToolSnapshot pending = PendingToolSnapshot.builder()
                 .turnId("turn-1")
                 .tenantId(TENANT_ID)
                 .userId(USER_ID)
@@ -557,7 +986,7 @@ class AgentChatPortImplToolLoopTest {
                 .input(Map.of("description", "Create a Customer table"))
                 .agentToolDefinitions(List.of(toolDef))
                 .build();
-        when(chatSessionStore.consumePending("approval-1")).thenReturn(pending);
+        when(pendingToolStore.consumePendingForOwner("approval-1", TENANT_ID, null)).thenReturn(pending);
         when(toolLoopService.executeToolCall(
                 eq(TENANT_ID),
                 eq("turn-1"),
@@ -595,6 +1024,50 @@ class AgentChatPortImplToolLoopTest {
         assertThat(defsCaptor.getValue()).hasSize(1);
         assertThat(defsCaptor.getValue().get(0).isRequiresApproval()).isFalse();
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
+    }
+
+    @Test
+    @DisplayName("approved pending chat tool replays completed execution record without re-executing")
+    void executeApprovedPendingToolReplaysCompletedExecutionRecord() throws Exception {
+        AgentToolDefinition toolDef = AgentToolDefinition.builder()
+                .name("platform.create_model")
+                .description("Create data model")
+                .toolType("platform")
+                .sourceCode("platform.create_model")
+                .riskLevel("L3")
+                .confirmationPolicy("approval_required")
+                .requiresApproval(true)
+                .build();
+        PendingToolSnapshot pending = PendingToolSnapshot.builder()
+                .turnId("turn-1")
+                .tenantId(TENANT_ID)
+                .userId(USER_ID)
+                .agentCode(AGENT_CODE)
+                .runPid("turn-1")
+                .taskPid("task-1")
+                .toolId("toolu-approval")
+                .toolName("platform.create_model")
+                .input(Map.of("description", "Create a Customer table"))
+                .idempotencyKey("idem-approval-1")
+                .agentToolDefinitions(List.of(toolDef))
+                .build();
+        Map<String, Object> completedResult = Map.of(
+                "success", true,
+                "data", Map.of("pid", "model-1"));
+        when(pendingToolStore.consumePendingForOwner("approval-1", TENANT_ID, null)).thenReturn(pending);
+        when(pendingToolStore.claimExecution(pending)).thenReturn(PendingToolExecutionClaim.replay(
+                PendingToolExecutionRecord.succeeded("idem-approval-1", completedResult)));
+
+        Map<String, Object> result = service.executeApprovedPendingTool(TENANT_ID, "approval-1");
+
+        assertThat(result)
+                .containsEntry("handled", true)
+                .containsEntry("success", true)
+                .containsEntry("replayed", true)
+                .containsEntry("approvalPid", "approval-1")
+                .containsEntry("toolName", "platform.create_model");
+        assertThat(result.get("result")).isEqualTo(completedResult);
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -661,10 +1134,10 @@ class AgentChatPortImplToolLoopTest {
         verify(sink).onDone("", null);
 
         // Pending entry persisted keyed by turnId; tape persisted by sessionId.
-        ArgumentCaptor<ChatSessionStore.PendingTool> pendingCaptor =
-                ArgumentCaptor.forClass(ChatSessionStore.PendingTool.class);
-        verify(chatSessionStore).storePending(eq(ctx.turnId()), pendingCaptor.capture());
-        ChatSessionStore.PendingTool stored = pendingCaptor.getValue();
+        ArgumentCaptor<PendingToolSnapshot> pendingCaptor =
+                ArgumentCaptor.forClass(PendingToolSnapshot.class);
+        verify(pendingToolStore).storePending(eq(ctx.turnId()), pendingCaptor.capture());
+        PendingToolSnapshot stored = pendingCaptor.getValue();
         assertThat(stored.getTurnId()).isEqualTo(ctx.turnId());
         assertThat(stored.getToolId()).isEqualTo("toolu-write");
         assertThat(stored.getToolName()).isEqualTo("cmd_pe_create_procurement_comparison_draft");
@@ -673,7 +1146,44 @@ class AgentChatPortImplToolLoopTest {
         assertThat(stored.getModel()).isEqualTo("test-model");
         assertThat(stored.getSessionId()).isEqualTo(SESSION_ID);
         assertThat(stored.getMessages()).isNotEmpty();
-        verify(chatSessionStore).storeConversationMessages(eq(SESSION_ID), any());
+        assertThat(stored.getToolVersion()).isEqualTo("v1");
+        assertThat(stored.getArgsHash()).hasSize(64);
+        assertThat(stored.getIdempotencyKey()).isEqualTo(
+                "cmd_pe_create_procurement_comparison_draft:v1:" + stored.getArgsHash());
+        assertThat(stored.getPolicyDecisionReason()).isEqualTo("user_confirmation_required");
+        assertThat(stored.getPreview()).isEqualTo(
+                "Execute cmd_pe_create_procurement_comparison_draft with 1 argument(s).");
+        assertProviderSecretNotPersisted(stored);
+        assertRuntimeStateExtension(stored);
+        verify(chatMessageTapeStore).storeConversationMessages(eq(SESSION_ID), any());
+    }
+
+    @Test
+    @DisplayName("requiresConfirmation path records reducer events for model response, tool use, and suspension")
+    void confirmationToolRecordsReducerEvents() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        DefaultAgentReducer reducer = spy(new DefaultAgentReducer());
+        service = newService(reducer);
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenReturn(List.of(writeTool()));
+        when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(toolUseResponse(
+                        "toolu-write",
+                        "cmd_pe_create_procurement_comparison_draft",
+                        Map.of("productId", "P-100")));
+
+        service.runAgentTurn(newTurnContext(), newRequest("Create draft for P-100"), sink);
+
+        ArgumentCaptor<AgentRuntimeEvent> eventCaptor = ArgumentCaptor.forClass(AgentRuntimeEvent.class);
+        verify(reducer, times(3)).reduce(any(AgentExecutionState.class), eventCaptor.capture());
+        assertThat(eventCaptor.getAllValues())
+                .extracting(AgentRuntimeEvent::type)
+                .containsExactly(
+                        AgentRuntimeEvent.MODEL_RESPONSE_RECEIVED,
+                        AgentRuntimeEvent.TOOL_USE_REQUESTED,
+                        AgentRuntimeEvent.CONFIRMATION_REQUIRED);
     }
 
     @Test
@@ -772,10 +1282,10 @@ class AgentChatPortImplToolLoopTest {
         verify(toolProviderRegistry).discoverAll(discoveryCaptor.capture());
         assertThat(discoveryCaptor.getValue().getUserId()).isEqualTo(USER_ID);
 
-        ArgumentCaptor<ChatSessionStore.PendingTool> pendingCaptor =
-                ArgumentCaptor.forClass(ChatSessionStore.PendingTool.class);
-        verify(chatSessionStore).storePending(eq(ctx.turnId()), pendingCaptor.capture());
-        ChatSessionStore.PendingTool stored = pendingCaptor.getValue();
+        ArgumentCaptor<PendingToolSnapshot> pendingCaptor =
+                ArgumentCaptor.forClass(PendingToolSnapshot.class);
+        verify(pendingToolStore).storePending(eq(ctx.turnId()), pendingCaptor.capture());
+        PendingToolSnapshot stored = pendingCaptor.getValue();
         assertThat(stored.getToolName()).isEqualTo("aurabot_model_create");
         assertThat(stored.getAgentToolDefinitions()).hasSize(1);
         assertThat(stored.getAgentToolDefinitions().get(0).getToolType()).isEqualTo("AURABOT_SKILL");
@@ -785,6 +1295,8 @@ class AgentChatPortImplToolLoopTest {
                 .containsEntry("previewToken", "preview-1")
                 .containsEntry("riskLevel", "high");
         assertThat(stored.getExtension().get("preview")).isEqualTo(Map.of("modelCode", "crm_customer"));
+        assertProviderSecretNotPersisted(stored);
+        assertRuntimeStateExtension(stored);
     }
 
     @Test
@@ -793,18 +1305,51 @@ class AgentChatPortImplToolLoopTest {
         stubAgentDefinition();
         stubProvider();
         stubGrounding();
+        DefaultAgentReducer reducer = spy(new DefaultAgentReducer());
+        service = newService(reducer);
         when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
-                .thenThrow(new RuntimeException("boom"));
+                .thenThrow(new IllegalArgumentException("Invalid scheme [stub] apiKey=sk-secret"));
 
         TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Hello"), sink);
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
         TurnOutcome.Failed failed = (TurnOutcome.Failed) outcome;
-        assertThat(failed.errorMessage()).contains("boom");
-        verify(sink).onError(any(String.class), eq(null));
+        assertThat(failed.errorMessage())
+                .contains("LLM provider request failed.")
+                .doesNotContain("sk-secret")
+                .doesNotContain("Invalid scheme [stub]");
+        verify(sink).onError(contains("LLM provider request failed."), eq(null));
         // No sink.onDone on failure.
         verify(sink, never()).onDone(any(String.class), any());
+        ArgumentCaptor<AgentRuntimeEvent> eventCaptor = ArgumentCaptor.forClass(AgentRuntimeEvent.class);
+        verify(reducer).reduce(any(AgentExecutionState.class), eventCaptor.capture());
+        AgentRuntimeEvent failedEvent = eventCaptor.getValue();
+        assertThat(failedEvent.type()).isEqualTo(AgentRuntimeEvent.TURN_FAILED);
+        assertThat(String.valueOf(failedEvent.payload()))
+                .contains("provider")
+                .contains("IllegalArgumentException")
+                .doesNotContain("sk-secret")
+                .doesNotContain("Invalid scheme [stub]");
+    }
+
+    @Test
+    @DisplayName("tool discovery failure fails closed before calling the LLM")
+    void toolDiscoveryFailureFailsClosedBeforeLlmCall() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
+                .thenThrow(new IllegalStateException("registry unavailable"));
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Compare suppliers"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        assertThat(((TurnOutcome.Failed) outcome).errorMessage())
+                .contains("Tool discovery failed")
+                .contains("registry unavailable");
+        verify(provider, never()).chat(any(LlmChatRequest.class), anyString(), anyString());
+        verify(sink).onError(contains("Tool discovery failed"), eq(null));
     }
 
     @Test
@@ -869,7 +1414,7 @@ class AgentChatPortImplToolLoopTest {
                 "toolUseId", "toolu-1",
                 "result", "{\"records\":[{\"supplier\":\"Acme PCB\"}]}")));
         storedTape.add(userToolResult);
-        when(chatSessionStore.loadConversationMessages(SESSION_ID)).thenReturn(storedTape);
+        when(chatMessageTapeStore.loadConversationMessages(SESSION_ID)).thenReturn(storedTape);
 
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(endTurnResponse("Ready to create the draft."));
