@@ -132,6 +132,19 @@ export interface NamedQueryTestRequest {
   params?: Record<string, unknown>;
 }
 
+export interface NamedQueryExecuteRequest {
+  parameters?: Record<string, unknown>;
+  whereConditions?: unknown;
+  orderConditions?: unknown;
+  page?: number;
+  size?: number;
+  syntaxOnly?: boolean;
+  executeQuery?: boolean;
+  timeoutSeconds?: number;
+  testEnvironment?: string;
+  logExecution?: boolean;
+}
+
 export interface NamedQueryTestResult {
   success?: boolean;
   message?: string;
@@ -238,11 +251,24 @@ type NamedQueryPagePayload<T> =
  * Handle API response
  */
 function handleResponse<T>(
-  result: { success?: boolean; message?: string; data: T | null },
+  result: {
+    code?: string | number;
+    success?: boolean;
+    desc?: string;
+    message?: string;
+    data: T | null;
+    context?: Record<string, unknown> | null;
+  },
   errorMessage: string,
 ): T {
-  if (!result.success) {
-    throw new Error(result.message || errorMessage);
+  const ok = result.success === true || result.code === '0' || result.code === 0;
+  if (!ok) {
+    const error = new Error(result.message || result.desc || errorMessage);
+    Object.assign(error, {
+      code: result.code,
+      context: result.context ?? null,
+    });
+    throw error;
   }
   return result.data as T;
 }
@@ -330,10 +356,9 @@ export const namedQueryService = {
    * Update named query status
    */
   async updateStatus(pid: string, status: string, httpRequest?: Request): Promise<NamedQueryDTO> {
-    const params = new URLSearchParams({ status });
     const result = await put<NamedQueryDTO>(
-      `${BASE_URL}/${pid}/status?${params.toString()}`,
-      undefined,
+      `${BASE_URL}/${pid}/status`,
+      { status },
       undefined,
       httpRequest,
     );
@@ -493,6 +518,23 @@ export const namedQueryService = {
       httpRequest,
     );
     return handleResponse(result, 'Failed to test named query');
+  },
+
+  /**
+   * Execute a published/testing/draft named query by code.
+   */
+  async execute(
+    code: string,
+    request: NamedQueryExecuteRequest,
+    httpRequest?: Request,
+  ): Promise<PageResult<Record<string, unknown>>> {
+    const result = await post<PageResult<Record<string, unknown>>>(
+      `${BASE_URL}/${code}/execute`,
+      request,
+      undefined,
+      httpRequest,
+    );
+    return normalizePageResult(handleResponse(result, 'Failed to execute named query'));
   },
 
   /**
