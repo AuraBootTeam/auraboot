@@ -694,4 +694,44 @@ describe('Model field block templates', () => {
       dictCode: 'customer_status',
     });
   });
+
+  it('creates relation fields as model-backed picker blocks', () => {
+    const modelField = {
+      modelCode: 'customer',
+      code: 'owner_id',
+      label: 'Owner',
+      type: 'relation',
+      component: 'select',
+      refTarget: {
+        modelCode: 'user',
+        valueField: 'pid',
+        displayField: 'displayName',
+      },
+    };
+
+    const formField = createModelFieldBlock(modelField, 'field', new Set());
+    const filterField = createModelFieldBlock(modelField, 'filter-field', new Set());
+
+    expect(formField.props).toMatchObject({
+      label: 'Owner',
+      component: 'picker',
+      dataType: 'relation',
+      pickerDataSource: 'model',
+      pickerSource: 'user',
+      valueField: 'pid',
+      displayField: 'displayName',
+      searchable: true,
+      searchField: 'displayName',
+      pageSize: 20,
+    });
+    expect(filterField.props).toMatchObject({
+      label: 'Owner',
+      component: 'picker',
+      operator: 'equals',
+      pickerDataSource: 'model',
+      pickerSource: 'user',
+      valueField: 'pid',
+      displayField: 'displayName',
+    });
+  });
 });

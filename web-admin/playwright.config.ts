@@ -50,6 +50,7 @@ const viewerStorageState = storageStatePath(
 const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
 const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
+const deepSpecPattern = /.*-deep\.spec\.ts$/;
 
 const enterpriseScopeDirs = [
   'annual-plan',
@@ -220,7 +221,7 @@ export default defineConfig({
             testDir: './tests/e2e',
             // Exclude resource-intensive deep designer tests — they get their own project (chromium-deep)
             // with workers:1 to prevent browser OOM crashes from concurrent heavy DOM operations.
-            testIgnore: /.*-deep\.spec\.ts$/,
+            testIgnore: deepSpecPattern,
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
@@ -230,7 +231,7 @@ export default defineConfig({
           {
             name: 'chromium-deep',
             testDir: './tests/e2e',
-            testMatch: /.*-deep\.spec\.ts$/,
+            testMatch: deepSpecPattern,
             // Run AFTER chromium completes — ensures deep designer tests don't compete
             // for browser resources with the main test suite (prevents OOM crashes).
             dependencies: ['chromium'],
@@ -249,7 +250,7 @@ export default defineConfig({
           {
             name: 'oss',
             testDir: './tests/e2e',
-            testIgnore: [/.*-deep\.spec\.ts$/, ...enterpriseScopeRegexes],
+            testIgnore: [deepSpecPattern, ...enterpriseScopeRegexes, contractScopeRegex],
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
@@ -259,8 +260,8 @@ export default defineConfig({
           {
             name: 'oss-deep',
             testDir: './tests/e2e',
-            testMatch: /.*-deep\.spec\.ts$/,
-            testIgnore: enterpriseScopeRegexes,
+            testMatch: deepSpecPattern,
+            testIgnore: [...enterpriseScopeRegexes, contractScopeRegex],
             dependencies: ['oss'],
             timeout: 120_000,
             use: {
@@ -278,6 +279,7 @@ export default defineConfig({
             name: 'contract',
             testDir: './tests/e2e',
             testMatch: contractScopeRegex,
+            testIgnore: deepSpecPattern,
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],

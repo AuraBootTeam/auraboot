@@ -59,6 +59,18 @@ const typedModelFields = {
       label: 'Industry',
       type: 'enum',
     },
+    {
+      modelCode: 'customer',
+      code: 'owner_id',
+      label: 'Owner',
+      type: 'relation',
+      component: 'select',
+      refTarget: {
+        modelCode: 'user',
+        valueField: 'pid',
+        displayField: 'displayName',
+      },
+    },
   ],
 };
 
@@ -1094,6 +1106,14 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
     dragModelFieldTo('model-field-industry', 'canvas-block-section_basic');
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('select');
+
+    fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
+    dragModelFieldTo('model-field-owner_id', 'canvas-block-section_basic');
+    expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('picker');
+    expect(screen.getByTestId('inspector-field-props.pickerDataSource')).toHaveValue('model');
+    expect(screen.getByTestId('inspector-field-props.pickerSource')).toHaveValue('user');
+    expect(screen.getByTestId('inspector-field-props.valueField')).toHaveValue('pid');
+    expect(screen.getByTestId('inspector-field-props.displayField')).toHaveValue('displayName');
   });
 
   it('drags model fields into list table and filter targets using the target block type', () => {

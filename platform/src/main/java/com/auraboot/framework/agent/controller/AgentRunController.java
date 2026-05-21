@@ -268,23 +268,28 @@ public class AgentRunController {
         Long tenantId = MetaContext.getCurrentTenantId();
         String normalizedRunId = normalizeBlank(runId);
         int safeLimit = Math.min(Math.max(1, limit), MAX_RUNTIME_OPS_ROWS);
+        List<Map<String, Object>> approvals = loadRuntimeApprovals(tenantId, normalizedRunId, safeLimit);
+        List<Map<String, Object>> pendingToolExecutions = loadRuntimeIdempotencyRows(
+                tenantId,
+                "agent.pending_tool_execution:%",
+                null,
+                safeLimit);
+        List<Map<String, Object>> durableToolExecutions = loadRuntimeIdempotencyRows(
+                tenantId,
+                "agent.tool_execution:%",
+                normalizedRunId,
+                safeLimit);
+        List<Map<String, Object>> checkpoints = loadRuntimeCheckpoints(tenantId, normalizedRunId, safeLimit);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", normalizedRunId);
         result.put("limit", safeLimit);
-        result.put("approvals", loadRuntimeApprovals(tenantId, normalizedRunId, safeLimit));
-        result.put("pendingToolExecutions", loadRuntimeIdempotencyRows(
-                tenantId,
-                "agent.pending_tool_execution:%",
-                null,
-                safeLimit));
+        result.put("summary", runtimeOpsSummary(approvals, pendingToolExecutions, durableToolExecutions, checkpoints));
+        result.put("approvals", approvals);
+        result.put("pendingToolExecutions", pendingToolExecutions);
         result.put("pendingToolExecutionScope", "tenant");
-        result.put("durableToolExecutions", loadRuntimeIdempotencyRows(
-                tenantId,
-                "agent.tool_execution:%",
-                normalizedRunId,
-                safeLimit));
-        result.put("checkpoints", loadRuntimeCheckpoints(tenantId, normalizedRunId, safeLimit));
+        result.put("durableToolExecutions", durableToolExecutions);
+        result.put("checkpoints", checkpoints);
         return ApiResponse.ok(result);
     }
 
@@ -405,6 +410,52 @@ public class AgentRunController {
             row.put("approvedAt", timestampString(rs, "approved_at"));
             return row;
         }, args.toArray());
+    }
+
+    private Map<String, Object> runtimeOpsSummary(List<Map<String, Object>> approvals,
+                                                  List<Map<String, Object>> pendingToolExecutions,
+                                                  List<Map<String, Object>> durableToolExecutions,
+                                                  List<Map<String, Object>> checkpoints) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("approvalPending", countByStatus(approvals, "approvalStatus", "pending"));
+        summary.put("approvalTerminal", countMatching(approvals, row ->
+                isStatus(row.get("approvalStatus"), "approved")
+                        || isStatus(row.get("approvalStatus"), "rejected")
+                        || isStatus(row.get("approvalStatus"), "expired")));
+        summary.put("pendingToolRunning", countByStatus(pendingToolExecutions, "status", "RUNNING"));
+        summary.put("pendingToolSucceeded", countByStatus(pendingToolExecutions, "status", "SUCCEEDED"));
+        summary.put("pendingToolFailed", countByStatus(pendingToolExecutions, "status", "FAILED"));
+        summary.put("durableRunning", countByStatus(durableToolExecutions, "status", "RUNNING"));
+        summary.put("durableSucceeded", countByStatus(durableToolExecutions, "status", "SUCCEEDED"));
+        summary.put("durableFailed", countByStatus(durableToolExecutions, "status", "FAILED"));
+        summary.put("durableCompensationRequired", countByStatus(
+                durableToolExecutions, "status", "COMPENSATION_REQUIRED"));
+        summary.put("durableCompensated", countByStatus(durableToolExecutions, "status", "COMPENSATED"));
+        summary.put("checkpointCount", checkpoints == null ? 0 : checkpoints.size());
+        return summary;
+    }
+
+    private int countByStatus(List<Map<String, Object>> rows, String key, String status) {
+        return countMatching(rows, row -> isStatus(row.get(key), status));
+    }
+
+    private int countMatching(List<Map<String, Object>> rows,
+                              java.util.function.Predicate<Map<String, Object>> predicate) {
+        if (rows == null || rows.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (Map<String, Object> row : rows) {
+            if (row != null && predicate.test(row)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private boolean isStatus(Object actual, String expected) {
+        return actual != null && expected != null
+                && expected.equalsIgnoreCase(String.valueOf(actual));
     }
 
     private List<Map<String, Object>> loadRuntimeIdempotencyRows(Long tenantId,
