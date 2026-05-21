@@ -67,6 +67,31 @@ class AgentApprovalGateServiceConcurrencyTest {
         verify(eventBus, never()).publishAfterCommit(any());
     }
 
+    @Test
+    @DisplayName("approver authorization denies approval rows without policy_id")
+    void approverAuthorizationDeniesRowsWithoutPolicyId() {
+        AgentApprovalGateService service = newService();
+        when(dynamicDataMapper.selectByQuery(anyString(), any()))
+                .thenReturn(List.of(Map.of("pid", "apv-no-policy")));
+
+        boolean authorized = service.isAuthorizedApprover(1L, "apv-no-policy", 99L);
+
+        assertThat(authorized).isFalse();
+    }
+
+    @Test
+    @DisplayName("approver authorization denies empty approver_rules fail-secure")
+    void approverAuthorizationDeniesEmptyApproverRules() {
+        AgentApprovalGateService service = newService();
+        when(dynamicDataMapper.selectByQuery(anyString(), any()))
+                .thenReturn(List.of(Map.of("pid", "apv-1", "policy_id", "policy-1")))
+                .thenReturn(List.of(Map.of("pid", "policy-1", "approver_rules", "[]")));
+
+        boolean authorized = service.isAuthorizedApprover(1L, "apv-1", 99L);
+
+        assertThat(authorized).isFalse();
+    }
+
     private AgentApprovalGateService newService() {
         return new AgentApprovalGateService(
                 dynamicDataMapper,
