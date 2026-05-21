@@ -81,12 +81,13 @@ public class TestFixtureController {
     public ResponseEntity<FixtureResult> createFixture(
             @RequestBody FixtureRequest request,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String fixtureName = request.getEffectiveName();
 
         String runId = request.getTestRunId() != null
                 ? request.getTestRunId()
                 : UniqueIdGenerator.generate().substring(0, 8);
 
-        log.info("Creating fixture: name={}, testRunId={}", request.getName(), runId);
+        log.info("Creating fixture: name={}, testRunId={}", fixtureName, runId);
 
         // Set MetaContext manually — test endpoints bypass JWT filter so tenant context
         // is never populated automatically.
@@ -108,7 +109,7 @@ public class TestFixtureController {
         }
 
         try {
-            FixtureResult result = switch (request.getName()) {
+            FixtureResult result = switch (fixtureName) {
                 case "records" -> createRecordsFixture(runId, request.getParams());
                 case "crossplatform" -> createCrossPlatformFixture(runId, request.getParams());
                 case "dashboard" -> createDashboardFixture(runId, request.getParams());
@@ -125,11 +126,11 @@ public class TestFixtureController {
                 case "native_fields" -> createNativeFieldsFixture(runId, request.getParams());
                 default -> FixtureResult.builder()
                         .success(false)
-                        .fixtureName(request.getName())
+                        .fixtureName(fixtureName)
                         .testRunId(runId)
                         .recordsCreated(0)
                         .recordIds(List.of())
-                        .metadata(Map.of("error", "Unknown fixture: " + request.getName()))
+                        .metadata(Map.of("error", "Unknown fixture: " + fixtureName))
                         .build();
             };
 

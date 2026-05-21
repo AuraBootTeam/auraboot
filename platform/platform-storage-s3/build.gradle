@@ -29,7 +29,7 @@ dependencies {
 
     // Spring conditional
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'
-    compileOnly 'org.springframework:spring-context:6.2.6'
+    compileOnly 'org.springframework:spring-context:6.2.18'
 
     // Test — depend on root project classes only (no transitive deps)
     testImplementation(project(':')) {
@@ -38,10 +38,10 @@ dependencies {
     testImplementation(project(':platform-plugin-api')) {
         transitive = false
     }
-    testImplementation 'org.springframework:spring-beans:6.2.6'  // DisposableBean
+    testImplementation 'org.springframework:spring-beans:6.2.18'  // DisposableBean
     testImplementation 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'  // @ConditionalOnProperty
-    testImplementation 'org.springframework:spring-context:6.2.6'  // @Component
-    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.14'  // @EnumValue
+    testImplementation 'org.springframework:spring-context:6.2.18'  // @Component
+    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.16'  // @EnumValue
     testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.19.2'  // @JsonValue
     testImplementation 'org.projectlombok:lombok:1.18.40'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.40'

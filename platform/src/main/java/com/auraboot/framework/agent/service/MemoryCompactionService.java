@@ -55,14 +55,36 @@ public class MemoryCompactionService {
      */
     @Scheduled(cron = "${acp.memory.compaction.cron:0 0 3 * * *}")
     public CompactionResult compactOversizedBuckets() {
+        return compactOversizedBuckets(null);
+    }
+
+    public CompactionResult compactOversizedBucketsForTenant(Long tenantId) {
+        if (tenantId == null) {
+            throw new IllegalArgumentException("tenantId must not be null");
+        }
+        return compactOversizedBuckets(tenantId);
+    }
+
+    private CompactionResult compactOversizedBuckets(Long tenantIdFilter) {
         int threshold = (int) Math.ceil(maxPerAgent * (thresholdPct / 100.0));
+        List<Object> args = new ArrayList<>();
+
+        String tenantClause = "";
+        if (tenantIdFilter != null) {
+            tenantClause = "  AND tenant_id = ? ";
+            args.add(tenantIdFilter);
+        }
+        args.add(threshold);
+
         List<Map<String, Object>> oversized = jdbcTemplate.queryForList(
                 "SELECT tenant_id, memory_agent_id, COUNT(*) AS n " +
                         "FROM ab_agent_memory " +
                         "WHERE (deleted_flag IS NULL OR deleted_flag = FALSE) " +
                         "  AND scope IN ('tenant', 'global') " +
+                        tenantClause +
                         "GROUP BY tenant_id, memory_agent_id " +
-                        "HAVING COUNT(*) >= ?", threshold);
+                        "HAVING COUNT(*) >= ?",
+                args.toArray());
 
         int buckets = 0;
         int compressed = 0;

@@ -103,5 +103,6 @@ aura plugin import --path plugins/crm-starter
 ## Compatibility
 
 - Platform: AuraBoot ≥ 1.0.0
-- Conflicts: namespaced as `crm`; will be cleanly overwritten by the enterprise
-  `crm` plugin when installed.
+- Conflicts: uses the OSS demo namespace `crms`; records keep the `crm_`
+  business model prefix so the enterprise `crm` plugin can provide a clean data
+  upgrade path when installed.

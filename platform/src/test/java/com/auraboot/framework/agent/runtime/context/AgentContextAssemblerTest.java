@@ -83,11 +83,21 @@ class AgentContextAssemblerTest {
         assertThat(bundle.blocks().get(0).provenance().scope()).isEqualTo("crm_lead");
         assertThat(bundle.blocks().get(1).provenance().recordIds()).containsExactly("LEAD-9");
         assertThat(bundle.blocks().get(1).provenance().permission()).isEqualTo("STRUCTURED_RECORD_CONTEXT");
+        assertThat(bundle.blocks().get(0).provenance().metadata())
+                .containsEntry("modelCode", "crm_lead")
+                .containsEntry("table", "mt_crm_lead");
+        assertThat(bundle.blocks().get(1).provenance().metadata())
+                .containsEntry("modelCode", "crm_lead")
+                .containsEntry("recordId", "LEAD-9")
+                .containsEntry("fieldCount", 2);
+        assertThat(bundle.blocks().get(2).provenance().metadata())
+                .containsEntry("knowledgeBaseIds", List.of("kb-leads"));
         assertThat(bundle.renderPromptSection())
                 .contains("context-provenance source=SCHEMA")
                 .contains("context-provenance source=RECORD")
                 .contains("context-provenance source=RAG")
                 .contains("freshness=SERVER_CONTEXT")
-                .contains("recordIds=[LEAD-9]");
+                .contains("recordIds=[LEAD-9]")
+                .contains("metadata=");
     }
 }

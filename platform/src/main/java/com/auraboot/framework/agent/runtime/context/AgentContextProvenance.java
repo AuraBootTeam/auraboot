@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.runtime.context;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Provenance labels for one context block inserted into an agent prompt.
@@ -14,7 +15,8 @@ public record AgentContextProvenance(
         List<String> recordIds,
         Long tenantId,
         String channel,
-        boolean readWriteRelevant) {
+        boolean readWriteRelevant,
+        Map<String, Object> metadata) {
 
     public AgentContextProvenance {
         source = source == null ? AgentContextSource.PAGE : source;
@@ -23,6 +25,7 @@ public record AgentContextProvenance(
         permission = hasText(permission) ? permission : "UNKNOWN";
         sensitivity = sensitivity == null ? AgentContextSensitivity.INTERNAL : sensitivity;
         recordIds = recordIds == null ? List.of() : List.copyOf(recordIds);
+        metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
     }
 
     String renderLabel() {
@@ -35,7 +38,8 @@ public record AgentContextProvenance(
                 + " tenant=" + (tenantId != null ? tenantId : "")
                 + " channel=" + (channel != null ? channel : "")
                 + " recordIds=" + recordIds
-                + " readWriteRelevant=" + readWriteRelevant;
+                + " readWriteRelevant=" + readWriteRelevant
+                + " metadata=" + metadata;
     }
 
     private static boolean hasText(String value) {
