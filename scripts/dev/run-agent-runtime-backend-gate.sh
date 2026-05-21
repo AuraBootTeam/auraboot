@@ -13,7 +13,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT/platform"
 
-./gradlew :compileJava :compileTestJava
+./gradlew :compileJava :compileTestJava --no-daemon
 
 ./gradlew :test \
   --tests 'com.auraboot.framework.agent.runtime.*' \
@@ -40,4 +40,5 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest' \
   --tests 'com.auraboot.framework.aurabot.service.ChatSessionStoreReliabilityTest' \
   --tests 'com.auraboot.framework.integration.agent.AgentRunControllerIntegrationTest.runtimeOps_surfacesExecutionStateDiagnostics' \
-  --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest'
+  --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest' \
+  --no-daemon
