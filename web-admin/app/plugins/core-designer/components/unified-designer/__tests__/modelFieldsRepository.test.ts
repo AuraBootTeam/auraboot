@@ -67,6 +67,16 @@ describe('modelFieldsRepository', () => {
               dataType: 'enum',
               extension: { displayName: 'Status' },
             },
+            {
+              code: 'owner_id',
+              dataType: 'relation',
+              displayName: 'Owner',
+              refTarget: {
+                modelCode: 'user',
+                valueField: 'pid',
+                displayField: 'displayName',
+              },
+            },
           ],
         };
       }
@@ -94,6 +104,19 @@ describe('modelFieldsRepository', () => {
           type: 'enum',
           component: undefined,
           required: false,
+        },
+        {
+          modelCode: 'customer',
+          code: 'owner_id',
+          label: 'Owner',
+          type: 'relation',
+          component: undefined,
+          required: false,
+          refTarget: {
+            modelCode: 'user',
+            valueField: 'pid',
+            displayField: 'displayName',
+          },
         },
       ],
     });
