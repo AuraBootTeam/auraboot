@@ -340,15 +340,16 @@ public class AgentApprovalGateService {
      *
      * <p>Authorization logic:
      * <ol>
-     *   <li>If the approval has no associated policy (policy_id is null), any authenticated user
-     *       within the same tenant is authorized — this preserves backward-compatible behavior.</li>
+     *   <li>If the approval has no associated policy ({@code policy_id} is null), no user is
+     *       authorized. Approval rows must be linked to an explicit policy so approvers are
+     *       auditable and tenant-scoped.</li>
      *   <li>If a policy is linked, its {@code approver_rules} JSON array is evaluated.
      *       Supported rule types:
      *       <ul>
      *         <li>{@code USER}  — matches when {@code userId} equals the current user ID</li>
      *         <li>{@code ROLE}  — matches when {@code roleCode} is assigned to the current user</li>
      *       </ul>
-     *       An empty {@code approver_rules} array or a null value also permits any authenticated user.
+     *       Empty or missing {@code approver_rules} also deny all approvers fail-secure.
      *   </li>
      * </ol>
      *
