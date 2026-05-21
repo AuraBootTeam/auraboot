@@ -14,8 +14,11 @@ interface BackendModelFieldRecord {
   type?: string;
   dictCode?: string;
   required?: boolean;
+  refTarget?: unknown;
   extension?: {
     displayName?: string;
+    refTarget?: unknown;
+    reference?: unknown;
   };
   uiSchema?: {
     component?: string;
@@ -33,6 +36,11 @@ interface BackendResolvedFieldRecord {
   returnType?: string;
   dictCode?: string;
   required?: boolean;
+  refTarget?: unknown;
+  extension?: {
+    refTarget?: unknown;
+    reference?: unknown;
+  };
   uiHint?: {
     component?: string;
     widget?: string;
@@ -160,6 +168,9 @@ function mapBackendField(
   field: BackendModelFieldRecord,
 ): ModelFieldDefinition {
   const code = field.code?.trim() ?? '';
+  const refTarget = normalizeFieldRefTarget(
+    field.refTarget ?? field.extension?.refTarget ?? field.extension?.reference,
+  );
   return {
     modelCode,
     code,
@@ -168,6 +179,7 @@ function mapBackendField(
     component: field.uiSchema?.component || field.uiSchema?.widget || field.uiSchema?.widgetType,
     dictCode: field.dictCode,
     required: Boolean(field.required),
+    ...(refTarget ? { refTarget } : {}),
   };
 }
 
@@ -176,6 +188,9 @@ function mapResolvedField(
   field: BackendResolvedFieldRecord,
 ): ModelFieldDefinition {
   const code = (field.aliasCode || field.code || '').trim();
+  const refTarget = normalizeFieldRefTarget(
+    field.refTarget ?? field.extension?.refTarget ?? field.extension?.reference,
+  );
   return {
     modelCode,
     code,
@@ -188,5 +203,46 @@ function mapResolvedField(
       field.uiHint?.type,
     dictCode: field.dictCode,
     required: Boolean(field.required),
+    ...(refTarget ? { refTarget } : {}),
   };
+}
+
+function normalizeFieldRefTarget(
+  value: unknown,
+): ModelFieldDefinition['refTarget'] | undefined {
+  if (typeof value === 'string') {
+    const modelCode = value.trim();
+    return modelCode ? { modelCode } : undefined;
+  }
+  if (!isRecord(value)) return undefined;
+
+  const modelCode =
+    getStringProp(value.modelCode) ||
+    getStringProp(value.targetModelCode) ||
+    getStringProp(value.targetModel) ||
+    getStringProp(value.model);
+  const valueField =
+    getStringProp(value.valueField) || getStringProp(value.keyField) || getStringProp(value.idField);
+  const displayField =
+    getStringProp(value.displayField) ||
+    getStringProp(value.labelField) ||
+    getStringProp(value.nameField) ||
+    getStringProp(value.titleField);
+
+  if (!modelCode && !valueField && !displayField) return undefined;
+  const refTarget: NonNullable<ModelFieldDefinition['refTarget']> = {};
+  if (modelCode) refTarget.modelCode = modelCode;
+  if (valueField) refTarget.valueField = valueField;
+  if (displayField) refTarget.displayField = displayField;
+  return refTarget;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function getStringProp(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
 }

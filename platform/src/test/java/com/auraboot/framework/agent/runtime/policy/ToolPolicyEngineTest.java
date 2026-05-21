@@ -141,7 +141,8 @@ class ToolPolicyEngineTest {
                         List.of("C-1"),
                         1L,
                         "web",
-                        true));
+                        true,
+                        Map.of("modelCode", "crm_customer", "recordId", "C-1")));
 
         ToolPolicyDecision decision = policyEngine.evaluate(
                 new ToolPolicyCall("cmd:crm_customer_update", Map.of("recordId", "C-2"), List.of(currentRecord)),

@@ -89,7 +89,7 @@ public class CommandFieldMapExecutor {
             convertModelFieldTypes(modelDef, data);
 
             // Merge JSONB virtual fields and map field codes to column names
-            Set<String> jsonbCols = modelDef != null ? JsonbFieldHelper.getJsonbHostColumns(modelDef) : Set.of();
+            Set<String> jsonbCols = resolveJsonbColumns(modelDef, tableName);
 
             // For UPDATE: load existing JSONB data to preserve unmodified keys
             String operationType = request.getOperationType();
@@ -98,7 +98,7 @@ public class CommandFieldMapExecutor {
                 injectExistingJsonbData(tableName, request.getTargetRecordId(), tenantId, jsonbCols, data);
             }
 
-            Map<String, Object> columnData = prepareColumnData(modelDef, data);
+            Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbCols);
 
             // Determine operation type - use actual table name for database operations
             if ("update".equalsIgnoreCase(operationType) && StringUtils.hasText(request.getTargetRecordId())) {
@@ -246,7 +246,7 @@ public class CommandFieldMapExecutor {
         }
 
         // Merge JSONB virtual fields and map field codes to column names
-        Set<String> jsonbColumns = modelDef != null ? JsonbFieldHelper.getJsonbHostColumns(modelDef) : Set.of();
+        Set<String> jsonbColumns = resolveJsonbColumns(modelDef, tableName);
 
         // For UPDATE: load existing JSONB data to preserve unmodified keys
         boolean isUpdateLike = "update".equalsIgnoreCase(operationType) || "state_transition".equalsIgnoreCase(operationType);
@@ -254,7 +254,7 @@ public class CommandFieldMapExecutor {
             injectExistingJsonbData(tableName, request.getTargetRecordId(), tenantId, jsonbColumns, data);
         }
 
-        Map<String, Object> columnData = prepareColumnData(modelDef, data);
+        Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbColumns);
 
         // Execute the database operation
         if (isUpdateLike && StringUtils.hasText(request.getTargetRecordId())) {
@@ -465,7 +465,8 @@ public class CommandFieldMapExecutor {
      * 2. Map field codes to physical column names
      * 3. Serialize JSONB values to JSON strings
      */
-    private Map<String, Object> prepareColumnData(ModelDefinition modelDef, Map<String, Object> data) {
+    private Map<String, Object> prepareColumnData(ModelDefinition modelDef, Map<String, Object> data,
+                                                   Set<String> jsonbColumns) {
         if (modelDef == null || modelDef.getFields() == null) {
             return data; // No model definition — pass through as-is
         }
@@ -476,7 +477,10 @@ public class CommandFieldMapExecutor {
         // Step 2: Map field codes to column names, serialize JSONB
         Map<String, Object> columnData = new LinkedHashMap<>();
         Map<String, String> codeToColumn = new HashMap<>();
-        Set<String> hostColumns = JsonbFieldHelper.getJsonbHostColumns(modelDef);
+        Set<String> hostColumns = new LinkedHashSet<>(JsonbFieldHelper.getJsonbHostColumns(modelDef));
+        if (jsonbColumns != null) {
+            hostColumns.addAll(jsonbColumns);
+        }
         for (FieldDefinition field : modelDef.getFields()) {
             if (!field.isJsonbVirtual()) {
                 codeToColumn.put(field.getCode(), field.getColumnName());
@@ -495,19 +499,39 @@ public class CommandFieldMapExecutor {
             }
             String columnName = codeToColumn.get(key);
             if (columnName != null) {
-                if (hostColumns.contains(columnName) && value instanceof Map) {
+                if (hostColumns.contains(columnName) && JsonbFieldHelper.shouldSerializeJsonValue(value)) {
                     columnData.put(columnName, JsonbFieldHelper.toJsonString(value));
                 } else {
                     columnData.put(columnName, value);
                 }
             } else if (hostColumns.contains(key)) {
-                columnData.put(key, value instanceof Map ? JsonbFieldHelper.toJsonString(value) : value);
+                columnData.put(key, JsonbFieldHelper.shouldSerializeJsonValue(value)
+                        ? JsonbFieldHelper.toJsonString(value)
+                        : value);
             } else {
                 // Unknown field — pass through (might be a system field not in the list)
                 columnData.put(key, value);
             }
         }
         return columnData;
+    }
+
+    private Set<String> resolveJsonbColumns(ModelDefinition modelDef, String tableName) {
+        Set<String> jsonbColumns = new LinkedHashSet<>();
+        if (modelDef != null) {
+            jsonbColumns.addAll(JsonbFieldHelper.getJsonbHostColumns(modelDef));
+        }
+        if (StringUtils.hasText(tableName)) {
+            try {
+                Set<String> physicalColumns = dynamicDataMapper.findJsonbColumns(tableName);
+                if (physicalColumns != null) {
+                    jsonbColumns.addAll(physicalColumns);
+                }
+            } catch (Exception e) {
+                log.debug("Could not resolve physical JSONB columns for {}: {}", tableName, e.getMessage());
+            }
+        }
+        return jsonbColumns;
     }
 
     /**
