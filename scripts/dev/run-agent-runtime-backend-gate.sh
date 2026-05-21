@@ -27,13 +27,17 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.service.PlanServiceTest' \
   --tests 'com.auraboot.framework.agent.service.SkillEngineTest' \
   --tests 'com.auraboot.framework.agent.service.StepLoopServiceThinkingIntegrationTest' \
+  --tests 'com.auraboot.framework.agent.service.AgentApprovalGateServiceConcurrencyTest' \
   --tests 'com.auraboot.framework.agent.service.AgentChatPortImpl*' \
+  --tests 'com.auraboot.framework.agent.AgentApprovalGateIntegrationTest' \
   --tests 'com.auraboot.framework.agentchat.handoff.HandoffPermissionPolicyTest' \
   --tests 'com.auraboot.framework.agentchat.reply.AgentReplyTaskChokepointTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpDispatchTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpResumeTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplDispatchTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplNamedAgentTaskTest' \
+  --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplResumeTest' \
   --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest' \
+  --tests 'com.auraboot.framework.aurabot.service.ChatSessionStoreReliabilityTest' \
   --tests 'com.auraboot.framework.integration.agent.AgentRunControllerIntegrationTest.runtimeOps_surfacesExecutionStateDiagnostics' \
   --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest'
