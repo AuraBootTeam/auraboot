@@ -191,7 +191,7 @@ test('archive and delete announcement', async ({ page }) => {
   await expectRowStatus(page, TITLE, /archived|已撤回/i);
 
   // Delete
-  await clickRowAction(page, TITLE, 'delete');
+  await clickRowAction(page, TITLE, '删除');
 
   // Verify record is gone
   const gone = page.locator('table').getByText(TITLE);

@@ -29,12 +29,93 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
 const runProfile = process.env.PW_PROFILE || 'fast';
 const enableRoleProjects = process.env.PW_ROLE_PROJECTS === '1';
 const skipWebServer = process.env.PW_SKIP_WEBSERVER === '1';
-const adminStorageState = process.env.PW_ADMIN_STORAGE_STATE || './tests/storage/admin.json';
-const operatorStorageState = process.env.PW_OPERATOR_STORAGE_STATE || './tests/storage/operator.json';
-const viewerStorageState = process.env.PW_VIEWER_STORAGE_STATE || './tests/storage/viewer.json';
+const storageDir = process.env.PW_STORAGE_DIR;
+const storageStatePath = (envName: string, fileName: string, fallback: string) =>
+  process.env[envName] || (storageDir ? `${storageDir}/${fileName}` : fallback);
+const adminStorageState = storageStatePath(
+  'PW_ADMIN_STORAGE_STATE',
+  'admin.json',
+  './tests/storage/admin.json',
+);
+const operatorStorageState = storageStatePath(
+  'PW_OPERATOR_STORAGE_STATE',
+  'operator.json',
+  './tests/storage/operator.json',
+);
+const viewerStorageState = storageStatePath(
+  'PW_VIEWER_STORAGE_STATE',
+  'viewer.json',
+  './tests/storage/viewer.json',
+);
 const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
 const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
+const deepSpecPattern = /.*-deep\.spec\.ts$/;
+
+const enterpriseDistributionDirs = [
+  'annual-plan',
+  'asset-management',
+  'construction-process',
+  'contract-cost',
+  'doc-knowledge',
+  'dual-prevention',
+  'enterprise',
+  'finance-accounting',
+  'license',
+  'logistics',
+  'maintenance',
+  'pcba',
+  'pcba-solution',
+  'procurement',
+  'product-catalog',
+  'project-management',
+  'quality',
+  'quarry',
+  'sales',
+  'sales-templates',
+  'tax',
+  'templates',
+] as const;
+
+const sharedContractDirs = [
+  'action-system',
+  'activity',
+  'agent-control-plane',
+  'approval',
+  'bpm',
+  'command',
+  'dashboard',
+  'data-tools',
+  'e2et-order',
+  'integration',
+  'model',
+  'named-query',
+  'plugin',
+  'query-builder',
+  'scheduler',
+  'search',
+  'smart-components',
+] as const;
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const e2eDirPattern = (dirs: readonly string[]) =>
+  new RegExp(`/tests/e2e/(?:${dirs.map(escapeRegex).join('|')})/.*\\.spec\\.ts$`);
+
+const enterpriseDistributionSpecPattern = e2eDirPattern(enterpriseDistributionDirs);
+const sharedContractSpecPattern = e2eDirPattern(sharedContractDirs);
+const enterpriseDistributionAuxSpecPattern = /\/tests\/e2e\/aurabot\/pcba-.*\.spec\.ts$/;
+const enterpriseDistributionScopePatterns = [
+  enterpriseDistributionSpecPattern,
+  enterpriseDistributionAuxSpecPattern,
+];
+const enterpriseDistributionWithPluginSpecPattern = e2eDirPattern([
+  ...enterpriseDistributionDirs,
+  'plugin',
+]);
+const enterpriseDistributionWithPluginScopePatterns = [
+  enterpriseDistributionWithPluginSpecPattern,
+  enterpriseDistributionAuxSpecPattern,
+];
 
 /**
  * Playwright E2E Test Configuration
@@ -144,7 +225,7 @@ export default defineConfig({
             testDir: './tests/e2e',
             // Exclude resource-intensive deep designer tests — they get their own project (chromium-deep)
             // with workers:1 to prevent browser OOM crashes from concurrent heavy DOM operations.
-            testIgnore: /.*-deep\.spec\.ts$/,
+            testIgnore: deepSpecPattern,
             dependencies: ['auth'],
             use: {
               ...devices['Desktop Chrome'],
@@ -154,7 +235,7 @@ export default defineConfig({
           {
             name: 'chromium-deep',
             testDir: './tests/e2e',
-            testMatch: /.*-deep\.spec\.ts$/,
+            testMatch: deepSpecPattern,
             // Run AFTER chromium completes — ensures deep designer tests don't compete
             // for browser resources with the main test suite (prevents OOM crashes).
             dependencies: ['chromium'],
@@ -164,6 +245,82 @@ export default defineConfig({
               storageState: adminStorageState,
               actionTimeout: 30_000,
               navigationTimeout: 60_000,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'oss'
+      ? [
+          {
+            name: 'oss',
+            testDir: './tests/e2e',
+            testIgnore: [
+              deepSpecPattern,
+              ...enterpriseDistributionScopePatterns,
+              sharedContractSpecPattern,
+            ],
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+          {
+            name: 'oss-deep',
+            testDir: './tests/e2e',
+            testMatch: deepSpecPattern,
+            testIgnore: [...enterpriseDistributionScopePatterns, sharedContractSpecPattern],
+            dependencies: ['oss'],
+            timeout: 120_000,
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+              actionTimeout: 30_000,
+              navigationTimeout: 60_000,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'contract'
+      ? [
+          {
+            name: 'contract',
+            testDir: './tests/e2e',
+            testMatch: sharedContractSpecPattern,
+            testIgnore: deepSpecPattern,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'enterprise-smoke'
+      ? [
+          {
+            name: 'enterprise-smoke',
+            testDir: './tests/e2e',
+            testMatch: enterpriseDistributionWithPluginScopePatterns,
+            grep: /@smoke/,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
+            },
+          },
+        ]
+      : []),
+    ...(runProfile === 'enterprise-full'
+      ? [
+          {
+            name: 'enterprise-full',
+            testDir: './tests/e2e',
+            testMatch: enterpriseDistributionWithPluginScopePatterns,
+            dependencies: ['auth'],
+            use: {
+              ...devices['Desktop Chrome'],
+              storageState: adminStorageState,
             },
           },
         ]

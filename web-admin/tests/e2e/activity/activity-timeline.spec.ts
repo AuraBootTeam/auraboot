@@ -87,12 +87,14 @@ test.describe('Activity Timeline — DOCUMENT model', () => {
     expect(note.content).toBe('This is a test activity note created via API.');
     expect(note.actorType).toBe('user');
 
-    // System activity from command execution should also be present
-    const systemOrCreate = activities.find(
-      (a: any) => a.activityType === 'create' || a.activityType === 'system',
+    // System activity from command execution should also be present.
+    // Query order is newest-first, so assert the create command exists anywhere
+    // instead of assuming the first system-like activity is the create event.
+    const createActivity = activities.find((a: any) =>
+      String(a.commandCode ?? '').includes('create_order'),
     );
-    expect(systemOrCreate).toBeTruthy();
-    expect(systemOrCreate.commandCode).toContain('create_order');
+    expect(createActivity).toBeTruthy();
+    expect(['create', 'system']).toContain(createActivity.activityType);
   });
 
   /**

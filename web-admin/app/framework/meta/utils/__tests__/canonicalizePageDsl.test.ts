@@ -205,6 +205,82 @@ describe('canonicalizePageSchemaDto', () => {
     expect(validateStructure(schema)).toEqual([]);
   });
 
+  it('adapts recursive V3 form blocks for the current dynamic form runtime', () => {
+    const schema = canonicalizePageSchemaDto({
+      pageKey: 'recursive_form',
+      modelCode: 'recursive_model',
+      modelCategory: null,
+      kind: 'form',
+      schemaVersion: 2,
+      layout: { type: 'grid', cols: 12 },
+      blocks: [
+        {
+          id: 'form_recursive_form',
+          blockType: 'form',
+          layout: { type: 'grid', cols: 12 },
+          blocks: [
+            {
+              id: 'basic',
+              blockType: 'form-section',
+              title: 'Basic',
+              blocks: [
+                {
+                  id: 'basic_name',
+                  blockType: 'field',
+                  field: 'name',
+                  layout: { span: 6 },
+                },
+              ],
+            },
+            {
+              id: 'buttons',
+              blockType: 'action-bar',
+              region: 'footer',
+              blocks: [
+                {
+                  id: 'buttons_submit',
+                  blockType: 'action',
+                  actionType: 'command',
+                  props: {
+                    code: 'submit',
+                    label: 'save',
+                    primary: true,
+                    action: {
+                      type: 'command',
+                      command: 'recursive:update',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(schema.blocks).toHaveLength(2);
+    expect(schema.blocks[0]).toMatchObject({
+      id: 'basic',
+      blockType: 'form-section',
+      fields: [{ field: 'name', colSpan: 6 }],
+    });
+    expect(schema.blocks[1]).toMatchObject({
+      id: 'buttons',
+      blockType: 'form-buttons',
+      buttons: [
+        {
+          code: 'submit',
+          primary: true,
+          action: {
+            type: 'command',
+            command: 'recursive:update',
+          },
+        },
+      ],
+    });
+    expect(validateStructure(schema)).toEqual([]);
+  });
+
   it('canonicalizes checked-in plugin page configs before structure validation', () => {
     const root = resolve(process.cwd(), '..');
     const pageFiles = collectPluginPageFiles(resolve(root, 'plugins'));

@@ -60,6 +60,14 @@ export function adminRuntimeEngineRoutes() {
     // the menu-driven catch-all route.
     route('/inbox', './routes/inbox/index.tsx'),
 
+    // CRM static feature pages that are linked from the CRM menu but are not
+    // PageSchema-driven /p routes.
+    route('/crm/merge-queue', './routes/crm/merge-queue.tsx'),
+    route('/crm/settings/inbound-channels', './routes/crm/settings/inbound-channels.tsx'),
+    route('/crm/settings/web-forms', './routes/crm/settings/web-forms.tsx'),
+    route('/crm/settings/web-form-editor/:pid', './routes/crm/settings/web-form-editor.$pid.tsx'),
+    route('/crm/settings/calendar-sync', './routes/crm/settings/calendar-sync.tsx'),
+
     // Page routes — /p/:pageKey based (V2, underscores)
     route('/p/:pageKey', './routes/p.$pageKey.tsx'),
     route('/p/:pageKey/new', './routes/p.$pageKey.new.tsx'),
