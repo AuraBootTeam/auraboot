@@ -75,7 +75,7 @@ class MemoryCompactionIntegrationTest extends BaseIntegrationTest {
         // 12 tenant-scoped rows; threshold=8 (10*0.8), batch=5 → compress 5.
         for (int i = 0; i < 12; i++) seed(i + 1, "tenant", "T" + i);
 
-        MemoryCompactionService.CompactionResult r = compactor.compactOversizedBuckets();
+        MemoryCompactionService.CompactionResult r = compactor.compactOversizedBucketsForTenant(tenantId);
         assertThat(r.buckets()).isEqualTo(1);
         assertThat(r.compressed()).isEqualTo(1);
         assertThat(r.replaced()).isEqualTo(5);
@@ -101,7 +101,7 @@ class MemoryCompactionIntegrationTest extends BaseIntegrationTest {
     @DisplayName("under-threshold bucket is untouched")
     void under_threshold_skipped() {
         for (int i = 0; i < 5; i++) seed(i + 1, "tenant", "low" + i);
-        MemoryCompactionService.CompactionResult r = compactor.compactOversizedBuckets();
+        MemoryCompactionService.CompactionResult r = compactor.compactOversizedBucketsForTenant(tenantId);
         assertThat(r.buckets()).isZero();
         assertThat(liveCount()).isEqualTo(5);
     }
@@ -120,7 +120,7 @@ class MemoryCompactionIntegrationTest extends BaseIntegrationTest {
                             " NOW(), NOW(), FALSE)",
                     pid, tenantId, agent, "U" + i, "body", i + 1);
         }
-        MemoryCompactionService.CompactionResult r = compactor.compactOversizedBuckets();
+        MemoryCompactionService.CompactionResult r = compactor.compactOversizedBucketsForTenant(tenantId);
         assertThat(r.buckets()).as("user scope excluded from buckets").isZero();
         assertThat(liveCount()).isEqualTo(12);
     }
@@ -163,11 +163,11 @@ class MemoryCompactionIntegrationTest extends BaseIntegrationTest {
     void idempotent_second_run() {
         for (int i = 0; i < 12; i++) seed(i + 1, "tenant", "A" + i);
 
-        MemoryCompactionService.CompactionResult r1 = compactor.compactOversizedBuckets();
+        MemoryCompactionService.CompactionResult r1 = compactor.compactOversizedBucketsForTenant(tenantId);
         assertThat(r1.buckets()).isEqualTo(1);
 
         // After first run: 12 -5 +1 = 8 → at threshold (=8). Run again.
-        MemoryCompactionService.CompactionResult r2 = compactor.compactOversizedBuckets();
+        MemoryCompactionService.CompactionResult r2 = compactor.compactOversizedBucketsForTenant(tenantId);
         // Could be 0 or 1 depending on threshold semantics. Spec uses >= threshold → yes compresses.
         // After second run: 8 -5 +1 = 4 rows.
         assertThat(liveCount()).isLessThanOrEqualTo(8);

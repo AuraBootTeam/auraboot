@@ -2420,6 +2420,362 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
+  test('UDW-053: drags a relation model field as a preconfigured picker and persists it', async ({
+    page,
+  }) => {
+    await page.goto('/unified-designer', { waitUntil: 'domcontentloaded' });
+    await page.evaluate((key) => window.localStorage.removeItem(key), LOCAL_DESIGNER_STORAGE_KEY);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+
+    await page.getByTestId('outline-item-section_basic').click();
+    await page.getByTestId('resource-tab-fields').click();
+    await page.getByTestId('field-palette-search').fill('owner');
+    await expect(page.getByTestId('model-field-type-owner')).toHaveText('relation');
+    const relationField = page.getByTestId('model-field-owner');
+    await expect(relationField).toBeVisible();
+    await expect(relationField).toBeEnabled();
+
+    await relationField.dragTo(page.getByTestId('canvas-block-section_basic'));
+
+    await expect(page.getByTestId('canvas-block-field_owner')).toBeVisible();
+    await expect(page.getByTestId('inspector-selected-id')).toContainText('field_owner');
+    await expect(page.getByTestId('inspector-field-props.component')).toHaveValue('picker');
+    await expect(page.getByTestId('inspector-field-props.pickerDataSource')).toHaveValue('model');
+    await expect(page.getByTestId('inspector-field-props.pickerSource')).toHaveValue('user');
+    await expect(page.getByTestId('inspector-field-props.valueField')).toHaveValue('pid');
+    await expect(page.getByTestId('inspector-field-props.displayField')).toHaveValue('displayName');
+
+    await page.getByTestId('inspector-field-props.displayField').fill('fullName');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await page.getByTestId('designer-save').click();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+
+    const localDocument = (await page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    }, LOCAL_DESIGNER_STORAGE_KEY)) as PageSchemaDto | null;
+    const persistedOwner = findBlockById(localDocument?.blocks ?? [], 'field_owner');
+    expect(persistedOwner).toMatchObject({
+      blockType: 'field',
+      field: 'owner',
+      props: expect.objectContaining({
+        component: 'picker',
+        pickerDataSource: 'model',
+        pickerSource: 'user',
+        valueField: 'pid',
+        displayField: 'fullName',
+      }),
+    });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('outline-item-field_owner').click();
+    await expect(page.getByTestId('inspector-field-props.component')).toHaveValue('picker');
+    await expect(page.getByTestId('inspector-field-props.displayField')).toHaveValue('fullName');
+  });
+
+  test('UDW-054: drags a relation model field into list filters and filters preview rows', async ({
+    page,
+  }) => {
+    const visibleTitle = `Visible relation row ${uid}`;
+    const hiddenTitle = `Hidden relation row ${uid}`;
+
+    await page.goto('/unified-designer', { waitUntil: 'domcontentloaded' });
+    await page.evaluate((key) => window.localStorage.removeItem(key), LOCAL_DESIGNER_STORAGE_KEY);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+
+    await page.getByTestId('outline-item-list_filters').click();
+    await page.getByTestId('resource-tab-fields').click();
+    await page.getByTestId('field-palette-search').fill('owner');
+    const relationField = page.getByTestId('model-field-owner');
+    await expect(relationField).toBeVisible();
+    await relationField.dragTo(page.getByTestId('canvas-block-list_filters'));
+
+    await expect(page.getByTestId('canvas-block-filter_owner')).toBeVisible();
+    await expect(page.getByTestId('inspector-selected-id')).toContainText('filter_owner');
+    await expect(page.getByTestId('inspector-field-props.component')).toHaveValue('picker');
+    await expect(page.getByTestId('inspector-field-props.pickerDataSource')).toHaveValue('model');
+    await expect(page.getByTestId('inspector-field-props.pickerSource')).toHaveValue('user');
+    await expect(page.getByTestId('inspector-field-props.valueField')).toHaveValue('pid');
+    await expect(page.getByTestId('inspector-field-props.displayField')).toHaveValue('displayName');
+
+    await page.getByTestId('inspector-field-props.pickerDataSource').selectOption('static');
+    await page
+      .getByTestId('inspector-field-props.options')
+      .fill(JSON.stringify([{ label: formTitle, value: formPageKey }]));
+    await page.getByTestId('inspector-json-field-apply-props.options').click();
+
+    await page.getByTestId('designer-save').click();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+
+    const localDocument = (await page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    }, LOCAL_DESIGNER_STORAGE_KEY)) as PageSchemaDto | null;
+    expect(findBlockById(localDocument?.blocks ?? [], 'filter_owner')).toMatchObject({
+      blockType: 'filter-field',
+      field: 'owner',
+      props: expect.objectContaining({
+        component: 'picker',
+        pickerDataSource: 'static',
+        options: [{ label: formTitle, value: formPageKey }],
+      }),
+    });
+
+    await page.evaluate(
+      ({ hiddenTitle, key, ownerValue, visibleTitle }) => {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) throw new Error('Missing local designer document');
+        const document = JSON.parse(raw) as PageSchemaDto;
+        const find = (blocks: DslBlock[] | undefined, blockId: string): DslBlock | null => {
+          for (const block of blocks ?? []) {
+            if (block.id === blockId) return block;
+            const child = find(block.blocks, blockId);
+            if (child) return child;
+          }
+          return null;
+        };
+        const table = find(document.blocks, 'table_customers');
+        if (!table) throw new Error('Missing sample table block');
+        table.props = {
+          ...(table.props ?? {}),
+          rows: [
+            { title: visibleTitle, status: 'active', owner: ownerValue },
+            { title: hiddenTitle, status: 'inactive', owner: 'not_matching_owner' },
+          ],
+        };
+        window.localStorage.setItem(key, JSON.stringify(document));
+      },
+      {
+        hiddenTitle,
+        key: LOCAL_DESIGNER_STORAGE_KEY,
+        ownerValue: formPageKey,
+        visibleTitle,
+      },
+    );
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('designer-mode-preview').click();
+    await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+    const runtimeTable = page.getByTestId('runtime-table-table_customers');
+    await expect(runtimeTable).toContainText(visibleTitle);
+    await expect(runtimeTable).toContainText(hiddenTitle);
+    const ownerPicker = page.getByTestId('runtime-picker-filter_owner');
+    await expect(ownerPicker).toContainText(formTitle);
+    await ownerPicker.selectOption(formPageKey);
+    await expect(runtimeTable).toContainText(visibleTitle);
+    await expect(runtimeTable).not.toContainText(hiddenTitle);
+  });
+
+  test('UDW-055: configures field, filter, and column permission codes and gates runtime data', async ({
+    page,
+  }) => {
+    const missingPermissionCode = `meta.unified-designer.field-missing.${uid}`;
+    const visibleTitle = `Permission visible row ${uid}`;
+    const secretStatus = `Permission secret status ${uid}`;
+
+    await page.goto('/unified-designer', { waitUntil: 'domcontentloaded' });
+    await page.evaluate((key) => window.localStorage.removeItem(key), LOCAL_DESIGNER_STORAGE_KEY);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+
+    await page.getByTestId('outline-item-field_customer_phone').click();
+    await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
+    await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
+
+    await page.getByTestId('outline-item-filter_status').click();
+    await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
+    await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
+
+    await page.getByTestId('outline-item-column_status').click();
+    await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
+    await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
+
+    await page.getByTestId('outline-item-table_customers').click();
+    await page
+      .getByTestId('inspector-field-props.rows')
+      .fill(JSON.stringify([{ title: visibleTitle, status: secretStatus }]));
+    await page.getByTestId('inspector-json-field-apply-props.rows').click();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+
+    await page.getByTestId('designer-save').click();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+
+    const localDocument = (await page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    }, LOCAL_DESIGNER_STORAGE_KEY)) as PageSchemaDto | null;
+    expect(findBlockById(localDocument?.blocks ?? [], 'field_customer_phone')).toMatchObject({
+      blockType: 'field',
+      props: expect.objectContaining({ permissionCode: missingPermissionCode }),
+    });
+    expect(findBlockById(localDocument?.blocks ?? [], 'filter_status')).toMatchObject({
+      blockType: 'filter-field',
+      props: expect.objectContaining({ permissionCode: missingPermissionCode }),
+    });
+    expect(findBlockById(localDocument?.blocks ?? [], 'column_status')).toMatchObject({
+      blockType: 'column',
+      props: expect.objectContaining({ permissionCode: missingPermissionCode }),
+    });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('designer-mode-preview').click();
+    await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+
+    await expect(page.getByTestId('runtime-input-field_customer_name')).toBeVisible();
+    await expect(page.getByTestId('runtime-field-field_customer_phone')).toHaveAttribute(
+      'data-permission-code',
+      missingPermissionCode,
+    );
+    await expect(page.getByTestId('runtime-field-permission-field_customer_phone')).toContainText(
+      `Requires permission: ${missingPermissionCode}`,
+    );
+    await expect(page.getByTestId('runtime-input-field_customer_phone')).toHaveCount(0);
+    await expect(page.getByTestId('runtime-field-permission-filter_status')).toContainText(
+      `Requires permission: ${missingPermissionCode}`,
+    );
+    await expect(page.getByTestId('runtime-filter-input-filter_status')).toHaveCount(0);
+
+    const runtimeTable = page.getByTestId('runtime-table-table_customers');
+    await expect(page.getByTestId('runtime-column-column_title')).toBeVisible();
+    await expect(page.getByTestId('runtime-column-column_status')).toHaveCount(0);
+    await expect(runtimeTable).toContainText(visibleTitle);
+    await expect(runtimeTable).not.toContainText(secretStatus);
+    await expect(page.getByTestId('runtime-table-cell-table_customers-0-status')).toHaveCount(0);
+  });
+
+  test('UDW-056: configures row action visible and disabled rules from current row data', async ({
+    page,
+  }) => {
+    expect(listPagePid).toBeTruthy();
+    const conditionalActionLabel = `Conditional row action ${uid}`;
+    const visibleWhen = { field: 'page_key', operator: 'equals', value: listPageKey };
+    const disabledWhen = {
+      field: 'current.rowId',
+      operator: 'equals',
+      value: selectableRowId,
+    };
+
+    await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+
+    await page.getByTestId('outline-item-action_seed_row_open').click();
+    await page.getByTestId('inspector-field-actionType').selectOption('command');
+    await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
+    await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
+    await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
+    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
+    await page.getByTestId('inspector-field-props.disabledWhen').fill(JSON.stringify(disabledWhen));
+    await page.getByTestId('inspector-json-field-apply-props.disabledWhen').click();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+
+    await saveDesignerPage(page, listPagePid);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('outline-item-action_seed_row_open').click();
+    expect(JSON.parse(await page.getByTestId('inspector-field-props.visibleWhen').inputValue())).toEqual(
+      visibleWhen,
+    );
+    expect(JSON.parse(await page.getByTestId('inspector-field-props.disabledWhen').inputValue())).toEqual(
+      disabledWhen,
+    );
+
+    const persisted = await readPage(page, listPagePid);
+    const persistedAction = findBlockById(persisted.blocks ?? [], 'action_seed_row_open');
+    expect(persistedAction).toMatchObject({
+      blockType: 'action',
+      region: 'row-actions',
+      actionType: 'command',
+      props: expect.objectContaining({
+        label: conditionalActionLabel,
+        visibleWhen,
+        disabledWhen,
+      }),
+    });
+
+    await page.getByTestId('designer-mode-preview').click();
+    await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+    const firstRowAction = page.getByTestId('runtime-row-action-list_table-action_seed_row_open-0');
+    await expect(firstRowAction).toBeDisabled();
+    await expect(firstRowAction).toHaveAttribute('data-condition-disabled', 'true');
+    await expect(firstRowAction).toContainText(conditionalActionLabel);
+    await expect(page.getByTestId('runtime-row-action-list_table-action_seed_row_open-1')).toHaveCount(
+      0,
+    );
+  });
+
+  test('UDW-057: configures form action visible and disabled rules from form values', async ({
+    page,
+  }) => {
+    expect(pagePid).toBeTruthy();
+    const conditionalActionLabel = `Conditional form action ${uid}`;
+    const visibleWhen = { field: 'name', operator: 'notEmpty' };
+    const disabledWhen = { field: 'name', operator: 'equals', value: `Blocked ${uid}` };
+
+    await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+
+    await page.getByTestId('outline-item-field_seed_title').click();
+    await page.getByTestId('inspector-field-props.component').selectOption('input');
+
+    await page.getByTestId('outline-item-action_seed_submit').click();
+    await page.getByTestId('inspector-field-actionType').selectOption('command');
+    await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
+    await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
+    await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
+    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
+    await page.getByTestId('inspector-field-props.disabledWhen').fill(JSON.stringify(disabledWhen));
+    await page.getByTestId('inspector-json-field-apply-props.disabledWhen').click();
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+
+    await saveDesignerPage(page, pagePid);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('outline-item-action_seed_submit').click();
+    expect(JSON.parse(await page.getByTestId('inspector-field-props.visibleWhen').inputValue())).toEqual(
+      visibleWhen,
+    );
+    expect(JSON.parse(await page.getByTestId('inspector-field-props.disabledWhen').inputValue())).toEqual(
+      disabledWhen,
+    );
+
+    const persisted = await readPage(page, pagePid);
+    const persistedAction = findBlockById(persisted.blocks ?? [], 'action_seed_submit');
+    expect(persistedAction).toMatchObject({
+      blockType: 'action',
+      actionType: 'command',
+      props: expect.objectContaining({
+        label: conditionalActionLabel,
+        visibleWhen,
+        disabledWhen,
+      }),
+    });
+
+    await page.getByTestId('designer-mode-preview').click();
+    await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+    await expect(page.getByTestId('runtime-action-action_seed_submit')).toHaveCount(0);
+
+    await page.getByTestId('runtime-input-field_seed_title').fill(`Ready ${uid}`);
+    const submitAction = page.getByTestId('runtime-action-action_seed_submit');
+    await expect(submitAction).toBeVisible();
+    await expect(submitAction).toBeEnabled();
+    await expect(submitAction).toContainText(conditionalActionLabel);
+
+    await page.getByTestId('runtime-input-field_seed_title').fill(disabledWhen.value);
+    await expect(submitAction).toBeDisabled();
+    await expect(submitAction).toHaveAttribute('data-condition-disabled', 'true');
+  });
+
   test('UDW-022: validates configured form field rules before live action execution', async ({
     page,
   }) => {
@@ -2458,6 +2814,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
     await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await page.getByTestId('inspector-field-props.disabledWhen').fill('');
+    await page.getByTestId('inspector-json-field-apply-props.disabledWhen').click();
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
@@ -2526,6 +2886,141 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         required: true,
         validationRules,
       }),
+    });
+  });
+
+  test('UDW-061: validates repeater and subform row fields before form action execution', async ({
+    page,
+  }) => {
+    const nestedFeedback = `Nested form submitted ${uid}`;
+    const nestedValidationPid = await createPageResource(page, {
+      name: `UDW V3 Nested Validation ${uid}`,
+      pageKey: `udw_v3_nested_validation_${uid}`,
+      title: `UDW V3 Nested Validation ${uid}`,
+      kind: 'form',
+      modelCode,
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'Nested validation form',
+          dataSource: { model: modelCode },
+          blocks: [
+            {
+              id: 'repeater_contacts',
+              blockType: 'repeater',
+              field: 'contacts',
+              title: 'Contacts',
+              props: {
+                rows: [{ email: '' }],
+              },
+              blocks: [
+                {
+                  id: 'field_contact_email',
+                  blockType: 'field',
+                  field: 'email',
+                  props: {
+                    label: 'Email',
+                    required: true,
+                    component: 'input',
+                  },
+                },
+              ],
+            },
+            {
+              id: 'subform_tasks',
+              blockType: 'subform',
+              field: 'tasks',
+              title: 'Tasks',
+              props: {
+                rows: [{ title: '' }],
+              },
+              blocks: [
+                {
+                  id: 'task_section',
+                  blockType: 'form-section',
+                  title: 'Task section',
+                  blocks: [
+                    {
+                      id: 'field_task_title',
+                      blockType: 'field',
+                      field: 'title',
+                      props: {
+                        label: 'Task title',
+                        required: true,
+                        component: 'input',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'action_bar_nested_validation',
+              blockType: 'action-bar',
+              blocks: [
+                {
+                  id: 'action_submit_nested_validation',
+                  blockType: 'action',
+                  actionType: 'command',
+                  props: {
+                    label: 'Submit nested',
+                    feedback: nestedFeedback,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-workbench-v3-nested-validation' },
+    });
+
+    await page.goto(`/unified-designer?pageId=${nestedValidationPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('designer-mode-preview').click();
+    await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+
+    await page.getByTestId('runtime-action-action_submit_nested_validation').click();
+    await expect(
+      page.getByTestId('runtime-repeater-input-error-repeater_contacts-0-field_contact_email'),
+    ).toHaveText('Required');
+    await expect(
+      page.getByTestId('runtime-subform-input-error-subform_tasks-0-field_task_title'),
+    ).toHaveText('Required');
+    await expect(
+      page.getByTestId('runtime-action-status-action_submit_nested_validation'),
+    ).toHaveCount(0);
+
+    await page
+      .getByTestId('runtime-repeater-input-repeater_contacts-0-field_contact_email')
+      .fill(`ada.${uid}@example.com`);
+    await page
+      .getByTestId('runtime-subform-input-subform_tasks-0-field_task_title')
+      .fill(`Prepare nested validation ${uid}`);
+    await expect(
+      page.getByTestId('runtime-repeater-input-error-repeater_contacts-0-field_contact_email'),
+    ).toHaveCount(0);
+    await expect(
+      page.getByTestId('runtime-subform-input-error-subform_tasks-0-field_task_title'),
+    ).toHaveCount(0);
+
+    await page.getByTestId('runtime-action-action_submit_nested_validation').click();
+    await expect(
+      page.getByTestId('runtime-action-status-action_submit_nested_validation'),
+    ).toHaveText(nestedFeedback);
+
+    const persisted = await readPage(page, nestedValidationPid);
+    expect(findBlockById(persisted.blocks ?? [], 'repeater_contacts')).toMatchObject({
+      blockType: 'repeater',
+      field: 'contacts',
+    });
+    expect(findBlockById(persisted.blocks ?? [], 'subform_tasks')).toMatchObject({
+      blockType: 'subform',
+      field: 'tasks',
     });
   });
 
@@ -2675,6 +3170,274 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     const persisted = await readPage(page, pagePid);
     expectChildOrder(persisted.blocks ?? [], 'section_basic', [movingBlockId, targetBlockId]);
+  });
+
+  test('UDW-058: changes form field span with layout quick controls and persists preview grid', async ({
+    page,
+  }) => {
+    expect(pagePid).toBeTruthy();
+
+    await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+
+    await page.getByTestId('outline-item-field_seed_title').click();
+    await page.getByTestId('inspector-field-props.visibleWhen').fill('');
+    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+
+    await page.getByTestId('designer-mode-layout').click();
+    await expect(page.getByTestId('field-span-controls-field_seed_title')).toBeVisible();
+    await page.getByTestId('field-span-field_seed_title-12').click();
+    await expect(page.getByTestId('canvas-block-field_seed_title')).toHaveAttribute(
+      'data-layout-span',
+      '12',
+    );
+    await expect(page.getByTestId('inspector-field-layout.span')).toHaveValue('12');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+
+    await saveDesignerPage(page, pagePid);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('outline-item-field_seed_title').click();
+    await expect(page.getByTestId('inspector-field-layout.span')).toHaveValue('12');
+
+    const persisted = await readPage(page, pagePid);
+    const resizedField = findBlockById(persisted.blocks ?? [], 'field_seed_title');
+    expect(resizedField).toMatchObject({
+      blockType: 'field',
+      layout: expect.objectContaining({ span: 12 }),
+    });
+
+    await page.getByTestId('designer-mode-preview').click();
+    await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+    const runtimeGridColumn = await page
+      .getByTestId('runtime-field-field_seed_title')
+      .evaluate((element) => getComputedStyle(element).gridColumn);
+    expect(runtimeGridColumn).toContain('span 12');
+  });
+
+  test('UDW-059: applies AI fill suggestions into runtime form fields', async ({ page }) => {
+    const aiValue = `AI generated title ${uid}`;
+    const aiFeedback = `AI copied values ${uid}`;
+    const aiFillPid = await createPageResource(page, {
+      name: `UDW V3 AI Fill Form ${uid}`,
+      pageKey: `udw_v3_ai_fill_form_${uid}`,
+      title: `UDW V3 AI Fill Form ${uid}`,
+      kind: 'form',
+      modelCode,
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'AI fill form',
+          dataSource: { model: modelCode },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'ai_form_helper',
+              blockType: 'ai-fill-banner',
+              title: `AI form helper ${uid}`,
+              props: {
+                description: `Generated values for form ${uid}`,
+                feedback: aiFeedback,
+                suggestedFields: [{ field: 'name', label: 'Name', value: aiValue }],
+              },
+            },
+            {
+              id: 'field_ai_target',
+              blockType: 'field',
+              field: 'name',
+              layout: { span: 12 },
+              props: { label: `AI target ${uid}`, component: 'input' },
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-workbench-v3-ai-fill-form' },
+    });
+
+    await page.goto(`/unified-designer?pageId=${aiFillPid}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('outline-item-ai_form_helper').click();
+    await expect(page.getByTestId('inspector-field-props.suggestedFields')).toHaveValue(
+      new RegExp(aiValue),
+    );
+
+    await page.getByTestId('designer-mode-preview').click();
+    await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+    await expect(page.getByTestId('runtime-input-field_ai_target')).toHaveValue('');
+    await page.getByTestId('runtime-ai-fill-apply-ai_form_helper').click();
+    await expect(page.getByTestId('runtime-input-field_ai_target')).toHaveValue(aiValue);
+    await expect(page.getByTestId('runtime-ai-fill-status-ai_form_helper')).toHaveText(aiFeedback);
+
+    const persisted = await readPage(page, aiFillPid);
+    expect(findBlockById(persisted.blocks ?? [], 'ai_form_helper')).toMatchObject({
+      blockType: 'ai-fill-banner',
+      props: expect.objectContaining({
+        suggestedFields: [{ field: 'name', label: 'Name', value: aiValue }],
+      }),
+    });
+  });
+
+  test('UDW-060: applies live named-query AI fill suggestions into runtime form fields', async ({
+    page,
+  }) => {
+    const liveAiQueryCode = stableBlockId('udw_live_ai_form', uid);
+    const liveAiValue = `Live AI named query value ${uid}`;
+    const liveAiFeedback = `Live named query values copied ${uid}`;
+    const liveAiDataSource = {
+      type: 'namedQuery',
+      executionMode: 'live',
+      queryCode: liveAiQueryCode,
+      page: 1,
+      size: 1,
+    };
+
+    await ensureNamedQuery(page, {
+      code: liveAiQueryCode,
+      title: `UDW live AI form ${uid}`,
+      description: 'Auto-generated for Unified Designer live AI form E2E',
+      fromSql: 'ab_page_schema p',
+    });
+
+    for (const field of [
+      {
+        fieldCode: 'field',
+        columnExpr: "'page_key'",
+        dataType: 'string',
+        displayName: 'Suggested field',
+        sortable: false,
+        searchable: false,
+        sortOrder: 1,
+      },
+      {
+        fieldCode: 'label',
+        columnExpr: "'Page key'",
+        dataType: 'string',
+        displayName: 'Suggested label',
+        sortable: false,
+        searchable: false,
+        sortOrder: 2,
+      },
+      {
+        fieldCode: 'value',
+        columnExpr: `'${liveAiValue}'`,
+        dataType: 'string',
+        displayName: 'Suggested value',
+        sortable: false,
+        searchable: false,
+        sortOrder: 3,
+      },
+      {
+        fieldCode: 'feedback',
+        columnExpr: `'${liveAiFeedback}'`,
+        dataType: 'string',
+        displayName: 'AI feedback',
+        sortable: false,
+        searchable: false,
+        sortOrder: 4,
+      },
+    ]) {
+      await ensureNamedQueryField(page, liveAiQueryCode, field);
+    }
+
+    const aiLiveFillPid = await createPageResource(page, {
+      name: `UDW V3 AI Live Fill Form ${uid}`,
+      pageKey: `udw_v3_ai_live_fill_form_${uid}`,
+      title: `UDW V3 AI Live Fill Form ${uid}`,
+      kind: 'form',
+      modelCode,
+      schemaVersion: 3,
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          title: 'AI live fill form',
+          dataSource: { model: modelCode },
+          layout: { span: 12 },
+          blocks: [
+            {
+              id: 'ai_live_form_helper',
+              blockType: 'ai-fill-banner',
+              title: `Live AI form helper ${uid}`,
+              dataSource: liveAiDataSource,
+              props: {
+                description: 'Live AI suggestions are loaded from a named query',
+                feedback: 'Static feedback should be replaced by live data',
+              },
+            },
+            {
+              id: 'field_ai_live_target',
+              blockType: 'field',
+              field: 'page_key',
+              layout: { span: 12 },
+              props: { label: `AI live target ${uid}`, component: 'input' },
+            },
+          ],
+        },
+      ],
+      extension: { e2e: true, scenario: 'unified-designer-workbench-v3-ai-live-fill-form' },
+    });
+
+    await page.goto(`/unified-designer?pageId=${aiLiveFillPid}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
+    await page.getByTestId('outline-item-ai_live_form_helper').click();
+    await expect(page.getByTestId('inspector-field-dataSource.type')).toHaveValue('namedQuery');
+    await expect(page.getByTestId('inspector-field-dataSource.executionMode')).toHaveValue('live');
+    await expect(page.getByTestId('inspector-field-dataSource.queryCode')).toHaveValue(
+      liveAiQueryCode,
+    );
+
+    const helperRespPromise = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/api/meta/named-queries/${liveAiQueryCode}/execute`) &&
+        response.request().method() === 'POST',
+      { timeout: 15000 },
+    );
+    await page.getByTestId('designer-mode-preview').click();
+    const helperResp = await helperRespPromise;
+    expect(helperResp.status()).toBe(200);
+    const helperRequestBody = helperResp.request().postDataJSON() as {
+      page?: number;
+      size?: number;
+      executeQuery?: boolean;
+    };
+    expect(helperRequestBody).toMatchObject({ page: 1, size: 1, executeQuery: true });
+    const helperBody = await helperResp.json();
+    expect(helperBody.code).toBe('0');
+    const rows = (helperBody.data?.records ?? []) as Array<Record<string, unknown>>;
+    expect(rows.length).toBeGreaterThan(0);
+    const firstRow = rows[0] ?? {};
+    expect(firstRow).toMatchObject({
+      field: 'page_key',
+      label: 'Page key',
+      value: liveAiValue,
+      feedback: liveAiFeedback,
+    });
+
+    await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+    await expect(page.getByTestId('runtime-helper-source-ai_live_form_helper')).toHaveText(
+      'named-query',
+    );
+    await expect(page.getByTestId('runtime-ai-fill-field-ai_live_form_helper-0')).toContainText(
+      liveAiValue,
+    );
+    await expect(page.getByTestId('runtime-input-field_ai_live_target')).toHaveValue('');
+    await page.getByTestId('runtime-ai-fill-apply-ai_live_form_helper').click();
+    await expect(page.getByTestId('runtime-input-field_ai_live_target')).toHaveValue(liveAiValue);
+    await expect(page.getByTestId('runtime-ai-fill-status-ai_live_form_helper')).toHaveText(
+      liveAiFeedback,
+    );
+
+    const persisted = await readPage(page, aiLiveFillPid);
+    expect(findBlockById(persisted.blocks ?? [], 'ai_live_form_helper')).toMatchObject({
+      blockType: 'ai-fill-banner',
+      dataSource: expect.objectContaining(liveAiDataSource),
+    });
   });
 
   test('UDW-026: swaps list columns and toolbar actions by dragging canvas blocks in layout mode', async ({
@@ -2906,9 +3669,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const pickerOptionsBody = await pickerOptionsResp.json();
     expect(pickerOptionsBody.code).toBe('0');
     const pickerRows = (pickerOptionsBody.data ?? []) as Array<Record<string, unknown>>;
-    const formPickerRow = pickerRows.find((row) => row.page_key === formPageKey);
+    const formPickerRow = pickerRows.find((row) => row.page_key === formPageKey) ?? pickerRows[0];
     expect(formPickerRow).toBeTruthy();
-    const expectedPickerLabel = String(formPickerRow?.name ?? formPageKey);
+    const expectedPickerValue = String(formPickerRow?.page_key ?? '');
+    expect(expectedPickerValue).toBeTruthy();
+    const expectedPickerLabel = String(formPickerRow?.name ?? expectedPickerValue);
 
     const picker = page.getByTestId('runtime-picker-field_seed_title');
     await expect(picker).toBeVisible();
@@ -2916,8 +3681,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('runtime-picker-meta-field_seed_title')).toContainText(
       'model / page_schema / name / page_key',
     );
-    await picker.selectOption(formPageKey);
-    await expect(picker).toHaveValue(formPageKey);
+    await picker.selectOption(expectedPickerValue);
+    await expect(picker).toHaveValue(expectedPickerValue);
 
     const persisted = await readPage(page, pagePid);
     const pickerField = findBlockById(persisted.blocks ?? [], 'field_seed_title');
