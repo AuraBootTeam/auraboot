@@ -1,64 +1,217 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.rag.d7.D7CompiledKnowledgeMatch;
+import com.auraboot.framework.rag.d7.D7CompiledKnowledgePage;
+import com.auraboot.framework.rag.d7.D7CompiledKnowledgeService;
+import com.auraboot.framework.rag.d7.D7ContextAssembler;
+import com.auraboot.framework.rag.d7.D7KnowledgeProperties;
+import com.auraboot.framework.rag.d7.D7RetrievalTraceWriter;
+import com.auraboot.framework.rag.d7.D7SourceRef;
 import com.auraboot.framework.rag.dto.RetrievalResult;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
-@DisplayName("RagContextProviderImpl")
 class RagContextProviderImplTest {
 
-    @Mock
-    private RagRetrievalService ragRetrievalService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @InjectMocks
-    private RagContextProviderImpl provider;
+    @TempDir
+    Path tempDir;
 
     @Test
-    @DisplayName("hasActiveKnowledgeBases delegates and returns true")
-    void hasActiveDelegates() {
+    @DisplayName("hasActiveKnowledgeBases keeps raw RAG as first signal")
+    void hasActiveKnowledgeBases_rawRagWins() {
+        RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
+        D7CompiledKnowledgeService d7Service = mock(D7CompiledKnowledgeService.class);
+        D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setEnabled(true);
+
         when(ragRetrievalService.hasActiveKnowledgeBases(7L)).thenReturn(true);
-        assertTrue(provider.hasActiveKnowledgeBases(7L));
-        verify(ragRetrievalService).hasActiveKnowledgeBases(7L);
+
+        RagContextProviderImpl provider = new RagContextProviderImpl(
+                ragRetrievalService,
+                d7Service,
+                new D7ContextAssembler(),
+                mock(D7RetrievalTraceWriter.class),
+                properties);
+
+        assertThat(provider.hasActiveKnowledgeBases(7L)).isTrue();
+        verifyNoInteractions(d7Service);
     }
 
     @Test
-    @DisplayName("hasActiveKnowledgeBases returns false when underlying service returns false")
-    void hasActiveDelegatesFalse() {
-        when(ragRetrievalService.hasActiveKnowledgeBases(8L)).thenReturn(false);
-        assertFalse(provider.hasActiveKnowledgeBases(8L));
+    @DisplayName("hasActiveKnowledgeBases can use compiled D7 pages when raw RAG is empty")
+    void hasActiveKnowledgeBases_d7FallbackWhenEnabled() {
+        RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
+        D7CompiledKnowledgeService d7Service = mock(D7CompiledKnowledgeService.class);
+        D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setEnabled(true);
+
+        when(ragRetrievalService.hasActiveKnowledgeBases(42L)).thenReturn(false);
+        when(d7Service.hasRetrievablePages(42L)).thenReturn(true);
+
+        RagContextProviderImpl provider = new RagContextProviderImpl(
+                ragRetrievalService,
+                d7Service,
+                new D7ContextAssembler(),
+                mock(D7RetrievalTraceWriter.class),
+                properties);
+
+        assertThat(provider.hasActiveKnowledgeBases(42L)).isTrue();
     }
 
     @Test
-    @DisplayName("retrieveContext calls retrieve with topK=5 then buildRagContext")
-    void retrieveContextDelegates() {
-        List<RetrievalResult> rs = List.of(RetrievalResult.builder().chunkPid("c1").build());
-        when(ragRetrievalService.retrieve(eq(1L), eq("q"), isNull(), eq(5), isNull())).thenReturn(rs);
-        when(ragRetrievalService.buildRagContext(rs)).thenReturn("CTX");
+    @DisplayName("D7-05: Feature flag disabled keeps raw RAG behavior")
+    void retrieveContext_d7DisabledUsesRawRagOnly() {
+        RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
+        D7CompiledKnowledgeService d7Service = mock(D7CompiledKnowledgeService.class);
+        D7RetrievalTraceWriter traceWriter = mock(D7RetrievalTraceWriter.class);
+        D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setEnabled(false);
+        List<RetrievalResult> rawResults = List.of(RetrievalResult.builder()
+                .chunkPid("chunk-raw")
+                .docName("raw-doc")
+                .content("raw only")
+                .chunkIndex(0)
+                .build());
 
-        assertEquals("CTX", provider.retrieveContext(1L, "q", null));
-        verify(ragRetrievalService).retrieve(1L, "q", null, 5, null);
-        verify(ragRetrievalService).buildRagContext(rs);
+        when(ragRetrievalService.retrieve(1L, "query", List.of("kb1"), 5, null)).thenReturn(rawResults);
+        when(ragRetrievalService.buildRagContext(rawResults)).thenReturn("## Reference Knowledge\nraw only");
+
+        RagContextProviderImpl provider = new RagContextProviderImpl(
+                ragRetrievalService,
+                d7Service,
+                new D7ContextAssembler(),
+                traceWriter,
+                properties);
+
+        String context = provider.retrieveContext(1L, "query", List.of("kb1"));
+
+        assertThat(context).isEqualTo("## Reference Knowledge\nraw only");
+        verify(ragRetrievalService).retrieve(1L, "query", List.of("kb1"), 5, null);
+        verifyNoInteractions(d7Service, traceWriter);
     }
 
     @Test
-    @DisplayName("retrieveContext passes through kbPids list")
-    void retrieveContextWithKbPids() {
-        List<String> kbPids = List.of("kb1");
-        when(ragRetrievalService.retrieve(eq(2L), eq("hello"), eq(kbPids), eq(5), isNull()))
+    @DisplayName("D7-04: Feature flag retrieves compiled pages before raw chunks")
+    void retrieveContext_d7EnabledPrependsCompiledKnowledge() {
+        RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
+        D7CompiledKnowledgeService d7Service = mock(D7CompiledKnowledgeService.class);
+        D7RetrievalTraceWriter traceWriter = mock(D7RetrievalTraceWriter.class);
+        D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setEnabled(true);
+        properties.setMaxCompiledPages(2);
+        properties.setRawTopK(4);
+
+        D7CompiledKnowledgePage page = D7CompiledKnowledgePage.builder()
+                .id("compiled.decision.d7")
+                .title("D7 retrieval decision")
+                .summary("Use compiled pages before raw chunks.")
+                .body("D7 context first.")
+                .staleStatus("fresh")
+                .sourceRefs(List.of(D7SourceRef.builder()
+                        .path("docs/system-reference/subsystems/96-AuraBoot知识系统重设计方案.md")
+                        .build()))
+                .build();
+        D7CompiledKnowledgeMatch match = new D7CompiledKnowledgeMatch(page, 1.0, false);
+        List<RetrievalResult> rawResults = List.of(RetrievalResult.builder()
+                .chunkPid("chunk-1")
+                .docName("raw-doc")
+                .content("raw content")
+                .chunkIndex(1)
+                .build());
+
+        when(d7Service.retrieve(1L, "query", 2)).thenReturn(List.of(match));
+        when(ragRetrievalService.retrieve(1L, "query", List.of("kb1"), 4, null)).thenReturn(rawResults);
+        when(ragRetrievalService.buildRagContext(rawResults)).thenReturn("## Reference Knowledge\nraw content");
+
+        RagContextProviderImpl provider = new RagContextProviderImpl(
+                ragRetrievalService,
+                d7Service,
+                new D7ContextAssembler(),
+                traceWriter,
+                properties);
+
+        String context = provider.retrieveContext(1L, "query", List.of("kb1"));
+
+        assertThat(context).contains("## Compiled Knowledge");
+        assertThat(context).contains("## Reference Knowledge");
+        assertThat(context.indexOf("## Compiled Knowledge"))
+                .isLessThan(context.indexOf("## Reference Knowledge"));
+        verify(d7Service).retrieve(1L, "query", 2);
+        verify(ragRetrievalService).retrieve(1L, "query", List.of("kb1"), 4, null);
+        verify(traceWriter).recordRetrieval(1L, "query", List.of(match), rawResults);
+    }
+
+    @Test
+    @DisplayName("D7-08: Runtime path captures ranked source paths for golden query evaluation")
+    void retrieveContext_d7EnabledWritesRuntimeTrace() throws Exception {
+        RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
+        D7CompiledKnowledgeService d7Service = mock(D7CompiledKnowledgeService.class);
+        D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setEnabled(true);
+        properties.setTraceEnabled(true);
+        properties.setTraceOutputPath(tempDir.resolve("trace.json").toString());
+        properties.setGoldenQueryPath(writeGoldenQueries().toString());
+
+        D7CompiledKnowledgePage page = D7CompiledKnowledgePage.builder()
+                .id("compiled.d7.runtime")
+                .title("D7 runtime trace")
+                .sourceRefs(List.of(D7SourceRef.builder()
+                        .path("docs/system-reference/subsystems/96-AuraBoot知识系统重设计方案.md")
+                        .build()))
+                .build();
+        D7CompiledKnowledgeMatch match = new D7CompiledKnowledgeMatch(page, 1.0, false);
+
+        when(d7Service.retrieve(1L, "How should D7 trace retrieval?", 3)).thenReturn(List.of(match));
+        when(ragRetrievalService.retrieve(1L, "How should D7 trace retrieval?", List.of("kb1"), 5, null))
                 .thenReturn(List.of());
-        when(ragRetrievalService.buildRagContext(anyList())).thenReturn("");
+        when(ragRetrievalService.buildRagContext(List.of())).thenReturn("");
 
-        assertEquals("", provider.retrieveContext(2L, "hello", kbPids));
+        RagContextProviderImpl provider = new RagContextProviderImpl(
+                ragRetrievalService,
+                d7Service,
+                new D7ContextAssembler(),
+                new D7RetrievalTraceWriter(objectMapper, properties),
+                properties);
+
+        provider.retrieveContext(1L, "How should D7 trace retrieval?", List.of("kb1"));
+
+        JsonNode root = objectMapper.readTree(Files.readString(tempDir.resolve("trace.json")));
+        assertThat(root.at("/results/0/queryId").asText()).isEqualTo("GQ-D7-001");
+        assertThat(root.at("/results/0/rankedSourcePaths/0").asText())
+                .isEqualTo("docs/system-reference/subsystems/96-AuraBoot知识系统重设计方案.md");
+        assertThat(root.at("/results/0/noAnswer").asBoolean()).isFalse();
+    }
+
+    private Path writeGoldenQueries() throws Exception {
+        Path path = tempDir.resolve("golden.json");
+        String json = """
+                {
+                  "schemaVersion": 1,
+                  "queries": [
+                    {
+                      "id": "GQ-D7-001",
+                      "query": "How should D7 trace retrieval?",
+                      "expectedBehavior": "answer_with_citations"
+                    }
+                  ]
+                }
+                """;
+        Files.writeString(path, json);
+        return path;
     }
 }
