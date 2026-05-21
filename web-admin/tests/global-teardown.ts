@@ -236,6 +236,14 @@ DELETE FROM ab_agent_interrupt_log
     OR active_run_id LIKE 'E2ELR%'
     OR subtask_run_id LIKE 'E2ELR%';
 
+DELETE FROM ab_agent_approval
+ WHERE pid LIKE 'E2ELP%'
+    OR run_id LIKE 'E2ELR%';
+
+DELETE FROM ab_idempotency_record
+ WHERE client_request_id LIKE 'E2ELX%'
+    OR (outcome->'request'->>'runPid') LIKE 'E2ELR%';
+
 DELETE FROM ab_agent_bif
  WHERE pid LIKE 'E2ELB%'
     OR run_id LIKE 'E2ELR%';

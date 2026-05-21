@@ -103,6 +103,12 @@
       "props": {
         "rowClickAction": "drawer"
       },
+      "table": {
+        "selection": {
+          "mode": "multiple",
+          "bind": "selectedRows"
+        }
+      },
       "columns": [
         {
           "field": "crm_lead_code",

@@ -12,7 +12,7 @@ public record AgentContextBlock(
         title = hasText(title) ? title : "Context";
         body = body == null ? "" : body;
         provenance = provenance == null
-                ? new AgentContextProvenance(null, null, null, null, null, null, null, null, false)
+                ? new AgentContextProvenance(null, null, null, null, null, null, null, null, false, null)
                 : provenance;
     }
 
