@@ -168,7 +168,7 @@ class InternalDocImportServiceIntegrationTest extends BaseIntegrationTest {
                 importService.importDocs(getTestTenant().getId(), getTestUser().getId(),
                         "/tmp/non-existent-dir-" + System.currentTimeMillis()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Not a directory");
+                .hasMessageContaining("is not a directory");
     }
 
     @Test

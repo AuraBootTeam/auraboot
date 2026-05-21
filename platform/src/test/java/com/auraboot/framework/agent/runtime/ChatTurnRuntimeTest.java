@@ -511,7 +511,8 @@ class ChatTurnRuntimeTest {
                         List.of("C-1"),
                         1L,
                         "web",
-                        true)));
+                        true,
+                        Map.of("modelCode", "crm_customer", "recordId", "C-1"))));
         PolicyCallbacks callbacks = new PolicyCallbacks(ExecutionEnvelope.writeCatalogWithGate(), contextBlocks);
 
         TurnOutcome outcome = runtime.runToolLoop(
@@ -665,7 +666,8 @@ class ChatTurnRuntimeTest {
                         List.of("C-100"),
                         1L,
                         "web",
-                        true)));
+                        true,
+                        Map.of("modelCode", "crm_customer", "recordId", "C-100"))));
         PolicyCallbacks callbacks = new PolicyCallbacks(ExecutionEnvelope.writeCatalogWithGate(), contextBlocks);
 
         TurnOutcome outcome = runtime.runToolLoop(

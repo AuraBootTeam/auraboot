@@ -103,7 +103,12 @@ public class AgentContextAssembler {
                         recordIds(page.getRecordPid()),
                         tenantId,
                         channel,
-                        false));
+                        false,
+                        metadata(
+                                "kind", page.getKind(),
+                                "pageKey", page.getPageKey(),
+                                "modelCode", page.getModelCode(),
+                                "recordId", page.getRecordPid())));
     }
 
     private AgentContextBlock schemaBlock(Long tenantId, String channel, String modelCode, String modelSchemaText) {
@@ -122,7 +127,10 @@ public class AgentContextAssembler {
                         List.of(),
                         tenantId,
                         channel,
-                        true));
+                        true,
+                        metadata(
+                                "modelCode", modelCode,
+                                "table", "mt_" + modelCode)));
     }
 
     private AgentContextBlock recordBlock(Long tenantId, String channel, ChatRequest.PageContext page) {
@@ -181,7 +189,11 @@ public class AgentContextAssembler {
                         recordIds(recordId),
                         tenantId,
                         channel,
-                        true));
+                        true,
+                        metadata(
+                                "modelCode", modelCode,
+                                "recordId", recordId,
+                                "fieldCount", recordData != null ? recordData.size() : 0)));
     }
 
     private AgentContextBlock ragBlock(Long tenantId, String channel, String ragContext, List<String> kbPids) {
@@ -199,7 +211,10 @@ public class AgentContextAssembler {
                         List.of(),
                         tenantId,
                         channel,
-                        false));
+                        false,
+                        metadata(
+                                "knowledgeBaseIds", kbPids == null ? List.of() : List.copyOf(kbPids),
+                                "sourceCount", kbPids == null ? 0 : kbPids.size())));
     }
 
     private void appendLine(StringBuilder body, String label, String value) {
@@ -223,6 +238,25 @@ public class AgentContextAssembler {
 
     private List<String> recordIds(String recordPid) {
         return hasText(recordPid) ? List.of(recordPid) : List.of();
+    }
+
+    private Map<String, Object> metadata(Object... keyValues) {
+        if (keyValues == null || keyValues.length == 0) {
+            return Map.of();
+        }
+        java.util.LinkedHashMap<String, Object> result = new java.util.LinkedHashMap<>();
+        for (int i = 0; i + 1 < keyValues.length; i += 2) {
+            Object key = keyValues[i];
+            Object value = keyValues[i + 1];
+            if (key == null || value == null) {
+                continue;
+            }
+            if (value instanceof String text && text.isBlank()) {
+                continue;
+            }
+            result.put(String.valueOf(key), value);
+        }
+        return result.isEmpty() ? Map.of() : Map.copyOf(result);
     }
 
     private boolean hasText(String value) {
