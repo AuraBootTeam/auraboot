@@ -39,6 +39,7 @@ class RagDocumentSyncListenerIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     public void setupMocks() {
         super.setupTenantContext();
+        ensureDkSourceTables();
         when(embeddingService.embedBatch(anyLong(), anyList(), anyString()))
                 .thenAnswer(inv -> {
                     List<String> texts = inv.getArgument(1);
@@ -181,6 +182,33 @@ class RagDocumentSyncListenerIntegrationTest extends BaseIntegrationTest {
                 + "VALUES (?, ?, ?, ?, ?, NOW(), NOW())",
                 pid, getTestTenant().getId(), title, content, status);
         return pid;
+    }
+
+    private void ensureDkSourceTables() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS mt_dk_document (
+                    id BIGSERIAL PRIMARY KEY,
+                    pid VARCHAR(64) NOT NULL UNIQUE,
+                    tenant_id BIGINT NOT NULL,
+                    dk_doc_title VARCHAR(300),
+                    dk_doc_content TEXT,
+                    dk_doc_status VARCHAR(50),
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS mt_dk_knowledge_article (
+                    id BIGSERIAL PRIMARY KEY,
+                    pid VARCHAR(64) NOT NULL UNIQUE,
+                    tenant_id BIGINT NOT NULL,
+                    dk_ka_title VARCHAR(300),
+                    dk_ka_content TEXT,
+                    dk_ka_status VARCHAR(50),
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+                """);
     }
 
     private void assertKbExists(String name) {

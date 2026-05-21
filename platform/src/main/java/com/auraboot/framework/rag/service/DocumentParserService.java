@@ -1,6 +1,7 @@
 package com.auraboot.framework.rag.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -69,6 +70,8 @@ public class DocumentParserService {
                 }
             }
             return sb.toString();
+        } catch (NotOfficeXmlFileException e) {
+            throw new IOException("Failed to parse DOCX: " + filePath, e);
         }
     }
 
