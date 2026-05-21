@@ -59,6 +59,37 @@ class ProviderToolCompensationHandlerTest {
     }
 
     @Test
+    @DisplayName("compensate accepts nested business compensation spec and propagates idempotency key")
+    void compensateAcceptsNestedBusinessCompensationSpec() throws Exception {
+        DurableToolExecutionRecord record = record(Map.of(
+                "ticketId", "T-100",
+                "compensation", Map.of(
+                        "toolRef", "custom:reopen_ticket",
+                        "args", Map.of("ticketId", "T-100"),
+                        "idempotencyKey", "comp-run-1")));
+        when(registry.execute(7L, "custom:reopen_ticket",
+                Map.of("ticketId", "T-100", "idempotencyKey", "comp-run-1")))
+                .thenReturn(ProviderExecutionResult.builder()
+                        .success(true)
+                        .data(Map.of("reopened", true))
+                        .durationMs(12)
+                        .build());
+
+        DurableToolCompensationResult result = handler.compensate(record);
+
+        assertThat(result.compensated()).isTrue();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = new ObjectMapper().readValue(result.rawResult(), Map.class);
+        assertThat(payload)
+                .containsEntry("success", true)
+                .containsEntry("provider", "custom:reopen_ticket")
+                .containsEntry("executionKey", record.executionKey())
+                .containsEntry("idempotencyKey", "comp-run-1");
+        verify(registry).execute(7L, "custom:reopen_ticket",
+                Map.of("ticketId", "T-100", "idempotencyKey", "comp-run-1"));
+    }
+
+    @Test
     @DisplayName("failed provider compensation keeps the record compensation-required")
     void failedProviderCompensationKeepsRecordRequired() {
         DurableToolExecutionRecord record = record(Map.of(

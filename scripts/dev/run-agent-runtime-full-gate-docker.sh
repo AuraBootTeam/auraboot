@@ -192,6 +192,7 @@ run_frontend_phase() {
                 SPRING_BOOT_URL="http://localhost:$BE_PORT" \
                 PLAYWRIGHT_BASE_URL="http://localhost:$VITE_PORT" \
                 BFF_URL="http://localhost:$BFF_PORT" \
+                BFF_PORT="$BFF_PORT" \
                 PW_SKIP_WEBSERVER=1 \
                 PW_PROFILE=full \
                 PW_WORKERS=1 \
