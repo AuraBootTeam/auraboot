@@ -283,6 +283,7 @@ function createFieldInputBlockFromModelField(
   existingIds: Set<string>,
 ): DslBlockV3 {
   const baseId = toStableBlockId('field', field.code);
+  const pickerProps = relationPickerPropsForModelField(field);
   return {
     id: createUniqueBlockId(baseId, existingIds),
     blockType: 'field',
@@ -290,10 +291,11 @@ function createFieldInputBlockFromModelField(
     layout: { span: 6 },
     props: {
       label: localizedToString(field.label),
-      component: field.component ?? componentForFieldType(field.type),
+      component: pickerProps ? 'picker' : field.component ?? componentForFieldType(field.type),
       dataType: field.type,
       dictCode: field.dictCode,
       required: Boolean(field.required),
+      ...pickerProps,
     },
   };
 }
@@ -321,16 +323,18 @@ function createFilterFieldBlockFromModelField(
   existingIds: Set<string>,
 ): DslBlockV3 {
   const baseId = toStableBlockId('filter', field.code);
+  const pickerProps = relationPickerPropsForModelField(field);
   return {
     id: createUniqueBlockId(baseId, existingIds),
     blockType: 'filter-field',
     field: field.code,
     props: {
       label: localizedToString(field.label),
-      component: field.component ?? componentForFieldType(field.type),
+      component: pickerProps ? 'picker' : field.component ?? componentForFieldType(field.type),
       dataType: field.type,
       dictCode: field.dictCode,
       operator: defaultFilterOperatorForFieldType(field.type),
+      ...pickerProps,
     },
   };
 }
@@ -358,6 +362,43 @@ function componentForFieldType(type: ModelFieldDefinition['type']): string {
   if (['money', 'currency'].includes(normalizedType)) return 'moneyinput';
   if (['file', 'attachment', 'image'].includes(normalizedType)) return 'upload';
   return 'input';
+}
+
+function relationPickerPropsForModelField(
+  field: ModelFieldDefinition,
+): Record<string, unknown> | null {
+  const refTarget = normalizeModelFieldRefTarget(field.refTarget);
+  if (!refTarget?.modelCode && !isRelationFieldType(field.type)) return null;
+
+  const pickerProps: Record<string, unknown> = {
+    pickerDataSource: 'model',
+    valueField: refTarget?.valueField ?? 'pid',
+    displayField: refTarget?.displayField ?? 'displayName',
+    searchable: true,
+    searchField: refTarget?.displayField ?? 'displayName',
+    pageSize: 20,
+  };
+  if (refTarget?.modelCode) {
+    pickerProps.pickerSource = refTarget.modelCode;
+  }
+  return pickerProps;
+}
+
+function normalizeModelFieldRefTarget(
+  value: ModelFieldDefinition['refTarget'],
+): ModelFieldDefinition['refTarget'] | null {
+  if (!value) return null;
+  const refTarget: ModelFieldDefinition['refTarget'] = {};
+  if (value.modelCode?.trim()) refTarget.modelCode = value.modelCode.trim();
+  if (value.valueField?.trim()) refTarget.valueField = value.valueField.trim();
+  if (value.displayField?.trim()) refTarget.displayField = value.displayField.trim();
+  return Object.keys(refTarget).length > 0 ? refTarget : null;
+}
+
+function isRelationFieldType(type: ModelFieldDefinition['type']): boolean {
+  return ['relation', 'lookup', 'reference', 'ref', 'belongsTo', 'hasOne']
+    .map(normalizeFieldType)
+    .includes(normalizeFieldType(type));
 }
 
 function defaultFilterOperatorForFieldType(type: ModelFieldDefinition['type']): string {

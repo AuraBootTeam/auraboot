@@ -16,10 +16,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,10 +80,56 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
         assertThat(row).containsEntry("mkt_pur_plugin_pid", "PLG-PID");
     }
 
+    @Test
+    @DisplayName("implicit update uses physical JSONB columns even when model metadata has drifted to text")
+    void implicitUpdateUsesPhysicalJsonbColumnsWhenMetadataDrifts() {
+        when(metaModelService.getModelDefinition("bpm_domain_config")).thenReturn(Optional.of(domainConfigModel()));
+        when(dynamicDataMapper.findJsonbColumns("ab_bpm_domain_config"))
+                .thenReturn(Set.of("process_keys", "list_fields", "filter_fields", "sort_fields"));
+        when(dynamicDataMapper.updateWithJsonb(eq("ab_bpm_domain_config"), anyMap(), anyMap(), eq(Set.of(
+                "process_keys",
+                "list_fields",
+                "filter_fields",
+                "sort_fields"
+        )))).thenReturn(1);
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("update");
+        request.setTargetRecordId("BPM-DOMAIN-001");
+
+        CommandFieldMapExecutor executor = new CommandFieldMapExecutor(dynamicDataMapper, metaModelService);
+        executor.executeImplicitFieldMapPhase(
+                Map.of("type", "update", "inputFields", List.of("domain_name", "sort_fields")),
+                Map.of("domain_name", "BPM Domain", "sort_fields", "[]"),
+                100L,
+                request,
+                domainCommand());
+
+        ArgumentCaptor<Map<String, Object>> dataCaptor = mapCaptor();
+        verify(dynamicDataMapper).updateWithJsonb(eq("ab_bpm_domain_config"), dataCaptor.capture(), anyMap(), eq(Set.of(
+                "process_keys",
+                "list_fields",
+                "filter_fields",
+                "sort_fields"
+        )));
+        verify(dynamicDataMapper, never()).update(eq("ab_bpm_domain_config"), anyMap(), anyMap());
+
+        Map<String, Object> row = dataCaptor.getValue();
+        assertThat(row).containsEntry("domain_name", "BPM Domain");
+        assertThat(row).containsEntry("sort_fields", "[]");
+    }
+
     private CommandDefinition command() {
         CommandDefinition command = new CommandDefinition();
         command.setCode("mkt:create_purchase");
         command.setModelCode("mkt_purchase");
+        return command;
+    }
+
+    private CommandDefinition domainCommand() {
+        CommandDefinition command = new CommandDefinition();
+        command.setCode("admin:update_bpm_domain_config");
+        command.setModelCode("bpm_domain_config");
         return command;
     }
 
@@ -115,6 +163,31 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
                 .code(code)
                 .columnName(code)
                 .dataType("string")
+                .build();
+    }
+
+    private ModelDefinition domainConfigModel() {
+        return ModelDefinition.builder()
+                .code("bpm_domain_config")
+                .tableName("ab_bpm_domain_config")
+                .fields(List.of(
+                        string("domain_name"),
+                        text("process_keys"),
+                        text("list_fields"),
+                        text("filter_fields"),
+                        text("sort_fields"),
+                        string("tenant_id"),
+                        string("pid"),
+                        string("updated_at")
+                ))
+                .build();
+    }
+
+    private FieldDefinition text(String code) {
+        return FieldDefinition.builder()
+                .code(code)
+                .columnName(code)
+                .dataType("text")
                 .build();
     }
 
