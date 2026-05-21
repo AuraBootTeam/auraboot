@@ -313,6 +313,7 @@ function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: Runtime
 }
 
 function RuntimeAiFillBanner({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const formContext = React.useContext(RuntimeFormValueContext);
   const [applied, setApplied] = React.useState(false);
   const { runtimeData, loading, runtimeError, permissionCode, permissionAllowed } =
     useRuntimeHelperBlockData(
@@ -336,6 +337,14 @@ function RuntimeAiFillBanner({ block, runtimeServices, pageContext, blockPath }:
     getStringProp(runtimeData?.emptyText) ||
     getStringProp(block.props?.emptyText) ||
     'No suggestions';
+  const applySuggestions = () => {
+    suggestedFields.forEach((field) => {
+      if (field.field) {
+        formContext?.setValue(field.field, field.value);
+      }
+    });
+    setApplied(true);
+  };
 
   return (
     <section
@@ -365,7 +374,7 @@ function RuntimeAiFillBanner({ block, runtimeServices, pageContext, blockPath }:
           type="button"
           className="rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
           data-testid={`runtime-ai-fill-apply-${block.id}`}
-          onClick={() => setApplied(true)}
+          onClick={applySuggestions}
         >
           Apply suggestions
         </button>
@@ -750,20 +759,22 @@ function RuntimeHelperDataStatus({
 }
 
 function RuntimeForm({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const hasPermission = React.useContext(RuntimePermissionContext);
   const [values, setValues] = React.useState<Record<string, unknown>>({});
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const validate = React.useCallback(() => {
-    const formFields = collectRuntimeVisibleFormFields(block, values);
-    const nextErrors = Object.fromEntries(
-      formFields.flatMap((fieldBlock) => {
+    const formFields = collectRuntimeVisibleFormFields(block, values, hasPermission);
+    const nextErrors = Object.fromEntries([
+      ...formFields.flatMap((fieldBlock) => {
         const fieldKey = fieldBlock.field || fieldBlock.id;
         const error = validateRuntimeFormField(fieldBlock, values[fieldKey]);
         return error ? [[fieldKey, error]] : [];
       }),
-    );
+      ...collectRuntimeNestedFormValidationErrors(block, values, hasPermission),
+    ]);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
-  }, [block, values]);
+  }, [block, hasPermission, values]);
   const formContext = React.useMemo<RuntimeFormContextValue>(
     () => ({
       values,
@@ -774,9 +785,15 @@ function RuntimeForm({ block, runtimeServices, pageContext, blockPath }: Runtime
           [field]: value,
         }));
         setErrors((current) => {
-          if (!current[field]) return current;
+          const nestedPrefix = `${field}.`;
+          if (!current[field] && !Object.keys(current).some((key) => key.startsWith(nestedPrefix))) {
+            return current;
+          }
           const next = { ...current };
           delete next[field];
+          for (const key of Object.keys(next)) {
+            if (key.startsWith(nestedPrefix)) delete next[key];
+          }
           return next;
         });
       },
@@ -799,11 +816,15 @@ function RuntimeForm({ block, runtimeServices, pageContext, blockPath }: Runtime
 }
 
 function RuntimeList({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const hasPermission = React.useContext(RuntimePermissionContext);
   const [selectedById, setSelectedById] = React.useState<Record<string, Record<string, unknown>>>(
     {},
   );
   const [filterValues, setFilterValues] = React.useState<Record<string, unknown>>({});
-  const filterBlocks = React.useMemo(() => collectRuntimeFilterFields(block), [block]);
+  const filterBlocks = React.useMemo(
+    () => collectRuntimeFilterFields(block, hasPermission),
+    [block, hasPermission],
+  );
   const selectionContext = React.useMemo<RuntimeSelectionContextValue>(() => {
     const selectedRowIds = Object.keys(selectedById);
     return {
@@ -910,7 +931,27 @@ function RuntimeSection({ block, runtimeServices, pageContext, blockPath }: Runt
 function RuntimeField({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
   const listContext = React.useContext(RuntimeListSelectionContext);
+  const hasPermission = React.useContext(RuntimePermissionContext);
   if (!isRuntimeBlockVisible(block, formContext?.values)) return null;
+
+  const permissionCode = getRuntimePermissionCode(block);
+  const permissionAllowed = isRuntimeBlockPermissionAllowed(block, hasPermission);
+  if (!permissionAllowed) {
+    return (
+      <div
+        className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm"
+        data-permission-allowed="false"
+        data-permission-code={permissionCode}
+        data-testid={`runtime-field-${block.id}`}
+        style={getSpanGridStyle(block)}
+      >
+        <RuntimePermissionNotice
+          permissionCode={permissionCode}
+          testId={`runtime-field-permission-${block.id}`}
+        />
+      </div>
+    );
+  }
 
   const fieldKey = block.field || block.id;
   const isFormField = block.blockType === 'field' && Boolean(formContext);
@@ -954,12 +995,15 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
         : isFilterField
           ? renderRuntimeFilterControl({
               block,
+              blockPath,
               component,
               fieldKey,
               filterValue,
               stringValue: filterStringValue,
               placeholder,
               listContext,
+              pageContext,
+              runtimeServices,
             })
         : null}
       {helpText ? (
@@ -1201,24 +1245,49 @@ function renderRuntimeFieldControl({
 
 function renderRuntimeFilterControl({
   block,
+  blockPath,
   component,
   fieldKey,
   filterValue,
   stringValue,
   placeholder,
   listContext,
+  pageContext,
+  runtimeServices,
 }: {
   block: DslBlockV3;
+  blockPath: string[];
   component: RuntimeFieldComponent;
   fieldKey: string;
   filterValue: unknown;
   stringValue: string;
   placeholder: string;
   listContext: RuntimeSelectionContextValue | null;
+  pageContext: RuntimePageContext;
+  runtimeServices?: RuntimeExecutionServices;
 }) {
   const baseClass =
     'mt-2 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400';
   const setFilterValue = (value: unknown) => listContext?.setFilterValue(fieldKey, value);
+
+  if (component === 'picker') {
+    return (
+      <RuntimePickerControl
+        baseClass={baseClass}
+        block={block}
+        blockPath={blockPath}
+        controlId={getRuntimeFieldControlId(block, component)}
+        fieldKey={fieldKey}
+        formContext={null}
+        onValueChange={setFilterValue}
+        pageContext={pageContext}
+        placeholder={placeholder || 'All records...'}
+        readOnly={false}
+        runtimeServices={runtimeServices}
+        stringValue={stringValue}
+      />
+    );
+  }
 
   if (component === 'select') {
     const options = getRuntimeSelectOptions(block.props?.options);
@@ -1275,6 +1344,7 @@ function RuntimePickerControl({
   controlId,
   fieldKey,
   formContext,
+  onValueChange,
   pageContext,
   placeholder,
   readOnly,
@@ -1287,6 +1357,7 @@ function RuntimePickerControl({
   controlId: string;
   fieldKey: string;
   formContext: RuntimeFormContextValue | null;
+  onValueChange?: (value: string) => void;
   pageContext: RuntimePageContext;
   placeholder: string;
   readOnly: boolean;
@@ -1387,7 +1458,13 @@ function RuntimePickerControl({
         name={fieldKey}
         disabled={readOnly || loading}
         value={stringValue}
-        onChange={(event) => formContext?.setValue(fieldKey, event.target.value)}
+        onChange={(event) => {
+          if (onValueChange) {
+            onValueChange(event.target.value);
+            return;
+          }
+          formContext?.setValue(fieldKey, event.target.value);
+        }}
       >
         <option value="">{loading ? 'Loading records...' : placeholder || 'Select record...'}</option>
         {options.map((option) => (
@@ -1528,20 +1605,119 @@ function collectRuntimeFormFields(block: DslBlockV3): DslBlockV3[] {
   return block.blockType === 'field' ? [block, ...childFields] : childFields;
 }
 
-function collectRuntimeFilterFields(block: DslBlockV3): DslBlockV3[] {
-  const childFields = block.blocks?.flatMap(collectRuntimeFilterFields) ?? [];
+function collectRuntimeFilterFields(
+  block: DslBlockV3,
+  hasPermission?: (permissionCode: string) => boolean,
+): DslBlockV3[] {
+  if (hasPermission && !isRuntimeBlockPermissionAllowed(block, hasPermission)) return [];
+  const childFields =
+    block.blocks?.flatMap((child) => collectRuntimeFilterFields(child, hasPermission)) ?? [];
   return block.blockType === 'filter-field' ? [block, ...childFields] : childFields;
 }
 
 function collectRuntimeVisibleFormFields(
   block: DslBlockV3,
   values: Record<string, unknown>,
+  hasPermission?: (permissionCode: string) => boolean,
 ): DslBlockV3[] {
   if (!isRuntimeBlockVisible(block, values)) return [];
+  if (hasPermission && !isRuntimeBlockPermissionAllowed(block, hasPermission)) return [];
   if (block.blockType === 'repeater' || block.blockType === 'subform') return [];
   const childFields =
-    block.blocks?.flatMap((child) => collectRuntimeVisibleFormFields(child, values)) ?? [];
+    block.blocks?.flatMap((child) =>
+      collectRuntimeVisibleFormFields(child, values, hasPermission),
+    ) ?? [];
   return block.blockType === 'field' ? [block, ...childFields] : childFields;
+}
+
+function collectRuntimeNestedFormValidationErrors(
+  block: DslBlockV3,
+  values: Record<string, unknown>,
+  hasPermission?: (permissionCode: string) => boolean,
+): Array<[string, string]> {
+  if (!isRuntimeBlockVisible(block, values)) return [];
+  if (hasPermission && !isRuntimeBlockPermissionAllowed(block, hasPermission)) return [];
+
+  const ownErrors =
+    block.blockType === 'repeater' || block.blockType === 'subform'
+      ? collectRuntimeRowContainerValidationErrors(block, values, hasPermission)
+      : [];
+  const childErrors =
+    block.blocks?.flatMap((child) =>
+      collectRuntimeNestedFormValidationErrors(child, values, hasPermission),
+    ) ?? [];
+  return [...ownErrors, ...childErrors];
+}
+
+function collectRuntimeRowContainerValidationErrors(
+  block: DslBlockV3,
+  values: Record<string, unknown>,
+  hasPermission?: (permissionCode: string) => boolean,
+): Array<[string, string]> {
+  const containerKey = block.field || block.id;
+  const rowsValue = values[containerKey];
+  const rows = Array.isArray(rowsValue)
+    ? rowsValue.filter(isRecord).map((row) => ({ ...row }))
+    : getRuntimeRepeaterRows(block);
+
+  return rows.flatMap((row, rowIndex) => {
+    const fieldBlocks =
+      block.blockType === 'repeater'
+        ? getRuntimeRepeaterFieldBlocks(block).filter((fieldBlock) =>
+            isRuntimeRowFieldValidationAllowed(fieldBlock, row, hasPermission),
+          )
+        : block.blocks?.flatMap((child) =>
+            collectRuntimeVisibleSubformRowFields(child, row, hasPermission),
+          ) ?? [];
+
+    return fieldBlocks.flatMap((fieldBlock) => {
+      const fieldKey = getRuntimeRepeaterFieldKey(fieldBlock);
+      const error = validateRuntimeFormField(fieldBlock, row[fieldKey]);
+      return error
+        ? [
+            [getRuntimeNestedFieldErrorKey(containerKey, rowIndex, fieldKey), error] as [
+              string,
+              string,
+            ],
+          ]
+        : [];
+    });
+  });
+}
+
+function collectRuntimeVisibleSubformRowFields(
+  block: DslBlockV3,
+  row: Record<string, unknown>,
+  hasPermission?: (permissionCode: string) => boolean,
+): DslBlockV3[] {
+  if (!isRuntimeBlockVisible(block, row)) return [];
+  if (hasPermission && !isRuntimeBlockPermissionAllowed(block, hasPermission)) return [];
+  if (block.blockType === 'field') return [block];
+  if (block.blockType === 'repeater' || block.blockType === 'subform') return [];
+  return (
+    block.blocks?.flatMap((child) =>
+      collectRuntimeVisibleSubformRowFields(child, row, hasPermission),
+    ) ?? []
+  );
+}
+
+function isRuntimeRowFieldValidationAllowed(
+  block: DslBlockV3,
+  row: Record<string, unknown>,
+  hasPermission?: (permissionCode: string) => boolean,
+): boolean {
+  return (
+    isRuntimeBlockVisible(block, row) &&
+    (!hasPermission || isRuntimeBlockPermissionAllowed(block, hasPermission))
+  );
+}
+
+function getRuntimeNestedFieldErrorKey(
+  containerKey: string,
+  rowIndex: number,
+  fieldKey: string,
+): string {
+  return `${containerKey}.${rowIndex}.${fieldKey}`;
 }
 
 function validateRuntimeFormField(block: DslBlockV3, value: unknown): string | null {
@@ -1612,6 +1788,16 @@ function isRuntimeBlockVisible(
   return evaluateRuntimeVisibleWhen(rule, values);
 }
 
+function isRuntimeBlockDisabled(
+  block: DslBlockV3,
+  values: Record<string, unknown> | undefined,
+): boolean {
+  const rule = block.props?.disabledWhen;
+  if (rule === undefined || rule === null) return false;
+  if (!values) return false;
+  return evaluateRuntimeVisibleWhen(rule, values);
+}
+
 function evaluateRuntimeVisibleWhen(rule: unknown, values: Record<string, unknown>): boolean {
   if (Array.isArray(rule)) return rule.every((item) => evaluateRuntimeVisibleWhen(item, values));
   if (!isRecord(rule)) return Boolean(rule);
@@ -1626,7 +1812,7 @@ function evaluateRuntimeVisibleWhen(rule: unknown, values: Record<string, unknow
   const field = getStringProp(rule.field);
   if (!field) return true;
 
-  const actualValue = values[field];
+  const actualValue = getRuntimeConditionValue(values, field);
   const expectedValue = rule.value;
   const operator = normalizeRuntimeVisibleOperator(rule.operator);
 
@@ -1642,6 +1828,14 @@ function evaluateRuntimeVisibleWhen(rule: unknown, values: Record<string, unknow
   if (operator === 'lte') return compareRuntimeNumbers(actualValue, expectedValue) <= 0;
 
   return runtimeValuesEqual(actualValue, expectedValue);
+}
+
+function getRuntimeConditionValue(values: Record<string, unknown>, field: string): unknown {
+  if (Object.prototype.hasOwnProperty.call(values, field)) return values[field];
+  return field.split('.').reduce<unknown>((current, part) => {
+    if (!isRecord(current)) return undefined;
+    return current[part];
+  }, values);
 }
 
 function normalizeRuntimeVisibleOperator(value: unknown): string {
@@ -1696,7 +1890,7 @@ function isRuntimeFieldValueEmpty(value: unknown): boolean {
 
 function RuntimeRepeater({ block }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
-  const visible = isRuntimeBlockVisible(block, formContext?.values);
+  if (!isRuntimeBlockVisible(block, formContext?.values)) return null;
 
   const repeaterKey = block.field || block.id;
   const fieldBlocks = getRuntimeRepeaterFieldBlocks(block);
@@ -1706,10 +1900,10 @@ function RuntimeRepeater({ block }: RuntimeBlockProps) {
   const hasSeededFormValue = React.useRef(false);
 
   React.useEffect(() => {
-    if (!visible || !formContext || hasSeededFormValue.current) return;
+    if (!formContext || hasSeededFormValue.current) return;
     hasSeededFormValue.current = true;
     formContext.setValue(repeaterKey, rows);
-  }, [formContext, repeaterKey, rows, visible]);
+  }, [formContext, repeaterKey, rows]);
 
   const updateRows = React.useCallback(
     (resolveNextRows: (currentRows: Array<Record<string, unknown>>) => Array<Record<string, unknown>>) => {
@@ -1738,8 +1932,6 @@ function RuntimeRepeater({ block }: RuntimeBlockProps) {
     },
     [updateRows],
   );
-
-  if (!visible) return null;
 
   return (
     <section
@@ -1791,6 +1983,15 @@ function RuntimeRepeater({ block }: RuntimeBlockProps) {
                   fieldBlock={fieldBlock}
                   row={row}
                   rowIndex={rowIndex}
+                  error={
+                    formContext?.errors[
+                      getRuntimeNestedFieldErrorKey(
+                        repeaterKey,
+                        rowIndex,
+                        getRuntimeRepeaterFieldKey(fieldBlock),
+                      )
+                    ]
+                  }
                   onChange={updateRowField}
                 />
               ))}
@@ -1816,6 +2017,7 @@ function RuntimeRepeaterField({
   row,
   rowIndex,
   onChange,
+  error,
   controlIdPrefix = 'runtime-repeater-control',
   testIdPrefix = 'runtime-repeater-input',
 }: {
@@ -1824,6 +2026,7 @@ function RuntimeRepeaterField({
   row: Record<string, unknown>;
   rowIndex: number;
   onChange: (rowIndex: number, fieldBlock: DslBlockV3, value: unknown) => void;
+  error?: string;
   controlIdPrefix?: string;
   testIdPrefix?: string;
 }) {
@@ -1908,13 +2111,21 @@ function RuntimeRepeaterField({
           onChange={(event) => onChange(rowIndex, fieldBlock, event.target.value)}
         />
       )}
+      {error ? (
+        <span
+          className="mt-1 block text-xs font-medium text-red-600"
+          data-testid={`${testIdPrefix}-error-${block.id}-${rowIndex}-${fieldBlock.id}`}
+        >
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
 
 function RuntimeSubform({ block }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
-  const visible = isRuntimeBlockVisible(block, formContext?.values);
+  if (!isRuntimeBlockVisible(block, formContext?.values)) return null;
 
   const subformKey = block.field || block.id;
   const [rows, setRows] = React.useState<Array<Record<string, unknown>>>(() =>
@@ -1923,10 +2134,10 @@ function RuntimeSubform({ block }: RuntimeBlockProps) {
   const hasSeededFormValue = React.useRef(false);
 
   React.useEffect(() => {
-    if (!visible || !formContext || hasSeededFormValue.current) return;
+    if (!formContext || hasSeededFormValue.current) return;
     hasSeededFormValue.current = true;
     formContext.setValue(subformKey, rows);
-  }, [formContext, rows, subformKey, visible]);
+  }, [formContext, rows, subformKey]);
 
   const updateRows = React.useCallback(
     (
@@ -1959,8 +2170,6 @@ function RuntimeSubform({ block }: RuntimeBlockProps) {
     },
     [updateRows],
   );
-
-  if (!visible) return null;
 
   return (
     <section
@@ -2012,6 +2221,7 @@ function RuntimeSubform({ block }: RuntimeBlockProps) {
                   block={child}
                   row={row}
                   rowIndex={rowIndex}
+                  errors={formContext?.errors ?? {}}
                   onChange={updateRowField}
                 />
               ))}
@@ -2036,21 +2246,26 @@ function RuntimeSubformRowBlock({
   block,
   row,
   rowIndex,
+  errors,
   onChange,
 }: {
   parentBlock: DslBlockV3;
   block: DslBlockV3;
   row: Record<string, unknown>;
   rowIndex: number;
+  errors: Record<string, string>;
   onChange: (rowIndex: number, fieldBlock: DslBlockV3, value: unknown) => void;
 }) {
   if (block.blockType === 'field') {
+    const subformKey = parentBlock.field || parentBlock.id;
+    const fieldKey = getRuntimeRepeaterFieldKey(block);
     return (
       <RuntimeRepeaterField
         block={parentBlock}
         fieldBlock={block}
         row={row}
         rowIndex={rowIndex}
+        error={errors[getRuntimeNestedFieldErrorKey(subformKey, rowIndex, fieldKey)]}
         onChange={onChange}
         controlIdPrefix="runtime-subform-control"
         testIdPrefix="runtime-subform-input"
@@ -2074,6 +2289,7 @@ function RuntimeSubformRowBlock({
               block={child}
               row={row}
               rowIndex={rowIndex}
+              errors={errors}
               onChange={onChange}
             />
           ))}
@@ -2097,6 +2313,7 @@ function RuntimeSubformRowBlock({
               block={child}
               row={row}
               rowIndex={rowIndex}
+              errors={errors}
               onChange={onChange}
             />
           ))}
@@ -2128,10 +2345,14 @@ function getRuntimeRepeaterFieldKey(block: DslBlockV3): string {
 
 function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
   const selectionContext = React.useContext(RuntimeListSelectionContext);
+  const hasPermission = React.useContext(RuntimePermissionContext);
   const rows = applyRuntimeListFilters(getRuntimeTableRows(block), selectionContext);
-  const columnBlocks = getRuntimeTableColumnBlocks(block);
+  const configuredColumnBlocks = getRuntimeTableColumnBlocks(block);
+  const columnBlocks = configuredColumnBlocks.filter((child) =>
+    isRuntimeBlockPermissionAllowed(child, hasPermission),
+  );
   const rowActionBlocks = getRuntimeTableRowActionBlocks(block);
-  const columns = getRuntimeTableColumns(block, rows);
+  const columns = getRuntimeTableColumns(block, rows, columnBlocks, configuredColumnBlocks.length > 0);
 
   return (
     <div className="rounded-md border border-slate-200" data-testid={`runtime-block-${block.id}`}>
@@ -2238,6 +2459,9 @@ function getRuntimeTableRowActionBlocks(block: DslBlockV3): DslBlockV3[] {
 }
 
 function RuntimeColumn({ block }: { block: DslBlockV3 }) {
+  const hasPermission = React.useContext(RuntimePermissionContext);
+  if (!isRuntimeBlockPermissionAllowed(block, hasPermission)) return null;
+
   return (
     <div
       className="border-r border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 last:border-r-0"
@@ -2299,13 +2523,11 @@ function matchesRuntimeListFilter(
 function getRuntimeTableColumns(
   block: DslBlockV3,
   rows: Array<Record<string, unknown>>,
+  columnBlocks = getRuntimeTableColumnBlocks(block),
+  hasConfiguredColumns = Boolean(block.blocks?.some((child) => child.blockType === 'column')),
 ): string[] {
-  const configuredColumns =
-    block.blocks
-      ?.filter((child) => child.blockType === 'column')
-      .map((child) => child.field || child.id)
-      .filter(Boolean) ?? [];
-  if (configuredColumns.length) return configuredColumns;
+  const configuredColumns = columnBlocks.map((child) => child.field || child.id).filter(Boolean);
+  if (hasConfiguredColumns) return configuredColumns;
   return Object.keys(rows[0] ?? {});
 }
 
@@ -2375,6 +2597,13 @@ function RuntimeAction({
   const href = getStringProp(block.props?.to);
   const permissionCode = getRuntimePermissionCode(block);
   const permissionAllowed = permissionCode ? hasPermission(permissionCode) : true;
+  const conditionValues = getRuntimeActionConditionValues({
+    formValues: formContext?.values,
+    currentRow,
+    currentRowId,
+  });
+  const visibleByCondition = isRuntimeBlockVisible(block, conditionValues);
+  const disabledByCondition = isRuntimeBlockDisabled(block, conditionValues);
   const liveExecution = Boolean(
     runtimeServices?.executeAction &&
       shouldExecuteLiveAction(block) &&
@@ -2382,7 +2611,7 @@ function RuntimeAction({
   );
 
   const executeAction = () => {
-    if (!permissionAllowed) return;
+    if (!permissionAllowed || disabledByCondition || !visibleByCondition) return;
 
     if (formContext && shouldValidateFormBeforeAction(block) && !formContext.validate()) {
       setPendingConfirm(false);
@@ -2439,7 +2668,9 @@ function RuntimeAction({
     setStatus(getActionStatus(block));
   };
   const actionTestIds = getRuntimeActionTestIds(block, testIds);
-  const disabled = executing || !permissionAllowed;
+  if (!visibleByCondition) return null;
+
+  const disabled = executing || !permissionAllowed || disabledByCondition;
 
   return (
     <div className="min-w-0" data-testid={actionTestIds.wrapper}>
@@ -2458,6 +2689,7 @@ function RuntimeAction({
         data-href={href || undefined}
         data-permission-code={permissionCode || undefined}
         data-permission-allowed={permissionCode ? String(permissionAllowed) : undefined}
+        data-condition-disabled={disabledByCondition ? 'true' : undefined}
         disabled={disabled}
         onClick={executeAction}
       >
@@ -2970,6 +3202,54 @@ function getBlockLabel(block: DslBlockV3): string {
 
 function getRuntimePermissionCode(block: DslBlockV3): string {
   return getStringProp(block.props?.permissionCode) || getStringProp(block.props?.permission);
+}
+
+function isRuntimeBlockPermissionAllowed(
+  block: DslBlockV3,
+  hasPermission: (permissionCode: string) => boolean,
+): boolean {
+  const permissionCode = getRuntimePermissionCode(block);
+  return permissionCode ? hasPermission(permissionCode) : true;
+}
+
+function RuntimePermissionNotice({
+  permissionCode,
+  testId,
+}: {
+  permissionCode: string;
+  testId: string;
+}) {
+  return (
+    <div
+      className="text-xs font-medium text-amber-700"
+      data-permission-allowed="false"
+      data-permission-code={permissionCode}
+      data-testid={testId}
+    >
+      Requires permission: {permissionCode}
+    </div>
+  );
+}
+
+function getRuntimeActionConditionValues({
+  formValues,
+  currentRow,
+  currentRowId,
+}: {
+  formValues?: Record<string, unknown>;
+  currentRow?: Record<string, unknown>;
+  currentRowId?: string;
+}): Record<string, unknown> | undefined {
+  if (currentRow) {
+    return {
+      ...currentRow,
+      current: {
+        row: currentRow,
+        rowId: currentRowId,
+      },
+    };
+  }
+  return formValues;
 }
 
 function shouldExecuteLiveAction(block: DslBlockV3): boolean {

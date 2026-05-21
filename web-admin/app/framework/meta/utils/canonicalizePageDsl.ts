@@ -175,6 +175,131 @@ function normalizeColumns(columns: unknown): unknown {
   return columns.map((column) => normalizeColumn(column as ColumnConfig));
 }
 
+function isRecursiveRuntimeRoot(block: Record<string, any>, kind: string): boolean {
+  if (!block || typeof block !== 'object') return false;
+  if (!Array.isArray(block.blocks)) return false;
+  return block.blockType === kind || block.blockType === 'composite';
+}
+
+function normalizeRecursiveBlocksForLegacyRuntime(
+  kind: string,
+  blocks: unknown,
+): BlockConfig[] {
+  if (!Array.isArray(blocks)) return [];
+  return blocks.flatMap((block) => {
+    if (!block || typeof block !== 'object') return [];
+    const typedBlock = block as Record<string, any>;
+    if (isRecursiveRuntimeRoot(typedBlock, kind)) {
+      return normalizeRecursiveBlocksForLegacyRuntime(kind, typedBlock.blocks);
+    }
+    if (Array.isArray(typedBlock.blocks)) {
+      return [normalizeRecursiveBlockForLegacyRuntime(typedBlock) as BlockConfig];
+    }
+    return [typedBlock as BlockConfig];
+  });
+}
+
+function normalizeRecursiveBlockForLegacyRuntime(block: Record<string, any>): Record<string, any> {
+  if (block.blockType === 'form-section' || block.blockType === 'detail-section') {
+    const { blocks: childBlocks, props, ...rest } = block;
+    return {
+      ...rest,
+      ...(props && typeof props === 'object' ? props : {}),
+      fields: Array.isArray(childBlocks)
+        ? childBlocks
+            .filter((child) => child?.blockType === 'field')
+            .map((child) => normalizeRecursiveFieldRef(child))
+        : [],
+    };
+  }
+
+  if (block.blockType === 'filter-bar') {
+    const { blocks: childBlocks, props, ...rest } = block;
+    return {
+      ...rest,
+      ...(props && typeof props === 'object' ? props : {}),
+      blockType: 'filters',
+      fields: Array.isArray(childBlocks)
+        ? childBlocks
+            .filter((child) => child?.blockType === 'filter-field')
+            .map((child) => normalizeRecursiveFieldRef(child))
+        : [],
+    };
+  }
+
+  if (block.blockType === 'table') {
+    const { blocks: childBlocks, props, ...rest } = block;
+    return {
+      ...rest,
+      ...(props && typeof props === 'object' ? props : {}),
+      columns: Array.isArray(childBlocks)
+        ? childBlocks
+            .filter((child) => child?.blockType === 'column')
+            .map((child) => normalizeRecursiveColumnRef(child))
+        : block.columns,
+    };
+  }
+
+  if (block.blockType === 'action-bar') {
+    const { blocks: childBlocks, props, region, ...rest } = block;
+    return {
+      ...rest,
+      ...(props && typeof props === 'object' ? props : {}),
+      region,
+      blockType: region === 'footer' ? 'form-buttons' : 'toolbar',
+      buttons: Array.isArray(childBlocks)
+        ? childBlocks
+            .filter((child) => child?.blockType === 'action')
+            .map((child) => normalizeRecursiveActionRef(child))
+        : block.buttons,
+    };
+  }
+
+  if (Array.isArray(block.blocks)) {
+    return {
+      ...block,
+      blocks: block.blocks.map((child) =>
+        child && typeof child === 'object'
+          ? normalizeRecursiveBlockForLegacyRuntime(child)
+          : child,
+      ),
+    };
+  }
+
+  return block;
+}
+
+function normalizeRecursiveFieldRef(block: Record<string, any>): Record<string, any> {
+  const { blockType: _blockType, blocks: _blocks, props, layout, ...rest } = block;
+  return {
+    ...(props && typeof props === 'object' ? props : {}),
+    ...rest,
+    ...(layout && typeof layout === 'object' && typeof layout.span === 'number'
+      ? { colSpan: layout.span }
+      : {}),
+  };
+}
+
+function normalizeRecursiveColumnRef(block: Record<string, any>): Record<string, any> {
+  const { blockType: _blockType, blocks: _blocks, props, layout, ...rest } = block;
+  return {
+    ...(props && typeof props === 'object' ? props : {}),
+    ...rest,
+    ...(layout && typeof layout === 'object' && typeof layout.width === 'number'
+      ? { width: layout.width }
+      : {}),
+  };
+}
+
+function normalizeRecursiveActionRef(block: Record<string, any>): Record<string, any> {
+  const { blockType: _blockType, blocks: _blocks, props, actionType, ...rest } = block;
+  return {
+    ...(props && typeof props === 'object' ? props : {}),
+    ...rest,
+    ...(actionType && !props?.action && { action: actionType }),
+  };
+}
+
 function normalizeBlock(
   block: BlockConfig,
   dataSources: Record<string, DataSourceConfig>,
@@ -208,7 +333,7 @@ function normalizeBlock(
     result.columns = normalizeColumns(result.columns) as ColumnConfig[];
   }
 
-  if (result.table?.columns) {
+  if (result.table) {
     const tableDataSource = (result.table as any).dataSource;
     let normalizedTableDataSource = tableDataSource;
     if (tableDataSource && typeof tableDataSource === 'object' && !Array.isArray(tableDataSource)) {
@@ -217,11 +342,14 @@ function normalizeBlock(
       dataSources[id] = { ...source, id };
       normalizedTableDataSource = id;
     }
+    const tableColumns = Array.isArray(result.table.columns) ? result.table.columns : result.columns;
 
     result.table = {
       ...result.table,
       dataSource: normalizedTableDataSource,
-      columns: normalizeColumns(result.table.columns) as ColumnConfig[],
+      ...(Array.isArray(tableColumns)
+        ? { columns: normalizeColumns(tableColumns) as ColumnConfig[] }
+        : {}),
       rowActions: Array.isArray(result.table.rowActions)
         ? result.table.rowActions.map(normalizeButton)
         : result.table.rowActions,
@@ -259,7 +387,10 @@ export function canonicalizePageSchemaDto(pageSchemaDTO: PageSchemaDTO): Unified
     kind: pageSchemaDTO.kind,
     title: resolveTitle(pageSchemaDTO),
     name: pageSchemaDTO.name,
-    blocks: pageSchemaDTO.blocks || [],
+    blocks: normalizeRecursiveBlocksForLegacyRuntime(
+      pageSchemaDTO.kind,
+      pageSchemaDTO.blocks || [],
+    ),
     layout: pageSchemaDTO.layout || { type: 'stack' },
     profile: pageSchemaDTO.profile || 'admin',
     schemaVersion: pageSchemaDTO.schemaVersion ?? undefined,
