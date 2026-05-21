@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   getAgentRunDetail,
+  getAgentRunRuntimeOps,
   type AgentRunDetail,
   type AgentActionItem,
   type AgentInterruptItem,
@@ -25,6 +26,8 @@ import {
   type AgentConversationTurnReplay,
   type AgentConversationMessageItem,
   type AgentResultContractItem,
+  type AgentRuntimeOps,
+  type AgentRuntimeOpsRow,
 } from '../services/agentRunsApi';
 import LiveStreamSection from './LiveStreamSection';
 import { ResultContractView } from './ResultContractView';
@@ -93,6 +96,21 @@ function prettyJson(raw: string | null | undefined): string {
   }
 }
 
+function runtimeValue(row: AgentRuntimeOpsRow, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== null && value !== undefined && String(value) !== '') {
+      return String(value);
+    }
+  }
+  return '-';
+}
+
+function runtimeRowId(row: AgentRuntimeOpsRow, fallback: string, ...keys: string[]): string {
+  const value = runtimeValue(row, ...keys);
+  return value === '-' ? fallback : value;
+}
+
 // ---------------------------------------------------------------------------
 // Section components
 // ---------------------------------------------------------------------------
@@ -121,6 +139,185 @@ function MetadataSection({ run }: { run: AgentRunListItem }) {
           </div>
         ))}
       </dl>
+    </section>
+  );
+}
+
+function RuntimeSummaryStat({
+  label,
+  value,
+  testId,
+}: {
+  label: string;
+  value: number;
+  testId: string;
+}) {
+  return (
+    <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2">
+      <div className="text-[11px] font-medium text-gray-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold tabular-nums text-gray-900" data-testid={testId}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function RuntimeMiniTable({
+  title,
+  rows,
+  rowPrefix,
+  idKeys,
+  columns,
+  emptyText,
+}: {
+  title: string;
+  rows: AgentRuntimeOpsRow[];
+  rowPrefix: string;
+  idKeys: string[];
+  columns: Array<{ label: string; keys: string[]; mono?: boolean }>;
+  emptyText: string;
+}) {
+  return (
+    <div>
+      <h4 className="mb-2 text-xs font-semibold text-gray-600">
+        {title} ({rows.length})
+      </h4>
+      {rows.length === 0 ? (
+        <div className="text-xs text-gray-500">{emptyText}</div>
+      ) : (
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-gray-200 text-left text-gray-500">
+              {columns.map((column) => (
+                <th key={column.label} className="py-1 pr-2">
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const id = runtimeRowId(row, String(index), ...idKeys);
+              return (
+                <tr key={`${rowPrefix}-${id}`} className="border-b border-gray-100" data-testid={`runtime-row-${rowPrefix}-${id}`}>
+                  {columns.map((column) => (
+                    <td
+                      key={column.label}
+                      className={`py-1 pr-2 align-top ${column.mono ? 'break-all font-mono' : ''}`}
+                    >
+                      {runtimeValue(row, ...column.keys)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function RuntimeDiagnosticsSection({
+  runtimeOps,
+  loading,
+  error,
+}: {
+  runtimeOps: AgentRuntimeOps | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const summary = runtimeOps?.summary;
+  return (
+    <section data-testid="drawer-section-runtime-diagnostics" className="border-b border-gray-200 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-gray-700">Runtime Diagnostics</h3>
+        {runtimeOps && (
+          <span className="text-[11px] text-gray-500">
+            limit {runtimeOps.limit} · pending scope {runtimeOps.pendingToolExecutionScope}
+          </span>
+        )}
+      </div>
+      {loading && (
+        <div className="text-xs text-gray-500" data-testid="runtime-diagnostics-loading">
+          Loading runtime diagnostics…
+        </div>
+      )}
+      {error && (
+        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" data-testid="runtime-diagnostics-error">
+          {error}
+        </div>
+      )}
+      {!loading && !error && !runtimeOps && (
+        <div className="text-xs text-gray-500">No runtime diagnostics.</div>
+      )}
+      {summary && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <RuntimeSummaryStat
+              label="Approval pending"
+              value={summary.approvalPending}
+              testId="runtime-summary-approvalPending"
+            />
+            <RuntimeSummaryStat
+              label="Pending running"
+              value={summary.pendingToolRunning}
+              testId="runtime-summary-pendingToolRunning"
+            />
+            <RuntimeSummaryStat
+              label="Compensation required"
+              value={summary.durableCompensationRequired}
+              testId="runtime-summary-durableCompensationRequired"
+            />
+            <RuntimeSummaryStat
+              label="Checkpoints"
+              value={summary.checkpointCount}
+              testId="runtime-summary-checkpointCount"
+            />
+          </div>
+          <div className="grid gap-4">
+            <RuntimeMiniTable
+              title="Approvals"
+              rows={runtimeOps.approvals}
+              rowPrefix="approval"
+              idKeys={['approvalPid', 'pid']}
+              emptyText="No approval rows."
+              columns={[
+                { label: 'PID', keys: ['approvalPid', 'pid'], mono: true },
+                { label: 'Status', keys: ['approvalStatus', 'status'] },
+                { label: 'Type', keys: ['approvalType'] },
+                { label: 'Created', keys: ['createdAt'] },
+              ]}
+            />
+            <RuntimeMiniTable
+              title="Pending Tool Executions"
+              rows={runtimeOps.pendingToolExecutions}
+              rowPrefix="pending"
+              idKeys={['executionKey', 'clientRequestId', 'requestHash']}
+              emptyText="No pending tool execution rows."
+              columns={[
+                { label: 'Execution', keys: ['executionKey', 'clientRequestId'], mono: true },
+                { label: 'Status', keys: ['status'] },
+                { label: 'Command', keys: ['commandCode'], mono: true },
+                { label: 'Created', keys: ['createdAt'] },
+              ]}
+            />
+            <RuntimeMiniTable
+              title="Durable Tool Executions"
+              rows={runtimeOps.durableToolExecutions}
+              rowPrefix="durable"
+              idKeys={['executionKey', 'clientRequestId', 'requestHash']}
+              emptyText="No durable tool execution rows."
+              columns={[
+                { label: 'Execution', keys: ['executionKey', 'clientRequestId'], mono: true },
+                { label: 'Status', keys: ['status'] },
+                { label: 'Command', keys: ['commandCode'], mono: true },
+                { label: 'Created', keys: ['createdAt'] },
+              ]}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -549,6 +746,9 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
   const [detail, setDetail] = useState<AgentRunDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [runtimeOps, setRuntimeOps] = useState<AgentRuntimeOps | null>(null);
+  const [runtimeOpsLoading, setRuntimeOpsLoading] = useState(false);
+  const [runtimeOpsError, setRuntimeOpsError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DrawerTab>('overview');
   const [selectedResultContractId, setSelectedResultContractId] = useState<string | null>(null);
 
@@ -560,6 +760,7 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
   useEffect(() => {
     if (!runId) {
       setDetail(null);
+      setRuntimeOps(null);
       return;
     }
     let cancelled = false;
@@ -577,6 +778,37 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [runId]);
+
+  useEffect(() => {
+    if (!runId) {
+      setRuntimeOps(null);
+      setRuntimeOpsError(null);
+      return;
+    }
+    let cancelled = false;
+    setRuntimeOps(null);
+    setRuntimeOpsLoading(true);
+    setRuntimeOpsError(null);
+    getAgentRunRuntimeOps(runId, 20)
+      .then((ops) => {
+        if (!cancelled) {
+          setRuntimeOps(ops);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) {
+          setRuntimeOpsError(e.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRuntimeOpsLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -691,6 +923,11 @@ export default function AgentRunDetailDrawer({ runId, onClose, onSelectRun }: Pr
             {activeTab === 'overview' && (
               <>
                 <MetadataSection run={detail.run} />
+                <RuntimeDiagnosticsSection
+                  runtimeOps={runtimeOps}
+                  loading={runtimeOpsLoading}
+                  error={runtimeOpsError}
+                />
                 <ActionsSection
                   actions={detail.actions}
                   onOpenResult={(contractId) => {
