@@ -40,6 +40,12 @@ const defaultFields: PropertySchema<string>[] = [
   { key: 'region', label: 'Region', type: 'text' },
 ];
 
+const permissionCodeField: PropertySchema<string> = {
+  key: 'props.permissionCode',
+  label: 'Permission code',
+  type: 'text',
+};
+
 const modelContainerFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'dataSource.model', label: 'Model', type: 'model' },
@@ -104,6 +110,7 @@ const fieldFields: PropertySchema<string>[] = [
   { key: 'props.dictCode', label: 'Dict code', type: 'text' },
   { key: 'props.required', label: 'Required', type: 'boolean' },
   { key: 'props.readOnly', label: 'Read only', type: 'boolean' },
+  permissionCodeField,
   { key: 'props.placeholder', label: 'Placeholder', type: 'text' },
   { key: 'props.helpText', label: 'Help text', type: 'text' },
   { key: 'props.options', label: 'Options JSON', type: 'json' },
@@ -164,6 +171,7 @@ const filterFieldFields: PropertySchema<string>[] = [
 const columnFields: PropertySchema<string>[] = [
   { key: 'props.label', label: 'Label', type: 'text' },
   { key: 'field', label: 'Field', type: 'field-select' },
+  permissionCodeField,
   { key: 'props.dataType', label: 'Data type', type: 'text' },
   { key: 'props.dictCode', label: 'Dict code', type: 'text' },
   { key: 'layout.width', label: 'Width', type: 'number' },
@@ -207,7 +215,7 @@ const subformFields: PropertySchema<string>[] = [
 ];
 
 const helperDataSourceFields: PropertySchema<string>[] = [
-  { key: 'props.permissionCode', label: 'Permission code', type: 'text' },
+  permissionCodeField,
   {
     key: 'dataSource.type',
     label: 'Data source',
@@ -302,7 +310,9 @@ const actionBaseFields: PropertySchema<string>[] = [
   { key: 'props.label', label: 'Label', type: 'text' },
   actionTypeField,
   { key: 'props.confirm', label: 'Confirm first', type: 'boolean' },
-  { key: 'props.permissionCode', label: 'Permission code', type: 'text' },
+  permissionCodeField,
+  { key: 'props.visibleWhen', label: 'Visible when JSON', type: 'json' },
+  { key: 'props.disabledWhen', label: 'Disabled when JSON', type: 'json' },
 ];
 
 const actionCommonFeedbackFields: PropertySchema<string>[] = [
