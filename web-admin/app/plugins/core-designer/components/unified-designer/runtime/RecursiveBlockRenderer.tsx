@@ -1890,7 +1890,7 @@ function isRuntimeFieldValueEmpty(value: unknown): boolean {
 
 function RuntimeRepeater({ block }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
-  if (!isRuntimeBlockVisible(block, formContext?.values)) return null;
+  const isVisible = isRuntimeBlockVisible(block, formContext?.values);
 
   const repeaterKey = block.field || block.id;
   const fieldBlocks = getRuntimeRepeaterFieldBlocks(block);
@@ -1900,10 +1900,10 @@ function RuntimeRepeater({ block }: RuntimeBlockProps) {
   const hasSeededFormValue = React.useRef(false);
 
   React.useEffect(() => {
-    if (!formContext || hasSeededFormValue.current) return;
+    if (!isVisible || !formContext || hasSeededFormValue.current) return;
     hasSeededFormValue.current = true;
     formContext.setValue(repeaterKey, rows);
-  }, [formContext, repeaterKey, rows]);
+  }, [formContext, isVisible, repeaterKey, rows]);
 
   const updateRows = React.useCallback(
     (resolveNextRows: (currentRows: Array<Record<string, unknown>>) => Array<Record<string, unknown>>) => {
@@ -1932,6 +1932,8 @@ function RuntimeRepeater({ block }: RuntimeBlockProps) {
     },
     [updateRows],
   );
+
+  if (!isVisible) return null;
 
   return (
     <section
@@ -2125,7 +2127,7 @@ function RuntimeRepeaterField({
 
 function RuntimeSubform({ block }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
-  if (!isRuntimeBlockVisible(block, formContext?.values)) return null;
+  const isVisible = isRuntimeBlockVisible(block, formContext?.values);
 
   const subformKey = block.field || block.id;
   const [rows, setRows] = React.useState<Array<Record<string, unknown>>>(() =>
@@ -2134,10 +2136,10 @@ function RuntimeSubform({ block }: RuntimeBlockProps) {
   const hasSeededFormValue = React.useRef(false);
 
   React.useEffect(() => {
-    if (!formContext || hasSeededFormValue.current) return;
+    if (!isVisible || !formContext || hasSeededFormValue.current) return;
     hasSeededFormValue.current = true;
     formContext.setValue(subformKey, rows);
-  }, [formContext, rows, subformKey]);
+  }, [formContext, isVisible, rows, subformKey]);
 
   const updateRows = React.useCallback(
     (
@@ -2170,6 +2172,8 @@ function RuntimeSubform({ block }: RuntimeBlockProps) {
     },
     [updateRows],
   );
+
+  if (!isVisible) return null;
 
   return (
     <section
