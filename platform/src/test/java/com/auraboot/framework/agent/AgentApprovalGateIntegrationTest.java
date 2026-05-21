@@ -47,9 +47,8 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
      * would return null and almost every test in the class would fail.
      *
      * <p>The {@code approver_rules} include a USER rule for the test user so the
-     * "any tenant user is authorized" expectations in test 10 / 15 still hold
-     * (the source is fail-secure on null/empty rules — see
-     * {@link AgentApprovalGateService#isAuthorizedApprover}).
+     * positive approval paths have an explicit approver. Null / empty policy
+     * rules are tested separately and must fail secure.
      */
     @BeforeEach
     void seedWildcardPolicy() {
@@ -292,27 +291,24 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo("reject");
     }
 
-    // ========== Test 10: isAuthorizedApprover - no policy → any tenant user is authorized ==========
+    // ========== Test 10: isAuthorizedApprover - no policy is fail-secure ==========
 
     @Test
     @Order(10)
-    void isAuthorizedApprover_noPolicyLinked_anyUserAuthorized() {
+    void isAuthorizedApprover_noPolicyLinked_unauthorized() {
         Long tenantId = getTestTenant().getId();
 
-        String approvalPid = approvalGateService.checkAndRequestApproval(
+        String approvalPid = createApprovalWithoutPolicy(
                 tenantId,
                 "run-" + testRunId + "-perm-010",
-                "task-perm-010",
-                "file_read", "Read config file",
-                Map.of("path", "/etc/config"),
-                true);
+                "task-perm-010");
         assertNotNull(approvalPid, "Approval PID must be created");
 
         boolean authorized = approvalGateService.isAuthorizedApprover(
                 tenantId, approvalPid, getTestUser().getId());
         assertThat(authorized)
-                .as("When no policy is linked, any tenant user should be authorized")
-                .isTrue();
+                .as("Approval rows without policy_id must deny all approvers")
+                .isFalse();
     }
 
     // ========== Test 11: isAuthorizedApprover - policy with USER rule matches correct user ==========
@@ -609,6 +605,22 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         approval.put("approval_title", "Security test approval");
         approval.put("approval_status", "pending");
         approval.put("policy_id", policyPid);
+        approval.put("created_at", LocalDateTime.now());
+        approval.put("updated_at", LocalDateTime.now());
+        dynamicDataMapper.insert("ab_agent_approval", approval);
+        return approvalPid;
+    }
+
+    private String createApprovalWithoutPolicy(Long tenantId, String runId, String taskId) {
+        String approvalPid = UniqueIdGenerator.generate();
+        Map<String, Object> approval = new HashMap<>();
+        approval.put("pid", approvalPid);
+        approval.put("tenant_id", tenantId);
+        approval.put("run_id", runId);
+        approval.put("task_id", taskId);
+        approval.put("approval_type", "tool_call");
+        approval.put("approval_title", "Security test approval without policy");
+        approval.put("approval_status", "pending");
         approval.put("created_at", LocalDateTime.now());
         approval.put("updated_at", LocalDateTime.now());
         dynamicDataMapper.insert("ab_agent_approval", approval);

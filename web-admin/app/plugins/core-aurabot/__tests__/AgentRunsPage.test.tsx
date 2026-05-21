@@ -24,14 +24,16 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 // freeze the page's URL-state filters. Re-mock react-router locally so
 // useSearchParams is backed by real React state for this spec. (Per-file
 // vi.mock overrides the setup-level mock for this module graph.)
-const { listAgentRunsMock, getAgentRunDetailMock } = vi.hoisted(() => ({
+const { listAgentRunsMock, getAgentRunDetailMock, getAgentRunRuntimeOpsMock } = vi.hoisted(() => ({
   listAgentRunsMock: vi.fn(),
   getAgentRunDetailMock: vi.fn(),
+  getAgentRunRuntimeOpsMock: vi.fn(),
 }));
 
 vi.mock('../services/agentRunsApi', () => ({
   listAgentRuns: (...args: unknown[]) => listAgentRunsMock(...args),
   getAgentRunDetail: (...args: unknown[]) => getAgentRunDetailMock(...args),
+  getAgentRunRuntimeOps: (...args: unknown[]) => getAgentRunRuntimeOpsMock(...args),
 }));
 
 vi.mock('react-router', async () => {
@@ -138,6 +140,57 @@ const DETAIL_RESPONSE = {
   resultContracts: [],
 };
 
+const RUNTIME_OPS_RESPONSE = {
+  runId: SAMPLE_RUNS[0].runId,
+  limit: 20,
+  summary: {
+    approvalPending: 1,
+    approvalTerminal: 2,
+    pendingToolRunning: 1,
+    pendingToolSucceeded: 3,
+    pendingToolFailed: 0,
+    durableRunning: 1,
+    durableSucceeded: 4,
+    durableFailed: 1,
+    durableCompensationRequired: 1,
+    durableCompensated: 2,
+    checkpointCount: 5,
+  },
+  approvals: [
+    {
+      approvalPid: 'APPROVAL-1',
+      runId: SAMPLE_RUNS[0].runId,
+      approvalStatus: 'pending',
+      createdAt: new Date().toISOString(),
+    },
+  ],
+  pendingToolExecutions: [
+    {
+      executionKey: 'pending-key-1',
+      status: 'RUNNING',
+      commandCode: 'agent.pending_tool_execution:TOOL-1',
+      createdAt: new Date().toISOString(),
+    },
+  ],
+  pendingToolExecutionScope: 'tenant',
+  durableToolExecutions: [
+    {
+      executionKey: 'durable-key-1',
+      status: 'COMPENSATION_REQUIRED',
+      commandCode: 'agent.tool_execution:RUN-1',
+      outcome: '{"compensationReason":"not retryable"}',
+      createdAt: new Date().toISOString(),
+    },
+  ],
+  checkpoints: [
+    {
+      checkpointId: 'CP-1',
+      checkpointType: 'PLAN',
+      createdAt: new Date().toISOString(),
+    },
+  ],
+};
+
 function renderPage(initialEntries: string[] = ['/admin/agent-runs']) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
@@ -149,8 +202,10 @@ function renderPage(initialEntries: string[] = ['/admin/agent-runs']) {
 beforeEach(() => {
   listAgentRunsMock.mockReset();
   getAgentRunDetailMock.mockReset();
+  getAgentRunRuntimeOpsMock.mockReset();
   listAgentRunsMock.mockResolvedValue(PAGE_RESPONSE);
   getAgentRunDetailMock.mockResolvedValue(DETAIL_RESPONSE);
+  getAgentRunRuntimeOpsMock.mockResolvedValue(RUNTIME_OPS_RESPONSE);
 });
 
 afterEach(() => {
@@ -192,6 +247,51 @@ describe('AgentRunsPage', () => {
     expect(screen.getByTestId('drawer-section-interrupts')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-section-child-runs')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-section-bif')).toBeInTheDocument();
+  });
+
+  it('clickRow_loadsRuntimeDiagnostics', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId(`run-row-${SAMPLE_RUNS[0].runId}`)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId(`run-row-${SAMPLE_RUNS[0].runId}`));
+
+    await waitFor(() => {
+      expect(getAgentRunRuntimeOpsMock).toHaveBeenCalledWith(SAMPLE_RUNS[0].runId, 20);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('drawer-section-runtime-diagnostics')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('runtime-summary-approvalPending')).toHaveTextContent('1');
+    expect(screen.getByTestId('runtime-summary-pendingToolRunning')).toHaveTextContent('1');
+    expect(screen.getByTestId('runtime-summary-durableCompensationRequired')).toHaveTextContent('1');
+    expect(screen.getByTestId('runtime-summary-checkpointCount')).toHaveTextContent('5');
+    expect(screen.getByTestId('runtime-row-approval-APPROVAL-1')).toHaveTextContent('pending');
+    expect(screen.getByTestId('runtime-row-pending-pending-key-1')).toHaveTextContent('RUNNING');
+    expect(screen.getByTestId('runtime-row-durable-durable-key-1')).toHaveTextContent(
+      'COMPENSATION_REQUIRED',
+    );
+  });
+
+  it('runtimeDiagnosticsFailure_keepsDrawerUsable', async () => {
+    getAgentRunRuntimeOpsMock.mockRejectedValueOnce(new Error('runtime ops unavailable'));
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId(`run-row-${SAMPLE_RUNS[0].runId}`)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId(`run-row-${SAMPLE_RUNS[0].runId}`));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('drawer-section-metadata')).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('runtime-diagnostics-error')).toHaveTextContent(
+        'runtime ops unavailable',
+      );
+    });
+    expect(screen.getByTestId('drawer-section-actions')).toBeInTheDocument();
   });
 
   it('filterByStatus_callsApiWithStatusParam', async () => {

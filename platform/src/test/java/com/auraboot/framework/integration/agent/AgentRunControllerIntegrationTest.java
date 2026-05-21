@@ -383,6 +383,12 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
                     assertThat(String.valueOf(row.get("outcome"))).contains("not retryable");
                 });
         assertThat(data).containsKey("checkpoints");
+        Map<String, Object> summary = (Map<String, Object>) data.get("summary");
+        assertThat(summary)
+                .containsEntry("approvalPending", 1)
+                .containsEntry("pendingToolRunning", 1)
+                .containsEntry("durableCompensationRequired", 1)
+                .containsEntry("checkpointCount", 0);
     }
 
     // =========================================================================
