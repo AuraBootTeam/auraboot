@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -90,6 +91,37 @@ class AgentApprovalGateServiceConcurrencyTest {
         boolean authorized = service.isAuthorizedApprover(1L, "apv-1", 99L);
 
         assertThat(authorized).isFalse();
+    }
+
+    @Test
+    @DisplayName("timeout enforcement expires pending approvals and fails pending runs")
+    void timeoutEnforcementExpiresPendingApprovalsAndFailsPendingRuns() {
+        AgentApprovalGateService service = newService();
+        when(dynamicDataMapper.selectByQueryWithoutTenant(anyString(), any()))
+                .thenReturn(List.of(Map.of(
+                        "pid", "apv-expired",
+                        "tenant_id", 1L,
+                        "run_id", "run-1",
+                        "task_id", "task-1")))
+                .thenReturn(List.of(Map.of("agent_id", "agent-1")))
+                .thenReturn(List.of(Map.of("run_status", "pending")));
+
+        service.enforceApprovalTimeouts();
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> conditionCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper, times(2)).update(anyString(), updateCaptor.capture(), conditionCaptor.capture());
+        assertThat(updateCaptor.getAllValues().get(0))
+                .containsEntry("approval_status", "expired")
+                .containsEntry("rejection_reason", "Auto-expired: approval timeout exceeded");
+        assertThat(conditionCaptor.getAllValues().get(0)).containsEntry("pid", "apv-expired");
+        assertThat(updateCaptor.getAllValues().get(1))
+                .containsEntry("run_status", "failed")
+                .containsEntry("error_message", "Approval expired");
+        assertThat(conditionCaptor.getAllValues().get(1)).containsEntry("pid", "run-1");
+        verify(eventBus).publishAfterCommit(any());
     }
 
     private AgentApprovalGateService newService() {
