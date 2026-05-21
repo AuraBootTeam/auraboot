@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.14'
-    id 'io.spring.dependency-management' version '1.1.6'
+    id 'io.spring.dependency-management' version '1.1.7'
     id 'maven-publish'
     id 'jacoco'
     id 'checkstyle'
@@ -197,7 +197,7 @@ ext {
     jacksonVersion = '2.21.3'
     sentryVersion = '6.28.0'
     jwtVersion = '0.13.0'
-    mybatisPlusVersion = '3.5.14'
+    mybatisPlusVersion = '3.5.16'
     lombokVersion = '1.18.40'
     aspectjVersion = '1.9.22'
     reflectasmVersion = '1.11.3'
@@ -312,7 +312,7 @@ dependencies {
     implementation 'org.apache.pdfbox:pdfbox:2.0.36'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
-    implementation('com.google.firebase:firebase-admin:9.8.0') {
+    implementation('com.google.firebase:firebase-admin:9.9.0') {
         exclude group: 'com.google.guava', module: 'listenablefuture'
     }
 
@@ -375,7 +375,7 @@ dependencies {
     testImplementation 'org.junit.platform:junit-platform-launcher'
 
     // Property-Based Testing with jqwik
-    testImplementation 'net.jqwik:jqwik:1.8.2'
+    testImplementation 'net.jqwik:jqwik:1.9.3'
 
     // ArchUnit — architecture constraint tests
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'

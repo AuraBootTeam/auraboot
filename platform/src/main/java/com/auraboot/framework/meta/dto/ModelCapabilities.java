@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import lombok.Builder;
 import lombok.Value;
 
@@ -85,6 +86,7 @@ public class ModelCapabilities {
      * list could mutate the whitelist post-construction and bypass the
      * runtime-truth invariant.
      */
+    @JsonPOJOBuilder(withPrefix = "")
     public static class ModelCapabilitiesBuilder {
         public ModelCapabilitiesBuilder sortableFields(List<String> fields) {
             this.sortableFields$value = fields == null ? Collections.emptyList() : List.copyOf(fields);

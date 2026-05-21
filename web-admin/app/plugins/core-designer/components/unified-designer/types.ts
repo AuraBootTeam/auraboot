@@ -54,6 +54,13 @@ export interface ModelFieldDefinition {
   component?: string;
   dictCode?: string;
   required?: boolean;
+  refTarget?: ModelFieldRefTarget;
+}
+
+export interface ModelFieldRefTarget {
+  modelCode?: string;
+  valueField?: string;
+  displayField?: string;
 }
 
 export type ModelFieldsByModel = Record<string, ModelFieldDefinition[]>;

@@ -109,6 +109,11 @@ describe('normalizePayloadValue', () => {
     expect(value).toEqual({ enabled: true });
   });
 
+  it('parses JSON strings for jsonb fields', () => {
+    const value = normalizePayloadValue('["process_a","process_b"]', 'jsonb');
+    expect(value).toEqual(['process_a', 'process_b']);
+  });
+
   it('serializes parsed json objects back to strings for command payloads', () => {
     const value = normalizeCommandPayloadValue(
       [
@@ -125,6 +130,11 @@ describe('normalizePayloadValue', () => {
   it('keeps stringified json values stable for command payloads', () => {
     const value = normalizeCommandPayloadValue('{"enabled":true}', 'json');
     expect(value).toBe('{"enabled":true}');
+  });
+
+  it('serializes parsed jsonb values back to strings for command payloads', () => {
+    const value = normalizeCommandPayloadValue('["field_a","field_b"]', 'jsonb');
+    expect(value).toBe('["field_a","field_b"]');
   });
 
   it('builds zh-CN required messages based on field type', () => {

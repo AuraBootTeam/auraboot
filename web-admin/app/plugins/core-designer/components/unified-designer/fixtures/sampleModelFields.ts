@@ -23,6 +23,11 @@ export const sampleModelFieldsByModel: ModelFieldsByModel = {
       label: 'Owner',
       type: 'relation',
       component: 'select',
+      refTarget: {
+        modelCode: 'user',
+        valueField: 'pid',
+        displayField: 'displayName',
+      },
     },
     {
       modelCode: 'customer',

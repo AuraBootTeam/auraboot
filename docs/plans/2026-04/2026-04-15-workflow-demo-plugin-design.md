@@ -30,7 +30,7 @@
 
 | 能力 | 落地产物 |
 |---|---|
-| 流程设计器 | `processes.json` 定义 `wd_leave_approval` 流程，含 9 节点 designerJson |
+| 流程设计器 | `processes.json` 定义 `wd_leave_approval` 流程，含 12 节点 designerJson |
 | 页面配置 | `pages.json` 3 张页面（wd_leave_request 的 list/form/detail），通过 Page Designer 渲染 |
 | 表单与字段 | `fields.json` / `bindings.json` 覆盖日期区间、枚举、数值、长文本、附件 5 类 |
 | 任务中心 | userTask 节点产生待办，出现在 task-center，可审批/驳回/转办 |
@@ -86,34 +86,37 @@ comp    | 调休 | limit_by_balance=true,  require_attachment_gt=0
 
 ```
 startEvent
-  → userTask(提交)
-  → serviceTask(Drools：计算审批人角色 approverRole)
+  → serviceTask(Drools：计算审批人角色 approverRole)      ← DroolsServiceTaskDelegate
   → exclusiveGateway(gw_approver：approverRole?)
        ├─ manager → userTask(主管审批)  ← SLA
-       └─ hr      → userTask(HR 审批)
-       → exclusiveGateway(gw_result：任务结果?)
-            ├─ approved → serviceTask(扣减余额+通知) → endEvent(approved)
-            └─ rejected → endEvent(rejected)
+       └─ hr      → userTask(HR 审批)   ← SLA
+       → exclusiveGateway(gw_result：taskResult?)
+            ├─ approved → serviceTask(状态=approved) → serviceTask(发"通过"通知) → endEvent(approved)
+            └─ rejected → serviceTask(状态=rejected) → serviceTask(发"驳回"通知) → endEvent(rejected)
 ```
 
-**节点清单（10 节点，5 类全覆盖）**
+> 注意：`task_submit` userTask 已删除。提交动作已经由 `wd:submit_leave_request` Command 完成；BPMN 从 startEvent 直接进入 `svc_rule_route`，避免流程停在二次提交任务上。
 
-| id | type | 说明 |
-|---|---|---|
-| start_1 | startEvent | 流程起点 |
-| task_submit | userTask | 员工填写表单（formPageKey=wd_leave_request_form） |
-| svc_rule_route | serviceTask | 调 Drools：输出 `{approverRole}` 写入流程变量 |
-| gw_approver | exclusiveGateway | `approverRole == 'manager' / 'hr'` 分流 |
-| task_manager_approve | userTask | 主管审批（assigneeType=role/wd_manager）**挂 SLA** |
-| task_hr_approve | userTask | HR 审批（assigneeType=role/wd_hr）**挂 SLA** |
-| gw_result | exclusiveGateway | `taskResult == 'approved' / 'rejected'` 分流 |
-| svc_deduct | serviceTask | 扣减余额 + 发通知 |
-| end_approved | endEvent | 审批通过终态 |
-| end_rejected | endEvent | 驳回终态 |
+**节点清单（12 节点，7 类全覆盖）**
 
-5 类节点统计：startEvent×1 + userTask×3 + serviceTask×2 + exclusiveGateway×2 + endEvent×2 = 10。
+| id | type | config | 说明 |
+|---|---|---|---|
+| start_1 | startEvent | — | 流程起点 |
+| svc_rule_route | rule-task | `ruleCode=wd_leave_routing`, `factsVars=days,type` | Drools 路由，写 `approverRole` 到流程变量 |
+| gw_approver | exclusiveGateway | `${approverRole == 'manager'}` / `${approverRole == 'hr'}` | 分流 |
+| task_manager_approve | userTask | role=`wd_manager`, form=`wd_leave_request_detail`, SLA=`wd_manager_approve_sla` | 主管审批 |
+| task_hr_approve | userTask | role=`wd_hr`, form=`wd_leave_request_detail`, SLA=`wd_hr_approve_sla` | HR 审批 |
+| gw_result | exclusiveGateway | `${taskResult == 'approved'}` / `${taskResult == 'rejected'}` | 分流 |
+| svc_set_approved | record-update-task | `wd_req_status=approved` | 通过后更新申请状态 |
+| svc_set_rejected | record-update-task | `wd_req_status=rejected` | 驳回后更新申请状态 |
+| svc_notify_approved | notification-task | `eventCode=wd_request_approved` | 通知申请人 |
+| svc_notify_rejected | notification-task | `eventCode=wd_request_rejected` | 通知申请人 |
+| end_approved | endEvent | — | 通过终态 |
+| end_rejected | endEvent | — | 驳回终态 |
 
-边：9 条，全部带 `conditionExpression`（遵循 `project_smartengine_default_flow` 约束，无 default flow）。
+7 类统计：startEvent×1 + rule-task×1 + userTask×2 + exclusiveGateway×2 + record-update-task×2 + notification-task×2 + endEvent×2 = 12。
+
+边：12 条，全部带 `condition{type, content}` 对象；无条件边使用 `${true}`，不依赖 BPMN `default=`。
 
 **DRL 规则文件**
 
@@ -363,17 +366,17 @@ The runtime wiring (a Phase 3 backend task) must:
 2. After the transition, start the process defined in `extension.startProcess`
    and persist the returned `processInstanceId` into the named field.
 
-`wd:execute_deduct_balance` uses the same shape under
-`extension.deductionRules` and `extension.notification`; the BPM engine's
-serviceTask runner (Phase 3) must honor them when it sees
-`commandCode: wd:execute_deduct_balance` on the `svc_deduct` node.
+Approval completion no longer routes through a `wd:execute_deduct_balance`
+Command. The process uses dedicated `record-update-task` and
+`notification-task` nodes so status mutation and notification dispatch stay
+inside explicit SmartEngine delegates.
 
-### 15.4 Edges all carry conditionExpression — including unconditional ones
+### 15.4 Edges all carry condition objects — including unconditional ones
 
 Per memory `project_smartengine_default_flow`, SmartEngine ignores the BPMN
-`default=` attribute at runtime. All 10 edges in `wd_leave_approval` carry a
-`conditionExpression`; unconditional edges use `${true}` as a non-magic
-literal that the existing gateway evaluator short-circuits.
+`default=` attribute at runtime. All 12 edges in `wd_leave_approval` carry a
+`condition{type, content}` object; unconditional edges use `${true}` as a
+non-magic literal that the existing gateway evaluator short-circuits.
 
 ### 15.5 approval history query targets `ab_approval_task`
 
@@ -392,8 +395,8 @@ without a UI-side transform.
   add importer methods for `BpmRule` and `SlaConfigEntity`.
 - Backend: implement the `extension.preflightRule` / `extension.startProcess`
   hooks on `CommandPipeline` (or whatever runs `state_transition`).
-- Backend: implement `extension.deductionRules` + `extension.notification`
-  on the `serviceTask` runner.
+- Backend: record-update and notification delegates are implemented through
+  dedicated process nodes; no `svc_deduct` command bridge remains.
 - Seed: 5 demo employees + per-year `wd_leave_balance` rows
   (`default-bootstrap.json` extension planned for Phase 3).
 - E2E: 4 specs per §11 remain Phase 4.

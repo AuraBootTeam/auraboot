@@ -52,12 +52,12 @@
         "rowActions": [
           {
             "code": "edit_unified",
-            "label": { "zh-CN": "统一设计器", "en": "Unified" },
+            "label": { "zh-CN": "统一设计器", "en": "Unified Designer" },
             "action": { "type": "navigate", "to": "/unified-designer?pageId={pid}" }
           },
           {
             "code": "edit_legacy",
-            "label": { "zh-CN": "旧版设计器", "en": "Legacy" },
+            "label": { "zh-CN": "旧页面设计器", "en": "Legacy Page Designer" },
             "action": { "type": "navigate", "to": "/page-designer/{pid}" }
           },
           {
