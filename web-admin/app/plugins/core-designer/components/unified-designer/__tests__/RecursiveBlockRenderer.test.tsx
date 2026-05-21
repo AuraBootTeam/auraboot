@@ -85,6 +85,172 @@ describe('RecursiveBlockRenderer', () => {
     expect(table).not.toHaveTextContent('Beta mission');
   });
 
+  it('renders relation picker filters and applies selected values to list rows', async () => {
+    const runtimeServices: RuntimeExecutionServices = {
+      loadPickerOptions: vi.fn().mockResolvedValue([
+        { label: 'Alice', value: 'alice' },
+        { label: 'Bob', value: 'bob' },
+      ]),
+    };
+
+    render(
+      <RecursiveBlockRenderer
+        runtimeServices={runtimeServices}
+        schema={{
+          schemaVersion: 3,
+          kind: 'list',
+          id: 'relation_filtered_list',
+          blocks: [
+            {
+              id: 'list_root',
+              blockType: 'list',
+              blocks: [
+                {
+                  id: 'list_filters',
+                  blockType: 'filter-bar',
+                  blocks: [
+                    {
+                      id: 'filter_owner',
+                      blockType: 'filter-field',
+                      field: 'owner',
+                      props: {
+                        label: 'Owner',
+                        component: 'picker',
+                        pickerDataSource: 'model',
+                        pickerSource: 'user',
+                        valueField: 'pid',
+                        displayField: 'displayName',
+                        operator: 'equals',
+                      },
+                    },
+                  ],
+                },
+                {
+                  id: 'list_table',
+                  blockType: 'table',
+                  props: {
+                    rows: [
+                      { id: 'row_alpha', name: 'Alpha mission', owner: 'alice' },
+                      { id: 'row_beta', name: 'Beta mission', owner: 'bob' },
+                    ],
+                  },
+                  blocks: [
+                    {
+                      id: 'column_name',
+                      blockType: 'column',
+                      field: 'name',
+                      props: { label: 'Name' },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    const picker = await screen.findByTestId('runtime-picker-filter_owner');
+    const table = screen.getByTestId('runtime-table-list_table');
+    await waitFor(() => expect(picker).toHaveTextContent('Alice'));
+    expect(table).toHaveTextContent('Alpha mission');
+    expect(table).toHaveTextContent('Beta mission');
+
+    fireEvent.change(picker, { target: { value: 'alice' } });
+
+    expect(table).toHaveTextContent('Alpha mission');
+    expect(table).not.toHaveTextContent('Beta mission');
+    expect(runtimeServices.loadPickerOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'filter_owner' }),
+      expect.objectContaining({
+        pageId: 'relation_filtered_list',
+        blockPath: ['list_root', 'list_filters', 'filter_owner'],
+      }),
+    );
+  });
+
+  it('gates form fields and table columns by permission code', () => {
+    render(
+      <RecursiveBlockRenderer
+        permissionEvaluator={(permissionCode) => permissionCode === 'customer.public.read'}
+        schema={{
+          schemaVersion: 3,
+          kind: 'composite',
+          id: 'permission_page',
+          blocks: [
+            {
+              id: 'form_root',
+              blockType: 'form',
+              blocks: [
+                {
+                  id: 'field_public',
+                  blockType: 'field',
+                  field: 'publicName',
+                  props: {
+                    label: 'Public name',
+                    component: 'input',
+                    permissionCode: 'customer.public.read',
+                  },
+                },
+                {
+                  id: 'field_secret',
+                  blockType: 'field',
+                  field: 'secretName',
+                  props: {
+                    label: 'Secret name',
+                    component: 'input',
+                    permissionCode: 'customer.secret.read',
+                  },
+                },
+              ],
+            },
+            {
+              id: 'table_root',
+              blockType: 'table',
+              props: {
+                rows: [{ publicName: 'Visible customer', secretName: 'Private customer' }],
+              },
+              blocks: [
+                {
+                  id: 'column_public',
+                  blockType: 'column',
+                  field: 'publicName',
+                  props: {
+                    label: 'Public',
+                    permissionCode: 'customer.public.read',
+                  },
+                },
+                {
+                  id: 'column_secret',
+                  blockType: 'column',
+                  field: 'secretName',
+                  props: {
+                    label: 'Secret',
+                    permissionCode: 'customer.secret.read',
+                  },
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('runtime-input-field_public')).toBeInTheDocument();
+    expect(screen.getByTestId('runtime-field-permission-field_secret')).toHaveTextContent(
+      'Requires permission: customer.secret.read',
+    );
+    expect(screen.queryByTestId('runtime-input-field_secret')).not.toBeInTheDocument();
+
+    expect(screen.getByTestId('runtime-column-column_public')).toHaveTextContent('Public');
+    expect(screen.queryByTestId('runtime-column-column_secret')).not.toBeInTheDocument();
+    expect(screen.getByTestId('runtime-table-table_root')).toHaveTextContent('Visible customer');
+    expect(screen.getByTestId('runtime-table-table_root')).not.toHaveTextContent(
+      'Private customer',
+    );
+    expect(screen.queryByTestId('runtime-table-cell-table_root-0-secretName')).not.toBeInTheDocument();
+  });
+
   it('renders dedicated helper blocks for AI fill, BPM, timeline, and field history', () => {
     render(
       <RecursiveBlockRenderer
@@ -174,6 +340,124 @@ describe('RecursiveBlockRenderer', () => {
     expect(screen.getByTestId('runtime-field-history-entry-helper_history-0')).toHaveTextContent(
       'pending',
     );
+  });
+
+  it('applies AI fill suggestions to fields in the current runtime form', () => {
+    render(
+      <RecursiveBlockRenderer
+        schema={{
+          schemaVersion: 3,
+          kind: 'form',
+          id: 'ai_fill_form',
+          blocks: [
+            {
+              id: 'form_root',
+              blockType: 'form',
+              blocks: [
+                {
+                  id: 'helper_ai',
+                  blockType: 'ai-fill-banner',
+                  title: 'AI suggestions',
+                  props: {
+                    feedback: 'AI values copied',
+                    suggestedFields: [
+                      { field: 'name', label: 'Name', value: 'Ada generated' },
+                    ],
+                  },
+                },
+                {
+                  id: 'field_name',
+                  blockType: 'field',
+                  field: 'name',
+                  props: { label: 'Name', component: 'input' },
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('runtime-input-field_name')).toHaveValue('');
+
+    fireEvent.click(screen.getByTestId('runtime-ai-fill-apply-helper_ai'));
+
+    expect(screen.getByTestId('runtime-input-field_name')).toHaveValue('Ada generated');
+    expect(screen.getByTestId('runtime-ai-fill-status-helper_ai')).toHaveTextContent(
+      'AI values copied',
+    );
+  });
+
+  it('applies runtime AI fill suggestions loaded from services to form fields', async () => {
+    const runtimeServices: RuntimeExecutionServices = {
+      loadHelperBlockData: vi.fn(async () => ({
+        source: 'named-query',
+        suggestedFields: [
+          { field: 'page_key', label: 'Page key', value: 'live-generated-page-key' },
+        ],
+        feedback: 'Live named-query values copied',
+      })),
+    };
+
+    render(
+      <RecursiveBlockRenderer
+        runtimeServices={runtimeServices}
+        schema={{
+          schemaVersion: 3,
+          kind: 'form',
+          id: 'ai_live_fill_form',
+          blocks: [
+            {
+              id: 'form_root',
+              blockType: 'form',
+              blocks: [
+                {
+                  id: 'helper_ai_live',
+                  blockType: 'ai-fill-banner',
+                  dataSource: {
+                    type: 'namedQuery',
+                    executionMode: 'live',
+                    queryCode: 'udw_ai_suggestions',
+                  },
+                },
+                {
+                  id: 'field_page_key',
+                  blockType: 'field',
+                  field: 'page_key',
+                  props: { label: 'Page key', component: 'input' },
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId('runtime-ai-fill-field-helper_ai_live-0')).toHaveTextContent(
+      'live-generated-page-key',
+    );
+    expect(screen.getByTestId('runtime-input-field_page_key')).toHaveValue('');
+
+    fireEvent.click(screen.getByTestId('runtime-ai-fill-apply-helper_ai_live'));
+
+    expect(screen.getByTestId('runtime-input-field_page_key')).toHaveValue(
+      'live-generated-page-key',
+    );
+    expect(screen.getByTestId('runtime-ai-fill-status-helper_ai_live')).toHaveTextContent(
+      'Live named-query values copied',
+    );
+    await waitFor(() => {
+      expect(runtimeServices.loadHelperBlockData).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'helper_ai_live' }),
+        expect.objectContaining({
+          pageId: 'ai_live_fill_form',
+          pageKind: 'form',
+          blockId: 'helper_ai_live',
+          blockType: 'ai-fill-banner',
+          blockPath: ['form_root', 'helper_ai_live'],
+        }),
+      );
+    });
   });
 
   it('loads helper block data through injected runtime services', async () => {
@@ -1732,6 +2016,65 @@ describe('RecursiveBlockRenderer', () => {
     });
   });
 
+  it('applies form action visibleWhen and disabledWhen rules against form values', () => {
+    render(
+      <RecursiveBlockRenderer
+        schema={{
+          schemaVersion: 3,
+          kind: 'form',
+          id: 'form_runtime_action_conditions',
+          blocks: [
+            {
+              id: 'form_root',
+              blockType: 'form',
+              blocks: [
+                {
+                  id: 'field_status',
+                  blockType: 'field',
+                  field: 'status',
+                  props: { label: 'Status', component: 'input' },
+                },
+                {
+                  id: 'form_actions',
+                  blockType: 'action-bar',
+                  blocks: [
+                    {
+                      id: 'action_submit',
+                      blockType: 'action',
+                      actionType: 'command',
+                      props: {
+                        label: 'Submit',
+                        command: 'form.submit',
+                        visibleWhen: { field: 'status', operator: 'notEmpty' },
+                        disabledWhen: { field: 'status', operator: 'equals', value: 'blocked' },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.queryByTestId('runtime-action-action_submit')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('runtime-input-field_status'), {
+      target: { value: 'ready' },
+    });
+    expect(screen.getByTestId('runtime-action-action_submit')).toBeEnabled();
+
+    fireEvent.change(screen.getByTestId('runtime-input-field_status'), {
+      target: { value: 'blocked' },
+    });
+    expect(screen.getByTestId('runtime-action-action_submit')).toBeDisabled();
+    expect(screen.getByTestId('runtime-action-action_submit')).toHaveAttribute(
+      'data-condition-disabled',
+      'true',
+    );
+  });
+
   it('validates form field rules before executing form actions', async () => {
     const runtimeServices: RuntimeExecutionServices = {
       executeAction: vi.fn().mockResolvedValue({ status: 'Submitted' }),
@@ -1830,6 +2173,130 @@ describe('RecursiveBlockRenderer', () => {
       );
     });
     expect(screen.queryByTestId('runtime-field-error-field_name')).not.toBeInTheDocument();
+  });
+
+  it('validates repeater and subform row fields before executing form actions', async () => {
+    const runtimeServices: RuntimeExecutionServices = {
+      executeAction: vi.fn().mockResolvedValue({ status: 'Nested submitted' }),
+    };
+
+    render(
+      <RecursiveBlockRenderer
+        runtimeServices={runtimeServices}
+        schema={{
+          schemaVersion: 3,
+          kind: 'form',
+          id: 'nested_form_runtime_validation',
+          blocks: [
+            {
+              id: 'form_root',
+              blockType: 'form',
+              blocks: [
+                {
+                  id: 'repeater_contacts',
+                  blockType: 'repeater',
+                  field: 'contacts',
+                  props: {
+                    rows: [{ email: '' }],
+                  },
+                  blocks: [
+                    {
+                      id: 'field_contact_email',
+                      blockType: 'field',
+                      field: 'email',
+                      props: {
+                        label: 'Email',
+                        required: true,
+                      },
+                    },
+                  ],
+                },
+                {
+                  id: 'subform_tasks',
+                  blockType: 'subform',
+                  field: 'tasks',
+                  props: {
+                    rows: [{ title: '' }],
+                  },
+                  blocks: [
+                    {
+                      id: 'task_section',
+                      blockType: 'form-section',
+                      blocks: [
+                        {
+                          id: 'field_task_title',
+                          blockType: 'field',
+                          field: 'title',
+                          props: {
+                            label: 'Task title',
+                            required: true,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  id: 'form_actions',
+                  blockType: 'action-bar',
+                  blocks: [
+                    {
+                      id: 'action_submit_nested',
+                      blockType: 'action',
+                      actionType: 'command',
+                      props: {
+                        label: 'Submit nested',
+                        command: 'nested.submit',
+                        executionMode: 'live',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('runtime-action-action_submit_nested'));
+
+    expect(runtimeServices.executeAction).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('runtime-repeater-input-error-repeater_contacts-0-field_contact_email'),
+    ).toHaveTextContent('Required');
+    expect(
+      screen.getByTestId('runtime-subform-input-error-subform_tasks-0-field_task_title'),
+    ).toHaveTextContent('Required');
+
+    fireEvent.change(
+      screen.getByTestId('runtime-repeater-input-repeater_contacts-0-field_contact_email'),
+      {
+        target: { value: 'ada@example.com' },
+      },
+    );
+    fireEvent.change(screen.getByTestId('runtime-subform-input-subform_tasks-0-field_task_title'), {
+      target: { value: 'Prepare launch' },
+    });
+    fireEvent.click(screen.getByTestId('runtime-action-action_submit_nested'));
+
+    await waitFor(() => {
+      expect(runtimeServices.executeAction).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'action_submit_nested' }),
+        expect.objectContaining({
+          formValues: {
+            contacts: [{ email: 'ada@example.com' }],
+            tasks: [{ title: 'Prepare launch' }],
+          },
+        }),
+      );
+    });
+    expect(
+      screen.queryByTestId('runtime-repeater-input-error-repeater_contacts-0-field_contact_email'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('runtime-subform-input-error-subform_tasks-0-field_task_title'),
+    ).not.toBeInTheDocument();
   });
 
   it('passes selected table rows to live toolbar actions inside the same list', async () => {
@@ -1974,6 +2441,67 @@ describe('RecursiveBlockRenderer', () => {
     expect(
       await screen.findByTestId('runtime-row-action-status-table_customers-action_open_row-1'),
     ).toHaveTextContent('Row action completed');
+  });
+
+  it('applies row action visibleWhen and disabledWhen rules against the current row', () => {
+    render(
+      <RecursiveBlockRenderer
+        schema={{
+          schemaVersion: 3,
+          kind: 'list',
+          id: 'list_runtime_row_conditions',
+          blocks: [
+            {
+              id: 'list_root',
+              blockType: 'list',
+              blocks: [
+                {
+                  id: 'table_customers',
+                  blockType: 'table',
+                  props: {
+                    rows: [
+                      { id: 'row_001', name: 'Ada', status: 'locked' },
+                      { id: 'row_002', name: 'Grace', status: 'hidden' },
+                      { id: 'row_003', name: 'Lin', status: 'active' },
+                    ],
+                  },
+                  blocks: [
+                    {
+                      id: 'column_name',
+                      blockType: 'column',
+                      field: 'name',
+                      props: { label: 'Name' },
+                    },
+                    {
+                      id: 'action_open_row',
+                      blockType: 'action',
+                      region: 'row-actions',
+                      actionType: 'command',
+                      props: {
+                        label: 'Open row',
+                        command: 'customer.open',
+                        visibleWhen: { field: 'status', operator: 'notEquals', value: 'hidden' },
+                        disabledWhen: { field: 'current.rowId', operator: 'equals', value: 'row_001' },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+
+    const lockedAction = screen.getByTestId(
+      'runtime-row-action-table_customers-action_open_row-0',
+    );
+    expect(lockedAction).toBeDisabled();
+    expect(lockedAction).toHaveAttribute('data-condition-disabled', 'true');
+    expect(
+      screen.queryByTestId('runtime-row-action-table_customers-action_open_row-1'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('runtime-row-action-table_customers-action_open_row-2')).toBeEnabled();
   });
 
   it('shows live runtime action failures inline', async () => {

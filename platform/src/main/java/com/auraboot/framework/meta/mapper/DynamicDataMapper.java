@@ -207,6 +207,21 @@ public interface DynamicDataMapper {
     int checkColumnExists(@Param("tableName") String tableName, @Param("columnName") String columnName);
 
     /**
+     * List physical JSONB columns for a table (bypasses tenant interceptor).
+     * Used as a defensive source of truth when model metadata has drifted from
+     * the actual PostgreSQL table definition.
+     */
+    @Select("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = #{tableName}
+        AND data_type = 'jsonb'
+        """)
+    @InterceptorIgnore(tenantLine = "true")
+    Set<String> findJsonbColumns(@Param("tableName") String tableName);
+
+    /**
      * 添加列到表
      * @param alterTableSql 修改表SQL
      * @return 执行结果

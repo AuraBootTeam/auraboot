@@ -4,6 +4,7 @@
  * Wraps the Replay UI MVP REST endpoints exposed by AgentRunController:
  *   GET /api/admin/agent-runs
  *   GET /api/admin/agent-runs/{runId}
+ *   GET /api/admin/agent-runs/runtime-ops
  *
  * Type shapes mirror the backend DTOs at
  * platform/src/main/java/com/auraboot/framework/agent/dto/replay/*.java.
@@ -147,6 +148,35 @@ export interface AgentRunPage {
   size: number;
 }
 
+export interface AgentRuntimeOpsSummary {
+  approvalPending: number;
+  approvalTerminal: number;
+  pendingToolRunning: number;
+  pendingToolSucceeded: number;
+  pendingToolFailed: number;
+  durableRunning: number;
+  durableSucceeded: number;
+  durableFailed: number;
+  durableCompensationRequired: number;
+  durableCompensated: number;
+  checkpointCount: number;
+}
+
+export interface AgentRuntimeOpsRow {
+  [key: string]: unknown;
+}
+
+export interface AgentRuntimeOps {
+  runId: string | null;
+  limit: number;
+  summary: AgentRuntimeOpsSummary;
+  approvals: AgentRuntimeOpsRow[];
+  pendingToolExecutions: AgentRuntimeOpsRow[];
+  pendingToolExecutionScope: string;
+  durableToolExecutions: AgentRuntimeOpsRow[];
+  checkpoints: AgentRuntimeOpsRow[];
+}
+
 export interface AgentRunsListParams {
   page?: number;
   size?: number;
@@ -172,6 +202,13 @@ function buildQuery(params: AgentRunsListParams): string {
   return qs ? `?${qs}` : '';
 }
 
+function buildRuntimeOpsQuery(runId: string | null | undefined, limit: number): string {
+  const sp = new URLSearchParams();
+  if (runId) sp.set('runId', runId);
+  sp.set('limit', String(limit));
+  return `?${sp.toString()}`;
+}
+
 export async function listAgentRuns(params: AgentRunsListParams = {}): Promise<AgentRunPage> {
   const r = await get(`/api/admin/agent-runs${buildQuery(params)}`);
   if (!ResultHelper.isSuccess(r)) {
@@ -186,4 +223,16 @@ export async function getAgentRunDetail(runId: string): Promise<AgentRunDetail> 
     throw new Error((r as { message?: string }).message ?? 'Failed to load agent run detail');
   }
   return r.data as AgentRunDetail;
+}
+
+export async function getAgentRunRuntimeOps(
+  runId: string | null | undefined,
+  limit = 20,
+): Promise<AgentRuntimeOps> {
+  const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
+  const r = await get(`/api/admin/agent-runs/runtime-ops${buildRuntimeOpsQuery(runId, safeLimit)}`);
+  if (!ResultHelper.isSuccess(r)) {
+    throw new Error((r as { message?: string }).message ?? 'Failed to load runtime diagnostics');
+  }
+  return r.data as AgentRuntimeOps;
 }
