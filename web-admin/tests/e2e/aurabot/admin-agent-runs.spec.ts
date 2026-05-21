@@ -58,6 +58,8 @@ const RUN_PREFIX = 'E2ELR'; // ab_agent_run
 const ACTION_PREFIX = 'E2ELA'; // ab_agent_action
 const BIF_PREFIX = 'E2ELB'; // ab_agent_bif
 const INTERRUPT_PREFIX = 'E2ELI'; // ab_agent_interrupt_log
+const APPROVAL_PREFIX = 'E2ELP'; // ab_agent_approval
+const IDEMPOTENCY_PREFIX = 'E2ELX'; // ab_idempotency_record
 const TASK_PREFIX = 'E2ELT'; // ab_agent_task
 const TURN_PREFIX = 'E2ELU'; // conversation turn metadata
 const CONVERSATION_PREFIX = 'E2ELC'; // ab_im_conversation.name
@@ -72,6 +74,9 @@ const RUN_CHILD = `${RUN_PREFIX}_CH_${Date.now().toString(36).toUpperCase()}`.sl
 const ACTION_PID = `${ACTION_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
 const BIF_PID = `${BIF_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
 const INTERRUPT_PID = `${INTERRUPT_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
+const APPROVAL_PID = `${APPROVAL_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
+const PENDING_EXECUTION_KEY = `${IDEMPOTENCY_PREFIX}_PENDING_${Date.now().toString(36).toUpperCase()}`;
+const DURABLE_EXECUTION_KEY = `${IDEMPOTENCY_PREFIX}_DURABLE_${Date.now().toString(36).toUpperCase()}`;
 const TRACE_ID = randomUUID();
 
 const TASK_ID = `${TASK_PREFIX}_${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
@@ -246,6 +251,39 @@ async function seedInterruptForRun(args: {
       (${sqlString(args.pid)}, ${ADMIN_TENANT_ID}, ${sqlString(args.sessionId)}, ${sqlString(args.activeRunId)},
        'replay e2e interrupt excerpt', 'replace_intent', 'keyword',
        0.91, 'replay e2e seeded', 'active_run_cancelled', NOW());
+  `);
+}
+
+async function seedRuntimeApproval(args: { pid: string; runId: string }): Promise<void> {
+  await psql(`
+    INSERT INTO ab_agent_approval
+      (pid, tenant_id, run_id, approval_type, approval_title,
+       approval_description, request_data, approval_status,
+       policy_id, idempotency_key, created_at, updated_at)
+    VALUES
+      (${sqlString(args.pid)}, ${ADMIN_TENANT_ID}, ${sqlString(args.runId)},
+       'tool_call', 'Replay E2E approval', 'runtime diagnostics approval',
+       '{"toolName":"sales.list","targetRecordId":"REC-PID-001"}',
+       'pending', ${sqlString(`policy-${args.pid}`)}, ${sqlString(`${args.pid}-idempotency`)},
+       NOW(), NOW());
+  `);
+}
+
+async function seedRuntimeIdempotency(args: {
+  clientRequestId: string;
+  commandCode: string;
+  status: string;
+  outcomeJson: string;
+}): Promise<void> {
+  await psql(`
+    INSERT INTO ab_idempotency_record
+      (tenant_id, client_request_id, request_hash, command_code,
+       outcome, status, expires_at, created_at)
+    VALUES
+      (${ADMIN_TENANT_ID}, ${sqlString(args.clientRequestId)},
+       ${sqlString(`hash-${args.clientRequestId}`)}, ${sqlString(args.commandCode)},
+       ${sqlString(args.outcomeJson)}::jsonb, ${sqlString(args.status)},
+       NOW() + INTERVAL '1 hour', NOW());
   `);
 }
 
@@ -571,6 +609,36 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
       activeRunId: RUN_OK,
       sessionId: `e2e_replay_${Date.now()}`,
     });
+    await seedRuntimeApproval({
+      pid: APPROVAL_PID,
+      runId: RUN_OK,
+    });
+    await seedRuntimeIdempotency({
+      clientRequestId: PENDING_EXECUTION_KEY,
+      commandCode: 'agent.pending_tool_execution:replay_e2e',
+      status: 'RUNNING',
+      outcomeJson: JSON.stringify({
+        executionKey: PENDING_EXECUTION_KEY,
+        status: 'RUNNING',
+        commandCode: 'agent.pending_tool_execution:replay_e2e',
+      }),
+    });
+    await seedRuntimeIdempotency({
+      clientRequestId: DURABLE_EXECUTION_KEY,
+      commandCode: 'agent.tool_execution:replay_e2e',
+      status: 'COMPENSATION_REQUIRED',
+      outcomeJson: JSON.stringify({
+        executionKey: DURABLE_EXECUTION_KEY,
+        status: 'COMPENSATION_REQUIRED',
+        compensationReason: 'replay e2e compensation required',
+        request: {
+          tenantId: ADMIN_TENANT_ID,
+          runPid: RUN_OK,
+          toolName: 'replay_e2e_tool',
+          toolRef: 'replay_e2e_tool',
+        },
+      }),
+    });
     await seedAiTraceForRun({
       traceId: TRACE_ID,
       runId: RUN_OK,
@@ -689,9 +757,18 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
         r.url().includes(`/api/admin/agent-runs/${RUN_OK}`) && r.status() === 200,
       { timeout: 15_000 },
     );
+    const runtimeOpsResponsePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes('/api/admin/agent-runs/runtime-ops') &&
+        r.url().includes(`runId=${RUN_OK}`) &&
+        r.status() === 200,
+      { timeout: 15_000 },
+    );
     await okRow.click();
     const detailResp = await detailResponsePromise;
+    const runtimeOpsResp = await runtimeOpsResponsePromise;
     const detailBody = await detailResp.json();
+    const runtimeOpsBody = await runtimeOpsResp.json();
     expect(detailBody?.code).toBe('0');
     expect(detailBody?.data?.run?.runId).toBe(RUN_OK);
     expect(detailBody?.data?.actions?.length).toBe(1);
@@ -710,6 +787,22 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     expect(detailBody?.data?.conversationTurn?.resultContractIds).toContain(RESULT_CONTRACT_ID);
     expect(detailBody?.data?.resultContracts?.[0]?.contractId).toBe(RESULT_CONTRACT_ID);
     expect(detailBody?.data?.resultContracts?.[0]?.contract?.textSummary).toBe(ACTION_INTENT_TEXT);
+    expect(runtimeOpsBody?.code).toBe('0');
+    expect(
+      runtimeOpsBody?.data?.approvals?.some(
+        (row: { pid?: string }) => row.pid === APPROVAL_PID,
+      ),
+    ).toBe(true);
+    expect(
+      runtimeOpsBody?.data?.pendingToolExecutions?.some(
+        (row: { clientRequestId?: string }) => row.clientRequestId === PENDING_EXECUTION_KEY,
+      ),
+    ).toBe(true);
+    expect(
+      runtimeOpsBody?.data?.durableToolExecutions?.some(
+        (row: { clientRequestId?: string }) => row.clientRequestId === DURABLE_EXECUTION_KEY,
+      ),
+    ).toBe(true);
 
     const drawer = page.locator('[data-testid="agent-run-detail-drawer"]');
     await expect(drawer).toBeVisible({ timeout: 5_000 });
@@ -728,7 +821,25 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     await expect(metadata).toContainText('5.00s');
     await expect(metadata).toContainText(INTENT_TEXT);
 
-    // [D7-2] Actions section: lists the seeded action by pid testid.
+    // [D7-2] Runtime diagnostics: concrete approval / pending / durable
+    // state is visible in the drawer, not hidden behind the raw API.
+    const runtimeDiagnostics = page.locator('[data-testid="drawer-section-runtime-diagnostics"]');
+    await expect(runtimeDiagnostics).toBeVisible();
+    await expect(page.locator('[data-testid="runtime-summary-approvalPending"]')).toHaveText('1');
+    await expect(
+      page.locator('[data-testid="runtime-summary-durableCompensationRequired"]'),
+    ).toHaveText('1');
+    await expect(
+      page.locator(`[data-testid="runtime-row-approval-${APPROVAL_PID}"]`),
+    ).toContainText('pending');
+    await expect(
+      page.locator(`[data-testid="runtime-row-pending-${PENDING_EXECUTION_KEY}"]`),
+    ).toContainText('RUNNING');
+    await expect(
+      page.locator(`[data-testid="runtime-row-durable-${DURABLE_EXECUTION_KEY}"]`),
+    ).toContainText('COMPENSATION_REQUIRED');
+
+    // [D7-3] Actions section: lists the seeded action by pid testid.
     const actionsSection = page.locator('[data-testid="drawer-section-actions"]');
     await expect(actionsSection).toBeVisible();
     await expect(actionsSection).toContainText(/Action Timeline \(\d+\)/);
@@ -737,14 +848,14 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     await expect(actionRow).toContainText('sales.list');
     await expect(actionRow).toContainText('success');
 
-    // [D7-3] Interrupts section: seeded interrupt's policy + tier are visible.
+    // [D7-4] Interrupts section: seeded interrupt's policy + tier are visible.
     const interruptsSection = page.locator('[data-testid="drawer-section-interrupts"]');
     await expect(interruptsSection).toBeVisible();
     await expect(interruptsSection).toContainText(/Interrupt Log \(\d+\)/);
     await expect(interruptsSection).toContainText('replace_intent');
     await expect(interruptsSection).toContainText('active_run_cancelled');
 
-    // [D7-4] Child runs section: seeded child run is visible AND clickable.
+    // [D7-5] Child runs section: seeded child run is visible AND clickable.
     const childRunsSection = page.locator('[data-testid="drawer-section-child-runs"]');
     await expect(childRunsSection).toBeVisible();
     await expect(childRunsSection).toContainText(/Child Runs \(\d+\)/);
@@ -756,14 +867,14 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
     await expect(childNode).toContainText('aurabot.child.e2e');
     await expect(childNode).toContainText('succeeded');
 
-    // [D7-5] BIF section: seeded grounding intent + skill name visible.
+    // [D7-6] BIF section: seeded grounding intent + skill name visible.
     const bifSection = page.locator('[data-testid="drawer-section-bif"]');
     await expect(bifSection).toBeVisible();
     await expect(bifSection).toContainText(INTENT_TEXT);
     await expect(bifSection).toContainText('replay.e2e.skill');
     await expect(bifSection).toContainText('AgentRun');
 
-    // [D7-6] ResultContract deep link: action row opens the selected
+    // [D7-7] ResultContract deep link: action row opens the selected
     // contract derived from ab_agent_action, without a second runtime path.
     await page.locator(`[data-testid="action-toggle-${ACTION_PID}"]`).click();
     const actionDetail = page.locator(`[data-testid="action-detail-${ACTION_PID}"]`);
@@ -780,7 +891,7 @@ test.describe('Replay UI — Admin Agent Runs (real backend, ACP A.2)', () => {
       page.locator(`[data-testid="result-contract-item-${RESULT_CONTRACT_ID}"]`),
     ).toHaveClass(/border-indigo-300/);
 
-    // [D7-7] Conversation tab reconstructs the exact turn tape: inbound
+    // [D7-8] Conversation tab reconstructs the exact turn tape: inbound
     // user message + outbound agent message by turn-scoped ids.
     await page.locator('[data-testid="drawer-tab-conversation"]').click();
     const conversationSection = page.locator('[data-testid="drawer-section-conversation"]');

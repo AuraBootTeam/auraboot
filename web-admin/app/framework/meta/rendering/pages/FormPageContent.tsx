@@ -131,14 +131,14 @@ export function normalizeCommandPayloadValue(rawValue: any, dataType?: string): 
     return path[path.length - 1] ?? '';
   }
   const normalized = normalizePayloadValue(rawValue, dataType);
-  if (
-    String(dataType || '').toLowerCase() === 'json' &&
-    normalized != null &&
-    typeof normalized === 'object'
-  ) {
+  if (isJsonLikeDataType(dataType) && normalized != null && typeof normalized === 'object') {
     return JSON.stringify(normalized);
   }
   return normalized;
+}
+
+function isJsonLikeDataType(dataType?: string): boolean {
+  return ['json', 'jsonb'].includes(String(dataType || '').toLowerCase());
 }
 
 function resolveComponentByFieldMeta(
@@ -216,7 +216,7 @@ export function normalizePayloadValue(rawValue: any, dataType?: string) {
   ) {
     return null;
   }
-  if (String(dataType || '').toLowerCase() === 'json' && typeof rawValue === 'string') {
+  if (isJsonLikeDataType(dataType) && typeof rawValue === 'string') {
     const trimmed = rawValue.trim();
     if (
       (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
