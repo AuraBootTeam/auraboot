@@ -297,6 +297,7 @@ UNIFIED_START_OUTPUT="$(cat /tmp/dev-env-unified-start-$$.out)"
 assert_contains "env start dry-run delegates infra plan" "$UNIFIED_START_OUTPUT" "scripts/dev/start-dev-infra.sh --slug=scriptcheck-env --product=enterprise --dry-run"
 assert_contains "env start dry-run names backend session" "$UNIFIED_START_OUTPUT" "auraboot-scriptcheck-env-backend"
 assert_contains "env start dry-run names frontend session" "$UNIFIED_START_OUTPUT" "auraboot-scriptcheck-env-frontend"
+assert_contains "env start dry-run names bff session" "$UNIFIED_START_OUTPUT" "auraboot-scriptcheck-env-bff"
 assert_contains "env start dry-run disables startup bootstrap" "$UNIFIED_START_OUTPUT" "--auraboot.bootstrap.enabled=false"
 rm -f /tmp/dev-env-unified-start-$$.out
 
@@ -358,6 +359,7 @@ assert_contains "env status includes slug" "$STATUS_OUTPUT" '"slug":"scriptcheck
 assert_contains "env status includes backend port" "$STATUS_OUTPUT" '"be":"16443"'
 assert_contains "env status includes postgres port" "$STATUS_OUTPUT" '"pg":"15432"'
 assert_contains "env status includes port listener summary" "$STATUS_OUTPUT" "ports be="
+assert_contains "env status includes bff tmux summary" "$STATUS_OUTPUT" "tmux bff="
 STATUS_OUTPUT_FROM_OTHER_CWD="$(
     cd /tmp &&
     AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" "$PROJECT_ROOT/scripts/dev/env.sh" status --slug=scriptcheck-r2
@@ -382,6 +384,7 @@ STOP_OUTPUT="$(
 )"
 assert_contains "env stop dry-run names backend session" "$STOP_OUTPUT" "auraboot-scriptcheck-r2-backend"
 assert_contains "env stop dry-run names frontend session" "$STOP_OUTPUT" "auraboot-scriptcheck-r2-frontend"
+assert_contains "env stop dry-run names bff session" "$STOP_OUTPUT" "auraboot-scriptcheck-r2-bff"
 assert_contains "env stop dry-run lists exact ports" "$STOP_OUTPUT" "16443 15173 13500"
 assert_contains "env stop dry-run avoids global pkill" "$STOP_OUTPUT" "no global pkill"
 assert_contains "env stop dry-run stops slug-scoped docker infra" "$STOP_OUTPUT" "scripts/dev/stop-isolated.sh --slug=scriptcheck-r2"
