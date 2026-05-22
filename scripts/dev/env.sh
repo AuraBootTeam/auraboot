@@ -138,14 +138,34 @@ registry_manifest_file() {
     echo "$(registry_root)/envs/$SLUG/manifest.json"
 }
 
+registry_manifest_value() {
+    local key="$1"
+    local manifest
+    manifest="$(registry_manifest_file)"
+    if [ ! -f "$manifest" ]; then
+        return 1
+    fi
+    node -e 'const fs = require("fs"); const [file, key] = process.argv.slice(1); const value = JSON.parse(fs.readFileSync(file, "utf8"))[key]; if (value) process.stdout.write(String(value));' "$manifest" "$key"
+}
+
+registered_core_root() {
+    local root
+    root="$(registry_manifest_value coreRoot || true)"
+    echo "${root:-$PROJECT_ROOT}"
+}
+
 current_branch_for_root() {
     local root="$1"
     git -C "$root" branch --show-current 2>/dev/null || echo "unknown"
 }
 
 resolve_enterprise_root() {
+    local registered_enterprise_root
+    registered_enterprise_root="$(registry_manifest_value enterpriseRoot || true)"
     if [ -n "${AURA_ENTERPRISE_ROOT:-}" ]; then
         echo "$AURA_ENTERPRISE_ROOT"
+    elif [ -n "$registered_enterprise_root" ]; then
+        echo "$registered_enterprise_root"
     elif [ -d "$PROJECT_ROOT/../auraboot-enterprise" ]; then
         cd "$PROJECT_ROOT/../auraboot-enterprise" && pwd
     elif [ -d "/Users/ghj/work/auraboot/auraboot-enterprise" ]; then
@@ -157,7 +177,7 @@ resolve_enterprise_root() {
 
 backend_root_for_product() {
     case "$PRODUCT" in
-        oss) echo "$PROJECT_ROOT/platform" ;;
+        oss) echo "$(registered_core_root)/platform" ;;
         enterprise)
             local enterprise_root
             enterprise_root="$(resolve_enterprise_root)"
@@ -173,7 +193,7 @@ backend_root_for_product() {
 
 reset_script_for_product() {
     case "$PRODUCT" in
-        oss) echo "$PROJECT_ROOT/scripts/reset-db.sh" ;;
+        oss) echo "$(registered_core_root)/scripts/reset-db.sh" ;;
         enterprise)
             local enterprise_root
             enterprise_root="$(resolve_enterprise_root)"
@@ -193,6 +213,8 @@ load_bugfix_env() {
 
 registry_upsert_current() {
     local status="${1:-running}"
+    local core_root
+    core_root="$(registered_core_root)"
     local enterprise_root=""
     local enterprise_branch=""
     if [ "$PRODUCT" = "enterprise" ]; then
@@ -208,8 +230,8 @@ registry_upsert_current() {
         --slug "$SLUG"
         --mode "$MODE"
         --product "$PRODUCT"
-        --core-root "$PROJECT_ROOT"
-        --core-branch "$(current_branch_for_root "$PROJECT_ROOT")"
+        --core-root "$core_root"
+        --core-branch "$(current_branch_for_root "$core_root")"
         --compose-project "${COMPOSE_PROJECT_NAME:-auraboot-$SLUG}"
         --status "$status"
         --pg-port "$PG_PORT"
@@ -304,7 +326,7 @@ start_backend_host() {
     session="$(backend_session)"
     local core_export=""
     if [ "$PRODUCT" = "enterprise" ]; then
-        core_export="AURA_CORE_PROJECT_ROOT='$PROJECT_ROOT'"
+        core_export="AURA_CORE_PROJECT_ROOT='$(registered_core_root)'"
     fi
     local cmd
     cmd="cd '$backend_root' && $core_export SPRING_PROFILES_ACTIVE=dev PGHOST='$PG_HOST' PGPORT='$PG_PORT' PGDATABASE='$PG_DB' PGUSER='$PG_USER' PGPASSWORD='$PGPASSWORD' ./gradlew bootRun --no-daemon --args='--server.port=$BE_PORT --spring.datasource.url=jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB --spring.datasource.username=$PG_USER --spring.datasource.password=$PGPASSWORD --spring.data.redis.host=127.0.0.1 --spring.data.redis.port=$REDIS_PORT --auraboot.bootstrap.enabled=false' >'$log_file' 2>&1"
@@ -325,7 +347,9 @@ start_frontend_host() {
     local session
     session="$(frontend_session)"
     local cmd
-    cmd="cd '$PROJECT_ROOT/web-admin' && SPRING_BOOT_URL='$BACKEND_URL' BACKEND_URL='$BACKEND_URL' PLAYWRIGHT_BASE_URL='$PLAYWRIGHT_BASE_URL' BFF_URL='$BFF_URL' BFF_PORT='$BFF_PORT' VITE_PORT='$VITE_PORT' NO_PROXY='localhost,127.0.0.1' pnpm dev:full >'$log_file' 2>&1"
+    local core_root
+    core_root="$(registered_core_root)"
+    cmd="cd '$core_root/web-admin' && SPRING_BOOT_URL='$BACKEND_URL' BACKEND_URL='$BACKEND_URL' PLAYWRIGHT_BASE_URL='$PLAYWRIGHT_BASE_URL' BFF_URL='$BFF_URL' BFF_PORT='$BFF_PORT' VITE_PORT='$VITE_PORT' NO_PROXY='localhost,127.0.0.1' pnpm dev:full >'$log_file' 2>&1"
 
     if [ "$DRY_RUN" = "1" ]; then
         echo "tmux new-session -d -s $session \"$cmd\""
