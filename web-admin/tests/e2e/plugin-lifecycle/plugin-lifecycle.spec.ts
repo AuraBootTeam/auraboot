@@ -20,6 +20,21 @@ import { navigateToDynamicPage, waitForDynamicPageLoad, getTableRowCount } from 
 test.describe('Plugin Lifecycle', () => {
   test.describe.configure({ timeout: 30000 });
 
+  async function getE2etOrderTotal(page: import('@playwright/test').Page): Promise<number> {
+    const resp = await page.request.get('/api/dynamic/e2et_order/list?page=0&pageSize=1');
+    expect(resp.ok()).toBe(true);
+    const body = await resp.json().catch(() => ({}));
+    const data = body?.data;
+    return Number(
+      data?.totalElements ??
+        data?.total ??
+        data?.totalCount ??
+        data?.page?.totalElements ??
+        data?.pagination?.total ??
+        0,
+    );
+  }
+
   /**
    * PL-01: Plugin import API endpoint exists
    */
@@ -115,10 +130,12 @@ test.describe('Plugin Lifecycle', () => {
    * PL-05: Plugin reimport is idempotent — data survives reimport
    */
   test('PL-05: plugin reimport is idempotent and preserves existing data', async ({ page }) => {
-    // Step 1: Verify table renders before reimport (may have 0 rows)
+    // Step 1: Verify table renders before reimport (may have 0 rows) and capture
+    // the backend total rather than visible rows; the list page can legitimately
+    // change page size/view state across plugin import.
     await navigateToDynamicPage(page, 'e2et_order');
-    const rowCountBefore = await getTableRowCount(page);
-    // rowCountBefore may be 0 if no seed data — still valid for idempotency test
+    await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
+    const totalBefore = await getE2etOrderTotal(page);
 
     // Step 2: Reimport the test-fixtures plugin
     const importResp = await page.request.post('/api/plugins/import/import-directory-sync', {
@@ -141,7 +158,8 @@ test.describe('Plugin Lifecycle', () => {
     await waitForDynamicPageLoad(page);
     await listResponsePromise;
 
-    const rowCountAfter = await getTableRowCount(page);
-    expect(rowCountAfter).toBeGreaterThanOrEqual(rowCountBefore);
+    await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
+    const totalAfter = await getE2etOrderTotal(page);
+    expect(totalAfter).toBeGreaterThanOrEqual(totalBefore);
   });
 });

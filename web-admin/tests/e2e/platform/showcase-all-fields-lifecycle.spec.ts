@@ -43,6 +43,7 @@ import {
   waitForToast,
   waitForDynamicPageLoad,
   queryFilteredList,
+  fillControlledInput,
 } from '../helpers/index';
 import {
   createDefaultTableView,
@@ -182,6 +183,46 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
   let uiCreatedPid: string;
   let uiCreatedCode: string;
   let defaultTableView: DefaultTableViewState | null = null;
+
+  async function ensureUiCreatedRecord(page: Page): Promise<void> {
+    if (uiCreatedPid) return;
+
+    const existing = await queryFilteredList(page, MODEL_CODE, 'sc_name', RECORD_NAME_UI, {
+      operator: 'EQ',
+      pageSize: 5,
+    });
+    const existingPid = String(existing[0]?.pid ?? existing[0]?.id ?? '');
+    if (existingPid) {
+      uiCreatedPid = existingPid;
+      uiCreatedCode = String(existing[0]?.sc_code ?? '');
+      return;
+    }
+
+    const result = await executeCommandViaApi(
+      page,
+      'sc:create_showcase',
+      {
+        sc_name: RECORD_NAME_UI,
+        sc_description: DESCRIPTION,
+        sc_quantity: 88,
+        sc_price: 199.5,
+        sc_priority: 'medium',
+        sc_category: 'electronics',
+        sc_status: 'draft',
+        sc_is_active: true,
+        sc_start_date: START_DATE,
+        sc_end_date: END_DATE,
+        sc_progress: 75,
+        sc_rating: 4,
+        sc_email: `ui_${UID}@example.com`,
+        sc_phone: '13900001234',
+      },
+      undefined,
+      'create',
+    );
+    uiCreatedPid = result.recordId;
+    expect(uiCreatedPid, 'SC-008 fallback seed must create a record').toBeTruthy();
+  }
 
   // =========================================================================
   // beforeAll: seed 3 draft records via API for list testing
@@ -903,8 +944,9 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
   // =========================================================================
   test('SC-008 @critical — Edit record → save → values updated on re-open', async ({ page }) => {
     test.setTimeout(45000);
+    await ensureUiCreatedRecord(page);
     // Navigate to edit form directly (avoids detail→edit navigation chain issues)
-    await page.goto(`/p/showcase_all_fields/${uiCreatedPid}/edit?commandCode=sc%3Aupdate_showcase`, {
+    await page.goto(`/p/showcase_all_fields/edit/${uiCreatedPid}?commandCode=sc%3Aupdate_showcase`, {
       waitUntil: 'domcontentloaded',
     });
     await waitForFormReady(page, 15_000);
@@ -914,14 +956,14 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
       .locator('[data-testid="form-field-sc_name"] input, [data-field="sc_name"] input')
       .first();
     if (await nameInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      const currentName = await nameInput.inputValue();
-      expect(currentName, 'Name field should be pre-filled').toContain(RECORD_NAME_UI.slice(0, 15));
+      await expect
+        .poll(async () => nameInput.inputValue(), { timeout: 15_000, intervals: [250, 500, 1000] })
+        .toContain(RECORD_NAME_UI.slice(0, 15));
     }
 
     // Modify name
     if (await nameInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await nameInput.click();
-      await nameInput.fill(RECORD_NAME_EDITED);
+      await fillControlledInput(nameInput, RECORD_NAME_EDITED);
     }
 
     // Modify quantity to 200
@@ -929,8 +971,7 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
       .locator('[data-testid="form-field-sc_quantity"] input, [data-field="sc_quantity"] input')
       .first();
     if (await qtyInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await qtyInput.click();
-      await qtyInput.fill('200');
+      await fillControlledInput(qtyInput, '200');
     }
 
     // Submit edit

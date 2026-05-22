@@ -346,7 +346,7 @@ public class TestSeedController {
 
         jdbcTemplate.update("""
                 DELETE FROM mt_org_department
-                WHERE pid = 'mobile_showcase_department_sales'
+                WHERE pid = 'mob_showcase_dept_sales_01'
                    OR (
                     tenant_id = ?
                     AND org_dept_code = 'DEPT-20260516-001'
@@ -359,7 +359,7 @@ public class TestSeedController {
                     org_dept_manager_id, org_dept_order, org_dept_status
                 )
                 VALUES (
-                    'mobile_showcase_department_sales', ?, ?, ?, NOW(), NOW(),
+                    'mob_showcase_dept_sales_01', ?, ?, ?, NOW(), NOW(),
                     'DEPT-20260516-001', '销售部', NULL,
                     NULL, 10, 'active'
                 )

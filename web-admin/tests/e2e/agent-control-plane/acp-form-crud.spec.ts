@@ -33,8 +33,10 @@ import {
   navigateToDynamicPage,
   waitForFormReady,
   waitForToast,
+  fillControlledInput,
   acceptConfirmDialog,
   findRowInPaginatedList,
+  queryFilteredList,
   clickSaveButton,
   clickRowActionByLocator,
 } from '../helpers/index';
@@ -145,9 +147,7 @@ async function fillFormField(page: Page, fieldCode: string, value: string): Prom
     for (let i = 0; i < count; i++) {
       const input = candidate.nth(i);
       if (await input.isVisible({ timeout: 500 }).catch(() => false)) {
-        await input.scrollIntoViewIfNeeded();
-        await input.fill(value);
-        await expect.poll(async () => input.inputValue(), { timeout: 5_000 }).toBe(value);
+        await fillControlledInput(input, value);
         return true;
       }
     }
@@ -897,15 +897,22 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await cmdPromise;
     await waitForToast(page).catch(() => {});
 
-    await page
-      .waitForURL(
-        (url) => url.pathname.includes('/p/agent_task') && !url.pathname.includes('/new'),
-        { timeout: 10_000 },
+    await expect
+      .poll(
+        async () =>
+          (
+            await queryFilteredList(page, 'agent-task', 'title', taskTitle, {
+              operator: 'EQ',
+            })
+          ).length,
+        { timeout: 15_000, message: 'created agent_task must be queryable before UI lookup' },
       )
-      .catch(() => {});
+      .toBeGreaterThan(0);
 
-    const row = await findRowInPaginatedList(page, taskTitle);
-    await expect(row).toBeVisible({ timeout: 8_000 });
+    await navigateToAcpPage(page, '/dynamic/agent-task');
+
+    const row = await findRowInPaginatedList(page, taskTitle, 20_000);
+    await expect(row).toBeVisible({ timeout: 10_000 });
   });
 
   test('CRUD-08: Edit task — change priority and verify echo', async ({ page }) => {
@@ -928,8 +935,6 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
 
     // Change priority
     await selectFormField(page, 'task_priority', 'critical').catch(() => null);
-    // Also update description for a clear change signal
-    await fillFormField(page, 'description', `Updated by CRUD-08 — ${uid}`);
 
     const cmdPromise = page
       .waitForResponse(
@@ -943,6 +948,18 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await clickSaveButton(page);
     await cmdPromise;
     await waitForToast(page).catch(() => {});
+
+    await expect
+      .poll(
+        async () => {
+          const records = await queryFilteredList(page, 'agent-task', 'title', taskTitle, {
+            operator: 'EQ',
+          });
+          return String(records[0]?.task_priority ?? records[0]?.priority ?? '').toLowerCase();
+        },
+        { timeout: 10_000, intervals: [300, 600, 1000] },
+      )
+      .toBe('critical');
 
     await page
       .waitForURL(
@@ -1756,7 +1773,38 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     const updatedDescription = `Updated CRUD-23 — ${uid}`;
 
     await navigateToAcpPage(page, '/dynamic/approval-policy');
-    await clickEditOnRow(page, policyName);
+    let records = await queryFilteredList(page, 'approval-policy', 'policy_name', policyName, {
+      operator: 'EQ',
+      pageSize: 5,
+    });
+    if (records.length === 0) {
+      await executeCommandViaApi(
+        page,
+        CMD.createPolicy,
+        {
+          policy_name: policyName,
+          description: `E2E CRUD approval policy — ${uid}`,
+          trigger_rules: JSON.stringify([{ type: 'cost_threshold', threshold: 100 }]),
+          approver_rules: JSON.stringify([{ role: 'tenant_admin' }]),
+          policy_status: 'active',
+          timeout_hours: 24,
+          timeout_action: 'reject',
+        },
+        undefined,
+        'create',
+      );
+      records = await queryFilteredList(page, 'approval-policy', 'policy_name', policyName, {
+        operator: 'EQ',
+        pageSize: 5,
+      });
+    }
+    const policyPid = String(records[0]?.pid ?? records[0]?.id ?? '');
+    expect(policyPid, `approval policy ${policyName} should exist before edit`).toBeTruthy();
+
+    await page.goto(
+      `/p/approval_policy/edit/${policyPid}?commandCode=${encodeURIComponent('acp:update_approval_policy')}`,
+      { waitUntil: 'domcontentloaded' },
+    );
     await waitForFormReady(page);
 
     // Change timeout_hours from 24 to 48 — assertion below depends on this,

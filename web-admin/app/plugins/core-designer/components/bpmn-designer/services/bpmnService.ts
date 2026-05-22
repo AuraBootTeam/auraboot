@@ -170,7 +170,7 @@ function normalizeNode(nodeValue: unknown, index: number) {
   const node = readRecord(nodeValue, path);
   const nodeType = readNodeType(node, path);
   const data = readRecord(node.data, `${path}.data`);
-  const dataType = readNodeType(data, `${path}.data`);
+  const dataType = data.type == null ? nodeType : readNodeType(data, `${path}.data`);
   if (dataType !== nodeType) {
     throw new Error(`${path}.data.type must match ${path}.type`);
   }
@@ -223,7 +223,7 @@ function normalizeEdge(edgeValue: unknown, index: number, nodeIds: Set<string>) 
     throw new Error(`${path}.target must reference an existing node`);
   }
 
-  const data = readRecord(edge.data, `${path}.data`);
+  const data = edge.data == null ? {} : readRecord(edge.data, `${path}.data`);
   const label = resolveLocalizedField(data, 'label');
 
   const {

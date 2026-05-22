@@ -13,7 +13,7 @@ import java.sql.SQLException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class JdbcDataSourcePoolTest {
 
     @Container

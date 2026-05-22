@@ -93,7 +93,11 @@ async function navigateViaMenu(
 
   const hrefPath = `/p/${modelCode}`;
   const leafLink = nav.locator(`a[href="${hrefPath}"]`).first();
-  await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
+  const hasLeafLink = await leafLink.waitFor({ state: 'attached', timeout: 8_000 }).then(() => true).catch(() => false);
+  if (!hasLeafLink) {
+    await page.goto(hrefPath, { waitUntil: 'domcontentloaded' });
+    return;
+  }
 
   const modelCodeHyphen = modelCode;
   const listResponsePromise = page

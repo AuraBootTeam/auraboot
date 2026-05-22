@@ -56,6 +56,8 @@ if ! command -v jq >/dev/null; then
   exit 1
 fi
 
+API_COUNT=$(jq '[.test_paths[] | select(startswith("tests/api/"))] | length' "$SCOPE_FILE")
+
 cd "$WEB_ADMIN_DIR"
 
 # Count spec files in scope (for reporting only — the actual filter is applied
@@ -140,7 +142,11 @@ case "$PROFILE" in
       run_gate_phase "chromium-deep" --project=chromium-deep --no-deps --workers=1 || EXIT_CODE=$?
     fi
     if [[ "$PROFILE" == "full" ]]; then
-      run_gate_phase "api" --project=api --no-deps || EXIT_CODE=$?
+      if [[ "$API_COUNT" -gt 0 ]]; then
+        run_gate_phase "api" --project=api --no-deps || EXIT_CODE=$?
+      else
+        echo "=== Phase: api skipped (no OSS-scoped tests/api entries) ===" | tee -a "$LOG"
+      fi
     fi
     ;;
   *)

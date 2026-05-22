@@ -205,7 +205,7 @@ class DebugSessionServiceImplTest {
         assertThat(s.getStatus()).isEqualTo("paused");
         assertThat(s.getActionResults()).hasSize(1);
         assertThat(dto.getTotalActions()).isEqualTo(2);
-        verify(eventPublisher).publish(eq(SESSION_PID), any());
+        verify(eventPublisher, times(3)).publish(eq(SESSION_PID), any());
     }
 
     @Test

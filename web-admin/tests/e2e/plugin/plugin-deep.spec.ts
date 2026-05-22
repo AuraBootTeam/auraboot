@@ -457,7 +457,7 @@ test.describe('Plugin System Deep', () => {
     const corePluginDir = process.env.AURA_CORE_PROJECT_ROOT
       ? path.resolve(process.env.AURA_CORE_PROJECT_ROOT, 'plugins/project-management')
       : null;
-    const hostPluginDir = path.resolve(process.cwd(), '../../plugins/project-management');
+    const hostPluginDir = path.resolve(process.cwd(), '../plugins/project-management');
     const candidatePaths = [
       process.env.E2E_BACKEND_PLUGIN_DIR,
       enterprisePluginDir,

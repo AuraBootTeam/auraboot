@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Repository-level IT for {@code ab_aurabot_skill_run} (Plan Step 3).
  *
  * <p>Targets the isolated docker stack on host ports 25442 / 26389 — see
- * {@code application-skills-c2-test.yml}. All persisted IDs / keys are
+ * {@code application-integration-test.yml}. All persisted IDs / keys are
  * prefixed {@code it-aurabot-} so parallel suites can co-exist.
  *
  * <p>Each test uses {@link Propagation#NOT_SUPPORTED} to escape the
@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the {@code uq_aurabot_skill_idemp} unique index check requires a
  * committed prior row, which the auto-rollback wrapper would hide.
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 @DisplayName("SkillRun repository — DB layer (real Postgres on :25442)")
 class SkillRunRepositoryIntegrationTest extends BaseIntegrationTest {
 

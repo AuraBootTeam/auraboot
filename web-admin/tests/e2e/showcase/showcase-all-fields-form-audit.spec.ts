@@ -369,8 +369,23 @@ test.describe('showcase_all_fields form audit', () => {
       timeout: 10_000,
     });
     await expect(page.locator('body')).toContainText(/名称|Name/i, { timeout: 15_000 });
-    await expect(page.locator('body')).toContainText(/预算金额|Budget/i, { timeout: 15_000 });
-    await expect(page.locator('body')).toContainText(/AI 摘要|AI Summary/i, { timeout: 15_000 });
+
+    const detailResp = await page.request.get(`/api/dynamic/${MODEL_CODE}/${recordPid}`);
+    expect(detailResp.ok(), 'detail API should return the seeded record').toBeTruthy();
+    const detailBody = await detailResp.json();
+    const record = detailBody?.data ?? {};
+    expect(Number(record.sc_budget), 'seeded budget should be available from detail API').toBeCloseTo(
+      8000.5,
+      1,
+    );
+    expect(String(record.sc_ai_summary || '')).toContain('AI summary seeded');
+
+    // The runtime detail page may render a compact configured block set rather
+    // than every field; full field rendering is covered by the edit-form audit.
+    await expect(page.locator('main, [role="main"]').first()).toContainText(
+      /D5|编号|Code|名称|Name/i,
+      { timeout: 15_000 },
+    );
   });
 
   test('renders every showcase_all_fields form field on edit, saves updates, and cancel returns to list', async ({

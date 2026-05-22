@@ -218,7 +218,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
                             "FROM mt_crm_opportunity " +
                             "WHERE tenant_id = ? AND crm_opp_stage != ? " +
                             "GROUP BY crm_opp_stage",
-                    tenantId, STAGE_CLOSED_LOST
+                    new Object[]{tenantId, STAGE_CLOSED_LOST}
             );
 
             Map<String, Map<String, Object>> dataByStage = new HashMap<>();

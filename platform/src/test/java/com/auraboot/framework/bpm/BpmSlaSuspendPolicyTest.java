@@ -7,6 +7,7 @@ import com.auraboot.framework.bpm.mapper.SlaRecordMapper;
 import com.auraboot.framework.bpm.service.SlaRecordService;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
 import com.auraboot.framework.bpm.util.BpmSecurityUtil;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.common.util.UlidGenerator;
 import lombok.extern.slf4j.Slf4j;
@@ -262,7 +263,7 @@ class BpmSlaSuspendPolicyTest extends BaseIntegrationTest {
         var definition = deploymentService.create(request);
 
         // Undeploy a non-deployed process should throw
-        assertThrows(IllegalStateException.class,
+        assertThrows(ConflictException.class,
                 () -> deploymentService.undeploy(definition.getPid()),
                 "Should reject undeploy for non-deployed process");
 

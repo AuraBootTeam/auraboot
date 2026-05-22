@@ -43,7 +43,7 @@ const PROCESS_NAME = `Http ServiceTask E2E ${TS}`;
 const BK = `svch_bk_${TS}`;
 
 const FIXTURE_BODY = `AuraBoot SVCH OK ${TS}`;
-const FIXTURE_HOST = process.env.SVCH_FIXTURE_HOST || 'host.docker.internal';
+const FIXTURE_HOST = process.env.SVCH_FIXTURE_HOST || '127.0.0.1';
 const RESPONSE_VAR = 'healthResp';
 
 // ---------------------------------------------------------------------------

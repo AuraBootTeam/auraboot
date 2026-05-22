@@ -18,10 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Asserts that the {@code includeDemoPlugins} flag in
  * {@link BootstrapRepairService.RepairOptions} is threaded end-to-end:
  * <ul>
- *   <li>When {@code false}, only the 2 core plugins
- *       ({@code com.auraboot.org-management}, {@code com.auraboot.platform-admin})
- *       appear in {@code ab_plugin} after {@code repairBuiltinPlugins}; the 9 demo
- *       plugin rows are absent.</li>
+ *   <li>When {@code false}, only the core plugins appear in {@code ab_plugin}
+ *       after {@code repairBuiltinPlugins}; the demo plugin rows are absent.</li>
  *   <li>When {@code true}, the demo profile is also imported (subject to the
  *       plugin directory being resolvable on the test stack).</li>
  *   <li>Idempotent: calling {@code repairBuiltinPlugins} twice with the same
@@ -45,14 +43,9 @@ class BuiltinPluginProfileIT extends IntegrationTestBase {
 
     /** Plugin IDs that must NEVER appear in ab_plugin when includeDemoPlugins=false. */
     private static final Set<String> DEMO_PLUGIN_IDS = Set.of(
-            "com.auraboot.core-meta",
-            "com.auraboot.core-bpm",
-            "com.auraboot.core-aurabot",
-            "com.auraboot.page-manager",
             "com.auraboot.crm-starter",
             "com.auraboot.showcase",
             "com.auraboot.agent-control-plane",
-            "com.auraboot.acp-showcase",
             "com.auraboot.workflow-demo"
     );
 

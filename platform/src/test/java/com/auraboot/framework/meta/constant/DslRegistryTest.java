@@ -69,13 +69,13 @@ class DslRegistryTest {
     }
 
     @Test
-    void autoSetStrategy_has13Values() {
-        assertEquals(13, DslRegistry.AutoSetStrategy.values().length);
+    void autoSetStrategy_has14Values() {
+        assertEquals(14, DslRegistry.AutoSetStrategy.values().length);
         Set<String> codes = DslRegistry.AutoSetStrategy.codes();
         assertTrue(codes.containsAll(Set.of(
                 "current_user", "current_user_pid", "current_username",
                 "current_date", "current_datetime", "current_tenant",
-                "uuid", "sequence", "expression", "fixed_value",
+                "uuid", "sequence", "expression", "fixed_value", "default_value",
                 "auto_generate", "copy_field", "field_map")));
     }
 
@@ -126,13 +126,13 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has14Values() {
-        assertEquals(14, DslRegistry.BlockType.values().length);
+    void blockType_has15Values() {
+        assertEquals(15, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
                 "table", "filters", "toolbar", "description", "chart",
-                "tabs", "sub-table", "monthly-grid", "stat-card", "custom")));
+                "tabs", "sub-table", "monthly-grid", "stat-card", "ai-fill-banner", "custom")));
     }
 
     @Test

@@ -69,7 +69,7 @@ public class DebugEventPublisher {
                 emitter.send(SseEmitter.event()
                         .name(event.getEventType())
                         .data(event));
-            } catch (IOException e) {
+            } catch (IOException | IllegalStateException e) {
                 log.debug("Failed to push debug event to session {}: {}", sessionId, e.getMessage());
                 removeEmitter(sessionId, emitter);
             }

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code PREVIEW_TOKEN_INVALID}: token-missing (consumed twice), skill
  * mismatch, params hash mismatch.
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 @DisplayName("PreviewTokenStore — Redis one-shot handoff (real Redis on :26389)")
 class PreviewTokenStoreIntegrationTest extends BaseIntegrationTest {
 

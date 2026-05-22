@@ -77,6 +77,24 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
   const token = loginBody?.data?.jwt;
   expect(token, 'login response missing jwt').toBeTruthy();
 
+  const existingCommandsRes = await request.get(
+    `${BACKEND_URL}/api/meta/commands?modelCode=e2et_order`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  if (existingCommandsRes.ok()) {
+    const existingCommandsBody = (await existingCommandsRes.json()) as {
+      data?: Array<{ code?: string }>;
+    };
+    const commands = Array.isArray(existingCommandsBody?.data) ? existingCommandsBody.data : [];
+    if (commands.some((command) => command?.code === 'e2et:create_order')) {
+      return;
+    }
+  }
+
   const importRes = await request.post(
     `${BACKEND_URL}/api/plugins/import/import-directory-sync`,
     {
@@ -99,8 +117,9 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
     },
   );
 
-  expect(importRes.ok(), `import returned HTTP ${importRes.status()}`).toBe(true);
-  const body = (await importRes.json()) as {
+  const rawBody = await importRes.text();
+  expect(importRes.ok(), `import returned HTTP ${importRes.status()}: ${rawBody}`).toBe(true);
+  const body = JSON.parse(rawBody) as {
     data?: { success?: boolean; status?: string; errorMessage?: string };
     success?: boolean;
     status?: string;

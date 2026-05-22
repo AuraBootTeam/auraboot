@@ -156,9 +156,14 @@ async function navigateToDesignerViaMenu(
     }
   }
 
-  await expect(page).toHaveURL(new RegExp(`/page-designer/${pid}`), {
+  await expect(page).toHaveURL(new RegExp(`(?:/page-designer/${pid}|/unified-designer\\?pageId=${pid})`), {
     timeout: 5_000,
   });
+
+  if (page.url().includes('/unified-designer')) {
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 10_000 });
+    await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+  }
 
   await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 5_000 });
   await expect(page.getByTestId('designer-tab-fields')).toBeVisible();
@@ -281,16 +286,28 @@ async function selectFieldInCanvas(
   blockIndex: number,
   fieldCode: string,
 ): Promise<void> {
-  // form-section blocks live in canvas as [data-block-type="form-section"];
-  // the default Placeholder is index 0, so added sections start at 1.
-  const block = page.locator('[data-block-type="form-section"]').nth(blockIndex);
+  // Only user-added form-section blocks expose data-block-type in the current
+  // preview DOM; older builds also exposed the Placeholder. Keep the legacy
+  // caller index but map it back when needed.
+  const actualIndex = Math.max(0, blockIndex - 1);
+  const block = page.locator('[data-block-type="form-section"]').nth(actualIndex);
   await expect(block).toBeVisible({ timeout: 5_000 });
-  const label = block.locator(`label:has-text("${fieldCode}")`).first();
-  await expect(label).toBeVisible({ timeout: 5_000 });
-  await label
-    .locator('xpath=ancestor::div[contains(@class,"group/field")]')
-    .first()
-    .click();
+  let fieldPreview = block
+    .locator(`label:has-text("${fieldCode}"), button:has-text("${fieldCode}"), [data-field-code="${fieldCode}"], [data-field="${fieldCode}"]`)
+    .first();
+  if (!(await fieldPreview.isVisible({ timeout: 500 }).catch(() => false))) {
+    fieldPreview = page
+      .getByTestId('designer-canvas')
+      .locator(`label:has-text("${fieldCode}"), button:has-text("${fieldCode}"), [data-field-code="${fieldCode}"], [data-field="${fieldCode}"]`)
+      .first();
+  }
+  await expect(fieldPreview).toBeVisible({ timeout: 5_000 });
+  const clickable = fieldPreview.locator('xpath=ancestor::div[contains(@class,"group/field")]').first();
+  if (await clickable.isVisible({ timeout: 500 }).catch(() => false)) {
+    await clickable.click();
+  } else {
+    await fieldPreview.click();
+  }
   await expect(
     page.getByTestId('designer-properties-panel').locator('text=字段属性'),
   ).toBeVisible({ timeout: 5_000 });

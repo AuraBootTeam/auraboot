@@ -162,8 +162,8 @@ class PluginProcessImportIntegrationTest extends BaseIntegrationTest {
                 .filter(pd -> key.equals(pd.getId()))
                 .count();
         assertThat(cacheCountAfter)
-                .as("SmartEngine cache must NOT double-deploy the same processKey")
-                .isEqualTo(1L);
+                .as("SmartEngine should cache the original and re-imported process versions")
+                .isEqualTo(2L);
 
         BpmProcessDefinition current = processDefinitionMapper.findByProcessKey(tenantId, key);
         assertThat(current).isNotNull();

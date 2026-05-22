@@ -327,7 +327,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         }
 
         for (FieldDefinition field : modelDefinition.getFields()) {
-            if (field.isRequired() && context != ValidationContext.UPDATE) {
+            if (field.isRequired() && (context != ValidationContext.UPDATE || data.containsKey(field.getCode()))) {
                 Object value = data.get(field.getCode());
                 if (value == null || (value instanceof String && ((String) value).trim().isEmpty())) {
                     errors.add("Required field '" + field.getName() + "' is missing");

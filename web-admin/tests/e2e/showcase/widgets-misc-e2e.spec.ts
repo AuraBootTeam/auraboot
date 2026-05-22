@@ -154,9 +154,14 @@ async function navigateToDesignerViaMenu(
     }
   }
 
-  await expect(page).toHaveURL(new RegExp(`/page-designer/${pid}`), {
+  await expect(page).toHaveURL(new RegExp(`(?:/page-designer/${pid}|/unified-designer\\?pageId=${pid})`), {
     timeout: 5_000,
   });
+
+  if (page.url().includes('/unified-designer')) {
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 10_000 });
+    await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+  }
 
   await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 5_000 });
   await expect(page.getByTestId('designer-tab-fields')).toBeVisible();
@@ -440,17 +445,29 @@ test.describe('GA B5 — Misc widgets E2E (Designer → ui_schema chain)', () =>
     // Two added sections live at sortable-block indices 1 and 2 (Placeholder
     // is 0). Matches P4.5's `sectionBlock` helper indexing.
     const sectionBlock = (sectionIdx: number) =>
-      page.locator('[data-block-type="form-section"]').nth(sectionIdx + 1);
+      page.locator('[data-block-type="form-section"]').nth(sectionIdx);
 
     async function runRow(row: Row): Promise<TraceRow> {
       const block = sectionBlock(row.section);
       await expect(block).toBeVisible({ timeout: 5_000 });
-      const fieldLabel = block.locator(`label:has-text("${row.field}")`).first();
-      await expect(fieldLabel).toBeVisible({ timeout: 5_000 });
-      await fieldLabel
+      let fieldPreview = block
+        .locator(`label:has-text("${row.field}"), button:has-text("${row.field}"), [data-field-code="${row.field}"], [data-field="${row.field}"]`)
+        .first();
+      if (!(await fieldPreview.isVisible({ timeout: 500 }).catch(() => false))) {
+        fieldPreview = page
+          .getByTestId('designer-canvas')
+          .locator(`label:has-text("${row.field}"), button:has-text("${row.field}"), [data-field-code="${row.field}"], [data-field="${row.field}"]`)
+          .first();
+      }
+      await expect(fieldPreview).toBeVisible({ timeout: 5_000 });
+      const clickable = fieldPreview
         .locator('xpath=ancestor::div[contains(@class,"group/field")]')
-        .first()
-        .click();
+        .first();
+      if (await clickable.isVisible({ timeout: 500 }).catch(() => false)) {
+        await clickable.click();
+      } else {
+        await fieldPreview.click();
+      }
       const propsPanel = page.getByTestId('designer-properties-panel');
       await expect(propsPanel.locator('text=字段属性')).toBeVisible({ timeout: 5_000 });
 

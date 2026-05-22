@@ -22,6 +22,9 @@ function generateCode(prefix: string = 'nq'): string {
 function pickStatus(input: any): string | undefined {
   if (!input || typeof input !== 'object') return undefined;
   if (typeof input.status === 'string') return input.status;
+  if (typeof input.lifecycleStatus === 'string') return input.lifecycleStatus;
+  if (typeof input.lifecycle_status === 'string') return input.lifecycle_status;
+  if (typeof input.state === 'string') return input.state;
   for (const value of Object.values(input)) {
     if (value && typeof value === 'object') {
       const nested = pickStatus(value);
@@ -105,7 +108,7 @@ test.describe('Named Query Management', () => {
    * NQ-E02: Create named query via UI → lands on edit page in draft status
    */
   test('NQ-E02: Create named query via UI', async ({ page }) => {
-    test.setTimeout(30000);
+    test.setTimeout(45000);
     const nq = new NamedQueryPage(page);
     await nq.gotoNew();
 
@@ -171,12 +174,26 @@ test.describe('Named Query Management', () => {
           const fromDetail = normalizeStatus(pickStatus(result));
           if (fromDetail) return fromDetail;
 
+          const byCodeResp = await page.request.get(
+            `/api/meta/named-queries/by-code/${encodeURIComponent(queryCode || testCode)}`,
+          );
+          if (byCodeResp.ok()) {
+            const byCode = await byCodeResp.json().catch(() => ({}));
+            const fromByCode = normalizeStatus(pickStatus(byCode));
+            if (fromByCode) return fromByCode;
+          }
+
           const listResp = await page.request.get(
             `/api/meta/named-queries?pageSize=20&sortBy=createdAt&sortOrder=desc&keyword=${encodeURIComponent(testCode)}`,
           );
           if (listResp.ok()) {
             const listData = await listResp.json().catch(() => ({}));
-            const records = listData.data?.data || listData.data?.records || [];
+            const records =
+              listData.data?.data?.records ||
+              listData.data?.records ||
+              listData.data?.data ||
+              listData.records ||
+              [];
             const found = records.find((r: any) => r.code === queryCode || r.pid === queryPid);
             const fromList = normalizeStatus(pickStatus(found));
             if (fromList) return fromList;

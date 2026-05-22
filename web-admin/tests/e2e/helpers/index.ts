@@ -759,6 +759,68 @@ export async function findRowByContent(page: Page, text: string | RegExp): Promi
 }
 
 /**
+ * Fill a React-controlled input and verify the value sticks.
+ *
+ * Under full-suite load a plain locator.fill() can occasionally race with
+ * async form hydration and leave the old controlled value in place. This helper
+ * retries through keyboard input and finally the native value setter so tests
+ * fail on actual save/validation behavior instead of a missed input event.
+ */
+export async function fillControlledInput(
+  input: Locator,
+  value: string,
+  timeout = 5000,
+): Promise<void> {
+  const hasValue = async () => (await input.inputValue().catch(() => '')) === value;
+  const canRetry = (error: unknown) =>
+    /not attached|detached|Target page, context or browser has been closed/i.test(
+      String((error as Error)?.message ?? error),
+    );
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await input.waitFor({ state: 'visible', timeout });
+      await input.scrollIntoViewIfNeeded();
+
+      await input.fill(value);
+      if (!(await hasValue())) {
+        await input.click();
+        await input.press('ControlOrMeta+A').catch(() => null);
+        await input.type(value, { delay: 5 });
+      }
+      if (!(await hasValue())) {
+        await input.evaluate((node, nextValue) => {
+          const element = node as HTMLInputElement | HTMLTextAreaElement;
+          const proto =
+            element instanceof HTMLTextAreaElement
+              ? HTMLTextAreaElement.prototype
+              : HTMLInputElement.prototype;
+          const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+          setter?.call(element, nextValue);
+          element.dispatchEvent(
+            new InputEvent('input', { bubbles: true, inputType: 'insertText', data: nextValue }),
+          );
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+        }, value);
+      }
+      break;
+    } catch (error) {
+      if (attempt === 2 || !canRetry(error)) {
+        throw error;
+      }
+    }
+  }
+
+  await expect.poll(async () => input.inputValue(), { timeout }).toBe(value);
+  await input.evaluate((node) => {
+    const element = node as HTMLInputElement | HTMLTextAreaElement;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    element.blur();
+  });
+  await expect.poll(async () => input.inputValue(), { timeout }).toBe(value);
+}
+
+/**
  * Find a row by text in a paginated list. Navigates to the last page if not found.
  * Newest items (highest ISS/ID numbers) are on the last page when sorted ascending.
  */

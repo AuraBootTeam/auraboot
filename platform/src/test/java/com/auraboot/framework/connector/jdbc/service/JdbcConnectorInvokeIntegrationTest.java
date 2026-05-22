@@ -36,7 +36,7 @@ import static org.mockito.Mockito.*;
  * mappers and a real {@link JdbcDataSourcePool}. {@link MetaContext} is stubbed via
  * {@link MockedStatic} so tenant-ID lookups resolve without a web request.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class JdbcConnectorInvokeIntegrationTest {
 
     @Container

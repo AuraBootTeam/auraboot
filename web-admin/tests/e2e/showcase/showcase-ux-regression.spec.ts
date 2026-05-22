@@ -407,8 +407,8 @@ test.describe('Showcase UX Regression', () => {
     await dashResp.catch(() => null);
 
     await expect(page.locator('[data-card-style="metric"]')).toHaveCount(4, { timeout: 10_000 });
-    await expect(page.locator('body')).toContainText('Pages');
-    await expect(page.locator('body')).toContainText('Agents');
+    await expect(page.locator('body')).toContainText('客户总数');
+    await expect(page.locator('body')).toContainText('Pipeline 金额');
   });
 
   // ─── Seed data quality checks ────────────────────────────────────────

@@ -99,8 +99,8 @@ public class DesignRuleValidator implements PluginValidator {
             // Check: DELETE commands should have risk acknowledged
             if ("delete".equals(type) || "bulk_delete".equals(type)) {
                 Object riskLevel = execConfig.get("riskLevel");
-                if (riskLevel == null && cmd.getUnknownFields() != null
-                        && !cmd.getUnknownFields().containsKey("cmd_risk_level")) {
+                if (riskLevel == null && (cmd.getUnknownFields() == null
+                        || !cmd.getUnknownFields().containsKey("cmd_risk_level"))) {
                     messages.add(PluginValidationMessage.warning("D-RISK-DELETE",
                             "design",
                             "commands[" + i + "]",

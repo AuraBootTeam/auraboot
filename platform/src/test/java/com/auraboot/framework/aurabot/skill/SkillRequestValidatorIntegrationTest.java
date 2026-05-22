@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
  * isolation intact while still exercising the Step 3 (Redis idempotency +
  * PG row lookup) and Step 5 (preview token consume) end-to-end paths.
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 @DisplayName("SkillRequestValidator — IT (real Redis + real PG, mocked registry)")
 class SkillRequestValidatorIntegrationTest extends BaseIntegrationTest {
 

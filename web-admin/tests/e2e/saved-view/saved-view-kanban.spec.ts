@@ -45,7 +45,10 @@ test.describe('SavedView — KANBAN View', () => {
   let kanbanViewPid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    const page = await context.newPage();
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
     // Clean up leftover views from previous runs
@@ -97,11 +100,14 @@ test.describe('SavedView — KANBAN View', () => {
     await order.child('item').createForParent(submitPid);
     await order.executeCommand('submit', submitPid);
 
-    await page.close();
+    await context.close();
   });
 
   test.afterAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    const page = await context.newPage();
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     for (const pid of [...pids].reverse()) {
       try {
@@ -128,7 +134,7 @@ test.describe('SavedView — KANBAN View', () => {
         await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
       }
     }
-    await page.close();
+    await context.close();
   });
 
   test('SV-010: KANBAN — board renders with status columns @smoke', async ({ page }) => {

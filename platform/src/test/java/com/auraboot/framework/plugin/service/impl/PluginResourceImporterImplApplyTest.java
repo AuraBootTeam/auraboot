@@ -58,6 +58,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -188,8 +189,8 @@ class PluginResourceImporterImplApplyTest {
     @DisplayName("importPermission CREATE branch: soft-deleted resurrect path -> returns CREATE without calling create()")
     void importPermission_resurrect_happyPath() {
         when(permissionService.findByCode("perm.res")).thenReturn(null);
-        when(jdbcTemplate.queryForObject(anyString(), eq(String.class), any(), any()))
-                .thenReturn("resurrected-pid");
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of(Map.of("pid", "resurrected-pid")));
 
         PermissionDefinitionDTO dto = PermissionDefinitionDTO.builder()
                 .code("perm.res")
@@ -343,6 +344,7 @@ class PluginResourceImporterImplApplyTest {
         com.auraboot.framework.meta.dto.BindingRuleDTO existing = new com.auraboot.framework.meta.dto.BindingRuleDTO();
         existing.setPid("old-rule");
         existing.setRuleType("PRE_VALIDATE");
+        existing.setSequence(0);
         when(commandService.getBindingRules("cmd-pid")).thenReturn(List.of(existing));
 
         com.auraboot.framework.meta.dto.BindingRuleDTO created = new com.auraboot.framework.meta.dto.BindingRuleDTO();
