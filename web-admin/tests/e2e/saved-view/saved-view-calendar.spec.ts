@@ -49,7 +49,10 @@ test.describe('SavedView — CALENDAR View', () => {
   let calendarViewPid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    const page = await context.newPage();
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
 
     // Clean up leftover views from previous runs
@@ -92,11 +95,14 @@ test.describe('SavedView — CALENDAR View', () => {
       });
       pids.push(pid);
     }
-    await page.close();
+    await context.close();
   });
 
   test.afterAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    const page = await context.newPage();
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     for (const pid of pids) {
       await order.deleteViaApi(pid).catch(() => {});
@@ -116,7 +122,7 @@ test.describe('SavedView — CALENDAR View', () => {
         await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
       }
     }
-    await page.close();
+    await context.close();
   });
 
   test('SV-020: CALENDAR — renders events by date field @smoke', async ({ page }) => {

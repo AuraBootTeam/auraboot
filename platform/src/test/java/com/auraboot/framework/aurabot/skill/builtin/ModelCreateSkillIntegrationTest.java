@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * {@link BaseIntegrationTest}. Each test allocates a unique modelCode so PG
  * state cannot collide across re-runs.
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 class ModelCreateSkillIntegrationTest extends BaseIntegrationTest {
 
     @Autowired ModelCreateSkill skill;

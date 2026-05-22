@@ -745,19 +745,16 @@ test.describe('Showcase Smart Component — Deep Interaction', () => {
     const districtDropdown = addrField.locator('[data-testid="address-district-sc_address"]');
 
     await expect(provinceDropdown).toBeVisible({ timeout: 3_000 });
-    await expect(cityDropdown.locator('button').first()).toBeDisabled();
-    await expect(districtDropdown.locator('button').first()).toBeDisabled();
+    await expect(cityDropdown).toBeDisabled();
+    await expect(districtDropdown).toBeDisabled();
 
-    await provinceDropdown.locator('button').first().click();
-    await page.getByRole('button', { name: '广东省' }).click();
-    await expect(cityDropdown.locator('button').first()).toBeEnabled({ timeout: 3_000 });
+    await provinceDropdown.selectOption({ label: '广东省' });
+    await expect(cityDropdown).toBeEnabled({ timeout: 3_000 });
 
-    await cityDropdown.locator('button').first().click();
-    await page.getByRole('button', { name: '深圳市' }).click();
-    await expect(districtDropdown.locator('button').first()).toBeEnabled({ timeout: 3_000 });
+    await cityDropdown.selectOption({ label: '深圳市' });
+    await expect(districtDropdown).toBeEnabled({ timeout: 3_000 });
 
-    await districtDropdown.locator('button').first().click();
-    await page.getByRole('button', { name: '南山区' }).click();
+    await districtDropdown.selectOption({ label: '南山区' });
 
     await expect(addrField).toContainText('广东省 / 深圳市 / 南山区');
   });

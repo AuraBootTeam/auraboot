@@ -67,13 +67,13 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
         // 验证具体的Permission存在
         // Permission code format (red-line #13): <resourceType>.<resourceCode>.<action>
         // Legacy "system.*" prefix retired — SystemPermissionInitializer emits
-        // codes via PermissionCodeValidator.build, e.g. "model.model.read".
-        Permission modelCreate = permissionMapper.findByCode("model.model.create");
-        assertNotNull(modelCreate, "model.model.create permission should exist");
+        // codes via PermissionCodeValidator.build, e.g. "system.model.read".
+        Permission modelCreate = permissionMapper.findByCode("system.model.create");
+        assertNotNull(modelCreate, "system.model.create permission should exist");
         assertEquals("system", modelCreate.getSource(), "Should be system-level permission");
 
-        Permission modelRead = permissionMapper.findByCode("model.model.read");
-        assertNotNull(modelRead, "model.model.read permission should exist");
+        Permission modelRead = permissionMapper.findByCode("system.model.read");
+        assertNotNull(modelRead, "system.model.read permission should exist");
         assertEquals("system", modelRead.getSource(), "Should be system-level permission");
     }
     
@@ -184,19 +184,15 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
         
         // Permission code format (red-line #13): <resourceType>.<resourceCode>.<action>
         // For resources where resourceType==resourceCode (e.g. model/model) the
-        // code reads "model.model.read"; for sub-resources (rbac/role) it reads
-        // "rbac.role.read". We only spot-check the canonical resources that
+        // code reads "system.model.read"; for sub-resources (rbac/role) it reads
+        // "system.rbac_role.read". We only spot-check the canonical resources that
         // SystemPermissionInitializer registers under the platform module.
-        String[][] sampleCodes = {
-                {"model", "model"},
-                {"field", "field"},
-                {"menu", "menu"}
-        };
+        String[] sampleResources = {"model", "field", "menu"};
         String[] actions = {"create", "read"};
 
-        for (String[] pair : sampleCodes) {
+        for (String resource : sampleResources) {
             for (String action : actions) {
-                String code = pair[0] + "." + pair[1] + "." + action;
+                String code = "system." + resource + "." + action;
                 Permission permission = permissionMapper.findByCode(code);
                 assertNotNull(permission,
                     "Permission should exist: " + code);
@@ -206,11 +202,11 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
         }
 
         // Verify RBAC sub-resource permissions (resourceType=rbac, resourceCode=role)
-        Permission roleCreate = permissionMapper.findByCode("rbac.role.create");
-        assertNotNull(roleCreate, "Permission should exist: rbac.role.create");
+        Permission roleCreate = permissionMapper.findByCode("system.rbac_role.create");
+        assertNotNull(roleCreate, "Permission should exist: system.rbac_role.create");
 
         // Verify PAGE sub-resource permissions
-        Permission pageCreate = permissionMapper.findByCode("page.page.create");
-        assertNotNull(pageCreate, "Permission should exist: page.page.create");
+        Permission pageCreate = permissionMapper.findByCode("system.page.create");
+        assertNotNull(pageCreate, "Permission should exist: system.page.create");
     }
 }

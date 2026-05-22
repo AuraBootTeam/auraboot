@@ -15,11 +15,51 @@ import { uniqueId, todayStr } from '../helpers';
 
 test.describe('SavedView — TABLE View', () => {
   let order: ModelTestHelper;
+  let tableViewName = '';
+  let tableViewPid = '';
   const pids: string[] = [];
+
+  async function gotoTableList(page: import('@playwright/test').Page): Promise<DynamicListPage> {
+    const listPage = await order.gotoList();
+    const table = page.locator('table, [role="table"]').first();
+    if (await table.isVisible({ timeout: 3000 }).catch(() => false)) {
+      return listPage;
+    }
+
+    const viewSelector = page.locator('button[aria-haspopup="listbox"]').first();
+    await viewSelector.click();
+    const panel = page.locator('[role="dialog"]');
+    await panel.waitFor({ state: 'visible', timeout: 5000 });
+    await panel.getByText(tableViewName, { exact: false }).first().click();
+
+    const closeBtn = panel.locator('button[aria-label="Close panel"]');
+    if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await closeBtn.click();
+    }
+    await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await expect(table).toBeVisible({ timeout: 10000 });
+    return listPage;
+  }
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
+    tableViewName = `E2E Table View ${uniqueId('SVT')}`;
+    const viewResp = await page.request.post('/api/views', {
+      data: {
+        name: tableViewName,
+        modelCode: E2ET_ORDER_CONFIG.modelCode,
+        pageKey: E2ET_ORDER_CONFIG.pageKey,
+        viewType: 'table',
+        scope: 'global',
+        viewConfig: {},
+      },
+    });
+    expect(viewResp.ok()).toBe(true);
+    const viewBody = await viewResp.json();
+    tableViewPid = viewBody.data?.pid ?? viewBody.pid ?? '';
+    expect(tableViewPid).toBeTruthy();
+
     // Create test records for table display
     for (let i = 0; i < 3; i++) {
       const pid = await order.createViaApi({
@@ -37,12 +77,15 @@ test.describe('SavedView — TABLE View', () => {
     for (const pid of pids) {
       await order.deleteViaApi(pid).catch(() => {});
     }
+    if (tableViewPid) {
+      await page.request.delete(`/api/views/${tableViewPid}`).catch(() => {});
+    }
     await page.close();
   });
 
   test('SV-001: TABLE view — default table renders correctly @smoke', async ({ page }) => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    const listPage = await gotoTableList(page);
     // Table should be visible
     const table = page.locator('table, [role="table"]').first();
     await expect(table).toBeVisible();
@@ -54,7 +97,7 @@ test.describe('SavedView — TABLE View', () => {
 
   test('SV-002: TABLE view — column visibility toggle @smoke', async ({ page }) => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    const listPage = await gotoTableList(page);
     // Look for column settings button
     const colSettingsBtn = page
       .locator('button')
@@ -74,7 +117,7 @@ test.describe('SavedView — TABLE View', () => {
 
   test('SV-003: TABLE view — column width drag adjustment', async ({ page }) => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    const listPage = await gotoTableList(page);
     // Check that column headers exist and have measurable width
     const firstHeader = page.locator('thead th, [role="columnheader"]').first();
     const box = await firstHeader.boundingBox();
@@ -86,7 +129,7 @@ test.describe('SavedView — TABLE View', () => {
 
   test('SV-004: TABLE view — single field sort @smoke', async ({ page }) => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    const listPage = await gotoTableList(page);
     // Click on a sortable column header
     const titleHeader = page
       .locator('thead th, [role="columnheader"]')
@@ -119,7 +162,7 @@ test.describe('SavedView — TABLE View', () => {
 
   test('SV-006: TABLE view — filter conditions saved to view @smoke', async ({ page }) => {
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
-    const listPage = await order.gotoList();
+    const listPage = await gotoTableList(page);
     // Use the filter input to search
     const filterInput = listPage.filterInput('e2et_order_title');
     if (await filterInput.isVisible({ timeout: 3000 }).catch(() => false)) {

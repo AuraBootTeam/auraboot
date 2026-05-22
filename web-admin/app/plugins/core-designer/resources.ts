@@ -32,6 +32,18 @@ export const RESOURCES: PluginResource[] = [
     file: './plugins/core-designer/pages/flow-designer.tsx',
   },
   {
+    key: 'designer.report.create', path: '/report-designer',
+    title: { en: 'Report Designer', zh: '报表设计器' }, icon: 'file-text',
+    menu: false, parentKey: 'designer.unified',
+    file: './routes/report-designer.tsx',
+  },
+  {
+    key: 'designer.report.edit', path: '/report-designer/:id',
+    title: { en: 'Edit Report', zh: '编辑报表' },
+    menu: false, parentKey: 'designer.report.create',
+    file: './routes/report-designer.$id.tsx',
+  },
+  {
     key: 'designer.query', path: '/query-builder',
     title: { en: 'Query Builder', zh: '查询构建器' }, icon: 'search',
     menu: { order: 40, group: 'designer' },

@@ -42,15 +42,31 @@ public class AuraBootObjectHandler implements MetaObjectHandler {
     @Override
     public void insertFill(MetaObject metaObject) {
         Instant now = Instant.now();
-        this.strictInsertFill(metaObject, "createdAt", Instant.class, now);
-        this.strictInsertFill(metaObject, "updatedAt", Instant.class, now);
+        strictInsertFillIfMapped(metaObject, "createdAt", Instant.class, now);
+        strictInsertFillIfMapped(metaObject, "updatedAt", Instant.class, now);
         fillEnvIdIfApplicable(metaObject);
     }
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        this.strictUpdateFill(metaObject, "updatedAt", Instant.class, Instant.now());
+        strictUpdateFillIfMapped(metaObject, "updatedAt", Instant.class, Instant.now());
         // env_id is set on insert and not auto-updated.
+    }
+
+    private <T> void strictInsertFillIfMapped(MetaObject metaObject, String fieldName, Class<T> fieldType, T fieldVal) {
+        try {
+            this.strictInsertFill(metaObject, fieldName, fieldType, fieldVal);
+        } catch (NullPointerException e) {
+            log.debug("insert auto-fill skipped for unmapped object: field={}", fieldName);
+        }
+    }
+
+    private <T> void strictUpdateFillIfMapped(MetaObject metaObject, String fieldName, Class<T> fieldType, T fieldVal) {
+        try {
+            this.strictUpdateFill(metaObject, fieldName, fieldType, fieldVal);
+        } catch (NullPointerException e) {
+            log.debug("update auto-fill skipped for unmapped object: field={}", fieldName);
+        }
     }
 
     private void fillEnvIdIfApplicable(MetaObject metaObject) {

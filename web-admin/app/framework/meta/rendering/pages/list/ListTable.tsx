@@ -285,8 +285,9 @@ export const ListTable = React.memo(function ListTable({
                   <td
                     colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
                     className="px-6 py-4 text-center text-gray-500"
+                    data-testid="empty-state"
                   >
-                    {t('table.noData')}
+                    {t('table.noData') || 'No data'}
                   </td>
                 </tr>
               ) : (

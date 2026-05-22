@@ -50,7 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Main IT suite for {@code AuraBotSkillController} (Plan §Step 10).
  *
  * <p>Real PostgreSQL (port 25442) + real Redis (port 26389) via the
- * {@code skills-c2-test} profile. {@link UserPermissionService} and
+ * standard {@code integration-test} profile. {@link UserPermissionService} and
  * {@link PermissionMapper} are mocked because the controller only consults
  * them through {@code resolveCurrentUserPermissions()} — wiring real RBAC
  * tables would turn this suite into an RBAC integration test.
@@ -65,7 +65,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * HTTP status (matching the SkillErrorCode → HTTP table in SPI Contract §11)
  * and the {@code body.code} string (the wire identifier the FE switches on).
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 @Import(AuraBotSkillControllerIntegrationTest.NoDryRunSkillTestConfig.class)
 @DisplayName("AuraBotSkillController — main IT (real PG + real Redis, mocked permissions)")
 class AuraBotSkillControllerIntegrationTest extends BaseIntegrationTest {

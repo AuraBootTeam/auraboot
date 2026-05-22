@@ -46,11 +46,11 @@ import static org.mockito.Mockito.when;
  * </ul>
  *
  * <p>Real PG (port 25442) + real Redis (port 26389) via the
- * {@code skills-c2-test} profile. {@link UserPermissionService} +
+ * standard {@code integration-test} profile. {@link UserPermissionService} +
  * {@link PermissionMapper} are mocked to avoid wiring full RBAC tables —
  * mirrors {@code AuraBotSkillToolProviderIntegrationTest}.
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired SkillToolExecutor executor;

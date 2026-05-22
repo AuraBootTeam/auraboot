@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -39,9 +40,9 @@ class PerformanceMonitoringAspectTest {
         f.setAccessible(true);
         f.set(aspect, monitor);
 
-        when(joinPoint.getSignature()).thenReturn(signature);
-        when(signature.getDeclaringTypeName()).thenReturn("com.example.Foo");
-        when(signature.getName()).thenReturn("bar");
+        lenient().when(joinPoint.getSignature()).thenReturn(signature);
+        lenient().when(signature.getDeclaringTypeName()).thenReturn("com.example.Foo");
+        lenient().when(signature.getName()).thenReturn("bar");
     }
 
     @Test

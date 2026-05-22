@@ -68,9 +68,9 @@ class IdempotentAspectTest {
 
     private void wireSignature(Object[] args) throws NoSuchMethodException {
         Method m = sampleMethod();
-        when(joinPoint.getSignature()).thenReturn(signature);
-        when(signature.getMethod()).thenReturn(m);
-        when(joinPoint.getArgs()).thenReturn(args);
+        lenient().when(joinPoint.getSignature()).thenReturn(signature);
+        lenient().when(signature.getMethod()).thenReturn(m);
+        lenient().when(joinPoint.getArgs()).thenReturn(args);
         lenient().when(signature.getReturnType()).thenAnswer(inv -> m.getReturnType());
     }
 

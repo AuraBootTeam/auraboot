@@ -12,7 +12,7 @@ import java.sql.Statement;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class TestContainersMysqlAvailableTest {
     @Container
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.39");

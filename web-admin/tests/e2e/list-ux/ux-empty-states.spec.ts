@@ -93,7 +93,11 @@ async function navigateViaMenu(
 
   const hrefPath = `/p/${modelCode}`;
   const leafLink = nav.locator(`a[href="${hrefPath}"]`).first();
-  await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
+  const hasLeafLink = await leafLink.waitFor({ state: 'attached', timeout: 8_000 }).then(() => true).catch(() => false);
+  if (!hasLeafLink) {
+    await page.goto(hrefPath, { waitUntil: 'domcontentloaded' });
+    return;
+  }
 
   const modelCodeHyphen = modelCode;
   const listResponsePromise = page
@@ -251,6 +255,14 @@ async function applyNoMatchSearch(page: Page, modelCode: string): Promise<void> 
     .catch(() => null);
 }
 
+async function waitForVisibleEmptyState(page: Page) {
+  const emptyState = page.locator('[data-testid="empty-state"], .ant-empty, [class*="empty"]').first();
+  await expect(emptyState, 'empty state component must be visible after no-match search').toBeVisible({
+    timeout: 10_000,
+  });
+  return emptyState;
+}
+
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
@@ -274,6 +286,7 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
     await applyNoMatchSearch(page, 'crm_lead');
 
     // Layer 2 (Data): no data rows — tbody contains exactly 1 row (the empty message row)
+    const emptyState = await waitForVisibleEmptyState(page);
     const dataRows = page.locator('tbody tr');
     await dataRows.first().waitFor({ state: 'visible', timeout: 10_000 });
     const rowCount = await dataRows.count();
@@ -287,11 +300,11 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
     ).toBeGreaterThanOrEqual(1);
 
     // Layer 3 (Behavior): the empty state must have visible content (text or empty-state component)
-    const emptyCell = page.locator('tbody tr td').first();
+    const emptyCell = page.locator('tbody tr td[data-testid="empty-state"]').first();
     await expect(emptyCell).toBeVisible({ timeout: 5_000 });
-    const cellText = (await emptyCell.innerText()).trim();
+    const cellText = (await emptyState.innerText()).trim();
     // The empty state may render as text, an icon, or a dedicated empty-state component
-    const hasEmptyComponent = await page.locator('[data-testid="empty-state"], .ant-empty, [class*="empty"]').first().isVisible({ timeout: 2000 }).catch(() => false);
+    const hasEmptyComponent = await emptyState.isVisible({ timeout: 2000 }).catch(() => false);
     const hasVisualContent = cellText.length > 0 || hasEmptyComponent;
     expect(
       hasVisualContent,

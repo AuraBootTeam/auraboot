@@ -54,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * skill at one risk level for the whole suite or require a per-test
  * {@code DirtiesContext}.
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 @TestPropertySource(properties = "aurabot.skill.echo.risk-level=medium")
 @DisplayName("AuraBotSkillController — MEDIUM-risk echo IT (case 4 + case 5)")
 class SkillExecuteMediumRiskIT extends BaseIntegrationTest {

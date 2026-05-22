@@ -323,17 +323,16 @@ export class HeaderPage {
     const hasLogoutButton = await logoutButton.isVisible({ timeout: 5000 }).catch(() => false);
     if (hasLogoutButton) {
       await logoutButton.scrollIntoViewIfNeeded();
-      await Promise.race([
-        Promise.all([
-          this.page.waitForURL(/\/login/, { timeout: 10000 }),
-          logoutButton.click(),
-        ]),
-        this.page.locator('form').first().evaluate((form) => {
-          if (form instanceof HTMLFormElement) {
-            form.requestSubmit();
-          }
+      await Promise.all([
+        this.page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => null),
+        logoutButton.click().catch(async () => {
+          await this.page.locator('form').first().evaluate((form) => {
+            if (form instanceof HTMLFormElement) {
+              form.requestSubmit();
+            }
+          });
         }),
-      ]).catch(() => {});
+      ]);
 
       if (/\/logout([?#].*)?$/.test(this.page.url())) {
         await this.page.locator('form').first().evaluate((form) => {

@@ -30,6 +30,7 @@ import {
   dateOffsetStr,
   executeCommandViaApi,
   findRowInPaginatedList,
+  fillControlledInput,
   waitForFormReady,
   waitForDynamicPageLoad,
 } from '../helpers/index';
@@ -396,19 +397,25 @@ test.describe('Showcase Smart Components', () => {
 
     // Edit budget
     const budgetInput = field(page, 'sc_budget').locator('input').first();
-    await budgetInput.scrollIntoViewIfNeeded();
     if (await budgetInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await budgetInput.click();
-      await budgetInput.press('Meta+A');
-      await budgetInput.type('88888.88');
-      await budgetInput.blur();
+      await budgetInput.press('ControlOrMeta+A');
+      await budgetInput.press('Backspace');
+      await budgetInput.type('88888.88', { delay: 5 });
+      await expect
+        .poll(async () => (await budgetInput.inputValue()).replace(/,/g, ''))
+        .toBe('88888.88');
+      await budgetInput.evaluate((node) => {
+        const element = node as HTMLInputElement;
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.blur();
+      });
     }
 
     // Edit time slot
     const timeInput = field(page, 'sc_time_slot').locator('input[step]').first();
-    await timeInput.scrollIntoViewIfNeeded();
     if (await timeInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await timeInput.fill('16:45');
+      await fillControlledInput(timeInput, '16:45');
     }
 
     // Save

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code aurabot:idemp:*} keys this method may have left behind so B4+
  * tests start clean.
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 @DisplayName("SkillIdempotencyStore — Redis ledger (real Redis on :26389)")
 class SkillIdempotencyStoreIntegrationTest extends BaseIntegrationTest {
 

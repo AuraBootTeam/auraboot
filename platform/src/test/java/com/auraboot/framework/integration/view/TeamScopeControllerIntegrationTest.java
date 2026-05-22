@@ -82,12 +82,7 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
 
         Filter contextFilter = (request, response, chain) -> {
             try {
-                MetaContext.setContext(
-                        getTestTenant().getId(),
-                        getTestUser().getId(),
-                        getTestUser().getPid(),
-                        getTestUser().getUserName()
-                );
+                applyTestMetaContext();
                 CustomUserDetails userDetails = new CustomUserDetails(
                         getTestUser().getUserName(),
                         "test-password",

@@ -215,6 +215,7 @@ public class FieldManagementIntegrationTest extends BaseIntegrationTest {
         model.setPid("model_pid_" + System.currentTimeMillis());
         model.setTenantId(getTestTenant().getId());
         model.setCode(code);
+        model.setTableName("mt_" + code.toLowerCase());
         
         Map<String, Object> extensionData = new HashMap<>();
         extensionData.put("displayName", "Test Model");

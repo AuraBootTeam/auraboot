@@ -121,6 +121,9 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    include: ['react-grid-layout', 'react-draggable', 'react-resizable'],
+  },
   build: {
     modulePreload: false,
     target: 'esnext',

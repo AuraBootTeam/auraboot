@@ -52,7 +52,7 @@ import static org.mockito.Mockito.when;
  */
 @DisplayName("H.3: StepLoopService.executePlanSteps Extended Thinking propagation")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 class ExecutePlanStepsThinkingIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

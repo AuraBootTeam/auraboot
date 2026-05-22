@@ -4765,7 +4765,7 @@ CREATE TABLE IF NOT EXISTS ab_mission (
   description     TEXT,
   mission_status  VARCHAR(20) DEFAULT 'active',
   owner_id        BIGINT,
-  priority     INTEGER DEFAULT 0,
+  acp_priority INTEGER DEFAULT 0,
   target_date  TIMESTAMPTZ,
   kpis         TEXT,
   tags         TEXT,
@@ -6844,7 +6844,7 @@ CREATE TABLE IF NOT EXISTS ab_object_alias (
     model_code  VARCHAR(100) NOT NULL,
     alias       VARCHAR(200) NOT NULL,
     language    VARCHAR(10) DEFAULT 'zh-CN',
-    priority    INTEGER DEFAULT 0,
+    acp_priority INTEGER DEFAULT 0,
     created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     created_by  BIGINT,
@@ -6863,7 +6863,7 @@ CREATE TABLE IF NOT EXISTS ab_semantic_term (
     term_type   VARCHAR(20) NOT NULL,         -- filter | time_range | metric | segment
     resolution  JSONB,
     description VARCHAR(500),
-    priority    INTEGER DEFAULT 0,
+    acp_priority INTEGER DEFAULT 0,
     created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     created_by  BIGINT,
@@ -8706,3 +8706,181 @@ COMMENT ON COLUMN ab_aurabot_skill_run.status IS
   'SkillRunStatus.code() — one of success / undone / failed. Never store enum.name() directly.';
 COMMENT ON COLUMN ab_aurabot_skill_run.risk_level IS
   'RiskLevel.code() snapshot at execute time — one of low / medium / high / critical.';
+
+-- ============================================================================
+-- OSS dynamic-domain physical tables used by backend integration paths
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS mt_tax_vat_rate (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    tax_vr_code VARCHAR(100) NOT NULL,
+    tax_vr_name VARCHAR(200),
+    tax_vr_rate_pct NUMERIC(10, 4) NOT NULL DEFAULT 0,
+    tax_vr_category VARCHAR(100),
+    tax_vr_tax_type VARCHAR(100),
+    tax_vr_effective_date DATE,
+    tax_vr_expiry_date DATE,
+    tax_vr_is_default BOOLEAN DEFAULT FALSE,
+    tax_vr_is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_tax_vat_rate_tenant_code ON mt_tax_vat_rate (tenant_id, tax_vr_code);
+
+CREATE TABLE IF NOT EXISTS mt_tax_einvoice (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    tax_ei_serial_no VARCHAR(100),
+    tax_ei_einvoice_no VARCHAR(100),
+    tax_ei_einvoice_code VARCHAR(100),
+    tax_ei_source_type VARCHAR(50),
+    tax_ei_source_id VARCHAR(100),
+    tax_ei_invoice_type VARCHAR(50),
+    tax_ei_buyer_name VARCHAR(200),
+    tax_ei_buyer_uscc VARCHAR(100),
+    tax_ei_buyer_address TEXT,
+    tax_ei_buyer_bank TEXT,
+    tax_ei_seller_name VARCHAR(200),
+    tax_ei_seller_uscc VARCHAR(100),
+    tax_ei_seller_address TEXT,
+    tax_ei_seller_bank TEXT,
+    tax_ei_status VARCHAR(50) DEFAULT 'draft',
+    tax_ei_subtotal_amount NUMERIC(18, 2) DEFAULT 0,
+    tax_ei_tax_total_amount NUMERIC(18, 2) DEFAULT 0,
+    tax_ei_total_amount NUMERIC(18, 2) DEFAULT 0,
+    tax_ei_is_redline BOOLEAN DEFAULT FALSE,
+    tax_ei_currency_code VARCHAR(20) DEFAULT 'cny',
+    tax_ei_qr_code_data TEXT,
+    tax_ei_issue_date DATE,
+    tax_ei_remarks TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_tax_einvoice_tenant_status ON mt_tax_einvoice (tenant_id, tax_ei_status);
+
+CREATE TABLE IF NOT EXISTS mt_tax_einvoice_line (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    tax_eil_einvoice_id VARCHAR(26) NOT NULL,
+    tax_eil_line_no INTEGER NOT NULL DEFAULT 1,
+    tax_eil_item_name VARCHAR(200),
+    tax_eil_item_code VARCHAR(100),
+    tax_eil_specification VARCHAR(200),
+    tax_eil_unit VARCHAR(50),
+    tax_eil_quantity NUMERIC(18, 4),
+    tax_eil_unit_price NUMERIC(18, 4),
+    tax_eil_amount NUMERIC(18, 2),
+    tax_eil_vat_rate_pct NUMERIC(10, 4),
+    tax_eil_vat_amount NUMERIC(18, 2),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_tax_einvoice_line_parent ON mt_tax_einvoice_line (tenant_id, tax_eil_einvoice_id, tax_eil_line_no);
+
+CREATE TABLE IF NOT EXISTS mt_crm_complaint (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL DEFAULT '',
+    tenant_id BIGINT NOT NULL,
+    crm_cp_title VARCHAR(500),
+    crm_cp_description TEXT,
+    crm_cp_status VARCHAR(50) DEFAULT 'open',
+    crm_cp_priority VARCHAR(50),
+    crm_cp_customer_email VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_crm_complaint_tenant_created ON mt_crm_complaint (tenant_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS mt_org_department (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    org_dept_name VARCHAR(200),
+    org_dept_code VARCHAR(100),
+    org_dept_parent_id VARCHAR(26),
+    org_dept_manager_id VARCHAR(26),
+    org_dept_order INTEGER,
+    org_dept_status VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by BIGINT,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+ALTER TABLE mt_org_department ADD COLUMN IF NOT EXISTS org_dept_manager_id VARCHAR(26);
+ALTER TABLE mt_org_department ADD COLUMN IF NOT EXISTS org_dept_order INTEGER;
+ALTER TABLE mt_org_department ADD COLUMN IF NOT EXISTS org_dept_status VARCHAR(50);
+ALTER TABLE mt_org_department ADD COLUMN IF NOT EXISTS created_by BIGINT;
+ALTER TABLE mt_org_department ADD COLUMN IF NOT EXISTS updated_by BIGINT;
+
+CREATE TABLE IF NOT EXISTS mt_org_employee (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    org_emp_name VARCHAR(200),
+    org_emp_email VARCHAR(255),
+    org_emp_phone VARCHAR(50),
+    org_emp_gender VARCHAR(50),
+    org_emp_dept_id VARCHAR(26),
+    org_emp_position_id VARCHAR(26),
+    org_emp_status VARCHAR(50),
+    org_emp_type VARCHAR(50),
+    org_emp_member_id VARCHAR(26),
+    org_emp_user_id VARCHAR(26),
+    org_emp_report_to VARCHAR(26),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by BIGINT,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+ALTER TABLE mt_org_employee ADD COLUMN IF NOT EXISTS created_by BIGINT;
+ALTER TABLE mt_org_employee ADD COLUMN IF NOT EXISTS updated_by BIGINT;
+CREATE INDEX IF NOT EXISTS idx_org_employee_tenant_user ON mt_org_employee (tenant_id, org_emp_user_id);
+
+CREATE TABLE IF NOT EXISTS mt_dk_document (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    dk_doc_title VARCHAR(500),
+    dk_doc_content TEXT,
+    dk_doc_status VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS mt_dk_knowledge_article (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(26) UNIQUE NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    dk_ka_title VARCHAR(500),
+    dk_ka_content TEXT,
+    dk_ka_status VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+ALTER TABLE ab_mission ADD COLUMN IF NOT EXISTS acp_priority INTEGER DEFAULT 0;
+ALTER TABLE ab_object_alias ADD COLUMN IF NOT EXISTS acp_priority INTEGER DEFAULT 0;
+ALTER TABLE ab_semantic_term ADD COLUMN IF NOT EXISTS acp_priority INTEGER DEFAULT 0;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ab_mission' AND column_name = 'priority') THEN
+        UPDATE ab_mission SET acp_priority = priority WHERE acp_priority IS NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ab_object_alias' AND column_name = 'priority') THEN
+        UPDATE ab_object_alias SET acp_priority = priority WHERE acp_priority IS NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ab_semantic_term' AND column_name = 'priority') THEN
+        UPDATE ab_semantic_term SET acp_priority = priority WHERE acp_priority IS NULL;
+    END IF;
+END $$;

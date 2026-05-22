@@ -14,7 +14,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { navigateToDynamicPage, uniqueId, executeCommandViaApi, waitForFormReady, clickRowActionByLocator } from '../helpers';
+import { navigateToDynamicPage, uniqueId, executeCommandViaApi, waitForFormReady, clickRowActionByLocator, fillControlledInput } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
 const EMPLOYEE_PAGE_KEY = 'org-employee';
@@ -301,7 +301,7 @@ test.describe('Organization Employee', () => {
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await nameInput.fill(updatedName);
+    await fillControlledInput(nameInput, updatedName);
     await expect(nameInput).toHaveValue(updatedName, { timeout: 3000 });
 
     // Save

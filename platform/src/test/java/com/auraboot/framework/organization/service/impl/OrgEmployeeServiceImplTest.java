@@ -96,7 +96,7 @@ class OrgEmployeeServiceImplTest {
         TenantMember member = new TenantMember();
         member.setId(50L);
         member.setPid("mem-50");
-        when(tenantMemberService.addMember(99L, 1L, "ACTIVE")).thenReturn(member);
+        when(tenantMemberService.addMember(99L, 1L, "active")).thenReturn(member);
 
         Map<String, Object> created = new HashMap<>();
         created.put("id", 200L);

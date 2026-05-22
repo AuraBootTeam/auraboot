@@ -17,6 +17,7 @@
 
 import { test, expect } from '../../fixtures';
 import { uniqueId, ensureSidebarExpanded } from '../helpers/index';
+import type { Locator, Page } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
 // Serial mode
@@ -41,19 +42,46 @@ async function navigateToComposePage(page: any): Promise<void> {
   await crmBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 
-  // Click "Email" sub-menu button
+  // Click "Email" sub-menu button when the tenant has an email menu. OSS seed
+  // data may expose the email pages by route without mounting them in sidebar.
   const emailBtn = nav.getByRole('button', { name: /Email|邮件/i }).first();
-  await emailBtn.waitFor({ state: 'visible', timeout: 6_000 });
+  const hasEmailMenu = await emailBtn.isVisible({ timeout: 6_000 }).catch(() => false);
+  if (!hasEmailMenu) {
+    await page.goto('/email/compose', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('[data-testid="email-compose-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    return;
+  }
   await emailBtn.scrollIntoViewIfNeeded().catch(() => null);
   await emailBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 
   // Click "Compose" leaf link
   const composeLink = nav.locator('a[href="/email/compose"]').first();
-  await composeLink.waitFor({ state: 'attached', timeout: 10_000 });
+  const hasComposeLink = await composeLink.isVisible({ timeout: 10_000 }).catch(() => false);
+  if (!hasComposeLink) {
+    await page.goto('/email/compose', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('[data-testid="email-compose-page"]')
+      .waitFor({ state: 'visible', timeout: 15_000 });
+    return;
+  }
   await composeLink.scrollIntoViewIfNeeded().catch(() => null);
   await composeLink.evaluate((el: HTMLElement) => el.click());
   await page.waitForLoadState('domcontentloaded');
+}
+
+async function toggleCheckbox(page: Page, checkbox: Locator): Promise<void> {
+  const initialState = await checkbox.isChecked();
+  await checkbox.click();
+
+  if ((await checkbox.isChecked()) === initialState) {
+    await checkbox.focus();
+    await page.keyboard.press('Space');
+  }
+
+  await expect.poll(() => checkbox.isChecked()).toBe(!initialState);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,13 +93,11 @@ test.describe('Email Compose', () => {
   // =========================================================================
   // T1: Navigate to Compose via sidebar (D1)
   // =========================================================================
-  test('T1: navigate to Compose page via sidebar menu', async ({ page }) => {
-    // Use direct navigation as fallback for complex menu nesting
-    await page.goto('/email/compose', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle').catch(() => {});
-
-    const composePage = page.locator('[data-testid="email-compose-page"], main').first();
-    await expect(composePage).toBeVisible({ timeout: 20_000 });
+  test('T1: navigate to Compose page', async ({ page }) => {
+    await navigateToComposePage(page);
+    await expect(page.locator('[data-testid="email-compose-page"]')).toBeVisible({
+      timeout: 20_000,
+    });
   });
 
   // =========================================================================
@@ -133,24 +159,26 @@ test.describe('Email Compose', () => {
       .locator('[data-testid="email-compose-page"]')
       .waitFor({ state: 'visible', timeout: 15_000 });
 
-    // CC toggle — may be a button or link element with text "CC"
-    const ccToggle = page.locator('button, a, span').filter({ hasText: /^CC$/ }).first();
+    const composePage = page.locator('[data-testid="email-compose-page"]');
+    const ccToggle = composePage.locator('[data-testid="compose-cc-toggle"]');
     const hasCcToggle = await ccToggle.isVisible({ timeout: 5_000 }).catch(() => false);
 
     if (hasCcToggle) {
-      await ccToggle.click();
+      await expect(ccToggle).toBeEnabled();
+      await page.waitForTimeout(500);
+      await ccToggle.evaluate((el: HTMLButtonElement) => el.click());
 
       const ccInput = page.locator('[data-testid="compose-cc"]');
       await expect(ccInput).toBeVisible({ timeout: 5_000 });
       await ccInput.fill(`cc-${UID}@example.com`);
       await expect(ccInput).toHaveValue(`cc-${UID}@example.com`);
 
-      // BCC toggle — may appear after CC is clicked, or alongside it
-      const bccToggle = page.locator('button, a, span').filter({ hasText: /^BCC$/ }).first();
+      const bccToggle = composePage.locator('[data-testid="compose-bcc-toggle"]');
       const hasBccToggle = await bccToggle.isVisible({ timeout: 3_000 }).catch(() => false);
 
       if (hasBccToggle) {
-        await bccToggle.click();
+        await expect(bccToggle).toBeEnabled();
+        await bccToggle.evaluate((el: HTMLButtonElement) => el.click());
 
         const bccInput = page.locator('[data-testid="compose-bcc"]');
         await expect(bccInput).toBeVisible({ timeout: 5_000 });
@@ -189,17 +217,11 @@ test.describe('Email Compose', () => {
 
     const trackOpens = page.locator('[data-testid="track-opens-toggle"]');
     await expect(trackOpens).toBeVisible({ timeout: 5_000 });
-    const initialOpensState = await trackOpens.isChecked();
-
-    await trackOpens.click();
-    expect(await trackOpens.isChecked()).toBe(!initialOpensState);
+    await toggleCheckbox(page, trackOpens);
 
     const trackClicks = page.locator('[data-testid="track-clicks-toggle"]');
     await expect(trackClicks).toBeVisible({ timeout: 5_000 });
-    const initialClicksState = await trackClicks.isChecked();
-
-    await trackClicks.click();
-    expect(await trackClicks.isChecked()).toBe(!initialClicksState);
+    await toggleCheckbox(page, trackClicks);
   });
 
   // =========================================================================

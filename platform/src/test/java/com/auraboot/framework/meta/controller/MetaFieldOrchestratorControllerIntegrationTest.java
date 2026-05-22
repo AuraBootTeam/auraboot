@@ -61,7 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   <li>{@code delete_dataExists_returns422} — ColumnHasDataException → 422 / COLUMN_HAS_DATA</li>
  * </ol>
  *
- * <p>Real PostgreSQL ({@code skills-c4-test} profile @ port 35442). Auth is
+ * <p>Real PostgreSQL from the standard {@code integration-test} profile. Auth is
  * established by installing a {@code MetaContext}-priming filter on the
  * MockMvc chain (mirrors {@code AuraBotSkillControllerIntegrationTest}); the
  * platform's central {@code PermissionInterceptor} handles authorization, so
@@ -71,7 +71,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Spring transaction in PostgreSQL.
  */
 @Slf4j
-@ActiveProfiles({"integration-test", "skills-c4-test"})
+@ActiveProfiles("integration-test")
 @DisplayName("MetaFieldOrchestratorController IT (Spec §4)")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class MetaFieldOrchestratorControllerIntegrationTest extends BaseIntegrationTest {

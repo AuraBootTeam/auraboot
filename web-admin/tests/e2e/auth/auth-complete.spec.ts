@@ -35,6 +35,7 @@ import {
   expect,
   request as playwrightRequest,
   type Page,
+  type Locator,
   type APIRequestContext,
 } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
@@ -91,6 +92,22 @@ async function loginViaUI(page: Page, email: string, password: string) {
     )
     .first()
     .click();
+}
+
+async function selectTab(tab: Locator): Promise<void> {
+  await expect(tab).toBeVisible({ timeout: 8_000 });
+  await expect
+    .poll(
+      async () => {
+        if ((await tab.getAttribute('aria-selected')) === 'true') {
+          return true;
+        }
+        await tab.click().catch(() => null);
+        return (await tab.getAttribute('aria-selected')) === 'true';
+      },
+      { timeout: 5_000, intervals: [250, 500, 1000] },
+    )
+    .toBe(true);
 }
 
 async function expectLoggedIn(page: Page, timeout = 30000) {
@@ -547,8 +564,7 @@ test.describe('Login — Email OTP', () => {
     await page.goto('/login');
     const tab = page.locator('[data-testid="login-tab-email_code"]');
     if (await tab.isVisible()) {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await selectTab(tab);
     }
 
     const emailCodeInput = page.locator('#ec-email');

@@ -2,15 +2,24 @@ package com.auraboot.framework.scheduler;
 
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
+import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
+import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.CommandExecutor;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,8 +54,25 @@ class ScheduledTaskCommandHardeningIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private DynamicDataMapper dynamicDataMapper;
 
+    @Autowired
+    private CommandDefinitionMapper commandDefinitionMapper;
+
+    @Autowired
+    private MetaModelMapper metaModelMapper;
+
+    @Autowired
+    private MetaModelService metaModelService;
+
     private static final String CREATE_CMD = "admin:create_scheduled_task";
     private static final String DELETE_CMD = "admin:delete_scheduled_task";
+
+    @BeforeEach
+    void ensureScheduledTaskCommands() {
+        ensureScheduledTaskModel();
+        ensureCommand(CREATE_CMD,
+                "{\"type\":\"create\",\"inputFields\":[\"name\",\"description\",\"task_type\",\"cron_expression\",\"interval_ms\",\"handler_bean\",\"handler_method\",\"params\",\"max_retries\",\"timeout_ms\",\"enabled\"]}");
+        ensureCommand(DELETE_CMD, "{\"type\":\"delete\"}");
+    }
 
     /** G-7: garbage cron expressions must blow up at command time. */
     @Test
@@ -157,5 +183,74 @@ class ScheduledTaskCommandHardeningIntegrationTest extends BaseIntegrationTest {
         List<Map<String, Object>> rowsAfter = dynamicDataMapper.selectByQuery(selectSql, selectParams);
         assertTrue(rowsAfter.isEmpty(),
                 () -> "row should be hard-deleted; still present: " + rowsAfter);
+    }
+
+    private void ensureCommand(String code, String executionConfig) {
+        if (commandDefinitionMapper.findCurrentByCode(code) != null) {
+            return;
+        }
+        CommandDefinition command = new CommandDefinition();
+        command.setPid(UniqueIdGenerator.generate());
+        command.setTenantId(getTestTenant().getId());
+        command.setCode(code);
+        command.setDisplayName(code);
+        command.setDescription("Scheduled task command fixture for integration tests");
+        command.setModelCode("scheduled_task");
+        command.setInputSchema("{}");
+        command.setTargetModels("[]");
+        command.setExecutionConfig(executionConfig);
+        command.setExtension(new ExtensionBean());
+        command.setCmdRiskLevel("L1");
+        command.setVersion(1);
+        command.setIsCurrent(true);
+        command.setRowVersion(1);
+        command.setStatus("published");
+        command.setDeletedFlag(false);
+        command.setCreatedAt(Instant.now());
+        command.setUpdatedAt(Instant.now());
+        commandDefinitionMapper.insertIdempotent(command);
+    }
+
+    private void ensureScheduledTaskModel() {
+        Model existing = metaModelMapper.findCurrentByCode("scheduled_task");
+        if (existing != null && "ab_scheduled_task".equals(existing.getTableName())) {
+            return;
+        }
+
+        Model model = existing != null ? existing : new Model();
+        if (model.getPid() == null) {
+            model.setPid(UniqueIdGenerator.generate());
+        }
+        model.setTenantId(getTestTenant().getId());
+        model.setCode("scheduled_task");
+        model.setTableName("ab_scheduled_task");
+        model.setModelCategory("master");
+        model.setSourceType("physical");
+        model.setDomainCategory("platform");
+        model.setDataSensitivity("internal");
+        model.setSemanticDescription("Configurable scheduled task definitions");
+        ExtensionBean extension = model.getExtension() != null ? model.getExtension() : new ExtensionBean();
+        extension.setDynamicProperty("displayName", "Scheduled Task");
+        extension.setDynamicProperty("modelType", "entity");
+        extension.setDynamicProperty("titleField", "name");
+        extension.setDynamicProperty("softDelete", false);
+        model.setExtension(extension);
+        model.setVersion(model.getVersion() != null ? model.getVersion() : 1);
+        model.setIsCurrent(true);
+        model.setRowVersion(model.getRowVersion() != null ? model.getRowVersion() : 1);
+        model.setStatus("published");
+        model.setDeletedFlag(false);
+        Instant now = Instant.now();
+        if (model.getCreatedAt() == null) {
+            model.setCreatedAt(now);
+        }
+        model.setUpdatedAt(now);
+
+        if (model.getId() == null) {
+            metaModelMapper.insert(model);
+        } else {
+            metaModelMapper.updateById(model);
+        }
+        metaModelService.refreshModelCache("scheduled_task");
     }
 }

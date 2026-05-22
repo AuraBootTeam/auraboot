@@ -79,7 +79,7 @@ public class AcpAiAnnotationRepository {
                     WHERE tenant_id = ?
                       AND target_model_code = ?
                       AND target_id = ?
-                    ORDER BY created_at DESC
+                    ORDER BY created_at DESC, id DESC
                     LIMIT 1
                     """,
                     tenantId, targetModelCode, targetId);

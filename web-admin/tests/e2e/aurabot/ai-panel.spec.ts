@@ -12,7 +12,7 @@
  */
 
 import { test, expect } from '../../fixtures';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 // ---------------------------------------------------------------------------
@@ -50,15 +50,7 @@ async function openPanel(page: Page) {
   const isAlreadyOpen = await panel.isVisible().catch(() => false);
   if (!isAlreadyOpen) {
     const toggle = page.locator('[data-testid="ai-panel-toggle"]');
-    await expect(toggle).toBeVisible({ timeout: 10000 });
-    await expect(toggle).toBeEnabled({ timeout: 5000 });
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      await toggle.click();
-      const opened = await panel.isVisible({ timeout: 2500 }).catch(() => false);
-      if (opened) {
-        break;
-      }
-    }
+    await clickToggleUntilPanelVisible(panel, toggle);
     const openedAfterClicks = await panel.isVisible({ timeout: 2000 }).catch(() => false);
     if (!openedAfterClicks) {
       await page.locator('body').click();
@@ -85,6 +77,24 @@ async function openPanel(page: Page) {
   }
   await expect(panel).toBeVisible({ timeout: 10000 });
   return panel;
+}
+
+async function clickToggleUntilPanelVisible(panel: Locator, toggle: Locator): Promise<void> {
+  await expect(toggle).toBeVisible({ timeout: 10_000 });
+  await expect(toggle).toBeEnabled({ timeout: 5_000 });
+
+  await expect
+    .poll(
+      async () => {
+        if (await panel.isVisible({ timeout: 250 }).catch(() => false)) {
+          return true;
+        }
+        await toggle.click().catch(() => null);
+        return panel.isVisible({ timeout: 1_500 }).catch(() => false);
+      },
+      { timeout: 10_000, intervals: [250, 500, 1000] },
+    )
+    .toBe(true);
 }
 
 async function toggleWithShortcut(page: Page, shouldOpen: boolean) {
@@ -164,10 +174,7 @@ test.describe('AuraBot Panel', () => {
 
     // Click toggle to open (retry once if panel doesn't appear)
     const toggle = page.locator('[data-testid="ai-panel-toggle"]');
-    await expect(toggle).toBeVisible({ timeout: 10000 });
-    await toggle.click();
-    const opened = await panel.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!opened) await toggle.click();
+    await clickToggleUntilPanelVisible(panel, toggle);
     await expect(panel).toBeVisible({ timeout: 10000 });
 
     // Panel should contain AuraBot heading in the header bar

@@ -20,6 +20,8 @@ import {
   findRowInPaginatedList,
   extractRecordId,
   clickRowActionByLocator,
+  fillControlledInput,
+  queryFilteredList,
 } from '../helpers';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { ADMIN_DATA_PERMISSION_CONFIG } from '../../helpers/configs/admin-data-permission.config';
@@ -82,7 +84,7 @@ async function fillFormField(
     )
     .first();
   await input.waitFor({ state: 'visible', timeout: 5000 });
-  await input.fill(value);
+  await fillControlledInput(input, value);
 }
 
 async function selectFormField(
@@ -225,7 +227,7 @@ test.describe('Data Permissions @gap010', () => {
       .locator('[data-testid="form-field-name"] input:visible, [data-field="name"] input:visible, [name="name"]:visible')
       .first();
     await expect(nameInput).toHaveValue(policyName, { timeout: 10000 });
-    await nameInput.fill(updatedName);
+    await fillControlledInput(nameInput, updatedName);
     await nameInput.blur();
     await expect(nameInput).toHaveValue(updatedName);
 
@@ -246,18 +248,33 @@ test.describe('Data Permissions @gap010', () => {
   test('DP-005: delete policy via list row action', async ({ page }) => {
     const helper = new ModelTestHelper(page, ADMIN_DATA_PERMISSION_CONFIG);
     const deleteName = `DP-DEL-${uniqueId()}`;
-    await helper.createViaApi({
+    const pid = await helper.createViaApi({
       name: deleteName,
       model_code: 'e2et_order',
       policy_type: 'row',
       enabled: true,
     });
 
+    await expect
+      .poll(
+        async () => {
+          const records = await queryFilteredList(page, PAGE_KEY, 'name', deleteName, {
+            operator: 'EQ',
+          });
+          return records.some(
+            (record) => String(record.pid ?? record.id ?? '') === pid || record.name === deleteName,
+          );
+        },
+        { timeout: 15_000, intervals: [500, 1000, 1500] },
+      )
+      .toBe(true);
+
     await navigateToDynamicPage(page, PAGE_KEY);
     await waitForDynamicPageLoad(page, 10000);
 
     // Find and delete the row
-    const row = await findRowInPaginatedList(page, deleteName, 12000);
+    const row = await findRowInPaginatedList(page, deleteName, 20000);
+    await expect(row).toBeVisible({ timeout: 5000 });
     await clickRowDeleteAndConfirm(page, row);
 
     // Verify the row is gone from the real list UI

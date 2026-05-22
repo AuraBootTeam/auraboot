@@ -131,7 +131,7 @@ class SqlViewModelExecutorTest {
     void list_appends_tenant_filter_when_view_has_tenant_id_column() {
         when(metaModelService.getDefinitionByCode("u")).thenReturn(def("u", "v_users", "id", ModelCapabilities.empty()));
         when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(1); // has tenant_id
-        when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(1L);
+        lenient().when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(1L);
         when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of("id", 1)));
 
         executor.list("u", DynamicQueryRequest.builder().pageNum(1).pageSize(20).build());
@@ -161,7 +161,7 @@ class SqlViewModelExecutorTest {
         ModelCapabilities caps = ModelCapabilities.builder().sort(true).sortableFields(List.of("name")).build();
         when(metaModelService.getDefinitionByCode("u")).thenReturn(def("u", "v_users", "id", caps));
         when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
-        when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(1L);
+        lenient().when(jdbc.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(1L);
 
         DynamicQueryRequest req = DynamicQueryRequest.builder()
             .pageNum(1).pageSize(10)

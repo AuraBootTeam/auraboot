@@ -123,11 +123,10 @@ else
 fi
 rm -rf "$WORKDIR_3" /tmp/guard-stdout-$$ /tmp/guard-stderr-$$
 
-# ----- Scenario 4: two worktrees + FORCE_HOST=1 → escape + audit log -----
+# ----- Scenario 4: two worktrees + isolated PG env + full script path → pass -----
 
-echo "Scenario 4: two-worktree repo + FORCE_HOST=1 → escape with audit log"
+echo "Scenario 4: two-worktree repo with isolated PG env and full script path → guard passes"
 WORKDIR_4=$(mktemp -d)
-HOME_4=$(mktemp -d)
 (
     cd "$WORKDIR_4"
     git init -q
@@ -135,23 +134,48 @@ HOME_4=$(mktemp -d)
     git config user.name test
     : > a.txt && git add a.txt && git commit -q -m init
     git worktree add -q ./wt-2 -b second-branch
-    HOME="$HOME_4" FORCE_HOST=1 bash "$GUARD_SCRIPT" check test-op-force \
-        > /tmp/guard-stdout-$$ 2> /tmp/guard-stderr-$$
+    PG_PORT=15432 bash "$GUARD_SCRIPT" check auraboot-enterprise/scripts/reset-db.sh > /tmp/guard-stdout-$$ 2> /tmp/guard-stderr-$$
 )
-assert_exit "scenario 4 exit code (escape)" 0 $?
-assert_file_contains "scenario 4 audit log captured operation" \
-    "$HOME_4/.aura/host-override.log" "operation=test-op-force"
-assert_file_contains "scenario 4 audit log captured worktree count" \
-    "$HOME_4/.aura/host-override.log" "worktree_count=2"
-if grep -q "WARN: FORCE_HOST=1" /tmp/guard-stderr-$$; then
-    echo "  PASS: scenario 4 emitted WARN on stderr"
+assert_exit "scenario 4 exit code (full path isolated PG)" 0 $?
+if [ ! -s /tmp/guard-stderr-$$ ]; then
+    echo "  PASS: scenario 4 produced no stderr noise"
     PASS=$((PASS + 1))
 else
-    echo "  FAIL: scenario 4 missing WARN line"
+    echo "  FAIL: scenario 4 produced stderr:"
     cat /tmp/guard-stderr-$$
     FAIL=$((FAIL + 1))
 fi
-rm -rf "$WORKDIR_4" "$HOME_4" /tmp/guard-stdout-$$ /tmp/guard-stderr-$$
+rm -rf "$WORKDIR_4" /tmp/guard-stdout-$$ /tmp/guard-stderr-$$
+
+# ----- Scenario 5: two worktrees + FORCE_HOST=1 → escape + audit log -----
+
+echo "Scenario 5: two-worktree repo + FORCE_HOST=1 → escape with audit log"
+WORKDIR_5=$(mktemp -d)
+HOME_5=$(mktemp -d)
+(
+    cd "$WORKDIR_5"
+    git init -q
+    git config user.email test@test.test
+    git config user.name test
+    : > a.txt && git add a.txt && git commit -q -m init
+    git worktree add -q ./wt-2 -b second-branch
+    HOME="$HOME_5" FORCE_HOST=1 bash "$GUARD_SCRIPT" check test-op-force \
+        > /tmp/guard-stdout-$$ 2> /tmp/guard-stderr-$$
+)
+assert_exit "scenario 5 exit code (escape)" 0 $?
+assert_file_contains "scenario 5 audit log captured operation" \
+    "$HOME_5/.aura/host-override.log" "operation=test-op-force"
+assert_file_contains "scenario 5 audit log captured worktree count" \
+    "$HOME_5/.aura/host-override.log" "worktree_count=2"
+if grep -q "WARN: FORCE_HOST=1" /tmp/guard-stderr-$$; then
+    echo "  PASS: scenario 5 emitted WARN on stderr"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: scenario 5 missing WARN line"
+    cat /tmp/guard-stderr-$$
+    FAIL=$((FAIL + 1))
+fi
+rm -rf "$WORKDIR_5" "$HOME_5" /tmp/guard-stdout-$$ /tmp/guard-stderr-$$
 
 echo ""
 echo "==========================================="

@@ -55,7 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Integration tests for {@link FieldAddSkill#execute(SkillRequest)} (Spec
  * §5.4 / §6.2 cases 1-4).
  *
- * <p>Real PostgreSQL ({@code skills-c4-test} profile) — no mocks for DB or
+ * <p>Real PostgreSQL from the standard {@code integration-test} profile — no mocks for DB or
  * Redis. The skill delegates to {@link com.auraboot.framework.meta.service.MetaFieldService}
  * which performs DDL inside {@code NOT_SUPPORTED} so this test class also
  * runs outside any wrapping transaction.
@@ -65,7 +65,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * models) and tears down its own table + rows in {@link #cleanup()}.
  */
 @Slf4j
-@ActiveProfiles({"integration-test", "skills-c4-test"})
+@ActiveProfiles("integration-test")
 @DisplayName("FieldAddSkill.execute Integration Test")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestInstance(TestInstance.Lifecycle.PER_METHOD)
