@@ -114,6 +114,10 @@ frontend_session() {
     echo "auraboot-$SLUG-frontend"
 }
 
+bff_session() {
+    echo "auraboot-$SLUG-bff"
+}
+
 backend_log() {
     echo "/tmp/aura-$SLUG-backend.log"
 }
@@ -287,8 +291,10 @@ Bugfix environment start plan
   backend root:     ${backend_root:-unresolved}
   backend session:  $(backend_session)
   frontend session: $(frontend_session)
+  bff session:      $(bff_session)
   backend log:      $(backend_log)
   frontend log:     $(frontend_log)
+  bff log:          $(bff_log)
   startup writes:   --auraboot.bootstrap.enabled=false
 PLAN
 }
@@ -349,7 +355,7 @@ start_frontend_host() {
     local cmd
     local core_root
     core_root="$(registered_core_root)"
-    cmd="cd '$core_root/web-admin' && SPRING_BOOT_URL='$BACKEND_URL' BACKEND_URL='$BACKEND_URL' PLAYWRIGHT_BASE_URL='$PLAYWRIGHT_BASE_URL' BFF_URL='$BFF_URL' BFF_PORT='$BFF_PORT' VITE_PORT='$VITE_PORT' NO_PROXY='localhost,127.0.0.1' pnpm dev:full >'$log_file' 2>&1"
+    cmd="cd '$core_root/web-admin' && SPRING_BOOT_URL='$BACKEND_URL' BACKEND_URL='$BACKEND_URL' PLAYWRIGHT_BASE_URL='$PLAYWRIGHT_BASE_URL' BFF_URL='$BFF_URL' BFF_PORT='$BFF_PORT' VITE_PORT='$VITE_PORT' NO_PROXY='localhost,127.0.0.1' pnpm sync-plugins && exec env SPRING_BOOT_URL='$BACKEND_URL' BACKEND_URL='$BACKEND_URL' PLAYWRIGHT_BASE_URL='$PLAYWRIGHT_BASE_URL' BFF_URL='$BFF_URL' BFF_PORT='$BFF_PORT' VITE_PORT='$VITE_PORT' NO_PROXY='localhost,127.0.0.1' ./node_modules/.bin/react-router dev >'$log_file' 2>&1"
 
     if [ "$DRY_RUN" = "1" ]; then
         echo "tmux new-session -d -s $session \"$cmd\""
@@ -359,6 +365,26 @@ start_frontend_host() {
     tmux kill-session -t "$session" 2>/dev/null || true
     tmux new-session -d -s "$session" "$cmd"
     echo "started frontend session: $session"
+}
+
+start_bff_host() {
+    local log_file
+    log_file="$(bff_log)"
+    local session
+    session="$(bff_session)"
+    local cmd
+    local core_root
+    core_root="$(registered_core_root)"
+    cmd="cd '$core_root/web-admin' && exec env SPRING_BOOT_URL='$BACKEND_URL' BACKEND_URL='$BACKEND_URL' PLAYWRIGHT_BASE_URL='$PLAYWRIGHT_BASE_URL' BFF_URL='$BFF_URL' BFF_PORT='$BFF_PORT' VITE_PORT='$VITE_PORT' NO_PROXY='localhost,127.0.0.1' ./node_modules/.bin/tsx app/server/bff.server.ts >'$log_file' 2>&1"
+
+    if [ "$DRY_RUN" = "1" ]; then
+        echo "tmux new-session -d -s $session \"$cmd\""
+        return 0
+    fi
+
+    tmux kill-session -t "$session" 2>/dev/null || true
+    tmux new-session -d -s "$session" "$cmd"
+    echo "started bff session: $session"
 }
 
 command_start() {
@@ -393,6 +419,7 @@ command_start() {
     registry_upsert_current running >/dev/null
     start_backend_host
     start_frontend_host
+    start_bff_host
 }
 
 command_status() {
@@ -401,6 +428,7 @@ command_status() {
     if command -v tmux >/dev/null 2>&1; then
         echo "tmux backend=$(tmux has-session -t "$(backend_session)" 2>/dev/null && echo running || echo stopped)"
         echo "tmux frontend=$(tmux has-session -t "$(frontend_session)" 2>/dev/null && echo running || echo stopped)"
+        echo "tmux bff=$(tmux has-session -t "$(bff_session)" 2>/dev/null && echo running || echo stopped)"
     fi
     local be_pids vite_pids bff_pids
     be_pids="$(aura_dev_listen_pids_for_port "$BE_PORT" | tr '\n' ',' | sed 's/,$//')"
@@ -457,10 +485,13 @@ command_stop() {
     echo "  slug:             $SLUG"
     echo "  backend session:  $(backend_session)"
     echo "  frontend session: $(frontend_session)"
+    echo "  bff session:      $(bff_session)"
     echo "  exact ports:      $BE_PORT $VITE_PORT $BFF_PORT"
     echo "  cleanup:          no global pkill"
     aura_dev_stop_tmux_session "$(backend_session)" "$DRY_RUN"
     aura_dev_stop_tmux_session "$(frontend_session)" "$DRY_RUN"
+    aura_dev_stop_tmux_session "$(bff_session)" "$DRY_RUN"
+    aura_dev_stop_web_processes_for_root "$DRY_RUN" "$(registered_core_root)/web-admin"
     aura_dev_stop_ports "$DRY_RUN" "$BE_PORT" "$VITE_PORT" "$BFF_PORT"
 
     if [ "$PURGE" = "1" ]; then
