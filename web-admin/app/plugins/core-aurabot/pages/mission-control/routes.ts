@@ -8,3 +8,13 @@ export const MISSION_CONTROL_DSL_PATHS = {
   artifactList: '/p/agent_artifact',
   approvalPolicyList: '/p/approval_policy',
 } as const;
+
+export const MISSION_CONTROL_STATIC_PATHS = {
+  runs: '/aurabot/runs',
+  traces: '/aurabot/traces',
+  interrupts: '/aurabot/interrupts',
+  learningDrafts: '/aurabot/learning-drafts',
+  memoryPromotions: '/aurabot/memory-promotions',
+  myProfile: '/aurabot/my-profile',
+  soulProfiles: '/aurabot/soul-profiles',
+} as const;

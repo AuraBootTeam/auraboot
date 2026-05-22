@@ -1,9 +1,30 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
+import type { LucideIcon } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Bot,
+  Brain,
+  CalendarClock,
+  ClipboardList,
+  FileText,
+  GitBranch,
+  History,
+  ListChecks,
+  PlayCircle,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  UserCircle,
+  Users,
+} from 'lucide-react';
 import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
-import { MISSION_CONTROL_DSL_PATHS } from './routes';
+import { MISSION_CONTROL_DSL_PATHS, MISSION_CONTROL_STATIC_PATHS } from './routes';
 
 // ============================================================================
 // Types
@@ -68,6 +89,28 @@ interface RunRecord {
   error_message: string;
   task_title: string;
   agent_name: string;
+}
+
+interface WorkbenchLink {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  onClick: () => void;
+  badge?: string;
+}
+
+interface WorkflowStep {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  meta: string;
+  onClick: () => void;
+}
+
+interface CommandGroup {
+  title: string;
+  desc: string;
+  links: WorkbenchLink[];
 }
 
 // ============================================================================
@@ -187,24 +230,24 @@ export default function MissionControl() {
         <div className="flex items-center gap-3">
           <span className="text-2xl">🎯</span>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            {l('AuraBot Dashboard', 'AuraBot Dashboard')}
+            {l('AuraBot 工作台', 'AuraBot Workbench')}
           </h1>
           <LiveIndicator />
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/p/mission')}
-            className="rounded-md bg-blue-50 px-3 py-1.5 text-sm text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+            onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
+            className="shrink-0 whitespace-nowrap rounded-md bg-blue-50 px-3 py-1.5 text-sm text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
             data-testid="mc-view-missions"
           >
-            {l('查看使命', 'View Missions')}
+            {l('进入调研任务', 'Open Research Tasks')}
           </button>
           <button
-            onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
-            className="rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            data-testid="mc-view-all-tasks"
+            onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
+            className="shrink-0 whitespace-nowrap rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            data-testid="mc-needs-review"
           >
-            {l('全部任务', 'All Tasks')}
+            {l('待处理', 'Needs Review')}
           </button>
         </div>
       </div>
@@ -310,6 +353,165 @@ function DashboardView({
     loadSchedules();
   }, [refreshKey, loadSchedules]);
 
+  const workflowSteps: WorkflowStep[] = [
+    {
+      icon: GitBranch,
+      title: l('使命', 'Mission'),
+      desc: l('定义竞对范围、周期和交付物', 'Define competitors, cadence, and deliverables'),
+      meta: l(`${kpi?.active_missions ?? 0} 个活跃使命`, `${kpi?.active_missions ?? 0} active missions`),
+      onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.taskList),
+    },
+    {
+      icon: ClipboardList,
+      title: l('任务拆解', 'Task Breakdown'),
+      desc: l('抓取、整理、分析、生成报告', 'Collect, normalize, analyze, and report'),
+      meta: l(`${kpi?.active_tasks ?? 0} 个活跃任务`, `${kpi?.active_tasks ?? 0} active tasks`),
+      onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.taskList),
+    },
+    {
+      icon: PlayCircle,
+      title: l('运行与追踪', 'Runs And Traces'),
+      desc: l('查看模型调用、成本和失败原因', 'Inspect model calls, cost, and failure causes'),
+      meta: l(`${kpi?.running_now ?? 0} 个运行中`, `${kpi?.running_now ?? 0} running`),
+      onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.runs),
+    },
+    {
+      icon: ShieldCheck,
+      title: l('人工介入', 'Human Review'),
+      desc: l('处理审批、中断和风险策略', 'Handle approvals, interrupts, and policies'),
+      meta: l(
+        `${kpi?.pending_approvals ?? 0} 个待审批`,
+        `${kpi?.pending_approvals ?? 0} pending approvals`,
+      ),
+      onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.approvalList),
+    },
+    {
+      icon: FileText,
+      title: l('产出物', 'Artifacts'),
+      desc: l('沉淀周报、对比表和销售话术', 'Deliver reports, comparison tables, and battlecards'),
+      meta: l('报告交付面', 'Delivery surface'),
+      onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.artifactList),
+    },
+  ];
+
+  const commandGroups: CommandGroup[] = [
+    {
+      title: l('执行链路', 'Execution'),
+      desc: l('从使命到产出物的主路径', 'Primary path from mission to artifact'),
+      links: [
+        {
+          icon: GitBranch,
+          title: l('使命', 'Missions'),
+          desc: l('定义业务目标和拆解边界', 'Define business goal and scope'),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.taskList),
+        },
+        {
+          icon: ClipboardList,
+          title: l('任务', 'Tasks'),
+          desc: l('查看和推进 Agent 任务', 'Review and advance agent tasks'),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.taskList),
+        },
+        {
+          icon: History,
+          title: l('运行记录', 'Runs'),
+          desc: l('跟踪执行状态和成本', 'Track execution status and cost'),
+          onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.runs),
+        },
+        {
+          icon: FileText,
+          title: l('产出物', 'Artifacts'),
+          desc: l('查看报告、摘要和表格', 'Open reports, summaries, and tables'),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.artifactList),
+        },
+      ],
+    },
+    {
+      title: l('治理与审计', 'Governance'),
+      desc: l('处理人工判断和风险边界', 'Handle judgment points and risk boundaries'),
+      links: [
+        {
+          icon: ShieldCheck,
+          title: l('审批', 'Approvals'),
+          desc: l('处理待确认动作', 'Resolve pending decisions'),
+          badge: String(kpi?.pending_approvals ?? 0),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.approvalList),
+        },
+        {
+          icon: AlertTriangle,
+          title: l('中断审计', 'Interrupts'),
+          desc: l('查看分类器产出的暂停点', 'Inspect classifier pause points'),
+          onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.interrupts),
+        },
+        {
+          icon: Search,
+          title: l('AI 追踪', 'AI Traces'),
+          desc: l('审计 LLM 调用和证据链', 'Audit LLM calls and evidence'),
+          onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.traces),
+        },
+        {
+          icon: Settings2,
+          title: l('审批策略', 'Policies'),
+          desc: l('配置风险规则', 'Configure risk rules'),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.approvalPolicyList),
+        },
+      ],
+    },
+    {
+      title: l('团队与记忆', 'Team And Memory'),
+      desc: l('管理 Agent、调度和偏好', 'Manage agents, schedules, and preferences'),
+      links: [
+        {
+          icon: Bot,
+          title: l('Agent 定义', 'Agent Definitions'),
+          desc: l('维护 Agent 能力和职责', 'Maintain agent capabilities and ownership'),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.agentList),
+        },
+        {
+          icon: CalendarClock,
+          title: l('调度', 'Schedules'),
+          desc: l('配置周期性研究任务', 'Configure recurring research work'),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.scheduleList),
+        },
+        {
+          icon: Brain,
+          title: l('记忆库', 'Memory'),
+          desc: l('浏览企业偏好和上下文', 'Browse preferences and context'),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.memoryList),
+        },
+        {
+          icon: UserCircle,
+          title: l('我的画像', 'My Profile'),
+          desc: l('查看个人研究偏好', 'Review personal research preferences'),
+          onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.myProfile),
+        },
+      ],
+    },
+    {
+      title: l('能力演进', 'Capability Loop'),
+      desc: l('把运行反馈沉淀成技能和记忆', 'Turn run feedback into skills and memory'),
+      links: [
+        {
+          icon: Sparkles,
+          title: l('技能草稿', 'Skill Drafts'),
+          desc: l('审核 Learning Loop 生成的草稿', 'Review drafts from the learning loop'),
+          onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.learningDrafts),
+        },
+        {
+          icon: Brain,
+          title: l('记忆晋升', 'Memory Promotions'),
+          desc: l('审核 user 到 tenant 的记忆晋升', 'Review user-to-tenant memory promotions'),
+          onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.memoryPromotions),
+        },
+        {
+          icon: Users,
+          title: l('Soul Profiles 管理', 'Soul Profiles'),
+          desc: l('监控租户画像元数据', 'Monitor tenant profile metadata'),
+          onClick: () => navigate(MISSION_CONTROL_STATIC_PATHS.soulProfiles),
+        },
+      ],
+    },
+  ];
+
   if (loading) return <Spinner />;
 
   return (
@@ -349,7 +551,7 @@ function DashboardView({
           label={l('活跃使命', 'Active Missions')}
           value={String(kpi?.active_missions ?? 0)}
           color="blue"
-          onClick={() => navigate('/p/mission')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
         />
         <KpiCard
           label={l('活跃任务', 'Active Tasks')}
@@ -380,6 +582,22 @@ function DashboardView({
           color={kpi?.month_cost && kpi.month_cost > 100 ? 'amber' : 'green'}
         />
       </div>
+
+      <CompetitiveIntelWorkbench
+        l={l}
+        kpi={kpi}
+        agents={agents}
+        schedules={schedules}
+        onStart={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
+        onOpenTasks={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
+        onOpenApprovals={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
+        onOpenArtifacts={() => navigate(MISSION_CONTROL_DSL_PATHS.artifactList)}
+        onOpenAgents={() => navigate(MISSION_CONTROL_DSL_PATHS.agentList)}
+      />
+
+      <WorkflowMap steps={workflowSteps} l={l} />
+
+      <CommandHub groups={commandGroups} />
 
       {/* Agent KPI Summary */}
       {agents.length > 0 && (
@@ -492,98 +710,6 @@ function DashboardView({
             ))}
           </div>
         )}
-      </div>
-
-      {/* Quick Navigation */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4" data-testid="mc-quick-nav">
-        <QuickLink
-          icon="📋"
-          title={l('任务', 'Tasks')}
-          desc={l('查看和管理 Agent 任务', 'View and manage agent tasks')}
-          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
-        />
-        <QuickLink
-          icon="▶️"
-          title={l('运行记录', 'Runs')}
-          desc={l('查看 Agent 运行日志', 'View agent run logs')}
-          onClick={() => navigate('/aurabot/runs')}
-        />
-        <QuickLink
-          icon="🔍"
-          title={l('AI 追踪', 'AI Traces')}
-          desc={l('LLM 调用追踪和成本分析', 'LLM call traces and cost analysis')}
-          onClick={() => navigate('/aurabot/traces')}
-        />
-        <QuickLink
-          icon="🛡️"
-          title={l('审批', 'Approvals')}
-          desc={l('处理 Agent 审批请求', 'Handle agent approval requests')}
-          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
-        />
-        <QuickLink
-          icon="🧠"
-          title={l('记忆库', 'Memory')}
-          desc={l('浏览 Agent 记忆数据', 'Browse agent memory data')}
-          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.memoryList)}
-        />
-        <QuickLink
-          icon="💡"
-          title={l('技能草稿', 'Skill Drafts')}
-          desc={l('审核 Learning Loop 产生的草稿', 'Review drafts from the learning loop')}
-          onClick={() => navigate('/aurabot/learning-drafts')}
-        />
-        <QuickLink
-          icon="⚠️"
-          title={l('中断审计', 'Interrupts')}
-          desc={l('查看分类器产出的中断记录', 'Inspect interrupt classifier output')}
-          onClick={() => navigate('/aurabot/interrupts')}
-        />
-        <QuickLink
-          icon="⬆️"
-          title={l('记忆晋升', 'Memory Promotions')}
-          desc={l('审核 user→tenant 记忆晋升提案', 'Review user→tenant memory promotion proposals')}
-          onClick={() => navigate('/aurabot/memory-promotions')}
-        />
-        <QuickLink
-          icon="🪞"
-          title={l('我的画像', 'My Profile')}
-          desc={l('查看、编辑、固定或遗忘 Soul Profile', 'View, edit, pin, or forget your soul profile')}
-          onClick={() => navigate('/aurabot/my-profile')}
-        />
-        <QuickLink
-          icon="👥"
-          title={l('Soul Profiles 管理', 'Soul Profiles (Admin)')}
-          desc={l('租户 Soul Profile 元数据监控', 'Tenant soul profile metadata monitoring')}
-          onClick={() => navigate('/aurabot/soul-profiles')}
-        />
-      </div>
-
-      {/* Quick Links to Config Pages */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4" data-testid="mc-quick-links">
-        <QuickLink
-          icon="🤖"
-          title={l('Agent 定义', 'Agent Definitions')}
-          desc={l('管理 Agent 配置', 'Manage agent configs')}
-          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.agentList)}
-        />
-        <QuickLink
-          icon="📅"
-          title={l('调度', 'Schedules')}
-          desc={l('定时任务配置', 'Scheduled tasks')}
-          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.scheduleList)}
-        />
-        <QuickLink
-          icon="📦"
-          title={l('产出物', 'Artifacts')}
-          desc={l('Agent 生成内容', 'Agent outputs')}
-          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.artifactList)}
-        />
-        <QuickLink
-          icon="🛡️"
-          title={l('审批策略', 'Policies')}
-          desc={l('审批规则配置', 'Approval rules')}
-          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalPolicyList)}
-        />
       </div>
 
       {/* Active Schedules */}
@@ -1125,26 +1251,253 @@ function KpiCard({
   );
 }
 
-function QuickLink({
-  icon,
-  title,
-  desc,
+function CompetitiveIntelWorkbench({
+  l,
+  kpi,
+  agents,
+  schedules,
+  onStart,
+  onOpenTasks,
+  onOpenApprovals,
+  onOpenArtifacts,
+  onOpenAgents,
+}: {
+  l: (zh: string, en: string) => string;
+  kpi: KpiData | null;
+  agents: AgentStat[];
+  schedules: ScheduleItem[];
+  onStart: () => void;
+  onOpenTasks: () => void;
+  onOpenApprovals: () => void;
+  onOpenArtifacts: () => void;
+  onOpenAgents: () => void;
+}) {
+  const activeAgentCount = agents.filter((agent) => agent.agent_status === 'active').length;
+
+  return (
+    <div
+      className="grid gap-4 rounded-lg border border-blue-100 bg-white p-5 shadow-sm dark:border-blue-900/40 dark:bg-gray-800 lg:grid-cols-[1.4fr_1fr]"
+      data-testid="mc-scenario-workbench"
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+            <Sparkles className="h-3.5 w-3.5" />
+            {l('企业场景模板', 'Enterprise scenario')}
+          </span>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+            {l('默认: 竞对调研', 'Default: competitive intelligence')}
+          </span>
+        </div>
+        <h2 className="mt-3 text-lg font-semibold text-gray-950 dark:text-white">
+          {l('竞对调研 Agent 工作台', 'Competitive Intelligence Agent Workbench')}
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+          {l(
+            '围绕公开资料抓取、价格页变更、产品更新、招聘信号和销售话术生成，把使命、任务、运行、审批、追踪和产出物串成一条可审计链路。',
+            'Connect public-source collection, pricing changes, product updates, hiring signals, and battlecard generation into an auditable mission-to-artifact chain.',
+          )}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            onClick={onStart}
+            data-testid="mc-scenario-start"
+          >
+            <GitBranch className="h-4 w-4" />
+            {l('进入调研任务', 'Open research tasks')}
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            onClick={onOpenTasks}
+          >
+            <ClipboardList className="h-4 w-4" />
+            {l('查看任务链路', 'Open task chain')}
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            onClick={onOpenArtifacts}
+          >
+            <FileText className="h-4 w-4" />
+            {l('查看产出物', 'Open artifacts')}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+        <ScenarioMetric
+          icon={ListChecks}
+          label={l('活跃任务', 'Active tasks')}
+          value={String(kpi?.active_tasks ?? 0)}
+          actionLabel={l('进入任务', 'Open tasks')}
+          onClick={onOpenTasks}
+        />
+        <ScenarioMetric
+          icon={ShieldCheck}
+          label={l('待人工判断', 'Needs review')}
+          value={String(kpi?.pending_approvals ?? 0)}
+          actionLabel={l('处理审批', 'Review approvals')}
+          onClick={onOpenApprovals}
+        />
+        <ScenarioMetric
+          icon={Users}
+          label={l('可用 Agent / 调度', 'Agents / schedules')}
+          value={`${activeAgentCount || agents.length} / ${schedules.length}`}
+          actionLabel={l('团队状态', 'Team status')}
+          onClick={onOpenAgents}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ScenarioMetric({
+  icon: Icon,
+  label,
+  value,
+  actionLabel,
   onClick,
 }: {
-  icon: string;
-  title: string;
-  desc: string;
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  actionLabel: string;
   onClick: () => void;
 }) {
   return (
-    <div
-      className="cursor-pointer rounded-lg bg-white p-4 shadow-sm transition-all hover:scale-[1.01] hover:shadow-md dark:bg-gray-800"
+    <button
+      type="button"
+      className="flex min-h-[76px] items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left transition-colors hover:border-blue-200 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-blue-900 dark:hover:bg-blue-950/30"
       onClick={onClick}
     >
-      <span className="text-2xl">{icon}</span>
-      <div className="mt-2 text-sm font-medium text-gray-900 dark:text-white">{title}</div>
-      <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{desc}</div>
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-blue-600 shadow-sm dark:bg-gray-800 dark:text-blue-300">
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{label}</span>
+          <span className="block text-lg font-semibold text-gray-950 dark:text-white">{value}</span>
+        </span>
+      </span>
+      <span className="ml-2 hidden items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-300 sm:inline-flex">
+        {actionLabel}
+        <ArrowRight className="h-3 w-3" />
+      </span>
+    </button>
+  );
+}
+
+function WorkflowMap({
+  steps,
+  l,
+}: {
+  steps: WorkflowStep[];
+  l: (zh: string, en: string) => string;
+}) {
+  return (
+    <div className="rounded-lg bg-white p-5 shadow-sm dark:bg-gray-800" data-testid="mc-workflow-map">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+            {l('竞对调研执行链路', 'Competitive Intelligence Execution Chain')}
+          </h3>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {l(
+              '每个入口只承担一个环节，避免资源菜单重复堆叠。',
+              'Each entry owns one step, avoiding duplicate resource menus.',
+            )}
+          </p>
+        </div>
+        <BarChart3 className="h-5 w-5 text-blue-500" />
+      </div>
+      <div className="grid gap-3 md:grid-cols-5">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          return (
+            <button
+              key={step.title}
+              type="button"
+              className="group relative min-h-[132px] rounded-lg border border-gray-200 bg-white p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-900 dark:hover:bg-blue-950/30"
+              onClick={step.onClick}
+            >
+              <span className="mb-3 flex items-center justify-between">
+                <span className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-100 text-gray-700 group-hover:bg-white group-hover:text-blue-600 dark:bg-gray-700 dark:text-gray-300">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="text-xs font-medium text-gray-400">{index + 1}</span>
+              </span>
+              <span className="block text-sm font-semibold text-gray-900 dark:text-white">
+                {step.title}
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">
+                {step.desc}
+              </span>
+              <span className="mt-3 block text-xs font-medium text-blue-600 dark:text-blue-300">
+                {step.meta}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
+  );
+}
+
+function CommandHub({
+  groups,
+}: {
+  groups: CommandGroup[];
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4" data-testid="mc-command-hub">
+      {groups.map((group) => (
+        <section key={group.title} className="rounded-lg bg-white p-5 shadow-sm dark:bg-gray-800">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{group.title}</h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{group.desc}</p>
+          </div>
+          <div className="space-y-2">
+            {group.links.map((link) => (
+              <WorkbenchLinkCard key={link.title} link={link} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function WorkbenchLinkCard({ link }: { link: WorkbenchLink }) {
+  const Icon = link.icon;
+  return (
+    <button
+      type="button"
+      className="flex min-h-[64px] w-full items-center gap-3 rounded-md border border-gray-100 bg-white px-3 py-2 text-left transition-colors hover:border-blue-200 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-900 dark:hover:bg-blue-950/30"
+      onClick={link.onClick}
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
+            {link.title}
+          </span>
+          {link.badge && (
+            <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+              {link.badge}
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+          {link.desc}
+        </span>
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-gray-400" />
+    </button>
   );
 }
 
