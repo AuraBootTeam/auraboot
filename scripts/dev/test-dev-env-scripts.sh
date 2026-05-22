@@ -108,7 +108,9 @@ TMP_DIRS+=("$R2_REGISTRY_ROOT")
         --mode bugfix \
         --product enterprise \
         --core-root "$PROJECT_ROOT" \
+        --enterprise-root /tmp/enterprise-scriptcheck \
         --core-branch "$(git -C "$PROJECT_ROOT" branch --show-current)" \
+        --enterprise-branch bugfix/enterprise-scriptcheck \
         --compose-project auraboot-scriptcheck-r2 \
         --status running \
         --pg-port 15432 \
@@ -309,7 +311,9 @@ TMP_DIRS+=("$REGISTRY_ROOT")
         --mode bugfix \
         --product enterprise \
         --core-root "$PROJECT_ROOT" \
+        --enterprise-root /tmp/enterprise-scriptcheck \
         --core-branch "$(git -C "$PROJECT_ROOT" branch --show-current)" \
+        --enterprise-branch bugfix/enterprise-scriptcheck \
         --compose-project auraboot-scriptcheck-r2 \
         --status running \
         --pg-port 15432 \
@@ -339,6 +343,7 @@ REUSE_START_OUTPUT="$(
     AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh start --mode=bugfix --product=enterprise --slug=scriptcheck-r2 --dry-run
 )"
 assert_contains "env start dry-run reuses existing registry env" "$REUSE_START_OUTPUT" "existing registry exports: $REGISTRY_ROOT/envs/scriptcheck-r2/exports.env"
+assert_contains "env start dry-run uses registered enterprise root" "$REUSE_START_OUTPUT" "backend root:     /tmp/enterprise-scriptcheck/platform"
 assert_contains "env start dry-run plans compose up for existing infra" "$REUSE_START_OUTPUT" "docker compose -p auraboot-scriptcheck-r2"
 case "$REUSE_START_OUTPUT" in
     *" minio"*) fail "env start dry-run does not start storage without --with-storage" ;;
@@ -365,6 +370,7 @@ RESET_OUTPUT="$(
     AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh reset --mode=bugfix --product=enterprise --slug=scriptcheck-r2 --dry-run
 )"
 assert_contains "env reset dry-run names enterprise reset script" "$RESET_OUTPUT" "scripts/reset-db.sh"
+assert_contains "env reset dry-run uses registered enterprise root" "$RESET_OUTPUT" "/tmp/enterprise-scriptcheck/scripts/reset-db.sh"
 assert_contains "env reset dry-run names isolated database" "$RESET_OUTPUT" "localhost:15432/aura_boot"
 assert_contains "env reset dry-run documents no global process cleanup" "$RESET_OUTPUT" "no global pkill"
 assert_contains "env reset dry-run documents bootstrap setup" "$RESET_OUTPUT" "/api/bootstrap/setup"
