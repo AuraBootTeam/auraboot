@@ -384,11 +384,16 @@ class CommandExecutorIntegrationTest {
     }
 
     private ModelFieldBinding buildBinding(Long modelId, Long fieldId, int order) {
+        return buildBinding(modelId, fieldId, order, false);
+    }
+
+    private ModelFieldBinding buildBinding(Long modelId, Long fieldId, int order, boolean required) {
         ModelFieldBinding binding = new ModelFieldBinding();
         binding.setTenantId(testTenant.getId());
         binding.setModelId(modelId);
         binding.setFieldId(fieldId);
         binding.setFieldOrder(order);
+        binding.setRequired(required);
         return binding;
     }
 
@@ -1547,7 +1552,7 @@ class CommandExecutorIntegrationTest {
         testFields.add(nameField);
         testFields.add(valueField);
 
-        fieldBindingMapper.insert(buildBinding(testModel.getId(), nameField.getId(), 1));
+        fieldBindingMapper.insert(buildBinding(testModel.getId(), nameField.getId(), 1, true));
         fieldBindingMapper.insert(buildBinding(testModel.getId(), valueField.getId(), 2));
 
         SchemaOperationResult result = schemaManagementService.createTableByModel(modelCode);

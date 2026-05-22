@@ -44,12 +44,19 @@ public class DataAccessFilterImpl implements DataAccessFilter {
     }
 
     @Override
-    @Cacheable(value = "dataFilterResult", key = "#request.userId + '_' + #request.tenantId + '_' + #request.modelCode")
+    @Cacheable(value = "dataFilterResult", key = "#request.userId + '_' + #request.tenantId + '_' + #request.modelCode", condition = "#request != null")
     public DataFilterResult filterQueryResult(DataFilterRequest request) {
-        log.info("开始过滤查询结果数据: userId={}, modelCode={}, recordCount={}",
-                request.getUserId(), request.getModelCode(), request.getData().size());
-
         try {
+            if (request == null || request.getData() == null || request.getUserId() == null || request.getModelCode() == null) {
+                return DataFilterResult.builder()
+                        .success(false)
+                        .errorMessage("Invalid data filter request")
+                        .build();
+            }
+
+            log.info("开始过滤查询结果数据: userId={}, modelCode={}, recordCount={}",
+                    request.getUserId(), request.getModelCode(), request.getData().size());
+
             // 1. 使用Permission检查用户是否有模型读取权限
             String modelReadPermission = "model." + request.getModelCode() + ".read";
             boolean hasModelPermission = userPermissionService.hasPermission(request.getUserId(), modelReadPermission);
@@ -385,6 +392,10 @@ public class DataAccessFilterImpl implements DataAccessFilter {
 
     @Override
     public void logDataAccess(DataAccessLogRequest request) {
+        if (request == null) {
+            log.warn("Skipping data access log: request is null");
+            return;
+        }
         log.info("记录数据访问日志: userId={}, modelCode={}, action={}, recordCount={}", 
                 request.getUserId(), request.getModelCode(), request.getAction(), request.getRecordCount());
 

@@ -25,6 +25,7 @@ import {
   clickSaveButton,
   clickRowActionByLocator,
   waitForToast,
+  fillControlledInput,
 } from '../helpers';
 
 async function selectFormField(page: Page, fieldCode: string, value: string) {
@@ -45,29 +46,32 @@ async function selectFormField(page: Page, fieldCode: string, value: string) {
     .first();
   await anyField.waitFor({ state: 'attached', timeout: 12000 }).catch(() => null);
 
-  const select = page
-    .locator([...fieldRoots.map((root) => `${root} select`), `select[name="${fieldCode}"]`].join(', '))
-    .first();
-  if (await select.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await select.selectOption(value);
-    return;
+  const selects = page.locator(
+    [...fieldRoots.map((root) => `${root} select`), `select[name="${fieldCode}"]`].join(', '),
+  );
+  const selectCount = await selects.count().catch(() => 0);
+  for (let i = 0; i < selectCount; i++) {
+    const select = selects.nth(i);
+    if (await select.isVisible({ timeout: 500 }).catch(() => false)) {
+      await select.selectOption(value);
+      return;
+    }
   }
 
-  const input = page
-    .locator(
-      [
-        ...fieldRoots.flatMap((root) => [
-          `${root} input:not([type="hidden"])`,
-          `${root} textarea`,
-        ]),
-        `input[name="${fieldCode}"]:not([type="hidden"])`,
-        `textarea[name="${fieldCode}"]`,
-      ].join(', '),
-    )
-    .first();
-  if (await input.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await input.fill(value);
-    return;
+  const inputs = page.locator(
+    [
+      ...fieldRoots.flatMap((root) => [`${root} input:not([type="hidden"])`, `${root} textarea`]),
+      `input[name="${fieldCode}"]:not([type="hidden"])`,
+      `textarea[name="${fieldCode}"]`,
+    ].join(', '),
+  );
+  const inputCount = await inputs.count().catch(() => 0);
+  for (let i = 0; i < inputCount; i++) {
+    const input = inputs.nth(i);
+    if (await input.isVisible({ timeout: 500 }).catch(() => false)) {
+      await fillControlledInput(input, value);
+      return;
+    }
   }
 
   const hiddenInput = page

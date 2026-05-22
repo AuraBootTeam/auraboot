@@ -13,6 +13,7 @@
 import { test, expect } from '../../fixtures';
 import { Client as PgClient } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
+import { fillControlledInput } from '../helpers/index';
 
 // Seed at least one e2et_record row with status='failed' so QB-07 (which
 // asserts data-rows >= 1 after filtering by status=failed) and QB-08 (which
@@ -26,17 +27,22 @@ async function seedE2etRecord(): Promise<void> {
   const client = new PgClient(PG_CONN);
   await client.connect();
   try {
-    const tenantRow = await client.query<{ tenant_id: string }>(
-      "SELECT tenant_id FROM ab_meta_model WHERE code = 'e2et_record' LIMIT 1",
+    const tenantRows = await client.query<{ tenant_id: string }>(
+      "SELECT DISTINCT tenant_id FROM ab_meta_model WHERE code = 'e2et_record'",
     );
-    if (tenantRow.rows.length === 0) return; // model missing — let test fail loudly elsewhere
-    const tenantId = tenantRow.rows[0]!.tenant_id;
-    await client.query(
-      `INSERT INTO mt_e2et_record (pid, tenant_id, e2et_name, e2et_status, e2et_count, created_at, updated_at)
-       VALUES ($1, $2, $3, 'failed', 1, NOW(), NOW())
-       ON CONFLICT (pid) DO NOTHING`,
-      ['qbseed_failed_01', tenantId, 'qb-seed-failed-01'],
-    );
+    if (tenantRows.rows.length === 0) return; // model missing — let test fail loudly elsewhere
+    for (const row of tenantRows.rows) {
+      const tenantId = row.tenant_id;
+      await client.query(
+        `INSERT INTO mt_e2et_record (pid, tenant_id, e2et_name, e2et_status, e2et_count, created_at, updated_at)
+         VALUES ($1, $2, $3, 'failed', 1, NOW(), NOW())
+         ON CONFLICT (pid) DO UPDATE SET
+           e2et_status = EXCLUDED.e2et_status,
+           e2et_count = EXCLUDED.e2et_count,
+           updated_at = NOW()`,
+        [`qbseed_failed_${tenantId}`, tenantId, `qb-seed-failed-${tenantId}`],
+      );
+    }
   } finally {
     await client.end();
   }
@@ -46,8 +52,24 @@ async function searchModel(page: import('@playwright/test').Page, modelCode: str
   const searchInput = page.locator('[data-testid="qb-model-search"]');
   await expect(searchInput).toBeVisible({ timeout: 10000 });
   await searchInput.fill('');
-  await searchInput.fill(modelCode);
-  await expect(searchInput).toHaveValue(modelCode);
+  const modelsResponse = page
+    .waitForResponse(
+      (resp) => {
+        if (!resp.url().includes('/api/query-builder/models') || resp.request().method() !== 'GET') {
+          return false;
+        }
+        return new URL(resp.url()).searchParams.get('keyword') === modelCode;
+      },
+      { timeout: 15_000 },
+    )
+    .catch(() => null);
+  await fillControlledInput(searchInput, modelCode);
+  await modelsResponse;
+  await expect(page.locator('[data-testid="qb-model-selector"]')).toHaveAttribute(
+    'data-loading',
+    'false',
+    { timeout: 15_000 },
+  );
   await expect(page.locator(`[data-testid="qb-model-${modelCode}"]`)).toBeVisible({
     timeout: 15000,
   });

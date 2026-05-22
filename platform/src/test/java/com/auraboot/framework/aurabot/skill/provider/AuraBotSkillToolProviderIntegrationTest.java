@@ -30,10 +30,10 @@ import static org.mockito.Mockito.when;
  * mocking pattern: {@link UserPermissionService} + {@link PermissionMapper} are
  * mocked so each case can drive a deterministic permission set without
  * provisioning real role rows. The SkillRegistry, MessageSource and provider
- * itself are real Spring beans on the {@code skills-c2-test} stack (real
+ * itself are real Spring beans on the standard {@code integration-test} stack (real
  * PostgreSQL + Redis).
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 class AuraBotSkillToolProviderIntegrationTest extends BaseIntegrationTest {
 
     @Autowired AuraBotSkillToolProvider provider;

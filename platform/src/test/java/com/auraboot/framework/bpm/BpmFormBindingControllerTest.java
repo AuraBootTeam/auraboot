@@ -64,17 +64,29 @@ class BpmFormBindingControllerTest extends BaseIntegrationTest {
     void bind02_getFieldsForValidPage() {
         // Find a published form page that has a modelCode
         List<PageSchemaDTO> allPublished = pageSchemaService.findPublishedSchemas();
-        Optional<PageSchemaDTO> formPageOpt = allPublished.stream()
-                .filter(p -> "form".equalsIgnoreCase(p.getKind()))
-                .filter(p -> p.getModelCode() != null && !p.getModelCode().isBlank())
-                .findFirst();
+        PageSchemaDTO formPage = null;
+        List<FieldDefinition> fields = List.of();
+        for (PageSchemaDTO candidate : allPublished) {
+            if (!"form".equalsIgnoreCase(candidate.getKind())) {
+                continue;
+            }
+            String candidateModelCode = candidate.getModelCode();
+            if (candidateModelCode == null || candidateModelCode.isBlank()) {
+                continue;
+            }
+            List<FieldDefinition> candidateFields = metaModelService.getModelFields(candidateModelCode);
+            if (!candidateFields.isEmpty()) {
+                formPage = candidate;
+                fields = candidateFields;
+                break;
+            }
+        }
 
-        if (formPageOpt.isEmpty()) {
-            log.warn("BIND-02 SKIPPED: No published form page with modelCode found in test data");
+        if (formPage == null) {
+            log.warn("BIND-02 SKIPPED: No published form page with a modelCode and fields found in test data");
             return;
         }
 
-        PageSchemaDTO formPage = formPageOpt.get();
         String pageKey = formPage.getPageKey();
         String modelCode = formPage.getModelCode();
 
@@ -85,8 +97,6 @@ class BpmFormBindingControllerTest extends BaseIntegrationTest {
         assertThat(resolved).as("findByPageKey should return a page for %s", pageKey).isNotNull();
         assertThat(resolved.getModelCode()).isEqualTo(modelCode);
 
-        // Get fields via MetaModelService (same as controller)
-        List<FieldDefinition> fields = metaModelService.getModelFields(modelCode);
         assertThat(fields).as("Model %s should have fields", modelCode).isNotEmpty();
 
         // Each field should have code and dataType

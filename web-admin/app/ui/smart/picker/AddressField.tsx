@@ -182,6 +182,7 @@ export const AddressField: React.FC<AddressFieldProps> = ({
       <div className="grid grid-cols-3 gap-2">
         {/* Province */}
         <select
+          data-testid={`address-province-${name}`}
           aria-label="province"
           value={state.province}
           onChange={handleProvinceChange}
@@ -198,6 +199,7 @@ export const AddressField: React.FC<AddressFieldProps> = ({
 
         {/* City */}
         <select
+          data-testid={`address-city-${name}`}
           aria-label="city"
           value={state.city}
           onChange={handleCityChange}
@@ -214,6 +216,7 @@ export const AddressField: React.FC<AddressFieldProps> = ({
 
         {/* District */}
         <select
+          data-testid={`address-district-${name}`}
           aria-label="district"
           value={state.district}
           onChange={handleDistrictChange}
@@ -229,9 +232,16 @@ export const AddressField: React.FC<AddressFieldProps> = ({
         </select>
       </div>
 
+      {state.province && state.city && state.district && (
+        <div className="text-xs text-gray-500">
+          {[state.province, state.city, state.district].join(' / ')}
+        </div>
+      )}
+
       {/* Detail address textarea */}
       {showDetailAddress && (
         <textarea
+          data-testid={`address-detail-${name}`}
           aria-label="detail-address"
           rows={2}
           value={state.detail}

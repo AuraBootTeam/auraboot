@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.event;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
@@ -39,7 +40,7 @@ class SchemaPublishedEventIntegrationTest extends BaseIntegrationTest {
         pageSchemaMapper.insertForPluginImport(
                 pid,
                 getTestTenant().getId(),
-                null,  // envId (env-layering #16)
+                MetaContext.getCurrentEnvironmentId(),
                 "draft",
                 pageKey,
                 "event_model_" + suffix,

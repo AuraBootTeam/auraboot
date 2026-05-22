@@ -78,11 +78,11 @@ import static org.mockito.Mockito.when;
  * very first call — we don't need a real LLM to verify the chokepoint.
  *
  * <p>Real PG (port 25442) + real Redis (port 26389) via the
- * {@code skills-c2-test} profile (same as T3 + T2). Permissions are mocked
+ * standard {@code integration-test} profile (same as T3 + T2). Permissions are mocked
  * via {@link UserPermissionService} / {@link PermissionMapper} — mirrors the
  * existing skill ITs.
  */
-@ActiveProfiles({"integration-test", "skills-c2-test"})
+@ActiveProfiles("integration-test")
 class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
 
     // Resume-path collaborators

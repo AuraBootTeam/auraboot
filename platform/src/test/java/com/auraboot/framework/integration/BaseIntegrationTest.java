@@ -3,6 +3,7 @@ package com.auraboot.framework.integration;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.environment.service.EnvironmentService;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
@@ -80,6 +81,8 @@ public class BaseIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private EnvironmentService environmentService;
 
 
     // 资源追踪器 - 每个测试独立
@@ -109,39 +112,7 @@ public class BaseIntegrationTest {
      * 确保测试数据存在，如果不存在则创建
      */
     private void ensureTestDataExists() {
-        if (testDataInitialized
-                && testUser != null
-                && testTenant != null
-                && testTenantMember != null
-                && testRole != null
-                && testUserRole != null) {
-            MetaContext.setContext(
-                    testTenant.getId(),
-                    testUser.getId(),
-                    testUser.getPid(),
-                    testUser.getUserName()
-            );
-            MetaContext.setMemberId(testTenantMember.getId());
-            return;
-        }
-
         synchronized (TEST_DATA_LOCK) {
-            if (testDataInitialized
-                    && testUser != null
-                    && testTenant != null
-                    && testTenantMember != null
-                    && testRole != null
-                    && testUserRole != null) {
-                MetaContext.setContext(
-                        testTenant.getId(),
-                        testUser.getId(),
-                        testUser.getPid(),
-                        testUser.getUserName()
-                );
-                MetaContext.setMemberId(testTenantMember.getId());
-                return;
-            }
-
             try {
                 TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
                 transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
@@ -150,15 +121,11 @@ public class BaseIntegrationTest {
                     testTenant = createTestTenant();
                     testTenantMember = createTestTenantMember();
 
-                    MetaContext.setContext(
-                            testTenant.getId(),
-                            testUser.getId(),
-                            testUser.getPid(),
-                            testUser.getUserName()
-                    );
-                    MetaContext.setMemberId(testTenantMember.getId());
+                    applyTestMetaContext();
 
-                    // 创建测试角色并为用户分配角色，仅初始化一次。
+                    // Repair the committed shared test identity on every test.
+                    // Some integration tests mutate role/member rows; static references alone
+                    // are not a reliable proof that the database rows are still usable.
                     testRole = createTestRole();
                     testUserRole = createTestUserRole();
                 });
@@ -167,6 +134,17 @@ public class BaseIntegrationTest {
                 throw new RuntimeException("Failed to setup test data", e);
             }
         }
+    }
+
+    protected void applyTestMetaContext() {
+        MetaContext.setContext(
+                testTenant.getId(),
+                testUser.getId(),
+                testUser.getPid(),
+                testUser.getUserName()
+        );
+        MetaContext.setMemberId(testTenantMember.getId());
+        MetaContext.setEnvironmentId(environmentService.findOrCreateDefaultId(testTenant.getId()));
     }
     
     /**
@@ -251,7 +229,21 @@ public class BaseIntegrationTest {
                 .eq(Role::getDeletedFlag, false)
                 .list();
         if (!existingRoles.isEmpty()) {
-            return existingRoles.get(0);
+            Role existing = existingRoles.get(0);
+            boolean changed = false;
+            if (!"active".equals(existing.getStatus())) {
+                existing.setStatus("active");
+                changed = true;
+            }
+            if (Boolean.TRUE.equals(existing.getDeletedFlag())) {
+                existing.setDeletedFlag(false);
+                changed = true;
+            }
+            if (changed) {
+                existing.setUpdatedAt(Instant.now());
+                roleService.updateRole(existing);
+            }
+            return existing;
         }
 
         Role role = new Role();
@@ -281,6 +273,12 @@ public class BaseIntegrationTest {
         UserRole existingUserRole = userRoleService.findByMemberIdAndRoleIdAndTenantId(
             testTenantMember.getId(), testRole.getId(), testTenant.getId());
         if (existingUserRole != null) {
+            if (!"active".equals(existingUserRole.getStatus()) || Boolean.TRUE.equals(existingUserRole.getDeletedFlag())) {
+                existingUserRole.setStatus("active");
+                existingUserRole.setDeletedFlag(false);
+                existingUserRole.setUpdatedAt(Instant.now());
+                userRoleService.updateById(existingUserRole);
+            }
             return existingUserRole;
         }
 

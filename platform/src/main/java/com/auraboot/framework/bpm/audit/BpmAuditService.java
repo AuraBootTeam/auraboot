@@ -101,7 +101,8 @@ public class BpmAuditService {
                 "eventType", eventType,
                 "description", description != null ? description : ""
         );
-        auditProcessOperation("process_event", processInstanceId, null, details);
+        runWithTenantFallback(tenantId, userId, () ->
+                auditProcessOperation("process_event", processInstanceId, null, details));
     }
 
     /**
@@ -113,7 +114,8 @@ public class BpmAuditService {
                 "eventType", eventType,
                 "description", description != null ? description : ""
         );
-        auditProcessOperation("activity_event", processInstanceId, null, details);
+        runWithTenantFallback(tenantId, userId, () ->
+                auditProcessOperation("activity_event", processInstanceId, null, details));
     }
 
     /**
@@ -283,6 +285,22 @@ public class BpmAuditService {
 
     private String getCurrentUserId() {
         return com.auraboot.framework.bpm.util.BpmSecurityUtil.getCurrentUserId();
+    }
+
+    private void runWithTenantFallback(String tenantId, String userId, Runnable action) {
+        if (MetaContext.exists() || !StringUtils.hasText(tenantId)) {
+            action.run();
+            return;
+        }
+
+        try {
+            Long parsedTenantId = Long.valueOf(tenantId);
+            Long parsedUserId = StringUtils.hasText(userId) ? Long.valueOf(userId) : null;
+            MetaContext.setContext(parsedTenantId, parsedUserId, null, null);
+            action.run();
+        } finally {
+            MetaContext.clear();
+        }
     }
 
     /**

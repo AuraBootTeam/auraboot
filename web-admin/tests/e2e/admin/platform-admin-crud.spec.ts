@@ -23,6 +23,7 @@ import {
   uniqueId,
   acceptConfirmDialog,
   findRowInPaginatedList,
+  fillControlledInput,
   queryFilteredList,
   extractRecordId,
   clickRowActionByLocator,
@@ -138,7 +139,7 @@ async function fillFormField(
     )
     .first();
   if (await byTestId.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await byTestId.fill(value);
+    await fillControlledInput(byTestId, value);
     return;
   }
   // Strategy 2: data-field attribute
@@ -148,7 +149,7 @@ async function fillFormField(
     )
     .first();
   if (await byField.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await byField.fill(value);
+    await fillControlledInput(byField, value);
     return;
   }
   // Strategy 3: name attribute
@@ -156,7 +157,7 @@ async function fillFormField(
     .locator(`input[name="${fieldCode}"]:not([type="hidden"]), textarea[name="${fieldCode}"]`)
     .first();
   if (await byName.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await byName.fill(value);
+    await fillControlledInput(byName, value);
     return;
   }
   // Strategy 4: find by visible label text as a last resort
@@ -174,7 +175,7 @@ async function fillFormField(
       .locator('input:not([type="hidden"]), textarea')
       .first();
     if (await byAccessibleLabel.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await byAccessibleLabel.fill(value);
+      await fillControlledInput(byAccessibleLabel, value);
       return;
     }
     const label = page.locator('label').filter({ hasText: labelPattern }).first();
@@ -182,7 +183,7 @@ async function fillFormField(
       const container = label.locator('xpath=ancestor::*[self::div or self::label][1]');
       const input = container.locator('input:not([type="hidden"]), textarea').first();
       if (await input.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await input.fill(value);
+        await fillControlledInput(input, value);
         return;
       }
     }
@@ -218,7 +219,7 @@ async function selectFormField(
     )
     .first();
   if (await input.isVisible({ timeout: 8000 }).catch(() => false)) {
-    await input.fill(value);
+    await fillControlledInput(input, value);
     return;
   }
   const hiddenInput = page
@@ -486,7 +487,7 @@ test.describe('PA: SLA Configuration CRUD', () => {
     const nameInput = page
       .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
       .first();
-    await nameInput.fill(updatedName);
+    await fillControlledInput(nameInput, updatedName);
     await clickSaveAndWait(page, { expectedCommandCode: 'admin:update_sla_config' });
 
     // Backend truth for this record id is the assertion source of truth.
@@ -590,7 +591,7 @@ test.describe('PA: BPM Domain Configuration CRUD', () => {
         '[data-testid="form-field-domain_name"] input, [data-field="domain_name"] input, [name="domain_name"]',
       )
       .first();
-    await nameInput.fill(updatedName);
+    await fillControlledInput(nameInput, updatedName);
     await clickSaveAndWait(page, { expectedCommandCode: 'admin:update_bpm_domain_config' });
 
     const updated = await helper.fetchViaApi(pid).catch(() => null);
@@ -691,7 +692,7 @@ test.describe('PA: Data Permission CRUD', () => {
     const nameInput = page
       .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
       .first();
-    await nameInput.fill(updatedName);
+    await fillControlledInput(nameInput, updatedName);
     await clickSaveAndWait(page);
 
     const updated = await helper.fetchViaApi(pid).catch(() => null);
@@ -794,7 +795,7 @@ test.describe('PA: Webhook Subscription CRUD', () => {
     // name before filling — otherwise an early fill() can be overwritten by
     // the async record-load that completes after waitForFormReady().
     await expect(nameInput).toHaveValue(originalName, { timeout: 10_000 });
-    await nameInput.fill(updatedName);
+    await fillControlledInput(nameInput, updatedName);
     await nameInput.blur();
     // Confirm the controlled input picked up the new value before clicking save.
     await expect(nameInput).toHaveValue(updatedName);
@@ -909,7 +910,7 @@ test.describe('PA: API Connector CRUD', () => {
     const nameInput = page
       .locator('[data-testid="form-field-name"] input, [data-field="name"] input, [name="name"]')
       .first();
-    await nameInput.fill(updatedName);
+    await fillControlledInput(nameInput, updatedName);
     await clickSaveAndWait(page);
 
     const records = await queryFilteredList(page, 'api-connector', 'name', updatedName, {

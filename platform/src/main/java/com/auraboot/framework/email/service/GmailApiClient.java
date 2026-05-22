@@ -199,6 +199,7 @@ public class GmailApiClient {
                 .queryParam("prompt",        "consent")
                 .queryParam("state",         state)
                 .build()
+                .encode()
                 .toUriString();
     }
 

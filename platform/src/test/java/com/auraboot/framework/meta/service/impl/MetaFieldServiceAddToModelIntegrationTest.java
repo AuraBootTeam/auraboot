@@ -53,12 +53,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  *   <li>§3.4 — invalid dataType rejected (whitelist of 9 abstract types)</li>
  * </ul>
  *
- * <p>Real PostgreSQL ({@code skills-c4-test} profile @ port 35442) — no mocks
+ * <p>Real PostgreSQL from the standard {@code integration-test} profile — no mocks
  * for DB or Redis. {@code NOT_SUPPORTED} propagation because DDL cannot roll
  * back inside a Spring transaction in PostgreSQL.
  */
 @Slf4j
-@ActiveProfiles({"integration-test", "skills-c4-test"})
+@ActiveProfiles("integration-test")
 @DisplayName("MetaFieldService.addToModel Integration Test")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestInstance(TestInstance.Lifecycle.PER_METHOD)

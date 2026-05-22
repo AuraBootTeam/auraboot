@@ -118,26 +118,49 @@ describe('bpmnService label normalization', () => {
     ).toThrow('designerJson.nodes[0].position must be an object');
   });
 
-  it('rejects designerJson edges without data objects', () => {
-    expect(() =>
-      normalizeDesignerJsonPayload({
-        nodes: [
-          {
-            id: 'start',
-            type: BPMNNodeType.START_EVENT,
-            position: { x: 100, y: 100 },
-            data: { type: BPMNNodeType.START_EVENT, label: 'Start' },
-          },
-          {
-            id: 'end',
-            type: BPMNNodeType.END_EVENT,
-            position: { x: 300, y: 100 },
-            data: { type: BPMNNodeType.END_EVENT, label: 'End' },
-          },
-        ],
-        edges: [{ id: 'e1', source: 'start', target: 'end' }],
-      }),
-    ).toThrow('designerJson.edges[0].data must be an object');
+  it('defaults missing designerJson edge data for legacy payloads', () => {
+    const designer = normalizeDesignerJsonPayload({
+      nodes: [
+        {
+          id: 'start',
+          type: BPMNNodeType.START_EVENT,
+          position: { x: 100, y: 100 },
+          data: { type: BPMNNodeType.START_EVENT, label: 'Start' },
+        },
+        {
+          id: 'end',
+          type: BPMNNodeType.END_EVENT,
+          position: { x: 300, y: 100 },
+          data: { type: BPMNNodeType.END_EVENT, label: 'End' },
+        },
+      ],
+      edges: [{ id: 'e1', source: 'start', target: 'end' }],
+    });
+
+    expect(designer.edges[0].data).toEqual({});
+  });
+
+  it('defaults missing designerJson node data.type from the top-level node type', () => {
+    const designer = normalizeDesignerJsonPayload({
+      nodes: [
+        {
+          id: 'start',
+          type: BPMNNodeType.START_EVENT,
+          position: { x: 100, y: 100 },
+          data: { label: 'Start' },
+        },
+        {
+          id: 'end',
+          type: BPMNNodeType.END_EVENT,
+          position: { x: 300, y: 100 },
+          data: { label: 'End' },
+        },
+      ],
+      edges: [{ id: 'e1', source: 'start', target: 'end' }],
+    });
+
+    expect(designer.nodes[0].data.type).toBe(BPMNNodeType.START_EVENT);
+    expect(designer.nodes[1].data.type).toBe(BPMNNodeType.END_EVENT);
   });
 
   it('accepts backend service delegate node types with required fields', () => {

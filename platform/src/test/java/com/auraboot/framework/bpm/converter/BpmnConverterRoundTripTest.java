@@ -89,8 +89,8 @@ class BpmnConverterRoundTripTest {
             String xml = jsonToBpmn.convert(original);
 
             assertThat(xml).contains("<conditionExpression");
-            assertThat(xml).contains("amount &gt;= 50000");
-            assertThat(xml).contains("amount &gt;= 10000");
+            assertThat(xml).contains("amount >= 50000");
+            assertThat(xml).contains("amount >= 10000");
             assertThat(xml).contains("default=\"e_auto\"");
 
             JsonNode back = bpmnToJson.convertToJsonNode(xml);
@@ -182,7 +182,7 @@ class BpmnConverterRoundTripTest {
 
             String xml = jsonToBpmn.convert(json);
             assertThat(xml).contains("language=\"mvel\"");
-            assertThat(xml).contains("score &gt; 80");
+            assertThat(xml).contains("score > 80");
 
             JsonNode back = bpmnToJson.convertToJsonNode(xml);
             JsonNode okEdge = findEdge(back.path("edges"), "e_ok");

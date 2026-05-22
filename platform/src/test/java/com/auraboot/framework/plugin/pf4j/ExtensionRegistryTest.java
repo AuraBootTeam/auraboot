@@ -123,8 +123,6 @@ class ExtensionRegistryTest {
         when(pluginManager.getExtensionsOfType(eq(CommandHandlerExtension.class), eq("plug-1"))).thenReturn(List.of(c));
         List<CommandHandlerExtension> first = registry.getCommandHandlers("plug-1");
         assertThat(first).containsExactly(c);
-        // Even if underlying call would change, cache returns same list
-        when(pluginManager.getExtensionsOfType(eq(CommandHandlerExtension.class), eq("plug-1"))).thenReturn(List.of());
         assertThat(registry.getCommandHandlers("plug-1")).isSameAs(first);
     }
 

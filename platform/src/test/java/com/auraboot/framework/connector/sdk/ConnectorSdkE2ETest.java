@@ -39,7 +39,7 @@ import static org.mockito.Mockito.*;
  *
  * @since 5.2.0
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class ConnectorSdkE2ETest {
 
     @Container

@@ -43,7 +43,10 @@ test.describe('SavedView — GALLERY View', () => {
   let galleryViewPid = '';
 
   test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    const page = await context.newPage();
 
     // Clean up leftover views from previous runs
     const existing = await page.request.get(
@@ -76,11 +79,14 @@ test.describe('SavedView — GALLERY View', () => {
       galleryViewPid = body.data?.pid ?? body.pid ?? '';
     }
 
-    await page.close();
+    await context.close();
   });
 
   test.afterAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    const page = await context.newPage();
     if (galleryViewPid) {
       await page.request.delete(`/api/views/${galleryViewPid}`).catch(() => {});
     }
@@ -95,7 +101,7 @@ test.describe('SavedView — GALLERY View', () => {
         await page.request.delete(`/api/views/${v.pid}`).catch(() => {});
       }
     }
-    await page.close();
+    await context.close();
   });
 
   test('SV-030: GALLERY — card grid renders @smoke', async ({ page }) => {
