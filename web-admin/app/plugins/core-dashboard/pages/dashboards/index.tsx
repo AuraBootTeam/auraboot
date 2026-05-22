@@ -39,6 +39,7 @@ import { userPreferenceService } from '~/shared/services/userPreferenceService';
 
 const PREF_KEY = 'dashboard_tab_order';
 const HINT_STORAGE_KEY = 'dashboard_drag_hint_shown';
+const DASHBOARD_LIST_PAGE_SIZE = 200;
 const HIDDEN_DEFAULT_TAB_CODES = new Set([
   'sc_workflow_dashboard',
   'sc_arsenal_dashboard',
@@ -203,10 +204,19 @@ export default function DashboardViewerPage() {
       setLoading(true);
       setError(null);
       try {
-        const [list, savedOrder] = await Promise.all([
-          dashboardService.list({ status: 'published' }),
+        const [baseList, savedOrder] = await Promise.all([
+          dashboardService.list({ status: 'published', pageSize: DASHBOARD_LIST_PAGE_SIZE }),
           userPreferenceService.get<string[]>(PREF_KEY).catch(() => null),
         ]);
+        const list =
+          codeParam && !baseList.some((d) => d.code === codeParam)
+            ? await dashboardService
+                .findByCode(codeParam)
+                .then((dashboard) =>
+                  dashboard.status === 'published' ? [...baseList, dashboard] : baseList,
+                )
+                .catch(() => baseList)
+            : baseList;
         setPublishedList(list);
         if (savedOrder && Array.isArray(savedOrder)) {
           setOrderedCodes(savedOrder);
@@ -278,7 +288,19 @@ export default function DashboardViewerPage() {
     setLoading(true);
     setError(null);
     try {
-      const list = await dashboardService.list({ status: 'published' });
+      const baseList = await dashboardService.list({
+        status: 'published',
+        pageSize: DASHBOARD_LIST_PAGE_SIZE,
+      });
+      const list =
+        activeCode && !baseList.some((d) => d.code === activeCode)
+          ? await dashboardService
+              .findByCode(activeCode)
+              .then((dashboard) =>
+                dashboard.status === 'published' ? [...baseList, dashboard] : baseList,
+              )
+              .catch(() => baseList)
+          : baseList;
       setPublishedList(list);
       if (activeCode && !list.some((d) => d.code === activeCode) && list.length > 0) {
         setActiveCode(list[0].code!);

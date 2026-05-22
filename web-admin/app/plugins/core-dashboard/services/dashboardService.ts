@@ -647,6 +647,8 @@ export const dashboardService = {
     if (query?.title) params.set('title', query.title);
     if (query?.scope) params.set('scope', query.scope);
     if (query?.status) params.set('status', query.status);
+    if (query?.pageNum) params.set('page', String(query.pageNum));
+    if (query?.pageSize) params.set('size', String(query.pageSize));
 
     const queryString = params.toString();
     const raw = await request<any>(queryString ? `?${queryString}` : '');

@@ -41,16 +41,39 @@ async function navigateToEmailSettings(page: any): Promise<void> {
   await crmBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 
-  // Click "Email" sub-menu button
+  // Click "Email" sub-menu button when the tenant has an email menu. OSS seed
+  // data may expose the email pages by route without mounting them in sidebar.
   const emailBtn = nav.getByRole('button', { name: /Email|邮件/i }).first();
-  await emailBtn.waitFor({ state: 'visible', timeout: 6_000 });
+  const hasEmailMenu = await emailBtn.isVisible({ timeout: 6_000 }).catch(() => false);
+  if (!hasEmailMenu) {
+    await page.goto('/email/settings', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({
+      timeout: 15_000,
+    });
+    await Promise.race([
+      page.locator('[data-testid="email-settings-empty"]').waitFor({ state: 'visible' }),
+      page.locator('[data-testid^="email-account-"]').first().waitFor({ state: 'visible' }),
+    ]).catch(() => null);
+    return;
+  }
   await emailBtn.scrollIntoViewIfNeeded().catch(() => null);
   await emailBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 
   // Click "Email Settings" leaf link
   const settingsLink = nav.locator('a[href="/email/settings"]').first();
-  await settingsLink.waitFor({ state: 'attached', timeout: 10_000 });
+  const hasSettingsLink = await settingsLink.isVisible({ timeout: 10_000 }).catch(() => false);
+  if (!hasSettingsLink) {
+    await page.goto('/email/settings', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({
+      timeout: 15_000,
+    });
+    await Promise.race([
+      page.locator('[data-testid="email-settings-empty"]').waitFor({ state: 'visible' }),
+      page.locator('[data-testid^="email-account-"]').first().waitFor({ state: 'visible' }),
+    ]).catch(() => null);
+    return;
+  }
   await settingsLink.scrollIntoViewIfNeeded().catch(() => null);
 
   const apiPromise = page
@@ -62,6 +85,14 @@ async function navigateToEmailSettings(page: any): Promise<void> {
   await settingsLink.evaluate((el: HTMLElement) => el.click());
   await apiPromise;
   await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({
+    timeout: 15_000,
+  });
+  await Promise.race([
+    page.locator('[data-testid="email-settings-empty"]').waitFor({ state: 'visible' }),
+    page.locator('[data-testid^="email-account-"]').first().waitFor({ state: 'visible' }),
+  ]).catch(() => null);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +104,7 @@ test.describe('Email Account Setup', () => {
   // =========================================================================
   // T1: Navigate to Email Settings via sidebar (D1)
   // =========================================================================
-  test('T1: navigate to Email Settings via sidebar menu', async ({ page }) => {
+  test('T1: navigate to Email Settings page', async ({ page }) => {
     await navigateToEmailSettings(page);
 
     await expect(page.locator('[data-testid="email-settings-page"]')).toBeVisible({

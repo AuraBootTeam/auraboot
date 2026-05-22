@@ -2,45 +2,31 @@
 
 ## Environment Status
 
-- Worktree: `/Users/ghj/work/auraboot/.worktrees/oss-e2e-docker-fix`
-- Branch: `oss-e2e-docker-fix`
-- Stack: `auraboot-ga-e2e`
-- Ports: backend `6444`, frontend `5174`, BFF `3501`, postgres `5433`
-- Fresh stack: `./scripts/docker-ga-e2e-down.sh --purge` then `GA_E2E_FRONTEND_IMAGE=node:22-bookworm-slim AURABOOT_AUTO_COPY_WRAPPER=1 ./scripts/docker-ga-e2e-up.sh`
-- Status at 2026-05-12 22:33 CST: backend `/actuator/health` UP, frontend `/` reachable, BFF `/api/bootstrap/status` reachable.
-- Fresh reset logs:
-  - First up failed before stack creation: `/tmp/oss-e2e-logs/fresh-up-20260512-223145.log`
-  - Retry after `docker pull eclipse-temurin:25-jre-alpine`: `/tmp/oss-e2e-logs/fresh-up-retry-20260512-223248.log`
-- Note: default Playwright frontend image pull (`mcr.microsoft.com/playwright:v1.59.1-noble`) was too slow in this environment, so frontend service was started with already-available `node:22-bookworm-slim`. Host Playwright runner is used against the Docker stack.
+- Worktree: `/Users/ghj/work/auraboot/auraboot`
+- Branch: `main`
+- Stack: local host OSS reset
+- Ports: backend `6443`, frontend `5173`, BFF `3500`
+- Status at 2026-05-22 CST: backend `/actuator/health` returned `200`, BFF `/health` returned `200`, and frontend `/` returned `302`.
+- Playwright profile: `PW_PROFILE=oss PW_ROLE_PROJECTS=1`
+- Playwright base URL now defaults to `http://127.0.0.1:5173` to avoid Node resolving `localhost` to IPv6 `::1` while Vite is reachable on IPv4.
+- Note: the final full gate stayed healthy for the full run; the earlier `::1:5173` failure was classified as environment/baseURL invalid rather than a product failure.
 
 ## Latest Valid Full Run
 
-- OSS-scoped regular chromium full gate command:
-  `cd web-admin && PLAYWRIGHT_BASE_URL=http://localhost:5174 BACKEND_URL=http://localhost:6444 BFF_URL=http://localhost:3501 BE_PORT=6444 VITE_PORT=5174 BFF_PORT=3501 PG_HOST=localhost PG_PORT=5433 PG_USER=auraboot PG_DB=aura_boot PGPASSWORD=auraboot_dev PW_SKIP_WEBSERVER=1 NO_PROXY=localhost PW_WORKERS=1 pnpm exec playwright test -c playwright.oss.config.ts --project=chromium --no-deps --reporter=line --workers=1`
-- Fresh baseline log: `/tmp/oss-e2e-logs/oss-chromium-w1-fresh-20260512-223803.log`
-- Fresh baseline result: `1319 passed / 30 failed / 84 skipped / 20 did not run`.
-- Fresh baseline duration: `52.3m`.
-- Latest post-fix full rerun log: `/tmp/oss-e2e-logs/oss-chromium-w1-rerun2-20260513-005348.log`
-- Latest post-fix full rerun result: `1348 passed / 7 failed / 85 skipped / 11 did not run`.
-- Latest post-fix full rerun duration: `49.7m`.
-- Final full rerun before last fixes: `/tmp/oss-e2e-logs/oss-chromium-w1-final-20260513-015140.log`
-- Final full rerun before last fixes result: `1364 passed / 2 failed / 85 skipped`.
-- Final full chromium rerun after last fixes: `/tmp/oss-e2e-logs/oss-chromium-w1-final-r2-20260513-024936.log`
-- Final full chromium rerun result: `1367 passed / 84 skipped / 0 failed`.
-- Final full chromium rerun duration: `49.7m`.
-- First deep rerun after regular gate: `/tmp/oss-e2e-logs/oss-chromium-deep-final-20260513-034015.log`
-- First deep rerun result: `181 passed / 3 failed / 3 skipped / 5 did not run`.
-- Deep targeted rerun after fixes: `/tmp/oss-e2e-logs/target-deep-final-three-r2-20260513-035051.log`
-- Deep targeted rerun result: `3 passed`.
-- Final deep rerun: `/tmp/oss-e2e-logs/oss-chromium-deep-final-r2-20260513-035111.log`
-- Final deep rerun result: `189 passed / 3 skipped / 0 failed`.
-- Final deep rerun duration: `7.2m`.
-- Deep export assertion cleanup targeted rerun: `/tmp/oss-e2e-logs/target-deep-data-export-r3-20260513-040000.log`
-- Deep export assertion cleanup targeted rerun result: `2 passed`.
-- Final deep rerun after assertion cleanup: `/tmp/oss-e2e-logs/oss-chromium-deep-final-r3-20260513-040008.log`
-- Final deep rerun after assertion cleanup result: `189 passed / 3 skipped / 0 failed`.
-- Final deep rerun after assertion cleanup duration: `7.2m`.
-- Interpretation: valid fresh OSS-scoped failure baseline plus post-fix regression runs. The regular `chromium` and `chromium-deep` OSS gates are green; truth audit is still required before claiming overall completion.
+- Full15 command:
+  `cd web-admin && NO_PROXY=localhost,127.0.0.1 PW_PROFILE=oss PW_ROLE_PROJECTS=1 pnpm exec playwright test --project=oss --project=oss-deep --workers=1 --reporter=list`
+- Full15 result: `1452 passed / 131 skipped / 0 failed`.
+- Duration: about `1.4h`.
+- Health during and after the run stayed valid: Vite `302`, BFF `200`, backend `200`.
+- Previously fixed red points re-passed in the full sequence: automation `AUTO-05`, community `CM-07`, webhook `WH-002`, email compose `T5`, list empty-state `UES-001`, platform RBAC, smart-components money formatting, saved-view `CS-007/CS-008`, and dashboard `A3`.
+- Post-run verification:
+  - Backend unit: `./gradlew :test` passed.
+  - Backend integration slices: `integrationTest testBpm testAgent testAi testPlugin` passed.
+  - Frontend unit: `pnpm test:unit` passed.
+  - TypeScript: `pnpm exec tsc --noEmit` passed.
+  - Lint: `pnpm lint` passed with existing warnings only (`0 errors`).
+  - E2E truth self-check was run before completion was claimed; no new retry/threshold bypass was introduced in the changed specs.
+- Interpretation: the current local host OSS full gate is green. The `131 skipped` entries are the suite's current skip/fixme baseline, not failures.
 
 ## Invalid/Aborted Runs
 

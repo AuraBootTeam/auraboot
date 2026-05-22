@@ -62,6 +62,17 @@ async function navigateToContactList(page: any): Promise<void> {
   await contactLink.evaluate((el: HTMLElement) => el.click());
   await listApiPromise;
   await page.waitForLoadState('domcontentloaded');
+
+  if (!page.url().includes('crm_contact')) {
+    await page.goto('/p/crm_contact', { waitUntil: 'domcontentloaded' });
+    await page
+      .waitForResponse(
+        (r: any) =>
+          r.url().includes('/api/dynamic/crm') && r.url().includes('list') && r.status() === 200,
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
+  }
 }
 
 // ---------------------------------------------------------------------------

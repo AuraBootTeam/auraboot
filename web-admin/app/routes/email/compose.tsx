@@ -72,6 +72,7 @@ export default function EmailComposePage() {
   const [sending, setSending] = useState(false);
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Link.configure({
@@ -203,6 +204,7 @@ export default function EmailComposePage() {
                   <button
                     type="button"
                     onClick={() => setShowCc(true)}
+                    data-testid="compose-cc-toggle"
                     className="text-xs text-blue-500 hover:text-blue-700"
                   >
                     CC
@@ -212,6 +214,7 @@ export default function EmailComposePage() {
                   <button
                     type="button"
                     onClick={() => setShowBcc(true)}
+                    data-testid="compose-bcc-toggle"
                     className="text-xs text-blue-500 hover:text-blue-700"
                   >
                     BCC
@@ -333,7 +336,7 @@ export default function EmailComposePage() {
             <label className="flex cursor-pointer items-center gap-2 text-gray-600 dark:text-gray-300">
               <input
                 type="checkbox"
-                checked={trackOpens}
+                defaultChecked={trackOpens}
                 onChange={(e) => setTrackOpens(e.target.checked)}
                 data-testid="track-opens-toggle"
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -343,7 +346,7 @@ export default function EmailComposePage() {
             <label className="flex cursor-pointer items-center gap-2 text-gray-600 dark:text-gray-300">
               <input
                 type="checkbox"
-                checked={trackClicks}
+                defaultChecked={trackClicks}
                 onChange={(e) => setTrackClicks(e.target.checked)}
                 data-testid="track-clicks-toggle"
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
