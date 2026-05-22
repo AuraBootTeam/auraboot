@@ -12,6 +12,14 @@ Multi-worktree mode requires per-worktree runtime state. Daily development can u
 
 ```bash
 # in any worktree
+scripts/dev/env.sh start --mode=bugfix --slug=<slug>
+scripts/dev/env.sh status --slug=<slug>
+scripts/dev/env.sh verify --level=health --slug=<slug>
+scripts/dev/env.sh logs --slug=<slug> --service=all
+scripts/dev/env.sh stop --slug=<slug> --dry-run
+scripts/dev/env.sh stop --slug=<slug>
+
+# Lower-level primitives remain available when you only need infra.
 scripts/dev/start-dev-infra.sh                 # daily dev: postgres + redis only
 source scripts/dev/r2-env-export.sh <slug>     # export ports for host apps
 echo "$PW_E2E_RUN_ROOT"                        # test-results/runs/<slug>/<date>
@@ -99,6 +107,13 @@ run-playwright-runner.sh
   runs the optional Linux Playwright runner; refuses uncached Playwright image
   by default so a normal dev command does not pull a multi-GB image silently
 
+env.sh
+  unified daily bugfix entrypoint for start/stop/status/reset/verify/logs;
+  start uses Docker infra plus host backend/Vite/BFF and reuses an existing
+  .aura-stack/<slug>.env, status reports env JSON, tmux sessions, and exact
+  BE/Vite/BFF listener PIDs, stop avoids global pkill and stops the slug-scoped
+  Docker infra while preserving volumes unless --purge is passed
+
 test-dev-env-scripts.sh
   non-mutating smoke tests for dry-run, r2 env export, and Maven local helper
 
@@ -148,6 +163,6 @@ scripts/dev/cleanup-artifacts.sh --slug=<slug> --days=7 --apply
 
 ## Out of scope (deferred to later P1 / P2)
 
-- A unified `aura dev start --isolated` CLI (P1 #6 in the design doc) — these shell scripts are the underlying primitives.
+- A productized `aura dev ...` CLI wrapper (P1 #6 in the design doc) — `scripts/dev/env.sh` is the current shell entrypoint.
 - Enterprise-side isolated stack (P1 #8) — only OSS covered today.
 - Probe-based port allocation (P2 #11) — current code uses hash + walk-forward; long-term plan is a probing scheme.

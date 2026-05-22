@@ -137,7 +137,17 @@ assert_exit "r2-env-export executed directly exits 2" 2 $?
     bash scripts/dev/maven-local-export.sh >/tmp/dev-env-maven-exec-$$.out 2>&1
 )
 assert_exit "maven-local-export executed directly exits 2" 2 $?
-rm -f /tmp/dev-env-r2-exec-$$.out /tmp/dev-env-maven-exec-$$.out
+(
+    cd "$PROJECT_ROOT"
+    bash scripts/dev/lib/process-manager.sh >/tmp/dev-env-process-exec-$$.out 2>&1
+)
+assert_exit "process-manager executed directly exits 2" 2 $?
+(
+    cd "$PROJECT_ROOT"
+    bash scripts/dev/lib/health.sh >/tmp/dev-env-health-exec-$$.out 2>&1
+)
+assert_exit "health helper executed directly exits 2" 2 $?
+rm -f /tmp/dev-env-r2-exec-$$.out /tmp/dev-env-maven-exec-$$.out /tmp/dev-env-process-exec-$$.out /tmp/dev-env-health-exec-$$.out
 
 echo "Scenario 5: maven-local-export sets per-worktree repo"
 MAVEN_OUTPUT="$(
@@ -265,6 +275,87 @@ assert_exit "artifact cleanup apply exit" 0 $?
 assert_not_exists "artifact cleanup apply removed run dir" "$ARTIFACT_RUN"
 assert_not_exists "artifact cleanup apply removed storage dir" "$ARTIFACT_STORAGE"
 rm -f /tmp/dev-env-artifacts-$$.out
+
+echo "Scenario 11: unified env start dry-run plans bugfix host stack without mutating"
+DRY_ENV_STACK="$STACK_DIR/scriptcheck-env.env"
+rm -f "$DRY_ENV_STACK"
+(
+    cd "$PROJECT_ROOT"
+    scripts/dev/env.sh start --mode=bugfix --product=enterprise --slug=scriptcheck-env --dry-run >/tmp/dev-env-unified-start-$$.out
+)
+assert_exit "env start dry-run exit" 0 $?
+assert_not_exists "env start dry-run did not write env" "$DRY_ENV_STACK"
+UNIFIED_START_OUTPUT="$(cat /tmp/dev-env-unified-start-$$.out)"
+assert_contains "env start dry-run delegates infra plan" "$UNIFIED_START_OUTPUT" "scripts/dev/start-dev-infra.sh --slug=scriptcheck-env --dry-run"
+assert_contains "env start dry-run names backend session" "$UNIFIED_START_OUTPUT" "auraboot-scriptcheck-env-backend"
+assert_contains "env start dry-run names frontend session" "$UNIFIED_START_OUTPUT" "auraboot-scriptcheck-env-frontend"
+assert_contains "env start dry-run disables startup bootstrap" "$UNIFIED_START_OUTPUT" "--auraboot.bootstrap.enabled=false"
+rm -f /tmp/dev-env-unified-start-$$.out
+
+echo "Scenario 12: unified env status reads slug env"
+REUSE_START_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    scripts/dev/env.sh start --mode=bugfix --product=enterprise --slug=scriptcheck-r2 --dry-run
+)"
+assert_contains "env start dry-run reuses existing stack env" "$REUSE_START_OUTPUT" "existing env file: $R2_ENV"
+assert_contains "env start dry-run plans compose up for existing infra" "$REUSE_START_OUTPUT" "docker compose -p auraboot-scriptcheck-r2"
+case "$REUSE_START_OUTPUT" in
+    *" minio"*) fail "env start dry-run does not start storage without --with-storage" ;;
+    *) pass "env start dry-run does not start storage without --with-storage" ;;
+esac
+
+STATUS_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    scripts/dev/env.sh status --slug=scriptcheck-r2
+)"
+assert_contains "env status includes slug" "$STATUS_OUTPUT" '"slug":"scriptcheck-r2"'
+assert_contains "env status includes backend port" "$STATUS_OUTPUT" '"be":"16443"'
+assert_contains "env status includes postgres port" "$STATUS_OUTPUT" '"pg":"15432"'
+assert_contains "env status includes port listener summary" "$STATUS_OUTPUT" "ports be="
+STATUS_OUTPUT_FROM_OTHER_CWD="$(
+    cd /tmp &&
+    "$PROJECT_ROOT/scripts/dev/env.sh" status --slug=scriptcheck-r2
+)"
+assert_contains "env status anchors env file to script project root" "$STATUS_OUTPUT_FROM_OTHER_CWD" '"slug":"scriptcheck-r2"'
+
+echo "Scenario 13: unified env reset dry-run is explicit and does not stop host processes"
+RESET_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    scripts/dev/env.sh reset --mode=bugfix --product=enterprise --slug=scriptcheck-r2 --dry-run
+)"
+assert_contains "env reset dry-run names enterprise reset script" "$RESET_OUTPUT" "scripts/reset-db.sh"
+assert_contains "env reset dry-run names isolated database" "$RESET_OUTPUT" "localhost:15432/aura_boot"
+assert_contains "env reset dry-run documents no global process cleanup" "$RESET_OUTPUT" "no global pkill"
+assert_contains "env reset dry-run documents bootstrap setup" "$RESET_OUTPUT" "/api/bootstrap/setup"
+
+echo "Scenario 14: unified env stop dry-run uses exact tmux sessions and ports"
+STOP_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    scripts/dev/env.sh stop --slug=scriptcheck-r2 --dry-run
+)"
+assert_contains "env stop dry-run names backend session" "$STOP_OUTPUT" "auraboot-scriptcheck-r2-backend"
+assert_contains "env stop dry-run names frontend session" "$STOP_OUTPUT" "auraboot-scriptcheck-r2-frontend"
+assert_contains "env stop dry-run lists exact ports" "$STOP_OUTPUT" "16443 15173 13500"
+assert_contains "env stop dry-run avoids global pkill" "$STOP_OUTPUT" "no global pkill"
+assert_contains "env stop dry-run stops slug-scoped docker infra" "$STOP_OUTPUT" "scripts/dev/stop-isolated.sh --slug=scriptcheck-r2"
+PURGE_STOP_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    scripts/dev/env.sh stop --slug=scriptcheck-r2 --purge --dry-run
+)"
+assert_contains "env stop purge dry-run includes purge flag" "$PURGE_STOP_OUTPUT" "scripts/dev/stop-isolated.sh --slug=scriptcheck-r2 --purge"
+
+echo "Scenario 15: unified env verify and logs dry-runs expose health targets and log paths"
+VERIFY_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    scripts/dev/env.sh verify --level=health --slug=scriptcheck-r2 --dry-run
+)"
+assert_contains "env verify dry-run includes backend health" "$VERIFY_OUTPUT" "http://localhost:16443/actuator/health"
+assert_contains "env verify dry-run includes frontend URL" "$VERIFY_OUTPUT" "http://localhost:15173"
+LOGS_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    scripts/dev/env.sh logs --slug=scriptcheck-r2 --service=frontend
+)"
+assert_contains "env logs prints frontend log path" "$LOGS_OUTPUT" "/tmp/aura-scriptcheck-r2-frontend.log"
 
 echo ""
 echo "==========================================="

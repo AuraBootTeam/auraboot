@@ -35,6 +35,7 @@
 
 aura_multi_worktree_guard() {
     local operation_name="${1:-unknown-operation}"
+    local operation_basename="${operation_name##*/}"
     local worktree_count
 
     # `git worktree list` prints one line per worktree; the main checkout
@@ -46,7 +47,7 @@ aura_multi_worktree_guard() {
         return 0
     fi
 
-    case "$operation_name" in
+    case "$operation_basename" in
         reset-db.sh|oss-reset-and-init.sh)
             if [ "${AURA_ENV_PROFILE:-}" = "r2" ] || [ "${PG_PORT:-5432}" != "5432" ] || [ -n "${COMPOSE_PROJECT_NAME:-}" ]; then
                 return 0
