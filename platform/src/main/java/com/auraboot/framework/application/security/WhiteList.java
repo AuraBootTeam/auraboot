@@ -23,6 +23,7 @@ public class WhiteList {
             // Mobile config — no auth required (app needs config before login)
             "/api/mobile/config",
             "/api/mobile/capabilities",
+            "/api/mobile/goods-ticket/**",
 
             "/api/ai/aurabot/oauth/callback",
 
