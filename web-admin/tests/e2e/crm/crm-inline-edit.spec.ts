@@ -30,6 +30,8 @@ test.describe('CRM Inline Edit @smoke', () => {
   const uid = uniqueId('IE');
   const initialCompany = `InlineEditLead_${uid}`;
   const updatedCompany = `Updated_${uid}`;
+  const initialOwner = `Owner_${uid}`;
+  const updatedOwner = `UpdatedOwner_${uid}`;
   let createdRecordId: string | undefined;
 
   // =========================================================================
@@ -47,6 +49,7 @@ test.describe('CRM Inline Edit @smoke', () => {
           crm_lead_contact_name: `IE Contact ${uid}`,
           crm_lead_source: 'website',
           crm_lead_status: 'new',
+          crm_lead_assigned_to: initialOwner,
         },
         undefined,
         'create',
@@ -169,20 +172,20 @@ test.describe('CRM Inline Edit @smoke', () => {
       return;
     }
 
-    // Target the cell containing initialCompany to ensure we edit the company field
-    const companyCells = row.locator('td').filter({ hasText: initialCompany });
+    // Target a text column that is explicitly inline-editable in crm_lead_list DSL.
+    const ownerCells = row.locator('td').filter({ hasText: initialOwner });
     let editableCell: import('@playwright/test').Locator | null = null;
 
-    const companyCount = await companyCells.count();
-    if (companyCount > 0) {
-      await companyCells.first().dblclick();
+    const ownerCount = await ownerCells.count();
+    if (ownerCount > 0) {
+      await ownerCells.first().dblclick();
       const inlineInput = page.locator('[data-testid^="inline-edit-text-"]');
       const visible = await inlineInput
         .first()
         .isVisible({ timeout: 2000 })
         .catch(() => false);
       if (visible) {
-        editableCell = companyCells.first();
+        editableCell = ownerCells.first();
       } else {
         await page.keyboard.press('Escape');
       }
@@ -233,7 +236,7 @@ test.describe('CRM Inline Edit @smoke', () => {
 
     // Clear existing value and type new value
     await editInput.click({ clickCount: 3 }); // select all
-    await editInput.fill(updatedCompany);
+    await editInput.fill(updatedOwner);
     await page.keyboard.press('Enter');
 
     const saveResp = await saveResponsePromise;
@@ -253,10 +256,10 @@ test.describe('CRM Inline Edit @smoke', () => {
       .catch(() => null);
 
     // The row should now show the updated value
-    const updatedRow = await findRowInPaginatedList(page, updatedCompany, 12000).catch(() => null);
+    const updatedRow = await findRowInPaginatedList(page, updatedOwner, 12000).catch(() => null);
     expect(
       updatedRow,
-      `After inline edit save, row with updated company "${updatedCompany}" must be visible in the list`,
+      `After inline edit save, row with updated owner "${updatedOwner}" must be visible in the list`,
     ).not.toBeNull();
     if (updatedRow) {
       await expect(updatedRow).toBeVisible();
@@ -268,36 +271,36 @@ test.describe('CRM Inline Edit @smoke', () => {
       expect(verifyResp.ok(), 'Record fetch after reload should succeed').toBe(true);
       const verifyBody = await verifyResp.json();
       expect(
-        verifyBody?.data?.crm_lead_company,
-        `Inline edit must persist: crm_lead_company should be "${updatedCompany}"`,
-      ).toBe(updatedCompany);
+        verifyBody?.data?.crm_lead_assigned_to,
+        `Inline edit must persist: crm_lead_assigned_to should be "${updatedOwner}"`,
+      ).toBe(updatedOwner);
     }
 
-    // --- UI check: search for updatedCompany in the list ---
+    // --- UI check: search for updatedOwner in the list ---
     await navigateToDynamicPage(page, 'crm-lead');
     await waitForDynamicPageLoad(page);
 
-    const persistedRow = await findRowInPaginatedList(page, updatedCompany, 12000).catch(
+    const persistedRow = await findRowInPaginatedList(page, updatedOwner, 12000).catch(
       () => null,
     );
     expect(
       persistedRow,
-      `After page reload, the updated company "${updatedCompany}" must still be present — inline edit must persist to DB`,
+      `After page reload, the updated owner "${updatedOwner}" must still be present — inline edit must persist to DB`,
     ).not.toBeNull();
 
     // The original value must no longer appear in the list (use search to confirm)
-    const searchInput = page.locator('[data-testid="search-input"]').first();
+    const searchInput = page.locator('[data-testid="list-search-input"]').first();
     if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchInput.fill(initialCompany);
+      await searchInput.fill(initialOwner);
       await page.keyboard.press('Enter');
       await page
         .waitForResponse((r) => r.url().includes('/list') && r.status() === 200, { timeout: 5000 })
         .catch(() => null);
     }
-    const oldRow = page.locator('tbody tr', { hasText: initialCompany }).first();
+    const oldRow = page.locator('tbody tr', { hasText: initialOwner }).first();
     await expect(
       oldRow,
-      `After successful inline edit, the original company "${initialCompany}" must no longer appear in the list`,
+      `After successful inline edit, the original owner "${initialOwner}" must no longer appear in the list`,
     ).not.toBeVisible({ timeout: 3000 });
   });
 });

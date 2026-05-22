@@ -53,9 +53,24 @@ async function navigateToSequenceList(page: any): Promise<void> {
   await crmBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 
-  // Click "Email" sub-menu button
+  // Click "Email" sub-menu button when present. OSS exposes email routes
+  // without mounting the email menu in the seeded sidebar.
   const emailBtn = nav.getByRole('button', { name: /Email|邮件/i }).first();
-  await emailBtn.waitFor({ state: 'visible', timeout: 6_000 });
+  const hasEmailMenu = await emailBtn.isVisible({ timeout: 6_000 }).catch(() => false);
+  if (!hasEmailMenu) {
+    const apiPromise = page
+      .waitForResponse((r: any) => r.url().includes('/api/email/sequences') && r.status() === 200, {
+        timeout: 15_000,
+      })
+      .catch(() => null);
+    await page.goto('/email-sequence', { waitUntil: 'domcontentloaded' });
+    await apiPromise;
+    await page.locator('[data-testid="email-sequence-list-page"]').waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    });
+    return;
+  }
   await emailBtn.scrollIntoViewIfNeeded().catch(() => null);
   await emailBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);

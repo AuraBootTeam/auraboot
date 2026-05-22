@@ -26,6 +26,7 @@ import { platformRoutes as platformPluginRoutes } from '../../app/plugins/core-p
 import { adminRoutes } from '../../app/plugins/core-admin/routes';
 import { opsRoutes } from '../../app/plugins/core-ops/routes';
 import { dashboardRoutes } from '../../app/plugins/core-dashboard/routes';
+import { emailRoutes } from '../../app/plugins/core-email/routes';
 
 /**
  * Admin feature routes — included in the authenticated platform shell.
@@ -47,6 +48,7 @@ export function adminFeatureRoutes() {
     ...adminRoutes(),
     ...opsRoutes(),
     ...dashboardRoutes(),
+    ...emailRoutes(),
   ];
 }
 

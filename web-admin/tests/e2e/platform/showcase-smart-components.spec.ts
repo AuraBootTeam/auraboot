@@ -398,8 +398,18 @@ test.describe('Showcase Smart Components', () => {
     // Edit budget
     const budgetInput = field(page, 'sc_budget').locator('input').first();
     if (await budgetInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await fillControlledInput(budgetInput, '88888.88');
-      await budgetInput.blur();
+      await budgetInput.click();
+      await budgetInput.press('ControlOrMeta+A');
+      await budgetInput.press('Backspace');
+      await budgetInput.type('88888.88', { delay: 5 });
+      await expect
+        .poll(async () => (await budgetInput.inputValue()).replace(/,/g, ''))
+        .toBe('88888.88');
+      await budgetInput.evaluate((node) => {
+        const element = node as HTMLInputElement;
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.blur();
+      });
     }
 
     // Edit time slot

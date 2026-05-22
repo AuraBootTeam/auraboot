@@ -1,0 +1,55 @@
+import type { PluginResource } from '../_shared/types.js'
+
+export const RESOURCES: PluginResource[] = [
+  {
+    key: 'email.inbox',
+    path: '/email',
+    title: { en: 'Email', zh: '邮件' },
+    icon: 'mail',
+    menu: false,
+    file: './routes/email/index.tsx',
+  },
+  {
+    key: 'email.compose',
+    path: '/email/compose',
+    title: { en: 'Compose', zh: '写邮件' },
+    icon: 'send',
+    menu: false,
+    parentKey: 'email.inbox',
+    file: './routes/email/compose.tsx',
+  },
+  {
+    key: 'email.settings',
+    path: '/email/settings',
+    title: { en: 'Email Settings', zh: '邮件设置' },
+    icon: 'settings',
+    menu: false,
+    parentKey: 'email.inbox',
+    file: './routes/email/settings.tsx',
+  },
+  {
+    key: 'email.thread',
+    path: '/email/thread/:threadId',
+    title: { en: 'Email Thread', zh: '邮件会话' },
+    menu: false,
+    parentKey: 'email.inbox',
+    file: './routes/email/thread.$threadId.tsx',
+  },
+  {
+    key: 'email.sequence',
+    path: '/email-sequence',
+    title: { en: 'Email Sequences', zh: '邮件序列' },
+    icon: 'list-restart',
+    menu: false,
+    parentKey: 'email.inbox',
+    file: './routes/email-sequence/index.tsx',
+  },
+  {
+    key: 'email.sequence.detail',
+    path: '/email-sequence/:sequenceId',
+    title: { en: 'Email Sequence Editor', zh: '邮件序列编辑器' },
+    menu: false,
+    parentKey: 'email.sequence',
+    file: './routes/email-sequence/$sequenceId.tsx',
+  },
+]

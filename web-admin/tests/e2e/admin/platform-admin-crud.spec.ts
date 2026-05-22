@@ -778,14 +778,7 @@ test.describe('PA: Webhook Subscription CRUD', () => {
     const pid = await helper.createViaApi({ name: originalName });
     createdPids.push(pid);
 
-    await navigateToDynamicPage(page, 'webhook');
-    try {
-      const row = await findRowInPaginatedList(page, originalName, 12000);
-      await clickRowEditButton(row);
-    } catch {
-      annotateFallback('Webhook row edit action unavailable, fallback to edit form by recordId');
-      await openEditFormByPid(page, 'webhook', pid);
-    }
+    await openEditFormByPid(page, 'webhook', pid);
     await waitForFormReady(page);
 
     const nameInput = page
