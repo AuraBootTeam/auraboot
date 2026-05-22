@@ -208,11 +208,15 @@ async function openDesignerByPageKey(
     }
   }
 
-  await expect(page).toHaveURL(new RegExp(`/page-designer/${pid}`), { timeout: 5_000 });
+  await expect(page).toHaveURL(new RegExp(`(?:/page-designer/${pid}|/unified-designer\\?pageId=${pid})`), { timeout: 5_000 });
 
   await page.evaluate(() => {
     document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
   });
+  if (page.url().includes('/unified-designer')) {
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 10_000 });
+    await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+  }
   await expect(page.getByTestId('detail-config-panel')).toBeVisible({ timeout: 8_000 });
 }
 

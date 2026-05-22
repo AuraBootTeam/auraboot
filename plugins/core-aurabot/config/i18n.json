@@ -63,6 +63,13 @@
     "refType": "ui"
   },
   {
+    "key": "aurabot.chat.send",
+    "source": "import",
+    "zh-CN": "发送 (Cmd+Enter)",
+    "en-US": "Send (Cmd+Enter)",
+    "refType": "ui"
+  },
+  {
     "key": "aurabot.shell.empty.hint",
     "source": "import",
     "zh-CN": "试试输入 echo hello,体验回路",

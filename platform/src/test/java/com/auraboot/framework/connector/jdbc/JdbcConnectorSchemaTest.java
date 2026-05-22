@@ -11,7 +11,7 @@ import java.sql.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class JdbcConnectorSchemaTest {
 
     @Container

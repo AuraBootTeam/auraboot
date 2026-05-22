@@ -77,7 +77,7 @@ class FileServiceImplTest {
 
         assertThatThrownBy(() -> fileService.uploadFile(empty, 1L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("File upload failed");
+                .hasMessageContaining("File must not be empty");
     }
 
     @Test

@@ -336,6 +336,11 @@ class TypeHandlersAndInterceptorsTest {
     @Mock
     MetaObject metaObject;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setupMetaObjectMock() {
+        lenient().when(metaObject.getOriginalObject()).thenReturn(new Object());
+    }
+
     @Test
     void auraBootObjectHandler_insertFillSetsTimestamps() {
         AuraBootObjectHandler h = new AuraBootObjectHandler(environmentService, envLockGuard);

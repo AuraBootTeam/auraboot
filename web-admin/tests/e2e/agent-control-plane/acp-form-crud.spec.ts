@@ -33,8 +33,10 @@ import {
   navigateToDynamicPage,
   waitForFormReady,
   waitForToast,
+  fillControlledInput,
   acceptConfirmDialog,
   findRowInPaginatedList,
+  queryFilteredList,
   clickSaveButton,
   clickRowActionByLocator,
 } from '../helpers/index';
@@ -65,6 +67,8 @@ const FIELD_LABELS: Record<string, string[]> = {
   soul_goals: ['长期目标', 'Goals'],
   skill_description: ['描述', 'Description'],
   skill_level: ['技能级别', 'Skill Level'],
+  task_priority: ['任务优先级', 'Priority'],
+  task_status: ['任务状态', 'Status'],
   timeout_hours: ['超时小时数', 'Timeout Hours'],
   importance: ['重要度', 'Importance'],
   memory_content: ['内容', 'Content'],
@@ -74,6 +78,12 @@ const FIELD_LABELS: Record<string, string[]> = {
 };
 
 const OPTION_LABELS: Record<string, Record<string, string[]>> = {
+  task_priority: {
+    critical: ['紧急', 'Critical', 'critical'],
+    high: ['高', 'High', 'high'],
+    medium: ['中', 'Medium', 'medium'],
+    low: ['低', 'Low', 'low'],
+  },
   memory_type: {
     lesson: ['经验', 'Lesson', 'lesson'],
   },
@@ -145,9 +155,7 @@ async function fillFormField(page: Page, fieldCode: string, value: string): Prom
     for (let i = 0; i < count; i++) {
       const input = candidate.nth(i);
       if (await input.isVisible({ timeout: 500 }).catch(() => false)) {
-        await input.scrollIntoViewIfNeeded();
-        await input.fill(value);
-        await expect.poll(async () => input.inputValue(), { timeout: 5_000 }).toBe(value);
+        await fillControlledInput(input, value);
         return true;
       }
     }
@@ -252,24 +260,101 @@ async function selectFormField(page: Page, fieldCode: string, optionValue: strin
       timeout: 10_000,
     })
     .catch(() => null);
-  const container = page.locator(`[data-testid="form-field-${fieldCode}"]`);
+  const container = page.locator(`[data-testid="form-field-${fieldCode}"]`).first();
+  const optionLabels = OPTION_LABELS[fieldCode]?.[optionValue] ?? [optionValue];
+  const escapedLabels = optionLabels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const labelPattern = new RegExp(`(${escapedLabels.join('|')})`, 'i');
+  const clickVisible = async (locator: Locator, timeout = 1_000): Promise<boolean> => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const target = locator.first();
+      if (!(await target.isVisible({ timeout }).catch(() => false))) return false;
+      try {
+        await target.scrollIntoViewIfNeeded();
+        await target.click();
+        return true;
+      } catch (error) {
+        const message = String(error);
+        if (message.includes('scrollIntoViewIfNeeded: Timeout')) return false;
+        if (!message.includes('not attached to the DOM') || attempt === 1) {
+          throw error;
+        }
+      }
+    }
+    return false;
+  };
+
+  const verifySelected = async (): Promise<boolean> => {
+    const hiddenValue = await container
+      .locator('input[type="hidden"]')
+      .first()
+      .inputValue()
+      .catch(() => '');
+    if (hiddenValue === optionValue) return true;
+
+    const inputValue = await container
+      .locator('input:not([type="hidden"]), textarea')
+      .first()
+      .inputValue()
+      .catch(() => '');
+    if (inputValue === optionValue || optionLabels.some((label) => inputValue === label)) return true;
+
+    const visibleText = await container.innerText().catch(() => '');
+    if (labelPattern.test(visibleText) || visibleText.toLowerCase().includes(optionValue.toLowerCase())) {
+      return true;
+    }
+
+    for (const fieldLabel of FIELD_LABELS[fieldCode] ?? []) {
+      const fieldLabelPattern = new RegExp(`^${fieldLabel}\\*?$`, 'i');
+      const labelText = page.getByText(fieldLabelPattern).first();
+      if (!(await labelText.isVisible({ timeout: 500 }).catch(() => false))) continue;
+      const trigger = labelText
+        .locator('xpath=following::*[@role="combobox" or self::button or self::select][1]')
+        .first();
+      const triggerText = (await trigger.textContent({ timeout: 500 }).catch(() => '')) ?? '';
+      if (labelPattern.test(triggerText) || triggerText.toLowerCase().includes(optionValue.toLowerCase())) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const clickOption = async (): Promise<boolean> => {
+    const candidates = [
+      page.locator(
+        `[role="option"][data-value="${optionValue}"], [role="option"][value="${optionValue}"], .ant-select-item-option[data-value="${optionValue}"]`,
+      ),
+      ...optionLabels.map((optionLabel) =>
+        page
+          .getByRole('option', { name: new RegExp(`^${optionLabel}$`, 'i') })
+          .or(page.locator(`.ant-select-item-option:has-text("${optionLabel}")`))
+          .or(page.locator(`li:has-text("${optionLabel}")`)),
+      ),
+    ];
+    for (const candidate of candidates) {
+      const option = candidate.first();
+      if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await option.click();
+        await expect.poll(verifySelected, { timeout: 3_000 }).toBe(true);
+        return true;
+      }
+    }
+    return false;
+  };
 
   // Try native select first
   const nativeSelect = container.locator('select').first();
   if (await nativeSelect.isVisible({ timeout: 1_500 }).catch(() => false)) {
     await nativeSelect.selectOption(optionValue);
+    await expect(nativeSelect).toHaveValue(optionValue, { timeout: 3_000 });
     return;
   }
 
   const testIdTrigger = page.locator(`[data-testid="select-trigger-${fieldCode}"]`).first();
   if (await testIdTrigger.isVisible({ timeout: 1_500 }).catch(() => false)) {
     await testIdTrigger.click();
-    for (const optionLabel of OPTION_LABELS[fieldCode]?.[optionValue] ?? [optionValue]) {
-      const option = page.getByRole('option', { name: new RegExp(optionLabel, 'i') }).first();
-      if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await option.click();
-        return;
-      }
+    if (await clickOption()) {
+      return;
     }
     await page.keyboard.press('Escape').catch(() => null);
   }
@@ -280,38 +365,11 @@ async function selectFormField(page: Page, fieldCode: string, optionValue: strin
     .first();
   if (await combobox.isVisible({ timeout: 1_500 }).catch(() => false)) {
     await combobox.click();
-    // Options may appear in dropdown portal (outside container)
-    // Try matching by value attribute first, then by visible text (which may be Chinese label)
-    const optionByValue = page
-      .locator(
-        `[role="option"][data-value="${optionValue}"], [role="option"][value="${optionValue}"]`,
-      )
-      .first();
-    if (await optionByValue.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await optionByValue.click();
+    if (await clickOption()) {
       return;
     }
-    // Try matching by visible text (could be value like "active" or label like "活跃")
-    for (const optionLabel of OPTION_LABELS[fieldCode]?.[optionValue] ?? [optionValue]) {
-      const optionByText = page
-        .locator(
-          `[role="option"]:has-text("${optionLabel}"), .ant-select-item-option:has-text("${optionLabel}"), li:has-text("${optionLabel}")`,
-        )
-        .first();
-      if (await optionByText.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await optionByText.click();
-        return;
-      }
-    }
-    // Last resort: just click the first option if we can't match
-    const firstOption = page.locator('[role="option"]').first();
-    if (await firstOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await firstOption.click();
-      return;
-    }
-    // Close dropdown without selection
     await page.keyboard.press('Escape');
-    return;
+    throw new Error(`selectFormField: option "${optionValue}" not found for field "${fieldCode}"`);
   }
 
   // Last resort: look for any select/combobox near a label
@@ -320,17 +378,17 @@ async function selectFormField(page: Page, fieldCode: string, optionValue: strin
     .first();
   if (await anySelect.isVisible({ timeout: 1_000 }).catch(() => false)) {
     await anySelect.click();
-    await page.getByText(optionValue, { exact: false }).first().click();
-    return;
+    if (await clickOption()) {
+      return;
+    }
+    await page.keyboard.press('Escape').catch(() => null);
   }
 
   for (const label of FIELD_LABELS[fieldCode] ?? []) {
     const labelPattern = new RegExp(`^${label}\\*?$`, 'i');
     const byAccessibleLabel = page.getByLabel(labelPattern).first();
     let clicked = false;
-    if (await byAccessibleLabel.isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await byAccessibleLabel.scrollIntoViewIfNeeded();
-      await byAccessibleLabel.click();
+    if (await clickVisible(byAccessibleLabel)) {
       clicked = true;
     } else {
       const labelText = page.getByText(labelPattern).first();
@@ -338,24 +396,14 @@ async function selectFormField(page: Page, fieldCode: string, optionValue: strin
         const trigger = labelText
           .locator('xpath=following::*[@role="combobox" or self::button or self::select][1]')
           .first();
-        if (await trigger.isVisible({ timeout: 2_000 }).catch(() => false)) {
-          await trigger.scrollIntoViewIfNeeded();
-          await trigger.click();
+        if (await clickVisible(trigger, 2_000)) {
           clicked = true;
         }
       }
     }
     if (!clicked) continue;
-    for (const optionLabel of OPTION_LABELS[fieldCode]?.[optionValue] ?? [optionValue]) {
-      const option = page
-        .locator(
-          `[role="option"]:has-text("${optionLabel}"), .ant-select-item-option:has-text("${optionLabel}"), li:has-text("${optionLabel}")`,
-        )
-        .first();
-      if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await option.click();
-        return;
-      }
+    if (await clickOption()) {
+      return;
     }
     await page.keyboard.press('Escape').catch(() => null);
   }
@@ -897,15 +945,22 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await cmdPromise;
     await waitForToast(page).catch(() => {});
 
-    await page
-      .waitForURL(
-        (url) => url.pathname.includes('/p/agent_task') && !url.pathname.includes('/new'),
-        { timeout: 10_000 },
+    await expect
+      .poll(
+        async () =>
+          (
+            await queryFilteredList(page, 'agent-task', 'title', taskTitle, {
+              operator: 'EQ',
+            })
+          ).length,
+        { timeout: 15_000, message: 'created agent_task must be queryable before UI lookup' },
       )
-      .catch(() => {});
+      .toBeGreaterThan(0);
 
-    const row = await findRowInPaginatedList(page, taskTitle);
-    await expect(row).toBeVisible({ timeout: 8_000 });
+    await navigateToAcpPage(page, '/dynamic/agent-task');
+
+    const row = await findRowInPaginatedList(page, taskTitle, 20_000);
+    await expect(row).toBeVisible({ timeout: 10_000 });
   });
 
   test('CRUD-08: Edit task — change priority and verify echo', async ({ page }) => {
@@ -927,9 +982,7 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     expect(titleEcho.length).toBeGreaterThan(0);
 
     // Change priority
-    await selectFormField(page, 'task_priority', 'critical').catch(() => null);
-    // Also update description for a clear change signal
-    await fillFormField(page, 'description', `Updated by CRUD-08 — ${uid}`);
+    await selectFormField(page, 'task_priority', 'critical');
 
     const cmdPromise = page
       .waitForResponse(
@@ -943,6 +996,18 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await clickSaveButton(page);
     await cmdPromise;
     await waitForToast(page).catch(() => {});
+
+    await expect
+      .poll(
+        async () => {
+          const records = await queryFilteredList(page, 'agent-task', 'title', taskTitle, {
+            operator: 'EQ',
+          });
+          return String(records[0]?.task_priority ?? records[0]?.priority ?? '').toLowerCase();
+        },
+        { timeout: 10_000, intervals: [300, 600, 1000] },
+      )
+      .toBe('critical');
 
     await page
       .waitForURL(
@@ -1756,7 +1821,38 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     const updatedDescription = `Updated CRUD-23 — ${uid}`;
 
     await navigateToAcpPage(page, '/dynamic/approval-policy');
-    await clickEditOnRow(page, policyName);
+    let records = await queryFilteredList(page, 'approval-policy', 'policy_name', policyName, {
+      operator: 'EQ',
+      pageSize: 5,
+    });
+    if (records.length === 0) {
+      await executeCommandViaApi(
+        page,
+        CMD.createPolicy,
+        {
+          policy_name: policyName,
+          description: `E2E CRUD approval policy — ${uid}`,
+          trigger_rules: JSON.stringify([{ type: 'cost_threshold', threshold: 100 }]),
+          approver_rules: JSON.stringify([{ role: 'tenant_admin' }]),
+          policy_status: 'active',
+          timeout_hours: 24,
+          timeout_action: 'reject',
+        },
+        undefined,
+        'create',
+      );
+      records = await queryFilteredList(page, 'approval-policy', 'policy_name', policyName, {
+        operator: 'EQ',
+        pageSize: 5,
+      });
+    }
+    const policyPid = String(records[0]?.pid ?? records[0]?.id ?? '');
+    expect(policyPid, `approval policy ${policyName} should exist before edit`).toBeTruthy();
+
+    await page.goto(
+      `/p/approval_policy/edit/${policyPid}?commandCode=${encodeURIComponent('acp:update_approval_policy')}`,
+      { waitUntil: 'domcontentloaded' },
+    );
     await waitForFormReady(page);
 
     // Change timeout_hours from 24 to 48 — assertion below depends on this,

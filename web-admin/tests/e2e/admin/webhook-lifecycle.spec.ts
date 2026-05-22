@@ -22,12 +22,21 @@ import {
   uniqueId,
   acceptConfirmDialog,
   findRowInPaginatedList,
-  clickSaveButton,
   clickRowActionByLocator,
   waitForToast,
+  fillControlledInput,
 } from '../helpers';
 
 async function selectFormField(page: Page, fieldCode: string, value: string) {
+  const optionLabels: Record<string, string[]> = {
+    record_created: ['记录创建', 'Record Created', 'record_created'],
+    record_updated: ['记录更新', 'Record Updated', 'record_updated'],
+    record_deleted: ['记录删除', 'Record Deleted', 'record_deleted'],
+    state_changed: ['状态变更', 'State Changed', 'state_changed'],
+  };
+  const fieldLabels: Record<string, string[]> = {
+    event_type: ['事件类型', 'Event Type'],
+  };
   const fieldRoots = [
     `[data-testid="form-field-${fieldCode}"]`,
     `[data-testid="field-${fieldCode}"]`,
@@ -45,29 +54,102 @@ async function selectFormField(page: Page, fieldCode: string, value: string) {
     .first();
   await anyField.waitFor({ state: 'attached', timeout: 12000 }).catch(() => null);
 
-  const select = page
-    .locator([...fieldRoots.map((root) => `${root} select`), `select[name="${fieldCode}"]`].join(', '))
-    .first();
-  if (await select.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await select.selectOption(value);
+  const selects = page.locator(
+    [...fieldRoots.map((root) => `${root} select`), `select[name="${fieldCode}"]`].join(', '),
+  );
+  const selectCount = await selects.count().catch(() => 0);
+  for (let i = 0; i < selectCount; i++) {
+    const select = selects.nth(i);
+    if (await select.isVisible({ timeout: 500 }).catch(() => false)) {
+      await select.selectOption(value);
+      return;
+    }
+  }
+
+  if (fieldCode === 'event_type' && value === 'record_created') {
+    const eventTypeRoot = page.locator('[data-testid="form-field-event_type"]').first();
+    const eventTypeTrigger = eventTypeRoot
+      .getByRole('combobox')
+      .or(page.getByText(/^事件类型\*?$|^Event Type\*?$/i).locator('xpath=following::*[@role="combobox"][1]'))
+      .first();
+    await eventTypeTrigger.click({ timeout: 5_000, force: true });
+    const option = page.locator('[role="option"][data-value="record_created"]').first();
+    await option.click({ timeout: 5_000, force: true });
     return;
   }
 
-  const input = page
-    .locator(
-      [
-        ...fieldRoots.flatMap((root) => [
-          `${root} input:not([type="hidden"])`,
-          `${root} textarea`,
-        ]),
-        `input[name="${fieldCode}"]:not([type="hidden"])`,
-        `textarea[name="${fieldCode}"]`,
-      ].join(', '),
-    )
-    .first();
-  if (await input.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await input.fill(value);
+  const fieldRoot = page.locator(fieldRoots.join(', ')).first();
+  const rootedTrigger = fieldRoot.getByRole('combobox').first();
+  if (await rootedTrigger.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await rootedTrigger.click();
+    const rootedOption = page
+      .locator(`[role="option"][data-value="${value}"]`)
+      .or(page.getByRole('option', { name: new RegExp(optionLabels[value]?.join('|') ?? value, 'i') }))
+      .first();
+    await expect(rootedOption).toBeVisible({ timeout: 5_000 });
+    await rootedOption.click();
+    await expect
+      .poll(async () => (await rootedTrigger.textContent().catch(() => '')) ?? '', {
+        timeout: 5_000,
+      })
+      .toMatch(new RegExp((optionLabels[value] ?? [value]).join('|'), 'i'));
     return;
+  }
+
+  for (const label of fieldLabels[fieldCode] ?? []) {
+    const labelPattern = new RegExp(`^${label}\\*?$`, 'i');
+    const labelText = page.getByText(labelPattern).first();
+    if (!(await labelText.isVisible({ timeout: 1_000 }).catch(() => false))) continue;
+    const trigger = labelText
+      .locator('xpath=following::*[@role="combobox" or self::button or self::select][1]')
+      .first();
+    if (!(await trigger.isVisible({ timeout: 2_000 }).catch(() => false))) continue;
+    await trigger.click();
+
+    for (const optionLabel of optionLabels[value] ?? [value]) {
+      const option = page
+        .getByRole('option', { name: new RegExp(`^${optionLabel}$`, 'i') })
+        .or(page.locator(`.ant-select-item-option:has-text("${optionLabel}")`))
+        .or(page.locator(`li:has-text("${optionLabel}")`))
+        .or(page.getByText(new RegExp(`^${optionLabel}$`, 'i')))
+        .first();
+      if (await option.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await option.click();
+        await expect
+          .poll(async () => (await trigger.textContent().catch(() => '')) ?? '', { timeout: 3_000 })
+          .toMatch(new RegExp((optionLabels[value] ?? [value]).join('|'), 'i'));
+        return;
+      }
+    }
+    if (value === 'record_created') {
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Enter');
+      await expect
+        .poll(async () => (await trigger.textContent().catch(() => '')) ?? '', { timeout: 3_000 })
+        .not.toMatch(/请选择|Please select/i);
+      return;
+    }
+    await page.keyboard.press('Escape').catch(() => null);
+  }
+
+  if (fieldLabels[fieldCode]) {
+    throw new Error(`Could not select combobox field: ${fieldCode}`);
+  }
+
+  const inputs = page.locator(
+    [
+      ...fieldRoots.flatMap((root) => [`${root} input:not([type="hidden"])`, `${root} textarea`]),
+      `input[name="${fieldCode}"]:not([type="hidden"])`,
+      `textarea[name="${fieldCode}"]`,
+    ].join(', '),
+  );
+  const inputCount = await inputs.count().catch(() => 0);
+  for (let i = 0; i < inputCount; i++) {
+    const input = inputs.nth(i);
+    if (await input.isVisible({ timeout: 500 }).catch(() => false)) {
+      await fillControlledInput(input, value);
+      return;
+    }
   }
 
   const hiddenInput = page
@@ -89,6 +171,35 @@ async function selectFormField(page: Page, fieldCode: string, value: string) {
   }
 
   throw new Error(`Could not find select field: ${fieldCode}`);
+}
+
+async function clickSaveAndWait(page: Page, expectedCommandCode: string) {
+  const saveBtn = page
+    .locator(
+      '[data-testid="form-btn-submit"], [data-testid="form-btn-save"], button:has-text("保存"), button:has-text("Save")',
+    )
+    .first();
+  await saveBtn.waitFor({ state: 'visible', timeout: 5000 });
+  const respPromise = page.waitForResponse(
+    (r) =>
+      r.url().includes(`/commands/execute/${expectedCommandCode}`) &&
+      r.request().method() === 'POST',
+    { timeout: 15000 },
+  );
+  await saveBtn.click();
+  const resp = await respPromise;
+  const body = await resp.json().catch(async () => ({ raw: await resp.text().catch(() => '') }));
+  expect(resp.ok(), `Command ${expectedCommandCode} failed: ${JSON.stringify(body)}`).toBe(true);
+  const code = String(body?.code ?? body?.data?.code ?? '');
+  if (code) {
+    expect(code, `Command ${expectedCommandCode} returned non-success: ${JSON.stringify(body)}`).toBe('0');
+  }
+  return body;
+}
+
+function extractRecordId(body: any): string {
+  const resultData = body?.data?.data ?? body?.data ?? body;
+  return String(resultData?.recordId ?? resultData?.pid ?? resultData?.id ?? '');
 }
 
 test.describe.serial('Webhook Lifecycle', () => {
@@ -183,7 +294,8 @@ test.describe.serial('Webhook Lifecycle', () => {
 
     await selectFormField(page, 'event_type', 'record_created');
 
-    await clickSaveButton(page);
+    const body = await clickSaveAndWait(page, 'admin:create_webhook');
+    createdPid = extractRecordId(body) || null;
     await waitForToast(page, undefined, 5_000).catch(() => null);
     await page
       .waitForURL(
@@ -201,7 +313,7 @@ test.describe.serial('Webhook Lifecycle', () => {
     expect(webhookListResp.ok()).toBeTruthy();
     const webhookListBody = await webhookListResp.json().catch(() => ({}));
     const subscriptions = Array.isArray(webhookListBody?.data) ? webhookListBody.data : [];
-    createdPid = String(
+    createdPid ||= String(
       subscriptions.find((item: Record<string, unknown>) => item?.name === createName)?.pid ?? '',
     );
     expect(createdPid, 'Created webhook pid should be discoverable from /api/webhooks').toBeTruthy();
@@ -298,7 +410,7 @@ test.describe.serial('Webhook Lifecycle', () => {
     await nameInput.fill(newName);
 
     // Submit
-    await clickSaveButton(page);
+    await clickSaveAndWait(page, 'admin:update_webhook');
     await expect(page).toHaveURL(/\/p\/webhook(?:\/.*)?|\/dynamic\/webhook/, { timeout: 15000 });
 
     // Verify the edited record is visible in the real list UI

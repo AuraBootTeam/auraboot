@@ -13,10 +13,14 @@ bash -n scripts/seed-marketplace.sh
 bash -n scripts/sync-marketplace-catalog.sh
 bash -n scripts/docker-ga-e2e-bootstrap.sh
 bash -n scripts/docker-ga-showcase-e2e.sh
+bash -n scripts/dev/env.sh
+bash -n scripts/dev/lib/process-manager.sh
+bash -n scripts/dev/lib/health.sh
 bash -n scripts/dev/run-agent-runtime-full-gate-docker.sh
 bash -n scripts/env/reset-and-init.sh
 
 echo "[reset-init-contracts] node regression"
+node --test scripts/dev/lib/env-registry.test.mjs
 node --test scripts/reset-init-contracts.test.mjs
 node --test scripts/audit-oss-plugins.test.mjs
 node web-admin/scripts/run-showcase-seed-sequence.test.mjs

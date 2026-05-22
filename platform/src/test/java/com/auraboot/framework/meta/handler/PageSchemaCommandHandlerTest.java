@@ -77,11 +77,11 @@ class PageSchemaCommandHandlerTest {
     @Test
     @DisplayName("archive clears published_at via SQL")
     void archive() {
-        when(jdbcTemplate.update(anyString(), any(), any())).thenReturn(1);
+        when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(1);
         Map<String, Object> result = handler.execute(ctx("pgm:archive_page_schema", "p2"));
         assertEquals("p2", result.get("pid"));
         ArgumentCaptor<String> sqlCap = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).update(sqlCap.capture(), any(), any());
+        verify(jdbcTemplate).update(sqlCap.capture(), any(Object[].class));
         assertTrue(sqlCap.getValue().contains("published_at = NULL"));
     }
 

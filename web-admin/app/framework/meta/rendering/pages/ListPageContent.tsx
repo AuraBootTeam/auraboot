@@ -17,7 +17,12 @@ import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-rou
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
-import type { BlockConfig, ColumnConfig, FieldConfig, ButtonConfig } from '~/framework/meta/schemas/types';
+import type {
+  BlockConfig,
+  ColumnConfig,
+  FieldConfig,
+  ButtonConfig,
+} from '~/framework/meta/schemas/types';
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
@@ -78,6 +83,17 @@ interface PaginationResult<T> {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+const SYSTEM_FIELD_I18N_KEYS: Record<string, string> = {
+  created_at: 'common.created_at',
+  updated_at: 'common.updated_at',
+  created_by: 'common.creator',
+  updated_by: 'common.modifier',
+};
+
+export function getSystemFieldI18nKey(fieldCode: string): string | undefined {
+  return SYSTEM_FIELD_I18N_KEYS[fieldCode];
 }
 
 interface InviteCodeData {
@@ -186,45 +202,42 @@ export function ListPageContent(props: PageContentProps) {
 
   // Debounced URL sync for keyword (300ms) — keeps input responsive while
   // reducing URL/history updates during rapid typing
-  const syncKeywordToUrl = useDebouncedCallback(
-    (value: string) => {
-      setSearchParams(
-        (prev) => {
-          const p = new URLSearchParams(prev);
-          if (value.trim()) {
-            p.set('keyword', value.trim());
-          } else {
-            p.delete('keyword');
-          }
-          return p;
-        },
-        { replace: true },
-      );
-    },
-    300,
-  );
+  const syncKeywordToUrl = useDebouncedCallback((value: string) => {
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (value.trim()) {
+          p.set('keyword', value.trim());
+        } else {
+          p.delete('keyword');
+        }
+        return p;
+      },
+      { replace: true },
+    );
+  }, 300);
 
   // Debounced auto-search: triggers loadData 300ms after the user stops typing,
   // so results update without requiring Enter. Reduces API calls by ~60-80%
   // compared to firing on every keystroke.
-  const debouncedSearch = useDebouncedCallback(
-    () => {
-      if (!schema) return;
-      loadData({ page: 0, size: pagination.pageSize });
-    },
-    300,
-  );
+  const debouncedSearch = useDebouncedCallback(() => {
+    if (!schema) return;
+    loadData({ page: 0, size: pagination.pageSize });
+  }, 300);
 
   // Synchronous ref update ensures loadData always reads the latest keyword
   // even when called in the same event cycle as a state update (e.g., Playwright fill + Enter)
-  const setKeyword = useCallback((value: string) => {
-    keywordRef.current = value;
-    _setKeyword(value);
-    // Sync keyword to URL (debounced 300ms)
-    syncKeywordToUrl(value);
-    // Auto-search after user stops typing (debounced 300ms)
-    debouncedSearch();
-  }, [syncKeywordToUrl, debouncedSearch]);
+  const setKeyword = useCallback(
+    (value: string) => {
+      keywordRef.current = value;
+      _setKeyword(value);
+      // Sync keyword to URL (debounced 300ms)
+      syncKeywordToUrl(value);
+      // Auto-search after user stops typing (debounced 300ms)
+      debouncedSearch();
+    },
+    [syncKeywordToUrl, debouncedSearch],
+  );
 
   // Active sort state — initialized from URL > SavedView > DSL defaultSort
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
@@ -304,9 +317,7 @@ export function ListPageContent(props: PageContentProps) {
   ]);
   const miscListBlocks = useMemo(() => {
     if (!schema?.blocks) return [];
-    return schema.blocks.filter(
-      (b: any) => !LIST_SPECIALIZED_BLOCK_TYPES.has(b.blockType),
-    );
+    return schema.blocks.filter((b: any) => !LIST_SPECIALIZED_BLOCK_TYPES.has(b.blockType));
   }, [schema]);
 
   // Sync URL pagination params -> local state (supports refresh and browser back/forward).
@@ -384,7 +395,9 @@ export function ListPageContent(props: PageContentProps) {
   const [memberImportFile, setMemberImportFile] = useState<File | null>(null);
   const [memberImportLoading, setMemberImportLoading] = useState(false);
   const [memberImportError, setMemberImportError] = useState<string | null>(null);
-  const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(null);
+  const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(
+    null,
+  );
   const { formats: dateTimeFormats } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
   const loadDataRef = useRef<
@@ -877,9 +890,9 @@ export function ListPageContent(props: PageContentProps) {
   // Initial data load - only execute once when schema is loaded
   // Pass current filters (which may include URL filter_* params) for the first load
   useEffect(() => {
-      if (schema) {
-        loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
-      }
+    if (schema) {
+      loadDataRef.current?.({ page: pagination.current - 1, size: pagination.pageSize, filters });
+    }
     // Intentionally only react to schema changes.
     // Pagination or filter updates are handled by explicit user actions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -936,9 +949,7 @@ export function ListPageContent(props: PageContentProps) {
             endpoint = schema!.dataSource!.endpoint!;
             method = (schema!.dataSource!.method as 'get' | 'post') || 'get';
           } else {
-            const apiTableName = schema?.modelCode
-              ? schema.modelCode
-              : tableName;
+            const apiTableName = schema?.modelCode ? schema.modelCode : tableName;
             endpoint = `${buildApiEndpoint(apiTableName)}/list`;
           }
 
@@ -1030,7 +1041,17 @@ export function ListPageContent(props: PageContentProps) {
         }
       })();
     },
-    [schema, buildFiltersParam, filters, pagination.pageSize, tableName, token, t, activeSorts, tableBlock],
+    [
+      schema,
+      buildFiltersParam,
+      filters,
+      pagination.pageSize,
+      tableName,
+      token,
+      t,
+      activeSorts,
+      tableBlock,
+    ],
   );
 
   // Evaluate visibleWhen expression against a row record
@@ -1268,7 +1289,7 @@ export function ListPageContent(props: PageContentProps) {
 
   const handleBulkDelete = useCallback(
     async (ids: string[]) => {
-      const mc = (schema?.modelCode || tableName);
+      const mc = schema?.modelCode || tableName;
       const resp = await fetchResult(`/api/dynamic/${mc}/batch`, {
         method: 'delete',
         params: ids,
@@ -1332,7 +1353,10 @@ export function ListPageContent(props: PageContentProps) {
       const effectiveValueType = inferValueType(column, value, record);
 
       // Null/undefined handling
-      if (!((column as any).allowNullRenderer === true) && (value === null || value === undefined)) {
+      if (
+        !((column as any).allowNullRenderer === true) &&
+        (value === null || value === undefined)
+      ) {
         return <span className="text-gray-400">-</span>;
       }
 
@@ -1414,7 +1438,7 @@ export function ListPageContent(props: PageContentProps) {
     async (field: string, value: any, record: Record<string, any>) => {
       const pid = record.pid || record.id;
       if (!pid) throw new Error('Record has no pid/id');
-      const slug = (schema?.modelCode || tableName);
+      const slug = schema?.modelCode || tableName;
       const result = await fetchResult<any>(`/api/dynamic/${slug}/${pid}`, {
         method: 'put',
         token: token || undefined,
@@ -1479,6 +1503,13 @@ export function ListPageContent(props: PageContentProps) {
 
   const resolveModelFieldLabel = useCallback(
     (fieldCode: string) => {
+      const systemKey = getSystemFieldI18nKey(fieldCode);
+      if (systemKey) {
+        const systemLabel = t(systemKey);
+        if (systemLabel && systemLabel !== systemKey) {
+          return systemLabel;
+        }
+      }
       const mc = schema?.modelCode || tableName;
       const modelKey = `model.${mc}.${fieldCode}.label`;
       const modelLabel = t(modelKey);
@@ -1582,12 +1613,12 @@ export function ListPageContent(props: PageContentProps) {
   const SYSTEM_FIELD_DEFS: ColumnConfig[] = [
     {
       field: 'created_at',
-      label: t('common.created_at') || 'Created At',
+      label: t(getSystemFieldI18nKey('created_at') || 'common.created_at') || 'Created At',
       valueType: 'datetime' as any,
     },
     {
       field: 'updated_at',
-      label: t('common.updated_at') || 'Updated At',
+      label: t(getSystemFieldI18nKey('updated_at') || 'common.updated_at') || 'Updated At',
       valueType: 'datetime' as any,
     },
     {
@@ -1688,7 +1719,12 @@ export function ListPageContent(props: PageContentProps) {
       if (column.isActionColumn) {
         return t('table.actions');
       }
-      const mc = (schema?.modelCode || tableName);
+      const systemKey = getSystemFieldI18nKey(column.field);
+      if (systemKey) {
+        const systemLabel = t(systemKey);
+        if (systemLabel !== systemKey) return systemLabel;
+      }
+      const mc = schema?.modelCode || tableName;
       const modelKey = `model.${mc}.${column.field}.label`;
       const modelLabel = t(modelKey);
       if (modelLabel !== modelKey) return modelLabel;
@@ -1797,7 +1833,12 @@ export function ListPageContent(props: PageContentProps) {
             ? col.label
             : getLocalizedText(col.label, locale, t)
           : (() => {
-              const mc = (schema?.modelCode || tableName);
+              const systemKey = getSystemFieldI18nKey(col.field);
+              if (systemKey) {
+                const systemLabel = t(systemKey);
+                if (systemLabel !== systemKey) return systemLabel;
+              }
+              const mc = schema?.modelCode || tableName;
               const modelKey = `model.${mc}.${col.field}.label`;
               const modelLabel = t(modelKey);
               if (modelLabel !== modelKey) return modelLabel;
@@ -1897,16 +1938,13 @@ export function ListPageContent(props: PageContentProps) {
   );
 
   // Evaluate button visibility (visibleWhen expression)
-  const evaluateButtonVisible = useCallback(
-    (button: ButtonConfig): boolean => {
-      // If no visibleWhen expression, always visible
-      if (!button.visibleWhen) return true;
-      // Simple expression evaluation: treat as always visible for now
-      // (full expression evaluation would use createExpressionContext)
-      return true;
-    },
-    [],
-  );
+  const evaluateButtonVisible = useCallback((button: ButtonConfig): boolean => {
+    // If no visibleWhen expression, always visible
+    if (!button.visibleWhen) return true;
+    // Simple expression evaluation: treat as always visible for now
+    // (full expression evaluation would use createExpressionContext)
+    return true;
+  }, []);
 
   // Build export filter conditions for toolbar
   const exportFilterConditions = useMemo(() => {
@@ -2160,7 +2198,15 @@ export function ListPageContent(props: PageContentProps) {
     } finally {
       setMemberImportLoading(false);
     }
-  }, [filters, memberImportFile, pagination.pageSize, showErrorToast, showSuccessToast, showWarningToast, token]);
+  }, [
+    filters,
+    memberImportFile,
+    pagination.pageSize,
+    showErrorToast,
+    showSuccessToast,
+    showWarningToast,
+    token,
+  ]);
 
   const listTabsBlock = useMemo(() => {
     const found = allBlocks.find((block: any) => block.blockType === 'tabs');
@@ -2193,7 +2239,9 @@ export function ListPageContent(props: PageContentProps) {
             title={
               schema.title
                 ? getLocalizedText(schema.title, locale, t)
-                : (schema.name && schema.name.trim() ? schema.name : tableName)
+                : schema.name && schema.name.trim()
+                  ? schema.name
+                  : tableName
             }
             modelCode={modelCode}
             savedViews={savedViews}
@@ -2203,15 +2251,18 @@ export function ListPageContent(props: PageContentProps) {
             onSelectView={(pid) => {
               selectView(pid);
               // Sync view selection to URL
-              setSearchParams((prev) => {
-                const p = new URLSearchParams(prev);
-                p.set('view', pid);
-                // Clear temporary filter/sort params when switching views
-                p.delete('sort');
-                p.delete('keyword');
-                p.delete('filters');
-                return p;
-              }, { replace: true });
+              setSearchParams(
+                (prev) => {
+                  const p = new URLSearchParams(prev);
+                  p.set('view', pid);
+                  // Clear temporary filter/sort params when switching views
+                  p.delete('sort');
+                  p.delete('keyword');
+                  p.delete('filters');
+                  return p;
+                },
+                { replace: true },
+              );
               const view = savedViews.find((v) => v.pid === pid);
               if (view?.viewType && view.viewType !== 'table') {
                 setActiveViewType(view.viewType as ViewType);
@@ -2287,7 +2338,8 @@ export function ListPageContent(props: PageContentProps) {
                   <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
                     <p className="font-medium text-blue-900">推荐流程</p>
                     <p className="mt-1 text-blue-800">
-                      Excel 导入先处理租户成员准入，再按邮箱复用已有 User 或创建待激活账号，最后再建立组织关系。
+                      Excel 导入先处理租户成员准入，再按邮箱复用已有 User
+                      或创建待激活账号，最后再建立组织关系。
                     </p>
                   </div>
 
@@ -2321,7 +2373,9 @@ export function ListPageContent(props: PageContentProps) {
                         className="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
                       />
                       {memberImportFile && (
-                        <p className="mt-2 text-xs text-gray-500">已选择: {memberImportFile.name}</p>
+                        <p className="mt-2 text-xs text-gray-500">
+                          已选择: {memberImportFile.name}
+                        </p>
                       )}
                     </div>
 
@@ -2393,7 +2447,9 @@ export function ListPageContent(props: PageContentProps) {
                           <tr>
                             <td className="px-3 py-2">部门</td>
                             <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">用于自动建立组织关系；不存在时进入冲突列表</td>
+                            <td className="px-3 py-2">
+                              用于自动建立组织关系；不存在时进入冲突列表
+                            </td>
                           </tr>
                           <tr>
                             <td className="px-3 py-2">职位</td>
@@ -2429,10 +2485,18 @@ export function ListPageContent(props: PageContentProps) {
                           <table className="min-w-full divide-y divide-amber-100 text-sm">
                             <thead className="bg-amber-50">
                               <tr>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">行号</th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">姓名</th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">邮箱</th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">原因</th>
+                                <th className="px-3 py-2 text-left font-medium text-amber-900">
+                                  行号
+                                </th>
+                                <th className="px-3 py-2 text-left font-medium text-amber-900">
+                                  姓名
+                                </th>
+                                <th className="px-3 py-2 text-left font-medium text-amber-900">
+                                  邮箱
+                                </th>
+                                <th className="px-3 py-2 text-left font-medium text-amber-900">
+                                  原因
+                                </th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-amber-100">
@@ -2553,161 +2617,164 @@ export function ListPageContent(props: PageContentProps) {
           )}
 
           {/* Filter area - Using Smart Components with collapse/expand (hidden in print) */}
-          {filterFormVisible && filterBlock && filterBlock.fields && filterBlock.fields.length > 0 && (
-            <div
-              data-testid="search-area"
-              data-ab-testid={deriveTestId('list', modelCode, 'filters')}
-              className="print-hide border-b border-gray-200 bg-gray-50 px-6 py-4"
-              data-print="hide"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSearch();
-                }
-              }}
-            >
+          {filterFormVisible &&
+            filterBlock &&
+            filterBlock.fields &&
+            filterBlock.fields.length > 0 && (
               <div
-                className={`grid grid-cols-1 gap-4 md:grid-cols-12 ${
-                  !filtersExpanded && filterBlock.fields.length > 4
-                    ? 'max-h-[72px] overflow-hidden'
-                    : ''
-                }`}
+                data-testid="search-area"
+                data-ab-testid={deriveTestId('list', modelCode, 'filters')}
+                className="print-hide border-b border-gray-200 bg-gray-50 px-6 py-4"
+                data-print="hide"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
               >
-                {filterBlock.fields.map((field: FieldConfig) => (
-                  <div
-                    key={field.field}
-                    className="min-w-0"
-                    style={{
-                      gridColumn: `span ${Math.min(Math.max(field.layout?.colSpan || 4, 1), 12)}`,
-                    }}
-                  >
-                    {renderSmartField(
-                      field.component === 'SmartSelect' && field.props?.inline === undefined
-                        ? { ...field, props: { ...(field.props || {}), inline: true } }
-                        : field,
+                <div
+                  className={`grid grid-cols-1 gap-4 md:grid-cols-12 ${
+                    !filtersExpanded && filterBlock.fields.length > 4
+                      ? 'max-h-[72px] overflow-hidden'
+                      : ''
+                  }`}
+                >
+                  {filterBlock.fields.map((field: FieldConfig) => (
+                    <div
+                      key={field.field}
+                      className="min-w-0"
+                      style={{
+                        gridColumn: `span ${Math.min(Math.max(field.layout?.colSpan || 4, 1), 12)}`,
+                      }}
+                    >
+                      {renderSmartField(
+                        field.component === 'SmartSelect' && field.props?.inline === undefined
+                          ? { ...field, props: { ...(field.props || {}), inline: true } }
+                          : field,
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                  {/* Expand/collapse toggle */}
+                  <div>
+                    {filterBlock.fields.length > 4 && (
+                      <button
+                        type="button"
+                        data-testid="filter-toggle"
+                        onClick={() => setFiltersExpanded((prev) => !prev)}
+                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        {filtersExpanded ? (
+                          <>
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 15l7-7 7 7"
+                              />
+                            </svg>
+                            {t('action.collapse') !== 'action.collapse'
+                              ? t('action.collapse')
+                              : 'Collapse'}
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
+                            {t('action.expand') !== 'action.expand' ? t('action.expand') : 'Expand'}
+                          </>
+                        )}
+                      </button>
                     )}
                   </div>
-                ))}
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                {/* Expand/collapse toggle */}
-                <div>
-                  {filterBlock.fields.length > 4 && (
-                    <button
-                      type="button"
-                      data-testid="filter-toggle"
-                      onClick={() => setFiltersExpanded((prev) => !prev)}
-                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      {filtersExpanded ? (
-                        <>
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 15l7-7 7 7"
-                            />
-                          </svg>
-                          {t('action.collapse') !== 'action.collapse'
-                            ? t('action.collapse')
-                            : 'Collapse'}
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                          {t('action.expand') !== 'action.expand' ? t('action.expand') : 'Expand'}
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2">
-                  {/* Save current filters to view */}
-                  {currentView && (
-                    <button
-                      type="button"
-                      data-testid="filter-save"
-                      onClick={handleSaveFilters}
-                      className="rounded-md px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-                      title="Save filters to current view"
-                    >
-                      <svg
-                        className="mr-1 inline h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                  {/* DSL-driven buttons if defined, otherwise fallback to defaults */}
-                  {filterBlock.buttons && filterBlock.buttons.length > 0 ? (
-                    filterBlock.buttons.map((button: ButtonConfig) => (
+                  <div className="flex items-center space-x-2">
+                    {/* Save current filters to view */}
+                    {currentView && (
                       <button
                         type="button"
-                        key={button.code}
-                        data-testid={`filter-btn-${button.code}`}
-                        onClick={() => handleAction(button)}
-                        className={`rounded-md px-4 py-2 ${
-                          button.primary || button.variant === 'primary'
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : button.variant === 'danger' || button.danger
-                              ? 'bg-red-600 text-white hover:bg-red-700'
-                              : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
-                        }`}
+                        data-testid="filter-save"
+                        onClick={handleSaveFilters}
+                        className="rounded-md px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                        title="Save filters to current view"
                       >
-                        {resolveButtonLabel(button)}
+                        <svg
+                          className="mr-1 inline h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                          />
+                        </svg>
                       </button>
-                    ))
-                  ) : (
-                    <>
-                      {/* Default buttons for backward compatibility */}
-                      <button
-                        type="button"
-                        data-testid="filter-reset"
-                        onClick={handleReset}
-                        className="rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-600 hover:bg-gray-50"
-                      >
-                        {t('action.reset')}
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="filter-search"
-                        onClick={handleSearch}
-                        className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                      >
-                        {t('action.search')}
-                      </button>
-                    </>
-                  )}
+                    )}
+                    {/* DSL-driven buttons if defined, otherwise fallback to defaults */}
+                    {filterBlock.buttons && filterBlock.buttons.length > 0 ? (
+                      filterBlock.buttons.map((button: ButtonConfig) => (
+                        <button
+                          type="button"
+                          key={button.code}
+                          data-testid={`filter-btn-${button.code}`}
+                          onClick={() => handleAction(button)}
+                          className={`rounded-md px-4 py-2 ${
+                            button.primary || button.variant === 'primary'
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : button.variant === 'danger' || button.danger
+                                ? 'bg-red-600 text-white hover:bg-red-700'
+                                : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {resolveButtonLabel(button)}
+                        </button>
+                      ))
+                    ) : (
+                      <>
+                        {/* Default buttons for backward compatibility */}
+                        <button
+                          type="button"
+                          data-testid="filter-reset"
+                          onClick={handleReset}
+                          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-600 hover:bg-gray-50"
+                        >
+                          {t('action.reset')}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="filter-search"
+                          onClick={handleSearch}
+                          className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                        >
+                          {t('action.search')}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {activeViewType === 'table' ? (
             <>
@@ -2722,7 +2789,9 @@ export function ListPageContent(props: PageContentProps) {
                 }}
                 filterFormVisible={filterFormVisible}
                 onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
-                hasFilterBlock={!!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)}
+                hasFilterBlock={
+                  !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
+                }
                 activeQuickFilter={activeQuickFilter}
                 onQuickFilter={handleQuickFilter}
                 activeSorts={activeSorts}
@@ -2731,16 +2800,7 @@ export function ListPageContent(props: PageContentProps) {
                   .filter((c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false)
                   .map((c: ColumnConfig) => ({
                     field: c.field,
-                    label: c.label
-                      ? typeof c.label === 'string'
-                        ? c.label
-                        : (c.label as any)?.['zh-CN'] || c.field
-                      : (() => {
-                          const mc = (schema?.modelCode || tableName);
-                          const key = `model.${mc}.${c.field}.label`;
-                          const resolved = t(key);
-                          return resolved !== key ? resolved : c.field;
-                        })(),
+                    label: resolveColumnLabel(c),
                     valueType: c.valueType || c.sorter,
                   }))}
                 rowHeight={currentView?.viewConfig?.rowHeight}
@@ -2752,16 +2812,7 @@ export function ListPageContent(props: PageContentProps) {
                   .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
                   .map((c: ColumnConfig) => ({
                     fieldCode: c.field,
-                    label: c.label
-                      ? typeof c.label === 'string'
-                        ? c.label
-                        : (c.label as any)?.['zh-CN'] || c.field
-                      : (() => {
-                          const mc = (schema?.modelCode || tableName);
-                          const key = `model.${mc}.${c.field}.label`;
-                          const resolved = t(key);
-                          return resolved !== key ? resolved : c.field;
-                        })(),
+                    label: resolveColumnLabel(c),
                     fieldType: c.valueType || c.sorter || 'text',
                     dictCode: c.dictCode,
                   }))}
@@ -2829,10 +2880,7 @@ export function ListPageContent(props: PageContentProps) {
                   stat-card / etc.) dispatched via BlockRenderer fallback
                   registry. Unknown block types surface a visible placeholder. */}
               {miscListBlocks.length > 0 && runtime && (
-                <div
-                  className="flex flex-col gap-4 p-4"
-                  data-testid="list-misc-blocks"
-                >
+                <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
                   {miscListBlocks.map((block: any, idx: number) => (
                     <BlockRenderer
                       key={block.id || `misc-list-${idx}`}
@@ -2963,16 +3011,7 @@ export function ListPageContent(props: PageContentProps) {
               .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
               .map((c: ColumnConfig) => ({
                 fieldCode: c.field,
-                label: c.label
-                  ? typeof c.label === 'string'
-                    ? c.label
-                    : (c.label as any)?.['zh-CN'] || c.field
-                  : (() => {
-                      const mc = (schema?.modelCode || tableName);
-                      const key = `model.${mc}.${c.field}.label`;
-                      const resolved = t(key);
-                      return resolved !== key ? resolved : c.field;
-                    })(),
+                label: resolveColumnLabel(c),
                 fieldType: c.valueType || c.sorter || 'text',
                 dictCode: c.dictCode,
               }))}

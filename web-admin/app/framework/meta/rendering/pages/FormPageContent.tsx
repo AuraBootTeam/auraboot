@@ -266,6 +266,15 @@ function resolveAfterSubmitRedirect(
   const bag: Record<string, any> = {
     ...(responseData && typeof responseData === 'object' ? responseData : {}),
   };
+  const nestedData =
+    responseData && typeof responseData === 'object' && (responseData as any).data
+      ? (responseData as any).data
+      : null;
+  if (nestedData && typeof nestedData === 'object') {
+    Object.assign(bag, nestedData);
+  }
+  if (bag.pid == null && bag.recordId != null) bag.pid = bag.recordId;
+  if (bag.id == null && bag.recordId != null) bag.id = bag.recordId;
   if (recordId && bag.pid == null) bag.pid = recordId;
   if (recordId && bag.id == null) bag.id = recordId;
   return template.replace(/\{(\w+)\}/g, (_match, key: string) => {
@@ -1506,6 +1515,7 @@ export function FormPageContent(props: PageContentProps) {
                               let field = meta
                                 ? {
                                     ...rawField,
+                                    modelCode: schema?.modelCode || tableName,
                                     label: rawField.label || meta.displayName || rawField.label,
                                     dataType: rawField.dataType || meta.dataType,
                                     component:
@@ -1536,7 +1546,7 @@ export function FormPageContent(props: PageContentProps) {
                                         : {}),
                                     },
                                   }
-                                : rawField;
+                                : { ...rawField, modelCode: schema?.modelCode || tableName };
 
                               // L1 SDK: apply external readonly permission override
                               if (externalPerm === 'readonly') {

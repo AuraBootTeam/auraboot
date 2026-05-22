@@ -82,7 +82,7 @@ class WorkbenchStatsServiceImplTest {
     @Test
     @DisplayName("getPipeline returns empty stages on table-missing error")
     void getPipelineFallback() {
-        when(jdbcTemplate.queryForList(anyString(), (Object[]) any()))
+        when(jdbcTemplate.queryForList(anyString(), (Object) any(), (Object) any()))
                 .thenThrow(new RuntimeException("table missing"));
         WorkbenchPipelineDTO p = service.getPipeline();
         assertNotNull(p);
@@ -96,7 +96,7 @@ class WorkbenchStatsServiceImplTest {
         row.put("stage", "qualification");
         row.put("cnt", 2);
         row.put("total_amount", "1000");
-        when(jdbcTemplate.queryForList(anyString(), (Object[]) any()))
+        when(jdbcTemplate.queryForList(anyString(), (Object) any(), (Object) any()))
                 .thenReturn(List.of(row));
 
         WorkbenchPipelineDTO p = service.getPipeline();

@@ -14,6 +14,7 @@ import {
   fieldErrorFocusStyles,
   fieldFocusStyles,
 } from '~/ui/ui/field-styles';
+import { sanitizeSmartDomProps } from './domProps';
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   (
@@ -130,11 +131,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
               autoResize && 'resize-none',
               !autoResize && 'resize-vertical',
             )}
-            {...(() => {
-              // Filter out non-DOM props to prevent React warnings
-              const { showCount: _showCount, ...domProps } = restProps as any;
-              return domProps;
-            })()}
+            {...sanitizeSmartDomProps(restProps as Record<string, unknown>)}
           />
 
           {/* 字符计数 */}

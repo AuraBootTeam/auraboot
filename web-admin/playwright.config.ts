@@ -25,7 +25,7 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 }
 
 // Must use 'localhost' not '127.0.0.1' — the BFF returns 502 on direct IP.
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const runProfile = process.env.PW_PROFILE || 'fast';
 const enableRoleProjects = process.env.PW_ROLE_PROJECTS === '1';
 const skipWebServer = process.env.PW_SKIP_WEBSERVER === '1';
@@ -102,6 +102,8 @@ const contractScopeDirs = [
 const scopeRegex = (dirs: string[]) => new RegExp(`.*\\/(${dirs.join('|')})\\/.*\\.spec\\.ts$`);
 const enterpriseScopeFilePatterns = [
   /.*\/aurabot\/pcba-.*\.spec\.ts$/,
+  /.*\/crm\/crm-(agent-ui-smoke|calendar-sync|campaign-sla|dashboard|dashboard-enhanced|email-features|inbound-channel|inbound-lifecycle|inbound-smoke|merge-queue|opportunity-currency|quote-complaint|web-form)\.spec\.ts$/,
+  /.*\/cs-agent\/cs-agent-email-lifecycle\.spec\.ts$/,
   /.*\/plugin\/asset-.*\.spec\.ts$/,
   /.*\/plugin\/pcba-.*\.spec\.ts$/,
   /.*\/plugin\/pm-.*\.spec\.ts$/,

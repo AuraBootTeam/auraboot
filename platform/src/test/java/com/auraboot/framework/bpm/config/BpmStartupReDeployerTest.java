@@ -1,6 +1,7 @@
 package com.auraboot.framework.bpm.config;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
@@ -145,7 +146,7 @@ class BpmStartupReDeployerTest extends BaseIntegrationTest {
 
         String brokenKey = "broken-isolate-" + System.nanoTime();
         BpmProcessDefinition broken = BpmProcessDefinition.builder()
-                .pid("broken-pid-" + System.nanoTime())
+                .pid(UlidGenerator.generate())
                 .tenantId(tenantId)
                 .processKey(brokenKey)
                 .processName("broken")

@@ -2,7 +2,8 @@
 #
 # r2-env-export.sh — single-line `source` to set up the env for an
 # isolated docker stack. Delegates to lib/env-loader.sh::aura_env_load r2,
-# which resolves ports from .aura-stack/<slug>.env.
+# which resolves ports from the global registry at
+# $AURA_ENV_REGISTRY_ROOT/envs/<slug>/exports.env.
 #
 # Usage:
 #
@@ -12,7 +13,7 @@
 #
 # After sourcing, every subsequent command in this shell sees:
 #   - BE_PORT / VITE_PORT / BFF_PORT / PG_PORT / REDIS_PORT
-#     (from .aura-stack/<slug>.env)
+#     (from the global env registry export)
 #   - PG_HOST=localhost / PG_USER=auraboot / PG_DB=aura_boot
 #   - PGPASSWORD=auraboot_dev (only if not already set)
 #   - BACKEND_URL=http://localhost:$BE_PORT

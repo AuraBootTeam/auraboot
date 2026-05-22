@@ -149,7 +149,11 @@ async function openDesignerFromList(page: Page, pid: string, pageKey: string): P
     }
   }
 
-  await expect(page).toHaveURL(new RegExp(`/page-designer/${pid}`), { timeout: 8_000 });
+  await expect(page).toHaveURL(new RegExp(`(?:/page-designer/${pid}|/unified-designer\\?pageId=${pid})`), { timeout: 8_000 });
+  if (page.url().includes('/unified-designer')) {
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 10_000 });
+    await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+  }
   await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId('designer-tab-blocks')).toBeVisible({ timeout: 5_000 });
 }

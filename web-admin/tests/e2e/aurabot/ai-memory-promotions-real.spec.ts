@@ -120,6 +120,24 @@ async function waitShadowRow(page: Page, pid: string): Promise<void> {
     .toBe(true);
 }
 
+async function selectShadowTab(page: Page): Promise<void> {
+  const tab = page.locator('[data-testid="tab-shadow"]');
+  await expect(tab).toBeVisible({ timeout: 10_000 });
+
+  await expect
+    .poll(
+      async () => {
+        if ((await tab.getAttribute('aria-selected')) === 'true') {
+          return true;
+        }
+        await tab.click().catch(() => null);
+        return (await tab.getAttribute('aria-selected')) === 'true';
+      },
+      { timeout: 5_000, intervals: [250, 500, 1000] },
+    )
+    .toBe(true);
+}
+
 test.describe('Mission Control — Memory Promotion review (real backend, PR-69)', () => {
   test('MP-E2E-01: approve flow — DRAFT_PENDING_REVIEW → PROMOTED_SHADOW', async ({ page }) => {
     const pid = seedMemoryPromotion('DRAFT_PENDING_REVIEW', 0.85, 'cross_user_agreement');
@@ -235,12 +253,7 @@ test.describe('Mission Control — Memory Promotion review (real backend, PR-69)
     const seed = seedMemoryPromotionWithPromotedMemory();
 
     await navigateViaSidebar(page);
-    await page.locator('[data-testid="tab-shadow"]').click();
-    await expect(page.locator('[data-testid="tab-shadow"]')).toHaveAttribute(
-      'aria-selected',
-      'true',
-      { timeout: 5_000 },
-    );
+    await selectShadowTab(page);
     await expect(
       page.locator('[data-testid="shadow-tab"], [data-testid="shadow-empty"]').first(),
     ).toBeVisible({ timeout: 10_000 });

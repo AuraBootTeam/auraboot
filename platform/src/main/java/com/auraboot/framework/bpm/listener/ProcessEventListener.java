@@ -76,6 +76,8 @@ public class ProcessEventListener implements Listener {
                 case ACTIVITY_START -> {
                     // Execute pre-check hooks
                     if (activityId != null) {
+                        bpmAuditService.recordActivityEvent(processInstanceId, activityId,
+                                "activity_start", "Activity started", startUserId, tenantId);
                         try {
                             String processKey = executionContext.getProcessInstance() != null
                                     ? executionContext.getProcessInstance().getProcessDefinitionId() : null;
@@ -105,6 +107,8 @@ public class ProcessEventListener implements Listener {
                         } catch (Exception e) {
                             log.error("Error executing post-action hooks: activityId={}", activityId, e);
                         }
+                        bpmAuditService.recordActivityEvent(processInstanceId, activityId,
+                                "activity_end", "Activity ended", startUserId, tenantId);
                     }
                 }
                 case ACTIVITY_EXECUTE -> {

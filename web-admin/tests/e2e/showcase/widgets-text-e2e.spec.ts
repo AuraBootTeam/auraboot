@@ -169,9 +169,17 @@ async function navigateToDesignerViaMenu(page: Page, pid: string, pageKey: strin
     }
   }
 
-  await expect(page).toHaveURL(new RegExp(`/page-designer/${pid}`), {
+  await expect(page).toHaveURL(new RegExp(`(?:/page-designer/${pid}|/unified-designer\\?pageId=${pid})`), {
     timeout: 5_000,
   });
+
+  if (page.url().includes('/unified-designer')) {
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 10_000 });
+    // This widget matrix still exercises the legacy BlocksDesigner widget
+    // property editor. The page-manager row link now lands in Unified Designer,
+    // so switch to the legacy editor after proving the UI navigation target.
+    await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+  }
 
   await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 5_000 });
   await expect(page.getByTestId('designer-tab-fields')).toBeVisible();

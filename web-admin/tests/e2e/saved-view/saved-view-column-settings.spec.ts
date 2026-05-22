@@ -80,6 +80,26 @@ async function openColumnSettingsPanel(page: Page) {
   return panel;
 }
 
+async function getSavedViewBySaveResponse(page: Page, resp: Awaited<ReturnType<Page['waitForResponse']>>) {
+  const body = await resp.json().catch(() => null);
+  const saved = body?.data ?? body;
+  const pid = saved?.pid;
+  if (pid) {
+    const detailResp = await page.request.get(`/api/views/${pid}`);
+    if (detailResp.ok()) {
+      const detailBody = await detailResp.json();
+      return detailBody.data ?? detailBody;
+    }
+  }
+
+  const listResp = await page.request.get(
+    `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
+  );
+  const listBody = await listResp.json();
+  const views = Array.isArray(listBody.data) ? listBody.data : [];
+  return views.find((v: any) => Array.isArray(v.viewConfig?.columns));
+}
+
 /** Get Save button (handles i18n: "Save" or "保存") */
 function getSaveBtn(panel: ReturnType<Page['getByTestId']>) {
   return panel
@@ -341,16 +361,11 @@ test.describe('Column Settings — SavedView integration', () => {
       { timeout: 8000 },
     );
     await getSaveBtn(panel).click();
-    await saveResp;
+    const resp = await saveResp;
     await expect(panel).not.toBeVisible({ timeout: 3000 });
 
     // Verify order values in backend
-    const viewResp = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
-    );
-    const viewBody = await viewResp.json();
-    const views = viewBody.data ?? [];
-    const myView = views.find((v: any) => v.name === 'My View');
+    const myView = await getSavedViewBySaveResponse(page, resp);
     expect(myView).toBeTruthy();
     expect(myView.viewConfig?.columns?.length).toBeGreaterThan(0);
 
@@ -385,16 +400,11 @@ test.describe('Column Settings — SavedView integration', () => {
       { timeout: 8000 },
     );
     await getSaveBtn(panel).click();
-    await saveResp;
+    const resp = await saveResp;
     await expect(panel).not.toBeVisible({ timeout: 3000 });
 
     // Verify in backend
-    const viewResp = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
-    );
-    const viewBody = await viewResp.json();
-    const views = viewBody.data ?? [];
-    const myView = views.find((v: any) => v.name === 'My View');
+    const myView = await getSavedViewBySaveResponse(page, resp);
     expect(myView).toBeTruthy();
 
     const colWithWidth = myView.viewConfig?.columns?.find((c: any) => c.width === 200);

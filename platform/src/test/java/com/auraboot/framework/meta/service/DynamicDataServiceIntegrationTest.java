@@ -617,7 +617,7 @@ class DynamicDataServiceIntegrationTest {
         // Create name field (required)
         Field nameField = createFieldEntity("name", false, true);
         metaFieldMapper.insert(nameField);
-        fieldBindingMapper.insert(createBinding(testModel.getId(), nameField.getId(), 0));
+        fieldBindingMapper.insert(createBinding(testModel.getId(), nameField.getId(), 0, true));
 
         // Create status field (optional)
         Field statusField = createFieldEntity("status", false, false);
@@ -659,11 +659,16 @@ class DynamicDataServiceIntegrationTest {
     }
 
     private ModelFieldBinding createBinding(Long modelId, Long fieldId, int order) {
+        return createBinding(modelId, fieldId, order, false);
+    }
+
+    private ModelFieldBinding createBinding(Long modelId, Long fieldId, int order, boolean required) {
         ModelFieldBinding binding = new ModelFieldBinding();
         binding.setTenantId(testTenant.getId());
         binding.setModelId(modelId);
         binding.setFieldId(fieldId);
         binding.setFieldOrder(order);
+        binding.setRequired(required);
         return binding;
     }
 

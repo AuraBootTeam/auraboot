@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -334,7 +335,11 @@ class RoleServiceImplTest {
         src.setPriority(5);
         doReturn(src).when(spyService).getById(1L);
         doReturn(0L).when(spyService).count(any(QueryWrapper.class));
-        doReturn(true).when(spyService).save(any(Role.class));
+        doAnswer(inv -> {
+            Role saved = inv.getArgument(0);
+            saved.setId(1L);
+            return true;
+        }).when(spyService).save(any(Role.class));
         when(rolePermissionService.getPermissionIdsByRoleId(1L)).thenReturn(Set.of());
 
         Role copied = spyService.copyRole(1L, "newName", "newCode");
@@ -389,7 +394,12 @@ class RoleServiceImplTest {
     @DisplayName("initializeSystemRoles creates super_admin and assigns all permissions")
     void initializeSystemRolesHappy() {
         doReturn(0L).when(spyService).count(any(QueryWrapper.class));
-        doReturn(true).when(spyService).save(any(Role.class));
+        doAnswer(inv -> {
+            Role saved = inv.getArgument(0);
+            saved.setId(1L);
+            return true;
+        }).when(spyService).save(any(Role.class));
+        doReturn(role(1L, "super_admin")).when(spyService).getById(1L);
 
         Permission p = new Permission();
         p.setId(101L);

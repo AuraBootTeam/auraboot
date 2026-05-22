@@ -340,7 +340,7 @@ public class DashboardServiceImpl implements DashboardService {
         JsonNode ext = dashboard.getExtension();
         if (ext != null && ext.has("menuMounted") && ext.get("menuMounted").asBoolean()) {
             log.info("Auto-unmounting dashboard from menu before unpublish: pid={}", pid);
-            unmountFromMenu(pid);
+            unmountFromMenu(dashboard);
             // Re-fetch dashboard since extension was modified
             dashboard = dashboardMapper.findByPid(pid);
         }
@@ -503,7 +503,11 @@ public class DashboardServiceImpl implements DashboardService {
         if (dashboard == null) {
             throw new ValidationException(ResponseCode.NOT_FOUND, "Dashboard not found: " + dashboardPid);
         }
+        unmountFromMenu(dashboard);
+    }
 
+    private void unmountFromMenu(Dashboard dashboard) {
+        String dashboardPid = dashboard.getPid();
         JsonNode ext = dashboard.getExtension();
         if (ext == null || !ext.has("menuCode")) {
             log.warn("Dashboard is not mounted to menu: pid={}", dashboardPid);

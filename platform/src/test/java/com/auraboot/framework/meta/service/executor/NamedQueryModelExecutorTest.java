@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,7 +38,7 @@ class NamedQueryModelExecutorTest {
 
     @BeforeEach
     void setupCtx() {
-        when(applicationContext.getBean(DynamicDataService.class)).thenReturn(dynamicDataService);
+        lenient().when(applicationContext.getBean(DynamicDataService.class)).thenReturn(dynamicDataService);
     }
 
     private ModelDefinition def(String code, String sourceRef, String pk, ModelCapabilities caps) {

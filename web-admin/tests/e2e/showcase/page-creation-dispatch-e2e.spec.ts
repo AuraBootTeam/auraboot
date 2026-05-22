@@ -5,11 +5,7 @@
  *   P2.1 — `/p/page_schema/new` form happy path for all three kinds (list / form
  *          / detail). Validates that `model_code` is required and that the
  *          submit succeeds against `pgm:create_page_schema`.
- *   P2.2 — `/page-designer/{pid}` dispatches to the correct designer body for
- *          each kind:
- *              list   -> `list-config-panel`
- *              detail -> `detail-config-panel`
- *              form   -> `designer-canvas` + `designer-tab-fields`
+ *   P2.2 — created pages dispatch to the current unified designer route.
  *
  * Plan: docs/plans/2026-04/2026-04-18-e2e-showcase-allfields-plan.md (Phase 2).
  *
@@ -145,8 +141,8 @@ async function fillAndSubmitCreateForm(page: Page, opts: CreatePageOptions): Pro
   }
 
   // Submit. The form-buttons block emits a "submit" button bound to
-  // pgm:create_page_schema. After success the page redirects to
-  // /page-designer/{pid} per pages.json `extension.afterSubmitRedirect`.
+  // pgm:create_page_schema. After success the page redirects to the designer
+  // route configured by pages.json `extension.afterSubmitRedirect`.
   const createResp = page.waitForResponse(
     (r) =>
       r.url().includes('/api/meta/commands/execute') &&
@@ -265,69 +261,20 @@ test.describe('Phase 2 — Page creation + kind dispatch E2E', () => {
       });
       createdPagePids.push(pid);
 
-      // ---- P2.2: navigate to the designer via the list-row click ----
-      // The create form returns to the list. Find the new row by page_key and
-      // click the row link — this exercises the DSL `detailUrl` config rather
-      // than typing the URL ourselves.
-      await expect(page).toHaveURL(/\/p\/page_schema(\?|$)/, { timeout: 10_000 });
-
-      // Dismiss Vite overlay (HMR warnings can mask interaction in dev mode).
-      await page.evaluate(() => {
-        document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
-      });
-
-      // Search for the new page_key so the row appears on page 1.
-      const keywordInput = page
-        .locator('[data-testid="list-search-input"], input[placeholder*="搜索"], input[placeholder*="查询"], input[placeholder*="Search"], input[placeholder*="Query"], input[type="search"]')
-        .first();
-      if (await keywordInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await keywordInput.click();
-        await keywordInput.fill(pageKey);
-        await keywordInput.press('Enter').catch(() => null);
-        await page
-          .waitForResponse(
-            (r) => (r.url().includes('/api/dynamic/page_schema/list') || r.url().includes('/dynamic/page_schema_list')) && r.status() === 200,
-            { timeout: 5_000 },
-          )
-          .catch(() => null);
-      }
-
-      // The row's "edit" rowAction navigates to /page-designer/{pid} per pages.json.
-      // Click the row containing our page_key (text appears in the page_key cell).
-      const row = page.locator(`tr:has-text("${pageKey}")`).first();
-      await expect(row).toBeVisible({ timeout: 8_000 });
-
-      // Prefer clicking the visible row link; fallback to the edit rowAction button.
-      const rowLink = row.locator('a[href*="/page-designer/"]').first();
-      if (await rowLink.isVisible({ timeout: 1_000 }).catch(() => false)) {
-        await rowLink.click();
-      } else {
-        await row.click();
-      }
-
-      await expect(page).toHaveURL(new RegExp(`/page-designer/${pid}`), {
+      // ---- P2.2: submit redirects to the designer configured by the page DSL ----
+      await expect(page).toHaveURL(new RegExp(`/unified-designer\\?pageId=${pid}`), {
         timeout: 10_000,
       });
 
-      // Dismiss overlay again post-navigation.
       await page.evaluate(() => {
         document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
       });
 
-      if (kind === 'list') {
-        await expect(page.getByTestId('list-config-panel')).toBeVisible({ timeout: 10_000 });
-        // detail-config-panel must NOT render for list pages — divergence assertion.
-        await expect(page.getByTestId('detail-config-panel')).toHaveCount(0);
-      } else if (kind === 'detail') {
-        await expect(page.getByTestId('detail-config-panel')).toBeVisible({ timeout: 10_000 });
-        await expect(page.getByTestId('list-config-panel')).toHaveCount(0);
-      } else {
-        // form -> BlocksDesigner: assert canvas + the fields tab button.
-        await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 10_000 });
-        await expect(page.getByTestId('designer-tab-fields')).toBeVisible();
-        await expect(page.getByTestId('list-config-panel')).toHaveCount(0);
-        await expect(page.getByTestId('detail-config-panel')).toHaveCount(0);
-      }
+      await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId('unified-workbench-body')).toBeVisible();
+      await expect(page.getByTestId('unified-canvas-host')).toBeVisible();
+      await expect(page.getByTestId('designer-mode-edit')).toHaveClass(/text-blue-700/);
+      await expect(page.getByTestId('designer-dirty-state')).toContainText(/Saved|已保存/i);
     });
   }
 });

@@ -153,6 +153,26 @@ scripts/import-plugins.sh \
 | `enterprise-demo` | 企业完整 demo 环境 | 企业 profile 列表，enterprise 同名插件优先 |
 | `pcba-agent` | PCBA / agent 专项验证环境 | PCBA 专项插件列表 |
 
+## 场景契约
+
+Profile 只定义“导入哪些插件”，不等价于“这个环境已经可用于 demo 或日常修 bug”。本地环境必须再声明场景契约，明确 reset、插件、auth、seed、页面数据源和 invariants 的边界。
+
+当前已固化的场景：
+
+| 场景 | 入口 | 目标 |
+|------|------|------|
+| `bugfix-oss-demo` | `scripts/dev/env.sh rebuild-demo --mode=bugfix --product=oss --slug=<slug>` | 日常修 bug 的 OSS demo 环境，一条命令完成启动、reset、bootstrap、导入全部 OSS 插件、刷新私有 auth、灌 showcase 与 workflow-demo 数据、同步 BPM 管理页 mirror，并运行 invariants。 |
+
+`bugfix-oss-demo` 的完成标准：
+
+- product 必须是 `oss`。
+- 插件导入使用 `scripts/dev/plugin-import-profiles.json` 的 `e2e` profile，即当前 OSS 全量插件集合。
+- Playwright storageState 使用 `.aura/envs/<slug>/auth/` 下的私有文件，不与其他环境共享。
+- showcase seed 必须覆盖 CRM、dashboard、AI/ACP、arsenal、supplement、dashboard-default、invariants。
+- workflow-demo seed 必须通过产品 API 创建 `wd_leave_balance`、`wd_leave_request`、`se_process_instance`、`se_task_instance`，并保留 pending 与 completed/rejected 历史。
+- `/p/bpm_process_management` 当前仍是 dynamic 页面，数据源为 `mt_bpm_process_management`；场景脚本必须把 `ab_bpm_process_definition` mirror 到该表，否则页面会空。
+- invariants 必须验证 OSS 插件数量、CRM 数据量、BPM 管理页、workflow-demo 申请与待办任务。任何一项不足都算场景未完成。
+
 兼容策略：
 
 - `default` 可以短期保留为 alias，但脚本应打印 deprecation warning。
@@ -183,6 +203,7 @@ scripts/import-plugins.sh \
 |------|----------|
 | Quickstart workflow | 只调用 `/api/bootstrap/setup` 并验证登录；不导 demo，不跑 showcase seed。 |
 | OSS host reset | `bootstrap/setup` 后调用 `scripts/import-plugins.sh --profile=demo --edition=oss`；`SKIP_SEED=1` 时可降为 `--profile=core`。 |
+| Daily OSS bugfix demo | `scripts/dev/env.sh rebuild-demo --mode=bugfix --product=oss --slug=<slug>`；不再手工拼 reset/import/seed/auth 命令。 |
 | OSS Docker reset | `docker-ga-e2e-bootstrap.sh` 只负责 bootstrap、测试用户、storage state；插件导入委托 `scripts/import-plugins.sh --profile=e2e --edition=oss`。 |
 | Agent Runtime gate | 自己启动 isolated stack，因此也必须显式执行 `/api/bootstrap/setup`，再调用 `scripts/import-plugins.sh --profile=e2e --edition=oss`，最后才进入 Playwright setup/auth。 |
 | Enterprise host reset | 删除手写逐个导入列表，委托统一导入脚本；profile 使用 `enterprise-demo` 或企业专项 profile。 |
@@ -200,6 +221,7 @@ scripts/import-plugins.sh \
 - Quickstart workflow 和 Setup Wizard 不再传 `seedDemoData`。
 - OSS Docker reset 与 Enterprise Docker reset 已通过统一导入脚本验证。企业仓路径解析会优先使用 `AURA_ENTERPRISE_ROOT`，否则在 side-by-side checkout 与 `.worktrees/<branch>` checkout 两类目录结构中查找完整企业仓，并要求找到 `plugins/platform-admin-ee/plugin.json`。
 - Agent Runtime Docker gate 已补回显式 bootstrap + `e2e` profile 导入；它不再依赖 Playwright `00-bootstrap` 或 `/api/bootstrap/setup` 隐式提供插件模型。
+- Daily OSS bugfix demo 已新增 `scripts/dev/prepare-bugfix-demo.sh` 与 `env.sh demo/rebuild-demo`，把“全部 OSS 插件 + showcase seed + workflow-demo seed + BPM 管理页 mirror + invariants”变成单一场景入口。
 
 ## 迁移计划
 

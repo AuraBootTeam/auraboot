@@ -26,7 +26,7 @@ import {
 
 const MODEL_CODE = 'crm_opportunity';
 const ROUTE_KEY = 'crm_opportunity';
-const STAGE_FILTERS = ['全部', '资格确认', '方案提报', '商务谈判', '赢单', '丢单'];
+const STAGE_FILTERS = ['全部', '进行中', '赢单', '输单'];
 
 test.describe('CRM Opportunity Kanban @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -143,7 +143,7 @@ test.describe('CRM Opportunity Kanban @smoke', () => {
     await waitForOpportunityTable(page);
     await expect(page.getByText('商机编号')).toBeVisible();
     await expect(page.getByText('商机名称')).toBeVisible();
-    await expect(page.getByText('商机阶段')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /阶段/ })).toBeVisible();
   });
 
   test('OPP-KAN-06: Opportunity list renders pipeline rows', async ({ page }) => {

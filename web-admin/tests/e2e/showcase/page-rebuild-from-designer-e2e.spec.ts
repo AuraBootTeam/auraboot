@@ -308,7 +308,11 @@ async function navigateToDesignerViaMenu(
     await row.evaluate((el: HTMLElement) => el.click());
   }
 
-  await expect(page).toHaveURL(new RegExp(`/page-designer/${pid}`), { timeout: 5_000 });
+  await expect(page).toHaveURL(new RegExp(`(?:/page-designer/${pid}|/unified-designer\\?pageId=${pid})`), { timeout: 5_000 });
+  if (page.url().includes('/unified-designer')) {
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 10_000 });
+    await page.goto(`/page-designer/${pid}`, { waitUntil: 'domcontentloaded' });
+  }
   await expect(page.getByTestId('designer-canvas')).toBeVisible({ timeout: 5_000 });
   await expect(page.getByTestId('designer-tab-blocks')).toBeVisible();
 }

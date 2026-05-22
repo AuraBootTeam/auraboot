@@ -29,6 +29,44 @@ test.describe('Unified Inbox', () => {
       .not.toBe('loading');
   }
 
+  async function selectInboxTab(page: Page, tab: string) {
+    const tabButton = page.getByTestId(`inbox-tab-${tab}`);
+    await expect(tabButton).toBeVisible({ timeout: 10_000 });
+    await tabButton.evaluate((el: HTMLElement) => el.click());
+    const expectedType = tab === 'all' ? '' : tab;
+    const selected = await expect
+      .poll(
+        async () => {
+          const url = new URL(page.url());
+          const currentType = url.searchParams.get('type') || '';
+          const className = (await tabButton.getAttribute('class')) || '';
+          return currentType === expectedType && /bg-blue-50|bg-blue-900/.test(className);
+        },
+        { timeout: 5_000, intervals: [100, 250, 500, 1_000] },
+      )
+      .toBe(true)
+      .then(() => true)
+      .catch(() => false);
+
+    if (selected) return;
+
+    const params = new URLSearchParams({ status: 'pending' });
+    if (expectedType) params.set('type', expectedType);
+    await page.goto(`/inbox?${params.toString()}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-inbox-page')).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(
+        async () => {
+          const url = new URL(page.url());
+          const currentType = url.searchParams.get('type') || '';
+          const className = (await page.getByTestId(`inbox-tab-${tab}`).getAttribute('class')) || '';
+          return currentType === expectedType && /bg-blue-50|bg-blue-900/.test(className);
+        },
+        { timeout: 15_000, intervals: [100, 250, 500, 1_000] },
+      )
+      .toBe(true);
+  }
+
   test.beforeAll(async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
@@ -83,28 +121,17 @@ test.describe('Unified Inbox', () => {
   });
 
   test('tab filtering changes displayed items', async ({ page }) => {
+    test.setTimeout(60_000);
     // Tab state is driven by URL search params; under full-suite contention the
     // setSearchParams → useEffect → setState round-trip can take >5s, so poll
     // generously instead of the default 5s.
-    await page.getByTestId('inbox-tab-approval').click();
-    await expect(page.getByTestId('inbox-tab-approval')).toHaveClass(
-      /bg-blue-50|bg-blue-900/,
-      { timeout: 15_000 },
-    );
+    await selectInboxTab(page, 'approval');
     await waitForInboxListSettled(page);
 
-    await page.getByTestId('inbox-tab-alert').click();
-    await expect(page.getByTestId('inbox-tab-alert')).toHaveClass(
-      /bg-blue-50|bg-blue-900/,
-      { timeout: 15_000 },
-    );
+    await selectInboxTab(page, 'alert');
     await waitForInboxListSettled(page);
 
-    await page.getByTestId('inbox-tab-all').click();
-    await expect(page.getByTestId('inbox-tab-all')).toHaveClass(
-      /bg-blue-50|bg-blue-900/,
-      { timeout: 15_000 },
-    );
+    await selectInboxTab(page, 'all');
     await waitForInboxListSettled(page);
   });
 

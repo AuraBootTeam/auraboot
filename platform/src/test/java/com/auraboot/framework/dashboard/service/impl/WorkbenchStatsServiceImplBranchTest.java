@@ -129,7 +129,7 @@ class WorkbenchStatsServiceImplBranchTest {
         p.put("cnt", 1);
         p.put("total_amount", "500");
 
-        when(jdbcTemplate.queryForList(anyString(), (Object[]) any()))
+        when(jdbcTemplate.queryForList(anyString(), (Object) any(), (Object) any()))
                 .thenReturn(List.of(q, p));
 
         WorkbenchPipelineDTO out = service.getPipeline();
@@ -146,7 +146,7 @@ class WorkbenchStatsServiceImplBranchTest {
         row.put("stage", "no_such_stage");
         row.put("cnt", 99);
         row.put("total_amount", "9999");
-        when(jdbcTemplate.queryForList(anyString(), (Object[]) any()))
+        when(jdbcTemplate.queryForList(anyString(), (Object) any(), (Object) any()))
                 .thenReturn(List.of(row));
 
         WorkbenchPipelineDTO out = service.getPipeline();

@@ -27,6 +27,7 @@ import {
   SelectContent,
   SelectItem,
 } from '~/ui/ui/select';
+import { sanitizeSmartDomProps } from './domProps';
 
 const baseStyles = `${fieldControlBase} focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed`;
 
@@ -293,7 +294,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             },
             className,
           )}
-          {...restProps}
+          {...sanitizeSmartDomProps(restProps as Record<string, unknown>)}
         >
           {placeholderText && !multiple && (
             <option value="" disabled hidden>
