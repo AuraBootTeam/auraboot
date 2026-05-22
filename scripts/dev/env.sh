@@ -36,7 +36,7 @@ PURGE=0
 
 usage() {
     cat <<USAGE
-Usage: scripts/dev/env.sh <start|stop|status|reset|verify|logs> [options]
+Usage: scripts/dev/env.sh <start|stop|status|reset|verify|logs|list|inspect> [options]
 
 Options:
   --mode=bugfix           Daily bugfix mode: Docker infra, host apps
@@ -126,8 +126,21 @@ bff_log() {
     echo "/tmp/aura-$SLUG-bff.log"
 }
 
-stack_env_file() {
-    echo "$PROJECT_ROOT/.aura-stack/$SLUG.env"
+registry_root() {
+    aura_env__registry_root "$PROJECT_ROOT"
+}
+
+registry_exports_file() {
+    echo "$(registry_root)/envs/$SLUG/exports.env"
+}
+
+registry_manifest_file() {
+    echo "$(registry_root)/envs/$SLUG/manifest.json"
+}
+
+current_branch_for_root() {
+    local root="$1"
+    git -C "$root" branch --show-current 2>/dev/null || echo "unknown"
 }
 
 resolve_enterprise_root() {
@@ -178,19 +191,69 @@ load_bugfix_env() {
     aura_env_load r2 "$SLUG"
 }
 
+registry_upsert_current() {
+    local status="${1:-running}"
+    local enterprise_root=""
+    local enterprise_branch=""
+    if [ "$PRODUCT" = "enterprise" ]; then
+        enterprise_root="$(resolve_enterprise_root || true)"
+        if [ -n "$enterprise_root" ]; then
+            enterprise_branch="$(current_branch_for_root "$enterprise_root")"
+        fi
+    fi
+
+    local args=(
+        "$SCRIPT_DIR/lib/env-registry.mjs" upsert
+        --registry-root "$(registry_root)"
+        --slug "$SLUG"
+        --mode "$MODE"
+        --product "$PRODUCT"
+        --core-root "$PROJECT_ROOT"
+        --core-branch "$(current_branch_for_root "$PROJECT_ROOT")"
+        --compose-project "${COMPOSE_PROJECT_NAME:-auraboot-$SLUG}"
+        --status "$status"
+        --pg-port "$PG_PORT"
+        --redis-port "$REDIS_PORT"
+        --be-port "$BE_PORT"
+        --vite-port "$VITE_PORT"
+        --bff-port "$BFF_PORT"
+    )
+    if [ -n "$enterprise_root" ]; then
+        args+=(--enterprise-root "$enterprise_root")
+    fi
+    if [ -n "$enterprise_branch" ]; then
+        args+=(--enterprise-branch "$enterprise_branch")
+    fi
+    if [ -n "${OFFSET:-}" ]; then
+        args+=(--offset "$OFFSET")
+    fi
+    if [ -n "${MINIO_API_PORT:-}" ]; then
+        args+=(--minio-api-port "$MINIO_API_PORT")
+    fi
+    if [ -n "${MINIO_CONSOLE_PORT:-}" ]; then
+        args+=(--minio-console-port "$MINIO_CONSOLE_PORT")
+    fi
+    if [ -n "${PROD_FRONTEND_PORT:-}" ]; then
+        args+=(--prod-frontend-port "$PROD_FRONTEND_PORT")
+    fi
+
+    node "${args[@]}"
+}
+
 print_start_plan() {
     local infra_cmd="scripts/dev/start-dev-infra.sh --slug=$SLUG"
+    infra_cmd="$infra_cmd --product=$PRODUCT"
     [ "$WITH_STORAGE" = "1" ] && infra_cmd="$infra_cmd --with-storage"
     [ "$DRY_RUN" = "1" ] && infra_cmd="$infra_cmd --dry-run"
-    local env_file
-    env_file="$(stack_env_file)"
+    local exports_file
+    exports_file="$(registry_exports_file)"
 
     local backend_root
     backend_root="$(backend_root_for_product || true)"
-    if [ -f "$env_file" ]; then
+    if [ -f "$exports_file" ]; then
         # shellcheck disable=SC1090
-        source "$env_file"
-        infra_cmd="existing env file: $env_file"
+        source "$exports_file"
+        infra_cmd="existing registry exports: $exports_file"
     fi
 
     cat <<PLAN
@@ -281,7 +344,7 @@ command_start() {
     fi
 
     print_start_plan
-    if [ -f "$(stack_env_file)" ]; then
+    if [ -f "$(registry_exports_file)" ]; then
         load_bugfix_env
         start_infra_from_existing_env
     fi
@@ -291,12 +354,19 @@ command_start() {
         return 0
     fi
 
-    if [ ! -f "$(stack_env_file)" ]; then
-        local infra_args=(--slug="$SLUG")
+    if [ ! -f "$(registry_exports_file)" ]; then
+        local infra_args=(--slug="$SLUG" --product="$PRODUCT")
         [ "$WITH_STORAGE" = "1" ] && infra_args+=(--with-storage)
-        "$SCRIPT_DIR/start-dev-infra.sh" "${infra_args[@]}"
+        local enterprise_root
+        enterprise_root="$(resolve_enterprise_root || true)"
+        env \
+            AURA_ENV_REGISTRY_ROOT="$(registry_root)" \
+            AURA_PRODUCT="$PRODUCT" \
+            AURA_ENTERPRISE_ROOT="$enterprise_root" \
+            "$SCRIPT_DIR/start-dev-infra.sh" "${infra_args[@]}"
         load_bugfix_env
     fi
+    registry_upsert_current running >/dev/null
     start_backend_host
     start_frontend_host
 }
@@ -392,6 +462,10 @@ command_stop() {
             fi
         fi
     fi
+
+    if [ "$DRY_RUN" != "1" ]; then
+        registry_upsert_current stopped >/dev/null
+    fi
 }
 
 command_verify() {
@@ -428,6 +502,14 @@ command_logs() {
     esac
 }
 
+command_list() {
+    node "$SCRIPT_DIR/lib/env-registry.mjs" list --registry-root "$(registry_root)"
+}
+
+command_inspect() {
+    node "$SCRIPT_DIR/lib/env-registry.mjs" inspect --registry-root "$(registry_root)" --slug "$SLUG"
+}
+
 case "$COMMAND" in
     start) command_start ;;
     stop) command_stop ;;
@@ -435,5 +517,7 @@ case "$COMMAND" in
     reset) command_reset ;;
     verify) command_verify ;;
     logs) command_logs ;;
+    list) command_list ;;
+    inspect) command_inspect ;;
     *) echo "ERROR: unknown command '$COMMAND'" >&2; usage; exit 2 ;;
 esac
