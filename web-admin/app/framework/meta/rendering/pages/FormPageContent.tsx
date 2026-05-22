@@ -1515,6 +1515,7 @@ export function FormPageContent(props: PageContentProps) {
                               let field = meta
                                 ? {
                                     ...rawField,
+                                    modelCode: schema?.modelCode || tableName,
                                     label: rawField.label || meta.displayName || rawField.label,
                                     dataType: rawField.dataType || meta.dataType,
                                     component:
@@ -1545,7 +1546,7 @@ export function FormPageContent(props: PageContentProps) {
                                         : {}),
                                     },
                                   }
-                                : rawField;
+                                : { ...rawField, modelCode: schema?.modelCode || tableName };
 
                               // L1 SDK: apply external readonly permission override
                               if (externalPerm === 'readonly') {

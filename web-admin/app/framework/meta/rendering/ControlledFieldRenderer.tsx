@@ -109,6 +109,16 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // Resolve field label from i18n keys with progressive fallback.
   let resolvedLabel: string | undefined = typeof field.label === 'string' ? field.label : undefined;
   if (!resolvedLabel) {
+    const modelCode = (field as any).modelCode || (context as any).modelCode;
+    if (modelCode) {
+      const modelKey = `model.${modelCode}.${field.field}.label`;
+      const modelLabel = t(modelKey);
+      if (modelLabel && modelLabel !== modelKey) {
+        resolvedLabel = modelLabel;
+      }
+    }
+  }
+  if (!resolvedLabel) {
     const directFieldKey = `field.${field.field}.label`;
     const directFieldLabel = t(directFieldKey);
     if (directFieldLabel && directFieldLabel !== directFieldKey) {
