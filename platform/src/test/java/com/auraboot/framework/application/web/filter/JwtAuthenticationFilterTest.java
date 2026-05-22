@@ -222,6 +222,20 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void shouldNotFilter_goodsTicketMobileApiSkipsJwtAuth() throws Exception {
+        MockHttpServletRequest records = new MockHttpServletRequest("GET", "/api/mobile/goods-ticket/records");
+        records.setServletPath("/api/mobile/goods-ticket/records");
+        MockHttpServletRequest export = new MockHttpServletRequest(
+                "GET",
+                "/api/mobile/goods-ticket/batches/1/export.xlsx"
+        );
+        export.setServletPath("/api/mobile/goods-ticket/batches/1/export.xlsx");
+
+        assertTrue((Boolean) ReflectionTestUtils.invokeMethod(filter, "shouldNotFilter", records));
+        assertTrue((Boolean) ReflectionTestUtils.invokeMethod(filter, "shouldNotFilter", export));
+    }
+
+    @Test
     void rbacLookupFailure_doesNotPropagate() throws Exception {
         MockHttpServletRequest req = req();
         req.addHeader("Authorization", "Bearer t.token");
