@@ -1,4 +1,6 @@
 export const MISSION_CONTROL_DSL_PATHS = {
+  missionList: '/p/mission',
+  missionCreate: '/p/mission/new',
   taskList: '/p/agent_task',
   approvalList: '/p/agent_approval',
   memoryList: '/p/agent_memory',

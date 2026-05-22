@@ -1,6 +1,9 @@
 import React, { useRef } from 'react';
 import type { InputProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
-import { useExpressionValue, useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
+import {
+  useExpressionValue,
+  useSmartField,
+} from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
@@ -12,6 +15,7 @@ import {
   fieldVariantStyles,
   fieldErrorFocusStyles,
 } from '~/ui/ui/field-styles';
+import { sanitizeSmartDomProps } from './domProps';
 
 const Input: React.FC<InputProps> = ({
   name,
@@ -41,6 +45,7 @@ const Input: React.FC<InputProps> = ({
 }) => {
   // 从 restProps 中提取 readOnly 属性
   const { readOnly, ...otherRestProps } = restProps as any;
+  const domProps = sanitizeSmartDomProps(otherRestProps);
 
   const st = useSmartText();
 
@@ -173,7 +178,7 @@ const Input: React.FC<InputProps> = ({
         onFocus={handleInputFocus}
         aria-describedby={meta.showError ? `${name}-error` : undefined}
         aria-required={requiredValue}
-        {...otherRestProps}
+        {...domProps}
       />
 
       {/* 字符计数 */}

@@ -70,7 +70,7 @@ The old flat quick link grid caused duplicated entry points:
 
 ## AuraBoot Mapping
 
-- Mission: future workflow object. The current first iteration routes users through `/p/agent_task` because the imported Mission DSL page still needs permission/data-source hardening before becoming a primary entry.
+- Mission: `/p/mission` and `/p/mission/new`
 - Task list: `/p/agent_task`
 - Approval queue: `/p/agent_approval`
 - Agent definition: `/p/agent_definition`
@@ -95,12 +95,11 @@ First iteration:
 - Keep all links read-only navigation. Do not create new backend commands in this iteration.
 - Preserve existing data loading and empty states.
 - Use the competitive intelligence scenario as the default product framing, while keeping links generic enough for other enterprise agent scenarios.
-- Do not make `/p/mission` a primary action until its DSL datasource permission issue is fixed.
+- Mission owner uses the platform `sys_user` reference picker, not a dynamic `ns_user` model.
 
 Deferred:
 
 - Real scenario template creation wizard.
-- Mission page permission/data-source fix, then reconnect mission creation as the first step.
 - One-click creation of mission, tasks, schedule, policy, and report artifact.
 - Seed data for a full competitive intelligence demo.
 - E2E coverage for create/run/approve/report once those commands exist.

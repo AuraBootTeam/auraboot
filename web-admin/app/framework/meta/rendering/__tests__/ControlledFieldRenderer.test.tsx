@@ -9,6 +9,46 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
   });
 
+  it('resolves model-scoped field labels before probing generic field keys', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+
+    const missingKeyWarnings: string[] = [];
+    const t = (key: string) => {
+      if (key === 'model.mission.title.label') return '标题';
+      missingKeyWarnings.push(key);
+      return key;
+    };
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={{ field: 'title', modelCode: 'mission' } as any}
+        value={undefined}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartInput');
+    });
+
+    expect(screen.getByText('标题')).toBeInTheDocument();
+    expect(missingKeyWarnings).toEqual([]);
+  });
+
   it('routes sys_user reference fields to the system user search endpoint', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

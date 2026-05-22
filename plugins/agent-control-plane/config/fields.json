@@ -210,8 +210,8 @@
     "displayName:en": "Owner",
     "dataType": "reference",
     "refTarget": {
-      "targetModel": "ns_user",
-      "displayField": "nick_name"
+      "targetModel": "sys_user",
+      "displayField": "displayName"
     }
   },
   {

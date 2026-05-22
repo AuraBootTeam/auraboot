@@ -236,11 +236,11 @@ export default function MissionControl() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
+            onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.missionCreate)}
             className="shrink-0 whitespace-nowrap rounded-md bg-blue-50 px-3 py-1.5 text-sm text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
             data-testid="mc-view-missions"
           >
-            {l('进入调研任务', 'Open Research Tasks')}
+            {l('创建调研使命', 'Create Research Mission')}
           </button>
           <button
             onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
@@ -359,7 +359,7 @@ function DashboardView({
       title: l('使命', 'Mission'),
       desc: l('定义竞对范围、周期和交付物', 'Define competitors, cadence, and deliverables'),
       meta: l(`${kpi?.active_missions ?? 0} 个活跃使命`, `${kpi?.active_missions ?? 0} active missions`),
-      onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.taskList),
+      onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.missionList),
     },
     {
       icon: ClipboardList,
@@ -403,7 +403,7 @@ function DashboardView({
           icon: GitBranch,
           title: l('使命', 'Missions'),
           desc: l('定义业务目标和拆解边界', 'Define business goal and scope'),
-          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.taskList),
+          onClick: () => navigate(MISSION_CONTROL_DSL_PATHS.missionList),
         },
         {
           icon: ClipboardList,
@@ -551,7 +551,7 @@ function DashboardView({
           label={l('活跃使命', 'Active Missions')}
           value={String(kpi?.active_missions ?? 0)}
           color="blue"
-          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.missionList)}
         />
         <KpiCard
           label={l('活跃任务', 'Active Tasks')}
@@ -588,7 +588,7 @@ function DashboardView({
         kpi={kpi}
         agents={agents}
         schedules={schedules}
-        onStart={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
+        onStart={() => navigate(MISSION_CONTROL_DSL_PATHS.missionCreate)}
         onOpenTasks={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
         onOpenApprovals={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
         onOpenArtifacts={() => navigate(MISSION_CONTROL_DSL_PATHS.artifactList)}
@@ -1306,7 +1306,7 @@ function CompetitiveIntelWorkbench({
             data-testid="mc-scenario-start"
           >
             <GitBranch className="h-4 w-4" />
-            {l('进入调研任务', 'Open research tasks')}
+            {l('创建调研使命', 'Create research mission')}
           </button>
           <button
             type="button"

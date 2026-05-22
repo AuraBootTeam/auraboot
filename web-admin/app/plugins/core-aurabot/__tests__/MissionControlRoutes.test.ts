@@ -8,6 +8,8 @@ import {
 describe('Mission Control DSL links', () => {
   it('uses model_code URL segments that resolve to imported DSL page schemas', () => {
     expect(MISSION_CONTROL_DSL_PATHS).toMatchObject({
+      missionList: '/p/mission',
+      missionCreate: '/p/mission/new',
       taskList: '/p/agent_task',
       approvalList: '/p/agent_approval',
       memoryList: '/p/agent_memory',
