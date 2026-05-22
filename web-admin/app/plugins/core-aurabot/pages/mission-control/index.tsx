@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
+import { MISSION_CONTROL_DSL_PATHS } from './routes';
 
 // ============================================================================
 // Types
@@ -199,7 +200,7 @@ export default function MissionControl() {
             {l('查看使命', 'View Missions')}
           </button>
           <button
-            onClick={() => navigate('/p/agent-task')}
+            onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
             className="rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             data-testid="mc-view-all-tasks"
           >
@@ -354,7 +355,7 @@ function DashboardView({
           label={l('活跃任务', 'Active Tasks')}
           value={String(kpi?.active_tasks ?? 0)}
           color="indigo"
-          onClick={() => navigate('/p/agent-task')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
         />
         <KpiCard
           label={l('运行中', 'Running Now')}
@@ -365,13 +366,13 @@ function DashboardView({
           label={l('待审批', 'Pending Approvals')}
           value={String(kpi?.pending_approvals ?? 0)}
           color={kpi?.pending_approvals ? 'amber' : 'green'}
-          onClick={() => navigate('/p/agent-approval')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
         />
         <KpiCard
           label={l('活跃 Agent', 'Active Agents')}
           value={String(kpi?.active_agents ?? 0)}
           color="emerald"
-          onClick={() => navigate('/p/agent-definition')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.agentList)}
         />
         <KpiCard
           label={l('本月成本', 'Month Cost')}
@@ -392,7 +393,7 @@ function DashboardView({
             </h3>
             <button
               className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-              onClick={() => navigate('/p/agent-definition')}
+              onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.agentList)}
               data-testid="mc-view-all-agents"
             >
               {l('查看全部 Agent', 'View All Agents')} &rarr;
@@ -403,7 +404,7 @@ function DashboardView({
               <div
                 key={agent.pid}
                 className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/30"
-                onClick={() => navigate(`/p/agent-definition/view/${agent.pid}`)}
+                onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.agentDetail(agent.pid))}
                 data-testid={`mc-agent-kpi-${agent.agent_code}`}
               >
                 <span className="text-xl">🤖</span>
@@ -499,7 +500,7 @@ function DashboardView({
           icon="📋"
           title={l('任务', 'Tasks')}
           desc={l('查看和管理 Agent 任务', 'View and manage agent tasks')}
-          onClick={() => navigate('/p/agent-task')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.taskList)}
         />
         <QuickLink
           icon="▶️"
@@ -517,13 +518,13 @@ function DashboardView({
           icon="🛡️"
           title={l('审批', 'Approvals')}
           desc={l('处理 Agent 审批请求', 'Handle agent approval requests')}
-          onClick={() => navigate('/p/agent-approval')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalList)}
         />
         <QuickLink
           icon="🧠"
           title={l('记忆库', 'Memory')}
           desc={l('浏览 Agent 记忆数据', 'Browse agent memory data')}
-          onClick={() => navigate('/p/agent-memory')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.memoryList)}
         />
         <QuickLink
           icon="💡"
@@ -563,25 +564,25 @@ function DashboardView({
           icon="🤖"
           title={l('Agent 定义', 'Agent Definitions')}
           desc={l('管理 Agent 配置', 'Manage agent configs')}
-          onClick={() => navigate('/p/agent-definition')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.agentList)}
         />
         <QuickLink
           icon="📅"
           title={l('调度', 'Schedules')}
           desc={l('定时任务配置', 'Scheduled tasks')}
-          onClick={() => navigate('/p/agent-schedule')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.scheduleList)}
         />
         <QuickLink
           icon="📦"
           title={l('产出物', 'Artifacts')}
           desc={l('Agent 生成内容', 'Agent outputs')}
-          onClick={() => navigate('/p/agent-artifact')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.artifactList)}
         />
         <QuickLink
           icon="🛡️"
           title={l('审批策略', 'Policies')}
           desc={l('审批规则配置', 'Approval rules')}
-          onClick={() => navigate('/p/approval-policy')}
+          onClick={() => navigate(MISSION_CONTROL_DSL_PATHS.approvalPolicyList)}
         />
       </div>
 
