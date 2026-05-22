@@ -18,6 +18,8 @@ scripts/dev/env.sh list
 scripts/dev/env.sh inspect --slug=<slug>
 scripts/dev/env.sh verify --level=health --slug=<slug>
 scripts/dev/env.sh logs --slug=<slug> --service=all
+scripts/dev/env.sh demo --mode=bugfix --product=oss --slug=<slug>
+scripts/dev/env.sh rebuild-demo --mode=bugfix --product=oss --slug=<slug>
 scripts/dev/env.sh stop --slug=<slug> --dry-run
 scripts/dev/env.sh stop --slug=<slug>
 
@@ -134,11 +136,19 @@ run-playwright-runner.sh
   by default so a normal dev command does not pull a multi-GB image silently
 
 env.sh
-  unified daily bugfix entrypoint for start/stop/status/reset/verify/logs/list/inspect;
+  unified daily bugfix entrypoint for start/stop/status/reset/demo/rebuild-demo/verify/logs/list/inspect;
   start uses Docker infra plus host backend/Vite/BFF and reuses an existing
   registry env at .aura/envs/<slug>, status reports env JSON, tmux sessions,
   and exact BE/Vite/BFF listener PIDs, stop avoids global pkill and stops the
-  slug-scoped Docker infra while preserving volumes unless --purge is passed
+  slug-scoped Docker infra while preserving volumes unless --purge is passed.
+  demo prepares the explicit bugfix-oss-demo contract; rebuild-demo starts,
+  resets, then prepares that contract in one command.
+
+prepare-bugfix-demo.sh
+  explicit OSS daily bugfix demo contract: imports profile=e2e (all OSS
+  plugins), refreshes private Playwright auth, runs showcase seeds, creates
+  workflow-demo business/process/task data, syncs BPM process definitions into
+  the dynamic bpm_process_management mirror, and fails on scenario invariants.
 
 test-dev-env-scripts.sh
   non-mutating smoke tests for dry-run, r2 env export, and Maven local helper
