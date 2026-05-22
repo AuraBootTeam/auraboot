@@ -14,6 +14,8 @@ Multi-worktree mode requires per-worktree runtime state. Daily development can u
 # in any worktree
 scripts/dev/env.sh start --mode=bugfix --slug=<slug>
 scripts/dev/env.sh status --slug=<slug>
+scripts/dev/env.sh list
+scripts/dev/env.sh inspect --slug=<slug>
 scripts/dev/env.sh verify --level=health --slug=<slug>
 scripts/dev/env.sh logs --slug=<slug> --service=all
 scripts/dev/env.sh stop --slug=<slug> --dry-run
@@ -35,24 +37,47 @@ scripts/dev/start-production-like.sh --slug=<slug> --wait --rebuild
 scripts/dev/run-playwright-runner.sh --slug=<slug> --allow-pull
 ```
 
-`r2-env-export.sh` also exports slug/date-scoped Playwright paths:
+Daily bugfix environments are registered globally under the mono-repo root,
+outside any one worktree:
+
+```text
+/Users/ghj/work/auraboot/.aura/env-registry.json
+/Users/ghj/work/auraboot/.aura/envs/<slug>/manifest.json
+/Users/ghj/work/auraboot/.aura/envs/<slug>/exports.env
+/Users/ghj/work/auraboot/.aura/envs/<slug>/auth/
+```
+
+`env-registry.json` is the source of truth for slug, worktree, branch,
+compose project, and port ownership. `start-dev-infra.sh` and `env.sh start`
+refuse registered port collisions across slugs even when the old process is not
+currently listening. Override `AURA_ENV_REGISTRY_ROOT` only for tests or
+throwaway experiments.
+
+`r2-env-export.sh` reads the registry export and also exports slug/date-scoped
+Playwright artifact paths plus private per-env storageState paths:
 
 ```text
 PW_E2E_RUN_ROOT=test-results/runs/<slug>/<date>
 PW_ARTIFACT_DIR=$PW_E2E_RUN_ROOT/artifacts
 PW_REPORT_DIR=$PW_E2E_RUN_ROOT/html-report
 PW_RESULTS_JSON=$PW_E2E_RUN_ROOT/results.json
-PW_STORAGE_DIR=tests/storage/<slug>/<date>
+PW_STORAGE_DIR=/Users/ghj/work/auraboot/.aura/envs/<slug>/auth
+PW_ADMIN_STORAGE_STATE=$PW_STORAGE_DIR/admin.json
+PW_OPERATOR_STORAGE_STATE=$PW_STORAGE_DIR/operator.json
+PW_VIEWER_STORAGE_STATE=$PW_STORAGE_DIR/viewer.json
 ```
 
 These paths keep host Playwright runs and optional container-runner runs from
-overwriting each other's traces, videos, reports, and storageState files.
+overwriting each other's traces, videos, reports, and storageState files. The
+auth files are intentionally not shared across environments.
 
 ## Slug + offset
 
 `start-isolated.sh` derives a **slug** (per-worktree namespace) from the current branch name; runs are scoped under `COMPOSE_PROJECT_NAME=auraboot-${slug}`. From the slug it computes a **port offset** (1-89, plus the special `slug=ga-e2e → offset=0` historical convention) via SHA1 hash, then probes the resulting host ports for availability and walks forward (up to 5 attempts) on collision.
 
-The chosen port assignments persist to `.aura-stack/${slug}.env` so subsequent invocations of `stop-isolated.sh` / `list-isolated.sh` see consistent values.
+Daily bugfix port assignments persist to the global registry under
+`.aura/envs/<slug>`. Full isolated stack helpers still persist their own
+full-stack metadata under `.aura-stack/${slug}.env`.
 
 | Service   | Base port | Formula            |
 |-----------|-----------|--------------------|
@@ -76,6 +101,7 @@ start-isolated.sh
 
 start-dev-infra.sh
   --slug=<name>    override auto slug
+  --product=<name> registry label: oss|enterprise
   --offset=<N>     skip auto-probing; force offset (1-89)
   --with-storage   also start MinIO with isolated host ports
   --dry-run        print plan, don't start docker
@@ -108,11 +134,11 @@ run-playwright-runner.sh
   by default so a normal dev command does not pull a multi-GB image silently
 
 env.sh
-  unified daily bugfix entrypoint for start/stop/status/reset/verify/logs;
+  unified daily bugfix entrypoint for start/stop/status/reset/verify/logs/list/inspect;
   start uses Docker infra plus host backend/Vite/BFF and reuses an existing
-  .aura-stack/<slug>.env, status reports env JSON, tmux sessions, and exact
-  BE/Vite/BFF listener PIDs, stop avoids global pkill and stops the slug-scoped
-  Docker infra while preserving volumes unless --purge is passed
+  registry env at .aura/envs/<slug>, status reports env JSON, tmux sessions,
+  and exact BE/Vite/BFF listener PIDs, stop avoids global pkill and stops the
+  slug-scoped Docker infra while preserving volumes unless --purge is passed
 
 test-dev-env-scripts.sh
   non-mutating smoke tests for dry-run, r2 env export, and Maven local helper
@@ -121,8 +147,9 @@ test-gradle-guard.sh
   non-publishing smoke test for the Gradle multi-worktree Maven guard
 ```
 
-`--dry-run` is read-only for both start scripts: it does not write
-`.aura-stack/<slug>.env` and does not start containers.
+`--dry-run` is read-only for both start scripts: daily bugfix mode does not
+write the global registry and full isolated mode does not write
+`.aura-stack/<slug>.env`; neither starts containers.
 
 `start-isolated.sh` refuses to start when Docker VM free space is below
 `AURA_MIN_DOCKER_FREE_MB` (default `2048`) because full stacks create

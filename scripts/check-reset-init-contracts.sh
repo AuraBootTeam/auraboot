@@ -20,6 +20,7 @@ bash -n scripts/dev/run-agent-runtime-full-gate-docker.sh
 bash -n scripts/env/reset-and-init.sh
 
 echo "[reset-init-contracts] node regression"
+node --test scripts/dev/lib/env-registry.test.mjs
 node --test scripts/reset-init-contracts.test.mjs
 node --test scripts/audit-oss-plugins.test.mjs
 node web-admin/scripts/run-showcase-seed-sequence.test.mjs
