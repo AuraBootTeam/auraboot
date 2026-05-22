@@ -110,6 +110,7 @@ Validation is split into two layers:
 
 1. Workbench wiring: prove the product entry points, DSL pages, and static pages are reachable from the scenario dashboard.
 2. Agent scenario: prove an Agent run can execute the scenario path, invoke a real tool, persist a report artifact, and pass a deterministic quality rubric.
+3. Scenario orchestration: prove the full business chain can connect mission, tasks, multiple agents, approval policy, schedule, run, artifact, and memory.
 
 - Unit test the dashboard link map so `/p/...` paths stay aligned with imported DSL page schemas.
 - Browser-check `/aurabot/dashboard` in the bugfix environment.
@@ -129,3 +130,12 @@ Validation is split into two layers:
   - Persists a real `agent_artifact` report through `cmd_acp_create_agent_artifact`, then verifies it from the Dashboard artifact entry in the browser.
   - Scores the report with a deterministic quality rubric: minimum length, required sections, source links, competitor specificity, GTM actionability, and no stub placeholder in the artifact body.
   - Attaches runtime SSE events and `ciwb-agent-artifact-quality.json` as test evidence.
+- Playwright orchestration E2E: `web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts`.
+  - Creates "竞对调研：A/B/C 公司本周变化" through the AuraBot confirmed tool path.
+  - Creates Research Agent, Data Analyst, Sales Agent, and AuraBot supervisor definitions.
+  - Creates five sub-tasks: official-site collection, pricing collection, feature extraction/comparison table, sales interpretation, and final weekly report.
+  - Creates approval policy rules for external website access, budget overrun, email sending, and high-risk commands.
+  - Creates memory for enterprise preferences: pricing, features, customer stories, keywords, source links, and sales actions.
+  - Creates a Monday weekly schedule, triggers it through `/api/agent/schedule/{schedulePid}/trigger`, and verifies the resulting Agent run.
+  - Persists the final report artifact linked to the scheduled run and report task, then verifies the schedule and artifact from Dashboard entries.
+  - Attaches `ciwb-orchestration-evidence.json` with record ids, run id, task ids, tool events, and report quality score.
