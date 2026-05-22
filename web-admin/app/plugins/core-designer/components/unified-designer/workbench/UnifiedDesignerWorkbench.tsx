@@ -10,6 +10,7 @@ import { findBlockById, moveBlockBefore, updateBlockById } from '../utils/recurs
 import { setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
+import { getKindPolicy, isBlockTypeAllowedForKind } from '../registry/kindPolicy';
 import {
   createBlockTemplate,
   createModelFieldBlock,
@@ -46,7 +47,13 @@ export function UnifiedDesignerWorkbench({
   const [draggingPaletteBlockType, setDraggingPaletteBlockType] = useState<string | null>(null);
   const [draggingModelField, setDraggingModelField] = useState<ModelFieldDefinition | null>(null);
   const blockRegistry = useMemo(() => createDefaultBlockRegistryV3(), []);
-  const blockDefinitions = useMemo(() => blockRegistry.getAll(), [blockRegistry]);
+  const blockDefinitions = useMemo(
+    () =>
+      blockRegistry
+        .getAll()
+        .filter((definition) => isBlockTypeAllowedForKind(document.kind, definition.blockType)),
+    [blockRegistry, document.kind],
+  );
 
   const currentSnapshot = serializeDocument(document);
   const isDirty = currentSnapshot !== savedSnapshot;
@@ -97,9 +104,10 @@ export function UnifiedDesignerWorkbench({
   const canAddBlock = (blockType: string) => {
     const definition = blockRegistry.get(blockType);
     if (!definition) return false;
+    if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     if (selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType)) return true;
     if (selectedBlockId && resolveBlockDropBeforeTarget(selectedBlockId, blockType)) return true;
-    return definition.category === 'page';
+    return canAddBlockToRoot(blockType);
   };
 
   const handleAddBlock = (blockType: string) => {
@@ -143,15 +151,24 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddBlockToParent = (parentBlockId: string, blockType: string) => {
+    if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     const parentBlock = findBlockById(document.blocks, parentBlockId)?.block;
     return parentBlock ? blockRegistry.canContain(parentBlock.blockType, blockType) : false;
   };
 
   const canAddBlockBeforeTarget = (targetBlockId: string, blockType: string) => {
+    if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     return Boolean(resolveBlockDropBeforeTarget(targetBlockId, blockType));
   };
 
   const canAddBlockToRoot = (blockType: string) => {
+    if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
+    const policy = getKindPolicy(document.kind);
+    if (policy.rootBlockType) {
+      // Single-kind page: only its root container, and only when not already present.
+      if (blockType !== policy.rootBlockType) return false;
+      return !document.blocks.some((block) => block.blockType === policy.rootBlockType);
+    }
     return blockRegistry.get(blockType)?.category === 'page';
   };
 

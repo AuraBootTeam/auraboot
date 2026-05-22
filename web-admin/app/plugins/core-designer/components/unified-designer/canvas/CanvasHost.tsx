@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowDown, ArrowUp, Maximize2 } from 'lucide-react';
+import { useI18n } from '~/contexts/I18nContext';
+import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { DesignerMode, DslBlockV3, ModelFieldDefinition, PageSchemaV3 } from '../types';
 import { readModelFieldPayload, readPaletteBlockType } from '../utils/dragPayload';
 
@@ -53,8 +55,17 @@ export function CanvasHost({
   onPaletteDragEnd,
   onModelFieldDragEnd,
 }: CanvasHostProps) {
+  const { locale } = useI18n();
   const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
   const [activeDropIntent, setActiveDropIntent] = useState<DropIntentState>(null);
+  const kindLabel = resolveDesignerText(
+    DESIGNER_I18N.unified.canvasKind[document.kind] ?? DESIGNER_I18N.unified.canvasKind.composite,
+    locale,
+  );
+  // Toolbar already renders the page title; the canvas band shows the kind (the
+  // actual fix for the wrong "Composite canvas" copy) plus the technical id.
+  const canvasSubject =
+    document.id || resolveDesignerText(DESIGNER_I18N.unified.untitledPage, locale);
   const rootCanAcceptPaletteBlock = Boolean(
     draggingPaletteBlockType && canAddBlockToRoot(draggingPaletteBlockType),
   );
@@ -141,11 +152,12 @@ export function CanvasHost({
           }`}
         >
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Composite canvas
+            {kindLabel}
           </div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">{document.id}</div>
+          <div className="mt-1 text-lg font-semibold text-slate-900">{canvasSubject}</div>
           <div className="mt-2 text-xs text-slate-500">
-            Mode: <span className="font-medium text-blue-700">{mode}</span>
+            {resolveDesignerText(DESIGNER_I18N.unified.mode, locale)}:{' '}
+            <span className="font-medium text-blue-700">{mode}</span>
           </div>
         </div>
         <div className="grid grid-cols-12 gap-4">

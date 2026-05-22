@@ -279,6 +279,45 @@ export const DESIGNER_I18N = {
       'en-US': 'Configure overview charts in the dashboard designer',
     } as L,
   },
+
+  // ── Unified designer ───────────────────────────────────────────
+  unified: {
+    canvasKind: {
+      form: { 'zh-CN': '表单', 'en-US': 'Form' } as L,
+      list: { 'zh-CN': '列表', 'en-US': 'List' } as L,
+      detail: { 'zh-CN': '详情', 'en-US': 'Detail' } as L,
+      dashboard: { 'zh-CN': '仪表盘', 'en-US': 'Dashboard' } as L,
+      composite: { 'zh-CN': '组合页面', 'en-US': 'Composite' } as L,
+    },
+    mode: { 'zh-CN': '模式', 'en-US': 'Mode' } as L,
+    untitledPage: { 'zh-CN': '未命名页面', 'en-US': 'Untitled page' } as L,
+
+    // Resource panel
+    tabOutline: { 'zh-CN': '大纲', 'en-US': 'Outline' } as L,
+    tabBlocks: { 'zh-CN': '区块', 'en-US': 'Blocks' } as L,
+    tabFields: { 'zh-CN': '字段', 'en-US': 'Fields' } as L,
+    pageTree: { 'zh-CN': '页面结构', 'en-US': 'Page tree' } as L,
+    target: { 'zh-CN': '目标', 'en-US': 'Target' } as L,
+    pageRoot: { 'zh-CN': '页面根', 'en-US': 'Page root' } as L,
+    fields: { 'zh-CN': '字段', 'en-US': 'Fields' } as L,
+    model: { 'zh-CN': '模型', 'en-US': 'Model' } as L,
+    searchFields: { 'zh-CN': '搜索字段', 'en-US': 'Search fields' } as L,
+    noFieldsMatch: { 'zh-CN': '无匹配字段', 'en-US': 'No fields match' } as L,
+    added: { 'zh-CN': '已添加', 'en-US': 'Added' } as L,
+    customField: { 'zh-CN': '自定义字段', 'en-US': 'Custom field' } as L,
+    virtual: { 'zh-CN': '虚拟', 'en-US': 'Virtual' } as L,
+    fieldCount: { 'zh-CN': '{count} 个字段', 'en-US': '{count} fields' } as L,
+    virtualCount: { 'zh-CN': '{count} 虚拟', 'en-US': '{count} virtual' } as L,
+    dragOrDoubleClick: { 'zh-CN': '拖拽或双击添加', 'en-US': 'Drag or double-click to add' } as L,
+    noModelBound: { 'zh-CN': '该页面未绑定模型，无可用字段', 'en-US': 'No model bound to this page' } as L,
+
+    // Inspector shell
+    inspector: { 'zh-CN': '检查器', 'en-US': 'Inspector' } as L,
+    basic: { 'zh-CN': '基础', 'en-US': 'Basic' } as L,
+    advancedJson: { 'zh-CN': '高级 JSON', 'en-US': 'Advanced JSON' } as L,
+    unset: { 'zh-CN': '未设置', 'en-US': 'Unset' } as L,
+    noSelection: { 'zh-CN': '未选择区块', 'en-US': 'No block selected' } as L,
+  },
 } as const;
 
 /**
