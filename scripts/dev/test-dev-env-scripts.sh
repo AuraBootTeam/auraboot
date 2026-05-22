@@ -407,6 +407,23 @@ LOGS_OUTPUT="$(
 )"
 assert_contains "env logs prints frontend log path" "$LOGS_OUTPUT" "/tmp/aura-scriptcheck-r2-frontend.log"
 
+echo "Scenario 16: unified env demo dry-run exposes full OSS demo contract"
+DEMO_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh demo --mode=bugfix --product=oss --slug=scriptcheck-r2 --dry-run
+)"
+assert_contains "env demo dry-run names scenario" "$DEMO_OUTPUT" "scenario:        bugfix-oss-demo"
+assert_contains "env demo dry-run uses e2e plugin profile" "$DEMO_OUTPUT" "plugin profile:  e2e"
+assert_contains "env demo dry-run includes workflow data" "$DEMO_OUTPUT" "workflow data:"
+assert_contains "env demo dry-run includes invariants" "$DEMO_OUTPUT" "node scripts/oss-demo-invariants.mjs"
+REBUILD_DEMO_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    AURA_ENV_REGISTRY_ROOT="$DRY_ENV_REGISTRY_ROOT" scripts/dev/env.sh rebuild-demo --mode=bugfix --product=oss --slug=scriptcheck-demo --dry-run
+)"
+assert_contains "env rebuild-demo dry-run prints start plan" "$REBUILD_DEMO_OUTPUT" "Bugfix environment start plan"
+assert_contains "env rebuild-demo dry-run prints reset command" "$REBUILD_DEMO_OUTPUT" "reset command: scripts/dev/env.sh reset"
+assert_contains "env rebuild-demo dry-run prints demo contract" "$REBUILD_DEMO_OUTPUT" "scenario:        bugfix-oss-demo"
+
 echo ""
 echo "==========================================="
 echo "  Results: $PASS passed, $FAIL failed"

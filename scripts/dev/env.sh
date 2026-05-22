@@ -36,7 +36,7 @@ PURGE=0
 
 usage() {
     cat <<USAGE
-Usage: scripts/dev/env.sh <start|stop|status|reset|verify|logs|list|inspect> [options]
+Usage: scripts/dev/env.sh <start|stop|status|reset|demo|rebuild-demo|verify|logs|list|inspect> [options]
 
 Options:
   --mode=bugfix           Daily bugfix mode: Docker infra, host apps
@@ -541,6 +541,39 @@ command_verify() {
     return "$failed"
 }
 
+command_demo() {
+    if [ "$MODE" != "bugfix" ]; then
+        echo "ERROR: demo currently supports --mode=bugfix" >&2
+        exit 2
+    fi
+    "$SCRIPT_DIR/prepare-bugfix-demo.sh" \
+        --slug="$SLUG" \
+        --product="$PRODUCT" \
+        $([ "$DRY_RUN" = "1" ] && printf '%s' "--dry-run")
+}
+
+command_rebuild_demo() {
+    if [ "$MODE" != "bugfix" ]; then
+        echo "ERROR: rebuild-demo currently supports --mode=bugfix" >&2
+        exit 2
+    fi
+    if [ "$PRODUCT" != "oss" ]; then
+        echo "ERROR: rebuild-demo currently supports --product=oss only" >&2
+        exit 2
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        command_start
+        echo ""
+        echo "Bugfix rebuild-demo dry-run"
+        echo "  reset command: scripts/dev/env.sh reset --mode=$MODE --product=$PRODUCT --slug=$SLUG"
+        command_demo
+        return 0
+    fi
+    command_start
+    command_reset
+    command_demo
+}
+
 command_logs() {
     case "$SERVICE" in
         backend) echo "$(backend_log)" ;;
@@ -570,6 +603,8 @@ case "$COMMAND" in
     stop) command_stop ;;
     status) command_status ;;
     reset) command_reset ;;
+    demo) command_demo ;;
+    rebuild-demo) command_rebuild_demo ;;
     verify) command_verify ;;
     logs) command_logs ;;
     list) command_list ;;
