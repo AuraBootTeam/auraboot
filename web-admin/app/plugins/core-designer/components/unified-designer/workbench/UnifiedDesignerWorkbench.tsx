@@ -1,4 +1,16 @@
 import React, { useMemo, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
 import type {
   DslBlockV3,
   ModelFieldDefinition,
@@ -17,9 +29,16 @@ import {
   type ModelFieldTargetBlockType,
 } from '../registry/createBlockTemplate';
 import { collectBlockIds } from '../utils/blockIds';
+import {
+  readDragData,
+  readDropData,
+  resolveBlockDropIntent,
+  resolveDragEndAction,
+  type DragData,
+} from '../dnd/dndShared';
 import { WorkbenchToolbar, type DesignerSaveStatus } from './WorkbenchToolbar';
 import { ResourcePanel } from './ResourcePanel';
-import { CanvasHost } from '../canvas/CanvasHost';
+import { CanvasHost, type ActiveDropIntent } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
@@ -44,8 +63,12 @@ export function UnifiedDesignerWorkbench({
   const [validationErrorCount, setValidationErrorCount] = useState(0);
   const [mode, setMode] = useState<WorkbenchMode>('edit');
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [draggingPaletteBlockType, setDraggingPaletteBlockType] = useState<string | null>(null);
-  const [draggingModelField, setDraggingModelField] = useState<ModelFieldDefinition | null>(null);
+  const [activeDrag, setActiveDrag] = useState<DragData | null>(null);
+  const [activeDropIntent, setActiveDropIntent] = useState<ActiveDropIntent>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
   const blockRegistry = useMemo(() => createDefaultBlockRegistryV3(), []);
   const blockDefinitions = useMemo(
     () =>
@@ -393,6 +416,66 @@ export function UnifiedDesignerWorkbench({
     }));
   };
 
+  const dropCapabilities = {
+    canAddBlockBeforeTarget,
+    canAddBlockToParent,
+    canAddModelFieldBeforeTarget,
+    canAddModelFieldToParent,
+  };
+  const rootAccepts = activeDrag?.kind === 'palette-block' && canAddBlockToRoot(activeDrag.blockType);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const drag = readDragData(event.active.data.current);
+    setActiveDrag(drag);
+    setActiveDropIntent(null);
+    if (drag?.kind === 'canvas-block') setSelectedBlockId(drag.blockId);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const drag = readDragData(event.active.data.current);
+    const drop = readDropData(event.over?.data.current);
+    if (!drag || !drop || drop.kind !== 'block') {
+      setActiveDropIntent(null);
+      return;
+    }
+    const intent = resolveBlockDropIntent(drag, drop.blockId, dropCapabilities);
+    setActiveDropIntent(intent ? { blockId: drop.blockId, intent } : null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const drag = readDragData(event.active.data.current);
+    const drop = readDropData(event.over?.data.current);
+    setActiveDrag(null);
+    setActiveDropIntent(null);
+
+    const action = resolveDragEndAction(drag, drop, {
+      ...dropCapabilities,
+      canAddBlockToRoot,
+    });
+    if (!action) return;
+
+    switch (action.type) {
+      case 'add-block-root':
+        handleAddBlockToRoot(action.blockType);
+        break;
+      case 'add-block-before':
+        handleAddBlockBeforeTarget(action.targetBlockId, action.blockType);
+        break;
+      case 'add-block-inside':
+        handleAddBlockToParent(action.parentBlockId, action.blockType);
+        break;
+      case 'add-field-before':
+        handleAddModelFieldBeforeTarget(action.targetBlockId, action.field);
+        break;
+      case 'add-field-inside':
+        handleAddModelFieldToParent(action.parentBlockId, action.field);
+        break;
+      case 'move-before':
+        handleMoveBefore(action.movingBlockId, action.targetBlockId);
+        break;
+    }
+  };
+
   const handleSave = async () => {
     const validation = validatePageSchemaV3(document);
     setSaveError(null);
@@ -445,59 +528,81 @@ export function UnifiedDesignerWorkbench({
           </div>
         </div>
       ) : (
-        <div
-          className="flex min-h-0 flex-1 flex-col overflow-auto xl:flex-row xl:overflow-hidden"
-          data-testid="unified-workbench-body"
+        <DndContext
+          sensors={sensors}
+          collisionDetection={pointerWithin}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => {
+            setActiveDrag(null);
+            setActiveDropIntent(null);
+          }}
         >
-          <ResourcePanel
-            document={document}
-            selectedBlockId={selectedBlockId}
-            selectedBlock={selectedBlock}
-            blockDefinitions={blockDefinitions}
-            selectedModelCode={selectedModelCode}
-            modelFields={selectedModelFields}
-            canAddBlock={canAddBlock}
-            canAddModelField={canAddModelField}
-            isModelFieldUsed={isSelectedModelFieldUsed}
-            onSelect={setSelectedBlockId}
-            onAddBlock={handleAddBlock}
-            onAddModelField={handleAddModelField}
-            onPaletteDragStart={setDraggingPaletteBlockType}
-            onPaletteDragEnd={() => setDraggingPaletteBlockType(null)}
-            onModelFieldDragStart={setDraggingModelField}
-            onModelFieldDragEnd={() => setDraggingModelField(null)}
-          />
-          <CanvasHost
-            document={document}
-            mode={mode}
-            selectedBlockId={selectedBlockId}
-            draggingPaletteBlockType={draggingPaletteBlockType}
-            draggingModelField={draggingModelField}
-            onSelect={setSelectedBlockId}
-            onMoveBefore={handleMoveBefore}
-            onPatchBlock={patchBlock}
-            canAddBlockToParent={canAddBlockToParent}
-            onAddBlockToParent={handleAddBlockToParent}
-            canAddBlockBeforeTarget={canAddBlockBeforeTarget}
-            onAddBlockBeforeTarget={handleAddBlockBeforeTarget}
-            canAddModelFieldToParent={canAddModelFieldToParent}
-            onAddModelFieldToParent={handleAddModelFieldToParent}
-            canAddModelFieldBeforeTarget={canAddModelFieldBeforeTarget}
-            onAddModelFieldBeforeTarget={handleAddModelFieldBeforeTarget}
-            canAddBlockToRoot={canAddBlockToRoot}
-            onAddBlockToRoot={handleAddBlockToRoot}
-            onPaletteDragEnd={() => setDraggingPaletteBlockType(null)}
-            onModelFieldDragEnd={() => setDraggingModelField(null)}
-          />
-          <InspectorHost
-            selectedBlock={selectedBlock}
-            modelFields={selectedModelFields}
-            onChange={updateSelectedBlock}
-          />
-        </div>
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-auto xl:flex-row xl:overflow-hidden"
+            data-testid="unified-workbench-body"
+          >
+            <ResourcePanel
+              document={document}
+              selectedBlockId={selectedBlockId}
+              selectedBlock={selectedBlock}
+              blockDefinitions={blockDefinitions}
+              selectedModelCode={selectedModelCode}
+              modelFields={selectedModelFields}
+              canAddBlock={canAddBlock}
+              canAddModelField={canAddModelField}
+              isModelFieldUsed={isSelectedModelFieldUsed}
+              onSelect={setSelectedBlockId}
+              onAddBlock={handleAddBlock}
+              onAddModelField={handleAddModelField}
+            />
+            <CanvasHost
+              document={document}
+              mode={mode}
+              selectedBlockId={selectedBlockId}
+              activeDrag={activeDrag}
+              activeDropIntent={activeDropIntent}
+              rootAccepts={Boolean(rootAccepts)}
+              onSelect={setSelectedBlockId}
+              onMoveBefore={handleMoveBefore}
+              onPatchBlock={patchBlock}
+            />
+            <InspectorHost
+              selectedBlock={selectedBlock}
+              modelFields={selectedModelFields}
+              onChange={updateSelectedBlock}
+            />
+          </div>
+          <DragOverlay dropAnimation={null}>
+            {activeDrag ? <DragGhost drag={activeDrag} /> : null}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );
+}
+
+function DragGhost({ drag }: { drag: DragData }) {
+  const label =
+    drag.kind === 'palette-block'
+      ? drag.blockType
+      : drag.kind === 'model-field'
+      ? localizedLabel(drag.field.label) || drag.field.code
+      : drag.blockId;
+  return (
+    <div
+      data-testid="drag-overlay-ghost"
+      className="pointer-events-none rounded-md border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-lg"
+    >
+      {label}
+    </div>
+  );
+}
+
+function localizedLabel(value: ModelFieldDefinition['label']): string {
+  if (typeof value === 'string') return value;
+  return value['zh-CN'] || value['en-US'] || Object.values(value)[0] || '';
 }
 
 function serializeDocument(document: PageSchemaV3): string {

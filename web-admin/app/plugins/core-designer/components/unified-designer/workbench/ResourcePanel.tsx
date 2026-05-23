@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import { useDraggable } from '@dnd-kit/core';
 import { Plus, Sparkles } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { BlockDefinitionV3, DslBlockV3, LocalizedText, ModelFieldDefinition, PageSchemaV3 } from '../types';
-import { PALETTE_BLOCK_TYPE_MIME, writeModelFieldPayload } from '../utils/dragPayload';
+import { fieldDraggableId, paletteDraggableId } from '../dnd/dndShared';
 import { groupModelFields } from '../utils/fieldGrouping';
 
 /**
@@ -26,10 +27,6 @@ interface ResourcePanelProps {
   onSelect: (blockId: string) => void;
   onAddBlock: (blockType: string) => void;
   onAddModelField: (field: ModelFieldDefinition) => void;
-  onPaletteDragStart: (blockType: string) => void;
-  onPaletteDragEnd: () => void;
-  onModelFieldDragStart: (field: ModelFieldDefinition) => void;
-  onModelFieldDragEnd: () => void;
 }
 
 type ResourcePanelTab = 'outline' | 'blocks' | 'fields';
@@ -47,10 +44,6 @@ export function ResourcePanel({
   onSelect,
   onAddBlock,
   onAddModelField,
-  onPaletteDragStart,
-  onPaletteDragEnd,
-  onModelFieldDragStart,
-  onModelFieldDragEnd,
 }: ResourcePanelProps) {
   const { locale } = useI18n();
   const [activeTab, setActiveTab] = useState<ResourcePanelTab>('outline');
@@ -104,8 +97,6 @@ export function ResourcePanel({
             selectedBlock={selectedBlock}
             canAddBlock={canAddBlock}
             onAddBlock={onAddBlock}
-            onPaletteDragStart={onPaletteDragStart}
-            onPaletteDragEnd={onPaletteDragEnd}
             locale={locale}
           />
         ) : null}
@@ -118,8 +109,6 @@ export function ResourcePanel({
             isModelFieldUsed={isModelFieldUsed}
             onAddField={() => onAddBlock('field')}
             onAddModelField={onAddModelField}
-            onModelFieldDragStart={onModelFieldDragStart}
-            onModelFieldDragEnd={onModelFieldDragEnd}
             locale={locale}
           />
         ) : null}
@@ -160,16 +149,12 @@ function BlockPalette({
   selectedBlock,
   canAddBlock,
   onAddBlock,
-  onPaletteDragStart,
-  onPaletteDragEnd,
   locale,
 }: {
   blockDefinitions: BlockDefinitionV3[];
   selectedBlock: DslBlockV3 | null;
   canAddBlock: (blockType: string) => boolean;
   onAddBlock: (blockType: string) => void;
-  onPaletteDragStart: (blockType: string) => void;
-  onPaletteDragEnd: () => void;
   locale: string;
 }) {
   const paletteDefinitions = useMemo(
@@ -198,48 +183,130 @@ function BlockPalette({
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
             {category}
           </div>
-          {definitions.map((definition) => {
-            const enabled = canAddBlock(definition.blockType);
-            return (
-              <button
-                key={definition.blockType}
-                type="button"
-                data-testid={`palette-add-${definition.blockType}`}
-                disabled={!enabled}
-                draggable={enabled}
-                onPointerDown={() => {
-                  if (enabled) onPaletteDragStart(definition.blockType);
-                }}
-                onPointerUp={onPaletteDragEnd}
-                onMouseDown={() => {
-                  if (enabled) onPaletteDragStart(definition.blockType);
-                }}
-                onMouseUp={onPaletteDragEnd}
-                onDragStart={(event) => {
-                  event.dataTransfer.effectAllowed = 'copy';
-                  event.dataTransfer.setData(PALETTE_BLOCK_TYPE_MIME, definition.blockType);
-                  event.dataTransfer.setData('text/plain', `palette:${definition.blockType}`);
-                  onPaletteDragStart(definition.blockType);
-                }}
-                onDragEnd={onPaletteDragEnd}
-                onClick={() => onAddBlock(definition.blockType)}
-                className={`flex w-full items-center justify-between rounded-md border px-2 py-2 text-left text-xs ${
-                  enabled
-                    ? 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
-                    : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                }`}
-              >
-                <span>
-                  <span className="block font-medium">{localizedToString(definition.label, locale)}</span>
-                  <span className="font-mono text-[10px]">{definition.blockType}</span>
-                </span>
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            );
-          })}
+          {definitions.map((definition) => (
+            <PaletteBlockButton
+              key={definition.blockType}
+              definition={definition}
+              enabled={canAddBlock(definition.blockType)}
+              onAddBlock={onAddBlock}
+              locale={locale}
+            />
+          ))}
         </div>
       ))}
     </div>
+  );
+}
+
+function PaletteBlockButton({
+  definition,
+  enabled,
+  onAddBlock,
+  locale,
+}: {
+  definition: BlockDefinitionV3;
+  enabled: boolean;
+  onAddBlock: (blockType: string) => void;
+  locale: string;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: paletteDraggableId(definition.blockType),
+    data: { kind: 'palette-block', blockType: definition.blockType },
+    disabled: !enabled,
+  });
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      data-testid={`palette-add-${definition.blockType}`}
+      disabled={!enabled}
+      onClick={() => onAddBlock(definition.blockType)}
+      {...attributes}
+      {...listeners}
+      className={`flex w-full items-center justify-between rounded-md border px-2 py-2 text-left text-xs ${
+        enabled
+          ? 'cursor-grab touch-none border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 active:cursor-grabbing'
+          : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+      } ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <span>
+        <span className="block font-medium">{localizedToString(definition.label, locale)}</span>
+        <span className="font-mono text-[10px]">{definition.blockType}</span>
+      </span>
+      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+    </button>
+  );
+}
+
+function ModelFieldItem({
+  field,
+  enabled,
+  used,
+  onAddModelField,
+  locale,
+}: {
+  field: ModelFieldDefinition;
+  enabled: boolean;
+  used: boolean;
+  onAddModelField: (field: ModelFieldDefinition) => void;
+  locale: string;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: fieldDraggableId(field),
+    data: { kind: 'model-field', field },
+    disabled: !enabled,
+  });
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      data-testid={`model-field-${field.code}`}
+      data-used={used ? 'true' : 'false'}
+      data-virtual={field.virtual ? 'true' : 'false'}
+      disabled={!enabled}
+      onDoubleClick={() => {
+        if (enabled) onAddModelField(field);
+      }}
+      onClick={() => onAddModelField(field)}
+      {...attributes}
+      {...listeners}
+      className={`flex w-full items-center justify-between rounded-md border px-2 py-2 text-left text-xs ${
+        enabled
+          ? 'cursor-grab touch-none border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 active:cursor-grabbing'
+          : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+      } ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <span className="min-w-0">
+        <span className="block truncate font-medium">{localizedToString(field.label, locale)}</span>
+        <span className="mt-1 flex flex-wrap items-center gap-1">
+          <span className="font-mono text-[10px]">{field.code}</span>
+          {field.type ? (
+            <span
+              data-testid={`model-field-type-${field.code}`}
+              className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500"
+            >
+              {field.type}
+            </span>
+          ) : null}
+          {field.virtual ? (
+            <span
+              data-testid={`model-field-virtual-${field.code}`}
+              className="inline-flex items-center gap-0.5 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600"
+            >
+              <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
+              {resolveDesignerText(DESIGNER_I18N.unified.virtual, locale)}
+            </span>
+          ) : null}
+        </span>
+      </span>
+      {used ? (
+        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+          {resolveDesignerText(DESIGNER_I18N.unified.added, locale)}
+        </span>
+      ) : (
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+      )}
+    </button>
   );
 }
 
@@ -251,8 +318,6 @@ function FieldPalette({
   isModelFieldUsed,
   onAddField,
   onAddModelField,
-  onModelFieldDragStart,
-  onModelFieldDragEnd,
   locale,
 }: {
   selectedModelCode: string | null;
@@ -262,8 +327,6 @@ function FieldPalette({
   isModelFieldUsed: (field: ModelFieldDefinition) => boolean;
   onAddField: () => void;
   onAddModelField: (field: ModelFieldDefinition) => void;
-  onModelFieldDragStart: (field: ModelFieldDefinition) => void;
-  onModelFieldDragEnd: () => void;
   locale: string;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -311,77 +374,16 @@ function FieldPalette({
                 {resolveDesignerText(DESIGNER_I18N.unified.fieldGroup[group.key], locale)}
                 <span className="ml-1 text-slate-300">({group.fields.length})</span>
               </div>
-              {group.fields.map((field) => {
-                const enabled = canAddModelField(field);
-                const used = isModelFieldUsed(field);
-                return (
-                  <button
-                    key={`${field.modelCode}.${field.code}`}
-                    type="button"
-                    data-testid={`model-field-${field.code}`}
-                    data-used={used ? 'true' : 'false'}
-                    data-virtual={field.virtual ? 'true' : 'false'}
-                    disabled={!enabled}
-                    draggable={enabled}
-                    onPointerDown={() => {
-                      if (enabled) onModelFieldDragStart(field);
-                    }}
-                    onPointerUp={onModelFieldDragEnd}
-                    onMouseDown={() => {
-                      if (enabled) onModelFieldDragStart(field);
-                    }}
-                    onMouseUp={onModelFieldDragEnd}
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = 'copy';
-                      writeModelFieldPayload(event.dataTransfer, field);
-                      onModelFieldDragStart(field);
-                    }}
-                    onDragEnd={onModelFieldDragEnd}
-                    onDoubleClick={() => {
-                      if (enabled) onAddModelField(field);
-                    }}
-                    onClick={() => onAddModelField(field)}
-                    className={`flex w-full items-center justify-between rounded-md border px-2 py-2 text-left text-xs ${
-                      enabled
-                        ? 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
-                        : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
-                    }`}
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">
-                        {localizedToString(field.label, locale)}
-                      </span>
-                      <span className="mt-1 flex flex-wrap items-center gap-1">
-                        <span className="font-mono text-[10px]">{field.code}</span>
-                        {field.type ? (
-                          <span
-                            data-testid={`model-field-type-${field.code}`}
-                            className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500"
-                          >
-                            {field.type}
-                          </span>
-                        ) : null}
-                        {field.virtual ? (
-                          <span
-                            data-testid={`model-field-virtual-${field.code}`}
-                            className="inline-flex items-center gap-0.5 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600"
-                          >
-                            <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
-                            {resolveDesignerText(DESIGNER_I18N.unified.virtual, locale)}
-                          </span>
-                        ) : null}
-                      </span>
-                    </span>
-                    {used ? (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
-                        {resolveDesignerText(DESIGNER_I18N.unified.added, locale)}
-                      </span>
-                    ) : (
-                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                    )}
-                  </button>
-                );
-              })}
+              {group.fields.map((field) => (
+                <ModelFieldItem
+                  key={`${field.modelCode}.${field.code}`}
+                  field={field}
+                  enabled={canAddModelField(field)}
+                  used={isModelFieldUsed(field)}
+                  onAddModelField={onAddModelField}
+                  locale={locale}
+                />
+              ))}
             </div>
           ))}
           {!filteredModelFields.length ? (

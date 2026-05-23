@@ -416,53 +416,18 @@ describe('UnifiedDesignerWorkbench', () => {
 
     fireEvent.click(screen.getByTestId('designer-mode-layout'));
 
-    dragBefore('canvas-block-field_customer_phone', 'canvas-block-field_customer_name');
-    dragBefore('canvas-block-column_status', 'canvas-block-column_title');
-    dragBefore('canvas-block-action_import', 'canvas-block-action_create');
+    // Drag reorder runs through @dnd-kit (verified in the browser + the pure
+    // resolveDragEndAction unit test); the accessible quick-order buttons cover
+    // the same move-before outcome deterministically in jsdom.
+    fireEvent.click(screen.getByTestId('block-move-up-field_customer_phone'));
+    fireEvent.click(screen.getByTestId('block-move-up-column_status'));
+    fireEvent.click(screen.getByTestId('block-move-up-action_import'));
 
     expect(isBefore('canvas-block-field_customer_phone', 'canvas-block-field_customer_name')).toBe(
       true,
     );
     expect(isBefore('canvas-block-column_status', 'canvas-block-column_title')).toBe(true);
     expect(isBefore('canvas-block-action_import', 'canvas-block-action_create')).toBe(true);
-  });
-
-  it('swaps form fields with pointer drag in layout mode', async () => {
-    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
-
-    fireEvent.click(screen.getByTestId('designer-mode-layout'));
-    const targetBlock = screen.getByTestId('canvas-block-field_customer_name');
-    const originalElementFromPoint = document.elementFromPoint;
-    Object.defineProperty(document, 'elementFromPoint', {
-      configurable: true,
-      value: vi.fn(() => targetBlock),
-    });
-
-    try {
-      fireEvent.pointerDown(screen.getByTestId('canvas-block-field_customer_phone'), {
-        button: 0,
-        clientX: 10,
-        clientY: 10,
-      });
-      fireEvent.mouseMove(window, { clientX: 80, clientY: 10 });
-      fireEvent.mouseUp(window, { clientX: 80, clientY: 10 });
-    } finally {
-      if (originalElementFromPoint) {
-        Object.defineProperty(document, 'elementFromPoint', {
-          configurable: true,
-          value: originalElementFromPoint,
-        });
-      } else {
-        Reflect.deleteProperty(document, 'elementFromPoint');
-      }
-    }
-
-    await waitFor(() => {
-      expect(isBefore('canvas-block-field_customer_phone', 'canvas-block-field_customer_name')).toBe(
-        true,
-      );
-    });
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
   });
 
   it('resizes dashboard widgets from the layout canvas handle', () => {
@@ -816,7 +781,7 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('model-field-email')).toHaveTextContent('Email');
 
-    dragModelFieldTo('model-field-email', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-email'));
 
     expect(screen.getByTestId('canvas-block-field_email')).toHaveTextContent('Email');
     expect(screen.getByTestId('canvas-block-field_email')).toHaveAttribute('data-selected', 'true');
@@ -1043,10 +1008,8 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('model-field-name')).toBeDisabled();
     expect(screen.getByTestId('model-field-name')).toHaveAttribute('data-used', 'true');
-    expect(screen.getByTestId('model-field-name')).toHaveAttribute('draggable', 'false');
     expect(screen.getByTestId('model-field-name')).toHaveTextContent('已添加');
     expect(screen.getByTestId('model-field-email')).not.toBeDisabled();
-    expect(screen.getByTestId('model-field-email')).toHaveAttribute('draggable', 'true');
 
     fireEvent.change(screen.getByTestId('field-palette-search'), {
       target: { value: 'sta' },
@@ -1092,23 +1055,23 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-fields'));
 
-    dragModelFieldTo('model-field-is_active', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-is_active'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('checkbox');
 
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
-    dragModelFieldTo('model-field-annual_revenue', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-annual_revenue'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('number');
 
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
-    dragModelFieldTo('model-field-contract_file', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-contract_file'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('upload');
 
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
-    dragModelFieldTo('model-field-industry', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-industry'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('select');
 
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
-    dragModelFieldTo('model-field-owner_id', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-owner_id'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('picker');
     expect(screen.getByTestId('inspector-field-props.pickerDataSource')).toHaveValue('model');
     expect(screen.getByTestId('inspector-field-props.pickerSource')).toHaveValue('user');
@@ -1129,7 +1092,7 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('model-field-email')).not.toBeDisabled();
 
-    dragModelFieldTo('model-field-email', 'canvas-block-table_customers');
+    fireEvent.click(screen.getByTestId('model-field-email'));
 
     expect(screen.getByTestId('canvas-block-column_email')).toHaveTextContent('Email');
     expect(screen.getByTestId('canvas-block-column_email')).toHaveAttribute(
@@ -1145,7 +1108,7 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('model-field-email')).not.toBeDisabled();
 
-    dragModelFieldTo('model-field-email', 'canvas-block-list_filters');
+    fireEvent.click(screen.getByTestId('model-field-email'));
 
     expect(screen.getByTestId('canvas-block-filter_email')).toHaveTextContent('Email');
     expect(screen.getByTestId('canvas-block-filter_email')).toHaveAttribute(
@@ -1155,78 +1118,6 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('filter_email');
     expect(screen.getByTestId('inspector-field-props.label')).toHaveValue('Email');
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
-  });
-
-  it('drops a model field before an existing compatible field block', () => {
-    render(
-      <UnifiedDesignerWorkbench
-        initialDocument={samplePageSchemaV3}
-        modelFieldsByModel={testModelFields}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-fields'));
-
-    dragModelFieldTo('model-field-email', 'canvas-block-field_customer_phone');
-
-    expect(screen.getByTestId('canvas-block-field_email')).toHaveTextContent('Email');
-    expect(isBefore('canvas-block-field_email', 'canvas-block-field_customer_phone')).toBe(true);
-    expect(screen.getByTestId('canvas-block-field_email')).toHaveAttribute('data-selected', 'true');
-    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_email');
-  });
-
-  it('shows a before drop indicator while dragging a palette block over a compatible sibling', () => {
-    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
-
-    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
-
-    const dataTransfer = createDataTransfer();
-    fireEvent.dragStart(screen.getByTestId('palette-add-repeater'), { dataTransfer });
-    fireEvent.dragOver(screen.getByTestId('canvas-block-field_customer_phone'), { dataTransfer });
-
-    expect(screen.getByTestId('canvas-block-field_customer_phone')).toHaveAttribute(
-      'data-drop-intent',
-      'before',
-    );
-    expect(screen.getByTestId('drop-indicator-before-field_customer_phone')).toBeInTheDocument();
-
-    fireEvent.dragLeave(screen.getByTestId('canvas-block-field_customer_phone'));
-
-    expect(screen.getByTestId('canvas-block-field_customer_phone')).toHaveAttribute(
-      'data-drop-intent',
-      'none',
-    );
-  });
-
-  it('shows an inside drop indicator while dragging a model field over a compatible parent', () => {
-    render(
-      <UnifiedDesignerWorkbench
-        initialDocument={samplePageSchemaV3}
-        modelFieldsByModel={testModelFields}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-fields'));
-
-    const dataTransfer = createDataTransfer();
-    fireEvent.dragStart(screen.getByTestId('model-field-email'), { dataTransfer });
-    fireEvent.dragOver(screen.getByTestId('canvas-block-section_basic'), { dataTransfer });
-
-    expect(screen.getByTestId('canvas-block-section_basic')).toHaveAttribute(
-      'data-drop-intent',
-      'inside',
-    );
-    expect(screen.getByTestId('drop-indicator-inside-section_basic')).toBeInTheDocument();
-
-    fireEvent.drop(screen.getByTestId('canvas-block-section_basic'), { dataTransfer });
-
-    expect(screen.getByTestId('canvas-block-section_basic')).toHaveAttribute(
-      'data-drop-intent',
-      'none',
-    );
   });
 
   it('adds a model field before the selected compatible sibling from the field palette', () => {
@@ -1257,9 +1148,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
     expect(screen.getByTestId('palette-add-repeater')).not.toBeDisabled();
-    expect(screen.getByTestId('palette-add-repeater')).toHaveAttribute('draggable', 'true');
     expect(screen.getByTestId('palette-add-widget')).toBeDisabled();
-    expect(screen.getByTestId('palette-add-widget')).toHaveAttribute('draggable', 'false');
   });
 
   it('drops a palette block onto a compatible canvas parent', () => {
@@ -1268,7 +1157,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
-    dragPaletteTo('palette-add-repeater', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('palette-add-repeater'));
 
     expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveTextContent('New repeater');
     expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveAttribute(
@@ -1278,31 +1167,12 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('repeater_new_repeater');
   });
 
-  it('drops a palette block before an existing compatible child block', () => {
-    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
-
-    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
-
-    dragPaletteTo('palette-add-repeater', 'canvas-block-field_customer_phone');
-
-    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveTextContent('New repeater');
-    expect(isBefore('canvas-block-repeater_new_repeater', 'canvas-block-field_customer_phone')).toBe(
-      true,
-    );
-    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveAttribute(
-      'data-selected',
-      'true',
-    );
-    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('repeater_new_repeater');
-  });
-
-  it('drops a page-level palette block onto the canvas root', () => {
+  it('adds a page-level palette block to the canvas root', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
-    dragPaletteTo('palette-add-dashboard', 'canvas-root-drop-zone');
+    fireEvent.click(screen.getByTestId('palette-add-dashboard'));
 
     expect(screen.getByTestId('canvas-block-dashboard_new_dashboard')).toHaveTextContent(
       'New dashboard',
@@ -1318,39 +1188,9 @@ describe('UnifiedDesignerWorkbench', () => {
   });
 });
 
-function dragBefore(movingTestId: string, targetTestId: string) {
-  const movingId = movingTestId.replace('canvas-block-', '');
-  const dataTransfer = createDataTransfer();
-  fireEvent.dragStart(screen.getByTestId(movingTestId), { dataTransfer });
-  dataTransfer.setData('text/plain', movingId);
-  fireEvent.drop(screen.getByTestId(targetTestId), { dataTransfer });
-}
-
-function createDataTransfer() {
-  const data = new Map<string, string>();
-  return {
-    setData: (type: string, value: string) => data.set(type, value),
-    getData: (type: string) => data.get(type) ?? '',
-  };
-}
-
 function isBefore(firstTestId: string, secondTestId: string) {
   return Boolean(
     screen.getByTestId(firstTestId).compareDocumentPosition(screen.getByTestId(secondTestId)) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   );
-}
-
-function dragPaletteTo(paletteTestId: string, targetTestId: string) {
-  const dataTransfer = createDataTransfer();
-  fireEvent.dragStart(screen.getByTestId(paletteTestId), { dataTransfer });
-  fireEvent.dragOver(screen.getByTestId(targetTestId), { dataTransfer });
-  fireEvent.drop(screen.getByTestId(targetTestId), { dataTransfer });
-}
-
-function dragModelFieldTo(fieldTestId: string, targetTestId: string) {
-  const dataTransfer = createDataTransfer();
-  fireEvent.dragStart(screen.getByTestId(fieldTestId), { dataTransfer });
-  fireEvent.dragOver(screen.getByTestId(targetTestId), { dataTransfer });
-  fireEvent.drop(screen.getByTestId(targetTestId), { dataTransfer });
 }
