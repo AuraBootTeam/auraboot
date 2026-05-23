@@ -572,12 +572,12 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Saved');
   });
 
-  it('adds a palette block to the selected compatible parent and selects it', () => {
+  it('adds a custom (unbound) field to the selected parent from the field library escape hatch', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
-    fireEvent.click(screen.getByTestId('palette-add-field'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('field-palette-add-field'));
 
     expect(screen.getByTestId('canvas-block-field_new_field')).toHaveTextContent('New field');
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_new_field');
@@ -1044,7 +1044,7 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('model-field-name')).toBeDisabled();
     expect(screen.getByTestId('model-field-name')).toHaveAttribute('data-used', 'true');
     expect(screen.getByTestId('model-field-name')).toHaveAttribute('draggable', 'false');
-    expect(screen.getByTestId('model-field-name')).toHaveTextContent('Added');
+    expect(screen.getByTestId('model-field-name')).toHaveTextContent('已添加');
     expect(screen.getByTestId('model-field-email')).not.toBeDisabled();
     expect(screen.getByTestId('model-field-email')).toHaveAttribute('draggable', 'true');
 
@@ -1183,7 +1183,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
     const dataTransfer = createDataTransfer();
-    fireEvent.dragStart(screen.getByTestId('palette-add-field'), { dataTransfer });
+    fireEvent.dragStart(screen.getByTestId('palette-add-repeater'), { dataTransfer });
     fireEvent.dragOver(screen.getByTestId('canvas-block-field_customer_phone'), { dataTransfer });
 
     expect(screen.getByTestId('canvas-block-field_customer_phone')).toHaveAttribute(
@@ -1256,8 +1256,8 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
-    expect(screen.getByTestId('palette-add-field')).not.toBeDisabled();
-    expect(screen.getByTestId('palette-add-field')).toHaveAttribute('draggable', 'true');
+    expect(screen.getByTestId('palette-add-repeater')).not.toBeDisabled();
+    expect(screen.getByTestId('palette-add-repeater')).toHaveAttribute('draggable', 'true');
     expect(screen.getByTestId('palette-add-widget')).toBeDisabled();
     expect(screen.getByTestId('palette-add-widget')).toHaveAttribute('draggable', 'false');
   });
@@ -1268,14 +1268,14 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
-    dragPaletteTo('palette-add-field', 'canvas-block-section_basic');
+    dragPaletteTo('palette-add-repeater', 'canvas-block-section_basic');
 
-    expect(screen.getByTestId('canvas-block-field_new_field')).toHaveTextContent('New field');
-    expect(screen.getByTestId('canvas-block-field_new_field')).toHaveAttribute(
+    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveTextContent('New repeater');
+    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveAttribute(
       'data-selected',
       'true',
     );
-    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_new_field');
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('repeater_new_repeater');
   });
 
   it('drops a palette block before an existing compatible child block', () => {
@@ -1284,17 +1284,17 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
-    dragPaletteTo('palette-add-field', 'canvas-block-field_customer_phone');
+    dragPaletteTo('palette-add-repeater', 'canvas-block-field_customer_phone');
 
-    expect(screen.getByTestId('canvas-block-field_new_field')).toHaveTextContent('New field');
-    expect(isBefore('canvas-block-field_new_field', 'canvas-block-field_customer_phone')).toBe(
+    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveTextContent('New repeater');
+    expect(isBefore('canvas-block-repeater_new_repeater', 'canvas-block-field_customer_phone')).toBe(
       true,
     );
-    expect(screen.getByTestId('canvas-block-field_new_field')).toHaveAttribute(
+    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveAttribute(
       'data-selected',
       'true',
     );
-    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_new_field');
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('repeater_new_repeater');
   });
 
   it('drops a page-level palette block onto the canvas root', () => {

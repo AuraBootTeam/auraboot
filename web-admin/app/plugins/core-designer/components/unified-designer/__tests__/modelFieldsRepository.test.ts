@@ -188,6 +188,36 @@ describe('modelFieldsRepository', () => {
     );
   });
 
+  it('flags virtual / computed resolved fields', async () => {
+    const fetcherMock = vi.fn(async (url: string) => {
+      if (url === '/api/meta/models/code/metrics_view') {
+        throw new Error('not a physical model');
+      }
+      if (url === '/api/meta/view-models/metrics_view/resolved-fields') {
+        return {
+          data: [
+            { code: 'name', displayName: 'Name', dataType: 'string' },
+            { code: 'margin', displayName: 'Margin', dataType: 'decimal', virtual: true },
+            {
+              code: 'total',
+              displayName: 'Total',
+              dataType: 'decimal',
+              computeExpression: 'price * qty',
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const fetcher = fetcherMock as unknown as ModelFieldFetcher;
+
+    const result = await loadModelFieldsByModelCodes(['metrics_view'], fetcher);
+    const byCode = Object.fromEntries(result.metrics_view.map((field) => [field.code, field]));
+    expect(byCode.name.virtual).toBeUndefined();
+    expect(byCode.margin.virtual).toBe(true);
+    expect(byCode.total.virtual).toBe(true);
+  });
+
   it('falls back to query-builder model fields when management model lookup is unavailable', async () => {
     const fetcherMock = vi.fn(async (url: string) => {
       if (url === '/api/meta/models/code/customer') {

@@ -311,6 +311,19 @@ export const DESIGNER_I18N = {
     dragOrDoubleClick: { 'zh-CN': '拖拽或双击添加', 'en-US': 'Drag or double-click to add' } as L,
     noModelBound: { 'zh-CN': '该页面未绑定模型，无可用字段', 'en-US': 'No model bound to this page' } as L,
 
+    // Field library groups
+    fieldGroup: {
+      text: { 'zh-CN': '文本', 'en-US': 'Text' } as L,
+      number: { 'zh-CN': '数值', 'en-US': 'Number' } as L,
+      choice: { 'zh-CN': '选项', 'en-US': 'Choice' } as L,
+      datetime: { 'zh-CN': '日期时间', 'en-US': 'Date & time' } as L,
+      boolean: { 'zh-CN': '布尔', 'en-US': 'Boolean' } as L,
+      relation: { 'zh-CN': '关联', 'en-US': 'Relation' } as L,
+      file: { 'zh-CN': '附件', 'en-US': 'File' } as L,
+      json: { 'zh-CN': 'JSON', 'en-US': 'JSON' } as L,
+      other: { 'zh-CN': '其他', 'en-US': 'Other' } as L,
+    },
+
     // Inspector shell
     inspector: { 'zh-CN': '检查器', 'en-US': 'Inspector' } as L,
     basic: { 'zh-CN': '基础', 'en-US': 'Basic' } as L,

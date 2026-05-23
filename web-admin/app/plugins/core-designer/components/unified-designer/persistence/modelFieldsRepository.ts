@@ -37,6 +37,10 @@ interface BackendResolvedFieldRecord {
   dictCode?: string;
   required?: boolean;
   refTarget?: unknown;
+  virtual?: boolean;
+  sourceType?: string;
+  semanticType?: string;
+  computeExpression?: string;
   extension?: {
     refTarget?: unknown;
     reference?: unknown;
@@ -191,6 +195,11 @@ function mapResolvedField(
   const refTarget = normalizeFieldRefTarget(
     field.refTarget ?? field.extension?.refTarget ?? field.extension?.reference,
   );
+  const virtual =
+    field.virtual === true ||
+    Boolean(field.computeExpression?.trim()) ||
+    field.sourceType === 'computed_only' ||
+    field.sourceType === 'computed';
   return {
     modelCode,
     code,
@@ -203,6 +212,8 @@ function mapResolvedField(
       field.uiHint?.type,
     dictCode: field.dictCode,
     required: Boolean(field.required),
+    ...(virtual ? { virtual: true } : {}),
+    ...(field.semanticType ? { semanticType: field.semanticType } : {}),
     ...(refTarget ? { refTarget } : {}),
   };
 }
