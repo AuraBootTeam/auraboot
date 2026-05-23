@@ -181,7 +181,9 @@ function BlockPalette({
       {groupedDefinitions.map(([category, definitions]) => (
         <div key={category} className="space-y-1.5">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            {category}
+            {DESIGNER_I18N.unified.category[category]
+              ? resolveDesignerText(DESIGNER_I18N.unified.category[category], locale)
+              : category}
           </div>
           {definitions.map((definition) => (
             <PaletteBlockButton

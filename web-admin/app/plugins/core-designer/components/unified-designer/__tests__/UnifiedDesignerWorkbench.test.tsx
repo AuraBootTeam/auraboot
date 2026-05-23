@@ -844,8 +844,8 @@ describe('UnifiedDesignerWorkbench', () => {
 
     fireEvent.click(screen.getByTestId('outline-item-field_customer_name'));
 
-    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('Picker');
-    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('Rich text');
+    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('选择器');
+    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('富文本');
 
     fireEvent.change(screen.getByTestId('inspector-field-props.component'), {
       target: { value: 'picker' },
@@ -866,7 +866,7 @@ describe('UnifiedDesignerWorkbench', () => {
       '模型',
     );
     expect(screen.getByTestId('inspector-field-props.pickerDataSource')).toHaveTextContent(
-      'Named query',
+      '命名查询',
     );
 
     fireEvent.change(screen.getByTestId('inspector-field-props.pickerDataSource'), {
@@ -922,7 +922,7 @@ describe('UnifiedDesignerWorkbench', () => {
 
     fireEvent.click(screen.getByTestId('outline-item-field_customer_name'));
 
-    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('Radio');
+    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('单选框');
 
     fireEvent.change(screen.getByTestId('inspector-field-props.component'), {
       target: { value: 'radio' },
