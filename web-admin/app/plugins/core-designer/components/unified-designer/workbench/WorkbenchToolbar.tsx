@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { PageSchemaV3, WorkbenchMode } from '../types';
 
 export type DesignerSaveStatus = 'saved' | 'dirty' | 'saving' | 'invalid' | 'error';
@@ -26,6 +28,7 @@ export function WorkbenchToolbar({
   onModeChange,
   onSave,
 }: WorkbenchToolbarProps) {
+  const { locale } = useI18n();
   const saveDisabled = !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
 
@@ -42,7 +45,7 @@ export function WorkbenchToolbar({
   return (
     <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2">
       <div className="min-w-[150px] flex-1">
-        <div className="text-sm font-semibold text-slate-900">{resolveTitle(document.title)}</div>
+        <div className="text-sm font-semibold text-slate-900">{resolveTitle(document.title, locale)}</div>
         <div className="font-mono text-xs text-slate-400">{document.id}</div>
       </div>
       <div className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto">
@@ -53,7 +56,7 @@ export function WorkbenchToolbar({
             onClick={handleReturnClick}
             className="rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
-            Pages
+            {resolveDesignerText(DESIGNER_I18N.unified.pages, locale)}
           </a>
         ) : null}
         <button
@@ -66,10 +69,10 @@ export function WorkbenchToolbar({
               : 'text-slate-600 hover:bg-slate-50'
           }`}
         >
-          Preview
+          {resolveDesignerText(DESIGNER_I18N.unified.preview, locale)}
         </button>
         <button className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-600">
-          History
+          {resolveDesignerText(DESIGNER_I18N.unified.history, locale)}
         </button>
         <div className="ml-2 grid grid-cols-2 rounded-md border border-slate-200 bg-slate-100 p-0.5">
           <button
@@ -80,7 +83,7 @@ export function WorkbenchToolbar({
               mode === 'edit' ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-slate-500'
             }`}
           >
-            Edit
+            {resolveDesignerText(DESIGNER_I18N.unified.edit, locale)}
           </button>
           <button
             type="button"
@@ -90,14 +93,14 @@ export function WorkbenchToolbar({
               mode === 'layout' ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-slate-500'
             }`}
           >
-            Layout
+            {resolveDesignerText(DESIGNER_I18N.unified.layout, locale)}
           </button>
         </div>
         <span
           className={`ml-2 rounded-md px-2 py-1 text-xs font-medium ${getStatusClassName(saveStatus)}`}
           data-testid="designer-dirty-state"
         >
-          {getStatusLabel(saveStatus, validationErrorCount)}
+          {getStatusLabel(saveStatus, validationErrorCount, locale)}
         </span>
         {saveError ? (
           <span
@@ -113,21 +116,21 @@ export function WorkbenchToolbar({
             className="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800"
             data-testid="designer-leave-warning"
           >
-            <span>Unsaved changes</span>
+            <span>{resolveDesignerText(DESIGNER_I18N.unified.unsavedChanges, locale)}</span>
             <button
               type="button"
               className="font-medium text-amber-900 underline-offset-2 hover:underline"
               data-testid="designer-leave-cancel"
               onClick={() => setShowLeaveWarning(false)}
             >
-              Stay
+              {resolveDesignerText(DESIGNER_I18N.unified.stay, locale)}
             </button>
             <a
               href={returnHref}
               className="font-medium text-amber-900 underline-offset-2 hover:underline"
               data-testid="designer-leave-confirm"
             >
-              Leave
+              {resolveDesignerText(DESIGNER_I18N.unified.leave, locale)}
             </a>
           </span>
         ) : null}
@@ -142,25 +145,37 @@ export function WorkbenchToolbar({
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {saveStatus === 'saving' ? 'Saving' : 'Save'}
+          {resolveDesignerText(
+            saveStatus === 'saving' ? DESIGNER_I18N.unified.saving : DESIGNER_I18N.unified.save,
+            locale,
+          )}
         </button>
       </div>
     </div>
   );
 }
 
-function resolveTitle(title: PageSchemaV3['title']): string {
-  if (!title) return 'Unified Designer';
+function resolveTitle(title: PageSchemaV3['title'], locale: string): string {
+  const fallback = resolveDesignerText(DESIGNER_I18N.unified.untitled, locale);
+  if (!title) return fallback;
   if (typeof title === 'string') return title;
-  return title.en || title['zh-CN'] || 'Unified Designer';
+  return title[locale] || title['en-US'] || title.en || title['zh-CN'] || fallback;
 }
 
-function getStatusLabel(status: DesignerSaveStatus, validationErrorCount: number): string {
-  if (status === 'dirty') return 'Unsaved';
-  if (status === 'saving') return 'Saving';
-  if (status === 'invalid') return `Invalid ${validationErrorCount}`;
-  if (status === 'error') return 'Save failed';
-  return 'Saved';
+function getStatusLabel(
+  status: DesignerSaveStatus,
+  validationErrorCount: number,
+  locale: string,
+): string {
+  if (status === 'dirty') return resolveDesignerText(DESIGNER_I18N.unified.statusUnsaved, locale);
+  if (status === 'saving') return resolveDesignerText(DESIGNER_I18N.unified.saving, locale);
+  if (status === 'invalid') {
+    return resolveDesignerText(DESIGNER_I18N.unified.statusInvalid, locale, {
+      count: validationErrorCount,
+    });
+  }
+  if (status === 'error') return resolveDesignerText(DESIGNER_I18N.unified.statusError, locale);
+  return resolveDesignerText(DESIGNER_I18N.unified.statusSaved, locale);
 }
 
 function getStatusClassName(status: DesignerSaveStatus): string {

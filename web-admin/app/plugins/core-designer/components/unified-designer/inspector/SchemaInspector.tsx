@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { getByPath } from '../utils/dotPath';
 import type { DslBlockV3, ModelFieldDefinition } from '../types';
 import { getInspectorFields } from './schemas';
@@ -9,7 +11,16 @@ interface SchemaInspectorProps {
   onChange: (path: string, value: unknown) => void;
 }
 
+const INSPECTOR_LABELS: Record<string, Record<string, string>> = DESIGNER_I18N.unified.inspectorLabels;
+
+/** Resolve an inspector field/option label, falling back to its English source. */
+function resolveInspectorLabel(label: string, locale: string): string {
+  const entry = INSPECTOR_LABELS[label];
+  return entry ? resolveDesignerText(entry, locale) : label;
+}
+
 export function SchemaInspector({ block, modelFields = [], onChange }: SchemaInspectorProps) {
+  const { locale } = useI18n();
   const fields = getInspectorFields(block);
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
 
@@ -20,7 +31,7 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
   if (!block) {
     return (
       <div className="p-4 text-sm text-slate-500" data-testid="inspector-empty">
-        Select a block on the canvas or outline.
+        {resolveDesignerText(DESIGNER_I18N.unified.selectBlockHint, locale)}
       </div>
     );
   }
@@ -29,9 +40,9 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
     <div className="flex h-full flex-col">
       <div className="border-b border-slate-200 px-4 py-3">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Inspector
+          {resolveDesignerText(DESIGNER_I18N.unified.inspector, locale)}
         </div>
-        <div className="mt-1 text-sm font-semibold text-slate-900">{getBlockLabel(block)}</div>
+        <div className="mt-1 text-sm font-semibold text-slate-900">{getBlockLabel(block, locale)}</div>
         <div className="mt-0.5 font-mono text-xs text-slate-400" data-testid="inspector-selected-id">
           {block.id}
         </div>
@@ -47,7 +58,7 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
               activeTab === 'basic' ? 'font-medium text-blue-700' : 'text-slate-500'
             }`}
           >
-            Basic
+            {resolveDesignerText(DESIGNER_I18N.unified.basic, locale)}
           </button>
           <button
             type="button"
@@ -57,7 +68,7 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
               activeTab === 'advanced' ? 'font-medium text-blue-700' : 'text-slate-500'
             }`}
           >
-            Advanced JSON
+            {resolveDesignerText(DESIGNER_I18N.unified.advancedJson, locale)}
           </button>
         </div>
 
@@ -68,20 +79,21 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
                 key={field.key}
                 block={block}
                 path={field.key}
-                label={String(field.label)}
+                label={resolveInspectorLabel(String(field.label), locale)}
                 type={field.type}
                 defaultValue={field.defaultValue}
                 options={field.options?.map((option) => ({
-                  label: String(option.label),
+                  label: resolveInspectorLabel(String(option.label), locale),
                   value: option.value,
                 }))}
                 modelFields={modelFields}
+                locale={locale}
                 onChange={onChange}
               />
             ))}
           </div>
         ) : (
-          <AdvancedJsonInspector block={block} onChange={onChange} />
+          <AdvancedJsonInspector block={block} locale={locale} onChange={onChange} />
         )}
       </div>
     </div>
@@ -90,19 +102,21 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
 
 const ADVANCED_JSON_FIELDS: Array<{
   key: 'props' | 'layout' | 'dataSource' | 'extension';
-  label: string;
+  label: Record<string, string>;
 }> = [
-  { key: 'props', label: 'Props' },
-  { key: 'layout', label: 'Layout' },
-  { key: 'dataSource', label: 'Data source' },
-  { key: 'extension', label: 'Extension' },
+  { key: 'props', label: DESIGNER_I18N.unified.jsonProps },
+  { key: 'layout', label: DESIGNER_I18N.unified.jsonLayout },
+  { key: 'dataSource', label: DESIGNER_I18N.unified.jsonDataSource },
+  { key: 'extension', label: DESIGNER_I18N.unified.jsonExtension },
 ];
 
 function AdvancedJsonInspector({
   block,
+  locale,
   onChange,
 }: {
   block: DslBlockV3;
+  locale: string;
   onChange: (path: string, value: unknown) => void;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>(() => createAdvancedJsonDrafts(block));
@@ -126,7 +140,10 @@ function AdvancedJsonInspector({
       setErrors((current) => ({ ...current, [key]: '' }));
       onChange(key, parsed);
     } catch {
-      setErrors((current) => ({ ...current, [key]: 'Invalid JSON' }));
+      setErrors((current) => ({
+        ...current,
+        [key]: resolveDesignerText(DESIGNER_I18N.unified.invalidJson, locale),
+      }));
     }
   };
 
@@ -139,7 +156,7 @@ function AdvancedJsonInspector({
               htmlFor={`inspector-json-${field.key}`}
               className="text-xs font-semibold uppercase tracking-wide text-slate-500"
             >
-              {field.label}
+              {resolveDesignerText(field.label, locale)}
             </label>
             <button
               type="button"
@@ -147,7 +164,7 @@ function AdvancedJsonInspector({
               onClick={() => applyDraft(field.key)}
               className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
-              Apply
+              {resolveDesignerText(DESIGNER_I18N.unified.apply, locale)}
             </button>
           </div>
           <textarea
@@ -196,6 +213,7 @@ function InspectorField({
   defaultValue,
   options,
   modelFields,
+  locale,
   onChange,
 }: {
   block: DslBlockV3;
@@ -205,6 +223,7 @@ function InspectorField({
   defaultValue?: unknown;
   options?: { label: string; value: string }[];
   modelFields: ModelFieldDefinition[];
+  locale: string;
   onChange: (path: string, value: unknown) => void;
 }) {
   const value = getByPath(block as unknown as Record<string, unknown>, path);
@@ -232,7 +251,7 @@ function InspectorField({
       setJsonError('');
       onChange(path, parsed);
     } catch {
-      setJsonError('Invalid JSON');
+      setJsonError(resolveDesignerText(DESIGNER_I18N.unified.invalidJson, locale));
     }
   };
 
@@ -265,7 +284,7 @@ function InspectorField({
           onChange={(event) => onChange(path, event.target.value)}
           className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         >
-          <option value="">Unset</option>
+          <option value="">{resolveDesignerText(DESIGNER_I18N.unified.unset, locale)}</option>
           {options?.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -291,7 +310,7 @@ function InspectorField({
           onChange={(event) => onChange(path, event.target.value)}
           className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         >
-          <option value="">Unset</option>
+          <option value="">{resolveDesignerText(DESIGNER_I18N.unified.unset, locale)}</option>
           {fieldOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -318,7 +337,7 @@ function InspectorField({
             onClick={applyJsonDraft}
             className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
-            Apply
+            {resolveDesignerText(DESIGNER_I18N.unified.apply, locale)}
           </button>
         </div>
         <textarea
@@ -382,11 +401,13 @@ function isLocalizedTextObject(value: unknown): value is Record<string, string> 
   );
 }
 
-function getBlockLabel(block: DslBlockV3): string {
+function getBlockLabel(block: DslBlockV3, locale: string): string {
   const title = block.title;
   if (typeof title === 'string') return title;
-  if (title?.en) return title.en;
-  if (title?.['zh-CN']) return title['zh-CN'];
+  if (title) {
+    const resolved = title[locale] || title['en-US'] || title.en || title['zh-CN'];
+    if (resolved) return resolved;
+  }
   if (typeof block.props?.label === 'string') return block.props.label;
   if (typeof block.props?.title === 'string') return block.props.title;
   return block.field || block.widgetType || block.actionType || block.blockType;

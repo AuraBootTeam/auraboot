@@ -88,6 +88,7 @@ export function CanvasHost({
               selectedBlockId={selectedBlockId}
               activeDrag={activeDrag}
               activeDropIntent={activeDropIntent}
+              locale={locale}
               onSelect={onSelect}
               onMoveBefore={onMoveBefore}
               onMoveWidget={patchWidgetLayout}
@@ -135,6 +136,7 @@ interface BlockFrameProps {
   selectedBlockId: string | null;
   activeDrag: DragData | null;
   activeDropIntent: ActiveDropIntent;
+  locale: string;
   dashboardSiblings?: DslBlockV3[];
   onSelect: (blockId: string) => void;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
@@ -151,6 +153,7 @@ function BlockFrame(props: BlockFrameProps) {
     selectedBlockId,
     activeDrag,
     activeDropIntent,
+    locale,
     dashboardSiblings,
     onSelect,
     onMoveBefore,
@@ -261,7 +264,7 @@ function BlockFrame(props: BlockFrameProps) {
             {!isDashboardWidget ? (
               <button
                 type="button"
-                aria-label={`Drag ${getBlockLabel(block)}`}
+                aria-label={`Drag ${getBlockLabel(block, locale)}`}
                 data-testid={`block-drag-handle-${block.id}`}
                 data-no-block-drag="true"
                 className="mt-0.5 shrink-0 cursor-grab touch-none text-slate-300 hover:text-blue-500 active:cursor-grabbing"
@@ -274,7 +277,7 @@ function BlockFrame(props: BlockFrameProps) {
             ) : null}
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-slate-900">
-                {getBlockLabel(block)}
+                {getBlockLabel(block, locale)}
               </div>
               <div className="truncate font-mono text-[11px] text-slate-400">{block.blockType}</div>
             </div>
@@ -301,6 +304,7 @@ function BlockFrame(props: BlockFrameProps) {
         selectedBlockId={selectedBlockId}
         activeDrag={activeDrag}
         activeDropIntent={activeDropIntent}
+        locale={locale}
         onSelect={onSelect}
         onMoveBefore={onMoveBefore}
         onMoveWidget={onMoveWidget}
@@ -310,7 +314,7 @@ function BlockFrame(props: BlockFrameProps) {
       {mode === 'layout' && block.blockType === 'widget' ? (
         <button
           type="button"
-          aria-label={`Resize ${getBlockLabel(block)}`}
+          aria-label={`Resize ${getBlockLabel(block, locale)}`}
           title="Resize widget"
           data-testid={`widget-resize-${block.id}`}
           data-no-block-drag="true"
@@ -342,7 +346,7 @@ function BlockContent(props: BlockContentProps) {
   if (block.blocks?.length) {
     return <NestedBlocks {...props} />;
   }
-  return <LeafBlock block={block} />;
+  return <LeafBlock block={block} locale={props.locale} />;
 }
 
 function NestedBlocks(props: BlockContentProps) {
@@ -398,11 +402,11 @@ function DashboardBlockContent(props: BlockContentProps) {
   );
 }
 
-function LeafBlock({ block }: { block: DslBlockV3 }) {
+function LeafBlock({ block, locale }: { block: DslBlockV3; locale: string }) {
   return (
     <div className="p-3">
       <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        {getBlockLabel(block)}
+        {getBlockLabel(block, locale)}
       </div>
     </div>
   );
@@ -513,10 +517,13 @@ function SpanQuickControls({
   );
 }
 
-export function getBlockLabel(block: DslBlockV3): string {
-  if (typeof block.title === 'string') return block.title;
-  if (block.title?.en) return block.title.en;
-  if (block.title?.['zh-CN']) return block.title['zh-CN'];
+export function getBlockLabel(block: DslBlockV3, locale = 'en-US'): string {
+  const title = block.title;
+  if (typeof title === 'string') return title;
+  if (title) {
+    const resolved = title[locale] || title['en-US'] || title.en || title['zh-CN'];
+    if (resolved) return resolved;
+  }
   if (typeof block.props?.label === 'string') return block.props.label;
   if (typeof block.props?.title === 'string') return block.props.title;
   return block.field || block.widgetType || block.actionType || block.blockType;
