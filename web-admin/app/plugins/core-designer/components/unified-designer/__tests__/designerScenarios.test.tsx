@@ -108,3 +108,121 @@ describe('Designer scenarios (form kind)', () => {
     expect(boundField?.block.props?.component).toBe('input');
   });
 });
+
+const listDocument: PageSchemaV3 = {
+  schemaVersion: 3,
+  kind: 'list',
+  id: 'demo_list',
+  title: { 'zh-CN': '演示列表', en: 'Demo List' },
+  modelCode: 'customer',
+  blocks: [
+    {
+      id: 'list_root',
+      blockType: 'list',
+      layout: { span: 12 },
+      blocks: [
+        { id: 'filters', blockType: 'filter-bar', region: 'filters', layout: { span: 12 }, blocks: [] },
+        {
+          id: 'tbl',
+          blockType: 'table',
+          layout: { span: 12 },
+          blocks: [{ id: 'col_name', blockType: 'column', field: 'name', props: { label: 'Name' } }],
+        },
+      ],
+    },
+  ],
+};
+
+describe('Designer scenarios (list kind)', () => {
+  it('collapses the palette to list blocks and hides other page kinds', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={listDocument} modelFieldsByModel={modelFields} />);
+    expect(screen.getByTestId('canvas-root-drop-zone')).toHaveTextContent('列表');
+    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
+    expect(screen.getByTestId('palette-add-table')).toBeInTheDocument();
+    expect(screen.getByTestId('palette-add-filter-bar')).toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-form-section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-detail')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-dashboard')).not.toBeInTheDocument();
+    // field-like leaf blocks are never in the palette
+    expect(screen.queryByTestId('palette-add-column')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-filter-field')).not.toBeInTheDocument();
+  });
+
+  it('binds a model field as a column under a table', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={listDocument} modelFieldsByModel={modelFields} />);
+    fireEvent.click(screen.getByTestId('outline-item-tbl'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('model-field-email'));
+    expect(screen.getByTestId('canvas-block-column_email')).toBeInTheDocument();
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('column_email');
+  });
+
+  it('binds a model field as a filter-field under a filter bar', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={listDocument} modelFieldsByModel={modelFields} />);
+    fireEvent.click(screen.getByTestId('outline-item-filters'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('model-field-status'));
+    expect(screen.getByTestId('canvas-block-filter_status')).toBeInTheDocument();
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('filter_status');
+  });
+});
+
+const detailDocument: PageSchemaV3 = {
+  schemaVersion: 3,
+  kind: 'detail',
+  id: 'demo_detail',
+  title: { 'zh-CN': '演示详情', en: 'Demo Detail' },
+  modelCode: 'customer',
+  blocks: [
+    {
+      id: 'detail_root',
+      blockType: 'detail',
+      layout: { span: 12 },
+      blocks: [{ id: 'dsec', blockType: 'detail-section', layout: { span: 12 }, blocks: [] }],
+    },
+  ],
+};
+
+describe('Designer scenarios (detail kind)', () => {
+  it('collapses the palette to detail blocks and binds a field into a detail section', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={detailDocument} modelFieldsByModel={modelFields} />);
+    expect(screen.getByTestId('canvas-root-drop-zone')).toHaveTextContent('详情');
+    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
+    expect(screen.getByTestId('palette-add-detail-section')).toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-form-section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-list')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('resource-tab-outline'));
+    fireEvent.click(screen.getByTestId('outline-item-dsec'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('model-field-email'));
+    expect(screen.getByTestId('canvas-block-field_email')).toBeInTheDocument();
+  });
+});
+
+const dashboardDocument: PageSchemaV3 = {
+  schemaVersion: 3,
+  kind: 'dashboard',
+  id: 'demo_dash',
+  title: { 'zh-CN': '演示仪表盘', en: 'Demo Dashboard' },
+  blocks: [
+    {
+      id: 'dash_root',
+      blockType: 'dashboard',
+      layout: { span: 12, type: 'dashboard-grid', cols: 12, rowHeight: 80, gap: 16 },
+      blocks: [],
+    },
+  ],
+};
+
+describe('Designer scenarios (dashboard kind)', () => {
+  it('exposes only widget blocks in the palette', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={dashboardDocument} />);
+    expect(screen.getByTestId('canvas-root-drop-zone')).toHaveTextContent('仪表盘');
+    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
+    expect(screen.getByTestId('palette-add-widget')).toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-form-section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-table')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('palette-add-detail-section')).not.toBeInTheDocument();
+  });
+});
