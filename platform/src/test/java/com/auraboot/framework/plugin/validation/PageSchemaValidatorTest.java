@@ -89,6 +89,34 @@ class PageSchemaValidatorTest {
     }
 
     @Test
+    void tableColumnForDictionaryFieldWithoutDictCodeIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(column("pe_status", localized("Status")))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-TABLE-DICT", "pages[0].blocks[0].columns[0].dictCode");
+    }
+
+    @Test
+    void tableColumnForDictionaryFieldWithMatchingDictCodeIsAccepted() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        Map<String, Object> statusColumn = column("pe_status", localized("Status"));
+        statusColumn.put("dictCode", "pe_order_status");
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(statusColumn)
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-TABLE-DICT".equals(m.getCode())),
+                () -> "Expected matching dictCode to pass but got " + messages);
+    }
+
+    @Test
     void tableColumnWithoutFieldIsRejected() {
         PluginManifestExtended manifest = manifestWithOrderModel();
         manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
@@ -231,6 +259,12 @@ class PageSchemaValidatorTest {
         unlabeled.setCode("pe_unlabeled");
         unlabeled.setDataType("string");
 
+        FieldDefinitionDTO status = new FieldDefinitionDTO();
+        status.setCode("pe_status");
+        status.setDataType("enum");
+        status.setDisplayNameEn("Status");
+        status.setDictCode("pe_order_status");
+
         ModelFieldBindingDTO orderNoBinding = new ModelFieldBindingDTO();
         orderNoBinding.setModelCode("pe_order");
         orderNoBinding.setFieldCode("pe_order_no");
@@ -244,8 +278,12 @@ class PageSchemaValidatorTest {
         unlabeledBinding.setModelCode("pe_order");
         unlabeledBinding.setFieldCode("pe_unlabeled");
 
-        manifest.setFields(List.of(orderNo, title, unlabeled));
-        manifest.setModelFieldBindings(List.of(orderNoBinding, titleBinding, unlabeledBinding));
+        ModelFieldBindingDTO statusBinding = new ModelFieldBindingDTO();
+        statusBinding.setModelCode("pe_order");
+        statusBinding.setFieldCode("pe_status");
+
+        manifest.setFields(List.of(orderNo, title, unlabeled, status));
+        manifest.setModelFieldBindings(List.of(orderNoBinding, titleBinding, unlabeledBinding, statusBinding));
         return manifest;
     }
 

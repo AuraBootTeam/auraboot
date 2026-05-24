@@ -209,10 +209,35 @@ public class PageSchemaValidator implements PluginValidator {
             String fieldCode = stringValue(column.get("field"));
             validateColumnBusinessLabel(pageKey, columnPath, column, fieldCode, modelIndex, messages);
             if (!isActionColumn(column)) {
-                validateFieldReference(pageKey, columnPath + ".field", column.get("field"), modelCode, modelIndex, messages);
+                fieldCode = validateFieldReference(pageKey, columnPath + ".field", column.get("field"),
+                        modelCode, modelIndex, messages);
+                validateColumnDictProjection(pageKey, columnPath, fieldCode, column, modelIndex, messages);
             }
             validateOptionalButtonLists(pageKey, columnPath, column, messages);
         }
+    }
+
+    private void validateColumnDictProjection(String pageKey,
+                                              String columnPath,
+                                              String fieldCode,
+                                              Map<String, Object> column,
+                                              PageModelIndex modelIndex,
+                                              List<PluginValidationMessage> messages) {
+        if (isBlank(fieldCode)) {
+            return;
+        }
+        String expectedDictCode = modelIndex.dictCodeByField().get(fieldCode);
+        if (isBlank(expectedDictCode)) {
+            return;
+        }
+        String actualDictCode = stringValue(column.get("dictCode"));
+        if (expectedDictCode.equals(actualDictCode)) {
+            return;
+        }
+        messages.add(error("S-PAGE-TABLE-DICT", category(), columnPath + ".dictCode",
+                "Page '" + pageKey + "' renders dictionary-backed field '" + fieldCode +
+                        "' in a table column but does not declare matching dictCode '" + expectedDictCode +
+                        "'. Without this, runtime table cells expose raw enum values instead of business labels."));
     }
 
     @SuppressWarnings("unchecked")
@@ -418,10 +443,11 @@ public class PageSchemaValidator implements PluginValidator {
         Map<String, Set<String>> fieldsByModel = new HashMap<>();
         Map<String, Set<String>> requiredFieldsByModel = new HashMap<>();
         Map<String, Set<String>> fieldLabelsByCode = fieldLabelsByCode(manifest);
+        Map<String, String> dictCodeByField = fieldDictCodesByCode(manifest);
         Set<String> globallyRequiredFields = requiredFieldCodes(manifest);
 
         if (manifest.getModelFieldBindings() == null) {
-            return new PageModelIndex(fieldsByModel, requiredFieldsByModel, fieldLabelsByCode);
+            return new PageModelIndex(fieldsByModel, requiredFieldsByModel, fieldLabelsByCode, dictCodeByField);
         }
 
         for (ModelFieldBindingDTO binding : manifest.getModelFieldBindings()) {
@@ -436,7 +462,7 @@ public class PageSchemaValidator implements PluginValidator {
             }
         }
 
-        return new PageModelIndex(fieldsByModel, requiredFieldsByModel, fieldLabelsByCode);
+        return new PageModelIndex(fieldsByModel, requiredFieldsByModel, fieldLabelsByCode, dictCodeByField);
     }
 
     private Map<String, Set<String>> fieldLabelsByCode(PluginManifestExtended manifest) {
@@ -453,6 +479,26 @@ public class PageSchemaValidator implements PluginValidator {
             addFieldLabel(labelsByCode, field.getCode(), field.getDisplayNameEn());
         }
         return labelsByCode;
+    }
+
+    private Map<String, String> fieldDictCodesByCode(PluginManifestExtended manifest) {
+        Map<String, String> dictCodesByCode = new HashMap<>();
+        if (manifest.getFields() == null) {
+            return dictCodesByCode;
+        }
+        for (FieldDefinitionDTO field : manifest.getFields()) {
+            if (field == null || isBlank(field.getCode())) {
+                continue;
+            }
+            String dictCode = firstNonBlank(
+                    field.getDictCode(),
+                    field.getExtension() == null ? null : stringValue(field.getExtension().get("dictCode"))
+            );
+            if (!isBlank(dictCode)) {
+                dictCodesByCode.put(field.getCode(), dictCode);
+            }
+        }
+        return dictCodesByCode;
     }
 
     private void addFieldLabel(Map<String, Set<String>> labelsByCode, String fieldCode, String label) {
@@ -517,7 +563,8 @@ public class PageSchemaValidator implements PluginValidator {
 
     private record PageModelIndex(Map<String, Set<String>> fieldsByModel,
                                   Map<String, Set<String>> requiredFieldsByModel,
-                                  Map<String, Set<String>> fieldLabelsByCode) {}
+                                  Map<String, Set<String>> fieldLabelsByCode,
+                                  Map<String, String> dictCodeByField) {}
 
     private void validateLegacyTopLevelFields(PageSchemaDTO page, String path, String pageKey,
                                               List<PluginValidationMessage> messages) {
