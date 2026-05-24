@@ -138,4 +138,35 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       .poll(async () => page.locator('[data-testid^="canvas-block-field_"]').count())
       .toBeGreaterThan(beforeFields);
   });
+
+  // Guards Playwright `.dragTo()` compatibility with @dnd-kit. The wider designer
+  // E2E suite (unified-designer-workbench UDW-*) drives drags via `.dragTo()`,
+  // whose single jump-move pointerWithin can miss — the workbench's
+  // pointerWithin→closestCenter fallback is what keeps those green.
+  test('binds a model field via Playwright .dragTo() (UDW drag-driver guard)', async ({ page }) => {
+    const formKey = await findFormPageKey(page);
+    test.skip(!formKey, 'no form-kind page seeded in this environment');
+
+    await openDesigner(page, formKey!);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
+
+    const sectionItem = page
+      .locator('button[data-testid^="outline-item-"]')
+      .filter({ hasText: 'form-section' })
+      .first();
+    test.skip((await sectionItem.count()) === 0, 'form page has no form-section');
+    const sectionId = (await sectionItem.getAttribute('data-testid'))!.replace('outline-item-', '');
+    await sectionItem.click();
+
+    await page.getByTestId('resource-tab-fields').click();
+    const fieldItem = page.locator('[data-testid^="model-field-"][data-used="false"]').first();
+    await fieldItem.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    test.skip((await fieldItem.count()) === 0, 'no bindable model field for this page');
+
+    const before = await page.locator('[data-testid^="canvas-block-field_"]').count();
+    await fieldItem.dragTo(page.getByTestId(`canvas-block-${sectionId}`));
+    await expect
+      .poll(() => page.locator('[data-testid^="canvas-block-field_"]').count())
+      .toBeGreaterThan(before);
+  });
 });

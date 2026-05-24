@@ -4,9 +4,11 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
+  closestCenter,
   pointerWithin,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -42,6 +44,15 @@ import { CanvasHost, type ActiveDropIntent } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
+
+// Precise pointer-based collision for real users, with a closestCenter fallback
+// when the pointer isn't inside any droppable. The fallback is what makes
+// Playwright `.dragTo()` (a single jump-move that pointerWithin can miss) resolve
+// a drop target instead of silently dropping nowhere.
+const designerCollisionDetection: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  return within.length > 0 ? within : closestCenter(args);
+};
 
 export interface UnifiedDesignerWorkbenchProps {
   initialDocument: PageSchemaV3;
@@ -530,7 +541,7 @@ export function UnifiedDesignerWorkbench({
       ) : (
         <DndContext
           sensors={sensors}
-          collisionDetection={pointerWithin}
+          collisionDetection={designerCollisionDetection}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
