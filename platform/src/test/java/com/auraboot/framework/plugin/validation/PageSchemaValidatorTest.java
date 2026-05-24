@@ -1,0 +1,279 @@
+package com.auraboot.framework.plugin.validation;
+
+import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.ModelFieldBindingDTO;
+import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
+import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
+import org.junit.jupiter.api.Test;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class PageSchemaValidatorTest {
+
+    private final PageSchemaValidator validator = new PageSchemaValidator();
+
+    @Test
+    void tableBlockWithoutIdIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "blockType", "table",
+                "columns", List.of(column("pe_order_no", localized("Order No")))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-BLOCK-ID", "pages[0].blocks[0].id");
+    }
+
+    @Test
+    void tableBlockWithoutColumnsIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table"
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-TABLE-COLUMNS", "pages[0].blocks[0].columns");
+    }
+
+    @Test
+    void tableColumnWithoutBusinessLabelIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(Map.of("field", "pe_unlabeled"))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-LABEL", "pages[0].blocks[0].columns[0].label");
+    }
+
+    @Test
+    void tableColumnWithoutPageLabelCanUseFieldDisplayName() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(Map.of("field", "pe_order_no"))
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-LABEL".equals(m.getCode())),
+                () -> "Expected field displayName fallback to satisfy column label but got " + messages);
+    }
+
+    @Test
+    void tableColumnUsingRawCodeAsLabelIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(column("pe_order_no", "pe_order_no"))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-LABEL", "pages[0].blocks[0].columns[0].label");
+    }
+
+    @Test
+    void tableColumnReferencingUnboundFieldIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(column("pe_missing_field", localized("Missing Field")))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-FIELD-REF", "pages[0].blocks[0].columns[0].field");
+    }
+
+    @Test
+    void tableColumnWithoutFieldIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(Map.of("label", localized("Order No")))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-FIELD-REF", "pages[0].blocks[0].columns[0].field");
+    }
+
+    @Test
+    void rowActionButtonUsingRawCodeAsLabelIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(Map.of(
+                        "field", "actions",
+                        "label", localized("Actions"),
+                        "isActionColumn", true,
+                        "buttons", List.of(Map.of(
+                                "code", "view",
+                                "label", "view"
+                        ))
+                ))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-LABEL", "pages[0].blocks[0].columns[0].buttons[0].label");
+    }
+
+    @Test
+    void nestedSubTableColumnLabelIsValidated() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_detail", "detail", "pe_order", List.of(Map.of(
+                "id", "order_lines",
+                "blockType", "sub-table",
+                "subTable", Map.of(
+                        "childModel", "pe_order",
+                        "columns", List.of(column("pe_order_no", "pe_order_no"))
+                )
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-LABEL", "pages[0].blocks[0].subTable.columns[0].label");
+    }
+
+    @Test
+    void formSectionWithoutFieldsIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_form", "form", "pe_order", List.of(Map.of(
+                "id", "basic_section",
+                "blockType", "form-section"
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-FORM-FIELDS", "pages[0].blocks[0].fields");
+    }
+
+    @Test
+    void requiredModelFieldUsedInFormMustBeRequiredOnPage() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_form", "form", "pe_order", List.of(Map.of(
+                "id", "basic_section",
+                "blockType", "form-section",
+                "fields", List.of(Map.of(
+                        "field", "pe_order_no",
+                        "component", "input"
+                ))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-FORM-REQUIRED", "pages[0].blocks[0].fields[0].required");
+    }
+
+    @Test
+    void formFieldWithoutFieldReferenceIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_form", "form", "pe_order", List.of(Map.of(
+                "id", "basic_section",
+                "blockType", "form-section",
+                "fields", List.of(Map.of(
+                        "label", localized("Order No"),
+                        "component", "input"
+                ))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-FIELD-REF", "pages[0].blocks[0].fields[0].field");
+    }
+
+    @Test
+    void toolbarWithoutButtonsIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "list_toolbar",
+                "blockType", "toolbar"
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-BUTTONS", "pages[0].blocks[0].buttons");
+    }
+
+    @Test
+    void buttonUsingRawCodeAsLabelIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "list_toolbar",
+                "blockType", "toolbar",
+                "buttons", List.of(Map.of(
+                        "action", "create",
+                        "label", "create"
+                ))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-LABEL", "pages[0].blocks[0].buttons[0].label");
+    }
+
+    private List<PluginValidationMessage> validate(PluginManifestExtended manifest) {
+        PluginValidationContext ctx = PluginValidationContext.builder()
+                .pluginId("com.test.plugin")
+                .namespace("pe")
+                .manifest(manifest)
+                .build();
+        return validator.validate(ctx);
+    }
+
+    private PluginManifestExtended manifestWithOrderModel() {
+        PluginManifestExtended manifest = new PluginManifestExtended();
+
+        FieldDefinitionDTO orderNo = new FieldDefinitionDTO();
+        orderNo.setCode("pe_order_no");
+        orderNo.setDataType("string");
+        orderNo.setDisplayNameEn("Order No");
+        FieldDefinitionDTO.FieldConstraints constraints = new FieldDefinitionDTO.FieldConstraints();
+        constraints.setRequired(true);
+        orderNo.setConstraints(constraints);
+
+        FieldDefinitionDTO title = new FieldDefinitionDTO();
+        title.setCode("title");
+        title.setDataType("string");
+        title.setDisplayNameEn("Title");
+
+        FieldDefinitionDTO unlabeled = new FieldDefinitionDTO();
+        unlabeled.setCode("pe_unlabeled");
+        unlabeled.setDataType("string");
+
+        ModelFieldBindingDTO orderNoBinding = new ModelFieldBindingDTO();
+        orderNoBinding.setModelCode("pe_order");
+        orderNoBinding.setFieldCode("pe_order_no");
+        orderNoBinding.setRequired(true);
+
+        ModelFieldBindingDTO titleBinding = new ModelFieldBindingDTO();
+        titleBinding.setModelCode("pe_order");
+        titleBinding.setFieldCode("title");
+
+        ModelFieldBindingDTO unlabeledBinding = new ModelFieldBindingDTO();
+        unlabeledBinding.setModelCode("pe_order");
+        unlabeledBinding.setFieldCode("pe_unlabeled");
+
+        manifest.setFields(List.of(orderNo, title, unlabeled));
+        manifest.setModelFieldBindings(List.of(orderNoBinding, titleBinding, unlabeledBinding));
+        return manifest;
+    }
+
+    private PageSchemaDTO page(String pageKey, String kind, String modelCode, List<Object> blocks) {
+        PageSchemaDTO page = new PageSchemaDTO();
+        page.setPageKey(pageKey);
+        page.setKind(kind);
+        page.setModelCode(modelCode);
+        page.setLayout(Map.of("type", kind));
+        page.setBlocks(blocks);
+        return page;
+    }
+
+    private Map<String, Object> column(String field, Object label) {
+        Map<String, Object> column = new LinkedHashMap<>();
+        column.put("field", field);
+        column.put("label", label);
+        return column;
+    }
+
+    private Map<String, Object> localized(String en) {
+        return Map.of("zh-CN", en, "en", en);
+    }
+
+    private void assertHasError(List<PluginValidationMessage> messages, String code, String path) {
+        assertTrue(messages.stream().anyMatch(m -> code.equals(m.getCode())
+                        && path.equals(m.getPath())
+                        && m.isError()),
+                () -> "Expected error " + code + " at " + path + " but got " + messages);
+    }
+}
