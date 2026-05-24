@@ -67,7 +67,7 @@ describe('UnifiedDesignerPage', () => {
 
     render(<UnifiedDesignerPage />);
 
-    expect(await screen.findByText('Customer Workspace')).toBeInTheDocument();
+    expect(await screen.findByText('客户工作台')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-fields'));
 

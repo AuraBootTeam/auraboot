@@ -1,5 +1,7 @@
 import React from 'react';
 import { usePermissions } from '~/contexts/AuthContext';
+import { useI18n } from '~/contexts/I18nContext';
+import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { DslBlockV3, PageSchemaV3 } from '../types';
 import {
   normalizeRuntimeExecutionError,
@@ -23,6 +25,7 @@ export function RecursiveBlockRenderer({
   permissionEvaluator,
 }: RecursiveBlockRendererProps) {
   const { hasPermission } = usePermissions();
+  const { locale } = useI18n();
   const evaluatePermission = permissionEvaluator ?? hasPermission;
   const pageContext: RuntimePageContext = {
     source: 'unified-designer-runtime-preview',
@@ -33,24 +36,34 @@ export function RecursiveBlockRenderer({
   };
 
   return (
-    <RuntimePermissionContext.Provider value={evaluatePermission}>
-      <div
-        className="grid grid-cols-12 gap-4"
-        data-testid={`runtime-page-${schema.id}`}
-        data-schema-version={schema.schemaVersion}
-      >
-        {schema.blocks.map((block) => (
-          <RuntimeBlock
-            key={block.id}
-            block={block}
-            runtimeServices={runtimeServices}
-            pageContext={pageContext}
-            blockPath={[block.id]}
-          />
-        ))}
-      </div>
-    </RuntimePermissionContext.Provider>
+    <RuntimeLocaleContext.Provider value={locale}>
+      <RuntimePermissionContext.Provider value={evaluatePermission}>
+        <div
+          className="grid grid-cols-12 gap-4"
+          data-testid={`runtime-page-${schema.id}`}
+          data-schema-version={schema.schemaVersion}
+        >
+          {schema.blocks.map((block) => (
+            <RuntimeBlock
+              key={block.id}
+              block={block}
+              runtimeServices={runtimeServices}
+              pageContext={pageContext}
+              blockPath={[block.id]}
+            />
+          ))}
+        </div>
+      </RuntimePermissionContext.Provider>
+    </RuntimeLocaleContext.Provider>
   );
+}
+
+const RuntimeLocaleContext = React.createContext<string>('zh-CN');
+
+/** Resolve a runtime preview i18n string for the current locale. */
+function useRuntimeText() {
+  const locale = React.useContext(RuntimeLocaleContext);
+  return (entry: Record<string, string>) => resolveDesignerText(entry, locale);
 }
 
 type RuntimePageContext = Pick<
@@ -253,6 +266,7 @@ function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: Runtim
 }
 
 function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const t = useRuntimeText();
   const tabs = block.blocks?.filter((child) => child.blockType === 'tab') ?? [];
   const [activeTabId, setActiveTabId] = React.useState(() => tabs[0]?.id ?? null);
   const resolvedActiveTabId = tabs.some((tab) => tab.id === activeTabId)
@@ -305,7 +319,7 @@ function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: Runtime
           className="mt-3 rounded-md border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-400"
           data-testid={`runtime-tabs-empty-${block.id}`}
         >
-          No tabs configured.
+          {t(DESIGNER_I18N.unified.runtime.noTabsConfigured)}
         </div>
       )}
     </section>
@@ -314,6 +328,7 @@ function RuntimeTabs({ block, runtimeServices, pageContext, blockPath }: Runtime
 
 function RuntimeAiFillBanner({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
   const formContext = React.useContext(RuntimeFormValueContext);
+  const t = useRuntimeText();
   const [applied, setApplied] = React.useState(false);
   const { runtimeData, loading, runtimeError, permissionCode, permissionAllowed } =
     useRuntimeHelperBlockData(
@@ -325,18 +340,18 @@ function RuntimeAiFillBanner({ block, runtimeServices, pageContext, blockPath }:
   const description =
     getStringProp(runtimeData?.description) ||
     getStringProp(block.props?.description) ||
-    'Review generated suggestions before applying them to the form.';
+    t(DESIGNER_I18N.unified.runtime.aiReviewHint);
   const feedback =
     getStringProp(runtimeData?.feedback) ||
     getStringProp(block.props?.feedback) ||
-    'Suggestions applied';
+    t(DESIGNER_I18N.unified.runtime.suggestionsApplied);
   const suggestedFields = getAiSuggestedFields(
     runtimeData?.suggestedFields ?? block.props?.suggestedFields ?? block.props?.fields,
   );
   const emptyText =
     getStringProp(runtimeData?.emptyText) ||
     getStringProp(block.props?.emptyText) ||
-    'No suggestions';
+    t(DESIGNER_I18N.unified.runtime.noSuggestions);
   const applySuggestions = () => {
     suggestedFields.forEach((field) => {
       if (field.field) {
@@ -410,6 +425,7 @@ function RuntimeAiFillBanner({ block, runtimeServices, pageContext, blockPath }:
 }
 
 function RuntimeBpmPanel({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const t = useRuntimeText();
   const { runtimeData, loading, runtimeError, permissionCode, permissionAllowed } =
     useRuntimeHelperBlockData(
       block,
@@ -433,7 +449,7 @@ function RuntimeBpmPanel({ block, runtimeServices, pageContext, blockPath }: Run
   const emptyText =
     getStringProp(runtimeData?.emptyText) ||
     getStringProp(block.props?.emptyText) ||
-    'No workflow tasks';
+    t(DESIGNER_I18N.unified.runtime.noWorkflowTasks);
   const hasBpmContent = Boolean(status || description || assignee || dueAt || actions.length);
 
   return (
@@ -467,13 +483,17 @@ function RuntimeBpmPanel({ block, runtimeServices, pageContext, blockPath }: Run
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         {assignee ? (
           <div data-testid={`runtime-bpm-assignee-${block.id}`}>
-            <dt className="text-xs font-medium uppercase text-slate-400">Assignee</dt>
+            <dt className="text-xs font-medium uppercase text-slate-400">
+              {t(DESIGNER_I18N.unified.runtime.assignee)}
+            </dt>
             <dd className="text-slate-800">{assignee}</dd>
           </div>
         ) : null}
         {dueAt ? (
           <div data-testid={`runtime-bpm-due-${block.id}`}>
-            <dt className="text-xs font-medium uppercase text-slate-400">Due</dt>
+            <dt className="text-xs font-medium uppercase text-slate-400">
+              {t(DESIGNER_I18N.unified.runtime.due)}
+            </dt>
             <dd className="text-slate-800">{dueAt}</dd>
           </div>
         ) : null}
@@ -510,6 +530,7 @@ function RuntimeActivityTimeline({
   pageContext,
   blockPath,
 }: RuntimeBlockProps) {
+  const t = useRuntimeText();
   const { runtimeData, loading, runtimeError, permissionCode, permissionAllowed } =
     useRuntimeHelperBlockData(
       block,
@@ -521,7 +542,7 @@ function RuntimeActivityTimeline({
   const emptyText =
     getStringProp(runtimeData?.emptyText) ||
     getStringProp(block.props?.emptyText) ||
-    'No activity yet';
+    t(DESIGNER_I18N.unified.runtime.noActivity);
 
   return (
     <section
@@ -575,6 +596,7 @@ function RuntimeFieldHistory({
   pageContext,
   blockPath,
 }: RuntimeBlockProps) {
+  const t = useRuntimeText();
   const { runtimeData, loading, runtimeError, permissionCode, permissionAllowed } =
     useRuntimeHelperBlockData(
       block,
@@ -586,7 +608,7 @@ function RuntimeFieldHistory({
   const emptyText =
     getStringProp(runtimeData?.emptyText) ||
     getStringProp(block.props?.emptyText) ||
-    'No field changes';
+    t(DESIGNER_I18N.unified.runtime.noFieldChanges);
 
   return (
     <section
@@ -608,10 +630,10 @@ function RuntimeFieldHistory({
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-2">Field</th>
-                <th className="px-3 py-2">From</th>
-                <th className="px-3 py-2">To</th>
-                <th className="px-3 py-2">By</th>
+                <th className="px-3 py-2">{t(DESIGNER_I18N.unified.runtime.field)}</th>
+                <th className="px-3 py-2">{t(DESIGNER_I18N.unified.runtime.from)}</th>
+                <th className="px-3 py-2">{t(DESIGNER_I18N.unified.runtime.to)}</th>
+                <th className="px-3 py-2">{t(DESIGNER_I18N.unified.runtime.by)}</th>
               </tr>
             </thead>
             <tbody>
@@ -708,6 +730,7 @@ function RuntimeHelperDataStatus({
   permissionCode: string;
   permissionAllowed: boolean;
 }) {
+  const t = useRuntimeText();
   const permissionStatus = permissionCode ? (
     <div
       className={`mt-1 text-xs ${
@@ -728,7 +751,7 @@ function RuntimeHelperDataStatus({
         className="mt-1 text-xs text-slate-400"
         data-testid={`runtime-helper-loading-${blockId}`}
       >
-        Loading live data...
+        {t(DESIGNER_I18N.unified.runtime.loadingLiveData)}
       </div>
     );
   } else if (error) {
@@ -932,6 +955,7 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
   const formContext = React.useContext(RuntimeFormValueContext);
   const listContext = React.useContext(RuntimeListSelectionContext);
   const hasPermission = React.useContext(RuntimePermissionContext);
+  const t = useRuntimeText();
   if (!isRuntimeBlockVisible(block, formContext?.values)) return null;
 
   const permissionCode = getRuntimePermissionCode(block);
@@ -991,6 +1015,7 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
             runtimeServices,
             pageContext,
             blockPath,
+            t,
           })
         : isFilterField
           ? renderRuntimeFilterControl({
@@ -1004,6 +1029,7 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
               listContext,
               pageContext,
               runtimeServices,
+              t,
             })
         : null}
       {helpText ? (
@@ -1032,6 +1058,7 @@ function renderRuntimeFieldControl({
   runtimeServices,
   pageContext,
   blockPath,
+  t,
 }: {
   block: DslBlockV3;
   component: RuntimeFieldComponent;
@@ -1044,6 +1071,7 @@ function renderRuntimeFieldControl({
   runtimeServices?: RuntimeExecutionServices;
   pageContext: RuntimePageContext;
   blockPath: string[];
+  t: (entry: Record<string, string>) => string;
 }) {
   const baseClass =
     'mt-2 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400';
@@ -1076,7 +1104,7 @@ function renderRuntimeFieldControl({
         value={stringValue}
         onChange={(event) => formContext?.setValue(fieldKey, event.target.value)}
       >
-        <option value="">{placeholder || 'Select...'}</option>
+        <option value="">{placeholder || t(DESIGNER_I18N.unified.runtime.selectPlaceholder)}</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -1138,7 +1166,7 @@ function renderRuntimeFieldControl({
         })}
         {options.length ? null : (
           <div className="text-xs text-slate-500" data-testid={`runtime-radio-empty-${block.id}`}>
-            No options configured
+            {t(DESIGNER_I18N.unified.runtime.noOptionsConfigured)}
           </div>
         )}
       </div>
@@ -1154,7 +1182,7 @@ function renderRuntimeFieldControl({
         >
           <span>B</span>
           <span>I</span>
-          <span>Link</span>
+          <span>{t(DESIGNER_I18N.unified.runtime.link)}</span>
         </div>
         <textarea
           id={controlId}
@@ -1254,6 +1282,7 @@ function renderRuntimeFilterControl({
   listContext,
   pageContext,
   runtimeServices,
+  t,
 }: {
   block: DslBlockV3;
   blockPath: string[];
@@ -1265,6 +1294,7 @@ function renderRuntimeFilterControl({
   listContext: RuntimeSelectionContextValue | null;
   pageContext: RuntimePageContext;
   runtimeServices?: RuntimeExecutionServices;
+  t: (entry: Record<string, string>) => string;
 }) {
   const baseClass =
     'mt-2 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400';
@@ -1281,7 +1311,7 @@ function renderRuntimeFilterControl({
         formContext={null}
         onValueChange={setFilterValue}
         pageContext={pageContext}
-        placeholder={placeholder || 'All records...'}
+        placeholder={placeholder || t(DESIGNER_I18N.unified.runtime.allRecords)}
         readOnly={false}
         runtimeServices={runtimeServices}
         stringValue={stringValue}
@@ -1299,7 +1329,7 @@ function renderRuntimeFilterControl({
         value={stringValue}
         onChange={(event) => setFilterValue(event.target.value)}
       >
-        <option value="">{placeholder || 'All'}</option>
+        <option value="">{placeholder || t(DESIGNER_I18N.unified.runtime.all)}</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -1364,6 +1394,7 @@ function RuntimePickerControl({
   runtimeServices?: RuntimeExecutionServices;
   stringValue: string;
 }) {
+  const t = useRuntimeText();
   const staticOptions = getRuntimeSelectOptions(block.props?.options);
   const [dynamicOptions, setDynamicOptions] = React.useState<RuntimeSelectOption[]>([]);
   const [searchText, setSearchText] = React.useState('');
@@ -1413,7 +1444,12 @@ function RuntimePickerControl({
       .catch((loadError: unknown) => {
         if (!cancelled) {
           setDynamicOptions([]);
-          setRuntimeError(normalizeRuntimeExecutionError(loadError, 'Picker options failed'));
+          setRuntimeError(
+            normalizeRuntimeExecutionError(
+              loadError,
+              t(DESIGNER_I18N.unified.runtime.pickerOptionsFailed),
+            ),
+          );
         }
       })
       .finally(() => {
@@ -1436,7 +1472,8 @@ function RuntimePickerControl({
 
   const options = shouldLoadOptions ? dynamicOptions : staticOptions;
   const meta = getRuntimePickerMeta(block);
-  const searchPlaceholder = getStringProp(block.props?.searchPlaceholder) || 'Search records...';
+  const searchPlaceholder =
+    getStringProp(block.props?.searchPlaceholder) || t(DESIGNER_I18N.unified.runtime.searchRecords);
 
   return (
     <div className="mt-2 space-y-1">
@@ -1466,7 +1503,11 @@ function RuntimePickerControl({
           formContext?.setValue(fieldKey, event.target.value);
         }}
       >
-        <option value="">{loading ? 'Loading records...' : placeholder || 'Select record...'}</option>
+        <option value="">
+          {loading
+            ? t(DESIGNER_I18N.unified.runtime.loadingRecords)
+            : placeholder || t(DESIGNER_I18N.unified.runtime.selectRecord)}
+        </option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -2032,6 +2073,7 @@ function RuntimeRepeaterField({
   controlIdPrefix?: string;
   testIdPrefix?: string;
 }) {
+  const t = useRuntimeText();
   const fieldKey = getRuntimeRepeaterFieldKey(fieldBlock);
   const component = normalizeRuntimeFieldComponent(fieldBlock.props?.component);
   const value = row[fieldKey];
@@ -2067,7 +2109,7 @@ function RuntimeRepeaterField({
           value={stringValue}
           onChange={(event) => onChange(rowIndex, fieldBlock, event.target.value)}
         >
-          <option value="">Select...</option>
+          <option value="">{t(DESIGNER_I18N.unified.runtime.selectPlaceholder)}</option>
           {getRuntimeSelectOptions(fieldBlock.props?.options).map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -2350,6 +2392,7 @@ function getRuntimeRepeaterFieldKey(block: DslBlockV3): string {
 function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
   const selectionContext = React.useContext(RuntimeListSelectionContext);
   const hasPermission = React.useContext(RuntimePermissionContext);
+  const t = useRuntimeText();
   const rows = applyRuntimeListFilters(getRuntimeTableRows(block), selectionContext);
   const configuredColumnBlocks = getRuntimeTableColumnBlocks(block);
   const columnBlocks = configuredColumnBlocks.filter((child) =>
@@ -2444,7 +2487,9 @@ function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: Runtim
           </tbody>
         </table>
       ) : (
-        <div className="px-3 py-4 text-sm text-slate-400">No records</div>
+        <div className="px-3 py-4 text-sm text-slate-400">
+          {t(DESIGNER_I18N.unified.runtime.noRecords)}
+        </div>
       )}
     </div>
   );
@@ -2592,6 +2637,8 @@ function RuntimeAction({
   const formContext = React.useContext(RuntimeFormValueContext);
   const selectionContext = React.useContext(RuntimeListSelectionContext);
   const hasPermission = React.useContext(RuntimePermissionContext);
+  const locale = React.useContext(RuntimeLocaleContext);
+  const t = useRuntimeText();
   const [pendingConfirm, setPendingConfirm] = React.useState(false);
   const [status, setStatus] = React.useState('');
   const [error, setError] = React.useState<RuntimeExecutionIssue | null>(null);
@@ -2697,7 +2744,11 @@ function RuntimeAction({
         disabled={disabled}
         onClick={executeAction}
       >
-        {pendingConfirm ? 'Confirm' : executing ? 'Running' : getBlockLabel(block)}
+        {pendingConfirm
+          ? t(DESIGNER_I18N.unified.runtime.confirm)
+          : executing
+          ? t(DESIGNER_I18N.unified.runtime.running)
+          : getBlockLabel(block, locale)}
       </button>
       {permissionCode ? (
         <div
@@ -3096,7 +3147,8 @@ function RuntimeMarkdownWidget({ block }: { block: DslBlockV3 }) {
 }
 
 function RuntimeWidgetEmpty({ block }: { block: DslBlockV3 }) {
-  const emptyText = getStringProp(block.props?.emptyText) || 'No data';
+  const t = useRuntimeText();
+  const emptyText = getStringProp(block.props?.emptyText) || t(DESIGNER_I18N.unified.runtime.noData);
   return (
     <div
       className="mt-auto rounded-md border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500"
@@ -3108,7 +3160,10 @@ function RuntimeWidgetEmpty({ block }: { block: DslBlockV3 }) {
 }
 
 function RuntimeTitle({ block }: { block: DslBlockV3 }) {
-  return <div className="mb-3 text-sm font-semibold text-slate-900">{getBlockLabel(block)}</div>;
+  const locale = React.useContext(RuntimeLocaleContext);
+  return (
+    <div className="mb-3 text-sm font-semibold text-slate-900">{getBlockLabel(block, locale)}</div>
+  );
 }
 
 interface RuntimeBlockContextOptions {
@@ -3195,10 +3250,13 @@ function clampGrid(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function getBlockLabel(block: DslBlockV3): string {
-  if (typeof block.title === 'string') return block.title;
-  if (block.title?.en) return block.title.en;
-  if (block.title?.['zh-CN']) return block.title['zh-CN'];
+function getBlockLabel(block: DslBlockV3, locale = 'en-US'): string {
+  const title = block.title;
+  if (typeof title === 'string') return title;
+  if (title) {
+    const resolved = title[locale] || title['en-US'] || title.en || title['zh-CN'];
+    if (resolved) return resolved;
+  }
   if (typeof block.props?.label === 'string') return block.props.label;
   if (typeof block.props?.title === 'string') return block.props.title;
   return block.field || block.widgetType || block.actionType || block.blockType;

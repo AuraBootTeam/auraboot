@@ -55,6 +55,10 @@ export interface ModelFieldDefinition {
   dictCode?: string;
   required?: boolean;
   refTarget?: ModelFieldRefTarget;
+  /** Virtual / computed field backed by an expression or external source. */
+  virtual?: boolean;
+  /** Optional backend-provided semantic grouping hint. */
+  semanticType?: string;
 }
 
 export interface ModelFieldRefTarget {

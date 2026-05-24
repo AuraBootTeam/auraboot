@@ -37,7 +37,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
   return createBlockRegistryV3([
     {
       blockType: 'form',
-      label: 'Form',
+      label: { 'en-US': 'Form', 'zh-CN': '表单' },
       icon: 'square-pen',
       category: 'page',
       allowedChildren: [
@@ -54,7 +54,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'form-section',
-      label: 'Form section',
+      label: { 'en-US': 'Form section', 'zh-CN': '表单分组' },
       icon: 'columns-3',
       category: 'form',
       allowedChildren: ['form-section', 'field', 'sub-table', 'repeater', 'subform'],
@@ -63,7 +63,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'field',
-      label: 'Field',
+      label: { 'en-US': 'Field', 'zh-CN': '字段' },
       icon: 'text-cursor-input',
       category: 'form',
       inspector: toInspectorSchema('field'),
@@ -71,7 +71,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'list',
-      label: 'List',
+      label: { 'en-US': 'List', 'zh-CN': '列表' },
       icon: 'table',
       category: 'page',
       allowedChildren: ['tabs', 'filter-bar', 'action-bar', 'table', 'widget'],
@@ -80,7 +80,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'filter-bar',
-      label: 'Filter bar',
+      label: { 'en-US': 'Filter bar', 'zh-CN': '筛选栏' },
       icon: 'list-filter',
       category: 'list',
       allowedChildren: ['filter-field'],
@@ -89,7 +89,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'filter-field',
-      label: 'Filter field',
+      label: { 'en-US': 'Filter field', 'zh-CN': '筛选字段' },
       icon: 'search',
       category: 'list',
       inspector: toInspectorSchema('filter-field'),
@@ -97,7 +97,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'table',
-      label: 'Table',
+      label: { 'en-US': 'Table', 'zh-CN': '表格' },
       icon: 'table-2',
       category: 'list',
       allowedChildren: ['column', 'action'],
@@ -106,7 +106,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'column',
-      label: 'Column',
+      label: { 'en-US': 'Column', 'zh-CN': '列' },
       icon: 'panel-left',
       category: 'list',
       inspector: toInspectorSchema('column'),
@@ -114,7 +114,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'action-bar',
-      label: 'Action bar',
+      label: { 'en-US': 'Action bar', 'zh-CN': '操作栏' },
       icon: 'between-horizontal-start',
       category: 'action',
       allowedChildren: ['action'],
@@ -123,7 +123,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'action',
-      label: 'Action',
+      label: { 'en-US': 'Action', 'zh-CN': '操作' },
       icon: 'mouse-pointer-click',
       category: 'action',
       inspector: toInspectorSchema('action'),
@@ -131,7 +131,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'detail',
-      label: 'Detail',
+      label: { 'en-US': 'Detail', 'zh-CN': '详情' },
       icon: 'panel-top',
       category: 'page',
       allowedChildren: [
@@ -148,7 +148,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'detail-section',
-      label: 'Detail section',
+      label: { 'en-US': 'Detail section', 'zh-CN': '详情分组' },
       icon: 'rows-3',
       category: 'detail',
       allowedChildren: ['field', 'sub-table', 'repeater', 'subform'],
@@ -157,7 +157,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'dashboard',
-      label: 'Dashboard',
+      label: { 'en-US': 'Dashboard', 'zh-CN': '仪表盘' },
       icon: 'layout-dashboard',
       category: 'page',
       allowedChildren: ['widget'],
@@ -166,7 +166,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'widget',
-      label: 'Widget',
+      label: { 'en-US': 'Widget', 'zh-CN': '组件' },
       icon: 'chart-no-axes-combined',
       category: 'dashboard',
       inspector: toInspectorSchema('widget'),
@@ -174,7 +174,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'tabs',
-      label: 'Tabs',
+      label: { 'en-US': 'Tabs', 'zh-CN': '标签页' },
       icon: 'panel-top-open',
       category: 'layout',
       allowedChildren: ['tab'],
@@ -183,7 +183,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'tab',
-      label: 'Tab',
+      label: { 'en-US': 'Tab', 'zh-CN': '标签' },
       icon: 'panel-top',
       category: 'layout',
       allowedChildren: [
@@ -206,7 +206,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'sub-table',
-      label: 'Sub table',
+      label: { 'en-US': 'Sub table', 'zh-CN': '子表' },
       icon: 'table-properties',
       category: 'detail',
       allowedChildren: ['column', 'action'],
@@ -215,7 +215,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'repeater',
-      label: 'Repeater',
+      label: { 'en-US': 'Repeater', 'zh-CN': '重复项' },
       icon: 'list-plus',
       category: 'form',
       allowedChildren: ['field'],
@@ -224,7 +224,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'subform',
-      label: 'Subform',
+      label: { 'en-US': 'Subform', 'zh-CN': '子表单' },
       icon: 'clipboard-list',
       category: 'form',
       allowedChildren: ['form-section', 'field'],
@@ -233,7 +233,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'ai-fill-banner',
-      label: 'AI fill banner',
+      label: { 'en-US': 'AI fill banner', 'zh-CN': 'AI 填充入口' },
       icon: 'sparkles',
       category: 'form',
       inspector: toInspectorSchema('ai-fill-banner'),
@@ -241,7 +241,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'bpm-panel',
-      label: 'BPM panel',
+      label: { 'en-US': 'BPM panel', 'zh-CN': '流程面板' },
       icon: 'workflow',
       category: 'workflow',
       inspector: toInspectorSchema('bpm-panel'),
@@ -249,7 +249,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'activity-timeline',
-      label: 'Activity timeline',
+      label: { 'en-US': 'Activity timeline', 'zh-CN': '活动时间线' },
       icon: 'history',
       category: 'workflow',
       inspector: toInspectorSchema('activity-timeline'),
@@ -257,7 +257,7 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
     },
     {
       blockType: 'field-history',
-      label: 'Field history',
+      label: { 'en-US': 'Field history', 'zh-CN': '字段历史' },
       icon: 'list-tree',
       category: 'workflow',
       inspector: toInspectorSchema('field-history'),
