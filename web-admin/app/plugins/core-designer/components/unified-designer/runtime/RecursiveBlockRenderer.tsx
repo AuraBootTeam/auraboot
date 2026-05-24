@@ -1015,6 +1015,7 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
             runtimeServices,
             pageContext,
             blockPath,
+            t,
           })
         : isFilterField
           ? renderRuntimeFilterControl({
@@ -1057,6 +1058,7 @@ function renderRuntimeFieldControl({
   runtimeServices,
   pageContext,
   blockPath,
+  t,
 }: {
   block: DslBlockV3;
   component: RuntimeFieldComponent;
@@ -1069,8 +1071,8 @@ function renderRuntimeFieldControl({
   runtimeServices?: RuntimeExecutionServices;
   pageContext: RuntimePageContext;
   blockPath: string[];
+  t: (entry: Record<string, string>) => string;
 }) {
-  const t = useRuntimeText();
   const baseClass =
     'mt-2 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-400';
   const controlId = getRuntimeFieldControlId(block, component);
