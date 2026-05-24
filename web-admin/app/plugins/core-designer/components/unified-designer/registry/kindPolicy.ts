@@ -19,6 +19,8 @@ export interface KindPolicy {
 const SHARED_FORM_BLOCKS = [
   'form-section',
   'field',
+  'sub-table',
+  'column',
   'repeater',
   'subform',
   'ai-fill-banner',

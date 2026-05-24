@@ -27,6 +27,9 @@ describe('kindPolicy', () => {
   it('allows form-family blocks but not other page kinds for a form page', () => {
     expect(isBlockTypeAllowedForKind('form', 'form-section')).toBe(true);
     expect(isBlockTypeAllowedForKind('form', 'field')).toBe(true);
+    // master-detail forms: sub-table (+ its columns) are valid form children
+    expect(isBlockTypeAllowedForKind('form', 'sub-table')).toBe(true);
+    expect(isBlockTypeAllowedForKind('form', 'column')).toBe(true);
     expect(isBlockTypeAllowedForKind('form', 'list')).toBe(false);
     expect(isBlockTypeAllowedForKind('form', 'detail')).toBe(false);
     expect(isBlockTypeAllowedForKind('form', 'dashboard')).toBe(false);
