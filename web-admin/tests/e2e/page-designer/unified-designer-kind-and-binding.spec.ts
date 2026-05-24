@@ -31,13 +31,43 @@ async function findFormPageKey(page: import('@playwright/test').Page): Promise<s
   });
 }
 
+/**
+ * Open the unified designer for a page key. On a cold dev Vite the very first
+ * navigation can race optimizeDeps and render a transient "Application Error";
+ * reload once (Vite is warm by then) before asserting on the workbench.
+ */
+async function openDesigner(page: import('@playwright/test').Page, pageKey: string) {
+  const workbench = page.getByTestId('unified-designer-workbench');
+  const attempts = 4;
+  for (let i = 0; i < attempts; i++) {
+    if (i === 0) {
+      await page.goto(`/unified-designer?pageKey=${pageKey}`, { waitUntil: 'domcontentloaded' });
+    } else {
+      // Cold dev Vite re-runs optimizeDeps on the heavy designer route and can
+      // render a transient "Application Error" until it settles; reload until ready.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+    }
+    try {
+      await workbench.waitFor({ state: 'visible', timeout: i === attempts - 1 ? 45000 : 15000 });
+      return;
+    } catch {
+      if (i === attempts - 1) throw new Error('unified-designer-workbench never became visible');
+      await page.waitForTimeout(2000);
+    }
+  }
+}
+
 test.describe('Unified designer — kind collapse, i18n, model binding', () => {
+  // The designer route pulls a heavy dep graph (@dnd-kit, lucide, react-router
+  // framework). On a cold dev Vite the first load triggers optimizeDeps and can
+  // need a couple of reloads to settle, which exceeds the default per-test budget.
+  test.describe.configure({ timeout: 120_000 });
+
   test('a form page collapses the palette and renders zh-CN copy', async ({ page }) => {
     const formKey = await findFormPageKey(page);
     test.skip(!formKey, 'no form-kind page seeded in this environment');
 
-    await page.goto(`/unified-designer?pageKey=${formKey}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 20000 });
+    await openDesigner(page, formKey!);
 
     // Canvas band shows the localized form kind label, not the old Composite text.
     const band = page.getByTestId('canvas-root-drop-zone');
@@ -63,8 +93,12 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const formKey = await findFormPageKey(page);
     test.skip(!formKey, 'no form-kind page seeded in this environment');
 
-    await page.goto(`/unified-designer?pageKey=${formKey}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 20000 });
+    await openDesigner(page, formKey!);
+
+    // Wait for the outline tree to populate before querying it.
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({
+      timeout: 15000,
+    });
 
     // Select the first form-section from the outline.
     const sectionItem = page
@@ -76,8 +110,13 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     const sectionId = sectionTestId!.replace('outline-item-', '');
     await sectionItem.click();
 
-    // Open the Fields library and pick an unused model field.
+    // Open the Fields library; model fields load async, so wait before deciding.
     await page.getByTestId('resource-tab-fields').click();
+    await page
+      .locator('[data-testid^="model-field-"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {});
     const fieldItem = page.locator('[data-testid^="model-field-"][data-used="false"]').first();
     test.skip((await fieldItem.count()) === 0, 'no bindable model field for this page');
 
