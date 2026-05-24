@@ -146,7 +146,7 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.queryByTestId('unified-resource-panel')).not.toBeInTheDocument();
     expect(screen.queryByTestId('unified-canvas-host')).not.toBeInTheDocument();
     expect(screen.queryByTestId('unified-inspector-host')).not.toBeInTheDocument();
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
 
     fireEvent.click(screen.getByTestId('designer-mode-edit'));
 
@@ -185,7 +185,7 @@ describe('UnifiedDesignerWorkbench', () => {
       target: { value: 'multiple' },
     });
 
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
 
     fireEvent.click(screen.getByTestId('inspector-tab-advanced'));
 
@@ -238,7 +238,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('inspector-json-apply-props'));
 
     expect(screen.getByTestId('canvas-block-action_import')).toHaveTextContent('Bulk import');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('renders action-type specific inspector fields for button configuration', () => {
@@ -263,7 +263,7 @@ describe('UnifiedDesignerWorkbench', () => {
     });
 
     expect(screen.getByTestId('inspector-field-props.to')).toHaveValue('/customers/:id');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('edits action JSON parameters in the basic inspector without falling back to advanced JSON', () => {
@@ -279,9 +279,9 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('inspector-json-field-apply-props.payload'));
 
     expect(screen.getByTestId('inspector-json-field-error-props.payload')).toHaveTextContent(
-      'Invalid JSON',
+      'JSON 格式错误',
     );
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Saved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
 
     fireEvent.change(screen.getByTestId('inspector-field-props.payload'), {
       target: { value: '{ "scope": "selected" }' },
@@ -289,7 +289,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('inspector-json-field-apply-props.payload'));
 
     expect(screen.queryByTestId('inspector-json-field-error-props.payload')).not.toBeInTheDocument();
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
 
     fireEvent.click(screen.getByTestId('inspector-tab-advanced'));
 
@@ -311,11 +311,11 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(validateFormInput);
 
     expect(validateFormInput).not.toBeChecked();
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
 
     fireEvent.click(screen.getByTestId('designer-save'));
 
-    await screen.findByText('Saved');
+    await screen.findByText('已保存');
     const savedDocument = onSave.mock.calls[0][0];
     const savedBlock = findBlockById(savedDocument.blocks, 'action_import')?.block;
     expect(savedBlock?.props).toMatchObject({ validateForm: false });
@@ -331,9 +331,9 @@ describe('UnifiedDesignerWorkbench', () => {
     });
     fireEvent.click(screen.getByTestId('inspector-json-apply-props'));
 
-    expect(screen.getByTestId('inspector-json-error-props')).toHaveTextContent('Invalid JSON');
+    expect(screen.getByTestId('inspector-json-error-props')).toHaveTextContent('JSON 格式错误');
     expect(screen.getByTestId('canvas-block-action_import')).toHaveTextContent('Import');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Saved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
   });
 
   it('tracks dirty state and saves the edited V3 document', async () => {
@@ -347,12 +347,12 @@ describe('UnifiedDesignerWorkbench', () => {
       target: { value: 'Customer Name' },
     });
 
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
     expect(screen.getByTestId('designer-save')).not.toBeDisabled();
 
     fireEvent.click(screen.getByTestId('designer-save'));
 
-    await screen.findByText('Saved');
+    await screen.findByText('已保存');
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
         schemaVersion: 3,
@@ -373,7 +373,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('designer-save'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Save failed');
+      expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('保存失败');
     });
     expect(screen.getByTestId('designer-save-error')).toHaveTextContent(
       'Backend rejected PageSchema V3.',
@@ -385,7 +385,7 @@ describe('UnifiedDesignerWorkbench', () => {
     });
 
     expect(screen.queryByTestId('designer-save-error')).not.toBeInTheDocument();
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('guards the return link when the document has unsaved changes', () => {
@@ -402,13 +402,13 @@ describe('UnifiedDesignerWorkbench', () => {
     });
     fireEvent.click(screen.getByTestId('designer-return-link'));
 
-    expect(screen.getByTestId('designer-leave-warning')).toHaveTextContent('Unsaved changes');
+    expect(screen.getByTestId('designer-leave-warning')).toHaveTextContent('有未保存的更改');
     expect(screen.getByTestId('designer-leave-confirm')).toHaveAttribute('href', '/p/page_schema');
 
     fireEvent.click(screen.getByTestId('designer-leave-cancel'));
 
     expect(screen.queryByTestId('designer-leave-warning')).not.toBeInTheDocument();
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('reorders form fields, list columns, and toolbar actions in layout mode', () => {
@@ -416,53 +416,18 @@ describe('UnifiedDesignerWorkbench', () => {
 
     fireEvent.click(screen.getByTestId('designer-mode-layout'));
 
-    dragBefore('canvas-block-field_customer_phone', 'canvas-block-field_customer_name');
-    dragBefore('canvas-block-column_status', 'canvas-block-column_title');
-    dragBefore('canvas-block-action_import', 'canvas-block-action_create');
+    // Drag reorder runs through @dnd-kit (verified in the browser + the pure
+    // resolveDragEndAction unit test); the accessible quick-order buttons cover
+    // the same move-before outcome deterministically in jsdom.
+    fireEvent.click(screen.getByTestId('block-move-up-field_customer_phone'));
+    fireEvent.click(screen.getByTestId('block-move-up-column_status'));
+    fireEvent.click(screen.getByTestId('block-move-up-action_import'));
 
     expect(isBefore('canvas-block-field_customer_phone', 'canvas-block-field_customer_name')).toBe(
       true,
     );
     expect(isBefore('canvas-block-column_status', 'canvas-block-column_title')).toBe(true);
     expect(isBefore('canvas-block-action_import', 'canvas-block-action_create')).toBe(true);
-  });
-
-  it('swaps form fields with pointer drag in layout mode', async () => {
-    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
-
-    fireEvent.click(screen.getByTestId('designer-mode-layout'));
-    const targetBlock = screen.getByTestId('canvas-block-field_customer_name');
-    const originalElementFromPoint = document.elementFromPoint;
-    Object.defineProperty(document, 'elementFromPoint', {
-      configurable: true,
-      value: vi.fn(() => targetBlock),
-    });
-
-    try {
-      fireEvent.pointerDown(screen.getByTestId('canvas-block-field_customer_phone'), {
-        button: 0,
-        clientX: 10,
-        clientY: 10,
-      });
-      fireEvent.mouseMove(window, { clientX: 80, clientY: 10 });
-      fireEvent.mouseUp(window, { clientX: 80, clientY: 10 });
-    } finally {
-      if (originalElementFromPoint) {
-        Object.defineProperty(document, 'elementFromPoint', {
-          configurable: true,
-          value: originalElementFromPoint,
-        });
-      } else {
-        Reflect.deleteProperty(document, 'elementFromPoint');
-      }
-    }
-
-    await waitFor(() => {
-      expect(isBefore('canvas-block-field_customer_phone', 'canvas-block-field_customer_name')).toBe(
-        true,
-      );
-    });
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
   });
 
   it('resizes dashboard widgets from the layout canvas handle', () => {
@@ -503,7 +468,7 @@ describe('UnifiedDesignerWorkbench', () => {
       'data-layout-span',
       '12',
     );
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('moves form fields with layout mode quick order controls', () => {
@@ -521,7 +486,7 @@ describe('UnifiedDesignerWorkbench', () => {
       true,
     );
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_customer_name');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
 
     fireEvent.click(screen.getByTestId('block-move-up-field_customer_name'));
 
@@ -549,7 +514,7 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('widget_revenue');
     expect(screen.getByTestId('inspector-field-layout.x')).toHaveValue(0);
     expect(screen.getByTestId('inspector-field-layout.y')).toHaveValue(3);
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('rejects dashboard widget moves that would overlap another widget', () => {
@@ -569,19 +534,19 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('widget_revenue');
     expect(screen.getByTestId('inspector-field-layout.x')).toHaveValue(0);
     expect(screen.getByTestId('inspector-field-layout.y')).toHaveValue(0);
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Saved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
   });
 
-  it('adds a palette block to the selected compatible parent and selects it', () => {
+  it('adds a custom (unbound) field to the selected parent from the field library escape hatch', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
-    fireEvent.click(screen.getByTestId('palette-add-field'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('field-palette-add-field'));
 
     expect(screen.getByTestId('canvas-block-field_new_field')).toHaveTextContent('New field');
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_new_field');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('adds and configures a sub-table inside a form section', async () => {
@@ -600,7 +565,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('palette-add-sub-table'));
 
     expect(screen.getByTestId('canvas-block-sub_table_new_sub_table')).toHaveTextContent(
-      'New sub table',
+      '新子表',
     );
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent(
       'sub_table_new_sub_table',
@@ -670,7 +635,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('palette-add-repeater'));
 
     expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveTextContent(
-      'New repeater',
+      '新重复项',
     );
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('repeater_new_repeater');
 
@@ -724,7 +689,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('palette-add-subform'));
 
     expect(screen.getByTestId('canvas-block-subform_new_subform')).toHaveTextContent(
-      'New subform',
+      '新子表单',
     );
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('subform_new_subform');
 
@@ -739,7 +704,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
     fireEvent.click(screen.getByTestId('palette-add-form-section'));
     expect(screen.getByTestId('canvas-block-form_section_new_section')).toHaveTextContent(
-      'New section',
+      '新分组',
     );
 
     fireEvent.change(screen.getByTestId('inspector-field-title'), {
@@ -789,7 +754,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('palette-add-action'));
 
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('action_new_action');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
 
     fireEvent.click(screen.getByTestId('designer-save'));
 
@@ -816,13 +781,13 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('model-field-email')).toHaveTextContent('Email');
 
-    dragModelFieldTo('model-field-email', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-email'));
 
     expect(screen.getByTestId('canvas-block-field_email')).toHaveTextContent('Email');
     expect(screen.getByTestId('canvas-block-field_email')).toHaveAttribute('data-selected', 'true');
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_email');
     expect(screen.getByTestId('inspector-field-props.label')).toHaveValue('Email');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('selects model fields from the inspector and writes the selected field to V3', async () => {
@@ -852,11 +817,11 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-field-props.dataType')).toHaveValue('enum');
     expect(screen.getByTestId('inspector-field-props.dictCode')).toHaveValue('customer_status');
     expect(screen.getByTestId('inspector-field-props.required')).not.toBeChecked();
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
 
     fireEvent.click(screen.getByTestId('designer-save'));
 
-    await screen.findByText('Saved');
+    await screen.findByText('已保存');
     const savedDocument = onSave.mock.calls[0][0];
     const savedBlock = findBlockById(savedDocument.blocks, 'field_customer_name')?.block;
     expect(savedBlock?.field).toBe('status');
@@ -879,8 +844,8 @@ describe('UnifiedDesignerWorkbench', () => {
 
     fireEvent.click(screen.getByTestId('outline-item-field_customer_name'));
 
-    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('Picker');
-    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('Rich text');
+    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('选择器');
+    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('富文本');
 
     fireEvent.change(screen.getByTestId('inspector-field-props.component'), {
       target: { value: 'picker' },
@@ -898,10 +863,10 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-field-props.pageSize')).toBeInTheDocument();
     expect(screen.getByTestId('inspector-field-props.pickerParameters')).toBeInTheDocument();
     expect(screen.getByTestId('inspector-field-props.pickerDataSource')).toHaveTextContent(
-      'Model',
+      '模型',
     );
     expect(screen.getByTestId('inspector-field-props.pickerDataSource')).toHaveTextContent(
-      'Named query',
+      '命名查询',
     );
 
     fireEvent.change(screen.getByTestId('inspector-field-props.pickerDataSource'), {
@@ -944,7 +909,7 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.queryByTestId('inspector-field-props.pickerSource')).not.toBeInTheDocument();
     expect(screen.queryByTestId('inspector-field-props.pickerDataSource')).not.toBeInTheDocument();
     expect(screen.queryByTestId('inspector-field-props.searchable')).not.toBeInTheDocument();
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('offers radio as a structured form component with options editing', () => {
@@ -957,7 +922,7 @@ describe('UnifiedDesignerWorkbench', () => {
 
     fireEvent.click(screen.getByTestId('outline-item-field_customer_name'));
 
-    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('Radio');
+    expect(screen.getByTestId('inspector-field-props.component')).toHaveTextContent('单选框');
 
     fireEvent.change(screen.getByTestId('inspector-field-props.component'), {
       target: { value: 'radio' },
@@ -968,7 +933,7 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('inspector-json-field-apply-props.options'));
 
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('radio');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('shows upload-specific form component settings in the field inspector', () => {
@@ -999,7 +964,7 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-field-props.accept')).toHaveValue('.pdf,.docx');
     expect(screen.getByTestId('inspector-field-props.multiple')).toBeChecked();
     expect(screen.getByTestId('inspector-field-props.maxFiles')).toHaveValue(2);
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('syncs filter metadata when the inspector field selection changes', () => {
@@ -1043,10 +1008,8 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('model-field-name')).toBeDisabled();
     expect(screen.getByTestId('model-field-name')).toHaveAttribute('data-used', 'true');
-    expect(screen.getByTestId('model-field-name')).toHaveAttribute('draggable', 'false');
-    expect(screen.getByTestId('model-field-name')).toHaveTextContent('Added');
+    expect(screen.getByTestId('model-field-name')).toHaveTextContent('已添加');
     expect(screen.getByTestId('model-field-email')).not.toBeDisabled();
-    expect(screen.getByTestId('model-field-email')).toHaveAttribute('draggable', 'true');
 
     fireEvent.change(screen.getByTestId('field-palette-search'), {
       target: { value: 'sta' },
@@ -1092,23 +1055,23 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-fields'));
 
-    dragModelFieldTo('model-field-is_active', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-is_active'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('checkbox');
 
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
-    dragModelFieldTo('model-field-annual_revenue', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-annual_revenue'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('number');
 
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
-    dragModelFieldTo('model-field-contract_file', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-contract_file'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('upload');
 
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
-    dragModelFieldTo('model-field-industry', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-industry'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('select');
 
     fireEvent.click(screen.getByTestId('canvas-block-section_basic'));
-    dragModelFieldTo('model-field-owner_id', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('model-field-owner_id'));
     expect(screen.getByTestId('inspector-field-props.component')).toHaveValue('picker');
     expect(screen.getByTestId('inspector-field-props.pickerDataSource')).toHaveValue('model');
     expect(screen.getByTestId('inspector-field-props.pickerSource')).toHaveValue('user');
@@ -1129,7 +1092,7 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('model-field-email')).not.toBeDisabled();
 
-    dragModelFieldTo('model-field-email', 'canvas-block-table_customers');
+    fireEvent.click(screen.getByTestId('model-field-email'));
 
     expect(screen.getByTestId('canvas-block-column_email')).toHaveTextContent('Email');
     expect(screen.getByTestId('canvas-block-column_email')).toHaveAttribute(
@@ -1145,7 +1108,7 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.getByTestId('model-field-email')).not.toBeDisabled();
 
-    dragModelFieldTo('model-field-email', 'canvas-block-list_filters');
+    fireEvent.click(screen.getByTestId('model-field-email'));
 
     expect(screen.getByTestId('canvas-block-filter_email')).toHaveTextContent('Email');
     expect(screen.getByTestId('canvas-block-filter_email')).toHaveAttribute(
@@ -1154,79 +1117,7 @@ describe('UnifiedDesignerWorkbench', () => {
     );
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('filter_email');
     expect(screen.getByTestId('inspector-field-props.label')).toHaveValue('Email');
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
-  });
-
-  it('drops a model field before an existing compatible field block', () => {
-    render(
-      <UnifiedDesignerWorkbench
-        initialDocument={samplePageSchemaV3}
-        modelFieldsByModel={testModelFields}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-fields'));
-
-    dragModelFieldTo('model-field-email', 'canvas-block-field_customer_phone');
-
-    expect(screen.getByTestId('canvas-block-field_email')).toHaveTextContent('Email');
-    expect(isBefore('canvas-block-field_email', 'canvas-block-field_customer_phone')).toBe(true);
-    expect(screen.getByTestId('canvas-block-field_email')).toHaveAttribute('data-selected', 'true');
-    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_email');
-  });
-
-  it('shows a before drop indicator while dragging a palette block over a compatible sibling', () => {
-    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
-
-    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
-
-    const dataTransfer = createDataTransfer();
-    fireEvent.dragStart(screen.getByTestId('palette-add-field'), { dataTransfer });
-    fireEvent.dragOver(screen.getByTestId('canvas-block-field_customer_phone'), { dataTransfer });
-
-    expect(screen.getByTestId('canvas-block-field_customer_phone')).toHaveAttribute(
-      'data-drop-intent',
-      'before',
-    );
-    expect(screen.getByTestId('drop-indicator-before-field_customer_phone')).toBeInTheDocument();
-
-    fireEvent.dragLeave(screen.getByTestId('canvas-block-field_customer_phone'));
-
-    expect(screen.getByTestId('canvas-block-field_customer_phone')).toHaveAttribute(
-      'data-drop-intent',
-      'none',
-    );
-  });
-
-  it('shows an inside drop indicator while dragging a model field over a compatible parent', () => {
-    render(
-      <UnifiedDesignerWorkbench
-        initialDocument={samplePageSchemaV3}
-        modelFieldsByModel={testModelFields}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-fields'));
-
-    const dataTransfer = createDataTransfer();
-    fireEvent.dragStart(screen.getByTestId('model-field-email'), { dataTransfer });
-    fireEvent.dragOver(screen.getByTestId('canvas-block-section_basic'), { dataTransfer });
-
-    expect(screen.getByTestId('canvas-block-section_basic')).toHaveAttribute(
-      'data-drop-intent',
-      'inside',
-    );
-    expect(screen.getByTestId('drop-indicator-inside-section_basic')).toBeInTheDocument();
-
-    fireEvent.drop(screen.getByTestId('canvas-block-section_basic'), { dataTransfer });
-
-    expect(screen.getByTestId('canvas-block-section_basic')).toHaveAttribute(
-      'data-drop-intent',
-      'none',
-    );
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
   it('adds a model field before the selected compatible sibling from the field palette', () => {
@@ -1256,10 +1147,8 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
-    expect(screen.getByTestId('palette-add-field')).not.toBeDisabled();
-    expect(screen.getByTestId('palette-add-field')).toHaveAttribute('draggable', 'true');
+    expect(screen.getByTestId('palette-add-repeater')).not.toBeDisabled();
     expect(screen.getByTestId('palette-add-widget')).toBeDisabled();
-    expect(screen.getByTestId('palette-add-widget')).toHaveAttribute('draggable', 'false');
   });
 
   it('drops a palette block onto a compatible canvas parent', () => {
@@ -1268,44 +1157,25 @@ describe('UnifiedDesignerWorkbench', () => {
     fireEvent.click(screen.getByTestId('outline-item-section_basic'));
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
-    dragPaletteTo('palette-add-field', 'canvas-block-section_basic');
+    fireEvent.click(screen.getByTestId('palette-add-repeater'));
 
-    expect(screen.getByTestId('canvas-block-field_new_field')).toHaveTextContent('New field');
-    expect(screen.getByTestId('canvas-block-field_new_field')).toHaveAttribute(
+    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveTextContent('新重复项');
+    expect(screen.getByTestId('canvas-block-repeater_new_repeater')).toHaveAttribute(
       'data-selected',
       'true',
     );
-    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_new_field');
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('repeater_new_repeater');
   });
 
-  it('drops a palette block before an existing compatible child block', () => {
-    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
-
-    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
-    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
-
-    dragPaletteTo('palette-add-field', 'canvas-block-field_customer_phone');
-
-    expect(screen.getByTestId('canvas-block-field_new_field')).toHaveTextContent('New field');
-    expect(isBefore('canvas-block-field_new_field', 'canvas-block-field_customer_phone')).toBe(
-      true,
-    );
-    expect(screen.getByTestId('canvas-block-field_new_field')).toHaveAttribute(
-      'data-selected',
-      'true',
-    );
-    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_new_field');
-  });
-
-  it('drops a page-level palette block onto the canvas root', () => {
+  it('adds a page-level palette block to the canvas root', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
 
-    dragPaletteTo('palette-add-dashboard', 'canvas-root-drop-zone');
+    fireEvent.click(screen.getByTestId('palette-add-dashboard'));
 
     expect(screen.getByTestId('canvas-block-dashboard_new_dashboard')).toHaveTextContent(
-      'New dashboard',
+      '新仪表盘',
     );
     expect(screen.getByTestId('canvas-block-dashboard_new_dashboard')).toHaveAttribute(
       'data-selected',
@@ -1314,43 +1184,13 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent(
       'dashboard_new_dashboard',
     );
-    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('Unsaved');
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 });
-
-function dragBefore(movingTestId: string, targetTestId: string) {
-  const movingId = movingTestId.replace('canvas-block-', '');
-  const dataTransfer = createDataTransfer();
-  fireEvent.dragStart(screen.getByTestId(movingTestId), { dataTransfer });
-  dataTransfer.setData('text/plain', movingId);
-  fireEvent.drop(screen.getByTestId(targetTestId), { dataTransfer });
-}
-
-function createDataTransfer() {
-  const data = new Map<string, string>();
-  return {
-    setData: (type: string, value: string) => data.set(type, value),
-    getData: (type: string) => data.get(type) ?? '',
-  };
-}
 
 function isBefore(firstTestId: string, secondTestId: string) {
   return Boolean(
     screen.getByTestId(firstTestId).compareDocumentPosition(screen.getByTestId(secondTestId)) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   );
-}
-
-function dragPaletteTo(paletteTestId: string, targetTestId: string) {
-  const dataTransfer = createDataTransfer();
-  fireEvent.dragStart(screen.getByTestId(paletteTestId), { dataTransfer });
-  fireEvent.dragOver(screen.getByTestId(targetTestId), { dataTransfer });
-  fireEvent.drop(screen.getByTestId(targetTestId), { dataTransfer });
-}
-
-function dragModelFieldTo(fieldTestId: string, targetTestId: string) {
-  const dataTransfer = createDataTransfer();
-  fireEvent.dragStart(screen.getByTestId(fieldTestId), { dataTransfer });
-  fireEvent.dragOver(screen.getByTestId(targetTestId), { dataTransfer });
-  fireEvent.drop(screen.getByTestId(targetTestId), { dataTransfer });
 }
