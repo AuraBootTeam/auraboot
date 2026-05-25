@@ -33,6 +33,10 @@ async function dndDragTo(
   const before = await canvasBlocks.count();
 
   const performGesture = async () => {
+    // Clear any pointer/drag state a prior (failed) gesture may have left behind:
+    // a held button or a stuck @dnd-kit drag would make this gesture a no-op.
+    await page.mouse.up().catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
     // mouse.move uses viewport coordinates, so both ends must be on-screen first;
     // a tall canvas (filters + toolbar + table) can push the drop target below the fold.
     await target.scrollIntoViewIfNeeded();
@@ -4870,7 +4874,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await switchResourceTab(page, 'blocks');
     const repeaterPaletteItem = page.getByTestId('palette-add-repeater');
     await expect(repeaterPaletteItem).toBeEnabled();
-    await dndDragTo(page, repeaterPaletteItem, page.getByTestId('canvas-block-detail_section_summary'));
+    // The section already holds a sub-table; drop into the section's top band so
+    // the gesture targets the section itself, not the nested sub-table/column
+    // (which cannot accept a repeater).
+    await dndDragTo(page, repeaterPaletteItem, page.getByTestId('canvas-block-detail_section_summary'), {
+      targetPosition: { x: 24, y: 16 },
+    });
     await expect(page.getByTestId(`canvas-block-${repeaterId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailRepeaterTitle);
     await page

@@ -43,6 +43,13 @@ describe('kindPolicy', () => {
     expect(isBlockTypeAllowedForKind('list', 'form-section')).toBe(false);
   });
 
+  it('allows detail helper blocks (ai-fill banner, timelines) for a detail page', () => {
+    expect(isBlockTypeAllowedForKind('detail', 'detail-section')).toBe(true);
+    expect(isBlockTypeAllowedForKind('detail', 'ai-fill-banner')).toBe(true);
+    expect(isBlockTypeAllowedForKind('detail', 'activity-timeline')).toBe(true);
+    expect(isBlockTypeAllowedForKind('detail', 'filter-bar')).toBe(false);
+  });
+
   it('exposes the single root container per concrete kind, none for composite', () => {
     expect(getKindPolicy('form').rootBlockType).toBe('form');
     expect(getKindPolicy('list').rootBlockType).toBe('list');

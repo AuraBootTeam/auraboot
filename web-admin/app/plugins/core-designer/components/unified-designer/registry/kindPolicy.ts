@@ -34,6 +34,7 @@ const SHARED_DETAIL_BLOCKS = [
   'repeater',
   'subform',
   'widget',
+  'ai-fill-banner',
 ] as const;
 
 const SHARED_LAYOUT_BLOCKS = ['tabs', 'tab'] as const;
