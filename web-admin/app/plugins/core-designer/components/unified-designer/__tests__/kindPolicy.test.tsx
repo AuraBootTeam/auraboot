@@ -27,10 +27,27 @@ describe('kindPolicy', () => {
   it('allows form-family blocks but not other page kinds for a form page', () => {
     expect(isBlockTypeAllowedForKind('form', 'form-section')).toBe(true);
     expect(isBlockTypeAllowedForKind('form', 'field')).toBe(true);
+    // master-detail forms: sub-table (+ its columns) are valid form children
+    expect(isBlockTypeAllowedForKind('form', 'sub-table')).toBe(true);
+    expect(isBlockTypeAllowedForKind('form', 'column')).toBe(true);
     expect(isBlockTypeAllowedForKind('form', 'list')).toBe(false);
     expect(isBlockTypeAllowedForKind('form', 'detail')).toBe(false);
     expect(isBlockTypeAllowedForKind('form', 'dashboard')).toBe(false);
     expect(isBlockTypeAllowedForKind('form', 'widget')).toBe(false);
+  });
+
+  it('allows list-family blocks including list-level widgets for a list page', () => {
+    expect(isBlockTypeAllowedForKind('list', 'table')).toBe(true);
+    expect(isBlockTypeAllowedForKind('list', 'filter-bar')).toBe(true);
+    expect(isBlockTypeAllowedForKind('list', 'widget')).toBe(true);
+    expect(isBlockTypeAllowedForKind('list', 'form-section')).toBe(false);
+  });
+
+  it('allows detail helper blocks (ai-fill banner, timelines) for a detail page', () => {
+    expect(isBlockTypeAllowedForKind('detail', 'detail-section')).toBe(true);
+    expect(isBlockTypeAllowedForKind('detail', 'ai-fill-banner')).toBe(true);
+    expect(isBlockTypeAllowedForKind('detail', 'activity-timeline')).toBe(true);
+    expect(isBlockTypeAllowedForKind('detail', 'filter-bar')).toBe(false);
   });
 
   it('exposes the single root container per concrete kind, none for composite', () => {

@@ -134,6 +134,7 @@ function ResourcePanelTabButton({
     <button
       type="button"
       data-testid={testId}
+      data-active={active ? 'true' : 'false'}
       onClick={onClick}
       className={`${isLast ? '' : 'border-r border-slate-200'} px-3 py-2 ${
         active ? 'font-medium text-blue-700' : 'text-slate-500 hover:bg-slate-50'
