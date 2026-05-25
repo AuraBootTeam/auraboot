@@ -56,7 +56,8 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
                     MARKER_INVOCATIONS.add(Map.of(
                             "type", action.getType(),
                             "config", action.getConfig() != null ? action.getConfig() : Map.of(),
-                            "recordId", String.valueOf(context.get("recordId"))));
+                            "recordId", String.valueOf(context.get("recordId")),
+                            "item", String.valueOf(context.get("item"))));
                     return Map.of("ok", true);
                 }
             };
@@ -149,6 +150,48 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
                                         Map.of("type", "expression", "content", "amount <= 1000"))))));
         a.setEnabled(true);
         return a;
+    }
+
+    private Automation loopMarkerAutomation() {
+        Automation a = new Automation();
+        a.setPid("ITLOOP" + System.currentTimeMillis());
+        a.setName("E2E loop automation");
+        a.setTenantId(MetaContext.getCurrentTenantId());
+        a.setFlowConfig(Map.of(
+                "nodes", List.of(
+                        Map.of("id", "t1", "type", "trigger-record-create",
+                                "data", Map.of("label", "On create", "config", Map.of())),
+                        Map.of("id", "loop", "type", "control-loop",
+                                "data", Map.of("label", "For each item",
+                                        "config", Map.of("collection", "items", "itemVariable", "item"))),
+                        Map.of("id", "body", "type", "action-test-marker",
+                                "data", Map.of("label", "Marker",
+                                        "config", Map.of("actionType", "test_marker")))),
+                "edges", List.of(
+                        Map.of("id", "e1", "source", "t1", "target", "loop"),
+                        Map.of("id", "e2", "source", "loop", "target", "body"))));
+        a.setEnabled(true);
+        return a;
+    }
+
+    @Test
+    void controlLoop_expandsBodyActionPerCollectionItem_onSmartEngine() {
+        Automation automation = loopMarkerAutomation();
+        runtime.deploy(automation);
+
+        // control-loop over a 3-element collection must expand the body action into
+        // 3 multi-instance executions on SmartEngine (the bridge-delegate serviceTask
+        // is driven by the compiled <multiInstanceLoopCharacteristics>).
+        runtime.run(automation, "rec-loop",
+                Map.of("event", "create", "items", List.of("a", "b", "c")));
+
+        assertThat(MARKER_INVOCATIONS)
+                .as("loop body should fire once per collection item")
+                .hasSize(3);
+        assertThat(MARKER_INVOCATIONS)
+                .extracting(m -> m.get("item"))
+                .as("each iteration binds its element under the loop itemVariable")
+                .containsExactlyInAnyOrder("a", "b", "c");
     }
 
     @Test

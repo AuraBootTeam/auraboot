@@ -46,12 +46,15 @@ class AutomationServiceImplTenantIsolationTest {
     private AutomationLogMapper automationLogMapper;
     @Mock
     private AutomationTriggerService automationTriggerService;
+    @Mock
+    private com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
 
     private AutomationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new AutomationServiceImpl(automationMapper, automationLogMapper, automationTriggerService);
+        service = new AutomationServiceImpl(automationMapper, automationLogMapper, automationTriggerService,
+                automationProcessRuntime);
         MetaContext.setContext(CURRENT_TENANT, 10L, "user-1", "tester");
     }
 
