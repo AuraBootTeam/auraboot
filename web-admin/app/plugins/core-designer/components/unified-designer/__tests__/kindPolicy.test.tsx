@@ -36,6 +36,13 @@ describe('kindPolicy', () => {
     expect(isBlockTypeAllowedForKind('form', 'widget')).toBe(false);
   });
 
+  it('allows list-family blocks including list-level widgets for a list page', () => {
+    expect(isBlockTypeAllowedForKind('list', 'table')).toBe(true);
+    expect(isBlockTypeAllowedForKind('list', 'filter-bar')).toBe(true);
+    expect(isBlockTypeAllowedForKind('list', 'widget')).toBe(true);
+    expect(isBlockTypeAllowedForKind('list', 'form-section')).toBe(false);
+  });
+
   it('exposes the single root container per concrete kind, none for composite', () => {
     expect(getKindPolicy('form').rootBlockType).toBe('form');
     expect(getKindPolicy('list').rootBlockType).toBe('list');

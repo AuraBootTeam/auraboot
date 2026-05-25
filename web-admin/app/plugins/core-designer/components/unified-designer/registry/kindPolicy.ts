@@ -59,6 +59,7 @@ const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
       'filter-field',
       'table',
       'column',
+      'widget',
       ...SHARED_LAYOUT_BLOCKS,
       ...SHARED_ACTION_BLOCKS,
     ]),

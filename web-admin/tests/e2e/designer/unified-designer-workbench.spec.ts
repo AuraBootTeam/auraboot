@@ -29,34 +29,49 @@ async function dndDragTo(
   target: Locator,
   opts?: { targetPosition?: { x: number; y: number } },
 ): Promise<void> {
-  // mouse.move uses viewport coordinates, so both ends must be on-screen first;
-  // a tall canvas (filters + toolbar + table) can push the drop target below the fold.
-  await target.scrollIntoViewIfNeeded();
-  await source.scrollIntoViewIfNeeded();
-  const src = await source.boundingBox();
-  const dst = await target.boundingBox();
-  if (!src || !dst) throw new Error('dndDragTo: source or target has no bounding box');
-  const sx = src.x + src.width / 2;
-  const sy = src.y + src.height / 2;
-  const tx = dst.x + (opts?.targetPosition?.x ?? dst.width / 2);
-  const ty = dst.y + (opts?.targetPosition?.y ?? dst.height / 2);
-  await page.mouse.move(sx, sy);
-  await page.mouse.down();
-  await page.mouse.move(sx + 12, sy + 12, { steps: 6 });
-  await page.mouse.move(tx, ty, { steps: 18 });
-  await page.mouse.move(tx + 2, ty + 2, { steps: 4 });
-  await page.mouse.up();
-  // Wait for @dnd-kit to tear down the drag (overlay ghost removed) so the next
-  // interaction isn't racing the drag-end re-render.
-  await page
-    .locator('[data-testid="drag-overlay-ghost"]')
-    .waitFor({ state: 'detached', timeout: 5000 })
-    .catch(() => {});
-  // Let React flush the document update + outline/canvas re-render before the
-  // next navigation click, so it doesn't race a partially-rendered tree.
-  await page.evaluate(
-    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
-  );
+  const canvasBlocks = page.locator('[data-testid^="canvas-block-"]');
+  const before = await canvasBlocks.count();
+
+  const performGesture = async () => {
+    // mouse.move uses viewport coordinates, so both ends must be on-screen first;
+    // a tall canvas (filters + toolbar + table) can push the drop target below the fold.
+    await target.scrollIntoViewIfNeeded();
+    await source.scrollIntoViewIfNeeded();
+    const src = await source.boundingBox();
+    const dst = await target.boundingBox();
+    if (!src || !dst) throw new Error('dndDragTo: source or target has no bounding box');
+    const sx = src.x + src.width / 2;
+    const sy = src.y + src.height / 2;
+    const tx = dst.x + (opts?.targetPosition?.x ?? dst.width / 2);
+    const ty = dst.y + (opts?.targetPosition?.y ?? dst.height / 2);
+    await page.mouse.move(sx, sy);
+    await page.mouse.down();
+    await page.mouse.move(sx + 12, sy + 12, { steps: 6 });
+    await page.mouse.move(tx, ty, { steps: 18 });
+    await page.mouse.move(tx + 2, ty + 2, { steps: 4 });
+    await page.mouse.up();
+    // Wait for @dnd-kit to tear down the drag (overlay ghost removed) and let
+    // React flush the document update + canvas re-render before checking/continuing.
+    await page
+      .locator('[data-testid="drag-overlay-ghost"]')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {});
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+  };
+
+  // Every dndDragTo in this suite adds a block (palette block or bound field).
+  // @dnd-kit's async measuring means a gesture occasionally doesn't register; the
+  // settle above lets a successful add render before we check, so retrying only
+  // fires when nothing was added (no double-add).
+  await expect(async () => {
+    await performGesture();
+    expect(await canvasBlocks.count()).toBeGreaterThan(before);
+  }).toPass({ timeout: 20000 });
 }
 
 /**
@@ -86,6 +101,15 @@ async function setCheckbox(page: Page, testId: string, checked: boolean): Promis
   const checkbox = page.getByTestId(testId);
   await expect(async () => {
     if ((await checkbox.isChecked()) !== checked) await checkbox.click();
+    // The DOM toggles on click, but if the controlled onChange didn't commit to
+    // the document, React reconciles the checkbox back on the next frame. Settle
+    // before verifying so a non-committed toggle is detected and retried.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
     expect(await checkbox.isChecked()).toBe(checked);
   }).toPass({ timeout: 10000 });
 }
