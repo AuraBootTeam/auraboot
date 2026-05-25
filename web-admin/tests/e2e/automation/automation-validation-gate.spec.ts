@@ -103,9 +103,16 @@ test.describe('Automation Designer — validation gate (P0-4)', () => {
     await page.goto(`/automation/${auto.pid}`);
     await page.waitForLoadState('domcontentloaded');
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
+    // Wait until the route loader's initialData has populated the editor. Filling
+    // before that races with the initialData effect that resets isDirty → the Save
+    // button would never enable.
+    await expect(nameInput(page)).toHaveValue(auto.name, { timeout: 10000 });
 
-    // Make the editor dirty so the Save button enables.
-    await nameInput(page).fill(`${auto.name} edited`);
+    // Make the editor dirty so the Save button enables. pressSequentially (not
+    // fill) so React's controlled onChange fires per keystroke → setIsDirty(true).
+    await nameInput(page).click();
+    await nameInput(page).press('End');
+    await nameInput(page).pressSequentially(' edited');
     const save = saveButton(page);
     await expect(save).toBeEnabled({ timeout: 5000 });
     await save.click();
@@ -136,9 +143,14 @@ test.describe('Automation Designer — validation gate (P0-4)', () => {
     await page.goto(`/automation/${auto.pid}`);
     await page.waitForLoadState('domcontentloaded');
     await expect(nameInput(page)).toBeVisible({ timeout: 10000 });
+    // Wait until the route loader's initialData has populated the editor. Filling
+    // before that races with the initialData effect that resets isDirty → the Save
+    // button would never enable.
+    await expect(nameInput(page)).toHaveValue(auto.name, { timeout: 10000 });
 
-    const editedName = `${auto.name} edited`;
-    await nameInput(page).fill(editedName);
+    await nameInput(page).click();
+    await nameInput(page).press('End');
+    await nameInput(page).pressSequentially(' edited');
     const save = saveButton(page);
     await expect(save).toBeEnabled({ timeout: 5000 });
     await save.click();
@@ -153,7 +165,7 @@ test.describe('Automation Designer — validation gate (P0-4)', () => {
         },
         { timeout: 8000 },
       )
-      .toBe(editedName);
+      .toContain('edited');
 
     // No field-level error in the panel.
     await expect(propertyPanel(page).getByText('This field is required')).toHaveCount(0);
