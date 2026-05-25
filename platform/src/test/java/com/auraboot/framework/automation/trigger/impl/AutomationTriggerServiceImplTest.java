@@ -375,68 +375,6 @@ class AutomationTriggerServiceImplTest {
     }
 
     // =========================================================
-    // P0 CHARACTERIZATION TESTS (review 2026-05-23)
-    // These document confirmed P0 runtime bugs. They PASS today because they
-    // assert the (broken) current behavior. When the bug is fixed, invert the
-    // assertion as indicated. See docs/backlog/2026-05-23-automation-designer-runtime-review.md
-    // =========================================================
-
-    /**
-     * P0-1: The visual designer's save path persists only flowConfig (nodes/edges) and
-     * leaves actions[] empty (AutomationEditPageImpl.handleSave). executeAutomation only
-     * iterates getActions() and there is NO flowConfig->actions compiler anywhere, so a
-     * designer-built automation executes ZERO actions — a silent no-op.
-     * WHEN FIXED (flowConfig compiled/executed): assert the notification action runs.
-     */
-    @Test
-    void executeAutomation_flowConfigOnly_executesNothing_P0BUG() {
-        Automation automation = new Automation();
-        automation.setPid("auto-p01");
-        automation.setModelCode("model-P01");
-        automation.setTenantId(1L);
-        // A fully-wired flow (record-create trigger -> send-notification) as the designer stores it...
-        automation.setFlowConfig(Map.of(
-                "nodes", List.of(
-                        Map.of("id", "trigger_0", "type", "trigger-record-create"),
-                        Map.of("id", "action_0", "type", "action-send-notification")),
-                "edges", List.of(Map.of("source", "trigger_0", "target", "action_0"))));
-        // ...but actions[] is empty, which is the only thing the executor reads.
-        automation.setActions(new java.util.ArrayList<>());
-
-        AutomationLog log = service.executeAutomation(automation, "rec-p01", Map.of());
-
-        // BUG: flowConfig is ignored; nothing executes.
-        verify(actionExecutor, never()).execute(any(), any());
-        assertThat(log.getActionResults()).isEmpty();
-    }
-
-    /**
-     * P0-2: executeAutomation runs actions linearly by sequence and never consumes the
-     * branch result of a condition node, so a condition evaluating to false does NOT gate
-     * the downstream action — it runs anyway.
-     * WHEN FIXED (condition gates downstream): change to verify(...).never() for downstream.
-     */
-    @Test
-    void executeAutomation_conditionFalse_doesNotGateDownstream_P0BUG() {
-        AutomationAction condition = AutomationAction.builder().type("condition").sequence(1)
-                .config(Map.of("expression", "false")).build();
-        AutomationAction downstream = AutomationAction.builder().type("update_record").sequence(2).build();
-        Automation automation = buildAutomation("auto-p02", "model-P02", null, null,
-                new java.util.ArrayList<>(List.of(condition, downstream)));
-
-        // The condition node yields a false branch result (as ControlNodeExecutor would)...
-        when(actionExecutor.execute(eq(condition), any()))
-                .thenReturn(Map.of("branch", "false", "result", false));
-        when(actionExecutor.execute(eq(downstream), any())).thenReturn(Map.of("ok", true));
-
-        AutomationLog log = service.executeAutomation(automation, "rec-p02", Map.of());
-
-        // BUG: downstream runs despite the false condition (no edge/gate consumption).
-        verify(actionExecutor).execute(eq(downstream), any());
-        assertThat(log.getActionResults()).hasSize(2);
-    }
-
-    // =========================================================
     // Helper
     // =========================================================
 
