@@ -7,14 +7,19 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
+import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.FileAccessor;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.context.ApplicationContext;
 
 import java.util.Collections;
@@ -55,8 +60,20 @@ class HandlerPhaseTest {
     @Mock
     private RecordSnapshotReader snapshotReader;
 
+    @Mock
+    private FileService fileService;
+
+    @Mock
+    private StorageProvider storageProvider;
+
     @InjectMocks
     private HandlerPhase phase;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(phase, "fileService", fileService);
+        ReflectionTestUtils.setField(phase, "storageProvider", storageProvider);
+    }
 
     @Test
     void execute_usesConfiguredPluginHandlerAndPassesHandlerParamsAsSettings() throws Exception {
@@ -88,7 +105,9 @@ class HandlerPhaseTest {
                 .containsEntry("statusField", "pr_po_status")
                 .containsEntry("__commandCode", BUSINESS_COMMAND_CODE)
                 .containsEntry("__handlerCode", PLUGIN_HANDLER_CODE)
-                .containsKey(CommandHandlerExtension.DATA_ACCESSOR_KEY);
+                .containsKey(CommandHandlerExtension.DATA_ACCESSOR_KEY)
+                .containsKey(CommandHandlerExtension.FILE_ACCESSOR_KEY);
+        assertThat(handler.capturedContext.get().fileAccessor()).isInstanceOf(FileAccessor.class);
         assertThat(ctx.getHandlerResults()).containsEntry("observedProcessKey", "po_approval");
     }
 

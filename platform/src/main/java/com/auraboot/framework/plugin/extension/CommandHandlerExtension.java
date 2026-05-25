@@ -39,6 +39,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for AiProviderAccessor in the settings map. */
     String AI_PROVIDER_ACCESSOR_KEY = AiProviderAccessor.SETTINGS_KEY;
 
+    /** Well-known key for FileAccessor in the settings map. */
+    String FILE_ACCESSOR_KEY = FileAccessor.SETTINGS_KEY;
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
@@ -186,6 +189,15 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public AiProviderAccessor aiProviderAccessor() {
             Object accessor = settings != null ? settings.get(AI_PROVIDER_ACCESSOR_KEY) : null;
             return accessor instanceof AiProviderAccessor ? (AiProviderAccessor) accessor : null;
+        }
+
+        /**
+         * Get the host file byte bridge from the settings map.
+         * Returns null if the host application has no file service bridge.
+         */
+        public FileAccessor fileAccessor() {
+            Object accessor = settings != null ? settings.get(FILE_ACCESSOR_KEY) : null;
+            return accessor instanceof FileAccessor ? (FileAccessor) accessor : null;
         }
 
         public static Builder builder() {
