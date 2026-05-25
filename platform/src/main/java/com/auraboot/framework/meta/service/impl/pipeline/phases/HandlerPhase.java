@@ -3,6 +3,8 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
@@ -21,6 +23,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,6 +60,12 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private LlmProviderFactory llmProviderFactory;
+
+    @Autowired(required = false)
+    private FileService fileService;
+
+    @Autowired(required = false)
+    private StorageProvider storageProvider;
 
     @Override public String name() { return "handler"; }
 
@@ -126,7 +135,7 @@ public class HandlerPhase implements CommandPhase {
         }
 
         // 2. Execute plugin command handlers from ExtensionRegistry
-        executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, request,
+        executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, userId, request,
                 fieldMapResults, handlerResults, execConfig);
 
         // 3. Declarative BPM trigger — skipped under dry-run since BPM
@@ -228,7 +237,7 @@ public class HandlerPhase implements CommandPhase {
     // ==================== Helper methods ====================
 
     private void executePluginCommandHandler(String commandCode, String modelCode,
-                                              Map<String, Object> payload, Long tenantId,
+                                              Map<String, Object> payload, Long tenantId, Long userId,
                                               CommandExecuteRequest request,
                                               Map<String, Object> fieldMapResults,
                                               Map<String, Object> handlerResults,
@@ -273,6 +282,10 @@ public class HandlerPhase implements CommandPhase {
             if (llmProviderFactory != null) {
                 pluginSettings.put(CommandHandlerExtension.AI_PROVIDER_ACCESSOR_KEY,
                         new LlmProviderAccessorImpl(llmProviderFactory, objectMapper, tenantId));
+            }
+            if (fileService != null && storageProvider != null) {
+                pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
+                        new FileAccessorImpl(fileService, storageProvider, userId));
             }
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)
