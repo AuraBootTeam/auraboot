@@ -20,7 +20,12 @@ import type {
   PageSchemaV3,
   WorkbenchMode,
 } from '../types';
-import { findBlockById, moveBlockBefore, updateBlockById } from '../utils/recursiveBlockWalker';
+import {
+  findBlockById,
+  moveBlockBefore,
+  removeBlockById,
+  updateBlockById,
+} from '../utils/recursiveBlockWalker';
 import { setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
@@ -45,10 +50,8 @@ import { InspectorHost } from './InspectorHost';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
 
-// Precise pointer-based collision for real users, with a closestCenter fallback
-// when the pointer isn't inside any droppable. The fallback is what makes
-// Playwright `.dragTo()` (a single jump-move that pointerWithin can miss) resolve
-// a drop target instead of silently dropping nowhere.
+// Pointer-based collision for real users, with a closestCenter fallback when the
+// pointer isn't inside any droppable.
 const designerCollisionDetection: CollisionDetection = (args) => {
   const within = pointerWithin(args);
   return within.length > 0 ? within : closestCenter(args);
@@ -133,6 +136,22 @@ export function UnifiedDesignerWorkbench({
       ...current,
       blocks: moveBlockBefore(current.blocks, movingBlockId, targetBlockId),
     }));
+  };
+
+  // The single top-level kind container (form/list/detail/dashboard root) defines
+  // the page; it cannot be deleted, only its descendants can.
+  const canDeleteBlock = (blockId: string) => {
+    const result = findBlockById(document.blocks, blockId);
+    return Boolean(result) && result!.path.length > 1;
+  };
+
+  const handleDeleteBlock = (blockId: string) => {
+    if (!canDeleteBlock(blockId)) return;
+    updateDocument((current) => ({
+      ...current,
+      blocks: removeBlockById(current.blocks, blockId),
+    }));
+    setSelectedBlockId((current) => (current === blockId ? null : current));
   };
 
   const canAddBlock = (blockType: string) => {
@@ -578,6 +597,8 @@ export function UnifiedDesignerWorkbench({
               onSelect={setSelectedBlockId}
               onMoveBefore={handleMoveBefore}
               onPatchBlock={patchBlock}
+              canDeleteBlock={canDeleteBlock}
+              onDeleteBlock={handleDeleteBlock}
             />
             <InspectorHost
               selectedBlock={selectedBlock}

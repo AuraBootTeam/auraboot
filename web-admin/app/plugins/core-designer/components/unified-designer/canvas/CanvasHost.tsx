@@ -1,6 +1,6 @@
 import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { ArrowDown, ArrowUp, GripVertical, Maximize2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, Maximize2, Trash2 } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import type { DesignerMode, DslBlockV3, PageSchemaV3 } from '../types';
@@ -26,6 +26,8 @@ interface CanvasHostProps {
   onSelect: (blockId: string) => void;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
   onPatchBlock: (blockId: string, updater: (block: DslBlockV3) => DslBlockV3) => void;
+  canDeleteBlock: (blockId: string) => boolean;
+  onDeleteBlock: (blockId: string) => void;
 }
 
 export function CanvasHost({
@@ -38,6 +40,8 @@ export function CanvasHost({
   onSelect,
   onMoveBefore,
   onPatchBlock,
+  canDeleteBlock,
+  onDeleteBlock,
 }: CanvasHostProps) {
   const { locale } = useI18n();
   const kindLabel = resolveDesignerText(
@@ -94,6 +98,8 @@ export function CanvasHost({
               onMoveWidget={patchWidgetLayout}
               onResizeWidget={patchWidgetLayout}
               onResizeSpan={patchBlockSpan}
+              canDeleteBlock={canDeleteBlock}
+              onDeleteBlock={onDeleteBlock}
             />
           ))}
         </div>
@@ -143,6 +149,8 @@ interface BlockFrameProps {
   onMoveWidget: (blockId: string, layoutPatch: Record<string, number>) => void;
   onResizeWidget: (blockId: string, layoutPatch: Record<string, number>) => void;
   onResizeSpan: (blockId: string, span: number) => void;
+  canDeleteBlock: (blockId: string) => boolean;
+  onDeleteBlock: (blockId: string) => void;
 }
 
 function BlockFrame(props: BlockFrameProps) {
@@ -160,6 +168,8 @@ function BlockFrame(props: BlockFrameProps) {
     onMoveWidget,
     onResizeWidget,
     onResizeSpan,
+    canDeleteBlock,
+    onDeleteBlock,
   } = props;
   const selected = selectedBlockId === block.id;
   const isDashboardWidget = block.blockType === 'widget';
@@ -298,6 +308,25 @@ function BlockFrame(props: BlockFrameProps) {
           </div>
         ) : null}
       </div>
+      {canDeleteBlock(block.id) ? (
+        <button
+          type="button"
+          aria-label={`${resolveDesignerText(DESIGNER_I18N.unified.deleteBlock, locale)} ${getBlockLabel(block, locale)}`}
+          title={resolveDesignerText(DESIGNER_I18N.unified.deleteBlock, locale)}
+          data-testid={`block-delete-${block.id}`}
+          data-no-block-drag="true"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDeleteBlock(block.id);
+          }}
+          // Absolutely positioned so it never affects canvas layout (a header-flow
+          // button would shift nested geometry and break position-based drops).
+          className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded-md bg-white/80 text-slate-300 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 data-[selected=true]:opacity-100"
+          data-selected={selected ? 'true' : 'false'}
+        >
+          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      ) : null}
       <BlockContent
         block={block}
         mode={mode}
@@ -310,6 +339,8 @@ function BlockFrame(props: BlockFrameProps) {
         onMoveWidget={onMoveWidget}
         onResizeWidget={onResizeWidget}
         onResizeSpan={onResizeSpan}
+        canDeleteBlock={canDeleteBlock}
+        onDeleteBlock={onDeleteBlock}
       />
       {mode === 'layout' && block.blockType === 'widget' ? (
         <button
