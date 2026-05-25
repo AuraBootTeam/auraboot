@@ -2,6 +2,42 @@
 
 Date: 2026-05-25
 Branch: `fix/udw-dndkit-e2e`
+Status: RESOLVED — full UDW workbench + page-designer E2E 64/64, reproducible
+across 5 consecutive runs; designer unit suite 167/167. See "Resolution".
+
+## Resolution (2026-05-25)
+
+The post-drag flakiness was a set of React re-render / @dnd-kit async-measuring
+races, each fixed with a robust test helper or a product gap fix. All product
+changes are minimal (kindPolicy gaps + one test affordance); no behavioural
+change to the designer runtime.
+
+Product fixes:
+- kindPolicy: forms allow `sub-table` + `column` (master-detail forms); lists
+  allow `widget` (list-level widgets); details allow `ai-fill-banner`. All were
+  already permitted by BlockRegistry but missing from the palette policy. Unit-
+  tested in `kindPolicy.test.tsx`.
+- ResourcePanel tab buttons expose `data-active` for reliable tab-state checks.
+
+Test robustness (races introduced by @dnd-kit + the designer's re-render-on-edit;
+real users drag across frames and are unaffected):
+- `dndDragTo()`: multi-step pointer gesture (not `.dragTo()`, which one-shots
+  past @dnd-kit's async measuring) + `scrollIntoViewIfNeeded` + overlay-ghost
+  settle + 2-frame rAF + verify-a-block-was-added retry + pre-gesture pointer/
+  Escape reset.
+- `switchResourceTab()` / `saveDesignerPage()` / `setCheckbox()` /
+  `applyJsonField()`: click/toggle + verify-it-took + retry (clicks lost to the
+  post-edit re-render; controlled checkbox reverted; JSON apply read a stale
+  draft closure).
+- `dragCanvasBlockBefore()`: grab the @dnd-kit drag handle, not the block body.
+- draggable assertions: `aria-roledescription='draggable'` (HTML5 `draggable`
+  attr is not set by @dnd-kit).
+- i18n: dirty-state assertions `已保存`/`未保存`.
+- bare `palette-add-field` → Fields-tab custom-field escape hatch.
+- UDW-042: drop the repeater into the detail section's top band (the section
+  holds a sub-table; centre targets the nested sub-table/column).
+
+### Original status (kept for history)
 Status: PARTIAL — see "Remaining" (blocked on post-drag flakiness)
 
 ## Context / root cause
