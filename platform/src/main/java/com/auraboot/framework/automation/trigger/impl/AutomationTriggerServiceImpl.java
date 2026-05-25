@@ -45,13 +45,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     private final AutomationMapper automationMapper;
     private final AutomationLogMapper automationLogMapper;
-    private final ActionExecutor actionExecutor;
     private final AutomationProcessRuntime automationProcessRuntime;
 
     private final ExpressionParser spelParser = new SpelExpressionParser();
-
-    /** Max execution time for a single automation run */
-    private static final Duration EXECUTION_TIMEOUT = Duration.ofSeconds(60);
 
     /** Max concurrent executions per automation rule (prevents thread pool exhaustion from batch events) */
     private static final int MAX_CONCURRENT_PER_RULE = 10;
@@ -75,11 +71,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     public AutomationTriggerServiceImpl(
             AutomationMapper automationMapper,
             AutomationLogMapper automationLogMapper,
-            @Qualifier("compositeActionExecutor") ActionExecutor actionExecutor,
             AutomationProcessRuntime automationProcessRuntime) {
         this.automationMapper = automationMapper;
         this.automationLogMapper = automationLogMapper;
-        this.actionExecutor = actionExecutor;
         this.automationProcessRuntime = automationProcessRuntime;
     }
 
@@ -271,21 +265,6 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         }
     }
 
-    /**
-     * T2 cutover: every automation with a visual flow OR flat actions runs on SmartEngine
-     * (the compiler synthesizes a linear flow from triggerType + actions[] when there is no
-     * flowConfig). The flat sequential executor further down is now reachable only for the
-     * degenerate empty-automation case and is pending physical removal.
-     */
-    private boolean hasExecutableFlow(Automation automation) {
-        Map<String, Object> flowConfig = automation.getFlowConfig();
-        boolean hasFlow = flowConfig != null
-                && flowConfig.get("nodes") instanceof List<?> nodes
-                && !nodes.isEmpty();
-        boolean hasActions = automation.getActions() != null && !automation.getActions().isEmpty();
-        return hasFlow || hasActions;
-    }
-
     @Override
     @Transactional
     public AutomationLog executeAutomation(Automation automation, String recordId,
@@ -308,98 +287,21 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
         automationLogMapper.insertLog(logEntry);
 
-        // T2: when the automation has a visual flow, run it on SmartEngine (the graph
-        // engine honors branches/loops) instead of the flat sequential actions loop.
-        if (hasExecutableFlow(automation)) {
-            try {
-                automationProcessRuntime.run(automation, recordId, triggerPayload);
-                logEntry.setStatus("success");
-            } catch (Exception e) {
-                log.error("Automation flow run failed: pid={}, error={}",
-                        automation.getPid(), e.getMessage(), e);
-                logEntry.setStatus(StatusConstants.FAILED);
-                logEntry.setErrorMessage(e.getMessage());
-            }
-            logEntry.setCompletedAt(Instant.now());
-            automationLogMapper.updateStatus(logEntry);
-            automationMapper.updateTriggerStats(automation.getPid());
-            return logEntry;
-        }
-
-        List<ActionResult> actionResults = new ArrayList<>();
-        boolean hasError = false;
-        String errorMessage = null;
-
+        // T2: every automation runs on SmartEngine. The compiler synthesizes a linear flow
+        // from triggerType + actions[] when there is no visual flowConfig, so the flat
+        // sequential executor has been removed.
         try {
-            // Execute actions in sequence with overall timeout
-            List<AutomationAction> actions = automation.getActions();
-            if (actions != null) {
-                // Sort by sequence
-                actions.sort(Comparator.comparingInt(a -> a.getSequence() != null ? a.getSequence() : 0));
-
-                Map<String, Object> context = new HashMap<>(triggerPayload);
-                context.put("recordId", recordId);
-                context.put("automationPid", automation.getPid());
-                // Expose the run id so action executors that emit live
-                // observability events (E.1: LlmCallExecutor →
-                // AutomationRunStreamPublisher) can key per-run subscribers
-                // without adding a new SPI argument.
-                context.put("runPid", logEntry.getPid());
-
-                Instant deadline = Instant.now().plus(EXECUTION_TIMEOUT);
-
-                for (AutomationAction action : actions) {
-                    // Check overall execution timeout before each action
-                    if (Instant.now().isAfter(deadline)) {
-                        hasError = true;
-                        errorMessage = "Automation execution timed out after " + EXECUTION_TIMEOUT.getSeconds() + "s";
-                        log.warn("Automation {} timed out after {}s, aborting remaining actions",
-                                automation.getPid(), EXECUTION_TIMEOUT.getSeconds());
-                        break;
-                    }
-
-                    ActionResult result = executeAction(action, context);
-                    actionResults.add(result);
-
-                    if (StatusConstants.FAILED.equals(result.getStatus())) {
-                        if (!Boolean.TRUE.equals(action.getContinueOnError())) {
-                            hasError = true;
-                            errorMessage = result.getErrorMessage();
-                            break;
-                        }
-                    }
-
-                    // Add result to context for next action
-                    context.put("action_" + action.getSequence() + "_result", result.getResult());
-                }
-            }
-
-            // Update log
-            logEntry.setActionResults(actionResults);
-            logEntry.setStatus(hasError ? "failed" : "success");
-            logEntry.setErrorMessage(errorMessage);
-            logEntry.setCompletedAt(Instant.now());
-
-            automationLogMapper.updateStatus(logEntry);
-
-            // Update automation stats
-            automationMapper.updateTriggerStats(automation.getPid());
-
-            log.info("Automation execution completed: pid={}, status={}",
-                    automation.getPid(), logEntry.getStatus());
-
+            automationProcessRuntime.run(automation, recordId, triggerPayload);
+            logEntry.setStatus("success");
         } catch (Exception e) {
-            log.error("Automation execution failed: pid={}, error={}",
+            log.error("Automation run failed: pid={}, error={}",
                     automation.getPid(), e.getMessage(), e);
-
             logEntry.setStatus(StatusConstants.FAILED);
             logEntry.setErrorMessage(e.getMessage());
-            logEntry.setCompletedAt(Instant.now());
-            logEntry.setActionResults(actionResults);
-
-            automationLogMapper.updateStatus(logEntry);
         }
-
+        logEntry.setCompletedAt(Instant.now());
+        automationLogMapper.updateStatus(logEntry);
+        automationMapper.updateTriggerStats(automation.getPid());
         return logEntry;
     }
 
@@ -479,26 +381,4 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         return evaluateCondition(condition, payload);
     }
 
-    private ActionResult executeAction(AutomationAction action, Map<String, Object> context) {
-        ActionResult result = new ActionResult();
-        result.setSequence(action.getSequence());
-        result.setActionType(action.getType());
-
-        long startTime = System.currentTimeMillis();
-
-        try {
-            Object actionResult = actionExecutor.execute(action, context);
-            result.setStatus(StatusConstants.SUCCESS);
-            result.setResult(actionResult);
-
-        } catch (Exception e) {
-            result.setStatus(StatusConstants.FAILED);
-            result.setErrorMessage(e.getMessage());
-            log.warn("Action execution failed: type={}, sequence={}, error={}",
-                    action.getType(), action.getSequence(), e.getMessage());
-        }
-
-        result.setDurationMs(System.currentTimeMillis() - startTime);
-        return result;
-    }
 }

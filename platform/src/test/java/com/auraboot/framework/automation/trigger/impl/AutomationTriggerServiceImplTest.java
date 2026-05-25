@@ -35,9 +35,6 @@ class AutomationTriggerServiceImplTest {
     private AutomationLogMapper automationLogMapper;
 
     @Mock
-    private ActionExecutor actionExecutor;
-
-    @Mock
     private com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
 
     private AutomationTriggerServiceImpl service;
@@ -45,7 +42,7 @@ class AutomationTriggerServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AutomationTriggerServiceImpl(
-                automationMapper, automationLogMapper, actionExecutor, automationProcessRuntime);
+                automationMapper, automationLogMapper, automationProcessRuntime);
     }
 
     // =========================================================
@@ -337,7 +334,6 @@ class AutomationTriggerServiceImplTest {
         AutomationLog log = service.executeAutomation(automation, "rec-011", Map.of());
 
         verify(automationProcessRuntime).run(eq(automation), eq("rec-011"), any());
-        verify(actionExecutor, never()).execute(any(), any());
         assertThat(log.getStatus()).isEqualTo("success");
     }
 
@@ -363,7 +359,6 @@ class AutomationTriggerServiceImplTest {
         AutomationLog log = service.executeAutomation(automation, "rec-F", Map.of("event", "create"));
 
         verify(automationProcessRuntime).run(eq(automation), eq("rec-F"), any());
-        verify(actionExecutor, never()).execute(any(), any());
         assertThat(log.getStatus()).isEqualTo("success");
     }
 
