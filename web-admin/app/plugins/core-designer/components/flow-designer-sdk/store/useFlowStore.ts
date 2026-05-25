@@ -14,6 +14,7 @@ interface FlowStoreState {
   nodes: FlowNode[];
   edges: FlowEdge[];
   selectedNodeId: string | null;
+  selectedEdgeId: string | null;
 
   // Status
   isDirty: boolean;
@@ -39,6 +40,7 @@ interface FlowStoreState {
   addEdge: (edge: Omit<FlowEdge, 'id'>) => string;
   updateEdge: (id: string, updates: Partial<FlowEdge>) => void;
   deleteEdge: (id: string) => void;
+  selectEdge: (id: string | null) => void;
 
   // Validation
   setValidationResult: (result: ValidationResult | null) => void;
@@ -77,6 +79,7 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     nodes: [],
     edges: [],
     selectedNodeId: null,
+    selectedEdgeId: null,
     isDirty: false,
     validationResult: null,
     registryVersion: 0,
@@ -121,6 +124,10 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
           nodes: newNodes,
           edges: newEdges,
           selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
+          selectedEdgeId:
+            state.selectedEdgeId && !newEdges.some((e) => e.id === state.selectedEdgeId)
+              ? null
+              : state.selectedEdgeId,
           isDirty: true,
           ...snapshot,
         };
@@ -128,7 +135,7 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     },
 
     selectNode: (id) => {
-      set({ selectedNodeId: id });
+      set({ selectedNodeId: id, selectedEdgeId: null });
     },
 
     addEdge: (edge) => {
@@ -153,8 +160,17 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
       set((state) => {
         const newEdges = state.edges.filter((e) => e.id !== id);
         const snapshot = pushSnapshot(state.nodes, newEdges);
-        return { edges: newEdges, isDirty: true, ...snapshot };
+        return {
+          edges: newEdges,
+          selectedEdgeId: state.selectedEdgeId === id ? null : state.selectedEdgeId,
+          isDirty: true,
+          ...snapshot,
+        };
       });
+    },
+
+    selectEdge: (id) => {
+      set({ selectedEdgeId: id, selectedNodeId: null });
     },
 
     setValidationResult: (result) => {
@@ -206,6 +222,7 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
         nodes,
         edges,
         selectedNodeId: null,
+        selectedEdgeId: null,
         isDirty: false,
         validationResult: null,
         history: [initialSnapshot],
@@ -223,6 +240,7 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
         nodes: [],
         edges: [],
         selectedNodeId: null,
+        selectedEdgeId: null,
         isDirty: false,
         validationResult: null,
         history: [],

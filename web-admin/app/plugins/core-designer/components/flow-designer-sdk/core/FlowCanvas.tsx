@@ -7,6 +7,7 @@ import {
   MiniMap,
   type Connection,
   type NodeTypes,
+  type EdgeTypes,
   type Node,
   type Edge,
   type NodeChange,
@@ -15,6 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useFlowStore } from '../store/useFlowStore';
 import { nodeRegistry } from '../nodes/NodeRegistry';
+import { edgeRegistry } from '../edges/EdgeRegistry';
 import { DefaultFlowNode } from './DefaultFlowNode';
 
 export interface FlowCanvasProps {
@@ -34,11 +36,13 @@ export function FlowCanvas({
     nodes,
     edges,
     selectedNodeId,
+    selectedEdgeId,
     registryVersion,
     updateNode,
     addNode,
     addEdge: storeAddEdge,
     selectNode,
+    selectEdge,
     deleteNode,
     deleteEdge,
   } = useFlowStore();
@@ -57,6 +61,18 @@ export function FlowCanvas({
     return types;
   }, [registryVersion]);
 
+  // Build edge types from registry (domains register custom edge components,
+  // e.g. a conditional edge). Default @xyflow edge is used when unregistered.
+  const edgeTypes: EdgeTypes = useMemo(() => {
+    const types: EdgeTypes = {};
+    edgeRegistry.getAll().forEach((def) => {
+      if (def.component) {
+        types[def.type] = def.component;
+      }
+    });
+    return types;
+  }, [registryVersion]);
+
   // Convert store nodes to ReactFlow nodes
   const rfNodes: Node[] = useMemo(
     () =>
@@ -67,7 +83,10 @@ export function FlowCanvas({
     [nodes, selectedNodeId],
   );
 
-  const rfEdges: Edge[] = useMemo(() => edges, [edges]);
+  const rfEdges: Edge[] = useMemo(
+    () => edges.map((e) => ({ ...e, selected: e.id === selectedEdgeId })),
+    [edges, selectedEdgeId],
+  );
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -113,6 +132,13 @@ export function FlowCanvas({
       selectNode(node.id);
     },
     [selectNode],
+  );
+
+  const onEdgeClick = useCallback(
+    (_: React.MouseEvent, edge: Edge) => {
+      selectEdge(edge.id);
+    },
+    [selectEdge],
   );
 
   const onPaneClick = useCallback(() => {
@@ -161,10 +187,12 @@ export function FlowCanvas({
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
         onDrop={onDrop}
         onDragOver={onDragOver}
