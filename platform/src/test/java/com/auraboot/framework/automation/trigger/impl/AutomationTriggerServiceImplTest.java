@@ -37,11 +37,15 @@ class AutomationTriggerServiceImplTest {
     @Mock
     private ActionExecutor actionExecutor;
 
+    @Mock
+    private com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
+
     private AutomationTriggerServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new AutomationTriggerServiceImpl(automationMapper, automationLogMapper, actionExecutor);
+        service = new AutomationTriggerServiceImpl(
+                automationMapper, automationLogMapper, actionExecutor, automationProcessRuntime);
     }
 
     // =========================================================
@@ -377,6 +381,28 @@ class AutomationTriggerServiceImplTest {
     // =========================================================
     // Helper
     // =========================================================
+
+    @Test
+    void executeAutomation_withFlowConfig_runsViaProcessRuntime_notFlatActions() {
+        Automation automation = new Automation();
+        automation.setPid("auto-flow-1");
+        automation.setModelCode("model-F");
+        automation.setTenantId(1L);
+        automation.setFlowConfig(java.util.Map.of(
+                "nodes", List.of(
+                        java.util.Map.of("id", "t1", "type", "trigger-record-create"),
+                        java.util.Map.of("id", "a1", "type", "action-send-notification")),
+                "edges", List.of(java.util.Map.of("source", "t1", "target", "a1"))));
+        // also give it flat actions to prove they are NOT used when a flow is present
+        automation.setActions(new java.util.ArrayList<>(
+                List.of(AutomationAction.builder().type("send_notification").sequence(1).build())));
+
+        AutomationLog log = service.executeAutomation(automation, "rec-F", Map.of("event", "create"));
+
+        verify(automationProcessRuntime).run(eq(automation), eq("rec-F"), any());
+        verify(actionExecutor, never()).execute(any(), any());
+        assertThat(log.getStatus()).isEqualTo("success");
+    }
 
     private Automation buildAutomation(String pid, String modelCode, String condition,
                                         TriggerConfig triggerConfig, List<AutomationAction> actions) {

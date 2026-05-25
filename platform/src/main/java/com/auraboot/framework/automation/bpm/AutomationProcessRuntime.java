@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.bpm;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
@@ -86,6 +87,14 @@ public class AutomationProcessRuntime {
         }
         variables.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, compiled.actionsByNodeId());
 
+        // The trigger path runs on @Async("eventTaskExecutor") threads that may not carry
+        // a MetaContext; startProcess needs the tenant. Set it from the automation when absent.
+        boolean tenantContextSet = false;
+        if (!MetaContext.exists() && automation.getTenantId() != null) {
+            MetaContext.setContext(automation.getTenantId(), null, automation.getCreatedBy(), null);
+            tenantContextSet = true;
+        }
+
         PersisterSession.create();
         StorageModeHolder.set(com.auraboot.smart.framework.engine.storage.StorageMode.CUSTOM);
         try {
@@ -93,6 +102,9 @@ public class AutomationProcessRuntime {
         } finally {
             StorageModeHolder.clear();
             PersisterSession.destroySession();
+            if (tenantContextSet) {
+                MetaContext.clear();
+            }
         }
     }
 

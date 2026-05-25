@@ -1,6 +1,7 @@
 package com.auraboot.framework.automation.trigger.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.automation.bpm.AutomationProcessRuntime;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.entity.AutomationLog;
@@ -45,6 +46,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     private final AutomationMapper automationMapper;
     private final AutomationLogMapper automationLogMapper;
     private final ActionExecutor actionExecutor;
+    private final AutomationProcessRuntime automationProcessRuntime;
 
     private final ExpressionParser spelParser = new SpelExpressionParser();
 
@@ -73,10 +75,12 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     public AutomationTriggerServiceImpl(
             AutomationMapper automationMapper,
             AutomationLogMapper automationLogMapper,
-            @Qualifier("compositeActionExecutor") ActionExecutor actionExecutor) {
+            @Qualifier("compositeActionExecutor") ActionExecutor actionExecutor,
+            AutomationProcessRuntime automationProcessRuntime) {
         this.automationMapper = automationMapper;
         this.automationLogMapper = automationLogMapper;
         this.actionExecutor = actionExecutor;
+        this.automationProcessRuntime = automationProcessRuntime;
     }
 
     @Override
@@ -267,6 +271,14 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         }
     }
 
+    /** True when the automation carries a visual flow (nodes) to run on SmartEngine. */
+    private boolean hasExecutableFlow(Automation automation) {
+        Map<String, Object> flowConfig = automation.getFlowConfig();
+        return flowConfig != null
+                && flowConfig.get("nodes") instanceof List<?> nodes
+                && !nodes.isEmpty();
+    }
+
     @Override
     @Transactional
     public AutomationLog executeAutomation(Automation automation, String recordId,
@@ -288,6 +300,24 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         logEntry.setCreatedAt(Instant.now());
 
         automationLogMapper.insertLog(logEntry);
+
+        // T2: when the automation has a visual flow, run it on SmartEngine (the graph
+        // engine honors branches/loops) instead of the flat sequential actions loop.
+        if (hasExecutableFlow(automation)) {
+            try {
+                automationProcessRuntime.run(automation, recordId, triggerPayload);
+                logEntry.setStatus("success");
+            } catch (Exception e) {
+                log.error("Automation flow run failed: pid={}, error={}",
+                        automation.getPid(), e.getMessage(), e);
+                logEntry.setStatus(StatusConstants.FAILED);
+                logEntry.setErrorMessage(e.getMessage());
+            }
+            logEntry.setCompletedAt(Instant.now());
+            automationLogMapper.updateStatus(logEntry);
+            automationMapper.updateTriggerStats(automation.getPid());
+            return logEntry;
+        }
 
         List<ActionResult> actionResults = new ArrayList<>();
         boolean hasError = false;

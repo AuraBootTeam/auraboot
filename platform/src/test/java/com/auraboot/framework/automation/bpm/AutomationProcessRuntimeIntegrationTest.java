@@ -66,6 +66,9 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
     @Autowired
     private AutomationProcessRuntime runtime;
 
+    @Autowired
+    private com.auraboot.framework.automation.trigger.AutomationTriggerService automationTriggerService;
+
     @BeforeEach
     void clearInvocations() {
         MARKER_INVOCATIONS.clear();
@@ -102,5 +105,20 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
                 .as("marker action should have fired once via the SmartEngine serviceTask delegate")
                 .hasSize(1);
         assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordId", "rec-1");
+    }
+
+    @Test
+    void executeAutomation_splicesFlowConfigOntoSmartEngine() {
+        Automation automation = markerAutomation();
+        runtime.deploy(automation);
+
+        // Go through the real trigger entry point: executeAutomation must route a
+        // flowConfig automation to the SmartEngine runtime (not the flat actions loop).
+        automationTriggerService.executeAutomation(automation, "rec-2", Map.of("event", "create"));
+
+        assertThat(MARKER_INVOCATIONS)
+                .as("flow automation should run via executeAutomation → SmartEngine splice")
+                .hasSize(1);
+        assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordId", "rec-2");
     }
 }
