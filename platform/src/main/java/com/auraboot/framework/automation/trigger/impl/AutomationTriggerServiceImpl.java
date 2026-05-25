@@ -271,12 +271,19 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         }
     }
 
-    /** True when the automation carries a visual flow (nodes) to run on SmartEngine. */
+    /**
+     * T2 cutover: every automation with a visual flow OR flat actions runs on SmartEngine
+     * (the compiler synthesizes a linear flow from triggerType + actions[] when there is no
+     * flowConfig). The flat sequential executor further down is now reachable only for the
+     * degenerate empty-automation case and is pending physical removal.
+     */
     private boolean hasExecutableFlow(Automation automation) {
         Map<String, Object> flowConfig = automation.getFlowConfig();
-        return flowConfig != null
+        boolean hasFlow = flowConfig != null
                 && flowConfig.get("nodes") instanceof List<?> nodes
                 && !nodes.isEmpty();
+        boolean hasActions = automation.getActions() != null && !automation.getActions().isEmpty();
+        return hasFlow || hasActions;
     }
 
     @Override
