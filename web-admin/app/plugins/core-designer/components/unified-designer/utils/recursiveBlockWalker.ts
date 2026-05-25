@@ -47,6 +47,28 @@ export function updateBlockById(
   return changed ? next : blocks;
 }
 
+/** Remove a block (and its subtree) by id, immutably. Returns the original array if not found. */
+export function removeBlockById(blocks: DslBlockV3[], blockId: string): DslBlockV3[] {
+  let changed = false;
+  const next: DslBlockV3[] = [];
+  for (const block of blocks) {
+    if (block.id === blockId) {
+      changed = true;
+      continue;
+    }
+    if (block.blocks?.length) {
+      const childBlocks = removeBlockById(block.blocks, blockId);
+      if (childBlocks !== block.blocks) {
+        changed = true;
+        next.push({ ...block, blocks: childBlocks });
+        continue;
+      }
+    }
+    next.push(block);
+  }
+  return changed ? next : blocks;
+}
+
 export function moveBlockBefore(
   blocks: DslBlockV3[],
   movingBlockId: string,

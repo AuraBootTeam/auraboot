@@ -11,6 +11,18 @@ import type { Browser, BrowserContext, Locator, Page, Request } from '@playwrigh
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { uniqueId } from '../helpers';
 
+// Wait for @dnd-kit to tear down the drag (overlay ghost removed) and let React
+// flush the document update + canvas re-render before the next interaction.
+async function settleAfterDrag(page: Page): Promise<void> {
+  await page
+    .locator('[data-testid="drag-overlay-ghost"]')
+    .waitFor({ state: 'detached', timeout: 5000 })
+    .catch(() => {});
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+}
+
 /**
  * Drag a source onto a target using a real multi-step pointer gesture.
  *
@@ -35,8 +47,6 @@ async function dndDragTo(
   const performGesture = async () => {
     // Clear any pointer/drag state a prior (failed) gesture may have left behind:
     // a held button or a stuck @dnd-kit drag would make this gesture a no-op.
-    await page.mouse.up().catch(() => {});
-    await page.keyboard.press('Escape').catch(() => {});
     // mouse.move uses viewport coordinates, so both ends must be on-screen first;
     // a tall canvas (filters + toolbar + table) can push the drop target below the fold.
     await target.scrollIntoViewIfNeeded();
@@ -54,18 +64,7 @@ async function dndDragTo(
     await page.mouse.move(tx, ty, { steps: 18 });
     await page.mouse.move(tx + 2, ty + 2, { steps: 4 });
     await page.mouse.up();
-    // Wait for @dnd-kit to tear down the drag (overlay ghost removed) and let
-    // React flush the document update + canvas re-render before checking/continuing.
-    await page
-      .locator('[data-testid="drag-overlay-ghost"]')
-      .waitFor({ state: 'detached', timeout: 5000 })
-      .catch(() => {});
-    await page.evaluate(
-      () =>
-        new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        ),
-    );
+    await settleAfterDrag(page);
   };
 
   // Every dndDragTo in this suite adds a block (palette block or bound field).
@@ -4874,9 +4873,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await switchResourceTab(page, 'blocks');
     const repeaterPaletteItem = page.getByTestId('palette-add-repeater');
     await expect(repeaterPaletteItem).toBeEnabled();
-    // The section already holds a sub-table; drop into the section's top band so
-    // the gesture targets the section itself, not the nested sub-table/column
-    // (which cannot accept a repeater).
+    // The section already holds a sub-table; drop into its top band so the gesture
+    // targets the section itself, not the nested sub-table/column.
     await dndDragTo(page, repeaterPaletteItem, page.getByTestId('canvas-block-detail_section_summary'), {
       targetPosition: { x: 24, y: 16 },
     });
