@@ -28,6 +28,11 @@ export { EdgeRegistry, edgeRegistry } from './edges/EdgeRegistry';
 // Adapters
 export { useFlowFieldAdapter } from './adapters/FlowFieldAdapter';
 
+// Validation (G4): pure validator + imperative hook shared by every save path.
+export { validateFlow } from './validation/validateFlow';
+export type { ValidateFlowOptions } from './validation/validateFlow';
+export { useFlowValidation } from './validation/useFlowValidation';
+
 // Types
 export type {
   FlowNode,
