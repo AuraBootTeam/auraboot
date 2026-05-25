@@ -79,6 +79,52 @@ class AutomationFlowCompilerTest {
         assertThat(cfg).containsEntry("title", "New lead");
     }
 
+    private Automation conditionalAutomation() {
+        Automation a = new Automation();
+        a.setPid("AUTOCOND");
+        a.setName("Conditional automation");
+        a.setFlowConfig(Map.of(
+                "nodes", List.of(
+                        Map.of("id", "t1", "type", "trigger-record-create",
+                                "data", Map.of("label", "On create", "config", Map.of())),
+                        Map.of("id", "gw", "type", "control-condition",
+                                "data", Map.of("label", "Amount?", "config", Map.of())),
+                        Map.of("id", "aHigh", "type", "action-send-notification",
+                                "data", Map.of("label", "High",
+                                        "config", Map.of("actionType", "send_notification"))),
+                        Map.of("id", "aLow", "type", "action-send-notification",
+                                "data", Map.of("label", "Low",
+                                        "config", Map.of("actionType", "send_notification")))),
+                "edges", List.of(
+                        Map.of("id", "e1", "source", "t1", "target", "gw"),
+                        Map.of("id", "e2", "source", "gw", "target", "aHigh",
+                                "data", Map.of("condition",
+                                        Map.of("type", "expression", "content", "amount > 1000"))),
+                        Map.of("id", "e3", "source", "gw", "target", "aLow",
+                                "data", Map.of("condition",
+                                        Map.of("type", "expression", "content", "amount <= 1000"))))));
+        return a;
+    }
+
+    @Test
+    void compile_conditionNodeToExclusiveGateway_convertsToValidBpmn() {
+        AutomationFlowCompiler.CompiledFlow out = compiler.compile(conditionalAutomation());
+
+        boolean hasGateway = false;
+        for (JsonNode n : out.designerJson().get("nodes")) {
+            if ("gw".equals(n.get("id").asText())) {
+                hasGateway = "exclusiveGateway".equals(n.get("type").asText());
+            }
+        }
+        assertThat(hasGateway).as("control-condition maps to exclusiveGateway").isTrue();
+
+        String bpmn = new JsonToBpmnConverter(new ObjectMapper(), null)
+                .convertFromJsonNode(out.designerJson());
+        assertThat(bpmn).contains("exclusiveGateway");
+        assertThat(bpmn).contains("conditionExpression");
+        assertThat(bpmn).contains("amount");
+    }
+
     @Test
     void compiledDesignerJson_convertsToValidSmartEngineBpmn() {
         AutomationFlowCompiler.CompiledFlow out = compiler.compile(linearNotificationAutomation());

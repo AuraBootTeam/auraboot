@@ -121,4 +121,51 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
                 .hasSize(1);
         assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordId", "rec-2");
     }
+
+    private Automation conditionalMarkerAutomation() {
+        Automation a = new Automation();
+        a.setPid("ITCOND" + System.currentTimeMillis());
+        a.setName("E2E conditional automation");
+        a.setTenantId(MetaContext.getCurrentTenantId());
+        a.setFlowConfig(Map.of(
+                "nodes", List.of(
+                        Map.of("id", "t1", "type", "trigger-record-create",
+                                "data", Map.of("label", "On create", "config", Map.of())),
+                        Map.of("id", "gw", "type", "control-condition",
+                                "data", Map.of("label", "Amount?", "config", Map.of())),
+                        Map.of("id", "aHigh", "type", "action-test-marker",
+                                "data", Map.of("label", "High",
+                                        "config", Map.of("actionType", "test_marker", "branch", "high"))),
+                        Map.of("id", "aLow", "type", "action-test-marker",
+                                "data", Map.of("label", "Low",
+                                        "config", Map.of("actionType", "test_marker", "branch", "low")))),
+                "edges", List.of(
+                        Map.of("id", "e1", "source", "t1", "target", "gw"),
+                        Map.of("id", "e2", "source", "gw", "target", "aHigh",
+                                "data", Map.of("condition",
+                                        Map.of("type", "expression", "content", "amount > 1000"))),
+                        Map.of("id", "e3", "source", "gw", "target", "aLow",
+                                "data", Map.of("condition",
+                                        Map.of("type", "expression", "content", "amount <= 1000"))))));
+        a.setEnabled(true);
+        return a;
+    }
+
+    @Test
+    void conditionGateway_routesOnlyMatchingBranch_onSmartEngine() {
+        Automation automation = conditionalMarkerAutomation();
+        runtime.deploy(automation);
+
+        // amount=2000 -> only the "amount > 1000" branch action must fire (P0-2 fixed:
+        // the SmartEngine exclusive gateway gates downstream; the false branch does not run).
+        runtime.run(automation, "rec-3", Map.of("event", "create", "amount", 2000));
+
+        assertThat(MARKER_INVOCATIONS)
+                .as("only the matching gateway branch should fire")
+                .hasSize(1);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> firedConfig =
+                (Map<String, Object>) MARKER_INVOCATIONS.get(0).get("config");
+        assertThat(firedConfig).containsEntry("branch", "high");
+    }
 }
