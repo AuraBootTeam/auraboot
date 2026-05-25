@@ -107,6 +107,34 @@ describe('Designer scenarios (form kind)', () => {
     expect(boundField?.block.field).toBe('email');
     expect(boundField?.block.props?.component).toBe('input');
   });
+
+  it('deletes a nested block via the canvas delete control and persists the removal', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={formDocument}
+        modelFieldsByModel={modelFields}
+        onSave={onSave}
+      />,
+    );
+    expect(screen.getByTestId('canvas-block-field_name')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('block-delete-field_name'));
+
+    expect(screen.queryByTestId('canvas-block-field_name')).not.toBeInTheDocument();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+
+    fireEvent.click(screen.getByTestId('designer-save'));
+    await screen.findByText('已保存');
+    const saved = onSave.mock.calls[0][0] as PageSchemaV3;
+    expect(findBlockById(saved.blocks, 'field_name')).toBeNull();
+  });
+
+  it('does not expose a delete control for the single root container', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={formDocument} modelFieldsByModel={modelFields} />);
+    expect(screen.getByTestId('canvas-block-form_root')).toBeInTheDocument();
+    expect(screen.queryByTestId('block-delete-form_root')).not.toBeInTheDocument();
+  });
 });
 
 const listDocument: PageSchemaV3 = {

@@ -169,4 +169,31 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
       .poll(() => page.locator('[data-testid^="canvas-block-field_"]').count())
       .toBeGreaterThan(before);
   });
+
+  // Block deletion: a designer must let users remove blocks (golden-standard
+  // delete). The top-level kind container is protected; descendants are deletable.
+  test('deletes a canvas block via the delete control and persists the removal', async ({ page }) => {
+    const formKey = await findFormPageKey(page);
+    test.skip(!formKey, 'no form-kind page seeded in this environment');
+
+    await openDesigner(page, formKey!);
+    await expect(page.locator('[data-testid^="outline-item-"]').first()).toBeVisible({ timeout: 15000 });
+
+    // The root form container has no delete control (it defines the page kind).
+    const rootItem = page.locator('button[data-testid^="outline-item-"]').first();
+    const rootId = (await rootItem.getAttribute('data-testid'))!.replace('outline-item-', '');
+    await expect(page.getByTestId(`block-delete-${rootId}`)).toHaveCount(0);
+
+    // Pick a deletable descendant block that exposes a delete control.
+    const deletable = page.locator('[data-testid^="block-delete-"]').first();
+    await expect(deletable).toBeVisible({ timeout: 10000 });
+    const deleteTestId = (await deletable.getAttribute('data-testid'))!;
+    const blockId = deleteTestId.replace('block-delete-', '');
+    await expect(page.getByTestId(`canvas-block-${blockId}`)).toBeVisible();
+
+    await deletable.click();
+
+    await expect(page.getByTestId(`canvas-block-${blockId}`)).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
+  });
 });

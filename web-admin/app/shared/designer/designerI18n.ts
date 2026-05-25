@@ -291,6 +291,7 @@ export const DESIGNER_I18N = {
     },
     mode: { 'zh-CN': '模式', 'en-US': 'Mode' } as L,
     untitledPage: { 'zh-CN': '未命名页面', 'en-US': 'Untitled page' } as L,
+    deleteBlock: { 'zh-CN': '删除', 'en-US': 'Delete' } as L,
 
     // Palette category headers
     category: {
