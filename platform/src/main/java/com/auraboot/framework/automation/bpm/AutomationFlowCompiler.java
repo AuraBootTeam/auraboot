@@ -72,6 +72,15 @@ public class AutomationFlowCompiler {
                     "automation " + automation.getPid() + " has no flow or actions to compile");
         }
 
+        // Rewrite control-loop nodes: elide each loop and attach a loop descriptor to its
+        // body action. SmartEngine multi-instance is userTask-only (no serviceTask collection
+        // executor), so the body serviceTask iterates inside AutomationActionServiceTaskDelegate
+        // rather than as a BPMN <multiInstanceLoopCharacteristics>.
+        LoopRewrite rewrite = rewriteControlLoops(nodes, edges);
+        nodes = rewrite.nodes();
+        edges = rewrite.edges();
+        Map<String, Map<String, Object>> loopByBodyId = rewrite.loopByBodyId();
+
         String processKey = PROCESS_KEY_PREFIX + automation.getPid();
         ObjectNode root = objectMapper.createObjectNode();
         root.put("key", processKey);
@@ -107,6 +116,10 @@ public class AutomationFlowCompiler {
                 Map<String, Object> spec = new HashMap<>();
                 spec.put("type", resolveActionType(type, config));
                 spec.put("config", new HashMap<>(config));
+                Map<String, Object> loop = loopByBodyId.get(id);
+                if (loop != null) {
+                    spec.put("loop", loop);
+                }
                 actionsByNodeId.put(id, spec);
                 if (!nodesWithOutgoing.contains(id)) {
                     terminalActionIds.add(id);
@@ -158,6 +171,96 @@ public class AutomationFlowCompiler {
         }
 
         return new CompiledFlow(processKey, root, actionsByNodeId);
+    }
+
+    /** Outcome of rewriting control-loop nodes: loop nodes elided, edges redirected,
+     *  and the loop descriptor ({@code collection} + {@code itemVariable}) to attach to
+     *  each loop body action spec, keyed by body node id. */
+    private record LoopRewrite(
+            List<Map<String, Object>> nodes,
+            List<Map<String, Object>> edges,
+            Map<String, Map<String, Object>> loopByBodyId) {}
+
+    /**
+     * Rewrite each {@code control-loop} node into a loop descriptor on its single body
+     * action: elide the loop node, redirect its incoming edges to the body, drop its
+     * outgoing edge, and record {@code {collection, itemVariable}} keyed by body node id.
+     *
+     * <p>The descriptor is honored at runtime by {@link AutomationActionServiceTaskDelegate}
+     * (delegate-internal for-each), because this SmartEngine fork only expands multi-instance
+     * for {@code userTask} (会签), not collection-driven {@code serviceTask}s.
+     *
+     * <p>Scope (T2): a loop wraps exactly one downstream action (single-action loop).
+     */
+    @SuppressWarnings("unchecked")
+    private LoopRewrite rewriteControlLoops(
+            List<Map<String, Object>> nodes, List<Map<String, Object>> edges) {
+        Map<String, Map<String, Object>> loopNodes = new HashMap<>();
+        for (Map<String, Object> n : nodes) {
+            if ("control-loop".equals(String.valueOf(n.get("type")))) {
+                loopNodes.put(String.valueOf(n.get("id")), n);
+            }
+        }
+        if (loopNodes.isEmpty()) {
+            return new LoopRewrite(nodes, edges, Map.of());
+        }
+
+        Map<String, String> loopToBody = new HashMap<>();
+        Map<String, Map<String, Object>> loopByBodyId = new HashMap<>();
+        for (Map.Entry<String, Map<String, Object>> entry : loopNodes.entrySet()) {
+            String loopId = entry.getKey();
+            List<String> bodies = edges.stream()
+                    .filter(e -> loopId.equals(String.valueOf(e.get("source"))))
+                    .map(e -> String.valueOf(e.get("target")))
+                    .collect(Collectors.toList());
+            if (bodies.size() != 1) {
+                throw new IllegalArgumentException("control-loop node " + loopId
+                        + " must have exactly one outgoing edge (body), found " + bodies.size());
+            }
+            String bodyId = bodies.get(0);
+            loopToBody.put(loopId, bodyId);
+
+            Map<String, Object> data = entry.getValue().get("data") instanceof Map
+                    ? (Map<String, Object>) entry.getValue().get("data") : Map.of();
+            Map<String, Object> cfg = data.get("config") instanceof Map
+                    ? (Map<String, Object>) data.get("config") : Map.of();
+            Object collection = cfg.get("collection");
+            if (collection == null || String.valueOf(collection).isBlank()) {
+                throw new IllegalArgumentException(
+                        "control-loop node " + loopId + " missing 'collection' in config");
+            }
+            Object itemVar = cfg.get("itemVariable");
+            String itemVariable = itemVar != null && !String.valueOf(itemVar).isBlank()
+                    ? String.valueOf(itemVar) : "item";
+
+            Map<String, Object> loop = new HashMap<>();
+            loop.put("collection", String.valueOf(collection));
+            loop.put("itemVariable", itemVariable);
+            loopByBodyId.put(bodyId, loop);
+        }
+
+        List<Map<String, Object>> newNodes = nodes.stream()
+                .filter(n -> !loopNodes.containsKey(String.valueOf(n.get("id"))))
+                .collect(Collectors.toList());
+
+        List<Map<String, Object>> newEdges = new ArrayList<>();
+        for (Map<String, Object> e : edges) {
+            String src = String.valueOf(e.get("source"));
+            String tgt = String.valueOf(e.get("target"));
+            if (loopNodes.containsKey(src)) {
+                // loop → body outgoing edge: dropped (loop elided into the body's loop descriptor)
+                continue;
+            }
+            if (loopNodes.containsKey(tgt)) {
+                // src → loop: redirect to src → body
+                Map<String, Object> redirected = new HashMap<>(e);
+                redirected.put("target", loopToBody.get(tgt));
+                newEdges.add(redirected);
+            } else {
+                newEdges.add(e);
+            }
+        }
+        return new LoopRewrite(newNodes, newEdges, loopByBodyId);
     }
 
     /** Synthesize a linear trigger→actions→end graph for actions-only automations. */
