@@ -35,13 +35,14 @@ class AutomationTriggerServiceImplTest {
     private AutomationLogMapper automationLogMapper;
 
     @Mock
-    private ActionExecutor actionExecutor;
+    private com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
 
     private AutomationTriggerServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new AutomationTriggerServiceImpl(automationMapper, automationLogMapper, actionExecutor);
+        service = new AutomationTriggerServiceImpl(
+                automationMapper, automationLogMapper, automationProcessRuntime);
     }
 
     // =========================================================
@@ -323,60 +324,43 @@ class AutomationTriggerServiceImplTest {
     // =========================================================
 
     @Test
-    void executeAutomation_actionsExecutedInSequence() {
-        AutomationAction action1 = AutomationAction.builder().type("send_notification").sequence(1).build();
-        AutomationAction action2 = AutomationAction.builder().type("create_record").sequence(2).build();
-        // Use ArrayList (mutable) — List.of() is immutable and actions.sort() would throw
+    void executeAutomation_actionsOnly_routesToProcessRuntime_afterCutover() {
+        // After the T2 cutover, actions-only automations also run on SmartEngine via the
+        // runtime (the compiler synthesizes a flow from actions[]), not the flat loop.
+        AutomationAction action = AutomationAction.builder().type("send_notification").sequence(1).build();
         Automation automation = buildAutomation("auto-011", "model-K", null, null,
-                new java.util.ArrayList<>(List.of(action2, action1))); // deliberately out of order
-
-        when(actionExecutor.execute(any(), any())).thenReturn(Map.of("ok", true));
+                new java.util.ArrayList<>(List.of(action)));
 
         AutomationLog log = service.executeAutomation(automation, "rec-011", Map.of());
 
+        verify(automationProcessRuntime).run(eq(automation), eq("rec-011"), any());
         assertThat(log.getStatus()).isEqualTo("success");
-        assertThat(log.getActionResults()).hasSize(2);
-    }
-
-    @Test
-    void executeAutomation_actionFails_stopsByDefault() {
-        AutomationAction action1 = AutomationAction.builder().type("send_notification").sequence(1)
-                .continueOnError(false).build();
-        AutomationAction action2 = AutomationAction.builder().type("create_record").sequence(2).build();
-        Automation automation = buildAutomation("auto-012", "model-L", null, null,
-                new java.util.ArrayList<>(List.of(action1, action2)));
-
-        when(actionExecutor.execute(eq(action1), any()))
-                .thenThrow(new RuntimeException("notification failed"));
-
-        AutomationLog log = service.executeAutomation(automation, "rec-012", Map.of());
-
-        assertThat(log.getStatus()).isEqualTo("failed");
-        assertThat(log.getActionResults()).hasSize(1); // action2 never ran
-    }
-
-    @Test
-    void executeAutomation_continueOnError_executesRemainingActions() {
-        AutomationAction action1 = AutomationAction.builder().type("send_notification").sequence(1)
-                .continueOnError(true).build();
-        AutomationAction action2 = AutomationAction.builder().type("create_record").sequence(2).build();
-        Automation automation = buildAutomation("auto-013", "model-M", null, null,
-                new java.util.ArrayList<>(List.of(action1, action2)));
-
-        when(actionExecutor.execute(eq(action1), any()))
-                .thenThrow(new RuntimeException("non-critical failure"));
-        when(actionExecutor.execute(eq(action2), any())).thenReturn(Map.of("ok", true));
-
-        AutomationLog log = service.executeAutomation(automation, "rec-013", Map.of());
-
-        assertThat(log.getActionResults()).hasSize(2);
-        assertThat(log.getActionResults().get(0).getStatus()).isEqualTo("failed");
-        assertThat(log.getActionResults().get(1).getStatus()).isEqualTo("success");
     }
 
     // =========================================================
     // Helper
     // =========================================================
+
+    @Test
+    void executeAutomation_withFlowConfig_runsViaProcessRuntime_notFlatActions() {
+        Automation automation = new Automation();
+        automation.setPid("auto-flow-1");
+        automation.setModelCode("model-F");
+        automation.setTenantId(1L);
+        automation.setFlowConfig(java.util.Map.of(
+                "nodes", List.of(
+                        java.util.Map.of("id", "t1", "type", "trigger-record-create"),
+                        java.util.Map.of("id", "a1", "type", "action-send-notification")),
+                "edges", List.of(java.util.Map.of("source", "t1", "target", "a1"))));
+        // also give it flat actions to prove they are NOT used when a flow is present
+        automation.setActions(new java.util.ArrayList<>(
+                List.of(AutomationAction.builder().type("send_notification").sequence(1).build())));
+
+        AutomationLog log = service.executeAutomation(automation, "rec-F", Map.of("event", "create"));
+
+        verify(automationProcessRuntime).run(eq(automation), eq("rec-F"), any());
+        assertThat(log.getStatus()).isEqualTo("success");
+    }
 
     private Automation buildAutomation(String pid, String modelCode, String condition,
                                         TriggerConfig triggerConfig, List<AutomationAction> actions) {
