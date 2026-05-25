@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -74,8 +75,62 @@ public class AutomationActionServiceTaskDelegate implements JavaDelegation {
                 .config(config)
                 .build();
 
+        // control-loop: this SmartEngine fork only expands multi-instance for userTask
+        // (会签), not collection-driven serviceTasks, so a loop body iterates here —
+        // once per collection element, with the element bound under itemVariable in an
+        // isolated per-iteration context copy.
+        Object loopObj = spec.get("loop");
+        if (loopObj instanceof Map<?, ?> loopMap) {
+            String collectionVar = String.valueOf(loopMap.get("collection"));
+            String itemVariable = loopMap.get("itemVariable") != null
+                    ? String.valueOf(loopMap.get("itemVariable")) : "item";
+            List<Object> items = resolveCollection(collectionVar, processVars);
+            log.info("AutomationActionDelegate: node={}, actionType={}, loop '{}' -> {} item(s)",
+                    nodeId, type, collectionVar, items.size());
+            for (Object element : items) {
+                Map<String, Object> iterationContext = new HashMap<>(processVars);
+                iterationContext.put(itemVariable, element);
+                actionExecutor.execute(action, iterationContext);
+            }
+            return;
+        }
+
         log.info("AutomationActionDelegate: node={}, actionType={}", nodeId, type);
         actionExecutor.execute(action, processVars);
+    }
+
+    /**
+     * Resolve a loop collection reference to a list of elements. Accepts a bare process
+     * variable name or {@code ${var}} template; the value may be a {@link java.util.Collection},
+     * an array, or a comma-separated String. Missing / blank → empty (the loop is skipped).
+     */
+    private List<Object> resolveCollection(String expr, Map<String, Object> ctx) {
+        if (expr == null || expr.isBlank()) {
+            return List.of();
+        }
+        String varName = expr.trim();
+        if (varName.startsWith("${") && varName.endsWith("}")) {
+            varName = varName.substring(2, varName.length() - 1).trim();
+        }
+        Object value = ctx.get(varName);
+        if (value == null) {
+            return List.of();
+        }
+        if (value instanceof java.util.Collection<?> coll) {
+            return new java.util.ArrayList<>(coll);
+        }
+        if (value.getClass().isArray()) {
+            return java.util.Arrays.asList((Object[]) value);
+        }
+        String str = value.toString();
+        if (str.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(str.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> (Object) s)
+                .toList();
     }
 
     private String resolveNodeId(ExecutionContext executionContext) {

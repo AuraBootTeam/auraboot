@@ -155,6 +155,108 @@ class AutomationFlowCompilerTest {
         assertThat(bpmn).contains(AutomationActionServiceTaskDelegate.BEAN_NAME);
     }
 
+    private Automation loopAutomation(String itemVariable) {
+        java.util.Map<String, Object> loopConfig = new java.util.HashMap<>();
+        loopConfig.put("collection", "items");
+        if (itemVariable != null) {
+            loopConfig.put("itemVariable", itemVariable);
+        }
+        Automation a = new Automation();
+        a.setPid("AUTOLOOP");
+        a.setName("Loop automation");
+        a.setFlowConfig(Map.of(
+                "nodes", List.of(
+                        Map.of("id", "t1", "type", "trigger-record-create",
+                                "data", Map.of("label", "On create", "config", Map.of())),
+                        Map.of("id", "loop", "type", "control-loop",
+                                "data", Map.of("label", "For each", "config", loopConfig)),
+                        Map.of("id", "body", "type", "action-send-notification",
+                                "data", Map.of("label", "Notify",
+                                        "config", Map.of("actionType", "send_notification",
+                                                "title", "Item")))),
+                "edges", List.of(
+                        Map.of("id", "e1", "source", "t1", "target", "loop"),
+                        Map.of("id", "e2", "source", "loop", "target", "body"))));
+        return a;
+    }
+
+    @Test
+    void compile_loopNode_isElided_andIncomingEdgeRedirectedToBody() {
+        AutomationFlowCompiler.CompiledFlow out = compiler.compile(loopAutomation("row"));
+
+        // loop node is elided — only trigger/body/end remain
+        Map<String, String> typeById = new java.util.HashMap<>();
+        out.designerJson().get("nodes").forEach(n ->
+                typeById.put(n.get("id").asText(), n.get("type").asText()));
+        assertThat(typeById).doesNotContainKey("loop");
+        assertThat(typeById).containsEntry("t1", "startEvent");
+        assertThat(typeById).containsEntry("body", "serviceTask");
+        assertThat(typeById).containsEntry("_end", "endEvent");
+
+        // incoming edge t1->loop redirected to t1->body; no edge touches "loop"
+        boolean hasRedirected = false;
+        for (JsonNode e : out.designerJson().get("edges")) {
+            String s = e.get("source").asText();
+            String t = e.get("target").asText();
+            assertThat(s).as("no edge sources from elided loop").isNotEqualTo("loop");
+            assertThat(t).as("no edge targets elided loop").isNotEqualTo("loop");
+            if ("t1".equals(s) && "body".equals(t)) {
+                hasRedirected = true;
+            }
+        }
+        assertThat(hasRedirected).as("t1->loop is redirected to t1->body").isTrue();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void compile_loopNode_injectsLoopDescriptorOnBodyActionSpec() {
+        AutomationFlowCompiler.CompiledFlow out = compiler.compile(loopAutomation("row"));
+
+        // The loop becomes a descriptor on the body action's spec (carried via the
+        // ACTIONS_VAR process variable). SmartEngine MI does not expand serviceTasks
+        // (userTask-only), so iteration is performed inside the bridge delegate.
+        Map<String, Object> spec = (Map<String, Object>) out.actionsByNodeId().get("body");
+        assertThat(spec).isNotNull();
+        Map<String, Object> loop = (Map<String, Object>) spec.get("loop");
+        assertThat(loop).isNotNull();
+        assertThat(loop).containsEntry("collection", "items");
+        assertThat(loop).containsEntry("itemVariable", "row");
+
+        // The emitted body is a plain serviceTask — no multiInstance leaks into the BPMN.
+        JsonNode body = null;
+        for (JsonNode n : out.designerJson().get("nodes")) {
+            if ("body".equals(n.get("id").asText())) {
+                body = n;
+            }
+        }
+        assertThat(body).isNotNull();
+        assertThat(body.path("data").path("config").path("multiInstance").isMissingNode()).isTrue();
+        assertThat(body.path("data").path("config").path("className").asText())
+                .isEqualTo(AutomationActionServiceTaskDelegate.BEAN_NAME);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void compile_loopNode_defaultsItemVariableToItem() {
+        AutomationFlowCompiler.CompiledFlow out = compiler.compile(loopAutomation(null));
+
+        Map<String, Object> spec = (Map<String, Object>) out.actionsByNodeId().get("body");
+        Map<String, Object> loop = (Map<String, Object>) spec.get("loop");
+        assertThat(loop).containsEntry("itemVariable", "item");
+    }
+
+    @Test
+    void compile_loopNode_emitsPlainServiceTaskBpmn() {
+        AutomationFlowCompiler.CompiledFlow out = compiler.compile(loopAutomation("row"));
+
+        String bpmn = new JsonToBpmnConverter(new ObjectMapper(), null)
+                .convertFromJsonNode(out.designerJson());
+        // The loop is delegate-internal: the BPMN body is a plain serviceTask with no
+        // multi-instance characteristics (the engine has no serviceTask MI executor).
+        assertThat(bpmn).contains("serviceTask");
+        assertThat(bpmn).doesNotContain("multiInstanceLoopCharacteristics");
+    }
+
     @Test
     void compiledDesignerJson_convertsToValidSmartEngineBpmn() {
         AutomationFlowCompiler.CompiledFlow out = compiler.compile(linearNotificationAutomation());
