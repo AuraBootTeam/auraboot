@@ -19,6 +19,8 @@ export interface KindPolicy {
 const SHARED_FORM_BLOCKS = [
   'form-section',
   'field',
+  'sub-table',
+  'column',
   'repeater',
   'subform',
   'ai-fill-banner',
@@ -32,6 +34,7 @@ const SHARED_DETAIL_BLOCKS = [
   'repeater',
   'subform',
   'widget',
+  'ai-fill-banner',
 ] as const;
 
 const SHARED_LAYOUT_BLOCKS = ['tabs', 'tab'] as const;
@@ -57,6 +60,7 @@ const POLICIES: Record<PageSchemaV3Kind, KindPolicy> = {
       'filter-field',
       'table',
       'column',
+      'widget',
       ...SHARED_LAYOUT_BLOCKS,
       ...SHARED_ACTION_BLOCKS,
     ]),

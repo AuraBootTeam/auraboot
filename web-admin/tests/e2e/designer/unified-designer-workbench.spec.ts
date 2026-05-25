@@ -7,9 +7,130 @@
 
 import { expect, test } from '../../fixtures';
 import { createCookieSessionStorage } from 'react-router';
-import type { Browser, BrowserContext, Page, Request } from '@playwright/test';
+import type { Browser, BrowserContext, Locator, Page, Request } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { uniqueId } from '../helpers';
+
+/**
+ * Drag a source onto a target using a real multi-step pointer gesture.
+ *
+ * Playwright `Locator.dragTo()` performs a single synchronous jump-move, which
+ * does not give @dnd-kit time to run its asynchronous droppable measurement and
+ * per-move collision detection. For short containers the stale start-rect still
+ * covers the drop point, but a container that grows after first paint (e.g. a
+ * table rendering preview rows) ends up with a stale short rect and the drop
+ * silently resolves to the page root, where model fields are rejected. Real
+ * users drag across many frames; this helper mirrors that with intermediate
+ * moves so the gesture drives @dnd-kit the same way a human does.
+ */
+async function dndDragTo(
+  page: Page,
+  source: Locator,
+  target: Locator,
+  opts?: { targetPosition?: { x: number; y: number } },
+): Promise<void> {
+  const canvasBlocks = page.locator('[data-testid^="canvas-block-"]');
+  const before = await canvasBlocks.count();
+
+  const performGesture = async () => {
+    // Clear any pointer/drag state a prior (failed) gesture may have left behind:
+    // a held button or a stuck @dnd-kit drag would make this gesture a no-op.
+    await page.mouse.up().catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
+    // mouse.move uses viewport coordinates, so both ends must be on-screen first;
+    // a tall canvas (filters + toolbar + table) can push the drop target below the fold.
+    await target.scrollIntoViewIfNeeded();
+    await source.scrollIntoViewIfNeeded();
+    const src = await source.boundingBox();
+    const dst = await target.boundingBox();
+    if (!src || !dst) throw new Error('dndDragTo: source or target has no bounding box');
+    const sx = src.x + src.width / 2;
+    const sy = src.y + src.height / 2;
+    const tx = dst.x + (opts?.targetPosition?.x ?? dst.width / 2);
+    const ty = dst.y + (opts?.targetPosition?.y ?? dst.height / 2);
+    await page.mouse.move(sx, sy);
+    await page.mouse.down();
+    await page.mouse.move(sx + 12, sy + 12, { steps: 6 });
+    await page.mouse.move(tx, ty, { steps: 18 });
+    await page.mouse.move(tx + 2, ty + 2, { steps: 4 });
+    await page.mouse.up();
+    // Wait for @dnd-kit to tear down the drag (overlay ghost removed) and let
+    // React flush the document update + canvas re-render before checking/continuing.
+    await page
+      .locator('[data-testid="drag-overlay-ghost"]')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {});
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+  };
+
+  // Every dndDragTo in this suite adds a block (palette block or bound field).
+  // @dnd-kit's async measuring means a gesture occasionally doesn't register; the
+  // settle above lets a successful add render before we check, so retrying only
+  // fires when nothing was added (no double-add).
+  await expect(async () => {
+    await performGesture();
+    expect(await canvasBlocks.count()).toBeGreaterThan(before);
+  }).toPass({ timeout: 20000 });
+}
+
+/**
+ * Switch the resource panel tab and confirm the switch took effect.
+ *
+ * Right after a drag + inspector edit, the resource panel re-renders; a single
+ * tab `click()` is occasionally lost to that re-render (the panel stays on the
+ * previous tab). Retry the click until the target tab reports active, so callers
+ * can rely on the tab actually being shown.
+ */
+async function switchResourceTab(page: Page, tab: 'outline' | 'blocks' | 'fields'): Promise<void> {
+  const button = page.getByTestId(`resource-tab-${tab}`);
+  await expect(async () => {
+    await button.click();
+    await expect(button).toHaveAttribute('data-active', 'true', { timeout: 1000 });
+  }).toPass({ timeout: 10000 });
+}
+
+/**
+ * Toggle an inspector checkbox to a target state and confirm it sticks.
+ *
+ * A controlled checkbox edited right after a sibling field edit can be reverted
+ * by the in-flight re-render (the click registers, then the prior edit's render
+ * resets `checked`). Retry the toggle until the state holds.
+ */
+async function setCheckbox(page: Page, testId: string, checked: boolean): Promise<void> {
+  const checkbox = page.getByTestId(testId);
+  await expect(async () => {
+    if ((await checkbox.isChecked()) !== checked) await checkbox.click();
+    // The DOM toggles on click, but if the controlled onChange didn't commit to
+    // the document, React reconciles the checkbox back on the next frame. Settle
+    // before verifying so a non-committed toggle is detected and retried.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect(await checkbox.isChecked()).toBe(checked);
+  }).toPass({ timeout: 10000 });
+}
+
+/**
+ * Click a JSON field's "apply" button after letting the textarea's draft state
+ * commit. The apply handler reads the draft from a render closure; under load the
+ * preceding `.fill()`'s state update may not have flushed yet, so the click would
+ * apply a stale (often empty) draft. A two-frame settle guarantees the draft is
+ * current before the button reads it.
+ */
+async function applyJsonField(page: Page, applyTestId: string): Promise<void> {
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+  await page.getByTestId(applyTestId).click();
+}
 
 const ADMIN_STORAGE_STATE =
   process.env.PW_ADMIN_STORAGE_STATE ||
@@ -54,6 +175,9 @@ interface DslBlock {
 }
 
 test.describe.serial('Unified Designer Workbench V3', () => {
+  // These flows perform several real multi-step pointer drags plus save/reopen
+  // round-trips; the 15s global default is too tight for the @dnd-kit gestures.
+  test.describe.configure({ timeout: 60_000 });
   const uid = uniqueId('udw');
   const formPageKey = `udw_v3_form_${uid}`;
   const listPageKey = `udw_v3_list_${uid}`;
@@ -683,17 +807,17 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-section_basic').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('section_basic');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
     const modelFieldButton = page.getByTestId(`model-field-${fieldCode}`);
     await expect(modelFieldButton).toBeVisible({ timeout: 10000 });
     await expect(modelFieldButton).toBeEnabled();
-    await modelFieldButton.dragTo(page.getByTestId('canvas-block-section_basic'));
+    await dndDragTo(page, modelFieldButton, page.getByTestId('canvas-block-section_basic'));
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(fieldBlockId);
     await expect(page.getByTestId(`canvas-block-${fieldBlockId}`)).toBeVisible();
@@ -701,7 +825,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const labelInput = page.getByTestId('inspector-field-props.label');
     await expect(labelInput).toBeVisible();
     await labelInput.fill(updatedLabel);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     const saveRespPromise = page.waitForResponse(
       (response) =>
@@ -713,7 +837,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     expect(saveResp.status()).toBe(200);
     const saveBody = await saveResp.json();
     expect(saveBody.code).toBe('0');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
@@ -737,38 +861,38 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-list_table').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('list_table');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
     const tableFieldButton = page.getByTestId(`model-field-${fieldCode}`);
     await expect(tableFieldButton).toBeVisible({ timeout: 10000 });
     await expect(tableFieldButton).toBeEnabled();
-    await tableFieldButton.dragTo(page.getByTestId('canvas-block-list_table'));
+    await dndDragTo(page, tableFieldButton, page.getByTestId('canvas-block-list_table'));
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(columnBlockId);
     await expect(page.getByTestId(`canvas-block-${columnBlockId}`)).toBeVisible();
     await page.getByTestId('inspector-field-props.label').fill(columnLabel);
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-list_filters').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('list_filters');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
     const filterFieldButton = page.getByTestId(`model-field-${fieldCode}`);
     await expect(filterFieldButton).toBeVisible({ timeout: 10000 });
     await expect(filterFieldButton).toBeEnabled();
-    await filterFieldButton.dragTo(page.getByTestId('canvas-block-list_filters'));
+    await dndDragTo(page, filterFieldButton, page.getByTestId('canvas-block-list_filters'));
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(filterBlockId);
     await expect(page.getByTestId(`canvas-block-${filterBlockId}`)).toBeVisible();
     await page.getByTestId('inspector-field-props.label').fill(filterLabel);
     await page.getByTestId('inspector-field-props.operator').selectOption('contains');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
 
@@ -804,7 +928,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_create').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('action_seed_create');
@@ -813,7 +937,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(actionLabel);
     await page.getByTestId('inspector-field-props.to').fill(actionRoute);
     await page.getByTestId('inspector-field-props.target').selectOption('self');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
 
@@ -848,7 +972,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-widget_pipeline').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('widget_pipeline');
@@ -862,7 +986,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('inspector-field-layout.w')).toHaveValue('6');
     await expect(page.getByTestId('inspector-field-layout.h')).toHaveValue('3');
     await page.getByTestId('inspector-field-props.title').fill(widgetTitle);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, dashboardPagePid);
 
@@ -945,22 +1069,23 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-section_basic').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('section_basic');
-    await page.getByTestId('resource-tab-blocks').click();
+    // A custom (unbound) field is added from the Fields tab escape hatch; the bare
+    // `field` leaf was removed from the Blocks palette (fields bind from the library).
+    await switchResourceTab(page, 'fields');
 
-    const paletteField = page.getByTestId('palette-add-field');
+    const paletteField = page.getByTestId('field-palette-add-field');
     await expect(paletteField).toBeVisible();
     await expect(paletteField).toBeEnabled();
-    await expect(paletteField).toHaveAttribute('draggable', 'true');
-    await paletteField.dragTo(page.getByTestId('canvas-block-section_basic'));
+    await paletteField.click();
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText('field_new_field');
     await expect(page.getByTestId('canvas-block-field_new_field')).toBeVisible();
     await page.getByTestId('inspector-field-props.label').fill(paletteFieldLabel);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -990,7 +1115,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expectBlockBefore(page, 'field_seed_title', 'field_seed_secondary');
     await page.getByTestId('block-move-up-field_seed_secondary').click();
     await expectBlockBefore(page, 'field_seed_secondary', 'field_seed_title');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, pagePid);
 
     let persisted = await readPage(page, pagePid);
@@ -1010,7 +1135,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expectBlockBefore(page, 'action_seed_create', 'action_seed_export');
     await page.getByTestId('block-move-up-action_seed_export').click();
     await expectBlockBefore(page, 'action_seed_export', 'action_seed_create');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, listPagePid);
 
     persisted = await readPage(page, listPagePid);
@@ -1032,22 +1157,22 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${detailPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-detail_section_summary').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('detail_section_summary');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
     const detailFieldButton = page.getByTestId(`model-field-${fieldCode}`);
     await expect(detailFieldButton).toBeVisible({ timeout: 10000 });
     await expect(detailFieldButton).toBeEnabled();
-    await detailFieldButton.dragTo(page.getByTestId('canvas-block-detail_section_summary'));
+    await dndDragTo(page, detailFieldButton, page.getByTestId('canvas-block-detail_section_summary'));
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(fieldBlockId);
     await expect(page.getByTestId(`canvas-block-${fieldBlockId}`)).toBeVisible();
     await page.getByTestId('inspector-field-props.label').fill(detailFieldLabel);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, detailPagePid);
 
@@ -1085,37 +1210,37 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-section_basic').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const nestedSection = page.getByTestId('palette-add-form-section');
     await expect(nestedSection).toBeEnabled();
-    await nestedSection.dragTo(page.getByTestId('canvas-block-section_basic'));
+    await dndDragTo(page, nestedSection, page.getByTestId('canvas-block-section_basic'));
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(
       'form_section_new_section',
     );
     await page.getByTestId('inspector-field-title').fill(nestedSectionTitle);
     await page.getByTestId('inspector-field-props.description').fill(nestedSectionDescription);
-    await page.getByTestId('inspector-field-props.collapsible').check();
+    await setCheckbox(page, 'inspector-field-props.collapsible', true);
     await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.placeholder').fill(complexPlaceholder);
     await page.getByTestId('inspector-field-props.helpText').fill(complexHelpText);
-    await page.getByTestId('inspector-field-props.readOnly').check();
+    await setCheckbox(page, 'inspector-field-props.readOnly', true);
     await page
       .getByTestId('inspector-field-props.visibleWhen')
       .fill(JSON.stringify(fieldVisibleWhen));
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await page
       .getByTestId('inspector-field-props.validationRules')
       .fill(JSON.stringify(validationRules));
-    await page.getByTestId('inspector-json-field-apply-props.validationRules').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.validationRules');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -1176,7 +1301,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-widget_pipeline').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('widget_pipeline');
@@ -1186,18 +1311,18 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-dataSource.model').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.metric').fill(advancedWidgetMetric);
     await page.getByTestId('inspector-field-dataSource.query').fill(JSON.stringify(query));
-    await page.getByTestId('inspector-json-field-apply-dataSource.query').click();
+    await applyJsonField(page, 'inspector-json-field-apply-dataSource.query');
     await page.getByTestId('inspector-field-props.value').fill(advancedWidgetValue);
     await page.getByTestId('inspector-field-props.format').selectOption('number');
     await page.getByTestId('inspector-field-props.emptyText').fill(advancedWidgetEmptyText);
     await page.getByTestId('inspector-field-props.drillDownTo').fill(advancedWidgetDrilldown);
     await page.getByTestId('inspector-field-props.thresholds').fill(JSON.stringify(thresholds));
-    await page.getByTestId('inspector-json-field-apply-props.thresholds').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.thresholds');
     await page.getByTestId('inspector-field-props.refreshInterval').fill('60');
 
     await page.getByTestId('outline-item-widget_health').click();
     await page.getByTestId('inspector-field-props.emptyText').fill(advancedWidgetEmptyText);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, dashboardPagePid);
 
@@ -1284,21 +1409,21 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-widget_health').click();
     await page.getByTestId('inspector-field-widgetType').selectOption('bar-chart');
     await page.getByTestId('inspector-field-props.title').fill(chartWidgetTitle);
     await page.getByTestId('inspector-field-props.emptyText').fill('');
     await page.getByTestId('inspector-field-props.series').fill(JSON.stringify(chartSeries));
-    await page.getByTestId('inspector-json-field-apply-props.series').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.series');
 
     await page.getByTestId('outline-item-widget_pipeline').click();
     await page.getByTestId('inspector-field-widgetType').selectOption('markdown');
     await page.getByTestId('inspector-field-props.value').fill('');
     await page.getByTestId('inspector-field-props.emptyText').fill('');
     await page.getByTestId('inspector-field-props.markdown').fill(markdownWidgetText);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, dashboardPagePid);
 
@@ -1354,14 +1479,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_export').click();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('action_seed_export');
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(runtimeCommandLabel);
     await page.getByTestId('inspector-field-props.command').fill('mission.archive');
-    await page.getByTestId('inspector-field-props.confirm').check();
+    await setCheckbox(page, 'inspector-field-props.confirm', true);
     await page.getByTestId('inspector-field-props.feedback').fill(runtimeCommandFeedback);
 
     await page.getByTestId('outline-item-action_seed_create').click();
@@ -1369,7 +1494,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(runtimeDrawerLabel);
     await page.getByTestId('inspector-field-props.pageKey').fill(runtimeDrawerPageKey);
     await page.getByTestId('inspector-field-props.title').fill(runtimeDrawerTitle);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
 
@@ -1452,7 +1577,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-widget_pipeline').click();
     await page.getByTestId('inspector-field-widgetType').selectOption('table');
@@ -1460,10 +1585,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-dataSource.model').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-dataSource.query').fill(JSON.stringify(query));
-    await page.getByTestId('inspector-json-field-apply-dataSource.query').click();
+    await applyJsonField(page, 'inspector-json-field-apply-dataSource.query');
     await page.getByTestId('inspector-field-props.value').fill('');
     await page.getByTestId('inspector-field-props.emptyText').fill('');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, dashboardPagePid);
 
@@ -1516,7 +1641,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
@@ -1543,13 +1668,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         __auditContext: { source: 'spoofed-client' },
       }),
     );
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
 
@@ -1655,7 +1780,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('workflow');
@@ -1663,14 +1788,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.workflowKey').fill(liveWorkflowKey);
     await page.getByTestId('inspector-field-props.businessKey').fill(workflowBusinessKeyTemplate);
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
 
@@ -1769,7 +1894,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-widget_pipeline').click();
     await page.getByTestId('inspector-field-widgetType').selectOption('table');
@@ -1778,12 +1903,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-dataSource.queryCode').fill(liveNamedQueryCode);
     await page.getByTestId('inspector-field-dataSource.parameters').fill(JSON.stringify({}));
-    await page.getByTestId('inspector-json-field-apply-dataSource.parameters').click();
+    await applyJsonField(page, 'inspector-json-field-apply-dataSource.parameters');
     await page.getByTestId('inspector-field-dataSource.page').fill('1');
     await page.getByTestId('inspector-field-dataSource.size').fill('20');
     await page.getByTestId('inspector-field-props.value').fill('');
     await page.getByTestId('inspector-field-props.emptyText').fill('');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, dashboardPagePid);
 
@@ -1856,7 +1981,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     const readOnlyInput = page.getByTestId('inspector-field-props.readOnly');
@@ -1864,7 +1989,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       await readOnlyInput.uncheck();
     }
     await page.getByTestId('inspector-field-props.visibleWhen').fill('');
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
     const addedFieldOutlineItem = page.getByTestId(`outline-item-${fieldBlockId}`);
     if ((await addedFieldOutlineItem.count()) > 0) {
@@ -1881,13 +2006,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command').fill(liveFormCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, pagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -1971,7 +2096,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_bulk').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
@@ -1979,13 +2104,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command').fill(liveBulkCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, listPagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -1998,7 +2123,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('runtime-table-row-list_table-0')).toContainText(
       selectableRowName,
     );
-    await page.getByTestId('runtime-row-select-list_table-0').check();
+    await setCheckbox(page, 'runtime-row-select-list_table-0', true);
 
     const commandRespPromise = page.waitForResponse(
       (response) =>
@@ -2073,7 +2198,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_row_open').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
@@ -2081,13 +2206,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command').fill(liveRowCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, listPagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -2179,15 +2304,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-list_table').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const paletteAction = page.getByTestId('palette-add-action');
     await expect(paletteAction).toBeVisible();
     await expect(paletteAction).toBeEnabled();
-    await expect(paletteAction).toHaveAttribute('draggable', 'true');
-    await paletteAction.dragTo(page.getByTestId('canvas-block-list_table'));
+    await expect(paletteAction).toHaveAttribute('aria-roledescription', 'draggable');
+    await dndDragTo(page, paletteAction, page.getByTestId('canvas-block-list_table'));
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(paletteRowActionBlockId);
     await expect(page.getByTestId(`canvas-block-${paletteRowActionBlockId}`)).toBeVisible();
@@ -2196,12 +2321,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command').fill(paletteRowCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, listPagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -2271,7 +2396,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(componentCheckboxLabel);
@@ -2281,7 +2406,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(componentTextareaLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('textarea');
     await page.getByTestId('inspector-field-props.placeholder').fill(componentTextareaPlaceholder);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, pagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -2341,7 +2466,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(componentPickerLabel);
@@ -2352,7 +2477,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.valueField').fill('id');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
     await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(pickerOptions));
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.label').fill(componentRichTextLabel);
@@ -2363,8 +2488,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.richTextToolbar')
       .fill(JSON.stringify(['bold', 'italic', 'link']));
-    await page.getByTestId('inspector-json-field-apply-props.richTextToolbar').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.richTextToolbar');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -2427,17 +2552,17 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.evaluate((key) => window.localStorage.removeItem(key), LOCAL_DESIGNER_STORAGE_KEY);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-section_basic').click();
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill('owner');
     await expect(page.getByTestId('model-field-type-owner')).toHaveText('relation');
     const relationField = page.getByTestId('model-field-owner');
     await expect(relationField).toBeVisible();
     await expect(relationField).toBeEnabled();
 
-    await relationField.dragTo(page.getByTestId('canvas-block-section_basic'));
+    await dndDragTo(page, relationField, page.getByTestId('canvas-block-section_basic'));
 
     await expect(page.getByTestId('canvas-block-field_owner')).toBeVisible();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('field_owner');
@@ -2448,9 +2573,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('inspector-field-props.displayField')).toHaveValue('displayName');
 
     await page.getByTestId('inspector-field-props.displayField').fill('fullName');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await page.getByTestId('designer-save').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     const localDocument = (await page.evaluate((key) => {
       const raw = window.localStorage.getItem(key);
@@ -2488,11 +2613,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('outline-item-list_filters').click();
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill('owner');
     const relationField = page.getByTestId('model-field-owner');
     await expect(relationField).toBeVisible();
-    await relationField.dragTo(page.getByTestId('canvas-block-list_filters'));
+    await dndDragTo(page, relationField, page.getByTestId('canvas-block-list_filters'));
 
     await expect(page.getByTestId('canvas-block-filter_owner')).toBeVisible();
     await expect(page.getByTestId('inspector-selected-id')).toContainText('filter_owner');
@@ -2506,10 +2631,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.options')
       .fill(JSON.stringify([{ label: formTitle, value: formPageKey }]));
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
     await page.getByTestId('designer-save').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     const localDocument = (await page.evaluate((key) => {
       const raw = window.localStorage.getItem(key);
@@ -2582,7 +2707,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.evaluate((key) => window.localStorage.removeItem(key), LOCAL_DESIGNER_STORAGE_KEY);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_customer_phone').click();
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
@@ -2600,11 +2725,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.rows')
       .fill(JSON.stringify([{ title: visibleTitle, status: secretStatus }]));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await page.getByTestId('designer-save').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     const localDocument = (await page.evaluate((key) => {
       const raw = window.localStorage.getItem(key);
@@ -2664,18 +2789,18 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_row_open').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
     await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
     await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
     await page.getByTestId('inspector-field-props.disabledWhen').fill(JSON.stringify(disabledWhen));
-    await page.getByTestId('inspector-json-field-apply-props.disabledWhen').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -2722,7 +2847,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.component').selectOption('input');
@@ -2732,11 +2857,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.label').fill(conditionalActionLabel);
     await expect(page.getByTestId('inspector-field-props.visibleWhen')).toBeVisible();
     await page.getByTestId('inspector-field-props.visibleWhen').fill(JSON.stringify(visibleWhen));
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await expect(page.getByTestId('inspector-field-props.disabledWhen')).toBeVisible();
     await page.getByTestId('inspector-field-props.disabledWhen').fill(JSON.stringify(disabledWhen));
-    await page.getByTestId('inspector-json-field-apply-props.disabledWhen').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -2794,7 +2919,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.component').selectOption('textarea');
@@ -2805,7 +2930,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.validationRules')
       .fill(JSON.stringify(validationRules));
-    await page.getByTestId('inspector-json-field-apply-props.validationRules').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.validationRules');
 
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
@@ -2813,17 +2938,17 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command').fill(validationCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     await page.getByTestId('inspector-field-props.visibleWhen').fill('');
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
     await page.getByTestId('inspector-field-props.disabledWhen').fill('');
-    await page.getByTestId('inspector-json-field-apply-props.disabledWhen').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.disabledWhen');
     await page.getByTestId('inspector-field-props.feedback').fill('');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, pagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -3038,10 +3163,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-section_basic').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     await page.getByTestId('palette-add-sub-table').click();
 
     await expect(page.getByTestId('inspector-selected-id')).toContainText(
@@ -3052,13 +3177,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-dataSource.parentField').fill(subTableParentField);
     await page.getByTestId('inspector-field-dataSource.childField').fill(subTableChildField);
     await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify(subTableRows));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
     await page.getByTestId(`model-field-${fieldCode}`).click();
     await expect(page.getByTestId(`canvas-block-${columnBlockId}`)).toBeVisible();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3109,17 +3234,17 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.component').selectOption('select');
     await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(selectOptions));
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
     const requiredInput = page.getByTestId('inspector-field-props.required');
     if (await requiredInput.isChecked()) {
       await requiredInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3156,7 +3281,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('designer-mode-layout').click();
     const [movingBlockId, targetBlockId] = await swapCanvasBlocksByPointerDrag(
@@ -3164,7 +3289,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       'field_seed_title',
       'field_seed_secondary',
     );
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3179,11 +3304,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.visibleWhen').fill('');
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
 
     await page.getByTestId('designer-mode-layout').click();
     await expect(page.getByTestId('field-span-controls-field_seed_title')).toBeVisible();
@@ -3193,7 +3318,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       '12',
     );
     await expect(page.getByTestId('inspector-field-layout.span')).toHaveValue('12');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3447,7 +3572,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('designer-mode-layout').click();
     const columnOrder = await swapCanvasBlocksByPointerDrag(
@@ -3460,7 +3585,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       'action_seed_create',
       'action_seed_export',
     );
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
 
@@ -3476,16 +3601,16 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(componentUploadLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('upload');
     await expect(page.getByTestId('inspector-field-props.accept')).toBeVisible();
     await page.getByTestId('inspector-field-props.accept').fill(componentUploadAccept);
-    await page.getByTestId('inspector-field-props.multiple').check();
+    await setCheckbox(page, 'inspector-field-props.multiple', true);
     await page.getByTestId('inspector-field-props.maxFiles').fill('2');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3549,13 +3674,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(controllerLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('select');
     await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(controllerOptions));
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.label').fill(dependentLabel);
@@ -3563,8 +3688,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.visibleWhen')
       .fill(JSON.stringify(dependentVisibleWhen));
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3618,7 +3743,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(dynamicPickerLabel);
@@ -3631,8 +3756,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.displayField').fill('name');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
     await page.getByTestId('inspector-field-props.options').fill('[]');
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3712,7 +3837,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.label').fill(namedQueryPickerLabel);
@@ -3725,12 +3850,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.displayField').fill('name');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
     await page.getByTestId('inspector-field-props.pickerParameters').fill(JSON.stringify({}));
-    await page.getByTestId('inspector-json-field-apply-props.pickerParameters').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.pickerParameters');
     await page.getByTestId('inspector-field-props.options').fill('[]');
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
     await page.getByTestId('inspector-field-props.visibleWhen').fill('');
-    await page.getByTestId('inspector-json-field-apply-props.visibleWhen').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.visibleWhen');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3817,7 +3942,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(searchablePickerLabel);
@@ -3828,7 +3953,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.pickerSource').fill(modelCode);
     await page.getByTestId('inspector-field-props.valueField').fill('page_key');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
-    await page.getByTestId('inspector-field-props.searchable').check();
+    await setCheckbox(page, 'inspector-field-props.searchable', true);
     await page
       .getByTestId('inspector-field-props.searchPlaceholder')
       .fill(searchablePickerPlaceholder);
@@ -3836,8 +3961,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.searchParameter').fill('keyword');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
     await page.getByTestId('inspector-field-props.options').fill('[]');
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -3946,7 +4071,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_secondary').click();
     await page.getByTestId('inspector-field-props.label').fill(namedQuerySearchableLabel);
@@ -3957,7 +4082,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.pickerQueryCode').fill(liveNamedQueryCode);
     await page.getByTestId('inspector-field-props.valueField').fill('page_key');
     await page.getByTestId('inspector-field-props.displayField').fill('name');
-    await page.getByTestId('inspector-field-props.searchable').check();
+    await setCheckbox(page, 'inspector-field-props.searchable', true);
     await page
       .getByTestId('inspector-field-props.searchPlaceholder')
       .fill(namedQuerySearchPlaceholder);
@@ -3965,10 +4090,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.searchParameter').fill('keyword');
     await page.getByTestId('inspector-field-props.pageSize').fill('1000');
     await page.getByTestId('inspector-field-props.pickerParameters').fill(JSON.stringify({}));
-    await page.getByTestId('inspector-json-field-apply-props.pickerParameters').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.pickerParameters');
     await page.getByTestId('inspector-field-props.options').fill('[]');
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -4079,7 +4204,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
@@ -4088,7 +4213,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
     await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
 
@@ -4134,7 +4259,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
@@ -4142,7 +4267,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.command').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.permissionCode').fill(allowedPermissionCode);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
 
@@ -4210,7 +4335,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${listPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
@@ -4220,7 +4345,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.permissionCode')
       .fill(ROLE_MATRIX_PERMISSION_CODE);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, listPagePid);
 
     const persisted = await readPage(page, listPagePid);
@@ -4277,18 +4402,18 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-field_seed_title').click();
     await page.getByTestId('inspector-field-props.label').fill(radioLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('radio');
     await page.getByTestId('inspector-field-props.options').fill(JSON.stringify(radioOptions));
-    await page.getByTestId('inspector-json-field-apply-props.options').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.options');
     const requiredInput = page.getByTestId('inspector-field-props.required');
     if (await requiredInput.isChecked()) {
       await requiredInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, pagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -4341,15 +4466,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-section_basic').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const repeaterPaletteItem = page.getByTestId('palette-add-repeater');
     const sectionCanvasBlock = page.getByTestId('canvas-block-section_basic');
-    await expect(repeaterPaletteItem).toHaveAttribute('draggable', 'true');
+    await expect(repeaterPaletteItem).toHaveAttribute('aria-roledescription', 'draggable');
     await sectionCanvasBlock.scrollIntoViewIfNeeded();
-    await repeaterPaletteItem.dragTo(sectionCanvasBlock, {
+    await dndDragTo(page, repeaterPaletteItem, sectionCanvasBlock, {
       targetPosition: { x: 24, y: 24 },
     });
     await expect(page.getByTestId(`canvas-block-${repeaterId}`)).toBeVisible();
@@ -4359,30 +4484,29 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.rows')
       .fill(JSON.stringify([{ [fieldCode]: initialLineValue }]));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId(`canvas-block-${repeaterId}`));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId(`canvas-block-${repeaterId}`));
     await expect(page.getByTestId('inspector-selected-id')).toContainText(fieldBlockId);
     await page.getByTestId('inspector-field-props.component').selectOption('input');
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(`Submit repeater ${uid}`);
     await page.getByTestId('inspector-field-props.command').fill(repeaterCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.validateForm').uncheck();
+    await setCheckbox(page, 'inspector-field-props.validateForm', false);
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(repeaterPayload));
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, pagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -4465,15 +4589,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-section_basic').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const subformPaletteItem = page.getByTestId('palette-add-subform');
     const sectionCanvasBlock = page.getByTestId('canvas-block-section_basic');
-    await expect(subformPaletteItem).toHaveAttribute('draggable', 'true');
+    await expect(subformPaletteItem).toHaveAttribute('aria-roledescription', 'draggable');
     await sectionCanvasBlock.scrollIntoViewIfNeeded();
-    await subformPaletteItem.dragTo(sectionCanvasBlock, {
+    await dndDragTo(page, subformPaletteItem, sectionCanvasBlock, {
       targetPosition: { x: 24, y: 24 },
     });
     await expect(page.getByTestId(`canvas-block-${subformId}`)).toBeVisible();
@@ -4483,17 +4607,16 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.rows')
       .fill(JSON.stringify([{ [fieldCode]: initialMemberValue }]));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId(`canvas-block-${subformId}`));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId(`canvas-block-${subformId}`));
     await expect(page.getByTestId('inspector-selected-id')).toContainText('field_');
     await page.getByTestId('inspector-field-props.component').selectOption('input');
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(`Submit subform ${uid}`);
@@ -4504,12 +4627,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       await validateFormInput.uncheck();
     }
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(subformPayload));
-    await page.getByTestId('inspector-json-field-apply-props.payload').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.payload');
     const confirmInput = page.getByTestId('inspector-field-props.confirm');
     if (await confirmInput.isChecked()) {
       await confirmInput.uncheck();
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, pagePid);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -4586,44 +4709,45 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${pagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-form_root').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const tabsPaletteItem = page.getByTestId('palette-add-tabs');
     await expect(tabsPaletteItem).toBeVisible();
     await expect(tabsPaletteItem).toBeEnabled();
-    await expect(tabsPaletteItem).toHaveAttribute('draggable', 'true');
-    await tabsPaletteItem.dragTo(page.getByTestId('canvas-block-form_root'));
+    await expect(tabsPaletteItem).toHaveAttribute('aria-roledescription', 'draggable');
+    await dndDragTo(page, tabsPaletteItem, page.getByTestId('canvas-block-form_root'));
     await expect(page.getByTestId(`canvas-block-${tabsId}`)).toBeVisible();
     await expect(page.getByTestId('inspector-selected-id')).toContainText(tabsId);
     await page.getByTestId('inspector-field-title').fill(tabsTitle);
 
     const tabPaletteItem = page.getByTestId('palette-add-tab');
     await expect(tabPaletteItem).toBeEnabled();
-    await expect(tabPaletteItem).toHaveAttribute('draggable', 'true');
-    await tabPaletteItem.dragTo(page.getByTestId(`canvas-block-${tabsId}`));
+    await expect(tabPaletteItem).toHaveAttribute('aria-roledescription', 'draggable');
+    await dndDragTo(page, tabPaletteItem, page.getByTestId(`canvas-block-${tabsId}`));
     await expect(page.getByTestId(`canvas-block-${tabId}`)).toBeVisible();
     await expect(page.getByTestId('inspector-selected-id')).toContainText(tabId);
     await page.getByTestId('inspector-field-title').fill(tabTitle);
 
     const sectionPaletteItem = page.getByTestId('palette-add-form-section');
     await expect(sectionPaletteItem).toBeEnabled();
-    await sectionPaletteItem.dragTo(page.getByTestId(`canvas-block-${tabId}`));
+    await dndDragTo(page, sectionPaletteItem, page.getByTestId(`canvas-block-${tabId}`));
     const sectionId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(sectionId).toMatch(/^form_section_new_section(_\d+)?$/);
     await expect(page.getByTestId(`canvas-block-${sectionId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(sectionTitle);
 
-    const fieldPaletteItem = page.getByTestId('palette-add-field');
+    await switchResourceTab(page, 'fields');
+    const fieldPaletteItem = page.getByTestId('field-palette-add-field');
     await expect(fieldPaletteItem).toBeEnabled();
-    await fieldPaletteItem.dragTo(page.getByTestId(`canvas-block-${sectionId}`));
+    await fieldPaletteItem.click();
     const freeFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(freeFieldId).toMatch(/^field_new_field(_\d+)?$/);
     await expect(page.getByTestId(`canvas-block-${freeFieldId}`)).toBeVisible();
     await page.getByTestId('inspector-field-props.label').fill(freeFieldLabel);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, pagePid);
 
@@ -4691,32 +4815,32 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${detailPagePid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-detail_root').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
 
     const actionBarPaletteItem = page.getByTestId('palette-add-action-bar');
     await expect(actionBarPaletteItem).toBeEnabled();
-    await actionBarPaletteItem.dragTo(page.getByTestId('canvas-block-detail_root'));
+    await dndDragTo(page, actionBarPaletteItem, page.getByTestId('canvas-block-detail_root'));
     await expect(page.getByTestId(`canvas-block-${actionBarId}`)).toBeVisible();
     await page.getByTestId('inspector-field-region').fill('footer');
 
     const actionPaletteItem = page.getByTestId('palette-add-action');
     await expect(actionPaletteItem).toBeEnabled();
-    await actionPaletteItem.dragTo(page.getByTestId(`canvas-block-${actionBarId}`));
+    await dndDragTo(page, actionPaletteItem, page.getByTestId(`canvas-block-${actionBarId}`));
     await expect(page.getByTestId(`canvas-block-${actionId}`)).toBeVisible();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(detailActionLabel);
     await page.getByTestId('inspector-field-props.command').fill(detailCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-detail_root').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const widgetPaletteItem = page.getByTestId('palette-add-widget');
     await expect(widgetPaletteItem).toBeEnabled();
-    await widgetPaletteItem.dragTo(page.getByTestId('canvas-block-detail_root'), {
+    await dndDragTo(page, widgetPaletteItem, page.getByTestId('canvas-block-detail_root'), {
       targetPosition: { x: 20, y: 20 },
     });
     await expect(page.getByTestId(`canvas-block-${widgetId}`)).toBeVisible();
@@ -4724,74 +4848,76 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.title').fill(detailWidgetTitle);
     await page.getByTestId('inspector-field-props.value').fill(detailWidgetValue);
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-detail_section_summary').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
 
     const subTablePaletteItem = page.getByTestId('palette-add-sub-table');
     await expect(subTablePaletteItem).toBeEnabled();
-    await subTablePaletteItem.dragTo(page.getByTestId('canvas-block-detail_section_summary'));
+    await dndDragTo(page, subTablePaletteItem, page.getByTestId('canvas-block-detail_section_summary'));
     await expect(page.getByTestId(`canvas-block-${subTableId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailSubTableTitle);
     await page.getByTestId('inspector-field-dataSource.model').fill(modelCode);
     await page
       .getByTestId('inspector-field-props.rows')
       .fill(JSON.stringify([{ [fieldCode]: subTablePreviewValue }]));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId(`canvas-block-${subTableId}`));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId(`canvas-block-${subTableId}`));
     await expect(page.getByTestId(`canvas-block-${columnBlockId}`)).toBeVisible();
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-detail_section_summary').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const repeaterPaletteItem = page.getByTestId('palette-add-repeater');
     await expect(repeaterPaletteItem).toBeEnabled();
-    await repeaterPaletteItem.dragTo(page.getByTestId('canvas-block-detail_section_summary'));
+    // The section already holds a sub-table; drop into the section's top band so
+    // the gesture targets the section itself, not the nested sub-table/column
+    // (which cannot accept a repeater).
+    await dndDragTo(page, repeaterPaletteItem, page.getByTestId('canvas-block-detail_section_summary'), {
+      targetPosition: { x: 24, y: 16 },
+    });
     await expect(page.getByTestId(`canvas-block-${repeaterId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailRepeaterTitle);
     await page
       .getByTestId('inspector-field-props.rows')
       .fill(JSON.stringify([{ [fieldCode]: repeaterPreviewValue }]));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId(`canvas-block-${repeaterId}`));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId(`canvas-block-${repeaterId}`));
     const repeaterFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(repeaterFieldId).toMatch(/^field_/);
     await page.getByTestId('inspector-field-props.component').selectOption('input');
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-detail_section_summary').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const subformPaletteItem = page.getByTestId('palette-add-subform');
     await expect(subformPaletteItem).toBeEnabled();
-    await subformPaletteItem.dragTo(page.getByTestId('canvas-block-detail_section_summary'));
+    await dndDragTo(page, subformPaletteItem, page.getByTestId('canvas-block-detail_section_summary'));
     await expect(page.getByTestId(`canvas-block-${subformId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailSubformTitle);
     await page
       .getByTestId('inspector-field-props.rows')
       .fill(JSON.stringify([{ [fieldCode]: subformPreviewValue }]));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId(`canvas-block-${subformId}`));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId(`canvas-block-${subformId}`));
     const subformFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(subformFieldId).toMatch(/^field_/);
     await page.getByTestId('inspector-field-props.component').selectOption('input');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, detailPagePid);
 
@@ -4898,15 +5024,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-dashboard_root').click();
-    await page.getByTestId('resource-tab-blocks').click();
+    await switchResourceTab(page, 'blocks');
     const widgetPaletteItem = page.getByTestId('palette-add-widget');
     await expect(widgetPaletteItem).toBeVisible();
     await expect(widgetPaletteItem).toBeEnabled();
-    await expect(widgetPaletteItem).toHaveAttribute('draggable', 'true');
-    await widgetPaletteItem.dragTo(page.getByTestId('canvas-block-dashboard_root'));
+    await expect(widgetPaletteItem).toHaveAttribute('aria-roledescription', 'draggable');
+    await dndDragTo(page, widgetPaletteItem, page.getByTestId('canvas-block-dashboard_root'));
 
     await expect(page.getByTestId(`canvas-block-${newWidgetId}`)).toBeVisible();
     await expect(page.getByTestId('inspector-selected-id')).toContainText(newWidgetId);
@@ -4917,7 +5043,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-layout.y').fill('2');
     await page.getByTestId('inspector-field-layout.w').fill('4');
     await page.getByTestId('inspector-field-layout.h').fill('2');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, dashboardPagePid);
 
@@ -4987,79 +5113,73 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.goto(`/unified-designer?pageId=${tabbedListPid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-list_root').click();
-    await page.getByTestId('resource-tab-blocks').click();
-    await page.getByTestId('palette-add-tabs').dragTo(page.getByTestId('canvas-block-list_root'));
+    await switchResourceTab(page, 'blocks');
+    await dndDragTo(page, page.getByTestId('palette-add-tabs'), page.getByTestId('canvas-block-list_root'));
     const tabsId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(tabsId).toMatch(/^tabs_new_tabs(_\d+)?$/);
     await page.getByTestId('inspector-field-title').fill(tabsTitle);
 
-    await page.getByTestId('palette-add-tab').dragTo(page.getByTestId(`canvas-block-${tabsId}`));
+    await dndDragTo(page, page.getByTestId('palette-add-tab'), page.getByTestId(`canvas-block-${tabsId}`));
     const tabId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(tabId).toMatch(/^tab_new_tab(_\d+)?$/);
     await page.getByTestId('inspector-field-title').fill(tabTitle);
 
-    await page
-      .getByTestId('palette-add-filter-bar')
-      .dragTo(page.getByTestId(`canvas-block-${tabId}`));
+    await dndDragTo(page, page
+      .getByTestId('palette-add-filter-bar'), page.getByTestId(`canvas-block-${tabId}`));
     const filterBarId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(filterBarId).toMatch(/^filter_bar_new_filter_bar(_\d+)?$/);
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId(`canvas-block-${filterBarId}`));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId(`canvas-block-${filterBarId}`));
     const filterId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(filterId).toMatch(new RegExp(`^filter_${fieldCode}(_\\d+)?$`));
     await page.getByTestId('inspector-field-props.label').fill(filterLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('input');
     await page.getByTestId('inspector-field-props.operator').selectOption('contains');
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId(`outline-item-${tabId}`).click();
-    await page.getByTestId('resource-tab-blocks').click();
-    await page
-      .getByTestId('palette-add-table')
-      .dragTo(page.getByTestId(`canvas-block-${tabId}`), { targetPosition: { x: 20, y: 20 } });
+    await switchResourceTab(page, 'blocks');
+    await dndDragTo(page, page
+      .getByTestId('palette-add-table'), page.getByTestId(`canvas-block-${tabId}`), { targetPosition: { x: 20, y: 20 } });
     const tableId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(tableId).toMatch(/^table_new_table(_\d+)?$/);
     await page.getByTestId('inspector-field-title').fill(tableTitle);
     await page
       .getByTestId('inspector-field-props.rows')
       .fill(JSON.stringify([{ [fieldCode]: matchingValue }, { [fieldCode]: hiddenValue }]));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId(`canvas-block-${tableId}`));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId(`canvas-block-${tableId}`));
     const columnId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(columnId).toMatch(new RegExp(`^column_${fieldCode}(_\\d+)?$`));
     await page.getByTestId('inspector-field-props.label').fill(columnLabel);
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId(`outline-item-${tabId}`).click();
-    await page.getByTestId('resource-tab-blocks').click();
-    await page
-      .getByTestId('palette-add-action-bar')
-      .dragTo(page.getByTestId(`canvas-block-${tabId}`), { targetPosition: { x: 20, y: 20 } });
+    await switchResourceTab(page, 'blocks');
+    await dndDragTo(page, page
+      .getByTestId('palette-add-action-bar'), page.getByTestId(`canvas-block-${tabId}`), { targetPosition: { x: 20, y: 20 } });
     const actionBarId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(actionBarId).toMatch(/^action_bar_new_action_bar(_\d+)?$/);
-    await page
-      .getByTestId('palette-add-action')
-      .dragTo(page.getByTestId(`canvas-block-${actionBarId}`));
+    await dndDragTo(page, page
+      .getByTestId('palette-add-action'), page.getByTestId(`canvas-block-${actionBarId}`));
     const actionId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(actionId).toMatch(/^action_new_action(_\d+)?$/);
     await page.getByTestId('inspector-field-actionType').selectOption('modal');
     await page.getByTestId('inspector-field-props.label').fill(actionLabel);
     await page.getByTestId('inspector-field-props.title').fill(actionTitle);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, tabbedListPid);
 
@@ -5150,7 +5270,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-widget_beta').click();
     await expect(page.getByTestId('inspector-field-layout.x')).toHaveValue('4');
     await expect(page.getByTestId('inspector-field-layout.y')).toHaveValue('0');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, moveDashboardPid);
 
@@ -5211,11 +5331,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
     await page.getByTestId('outline-item-section_components').click();
-    await page.getByTestId('resource-tab-blocks').click();
-
-    await page
-      .getByTestId('palette-add-field')
-      .dragTo(page.getByTestId('canvas-block-section_components'));
+    await switchResourceTab(page, 'fields');
+    await page.getByTestId('field-palette-add-field').click();
     const dateFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     await page.getByTestId('inspector-field-field').selectOption('created_at');
@@ -5223,12 +5340,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.component').selectOption('date');
     await page.getByTestId('inspector-field-props.placeholder').fill('YYYY-MM-DD');
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-section_components').click();
-    await page.getByTestId('resource-tab-blocks').click();
-    await page
-      .getByTestId('palette-add-field')
-      .dragTo(page.getByTestId('canvas-block-section_components'));
+    await switchResourceTab(page, 'fields');
+    await page.getByTestId('field-palette-add-field').click();
     const numberFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     await page.getByTestId('inspector-field-field').selectOption('page_key');
@@ -5236,18 +5351,16 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.component').selectOption('number');
     await page.getByTestId('inspector-field-props.helpText').fill(`Number help ${uid}`);
 
-    await page.getByTestId('resource-tab-outline').click();
+    await switchResourceTab(page, 'outline');
     await page.getByTestId('outline-item-section_components').click();
-    await page.getByTestId('resource-tab-blocks').click();
-    await page
-      .getByTestId('palette-add-field')
-      .dragTo(page.getByTestId('canvas-block-section_components'));
+    await switchResourceTab(page, 'fields');
+    await page.getByTestId('field-palette-add-field').click();
     const switchFieldId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     await page.getByTestId('inspector-field-field').selectOption('name');
     await page.getByTestId('inspector-field-props.label').fill(switchLabel);
     await page.getByTestId('inspector-field-props.component').selectOption('switch');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, componentFormPid);
 
@@ -5320,8 +5433,8 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.goto(`/unified-designer?pageId=${widgetListPid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
     await page.getByTestId('outline-item-list_root').click();
-    await page.getByTestId('resource-tab-blocks').click();
-    await page.getByTestId('palette-add-widget').dragTo(page.getByTestId('canvas-block-list_root'));
+    await switchResourceTab(page, 'blocks');
+    await dndDragTo(page, page.getByTestId('palette-add-widget'), page.getByTestId('canvas-block-list_root'));
     const widgetId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(widgetId).toMatch(/^widget_new_widget(_\d+)?$/);
     await page.getByTestId('inspector-field-widgetType').selectOption('table');
@@ -5330,10 +5443,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page
       .getByTestId('inspector-field-props.columns')
       .fill(JSON.stringify(['Status', 'Count']));
-    await page.getByTestId('inspector-json-field-apply-props.columns').click();
+    await applyJsonField(page, 'inspector-json-field-apply-props.columns');
     await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify(listWidgetRows));
-    await page.getByTestId('inspector-json-field-apply-props.rows').click();
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await applyJsonField(page, 'inspector-json-field-apply-props.rows');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, widgetListPid);
 
@@ -5426,32 +5539,30 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-detail_root').click();
-    await page.getByTestId('resource-tab-blocks').click();
-    await page.getByTestId('palette-add-tabs').dragTo(page.getByTestId('canvas-block-detail_root'));
+    await switchResourceTab(page, 'blocks');
+    await dndDragTo(page, page.getByTestId('palette-add-tabs'), page.getByTestId('canvas-block-detail_root'));
     const tabsId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(tabsId).toMatch(/^tabs_new_tabs(_\d+)?$/);
     await page.getByTestId('inspector-field-title').fill(tabsTitle);
 
-    await page.getByTestId('palette-add-tab').dragTo(page.getByTestId(`canvas-block-${tabsId}`));
+    await dndDragTo(page, page.getByTestId('palette-add-tab'), page.getByTestId(`canvas-block-${tabsId}`));
     const tabId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(tabId).toMatch(/^tab_new_tab(_\d+)?$/);
     await page.getByTestId('inspector-field-title').fill(tabTitle);
 
-    await page
-      .getByTestId('palette-add-detail-section')
-      .dragTo(page.getByTestId(`canvas-block-${tabId}`));
+    await dndDragTo(page, page
+      .getByTestId('palette-add-detail-section'), page.getByTestId(`canvas-block-${tabId}`));
     const sectionId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(sectionId).toMatch(/^detail_section_new_detail_section(_\d+)?$/);
     await page.getByTestId('inspector-field-title').fill(sectionTitle);
 
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId(`canvas-block-${sectionId}`));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId(`canvas-block-${sectionId}`));
     const fieldId = (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(fieldId).toMatch(new RegExp(`^field_${fieldCode}(_\\d+)?$`));
     await page.getByTestId('inspector-field-props.label').fill(fieldLabel);
@@ -5469,13 +5580,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     const helperIds: string[] = [];
     const helperIdsByType: Record<string, string> = {};
     for (const helper of helperBlocks) {
-      await page.getByTestId('resource-tab-outline').click();
+      await switchResourceTab(page, 'outline');
       await page.getByTestId(`outline-item-${tabId}`).click();
-      await page.getByTestId('resource-tab-blocks').click();
+      await switchResourceTab(page, 'blocks');
       await expect(page.getByTestId(helper.paletteId)).toBeEnabled();
-      await page
-        .getByTestId(helper.paletteId)
-        .dragTo(page.getByTestId(`canvas-block-${tabId}`), { targetPosition: { x: 20, y: 20 } });
+      await dndDragTo(page, page
+        .getByTestId(helper.paletteId), page.getByTestId(`canvas-block-${tabId}`), { targetPosition: { x: 20, y: 20 } });
       const helperId =
         (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
       expect(helperId).toContain(helper.blockType.replaceAll('-', '_'));
@@ -5488,14 +5598,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       await page
         .getByTestId('inspector-field-dataSource.parameters')
         .fill(JSON.stringify({ ...helperDataSourceParams, helper: helper.blockType }));
-      await page.getByTestId('inspector-json-field-apply-dataSource.parameters').click();
+      await applyJsonField(page, 'inspector-json-field-apply-dataSource.parameters');
       if (helper.blockType === 'ai-fill-banner') {
         await page.getByTestId('inspector-field-props.description').fill(aiDescription);
         await page.getByTestId('inspector-field-props.feedback').fill(aiFeedback);
         await page
           .getByTestId('inspector-field-props.suggestedFields')
           .fill(JSON.stringify(aiSuggestedFields));
-        await page.getByTestId('inspector-json-field-apply-props.suggestedFields').click();
+        await applyJsonField(page, 'inspector-json-field-apply-props.suggestedFields');
       }
       if (helper.blockType === 'bpm-panel') {
         await page.getByTestId('inspector-field-props.description').fill(bpmDescription);
@@ -5503,22 +5613,22 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         await page.getByTestId('inspector-field-props.assignee').fill(bpmAssignee);
         await page.getByTestId('inspector-field-props.dueAt').fill(bpmDueAt);
         await page.getByTestId('inspector-field-props.actions').fill(JSON.stringify(bpmActions));
-        await page.getByTestId('inspector-json-field-apply-props.actions').click();
+        await applyJsonField(page, 'inspector-json-field-apply-props.actions');
       }
       if (helper.blockType === 'activity-timeline') {
         await page.getByTestId('inspector-field-props.items').fill(JSON.stringify(timelineItems));
-        await page.getByTestId('inspector-json-field-apply-props.items').click();
+        await applyJsonField(page, 'inspector-json-field-apply-props.items');
       }
       if (helper.blockType === 'field-history') {
         await page
           .getByTestId('inspector-field-props.entries')
           .fill(JSON.stringify(historyEntries));
-        await page.getByTestId('inspector-json-field-apply-props.entries').click();
+        await applyJsonField(page, 'inspector-json-field-apply-props.entries');
       }
       helperIds.push(helperId);
       helperIdsByType[helper.blockType] = helperId;
     }
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, detailTabsPid);
 
@@ -5659,12 +5769,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
     await page.getByTestId('outline-item-dashboard_root').click();
     await page.getByTestId('inspector-field-layout.cols').fill('6');
     await page.getByTestId('inspector-field-layout.rowHeight').fill('96');
     await page.getByTestId('inspector-field-layout.gap').fill('24');
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, gridDashboardPid);
 
@@ -5767,7 +5877,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
     await page.getByTestId('outline-item-ai_live_helper').click();
     await expect(page.getByTestId('inspector-field-dataSource.type')).toHaveValue('namedQuery');
     await expect(page.getByTestId('inspector-field-dataSource.executionMode')).toHaveValue('live');
@@ -5882,14 +5992,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-detail_field_layout_section').click();
-    await page.getByTestId('resource-tab-fields').click();
+    await switchResourceTab(page, 'fields');
     await page.getByTestId('field-palette-search').fill(fieldCode);
-    await page
-      .getByTestId(`model-field-${fieldCode}`)
-      .dragTo(page.getByTestId('canvas-block-detail_field_layout_section'));
+    await dndDragTo(page, page
+      .getByTestId(`model-field-${fieldCode}`), page.getByTestId('canvas-block-detail_field_layout_section'));
     await expect(page.getByTestId(`canvas-block-${detailFieldBlockId}`)).toBeVisible();
     await expect(page.getByTestId('inspector-selected-id')).toContainText(detailFieldBlockId);
     await page.getByTestId('inspector-field-props.label').fill(detailFieldLabel);
@@ -5902,7 +6011,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       'detail_field_layout_seed',
       detailFieldBlockId,
     );
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, detailFieldPid);
 
@@ -6051,14 +6160,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-ai_empty_helper').click();
     await expect(page.getByTestId('inspector-field-props.emptyText')).toHaveValue(
       `No AI suggestions ${uid}`,
     );
     await page.getByTestId('inspector-field-props.emptyText').fill(updatedAiEmptyText);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     const emptyRespPromise = page.waitForResponse(
       (response) =>
@@ -6166,12 +6275,12 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     await page.getByTestId('outline-item-ai_permission_denied_helper').click();
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
     await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
-    await expect(page.getByTestId('designer-dirty-state')).toHaveText('Unsaved');
+    await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await page.getByTestId('outline-item-ai_permission_allowed_helper').click();
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toHaveValue(
@@ -6232,17 +6341,22 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 });
 
 async function saveDesignerPage(page: Page, pid: string): Promise<void> {
-  const saveRespPromise = page.waitForResponse(
-    (response) =>
-      response.url().includes(`/api/pages/${pid}`) && response.request().method() === 'PUT',
-    { timeout: 15000 },
-  );
-  await page.getByTestId('designer-save').click();
-  const saveResp = await saveRespPromise;
-  expect(saveResp.status()).toBe(200);
-  const saveBody = await saveResp.json();
-  expect(saveBody.code).toBe('0');
-  await expect(page.getByTestId('designer-dirty-state')).toHaveText('Saved');
+  // A save click issued right after an inspector input edit can be lost to the
+  // blur/re-render that the click itself triggers, so the PUT never fires. Retry
+  // the click until the save round-trip actually happens.
+  await expect(async () => {
+    const saveRespPromise = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/api/pages/${pid}`) && response.request().method() === 'PUT',
+      { timeout: 5000 },
+    );
+    await page.getByTestId('designer-save').click();
+    const saveResp = await saveRespPromise;
+    expect(saveResp.status()).toBe(200);
+    const saveBody = await saveResp.json();
+    expect(saveBody.code).toBe('0');
+  }).toPass({ timeout: 30000 });
+  await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 }
 
 async function resizeWidgetByMouse(
@@ -6287,30 +6401,40 @@ async function dragCanvasBlockBefore(
   movingBlockId: string,
   targetBlockId: string,
 ): Promise<void> {
-  const movingBlock = page.getByTestId(`canvas-block-${movingBlockId}`);
+  // @dnd-kit attaches the drag activators to the block's grip handle, not the
+  // block body, so the gesture must start on the handle. Drop onto the target
+  // block; the workbench resolves a canvas-block drop onto another block as a
+  // move-before. Use a multi-step pointer move so @dnd-kit measures + collides.
+  const handle = page.getByTestId(`block-drag-handle-${movingBlockId}`);
   const targetBlock = page.getByTestId(`canvas-block-${targetBlockId}`);
-  await expect(movingBlock).toBeVisible();
+  await expect(handle).toBeVisible();
   await expect(targetBlock).toBeVisible();
   await targetBlock.scrollIntoViewIfNeeded();
-  await movingBlock.scrollIntoViewIfNeeded();
+  await handle.scrollIntoViewIfNeeded();
 
-  const movingBox = await movingBlock.boundingBox();
+  const handleBox = await handle.boundingBox();
   const targetBox = await targetBlock.boundingBox();
-  expect(movingBox).not.toBeNull();
+  expect(handleBox).not.toBeNull();
   expect(targetBox).not.toBeNull();
 
-  const startYOffset = Math.max(12, movingBox!.height - 28);
-  const endYOffset = Math.max(12, targetBox!.height - 28);
-  const startX = movingBox!.x + Math.min(32, movingBox!.width / 2);
-  const startY = movingBox!.y + startYOffset;
-  const endX = targetBox!.x + Math.min(32, targetBox!.width / 2);
-  const endY = targetBox!.y + endYOffset;
+  const startX = handleBox!.x + handleBox!.width / 2;
+  const startY = handleBox!.y + handleBox!.height / 2;
+  const endX = targetBox!.x + targetBox!.width / 2;
+  const endY = targetBox!.y + Math.min(12, targetBox!.height / 4);
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(startX + 8, startY + 8, { steps: 2 });
-  await page.mouse.move(endX, endY, { steps: 12 });
+  await page.mouse.move(startX + 8, startY + 8, { steps: 6 });
+  await page.mouse.move(endX, endY, { steps: 16 });
+  await page.mouse.move(endX + 2, endY + 2, { steps: 4 });
   await page.mouse.up();
+  await page
+    .locator('[data-testid="drag-overlay-ghost"]')
+    .waitFor({ state: 'detached', timeout: 5000 })
+    .catch(() => {});
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
 }
 
 async function swapCanvasBlocksByPointerDrag(
