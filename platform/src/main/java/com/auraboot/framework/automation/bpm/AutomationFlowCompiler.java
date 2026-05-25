@@ -1,6 +1,7 @@
 package com.auraboot.framework.automation.bpm;
 
 import com.auraboot.framework.automation.entity.Automation;
+import com.auraboot.framework.automation.entity.AutomationAction;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -8,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,15 +52,25 @@ public class AutomationFlowCompiler {
 
     @SuppressWarnings("unchecked")
     public CompiledFlow compile(Automation automation) {
+        List<Map<String, Object>> nodes;
+        List<Map<String, Object>> edges;
+
         Map<String, Object> flowConfig = automation.getFlowConfig();
-        if (flowConfig == null || !(flowConfig.get("nodes") instanceof List)) {
+        if (flowConfig != null && flowConfig.get("nodes") instanceof List<?> fcNodes && !fcNodes.isEmpty()) {
+            nodes = (List<Map<String, Object>>) flowConfig.get("nodes");
+            edges = flowConfig.get("edges") instanceof List
+                    ? (List<Map<String, Object>>) flowConfig.get("edges")
+                    : new ArrayList<>();
+        } else if (automation.getActions() != null && !automation.getActions().isEmpty()) {
+            // No visual flow: synthesize a linear flow from triggerType + actions[] so
+            // legacy actions-only automations also run on SmartEngine (prereq for cutover).
+            Map<String, List<Map<String, Object>>> synth = synthesizeFromActions(automation);
+            nodes = synth.get("nodes");
+            edges = synth.get("edges");
+        } else {
             throw new IllegalArgumentException(
-                    "automation " + automation.getPid() + " has no flowConfig nodes to compile");
+                    "automation " + automation.getPid() + " has no flow or actions to compile");
         }
-        List<Map<String, Object>> nodes = (List<Map<String, Object>>) flowConfig.get("nodes");
-        List<Map<String, Object>> edges = flowConfig.get("edges") instanceof List
-                ? (List<Map<String, Object>>) flowConfig.get("edges")
-                : new ArrayList<>();
 
         String processKey = PROCESS_KEY_PREFIX + automation.getPid();
         ObjectNode root = objectMapper.createObjectNode();
@@ -146,6 +158,42 @@ public class AutomationFlowCompiler {
         }
 
         return new CompiledFlow(processKey, root, actionsByNodeId);
+    }
+
+    /** Synthesize a linear trigger→actions→end graph for actions-only automations. */
+    private Map<String, List<Map<String, Object>>> synthesizeFromActions(Automation automation) {
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        List<Map<String, Object>> edges = new ArrayList<>();
+
+        String triggerId = "trigger_0";
+        String triggerLabel = automation.getTriggerType() != null ? automation.getTriggerType() : "trigger";
+        nodes.add(Map.of("id", triggerId, "type", "trigger",
+                "data", Map.of("label", triggerLabel)));
+
+        List<AutomationAction> actions = new ArrayList<>(automation.getActions());
+        actions.sort(Comparator.comparingInt(a -> a.getSequence() != null ? a.getSequence() : 0));
+
+        String prev = triggerId;
+        for (int i = 0; i < actions.size(); i++) {
+            AutomationAction action = actions.get(i);
+            String id = "action_" + i;
+            Map<String, Object> config = new HashMap<>();
+            if (action.getConfig() != null) {
+                config.putAll(action.getConfig());
+            }
+            config.put("actionType", action.getType());
+            nodes.add(Map.of("id", id, "type", "action",
+                    "data", Map.of(
+                            "label", action.getType() != null ? action.getType() : id,
+                            "config", config)));
+            edges.add(Map.of("id", "e_" + prev + "_" + id, "source", prev, "target", id));
+            prev = id;
+        }
+
+        Map<String, List<Map<String, Object>>> result = new HashMap<>();
+        result.put("nodes", nodes);
+        result.put("edges", edges);
+        return result;
     }
 
     private String resolveActionType(String nodeType, Map<String, Object> config) {

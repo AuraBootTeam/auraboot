@@ -1,6 +1,7 @@
 package com.auraboot.framework.automation.bpm;
 
 import com.auraboot.framework.automation.entity.Automation;
+import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.bpm.converter.JsonToBpmnConverter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -123,6 +124,35 @@ class AutomationFlowCompilerTest {
         assertThat(bpmn).contains("exclusiveGateway");
         assertThat(bpmn).contains("conditionExpression");
         assertThat(bpmn).contains("amount");
+    }
+
+    @Test
+    void compile_actionsOnlyAutomation_synthesizesLinearFlow() {
+        Automation a = new Automation();
+        a.setPid("AUTOFLAT");
+        a.setName("Legacy actions-only");
+        a.setTriggerType("on_record_create");
+        a.setActions(new java.util.ArrayList<>(List.of(
+                AutomationAction.builder().type("send_notification").sequence(1)
+                        .config(Map.of("title", "hi")).build())));
+        // no flowConfig
+
+        AutomationFlowCompiler.CompiledFlow out = compiler.compile(a);
+
+        Map<String, String> typeById = new java.util.HashMap<>();
+        out.designerJson().get("nodes").forEach(n -> typeById.put(n.get("id").asText(), n.get("type").asText()));
+        assertThat(typeById).containsEntry("trigger_0", "startEvent");
+        assertThat(typeById).containsEntry("action_0", "serviceTask");
+        assertThat(typeById).containsEntry("_end", "endEvent");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> spec = (Map<String, Object>) out.actionsByNodeId().get("action_0");
+        assertThat(spec.get("type")).isEqualTo("send_notification");
+
+        String bpmn = new JsonToBpmnConverter(new ObjectMapper(), null)
+                .convertFromJsonNode(out.designerJson());
+        assertThat(bpmn).contains("startEvent");
+        assertThat(bpmn).contains(AutomationActionServiceTaskDelegate.BEAN_NAME);
     }
 
     @Test
