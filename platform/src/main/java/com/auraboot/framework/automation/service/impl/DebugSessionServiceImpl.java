@@ -56,7 +56,11 @@ public class DebugSessionServiceImpl implements DebugSessionService {
     @Override
     public DebugSessionDTO createSession(String automationId, DebugSessionCreateRequest request) {
         Automation automation = automationMapper.findByPid(automationId);
-        if (automation == null) {
+        // ab_automation bypasses the global tenant interceptor (scheduler scans cross-tenant),
+        // so enforce tenant ownership explicitly here — otherwise a debug session could be
+        // started against another tenant's automation by pid (cross-tenant IDOR).
+        Long currentTenant = MetaContext.getCurrentTenantId();
+        if (automation == null || currentTenant == null || !currentTenant.equals(automation.getTenantId())) {
             throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + automationId);
         }
 

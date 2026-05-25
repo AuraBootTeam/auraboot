@@ -22,6 +22,9 @@ export { useFlowStore } from './store/useFlowStore';
 // Node registry
 export { NodeRegistry, nodeRegistry } from './nodes/NodeRegistry';
 
+// Edge registry (G1)
+export { EdgeRegistry, edgeRegistry } from './edges/EdgeRegistry';
+
 // Adapters
 export { useFlowFieldAdapter } from './adapters/FlowFieldAdapter';
 
@@ -30,13 +33,17 @@ export type {
   FlowNode,
   FlowEdge,
   FlowData,
+  ConditionExpression,
   ValidationResult,
   ValidationError,
 } from './store/types';
 
 export type {
   FlowNodeDefinition,
+  NodePropertyEditorProps,
   PropertySchema,
   PropertyType,
   NodeValidation,
 } from './nodes/types';
+
+export type { FlowEdgeDefinition, EdgePropertyEditorProps } from './edges/types';

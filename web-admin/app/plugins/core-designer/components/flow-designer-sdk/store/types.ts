@@ -12,17 +12,33 @@ export interface FlowNode {
   };
 }
 
+/**
+ * Structured edge condition (aligns with the unified graph-grammar spec).
+ * Replaces the former bare-string condition. A bare string maps to
+ * `{ type: 'expression', content }`.
+ */
+export interface ConditionExpression {
+  type: 'expression' | 'script';
+  content: string;
+  language?: 'mvel' | 'juel' | 'spel';
+  /** Reference to a BPM rule-engine rule code (optional). */
+  ruleCode?: string;
+}
+
 export interface FlowEdge {
   id: string;
   source: string;
   target: string;
   sourceHandle?: string;
   targetHandle?: string;
-  /** Edge rendering type (e.g. 'smoothstep') */
+  /** Edge rendering type — maps to an EdgeRegistry definition / @xyflow edge type. */
   type?: string;
   data?: {
     label?: string;
-    condition?: string;
+    /** Gateway/branch condition (exclusive/inclusive outgoing flows). */
+    condition?: ConditionExpression;
+    /** Marks this edge as the gateway's default flow. */
+    isDefault?: boolean;
   };
 }
 

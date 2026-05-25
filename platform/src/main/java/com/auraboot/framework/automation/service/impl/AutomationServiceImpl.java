@@ -47,6 +47,31 @@ public class AutomationServiceImpl implements AutomationService {
     private final AutomationTriggerService automationTriggerService;
     private final com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
 
+    // ==================== Tenant isolation guards ====================
+    // ab_automation is excluded from the global TenantLineInnerInterceptor so the
+    // scheduler can scan across tenants every 60s/300s. That makes user-facing
+    // queries (by pid / model / search) responsible for scoping tenant explicitly,
+    // otherwise any holder of automation.* permission can read/modify another
+    // tenant's automation by pid (cross-tenant IDOR). These helpers fail closed.
+
+    /** Current tenant id, or throw NOT_FOUND if no tenant context (never match-all). */
+    private Long requireCurrentTenant() {
+        Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        if (tenantId == null) {
+            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found");
+        }
+        return tenantId;
+    }
+
+    /** Load an automation by pid and assert it belongs to the current tenant (404 otherwise). */
+    private Automation loadOwnedAutomation(String pid) {
+        Automation automation = automationMapper.findByPid(pid);
+        if (automation == null || !requireCurrentTenant().equals(automation.getTenantId())) {
+            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + pid);
+        }
+        return automation;
+    }
+
     @Transactional
     @Override
     public AutomationDTO create(AutomationCreateRequest request) {
@@ -90,7 +115,8 @@ public class AutomationServiceImpl implements AutomationService {
         // (flowConfig, triggerConfig, actions).
         LambdaQueryWrapper<Automation> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Automation::getPid, pid)
-               .eq(Automation::getDeletedFlag, false);
+               .eq(Automation::getDeletedFlag, false)
+               .eq(Automation::getTenantId, requireCurrentTenant());
         Automation automation = automationMapper.selectOne(wrapper);
         return automation != null ? toDTO(automation) : null;
     }
@@ -100,10 +126,7 @@ public class AutomationServiceImpl implements AutomationService {
     public AutomationDTO update(String pid, AutomationUpdateRequest request) {
         log.info("Updating automation: pid={}", pid);
 
-        Automation automation = automationMapper.findByPid(pid);
-        if (automation == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + pid);
-        }
+        Automation automation = loadOwnedAutomation(pid);
 
         String currentUserPid = MetaContext.getCurrentUserPid();
 
@@ -146,10 +169,7 @@ public class AutomationServiceImpl implements AutomationService {
     public void delete(String pid) {
         log.info("Deleting automation: pid={}", pid);
 
-        Automation automation = automationMapper.findByPid(pid);
-        if (automation == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + pid);
-        }
+        Automation automation = loadOwnedAutomation(pid);
 
         automationMapper.deleteById(automation.getId());
 
@@ -158,16 +178,27 @@ public class AutomationServiceImpl implements AutomationService {
 
     @Override
     public List<AutomationDTO> getByModelCode(String modelCode) {
-        List<Automation> automations = automationMapper.findByModelCode(modelCode);
-        return automations.stream()
+        // Tenant-scoped (ab_automation bypasses the global tenant interceptor — see guards above).
+        LambdaQueryWrapper<Automation> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Automation::getModelCode, modelCode)
+               .eq(Automation::getDeletedFlag, false)
+               .eq(Automation::getTenantId, requireCurrentTenant())
+               .orderByDesc(Automation::getCreatedAt);
+        return automationMapper.selectList(wrapper).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<AutomationDTO> getEnabledByModelCode(String modelCode) {
-        List<Automation> automations = automationMapper.findEnabledByModelCode(modelCode);
-        return automations.stream()
+        // Tenant-scoped (ab_automation bypasses the global tenant interceptor — see guards above).
+        LambdaQueryWrapper<Automation> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Automation::getModelCode, modelCode)
+               .eq(Automation::getEnabled, true)
+               .eq(Automation::getDeletedFlag, false)
+               .eq(Automation::getTenantId, requireCurrentTenant())
+               .orderByAsc(Automation::getCreatedAt);
+        return automationMapper.selectList(wrapper).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -182,7 +213,8 @@ public class AutomationServiceImpl implements AutomationService {
             int size) {
 
         LambdaQueryWrapper<Automation> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Automation::getDeletedFlag, false);
+        wrapper.eq(Automation::getDeletedFlag, false)
+               .eq(Automation::getTenantId, requireCurrentTenant());
 
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w
@@ -225,10 +257,7 @@ public class AutomationServiceImpl implements AutomationService {
     public AutomationDTO enable(String pid) {
         log.info("Enabling automation: pid={}", pid);
 
-        Automation automation = automationMapper.findByPid(pid);
-        if (automation == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + pid);
-        }
+        Automation automation = loadOwnedAutomation(pid);
 
         String currentUserPid = MetaContext.getCurrentUserPid();
         automationMapper.updateEnabled(pid, true, currentUserPid);
@@ -251,10 +280,7 @@ public class AutomationServiceImpl implements AutomationService {
     public AutomationDTO disable(String pid) {
         log.info("Disabling automation: pid={}", pid);
 
-        Automation automation = automationMapper.findByPid(pid);
-        if (automation == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + pid);
-        }
+        Automation automation = loadOwnedAutomation(pid);
 
         String currentUserPid = MetaContext.getCurrentUserPid();
         automationMapper.updateEnabled(pid, false, currentUserPid);
@@ -300,10 +326,7 @@ public class AutomationServiceImpl implements AutomationService {
     public AutomationLogDTO triggerManually(String pid, String recordId) {
         log.info("Manually triggering automation: pid={}, recordId={}", pid, recordId);
 
-        Automation automation = automationMapper.findByPid(pid);
-        if (automation == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + pid);
-        }
+        Automation automation = loadOwnedAutomation(pid);
 
         AutomationLog logEntry = automationTriggerService.executeAutomation(
                 automation,
@@ -318,10 +341,7 @@ public class AutomationServiceImpl implements AutomationService {
     @Transactional
     @Override
     public AutomationDTO toggle(String pid) {
-        Automation automation = automationMapper.findByPid(pid);
-        if (automation == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + pid);
-        }
+        Automation automation = loadOwnedAutomation(pid);
         boolean newState = !automation.isActive();
         String currentUserPid = MetaContext.getCurrentUserPid();
         automationMapper.updateEnabled(pid, newState, currentUserPid);
@@ -333,10 +353,7 @@ public class AutomationServiceImpl implements AutomationService {
     @Transactional
     @Override
     public AutomationDTO duplicate(String pid) {
-        Automation source = automationMapper.findByPid(pid);
-        if (source == null) {
-            throw new ValidationException(ResponseCode.NOT_FOUND, "Automation not found: " + pid);
-        }
+        Automation source = loadOwnedAutomation(pid);
 
         String currentUserPid = MetaContext.getCurrentUserPid();
         Long tenantId = MetaContext.getCurrentTenantId();
