@@ -1397,6 +1397,11 @@ export function FormPageContent(props: PageContentProps) {
   const allBlocks = schema.blocks || [];
 
   const formBlocks = allBlocks.filter((block: any) => block.blockType === 'form-section');
+  // Custom block support — surfaces blockType:"custom" entries that DSL
+  // pages declare for visual companions to the form (e.g. position
+  // ruler, designer panels). Rendered above the form-section blocks so
+  // operators see the visualization first.
+  const customBlocks = allBlocks.filter((block: any) => block.blockType === 'custom');
   // subTableBlocks computed via useMemo above (used for metadata fetching and rendering)
   const buttonBlock = allBlocks.find((block: any) => block.blockType === 'form-buttons');
   const effectiveButtonBlock = buttonBlock || null;
@@ -1472,7 +1477,13 @@ export function FormPageContent(props: PageContentProps) {
                 {t('common.loading') || 'Loading...'}
               </div>
             ) : (
-              formBlocks &&
+              <>
+              {customBlocks.length > 0 && customBlocks.map((block: any) => (
+                <div key={block.id} className={`block-custom mb-5 ${block.className || ''}`}>
+                  <ComponentLoader componentName={block.component} props={{ block, runtime: { record: formData, getContext: () => ({ record: formData }) } }} />
+                </div>
+              ))}
+              {formBlocks &&
               formBlocks.length > 0 && (
                 <div className="space-y-5">
                   {formBlocks.map((block: any, blockIndex: number) => {
@@ -1588,7 +1599,8 @@ export function FormPageContent(props: PageContentProps) {
                     );
                   })}
                 </div>
-              )
+              )}
+              </>
             )}
 
             {/* Sub-table blocks */}
