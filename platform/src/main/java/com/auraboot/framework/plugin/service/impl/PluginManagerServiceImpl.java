@@ -13,12 +13,15 @@ import com.auraboot.framework.plugin.exception.PluginNotFoundException;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.pf4j.AuraPlugin;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
+import com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.service.PluginManagerService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.pf4j.PluginWrapper;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
     private final PluginRecordMapper pluginRecordMapper;
     private final AuraPluginManager auraPluginManager;
     private final ExtensionRegistry extensionRegistry;
+    private final BackgroundComponentRegistry backgroundComponentRegistry;
     private final com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
 
     /**
@@ -188,6 +192,12 @@ public class PluginManagerServiceImpl implements PluginManagerService {
             // Update status
             pluginRecordMapper.markAsEnabled(record.getPid());
 
+            // Register plugin-contributed BackgroundComponentExtension beans in
+            // the host Spring context so @Autowired / @KafkaListener / @Scheduled
+            // / @PostConstruct fire. Done after markAsEnabled so a failure here
+            // surfaces as the explicit enableFailed below.
+            backgroundComponentRegistry.register(pluginId);
+
             log.info("Plugin enabled successfully: {}", pluginId);
             PluginOperationResult result = PluginOperationResult.enableSuccess(record.getPid(), pluginId, record.getNamespace());
             result.setPreviousStatus(currentStatus);
@@ -239,6 +249,10 @@ public class PluginManagerServiceImpl implements PluginManagerService {
                 plugin.onDisable(context);
             }
 
+            // Tear down BackgroundComponentExtension beans first so their
+            // @PreDestroy runs while plugin instance state is still consistent.
+            backgroundComponentRegistry.unregister(pluginId);
+
             // Update status
             pluginRecordMapper.markAsDisabled(record.getPid());
 
@@ -287,6 +301,10 @@ public class PluginManagerServiceImpl implements PluginManagerService {
 
                 plugin.onUninstall(context);
             }
+
+            // Defensive: tear down any leftover BackgroundComponentExtension
+            // beans (no-op if plugin was already disabled).
+            backgroundComponentRegistry.unregister(pluginId);
 
             // Soft delete the record
             pluginRecordMapper.softDelete(record.getPid());
@@ -428,6 +446,31 @@ public class PluginManagerServiceImpl implements PluginManagerService {
     public void unregisterPluginInstance(String pluginId) {
         pluginInstances.remove(pluginId);
         log.info("Unregistered plugin instance: {}", pluginId);
+    }
+
+    // ========== Boot-time wiring ==========
+
+    /**
+     * Register background components for plugins already started by PF4J at
+     * application boot. The per-tenant DB-tracked enable lifecycle calls
+     * {@code backgroundComponentRegistry.register} from the {@link #enable}
+     * method directly, but plugins that PF4J auto-started on boot need their
+     * Spring-context wiring done once, here.
+     *
+     * <p>Bean registration is process-wide (not tenant-scoped) since PF4J
+     * plugins themselves are loaded once per JVM. Tenant isolation lives
+     * inside each component's request handling, not at the bean level.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void registerStartedPluginBackgroundComponents() {
+        for (PluginWrapper wrapper : auraPluginManager.getStartedPlugins()) {
+            String pluginId = wrapper.getPluginId();
+            try {
+                backgroundComponentRegistry.register(pluginId);
+            } catch (RuntimeException e) {
+                log.error("Failed to register background components for plugin: {}", pluginId, e);
+            }
+        }
     }
 
     // ========== Helper Methods ==========
