@@ -28,6 +28,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
+import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
@@ -1478,11 +1479,54 @@ export function FormPageContent(props: PageContentProps) {
               </div>
             ) : (
               <>
-              {customBlocks.length > 0 && customBlocks.map((block: any) => (
-                <div key={block.id} className={`block-custom mb-5 ${block.className || ''}`}>
-                  <ComponentLoader componentName={block.component} props={{ block, runtime: { record: formData, getContext: () => ({ record: formData }) } }} />
-                </div>
-              ))}
+              {customBlocks.length > 0 && customBlocks.map((block: any) => {
+                // Honour DSL visibility condition (matches form-section behavior below).
+                if (block.visibleWhen && !evaluateCondition(block.visibleWhen, pageContext)) {
+                  return null;
+                }
+                // Missing component name → surface a visible error, mirroring
+                // BlockRenderer's pattern. Silent-null would hide DSL typos.
+                if (!block.component) {
+                  return (
+                    <div
+                      key={block.id}
+                      className="mb-5 rounded border border-red-300 bg-red-50 p-4"
+                      data-block-id={block.id}
+                    >
+                      <p className="text-red-800">
+                        Custom block missing `component`: {block.id}
+                      </p>
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={block.id}
+                    data-block-id={block.id}
+                    className={`block-custom mb-5 ${block.className || ''}`}
+                  >
+                    <ComponentLoader
+                      componentName={block.component}
+                      props={{
+                        block,
+                        runtime: {
+                          record: formData,
+                          initialRecord: initialFormData ?? formData,
+                          recordId,
+                          tableName,
+                          token,
+                          locale,
+                          t,
+                          getContext: () => ({
+                            record: formData,
+                            pageContext,
+                          }),
+                        },
+                      }}
+                    />
+                  </div>
+                );
+              })}
               {formBlocks &&
               formBlocks.length > 0 && (
                 <div className="space-y-5">
