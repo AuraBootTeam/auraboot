@@ -112,6 +112,11 @@ export default function PermissionManagement() {
     [roles, selectedRolePid],
   );
 
+  useEffect(() => {
+    if (selectedRolePid || filteredRoles.length === 0) return;
+    setSelectedRolePid(filteredRoles[0].pid);
+  }, [filteredRoles, selectedRolePid]);
+
   // -------------------------------------------------------------------------
   // Handlers
   // -------------------------------------------------------------------------
@@ -174,8 +179,11 @@ export default function PermissionManagement() {
     handleSubmitResult(result, {
       onSuccess: () => {
         showSuccessToast(
-          t(disabled ? 'admin.permission.role.enable.success' : 'admin.permission.role.disable.success') ||
-            (disabled ? 'Enabled' : 'Disabled'),
+          t(
+            disabled
+              ? 'admin.permission.role.enable.success'
+              : 'admin.permission.role.disable.success',
+          ) || (disabled ? 'Enabled' : 'Disabled'),
         );
         // Optimistic local update: mutate just this role's status so the row
         // stays mounted (stable key=pid) and interactive for subsequent clicks.
@@ -208,7 +216,7 @@ export default function PermissionManagement() {
                 placeholder={t('admin.permission.role.search') || 'Search roles...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-md border border-gray-300 py-1.5 pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                className="w-full rounded-md border border-gray-300 py-1.5 pr-3 pl-8 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
             <button
@@ -260,10 +268,7 @@ export default function PermissionManagement() {
                           : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}
                     >
-                      <td
-                        data-testid={`role-row-${role.code}`}
-                        className="px-3 py-2"
-                      >
+                      <td data-testid={`role-row-${role.code}`} className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           {role.type === 'SYSTEM' && (
                             <span
@@ -276,7 +281,9 @@ export default function PermissionManagement() {
                           )}
                           <span
                             className={`truncate text-sm font-medium ${
-                              isDisabled ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-gray-100'
+                              isDisabled
+                                ? 'text-gray-400 line-through'
+                                : 'text-gray-900 dark:text-gray-100'
                             }`}
                           >
                             {role.name}
@@ -288,7 +295,7 @@ export default function PermissionManagement() {
                           </div>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-2 py-2 text-right">
+                      <td className="px-2 py-2 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                           <button
                             data-testid={`role-action-edit-${role.code}`}
@@ -382,9 +389,7 @@ export default function PermissionManagement() {
             </div>
           )}
 
-          {activeRightTab === 'permissions' && (
-            <PermissionMatrixTab rolePid={selectedRolePid} />
-          )}
+          {activeRightTab === 'permissions' && <PermissionMatrixTab rolePid={selectedRolePid} />}
           {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
         </div>
       </div>

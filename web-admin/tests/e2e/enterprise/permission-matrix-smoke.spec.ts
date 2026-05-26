@@ -67,8 +67,13 @@ test.describe('Permission Matrix — Smoke', () => {
     // The custom Toast component renders with role="alert"
     await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 3000 });
 
-    // Restore original state
-    await page.waitForTimeout(500);
+    // Restore original state and wait for the rollback request to settle.
+    const restoreResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/permissions/matrix/') && resp.url().includes('/batch'),
+      { timeout: 5000 },
+    );
     await checkbox.click();
+    const restoreResponse = await restoreResponsePromise;
+    expect(restoreResponse.status()).toBe(200);
   });
 });
