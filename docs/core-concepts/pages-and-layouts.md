@@ -129,7 +129,7 @@ Every page JSON file follows this top-level structure:
 | `pageKey` | string | Yes | Unique page identifier. Used in URLs as `/p/{pageKey}`. Convention: `{model_code}_{kind}`. |
 | `name:zh-CN` | string | Yes | Chinese display name |
 | `name:en` | string | Yes | English display name |
-| `modelCode` | string | Yes | The model this page is bound to |
+| `modelCode` | string | Model pages | Required for model-backed `list`, `form`, and `detail` pages. Optional for dashboards and custom non-record pages. |
 | `kind` | string | Yes | `list`, `form`, `detail`, or `dashboard` |
 | `schemaVersion` | number | Yes | Always `2` (V2 flat format) |
 | `layout` | object | Yes | `{ "type": "stack" }` or `{ "type": "grid", "cols": 12 }` |
@@ -137,6 +137,36 @@ Every page JSON file follows this top-level structure:
 | `profile` | string | No | `admin` (default) or `report` |
 | `title` | object | No | Localized title override: `{ "zh-CN": "...", "en": "..." }` |
 | `description` | string | No | Human-readable page description |
+
+## Page DSL Validation Contract
+
+Plugin import rejects obvious page DSL gaps before the page can be published. Generated DSL must satisfy this contract:
+
+| Rule Code | Scope | Contract |
+|---|---|---|
+| `S-PAGE-KIND` / `S-PAGE-KIND-UNKNOWN` | page | `kind` is required and must be one of the registered page kinds. |
+| `S-PAGE-LAYOUT` | page | `layout` is required and cannot be empty. |
+| `S-PAGE-BLOCKS` | page | `blocks` is required and cannot be empty. |
+| `S-PAGE-LEGACY-FORMAT` | page | Legacy top-level `dslSchema` and `pageType` are rejected. Use the V2 flat format. |
+| `S-PAGE-BLOCK-ID` | block | Every block requires a stable `id` for runtime diagnostics and golden verification. |
+| `S-PAGE-BLOCK-TYPE` | block | `blockType` must be registered in `DslRegistry.BlockType`. |
+| `S-PAGE-TABLE-COLUMNS` | `table`, `sub-table` | Table-like blocks require non-empty `columns`. For `sub-table`, columns may live under `subTable.columns`. |
+| `S-PAGE-FORM-FIELDS` | `form-section` | Form sections require non-empty `fields`. |
+| `S-PAGE-BUTTONS` | `toolbar`, `form-buttons` | Command blocks require non-empty `buttons` or `actions`. |
+| `S-PAGE-FIELD-REF` | table/form fields | Field references are required and must be bound to the page model when binding metadata is present. |
+| `S-PAGE-LABEL` | list headers and commands | User-visible list/table headers and command labels must resolve to business labels. Table columns may use field display names as fallback; command labels must not be raw codes such as `sc_name`, `BOM_PROJECT_NO`, or `create`. |
+| `S-PAGE-FORM-REQUIRED` | editable forms | If a field is required in the model binding or field constraints, the editable page field must set `required: true`. |
+| `S-PAGE-I18N` | user-facing text | Non-ASCII hardcoded text is rejected. Use LocalizedText maps or `$i18n:key`. |
+
+LocalizedText is the preferred inline label format:
+
+```json
+{
+  "label": { "zh-CN": "Project No", "en": "Project No" }
+}
+```
+
+This does not require adding a separate i18n resource key. The label is stored directly in the DSL as a localized object and resolved by the renderer. Use `$i18n:key` when the text must be shared or centrally managed.
 
 ## List Page
 
@@ -199,15 +229,16 @@ This is a real configuration from the Showcase plugin:
       "blockType": "table",
       "onRowClick": "navigate",
       "columns": [
-        { "field": "sc_code", "width": 150, "sortable": true },
-        { "field": "sc_name", "width": 200, "sortable": true },
-        { "field": "sc_status", "width": 110, "renderType": "tag", "dictCode": "sc_status_dict" },
-        { "field": "sc_priority", "width": 100, "renderType": "tag", "dictCode": "sc_priority_dict" },
-        { "field": "sc_quantity", "width": 80 },
-        { "field": "sc_progress", "width": 120, "renderType": "progress" },
-        { "field": "sc_rating", "width": 120, "renderType": "rating" },
+        { "field": "sc_code", "label": { "en": "Code" }, "width": 150, "sortable": true },
+        { "field": "sc_name", "label": { "en": "Name" }, "width": 200, "sortable": true },
+        { "field": "sc_status", "label": { "en": "Status" }, "width": 110, "renderType": "tag", "dictCode": "sc_status_dict" },
+        { "field": "sc_priority", "label": { "en": "Priority" }, "width": 100, "renderType": "tag", "dictCode": "sc_priority_dict" },
+        { "field": "sc_quantity", "label": { "en": "Quantity" }, "width": 80 },
+        { "field": "sc_progress", "label": { "en": "Progress" }, "width": 120, "renderType": "progress" },
+        { "field": "sc_rating", "label": { "en": "Rating" }, "width": 120, "renderType": "rating" },
         {
           "field": "actions",
+          "label": { "en": "Actions" },
           "isActionColumn": true,
           "buttons": [
             {
@@ -244,6 +275,7 @@ This is a real configuration from the Showcase plugin:
 | Property | Type | Description |
 |---|---|---|
 | `field` | string | Field code from the model, or `"actions"` for action column |
+| `label` | object/string | Business label for the column header. Prefer LocalizedText or `$i18n:key`; if omitted, the field definition must provide a business display name. Raw field codes are rejected. |
 | `width` | number | Column width in pixels |
 | `sortable` | boolean | Enable column sorting |
 | `renderType` | string | Special rendering: `tag` (colored badge), `progress` (progress bar), `rating` (stars) |
@@ -299,7 +331,7 @@ A form page contains `form-section` blocks for field grouping and a `form-button
       "blockType": "form-section",
       "title": { "zh-CN": "Basic Information", "en-US": "Basic Information" },
       "fields": [
-        { "field": "sc_name", "colSpan": 6 },
+        { "field": "sc_name", "colSpan": 6, "required": true },
         { "field": "sc_code", "colSpan": 6, "readOnly": true },
         { "field": "sc_description", "colSpan": 12 }
       ]
@@ -353,6 +385,7 @@ A form page contains `form-section` blocks for field grouping and a `form-button
 |---|---|---|
 | `field` | string | Field code from the model |
 | `colSpan` | number | Width of the field in grid columns (out of 12) |
+| `required` | boolean | Must be `true` for editable fields that are required by the model binding or field constraints |
 | `readOnly` | boolean | Field is displayed but not editable |
 | `span` | number | Alternative to colSpan for detail sections with fixed column count |
 
@@ -411,15 +444,15 @@ From the CRM Opportunity plugin, showing sub-tables in three different data mode
                 "parentField": "crm_ol_opportunity_id",
                 "readOnly": false,
                 "columns": [
-                  { "field": "crm_ol_product_name", "width": 200 },
-                  { "field": "crm_ol_quantity", "width": 100, "align": "right" },
-                  { "field": "crm_ol_unit_price", "width": 120, "align": "right" },
-                  { "field": "crm_ol_amount", "width": 120, "align": "right" }
+                  { "field": "crm_ol_product_name", "label": { "en-US": "Product" }, "width": 200 },
+                  { "field": "crm_ol_quantity", "label": { "en-US": "Quantity" }, "width": 100, "align": "right" },
+                  { "field": "crm_ol_unit_price", "label": { "en-US": "Unit Price" }, "width": 120, "align": "right" },
+                  { "field": "crm_ol_amount", "label": { "en-US": "Amount" }, "width": 120, "align": "right" }
                 ],
                 "actions": [
-                  { "code": "add", "label": "create", "action": { "type": "command", "command": "crm:create_opp_line" } },
-                  { "code": "edit", "label": "edit", "action": { "type": "command", "command": "crm:update_opp_line" } },
-                  { "code": "delete", "danger": true, "label": "delete", "action": { "type": "command", "command": "crm:delete_opp_line" } }
+                  { "code": "add", "label": { "en-US": "Add" }, "action": { "type": "command", "command": "crm:create_opp_line" } },
+                  { "code": "edit", "label": { "en-US": "Edit" }, "action": { "type": "command", "command": "crm:update_opp_line" } },
+                  { "code": "delete", "danger": true, "label": { "en-US": "Delete" }, "action": { "type": "command", "command": "crm:delete_opp_line" } }
                 ],
                 "summary": {
                   "fields": [
@@ -449,9 +482,9 @@ From the CRM Opportunity plugin, showing sub-tables in three different data mode
                 },
                 "readOnly": true,
                 "columns": [
-                  { "field": "crm_act_type", "width": 100, "renderType": "tag" },
-                  { "field": "crm_act_subject", "width": 200 },
-                  { "field": "crm_act_date", "width": 160 }
+                  { "field": "crm_act_type", "label": { "en-US": "Type" }, "width": 100, "renderType": "tag" },
+                  { "field": "crm_act_subject", "label": { "en-US": "Subject" }, "width": 200 },
+                  { "field": "crm_act_date", "label": { "en-US": "Date" }, "width": 160 }
                 ]
               }
             }
@@ -467,24 +500,24 @@ From the CRM Opportunity plugin, showing sub-tables in three different data mode
           "code": "edit",
           "icon": "Edit",
           "permissionCode": "CRM.opportunity.manage",
-          "label": "edit",
+          "label": { "en-US": "Edit" },
           "action": { "type": "navigate", "to": "crm_opportunity_form" }
         },
         {
           "code": "qualify",
-          "label": "execute",
+          "label": { "en-US": "Qualify" },
           "action": { "type": "state_transition", "command": "crm:qualify_opportunity" }
         },
         {
           "code": "win",
           "primary": true,
-          "label": "execute",
+          "label": { "en-US": "Mark Won" },
           "action": { "type": "state_transition", "command": "crm:win_opportunity" }
         },
         {
           "code": "lose",
           "danger": true,
-          "label": "execute",
+          "label": { "en-US": "Mark Lost" },
           "action": { "type": "state_transition", "command": "crm:lose_opportunity" }
         }
       ]

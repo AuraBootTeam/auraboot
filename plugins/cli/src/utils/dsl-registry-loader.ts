@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 export interface DslEnumEntry {
   code: string;
@@ -20,8 +21,9 @@ let cachedRegistry: DslRegistryData | null = null;
 export function loadDslRegistry(): DslRegistryData {
   if (cachedRegistry) return cachedRegistry;
 
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
   const candidates = [
-    resolve(dirname(dirname(dirname(__dirname))), 'schemas', 'dsl-registry.json'),
+    resolve(moduleDir, '..', '..', '..', 'schemas', 'dsl-registry.json'),
     resolve(process.cwd(), 'plugins', 'schemas', 'dsl-registry.json'),
   ];
 

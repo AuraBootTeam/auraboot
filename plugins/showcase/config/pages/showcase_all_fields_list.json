@@ -352,7 +352,11 @@
                 "command": "sc:delete_showcase"
               }
             }
-          ]
+          ],
+          "label": {
+            "zh-CN": "操作",
+            "en": "Actions"
+          }
         }
       ],
       "searchFields": [

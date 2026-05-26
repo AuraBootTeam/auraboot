@@ -38,7 +38,11 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tpm.project.manage"
+          "permissionCode": "tpm.project.manage",
+          "label": {
+            "zh-CN": "编辑",
+            "en": "Edit"
+          }
         },
         {
           "code": "activate_project",
@@ -53,12 +57,20 @@
         {
           "code": "complete_project",
           "commandCode": "tpm:complete_project",
-          "permissionCode": "tpm.project.manage"
+          "permissionCode": "tpm.project.manage",
+          "label": {
+            "zh-CN": "完成",
+            "en": "Complete"
+          }
         },
         {
           "code": "cancel_project",
           "commandCode": "tpm:cancel_project",
-          "permissionCode": "tpm.project.manage"
+          "permissionCode": "tpm.project.manage",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          }
         },
         {
           "code": "delete",
@@ -66,7 +78,11 @@
           "danger": true,
           "commandCode": "tpm:delete_project",
           "permissionCode": "tpm.project.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": {
+            "zh-CN": "删除",
+            "en": "Delete"
+          }
         }
       ],
       "area": "header"

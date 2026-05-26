@@ -37,7 +37,8 @@
       "fields": [
         {
           "field": "tpm_ms_name",
-          "colSpan": 12
+          "colSpan": 12,
+          "required": true
         },
         {
           "field": "tpm_ms_project_id",
@@ -62,11 +63,19 @@
           "code": "submit",
           "action": "save",
           "commandCode": "tpm:create_milestone",
-          "primary": true
+          "primary": true,
+          "label": {
+            "zh-CN": "提交",
+            "en": "Submit"
+          }
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          }
         }
       ],
       "area": "footer"
