@@ -946,7 +946,7 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
     test.setTimeout(45000);
     await ensureUiCreatedRecord(page);
     // Navigate to edit form directly (avoids detail→edit navigation chain issues)
-    await page.goto(`/p/showcase_all_fields/edit/${uiCreatedPid}?commandCode=sc%3Aupdate_showcase`, {
+    await page.goto(`/p/showcase_all_fields/${uiCreatedPid}/edit?commandCode=sc%3Aupdate_showcase`, {
       waitUntil: 'domcontentloaded',
     });
     await waitForFormReady(page, 15_000);
@@ -989,7 +989,9 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
       { timeout: 20_000 },
     );
     await btn.click();
-    await commandResponsePromise;
+    const commandResponse = await commandResponsePromise;
+    const commandBody = await commandResponse.json().catch(() => ({}));
+    expect(String((commandBody as any)?.code ?? '0'), 'Update command should succeed').toBe('0');
 
     // [D8] Verify updated values via API (most reliable — avoids form redirect issues)
     const verifyResp = await page.request.get(

@@ -16,7 +16,8 @@
       "fields": [
         {
           "field": "crm_cpn_name",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "crm_cpn_type",
@@ -47,7 +48,10 @@
         {
           "code": "submit",
           "primary": true,
-          "label": "save",
+          "label": {
+            "zh-CN": "保存",
+            "en-US": "Save"
+          },
           "action": {
             "type": "command",
             "command": "crm:update_campaign"
@@ -55,7 +59,10 @@
         },
         {
           "code": "cancel",
-          "label": "cancel"
+          "label": {
+            "zh-CN": "取消",
+            "en-US": "Cancel"
+          }
         }
       ]
     }

@@ -14,7 +14,10 @@
           "code": "create",
           "primary": true,
           "permissionCode": "crm.opportunity.manage",
-          "label": "create",
+          "label": {
+            "zh-CN": "新建",
+            "en-US": "Create"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_opportunity_form",
@@ -99,7 +102,8 @@
         {
           "field": "crm_opp_stage",
           "width": 120,
-          "renderType": "tag"
+          "renderType": "tag",
+          "dictCode": "crm_opp_stage"
         },
         {
           "field": "crm_opp_expected_amount",
@@ -125,7 +129,10 @@
           "buttons": [
             {
               "code": "view",
-              "label": "detail",
+              "label": {
+                "zh-CN": "详情",
+                "en-US": "Detail"
+              },
               "action": {
                 "type": "navigate",
                 "to": "crm_opportunity_detail"
@@ -134,7 +141,10 @@
             {
               "code": "edit",
               "permissionCode": "crm.opportunity.manage",
-              "label": "edit",
+              "label": {
+                "zh-CN": "编辑",
+                "en-US": "Edit"
+              },
               "action": {
                 "type": "navigate",
                 "to": "crm_opportunity_form"
@@ -144,14 +154,21 @@
               "code": "delete",
               "danger": true,
               "permissionCode": "crm.opportunity.manage",
-              "label": "delete",
+              "label": {
+                "zh-CN": "删除",
+                "en-US": "Delete"
+              },
               "confirm": "delete.confirm",
               "action": {
                 "type": "command",
                 "command": "crm:delete_opportunity"
               }
             }
-          ]
+          ],
+          "label": {
+            "zh-CN": "操作",
+            "en-US": "Actions"
+          }
         }
       ],
       "searchFields": [

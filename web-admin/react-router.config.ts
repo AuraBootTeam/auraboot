@@ -5,5 +5,6 @@ export default {
   future: {
     v8_middleware: true,
   },
+  routeDiscovery: { mode: 'initial' },
   ssr: true,
 } satisfies Config;

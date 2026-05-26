@@ -40,6 +40,9 @@ public class PageSchemaValidator implements PluginValidator {
     private static final Set<String> FORM_FIELD_BLOCK_TYPES = Set.of("form-section");
     private static final Set<String> BUTTON_BLOCK_TYPES = Set.of("toolbar", "form-buttons");
     private static final Set<String> BUTTON_LIST_FIELDS = Set.of("buttons", "actions");
+    private static final Set<String> SYSTEM_FIELD_CODES = Set.of(
+            "pid", "id", "tenant_id", "created_at", "updated_at", "created_by", "updated_by",
+            "createdAt", "updatedAt", "createdBy", "updatedBy");
 
     @Override
     public String category() {
@@ -192,9 +195,11 @@ public class PageSchemaValidator implements PluginValidator {
                                     String modelCode,
                                     PageModelIndex modelIndex,
                                     List<PluginValidationMessage> messages) {
-        Object columnsObj = block.get("columns");
+        TableContract tableContract = tableContract(blockPath, block);
+        boolean modelBoundTable = !usesExternalDataSource(block) && !usesExternalDataSource(tableContract.source());
+        Object columnsObj = tableContract.source().get("columns");
         if (!(columnsObj instanceof List<?> columns) || columns.isEmpty()) {
-            messages.add(error("S-PAGE-TABLE-COLUMNS", category(), blockPath + ".columns",
+            messages.add(error("S-PAGE-TABLE-COLUMNS", category(), tableContract.path() + ".columns",
                     "Page '" + pageKey + "' table block is missing non-empty 'columns'. " +
                             "List/detail table semantics must be explicit; screenshots cannot verify absent fields."));
             return;
@@ -205,10 +210,10 @@ public class PageSchemaValidator implements PluginValidator {
                 continue;
             }
             Map<String, Object> column = (Map<String, Object>) columnRaw;
-            String columnPath = blockPath + ".columns[" + i + "]";
+            String columnPath = tableContract.path() + ".columns[" + i + "]";
             String fieldCode = stringValue(column.get("field"));
             validateColumnBusinessLabel(pageKey, columnPath, column, fieldCode, modelIndex, messages);
-            if (!isActionColumn(column)) {
+            if (modelBoundTable && !isActionColumn(column) && !isSystemField(fieldCode)) {
                 fieldCode = validateFieldReference(pageKey, columnPath + ".field", column.get("field"),
                         modelCode, modelIndex, messages);
                 validateColumnDictProjection(pageKey, columnPath, fieldCode, column, modelIndex, messages);
@@ -299,15 +304,54 @@ public class PageSchemaValidator implements PluginValidator {
             hasButtons = true;
             for (int i = 0; i < buttons.size(); i++) {
                 if (buttons.get(i) instanceof Map<?, ?> buttonRaw) {
-                    validateBusinessLabel(pageKey, ownerPath + "." + buttonListField + "[" + i + "].label",
-                            ((Map<String, Object>) buttonRaw).get("label"),
-                            (Map<String, Object>) buttonRaw,
+                    Map<String, Object> button = (Map<String, Object>) buttonRaw;
+                    BusinessLabel buttonLabel = businessLabel(button);
+                    validateBusinessLabel(pageKey, ownerPath + "." + buttonListField + "[" + i + "]." + buttonLabel.fieldName(),
+                            buttonLabel.value(),
+                            button,
                             true,
                             messages);
                 }
             }
         }
         return hasButtons;
+    }
+
+    @SuppressWarnings("unchecked")
+    private TableContract tableContract(String blockPath, Map<String, Object> block) {
+        if (block.get("columns") instanceof List<?>) {
+            return new TableContract(blockPath, block);
+        }
+        if (block.get("table") instanceof Map<?, ?> tableRaw) {
+            return new TableContract(blockPath + ".table", (Map<String, Object>) tableRaw);
+        }
+        return new TableContract(blockPath, block);
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean usesExternalDataSource(Map<String, Object> owner) {
+        Object dataSource = owner.get("dataSource");
+        if (dataSource instanceof Map<?, ?> dataSourceRaw) {
+            Map<String, Object> dataSourceMap = (Map<String, Object>) dataSourceRaw;
+            String type = stringValue(dataSourceMap.get("type"));
+            if ("api".equals(type) || "namedQuery".equals(type)) {
+                return true;
+            }
+            Object params = dataSourceMap.get("params");
+            if (params instanceof Map<?, ?> paramsRaw) {
+                String datasourceId = stringValue(((Map<String, Object>) paramsRaw).get("datasourceId"));
+                return datasourceId != null && datasourceId.startsWith("nq:");
+            }
+        }
+        return false;
+    }
+
+    private BusinessLabel businessLabel(Map<String, Object> owner) {
+        Object label = owner.get("label");
+        if (!isMissingLabel(label)) {
+            return new BusinessLabel("label", label);
+        }
+        return new BusinessLabel("content", owner.get("content"));
     }
 
     private String validateFieldReference(String pageKey,
@@ -436,7 +480,8 @@ public class PageSchemaValidator implements PluginValidator {
 
     private boolean isActionColumn(Map<String, Object> column) {
         return Boolean.TRUE.equals(column.get("isActionColumn"))
-                || "actions".equals(stringValue(column.get("field")));
+                || "actions".equals(stringValue(column.get("field")))
+                || "_actions".equals(stringValue(column.get("field")));
     }
 
     private PageModelIndex buildModelIndex(PluginManifestExtended manifest) {
@@ -511,8 +556,15 @@ public class PageSchemaValidator implements PluginValidator {
         if (isBlank(fieldCode)) {
             return false;
         }
+        if (isSystemField(fieldCode)) {
+            return true;
+        }
         Set<String> labels = modelIndex.fieldLabelsByCode().getOrDefault(fieldCode, Collections.emptySet());
         return labels.stream().anyMatch(label -> !isRawCodeText(label, fieldCode));
+    }
+
+    private boolean isSystemField(String fieldCode) {
+        return fieldCode != null && SYSTEM_FIELD_CODES.contains(fieldCode);
     }
 
     private boolean isRawCodeText(String label, String code) {
@@ -657,4 +709,8 @@ public class PageSchemaValidator implements PluginValidator {
                             "Use LocalizedText map or $i18n:key instead."));
         }
     }
+
+    private record TableContract(String path, Map<String, Object> source) {}
+
+    private record BusinessLabel(String fieldName, Object value) {}
 }

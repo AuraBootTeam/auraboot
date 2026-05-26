@@ -16,11 +16,13 @@
       "fields": [
         {
           "field": "crm_lead_company",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "crm_lead_contact_name",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "crm_lead_contact_phone",
@@ -63,7 +65,10 @@
         {
           "code": "submit",
           "primary": true,
-          "label": "save",
+          "label": {
+            "zh-CN": "保存",
+            "en-US": "Save"
+          },
           "action": {
             "type": "command",
             "command": "crm:update_lead"
@@ -71,7 +76,10 @@
         },
         {
           "code": "cancel",
-          "label": "cancel"
+          "label": {
+            "zh-CN": "取消",
+            "en-US": "Cancel"
+          }
         }
       ]
     }

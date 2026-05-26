@@ -14,7 +14,10 @@
           "code": "edit",
           "icon": "Edit",
           "permissionCode": "crm.opportunity.manage",
-          "label": "edit",
+          "label": {
+            "zh-CN": "编辑",
+            "en-US": "Edit"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_opportunity_form"

@@ -15,24 +15,48 @@
  */
 
 import { test, expect } from '../../fixtures';
-import { navigateToDynamicPage, waitForDynamicPageLoad, getTableRowCount } from '../helpers/index';
+import { Client } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
+import {
+  navigateToDynamicPage,
+  waitForDynamicPageLoad,
+  getTableRowCount,
+  executeCommandViaApi,
+  uniqueId,
+} from '../helpers/index';
 
 test.describe('Plugin Lifecycle', () => {
   test.describe.configure({ timeout: 30000 });
 
-  async function getE2etOrderTotal(page: import('@playwright/test').Page): Promise<number> {
-    const resp = await page.request.get('/api/dynamic/e2et_order/list?page=0&pageSize=1');
+  async function syncE2etOrderSequence(): Promise<void> {
+    const client = new Client(PG_CONN);
+    await client.connect();
+    try {
+      await client.query(`
+        SELECT setval(
+          pg_get_serial_sequence('mt_e2et_order', 'id'),
+          COALESCE((SELECT MAX(id) FROM mt_e2et_order), 0) + 1,
+          false
+        )
+      `);
+    } finally {
+      await client.end();
+    }
+  }
+
+  async function queryE2etOrdersByTitle(
+    page: import('@playwright/test').Page,
+    title: string,
+  ): Promise<unknown[]> {
+    const filters = encodeURIComponent(
+      JSON.stringify([{ fieldName: 'e2et_order_title', operator: 'EQ', value: title }]),
+    );
+    const resp = await page.request.get(
+      `/api/dynamic/e2et_order/list?filters=${filters}&pageNum=1&pageSize=10`,
+    );
     expect(resp.ok()).toBe(true);
     const body = await resp.json().catch(() => ({}));
-    const data = body?.data;
-    return Number(
-      data?.totalElements ??
-        data?.total ??
-        data?.totalCount ??
-        data?.page?.totalElements ??
-        data?.pagination?.total ??
-        0,
-    );
+    return body?.data?.records ?? body?.data?.data ?? [];
   }
 
   /**
@@ -130,36 +154,50 @@ test.describe('Plugin Lifecycle', () => {
    * PL-05: Plugin reimport is idempotent — data survives reimport
    */
   test('PL-05: plugin reimport is idempotent and preserves existing data', async ({ page }) => {
-    // Step 1: Verify table renders before reimport (may have 0 rows) and capture
-    // the backend total rather than visible rows; the list page can legitimately
-    // change page size/view state across plugin import.
+    // Step 1: Verify table renders, then create a sentinel record owned by this
+    // test. Total row count is shared by parallel specs and can change for
+    // unrelated reasons during a full gate.
     await navigateToDynamicPage(page, 'e2et_order');
     await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
-    const totalBefore = await getE2etOrderTotal(page);
-
-    // Step 2: Reimport the test-fixtures plugin
-    const importResp = await page.request.post('/api/plugins/import/import-directory-sync', {
-      data: { directory: 'plugins/test-fixtures' },
-      headers: { 'Content-Type': 'application/json' },
-      failOnStatusCode: false,
+    await syncE2etOrderSequence();
+    const sentinelTitle = `PL05 Reimport Sentinel ${uniqueId()}`;
+    const created = await executeCommandViaApi(page, 'e2et:create_order', {
+      e2et_order_title: sentinelTitle,
+      e2et_order_type: 'normal',
+      e2et_order_customer: 'PL05 Customer',
+      e2et_order_urgent: false,
     });
+    expect(created.recordId).toBeTruthy();
 
-    // Import should succeed or at least not crash
-    expect(importResp.status()).not.toBe(500);
+    try {
+      // Step 2: Reimport the test-fixtures plugin
+      const importResp = await page.request.post('/api/plugins/import/import-directory-sync', {
+        data: { directory: 'plugins/test-fixtures' },
+        headers: { 'Content-Type': 'application/json' },
+        failOnStatusCode: false,
+      });
 
-    // Step 3: Navigate again and verify data still exists
-    const listResponsePromise = page
-      .waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
-        timeout: 10000,
-      })
-      .catch(() => null);
+      // Import should succeed or at least not crash
+      expect(importResp.status()).not.toBe(500);
 
-    await page.goto('/p/e2et_order', { waitUntil: 'domcontentloaded' });
-    await waitForDynamicPageLoad(page);
-    await listResponsePromise;
+      // Step 3: Navigate again and verify the sentinel record still exists
+      const listResponsePromise = page
+        .waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
+          timeout: 10000,
+        })
+        .catch(() => null);
 
-    await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
-    const totalAfter = await getE2etOrderTotal(page);
-    expect(totalAfter).toBeGreaterThanOrEqual(totalBefore);
+      await page.goto('/p/e2et_order', { waitUntil: 'domcontentloaded' });
+      await waitForDynamicPageLoad(page);
+      await listResponsePromise;
+
+      await expect(page.locator('table, [role="table"]').first()).toBeVisible({ timeout: 10000 });
+      const matches = await queryE2etOrdersByTitle(page, sentinelTitle);
+      expect(matches).toHaveLength(1);
+    } finally {
+      await executeCommandViaApi(page, 'e2et:delete_order', {}, created.recordId, 'delete', {
+        allowHttpError: true,
+      }).catch(() => {});
+    }
   });
 });

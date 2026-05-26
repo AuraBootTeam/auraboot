@@ -17,7 +17,7 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": { "zh-CN": "新建公告", "en-US": "Create Announcement" },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_form",
@@ -47,11 +47,13 @@
           {
             "field": "announcement_priority",
             "width": 100,
+            "dictCode": "announcement_priority",
             "renderType": "tag"
           },
           {
             "field": "status",
             "width": 100,
+            "dictCode": "announcement_status",
             "renderType": "tag"
           },
           {
@@ -72,7 +74,7 @@
         "rowActions": [
           {
             "code": "view",
-            "label": "view",
+            "label": { "zh-CN": "查看", "en-US": "View" },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_detail"
@@ -80,7 +82,7 @@
           },
           {
             "code": "edit",
-            "label": "edit",
+            "label": { "zh-CN": "编辑", "en-US": "Edit" },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_form",
@@ -123,7 +125,7 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": { "zh-CN": "删除", "en-US": "Delete" },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -159,7 +161,7 @@
           "en-US": "Basic Information"
         },
         "fields": [
-          { "field": "title", "colSpan": 12 },
+          { "field": "title", "colSpan": 12, "required": true },
           { "field": "announcement_priority", "colSpan": 6 },
           { "field": "pinned", "colSpan": 6 },
           { "field": "expires_at", "colSpan": 6 },
@@ -173,7 +175,7 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": { "zh-CN": "保存", "en-US": "Save" },
             "action": {
               "type": "command",
               "command": "announcement:update_announcement"
@@ -181,7 +183,7 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": { "zh-CN": "取消", "en-US": "Cancel" }
           }
         ]
       }

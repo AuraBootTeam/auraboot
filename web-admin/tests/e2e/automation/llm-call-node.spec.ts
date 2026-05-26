@@ -222,7 +222,7 @@ async function createLlmAutomationViaApi(page: Page): Promise<SeededAutomation> 
           label: 'Send Notification',
           config: {
             actionType: 'send_notification',
-            type: 'in_app',
+            notificationType: 'in_app',
             title: NOTIFICATION_TITLE,
             content: NOTIFICATION_BODY,
             recipients: ['1'],

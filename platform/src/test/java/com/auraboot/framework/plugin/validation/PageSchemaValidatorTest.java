@@ -51,6 +51,22 @@ class PageSchemaValidatorTest {
     }
 
     @Test
+    void tableBlockCanDeclareColumnsUnderTableConfig() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "table", Map.of(
+                        "columns", List.of(column("pe_order_no", localized("Order No")))
+                )
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-TABLE-COLUMNS".equals(m.getCode())),
+                () -> "Expected nested table.columns to pass but got " + messages);
+    }
+
+    @Test
     void tableColumnWithoutPageLabelCanUseFieldDisplayName() {
         PluginManifestExtended manifest = manifestWithOrderModel();
         manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
@@ -86,6 +102,72 @@ class PageSchemaValidatorTest {
         )))));
 
         assertHasError(validate(manifest), "S-PAGE-FIELD-REF", "pages[0].blocks[0].columns[0].field");
+    }
+
+    @Test
+    void systemTableColumnCanUsePlatformDisplayLabel() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(Map.of("field", "created_at"))
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-LABEL".equals(m.getCode())
+                        || "S-PAGE-FIELD-REF".equals(m.getCode())),
+                () -> "Expected system column display policy to pass but got " + messages);
+    }
+
+    @Test
+    void namedQueryTableColumnsAreNotRequiredToBindToPageModel() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "dataSource", Map.of("type", "namedQuery", "queryCode", "order_activity"),
+                "columns", List.of(column("virtual_count", localized("Virtual Count")))
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-FIELD-REF".equals(m.getCode())),
+                () -> "Expected namedQuery columns to pass field binding validation but got " + messages);
+    }
+
+    @Test
+    void apiBackedTableColumnsAreNotRequiredToBindToPageModel() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "dataSource", Map.of("type", "api", "url", "/api/orders/summary"),
+                "columns", List.of(column("apiOnlyField", localized("API Only Field")))
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-FIELD-REF".equals(m.getCode())),
+                () -> "Expected API-backed columns to pass field binding validation but got " + messages);
+    }
+
+    @Test
+    void underscoreActionsColumnIsRecognizedAsActionColumn() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(Map.of(
+                        "field", "_actions",
+                        "label", localized("Actions"),
+                        "buttons", List.of(Map.of(
+                                "code", "view",
+                                "label", localized("View")
+                        ))
+                ))
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-FIELD-REF".equals(m.getCode())),
+                () -> "Expected _actions to pass field binding validation but got " + messages);
     }
 
     @Test
@@ -228,6 +310,23 @@ class PageSchemaValidatorTest {
         )))));
 
         assertHasError(validate(manifest), "S-PAGE-LABEL", "pages[0].blocks[0].buttons[0].label");
+    }
+
+    @Test
+    void buttonContentCanSatisfyBusinessLabel() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_list", "list", "pe_order", List.of(Map.of(
+                "id", "list_toolbar",
+                "blockType", "toolbar",
+                "buttons", List.of(Map.of(
+                        "action", "create",
+                        "content", localized("New Order")
+                ))
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-LABEL".equals(m.getCode())),
+                () -> "Expected button content to satisfy business label but got " + messages);
     }
 
     private List<PluginValidationMessage> validate(PluginManifestExtended manifest) {

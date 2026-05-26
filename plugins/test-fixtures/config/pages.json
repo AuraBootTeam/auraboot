@@ -33,7 +33,8 @@
             "filter": {
               "field": "e2et_order_status",
               "operator": "EQ",
-              "value": "draft"
+              "value": "draft",
+              "dictCode": "e2et_order_status"
             }
           },
           {
@@ -45,7 +46,8 @@
             "filter": {
               "field": "e2et_order_status",
               "operator": "EQ",
-              "value": "submitted"
+              "value": "submitted",
+              "dictCode": "e2et_order_status"
             }
           },
           {
@@ -57,7 +59,8 @@
             "filter": {
               "field": "e2et_order_status",
               "operator": "EQ",
-              "value": "approved"
+              "value": "approved",
+              "dictCode": "e2et_order_status"
             }
           },
           {
@@ -69,7 +72,8 @@
             "filter": {
               "field": "e2et_order_status",
               "operator": "EQ",
-              "value": "completed"
+              "value": "completed",
+              "dictCode": "e2et_order_status"
             }
           },
           {
@@ -81,7 +85,8 @@
             "filter": {
               "field": "e2et_order_status",
               "operator": "EQ",
-              "value": "cancelled"
+              "value": "cancelled",
+              "dictCode": "e2et_order_status"
             }
           }
         ]
@@ -122,11 +127,13 @@
           },
           {
             "field": "e2et_order_type",
-            "width": 100
+            "width": 100,
+            "dictCode": "e2et_order_type"
           },
           {
             "field": "e2et_order_status",
-            "width": 100
+            "width": 100,
+            "dictCode": "e2et_order_status"
           },
           {
             "field": "e2et_order_customer",
@@ -347,7 +354,8 @@
           },
           {
             "field": "e2et_order_type",
-            "span": 1
+            "span": 1,
+            "dictCode": "e2et_order_type"
           },
           {
             "field": "e2et_order_customer",
@@ -378,7 +386,8 @@
           {
             "field": "e2et_order_status",
             "span": 1,
-            "readOnly": true
+            "readOnly": true,
+            "dictCode": "e2et_order_status"
           },
           {
             "field": "e2et_order_amount",
@@ -416,7 +425,8 @@
             },
             {
               "field": "e2et_item_spec",
-              "width": 120
+              "width": 120,
+              "dictCode": "e2et_item_spec"
             },
             {
               "field": "e2et_item_qty",
@@ -536,11 +546,13 @@
                   },
                   {
                     "field": "e2et_order_type",
-                    "span": 1
+                    "span": 1,
+                    "dictCode": "e2et_order_type"
                   },
                   {
                     "field": "e2et_order_status",
-                    "span": 1
+                    "span": 1,
+                    "dictCode": "e2et_order_status"
                   },
                   {
                     "field": "e2et_order_customer",
@@ -599,7 +611,8 @@
                     },
                     {
                       "field": "e2et_item_spec",
-                      "width": 120
+                      "width": 120,
+                      "dictCode": "e2et_item_spec"
                     },
                     {
                       "field": "e2et_item_qty",
@@ -830,7 +843,8 @@
           },
           {
             "field": "e2et_cust_region",
-            "width": 120
+            "width": 120,
+            "dictCode": "e2et_region"
           },
           {
             "field": "e2et_cust_contact",
@@ -924,7 +938,8 @@
           {
             "field": "e2et_cust_region",
             "span": 1,
-            "required": true
+            "required": true,
+            "dictCode": "e2et_region"
           },
           {
             "field": "e2et_cust_active",
@@ -1001,7 +1016,8 @@
             "filter": {
               "field": "e2et_pay_status",
               "operator": "EQ",
-              "value": "draft"
+              "value": "draft",
+              "dictCode": "e2et_pay_status"
             }
           },
           {
@@ -1013,7 +1029,8 @@
             "filter": {
               "field": "e2et_pay_status",
               "operator": "EQ",
-              "value": "pending"
+              "value": "pending",
+              "dictCode": "e2et_pay_status"
             }
           },
           {
@@ -1025,7 +1042,8 @@
             "filter": {
               "field": "e2et_pay_status",
               "operator": "EQ",
-              "value": "approved"
+              "value": "approved",
+              "dictCode": "e2et_pay_status"
             }
           },
           {
@@ -1037,7 +1055,8 @@
             "filter": {
               "field": "e2et_pay_status",
               "operator": "EQ",
-              "value": "paid"
+              "value": "paid",
+              "dictCode": "e2et_pay_status"
             }
           }
         ]
@@ -1083,11 +1102,13 @@
           },
           {
             "field": "e2et_pay_method",
-            "width": 120
+            "width": 120,
+            "dictCode": "e2et_pay_method"
           },
           {
             "field": "e2et_pay_status",
-            "width": 100
+            "width": 100,
+            "dictCode": "e2et_pay_status"
           },
           {
             "field": "e2et_pay_date",
@@ -1223,12 +1244,14 @@
           },
           {
             "field": "e2et_pay_method",
-            "span": 1
+            "span": 1,
+            "dictCode": "e2et_pay_method"
           },
           {
             "field": "e2et_pay_status",
             "span": 1,
-            "readOnly": true
+            "readOnly": true,
+            "dictCode": "e2et_pay_status"
           },
           {
             "field": "e2et_pay_remark",
@@ -1295,11 +1318,13 @@
           },
           {
             "field": "e2et_pay_method",
-            "span": 1
+            "span": 1,
+            "dictCode": "e2et_pay_method"
           },
           {
             "field": "e2et_pay_status",
-            "span": 1
+            "span": 1,
+            "dictCode": "e2et_pay_status"
           },
           {
             "field": "e2et_pay_date",
@@ -1405,7 +1430,8 @@
             "field": "e2et_name"
           },
           {
-            "field": "e2et_status"
+            "field": "e2et_status",
+            "dictCode": "e2et_record_status"
           },
           {
             "field": "e2et_count"
@@ -1444,7 +1470,8 @@
           },
           {
             "field": "e2et_status",
-            "span": 1
+            "span": 1,
+            "dictCode": "e2et_record_status"
           },
           {
             "field": "e2et_count",

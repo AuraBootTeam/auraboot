@@ -448,7 +448,13 @@ async function addFieldsToSelectedBlock(page: Page, fieldCodes: string[]): Promi
 async function configureFieldOverride(
   page: Page,
   _blockId: string,
-  field: { field: string; colSpan?: number; readOnly?: boolean; visibleWhen?: string },
+  field: {
+    field: string;
+    colSpan?: number;
+    readOnly?: boolean;
+    required?: boolean;
+    visibleWhen?: string;
+  },
 ): Promise<void> {
   const panel = page.getByTestId('designer-properties-panel');
 
@@ -472,6 +478,14 @@ async function configureFieldOverride(
   // readonly — checkbox added 2026-04-19.
   if (field.readOnly) {
     const cb = panel.getByTestId(`field-item-readonly-${field.field}`).first();
+    if (await cb.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await cb.check();
+    }
+  }
+
+  // required — checkbox added for form-field validation semantics.
+  if (field.required) {
+    const cb = panel.getByTestId(`field-item-required-${field.field}`).first();
     if (await cb.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await cb.check();
     }

@@ -189,7 +189,7 @@ test.describe('List Query Dynamic Configuration', () => {
 
     // Wait for at least one data row. This page validates hover action chrome,
     // not bulk selection; some list schemas intentionally do not enable row checkboxes.
-    const firstRow = page.locator('tbody tr[data-testid^="table-row-"], tbody tr').first();
+    const firstRow = page.locator('tbody tr[data-testid^="table-row-"]').first();
     await expect(firstRow).toBeVisible({ timeout: 8000 });
 
     // Verify row has the 'group' class (enables group-hover for children)
