@@ -109,7 +109,13 @@ export function ExpressionEditor({ adapter, name, label, helpText, modelFields }
         />
       )}
 
-      {mode === 'builder' && helpText && (
+      {/* Field-level validation error (P0-4): the text/formula mode surfaces it via
+          BaseFormulaEditor, but the builder mode must render it too so required
+          expression fields show an inline error, not just the required marker. */}
+      {mode === 'builder' && adapter.error && (
+        <p className="mt-1 text-sm text-red-600">{adapter.error}</p>
+      )}
+      {mode === 'builder' && !adapter.error && helpText && (
         <p className="mt-1 text-xs text-gray-500">{helpText}</p>
       )}
     </div>

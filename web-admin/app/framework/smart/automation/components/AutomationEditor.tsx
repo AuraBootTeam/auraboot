@@ -1,6 +1,10 @@
 // web-admin/app/smart/automation/components/AutomationEditor.tsx
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
-import { FlowDesigner, type FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
+import {
+  FlowDesigner,
+  useFlowValidation,
+  type FlowData,
+} from '~/plugins/core-designer/components/flow-designer-sdk';
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import { useSmartText } from '~/utils/i18n';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -38,6 +42,7 @@ export function AutomationEditor({
   const initialised = useRef(false);
 
   const { isDebugMode, startDebug } = useDebugSession();
+  const { validate } = useFlowValidation();
 
   useEffect(() => {
     if (initialDebugMode && automationId) {
@@ -86,9 +91,19 @@ export function AutomationEditor({
     [name, description, onSave],
   );
 
-  /** Toolbar save: uses the latest flowData snapshot */
+  /** Toolbar save: uses the latest flowData snapshot. This is a separate save
+   *  path from the FlowDesigner toolbar, so it must run the same validation gate
+   *  (P0-4) — otherwise required-empty configs could be saved from here. */
   const handleToolbarSave = useCallback(async () => {
     if (!onSave || !flowData) return;
+    const result = validate();
+    if (!result.valid) {
+      showErrorToast(
+        st('$i18n:flow.validation.saveBlocked') ||
+          'Please fix the highlighted fields before saving',
+      );
+      return;
+    }
     setSaving(true);
     try {
       await onSave({ name, description, flowData });
@@ -96,7 +111,7 @@ export function AutomationEditor({
     } finally {
       setSaving(false);
     }
-  }, [onSave, name, description, flowData]);
+  }, [onSave, name, description, flowData, validate, showErrorToast, st]);
 
   const handleChange = useCallback((data: FlowData) => {
     setFlowData(data);

@@ -28,6 +28,14 @@ vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
     lastOnChange = props.onChange;
     return <div data-testid="flow-designer-mock" />;
   },
+  // useFlowValidation is consumed by AutomationEditor.handleToolbarSave to gate
+  // saves (G4/P0-4). The validation behavior itself is covered by the SDK's
+  // own unit tests + the golden E2E; here we only need a stable hook stub so
+  // the editor renders.
+  useFlowValidation: () => ({
+    validate: () => ({ valid: true, errors: [] }),
+    validationResult: null,
+  }),
 }));
 
 vi.mock('~/utils/i18n', () => ({
