@@ -122,7 +122,7 @@ test.describe('Procurement — Purchase Order Lifecycle', () => {
     ).catch(() => null);
 
     // Click purchase order link
-    const poLink = nav.getByRole('link', { name: '采购订单' });
+    const poLink = nav.locator('a[href="/p/pr_purchase_order"]').first();
     await poLink.scrollIntoViewIfNeeded();
     await poLink.evaluate((el: HTMLElement) => el.click());
 

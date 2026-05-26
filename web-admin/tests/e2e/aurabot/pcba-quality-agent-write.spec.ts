@@ -12,6 +12,8 @@
 
 import { expect, test } from '../../fixtures';
 import type { APIRequestContext, Locator, Page } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   ensureSidebarExpanded,
   executeCommandViaApi,
@@ -29,8 +31,19 @@ const DEFECTS_PATH = '/quality/defects';
 const CAPA_PATH = '/quality/capa';
 const STUB_TOOL_USE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
 const AURABOT_LAST_CONVERSATION_KEY = 'aurabot.lastConversationId';
-const OSS_PLUGIN_ROOT = process.env.OSS_PLUGIN_ROOT ?? '/app/plugins';
-const ENTERPRISE_PLUGIN_ROOT = process.env.ENTERPRISE_PLUGIN_ROOT ?? '/app/plugins-enterprise';
+function resolvePluginRoot(envValue: string | undefined, candidates: string[]): string {
+  if (envValue) return envValue;
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+}
+
+const OSS_PLUGIN_ROOT = resolvePluginRoot(process.env.OSS_PLUGIN_ROOT, [
+  path.resolve(process.cwd(), '../../../auraboot/plugins'),
+  path.resolve(process.cwd(), '../plugins'),
+]);
+const ENTERPRISE_PLUGIN_ROOT = resolvePluginRoot(process.env.ENTERPRISE_PLUGIN_ROOT, [
+  path.resolve(process.cwd(), '../../plugins'),
+  path.resolve(process.cwd(), '../../../auraboot-enterprise/plugins'),
+]);
 
 const REQUIRED_PLUGIN_IMPORTS = [
   { root: OSS_PLUGIN_ROOT, name: 'core-meta', pluginId: 'com.auraboot.core-meta' },
@@ -49,19 +62,16 @@ const REQUIRED_PLUGIN_IMPORTS = [
     root: ENTERPRISE_PLUGIN_ROOT,
     name: 'product-catalog',
     pluginId: 'com.auraboot.product-catalog',
-    force: true,
   },
   {
     root: ENTERPRISE_PLUGIN_ROOT,
     name: 'inventory',
     pluginId: 'com.auraboot.inventory',
-    force: true,
   },
   {
     root: ENTERPRISE_PLUGIN_ROOT,
     name: 'quality',
     pluginId: 'com.auraboot.quality',
-    force: true,
   },
   { root: ENTERPRISE_PLUGIN_ROOT, name: 'pcba-base', pluginId: 'com.auraboot.pcba-base' },
 ] as const;
@@ -341,8 +351,7 @@ test.describe('PCBA Quality Agent write flow', () => {
     testInfo.setTimeout(600000);
     const installedPluginIds = await fetchInstalledPluginIds(request);
     for (const plugin of REQUIRED_PLUGIN_IMPORTS) {
-      const forceImport = 'force' in plugin && plugin.force === true;
-      if (!forceImport && installedPluginIds.has(plugin.pluginId)) continue;
+      if (installedPluginIds.has(plugin.pluginId)) continue;
       await importPluginDirectory(request, plugin);
       installedPluginIds.add(plugin.pluginId);
     }

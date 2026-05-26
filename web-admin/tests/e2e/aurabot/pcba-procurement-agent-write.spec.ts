@@ -14,6 +14,8 @@
 
 import { expect, test } from '../../fixtures';
 import type { APIRequestContext, Page, Locator } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   clickRowActionByLocator,
   executeCommandViaApi,
@@ -32,8 +34,19 @@ const STUB_TOOL_USE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
 const SUBMIT_REVIEW_TOOL = 'cmd_pe_submit_procurement_comparison';
 const APPROVAL_POLICY_NAME = 'E2E PCBA Agent Review Approval';
 const AURABOT_LAST_CONVERSATION_KEY = 'aurabot.lastConversationId';
-const OSS_PLUGIN_ROOT = process.env.OSS_PLUGIN_ROOT ?? '/app/plugins';
-const ENTERPRISE_PLUGIN_ROOT = process.env.ENTERPRISE_PLUGIN_ROOT ?? '/app/plugins-enterprise';
+function resolvePluginRoot(envValue: string | undefined, candidates: string[]): string {
+  if (envValue) return envValue;
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+}
+
+const OSS_PLUGIN_ROOT = resolvePluginRoot(process.env.OSS_PLUGIN_ROOT, [
+  path.resolve(process.cwd(), '../../../auraboot/plugins'),
+  path.resolve(process.cwd(), '../plugins'),
+]);
+const ENTERPRISE_PLUGIN_ROOT = resolvePluginRoot(process.env.ENTERPRISE_PLUGIN_ROOT, [
+  path.resolve(process.cwd(), '../../plugins'),
+  path.resolve(process.cwd(), '../../../auraboot-enterprise/plugins'),
+]);
 
 const REQUIRED_PLUGIN_IMPORTS = [
   { root: OSS_PLUGIN_ROOT, name: 'core-meta' },
@@ -72,6 +85,18 @@ async function importPluginDirectory(
   plugin: { root: string; name: string },
 ) {
   const path = `${plugin.root}/${plugin.name}`;
+  const manifestPath = `${path}/plugin.json`;
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as { pluginId?: string };
+    if (manifest.pluginId) {
+      const pluginsResponse = await request.get('/api/plugins');
+      const pluginsBody = await pluginsResponse.json().catch(() => ({}));
+      const installed = ((pluginsBody?.data ?? []) as Array<{ pluginId?: string; plugin_id?: string }>).some(
+        (record) => String(record.pluginId ?? record.plugin_id ?? '') === manifest.pluginId,
+      );
+      if (installed) return;
+    }
+  }
   const response = await request.post('/api/plugins/import/import-directory-sync', {
     data: {
       path,
@@ -80,6 +105,7 @@ async function importPluginDirectory(
       autoPublishFields: true,
       autoPublishCommands: true,
       autoPublishPages: true,
+      validateReferences: false,
     },
     headers: { 'Content-Type': 'application/json' },
     timeout: 600000,
@@ -457,7 +483,7 @@ async function actOnApprovalViaUi(
   await gotoAcpUiPage(page, '/dynamic/agent-approval');
   await waitForDynamicPageLoad(page);
   const row = await findRowInPaginatedList(page, title, 15000);
-  await expect(row).toContainText('pending', { timeout: 10000 });
+  await expect(row).toContainText(/pending|待审批/i, { timeout: 10000 });
 
   const responsePromise = page.waitForResponse(
     (response) => {

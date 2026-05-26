@@ -71,7 +71,10 @@ async function expandIfNeeded(page: Page, label: RegExp, targetHref: string) {
     .or(nav.getByRole('link', { name: label }))
     .first();
   await expect(trigger).toBeVisible({ timeout: 10000 });
-  await trigger.click();
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.click().catch(async () => {
+    await trigger.evaluate((el) => (el as HTMLElement).click());
+  });
   await page.waitForLoadState('domcontentloaded').catch(() => {});
 }
 

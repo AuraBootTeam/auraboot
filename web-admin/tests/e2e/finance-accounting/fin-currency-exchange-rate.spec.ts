@@ -33,7 +33,7 @@ import {
 const UID = uniqueId('cur');
 
 const CURRENCY_DATA = {
-  code: `T${UID.slice(-3).toUpperCase()}`, // 3-char ISO-like code
+  code: UID.slice(-3).toUpperCase(), // 3-char ISO-like code
   name: `TestCurrency ${UID}`,
   symbol: '⊕',
   decimalPlaces: 2,

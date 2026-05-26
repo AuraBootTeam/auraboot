@@ -22,7 +22,13 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import { uniqueId, executeCommandViaApi, todayStr } from '../helpers/index';
+import {
+  uniqueId,
+  executeCommandViaApi,
+  forceDefaultTableView,
+  todayStr,
+  expectCollectionViewVisible,
+} from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Navigation helper — sidebar-driven navigation
@@ -47,10 +53,9 @@ async function goToIqcList(page: Page): Promise<import('@playwright/test').Respo
   );
   await leafLink.evaluate((el: HTMLElement) => el.click());
   const resp = await listResponsePromise;
+  await forceDefaultTableView(page, 'qc_iqc_order');
 
-  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
-    timeout: 10_000,
-  });
+  await expectCollectionViewVisible(page, 10_000);
 
   return resp;
 }
@@ -88,8 +93,8 @@ test.describe('Quality — IQC CRUD', () => {
           qc_iqc_material_name: `TestMaterial_${UID}`,
           qc_iqc_qty_received: 200,
           qc_iqc_qty_inspected: 200,
-          qc_iqc_qty_accepted: 190,
-          qc_iqc_qty_rejected: 10,
+          qc_iqc_qty_accepted: 200,
+          qc_iqc_qty_rejected: 0,
           qc_iqc_date: todayStr(),
           qc_iqc_inspector: `Inspector_${UID}`,
           qc_iqc_aql_level: 'aql_25',

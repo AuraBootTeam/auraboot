@@ -57,7 +57,7 @@ async function navigateToStplPage(
   await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
   // Expand sub-menu (B2B / B2C / Channel)
-  const subMenu = nav.getByRole('button', { name: new RegExp(rootMenuName, 'i') });
+  const subMenu = nav.getByRole('button', { name: new RegExp(rootMenuName, 'i') }).first();
   await subMenu.scrollIntoViewIfNeeded();
   await subMenu.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);

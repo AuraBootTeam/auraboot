@@ -20,6 +20,7 @@ import {
   findRowInPaginatedList,
   todayStr,
   clickRowActionByLocator,
+  expectCollectionViewVisible,
 } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
@@ -335,9 +336,7 @@ test.describe('PCBA Finance CRUD', () => {
 
     test('PF-005: Journal entry list page loads @smoke', async ({ page }) => {
       await navigateToDynamicPage(page, PAGE_KEYS.journalEntry);
-
-      const table = page.locator('table, [role="table"]');
-      await expect(table.first()).toBeVisible({ timeout: 15000 });
+      await expectCollectionViewVisible(page, 15000);
     });
 
     test('PF-006: Create journal entry via API, verify in list', async ({ page }) => {

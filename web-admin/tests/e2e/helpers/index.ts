@@ -105,6 +105,8 @@ export async function ensureSidebarExpanded(page: Page): Promise<void> {
  */
 export async function navigateToDynamicPage(page: Page, pageKey: string): Promise<void> {
   const normalizedPageKey = normalizeDynamicPageKey(pageKey);
+  const tableViewPid = await resolveTableSavedViewPid(page, normalizedPageKey, normalizedPageKey);
+  const query = tableViewPid ? `?view=${encodeURIComponent(tableViewPid)}` : '';
   // Set up list API listener BEFORE navigation so we catch the response
   const listResponsePromise = page
     .waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
@@ -112,11 +114,57 @@ export async function navigateToDynamicPage(page: Page, pageKey: string): Promis
     })
     .catch(() => null);
 
-  await page.goto(`/p/${normalizedPageKey}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`/p/${normalizedPageKey}${query}`, { waitUntil: 'domcontentloaded' });
   await waitForDynamicPageLoad(page);
 
   // Wait for list data API to return
   await listResponsePromise;
+}
+
+async function resolveTableSavedViewPid(
+  page: Page,
+  modelCode: string,
+  pageKey: string,
+): Promise<string | null> {
+  const params = `modelCode=${encodeURIComponent(modelCode)}&pageKey=${encodeURIComponent(pageKey)}`;
+  const readData = async (respPromise: Promise<import('@playwright/test').APIResponse>) => {
+    const resp = await respPromise.catch(() => null);
+    if (!resp?.ok()) return null;
+    const body = await resp.json().catch(() => null);
+    return body?.data ?? null;
+  };
+
+  const defaultView = await readData(page.request.get(`/api/views/default?${params}`));
+  if (defaultView?.pid && (defaultView.viewType || 'table') === 'table') {
+    return String(defaultView.pid);
+  }
+
+  const accessible = await readData(page.request.get(`/api/views/accessible?${params}`));
+  const views = Array.isArray(accessible) ? accessible : (accessible?.records ?? []);
+  const tableView = views.find((view: any) => view?.pid && (view.viewType || 'table') === 'table');
+  return tableView?.pid ? String(tableView.pid) : null;
+}
+
+export async function forceDefaultTableView(
+  page: Page,
+  pageKey: string,
+  modelCode = normalizeDynamicPageKey(pageKey),
+): Promise<void> {
+  const normalizedPageKey = normalizeDynamicPageKey(pageKey);
+  const normalizedModelCode = normalizeDynamicPageKey(modelCode);
+  const tableViewPid = await resolveTableSavedViewPid(page, normalizedModelCode, normalizedPageKey);
+  if (!tableViewPid) return;
+
+  const currentType = await page
+    .getByTestId('view-selector-trigger')
+    .getAttribute('data-current-view-type')
+    .catch(() => null);
+  if (currentType === 'table') return;
+
+  await page.goto(`/p/${normalizedPageKey}?view=${encodeURIComponent(tableViewPid)}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await waitForDynamicPageLoad(page);
 }
 
 // ---------------------------------------------------------------------------

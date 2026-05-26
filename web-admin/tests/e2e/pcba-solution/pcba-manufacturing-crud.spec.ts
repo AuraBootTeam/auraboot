@@ -28,6 +28,7 @@ import {
   findRowInPaginatedList,
   queryFilteredList,
   clickRowActionByLocator,
+  expectCollectionViewVisible,
 } from '../helpers';
 import { BASE_URL } from '../../helpers/environments';
 
@@ -633,8 +634,7 @@ test.describe('PCBA Manufacturing — IQC Order CRUD', () => {
 
   test('PM-012: IQC order list page loads @smoke', async ({ page }) => {
     await navigateToDynamicPage(page, 'qc-iqc-order');
-    const table = page.locator('table, [role="table"]');
-    await expect(table.first()).toBeVisible({ timeout: 15000 });
+    await expectCollectionViewVisible(page, 15000);
   });
 
   test('PM-013: Create IQC order via API, verify in list', async ({ page }) => {

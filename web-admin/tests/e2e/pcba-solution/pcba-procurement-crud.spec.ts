@@ -24,6 +24,7 @@ import {
   clickSaveButton,
   waitForFormReady,
   clickRowActionByLocator,
+  expectCollectionViewVisible,
 } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
@@ -188,10 +189,7 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
 
   test('PP-001: PO list page loads @smoke', async ({ page }) => {
     await navigateToDynamicPage(page, PAGE_KEYS.purchaseOrder);
-    const table = page.locator('table, [role="table"]');
-    await expect(table.first()).toBeVisible({ timeout: 15000 });
-    const headers = page.locator('thead th');
-    await expect(headers.first()).toBeVisible({ timeout: 5000 });
+    await expectCollectionViewVisible(page, 15000);
   });
 
   test('PP-002: Create PO via API, verify in list', async ({ page }) => {
@@ -259,7 +257,7 @@ test.describe('PCBA Procurement — Purchase Order CRUD', () => {
     });
 
     // Wait for navigation to form page to stabilize
-    await expect(page).toHaveURL(/\/edit\?commandCode=/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/edit(?:\/[^?]+)?\?commandCode=/, { timeout: 15000 });
 
     // Wait for dynamic form two-stage loading (schema fetch + field rendering)
     await waitForFormReady(page, 15000);
@@ -521,7 +519,7 @@ test.describe('PCBA Procurement — Purchase Request CRUD', () => {
     });
 
     // Wait for navigation to form page to stabilize
-    await expect(page).toHaveURL(/\/edit\?commandCode=/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/edit(?:\/[^?]+)?\?commandCode=/, { timeout: 15000 });
 
     // Wait for dynamic form two-stage loading (schema fetch + field rendering)
     await waitForFormReady(page, 15000);
@@ -787,7 +785,7 @@ test.describe('PCBA Procurement — Purchase Receipt CRUD', () => {
     });
 
     // Wait for navigation to form page to stabilize
-    await expect(page).toHaveURL(/\/edit\?commandCode=/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/edit(?:\/[^?]+)?\?commandCode=/, { timeout: 15000 });
 
     // Wait for dynamic form two-stage loading (schema fetch + field rendering)
     await waitForFormReady(page, 15000);

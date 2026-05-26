@@ -1178,7 +1178,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
 
       await clickRowActionByLocator(page, row, 'edit');
       await waitForFormReady(page);
-      await expect(page).toHaveURL(/\/p\/fin_payment\/.+\/edit/);
+      await expect(page).toHaveURL(/\/p\/fin_payment\/(?:.+\/edit|edit\/.+)/);
       // Ensure edit flow binds UPDATE command explicitly (avoid create-command fallback).
       const editUrl = new URL(page.url());
       if (editUrl.searchParams.get('commandCode') !== 'fin:update_payment') {
