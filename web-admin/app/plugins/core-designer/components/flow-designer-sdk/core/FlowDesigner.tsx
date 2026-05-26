@@ -7,6 +7,7 @@ import { FlowPalette } from './FlowPalette';
 import { FlowCanvas } from './FlowCanvas';
 import { FlowPropertyPanel } from './FlowPropertyPanel';
 import { useFlowAutoSave } from './useFlowAutoSave';
+import { useFlowValidation } from '../validation/useFlowValidation';
 import type { FlowNodeDefinition } from '../nodes/types';
 import type { FlowData } from '../store/types';
 import { cn } from '~/utils/cn';
@@ -44,6 +45,7 @@ export function FlowDesigner({
   autoSaveDelay,
 }: FlowDesignerProps) {
   const { importData, exportData, nodes, edges, setDirty, undo, redo, isDirty, bumpRegistryVersion } = useFlowStore();
+  const { validate } = useFlowValidation();
   const containerRef = useRef<HTMLDivElement>(null);
   // Track whether we are currently importing data so we can suppress the
   // onChange notification that would otherwise fire for every importData call.
@@ -83,10 +85,15 @@ export function FlowDesigner({
 
   const handleSave = useCallback(async () => {
     if (!onSave) return;
+    // P0-4: validation gate. Block save on errors; validate() publishes the
+    // result (field-level error states via FlowFieldAdapter) and selects the
+    // first errored node so the user sees what to fix.
+    const result = validate();
+    if (!result.valid) return;
     const data = exportData();
     await onSave(data);
     setDirty(false);
-  }, [onSave, exportData, setDirty]);
+  }, [onSave, exportData, setDirty, validate]);
 
   // Auto-save
   const { saveStatus } = useFlowAutoSave({
