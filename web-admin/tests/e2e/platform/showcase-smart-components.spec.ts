@@ -390,7 +390,7 @@ test.describe('Showcase Smart Components', () => {
   // D8: Edit → save → verify via API
   // =========================================================================
   test('SMC-004 — Edit Smart Component fields → save → verify via API', async ({ page }) => {
-    await page.goto(`/p/showcase_all_fields/${recordPid}/edit`, {
+    await page.goto(`/p/showcase_all_fields/edit/${recordPid}?commandCode=sc%3Aupdate_showcase`, {
       waitUntil: 'domcontentloaded',
     });
     await waitForFormReady(page, 15_000);
@@ -399,17 +399,18 @@ test.describe('Showcase Smart Components', () => {
     const budgetInput = field(page, 'sc_budget').locator('input').first();
     if (await budgetInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await budgetInput.click();
-      await budgetInput.press('ControlOrMeta+A');
-      await budgetInput.press('Backspace');
-      await budgetInput.type('88888.88', { delay: 5 });
+      await page.keyboard.press('ControlOrMeta+A');
+      await page.keyboard.press('Backspace');
+      await expect
+        .poll(async () => (await budgetInput.inputValue()).replace(/,/g, ''))
+        .toBe('');
+      await budgetInput.pressSequentially('88888.88', { delay: 5 });
       await expect
         .poll(async () => (await budgetInput.inputValue()).replace(/,/g, ''))
         .toBe('88888.88');
-      await budgetInput.evaluate((node) => {
-        const element = node as HTMLInputElement;
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-        element.blur();
-      });
+      await expect
+        .poll(async () => budgetInput.getAttribute('aria-valuenow'), { timeout: 5_000 })
+        .toBe('88888.88');
     }
 
     // Edit time slot
@@ -430,7 +431,9 @@ test.describe('Showcase Smart Components', () => {
       { timeout: 15_000 },
     );
     await saveBtn.click();
-    await saveResp.catch(() => null);
+    const response = await saveResp;
+    const responseBody = await response.json().catch(() => ({}));
+    expect(String((responseBody as any)?.code ?? '0'), 'Save command should succeed').toBe('0');
 
     // Verify via API
     const verifyResp = await page.request.get(

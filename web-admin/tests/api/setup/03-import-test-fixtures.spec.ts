@@ -6,8 +6,8 @@
  * many E2E specs depend on but are intentionally excluded from default
  * bootstrap (it is marked `internal: true` in plugin.json).
  *
- * Gate: runs when `AURA_ENV=test`, `IMPORT_TEST_FIXTURES=true`, or
- * `PW_PROFILE=full`.
+ * Gate: runs when `AURA_ENV=test`, `IMPORT_TEST_FIXTURES=true`,
+ * `PW_PROFILE=oss`, or `PW_PROFILE=full`.
  * Otherwise the test body is skipped — matching the backend-side
  * `BuiltinPluginImportService` behaviour described in
  * `auraboot-enterprise/AGENTS.md` §「系统目录」.
@@ -46,14 +46,17 @@ const BACKEND_PLUGIN_ROOT =
     : resolve(__dirname, '../../../../plugins'));
 const BACKEND_PLUGIN_DIR = resolve(BACKEND_PLUGIN_ROOT, 'test-fixtures');
 const SHOULD_IMPORT =
-  AURA_ENV === 'test' || IMPORT_TEST_FIXTURES.toLowerCase() === 'true' || PW_PROFILE === 'full';
+  AURA_ENV === 'test' ||
+  IMPORT_TEST_FIXTURES.toLowerCase() === 'true' ||
+  PW_PROFILE === 'oss' ||
+  PW_PROFILE === 'full';
 
 test.describe.configure({ mode: 'serial' });
 
 test('import test-fixtures plugin (gated)', async ({ request }) => {
   test.skip(
     !SHOULD_IMPORT,
-    'AURA_ENV=test, IMPORT_TEST_FIXTURES=true, or PW_PROFILE=full not set — skipping internal test-fixtures import',
+    'AURA_ENV=test, IMPORT_TEST_FIXTURES=true, PW_PROFILE=oss, or PW_PROFILE=full not set — skipping internal test-fixtures import',
   );
 
   // Sanity: refuse to run if the manifest is missing (tells the operator

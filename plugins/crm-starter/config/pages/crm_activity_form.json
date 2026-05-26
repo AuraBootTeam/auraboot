@@ -16,15 +16,18 @@
       "fields": [
         {
           "field": "crm_act_type",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "crm_act_subject",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "crm_act_date",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "crm_act_content",
@@ -39,7 +42,10 @@
         {
           "code": "submit",
           "primary": true,
-          "label": "save",
+          "label": {
+            "zh-CN": "保存",
+            "en-US": "Save"
+          },
           "action": {
             "type": "command",
             "command": "crm:update_activity"
@@ -47,7 +53,10 @@
         },
         {
           "code": "cancel",
-          "label": "cancel"
+          "label": {
+            "zh-CN": "取消",
+            "en-US": "Cancel"
+          }
         }
       ]
     }

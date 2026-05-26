@@ -782,10 +782,10 @@ export async function fillControlledInput(
       await input.waitFor({ state: 'visible', timeout });
       await input.scrollIntoViewIfNeeded();
 
-      await input.fill(value);
-      if (!(await hasValue())) {
-        await input.click();
-        await input.press('ControlOrMeta+A').catch(() => null);
+      await input.click();
+      await input.press('ControlOrMeta+A').catch(() => null);
+      await input.press('Backspace').catch(() => null);
+      if (value) {
         await input.type(value, { delay: 5 });
       }
       if (!(await hasValue())) {

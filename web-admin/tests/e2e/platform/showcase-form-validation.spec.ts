@@ -19,6 +19,7 @@ import { test, expect, type Page } from '../../fixtures';
 import {
   uniqueId,
   executeCommandViaApi,
+  fillControlledInput,
   waitForFormReady,
   waitForToast,
   waitForDynamicPageLoad,
@@ -205,7 +206,7 @@ test('VAL-002 — Edit form: clearing required field blocks submission', async (
   const nameInput = page.locator('input[name="sc_name"], [data-field="sc_name"] input').first();
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
   await expect(nameInput).not.toHaveValue('', { timeout: 10_000 });
-  await nameInput.clear();
+  await fillControlledInput(nameInput, '');
   await expect(nameInput).toHaveValue('');
 
   // Intercept any command execute call — should NOT be made
@@ -306,7 +307,7 @@ test('VAL-004 — Edit form: error toast contains field-specific message', async
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
   // Ensure the field is loaded with data before clearing
   await expect(nameInput).not.toHaveValue('', { timeout: 8_000 });
-  await nameInput.clear();
+  await fillControlledInput(nameInput, '');
   await expect(nameInput).toHaveValue('');
 
   // Intercept to confirm no backend call

@@ -14,7 +14,10 @@
           "code": "create",
           "primary": true,
           "permissionCode": "crm.campaign.manage",
-          "label": "create",
+          "label": {
+            "zh-CN": "新建",
+            "en-US": "Create"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_campaign_form",
@@ -90,12 +93,14 @@
         {
           "field": "crm_cpn_type",
           "width": 120,
-          "renderType": "tag"
+          "renderType": "tag",
+          "dictCode": "crm_campaign_type"
         },
         {
           "field": "crm_cpn_status",
           "width": 100,
-          "renderType": "tag"
+          "renderType": "tag",
+          "dictCode": "crm_campaign_status"
         },
         {
           "field": "crm_cpn_start_date",
@@ -122,7 +127,10 @@
           "buttons": [
             {
               "code": "view",
-              "label": "detail",
+              "label": {
+                "zh-CN": "详情",
+                "en-US": "Detail"
+              },
               "action": {
                 "type": "navigate",
                 "to": "crm_campaign_detail"
@@ -131,7 +139,10 @@
             {
               "code": "edit",
               "permissionCode": "crm.campaign.manage",
-              "label": "edit",
+              "label": {
+                "zh-CN": "编辑",
+                "en-US": "Edit"
+              },
               "action": {
                 "type": "navigate",
                 "to": "crm_campaign_form"
@@ -141,14 +152,21 @@
               "code": "delete",
               "danger": true,
               "permissionCode": "crm.campaign.manage",
-              "label": "delete",
+              "label": {
+                "zh-CN": "删除",
+                "en-US": "Delete"
+              },
               "confirm": "delete.confirm",
               "action": {
                 "type": "command",
                 "command": "crm:delete_campaign"
               }
             }
-          ]
+          ],
+          "label": {
+            "zh-CN": "操作",
+            "en-US": "Actions"
+          }
         }
       ],
       "searchFields": [

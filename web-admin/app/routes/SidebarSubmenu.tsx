@@ -25,9 +25,8 @@ export function resolveMenuLabel(
   item: Pick<SubmenuItem, 'name' | 'nameKey'>,
 ): string {
   const fallback = item.name || item.nameKey || '';
-  const key = item.nameKey || item.name;
-  if (!key) return fallback;
-  return t(key, undefined, fallback);
+  if (!item.nameKey) return fallback;
+  return t(item.nameKey, undefined, fallback);
 }
 
 function isPathInSubmenu(items: SubmenuItem[], pathname: string): boolean {

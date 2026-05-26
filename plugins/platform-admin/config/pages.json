@@ -17,7 +17,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "sla_config_form",
@@ -38,7 +41,8 @@
           {
             "field": "target_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "sla_target_type"
           },
           {
             "field": "target_key",
@@ -47,7 +51,8 @@
           {
             "field": "deadline_mode",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "sla_deadline_mode"
           },
           {
             "field": "deadline_value",
@@ -55,7 +60,8 @@
           },
           {
             "field": "suspend_policy",
-            "width": 120
+            "width": 120,
+            "dictCode": "sla_suspend_policy"
           },
           {
             "field": "enabled",
@@ -70,7 +76,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "sla_config_form",
@@ -80,7 +89,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -117,7 +129,8 @@
         "fields": [
           {
             "field": "name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "enabled",
@@ -125,7 +138,8 @@
           },
           {
             "field": "target_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "target_key",
@@ -137,7 +151,8 @@
           },
           {
             "field": "deadline_mode",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "deadline_value",
@@ -176,7 +191,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "admin:update_sla_config"
@@ -184,7 +202,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -208,7 +229,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "bpm_domain_config_form",
@@ -248,7 +272,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "bpm_domain_config_form",
@@ -258,7 +285,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -295,11 +325,13 @@
         "fields": [
           {
             "field": "domain_code",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "domain_name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "model_code",
@@ -334,7 +366,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "admin:update_bpm_domain_config"
@@ -342,7 +377,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -366,7 +404,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "data_permission_form",
@@ -391,12 +432,14 @@
           {
             "field": "policy_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "dp_policy_type"
           },
           {
             "field": "scope_type",
             "width": 130,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "dp_scope_type"
           },
           {
             "field": "field_code",
@@ -405,7 +448,8 @@
           {
             "field": "mask_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "dp_mask_type"
           },
           {
             "field": "priority",
@@ -425,7 +469,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "data_permission_form",
@@ -435,7 +482,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -472,15 +522,18 @@
         "fields": [
           {
             "field": "name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "model_code",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "policy_type",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "enabled",
@@ -554,7 +607,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "admin:update_data_permission"
@@ -562,7 +618,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -586,7 +645,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "webhook_form",
@@ -611,7 +673,8 @@
           {
             "field": "event_type",
             "width": 140,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "webhook_event_type"
           },
           {
             "field": "model_code",
@@ -638,7 +701,10 @@
         "rowActions": [
           {
             "code": "view",
-            "label": "view",
+            "label": {
+              "zh-CN": "查看",
+              "en-US": "View"
+            },
             "action": {
               "type": "navigate",
               "to": "webhook_detail"
@@ -646,7 +712,10 @@
           },
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "webhook_form",
@@ -656,7 +725,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -693,7 +765,8 @@
         "fields": [
           {
             "field": "name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "enabled",
@@ -701,11 +774,13 @@
           },
           {
             "field": "target_url",
-            "colSpan": 12
+            "colSpan": 12,
+            "required": true
           },
           {
             "field": "event_type",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "model_code",
@@ -740,7 +815,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "admin:update_webhook"
@@ -748,7 +826,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -831,7 +912,8 @@
           {
             "field": "delivery_status",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "webhook_delivery_status"
           },
           {
             "field": "response_status",
@@ -885,7 +967,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "api_connector_form",
@@ -910,7 +995,8 @@
           {
             "field": "auth_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "connector_auth_type"
           },
           {
             "field": "timeout_ms",
@@ -929,7 +1015,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "api_connector_form",
@@ -939,7 +1028,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -976,7 +1068,8 @@
         "fields": [
           {
             "field": "name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "enabled",
@@ -984,11 +1077,13 @@
           },
           {
             "field": "base_url",
-            "colSpan": 12
+            "colSpan": 12,
+            "required": true
           },
           {
             "field": "auth_type",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "timeout_ms",
@@ -1015,7 +1110,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "admin:update_api_connector"
@@ -1023,7 +1121,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -1046,7 +1147,10 @@
         "buttons": [
           {
             "code": "create",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "variant": "primary",
             "action": {
               "type": "navigate",
@@ -1109,7 +1213,7 @@
         "blockType": "table",
         "columns": [
           {
-            "field": "processKey",
+            "field": "process_key",
             "label": {
               "zh-CN": "流程标识",
               "en-US": "Process Key"
@@ -1117,7 +1221,7 @@
             "width": 180
           },
           {
-            "field": "processName",
+            "field": "process_name",
             "label": {
               "zh-CN": "流程名称",
               "en-US": "Process Name"
@@ -1147,10 +1251,11 @@
               "en-US": "Status"
             },
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "member_status"
           },
           {
-            "field": "deployedAt",
+            "field": "deployed_at",
             "label": {
               "zh-CN": "部署时间",
               "en-US": "Deployed At"
@@ -1163,7 +1268,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "/bpmn-designer?pid={pid}"
@@ -1292,7 +1400,10 @@
             "code": "create",
             "icon": "Plus",
             "primary": true,
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "/dashboard-designer"
@@ -1360,7 +1471,8 @@
                   "label": "Published",
                   "color": "green"
                 }
-              }
+              },
+              "dictCode": "member_status"
             },
             {
               "field": "updatedAt",
@@ -1378,7 +1490,10 @@
                 {
                   "code": "edit",
                   "icon": "Edit",
-                  "label": "edit",
+                  "label": {
+                    "zh-CN": "编辑",
+                    "en-US": "Edit"
+                  },
                   "action": {
                     "type": "navigate",
                     "to": "/dashboard-designer/{pid}"
@@ -1387,7 +1502,10 @@
                 {
                   "code": "publish",
                   "visibleWhen": "row.status === 'draft'",
-                  "label": "publish",
+                  "label": {
+                    "zh-CN": "发布",
+                    "en-US": "Publish"
+                  },
                   "action": {
                     "type": "flow",
                     "steps": [
@@ -1402,7 +1520,10 @@
                 {
                   "code": "unpublish",
                   "visibleWhen": "row.status === 'published'",
-                  "label": "unpublish",
+                  "label": {
+                    "zh-CN": "取消发布",
+                    "en-US": "Unpublish"
+                  },
                   "action": {
                     "type": "flow",
                     "steps": [
@@ -1417,7 +1538,10 @@
                 {
                   "code": "delete",
                   "danger": true,
-                  "label": "delete",
+                  "label": {
+                    "zh-CN": "删除",
+                    "en-US": "Delete"
+                  },
                   "confirm": "confirm.delete",
                   "action": {
                     "type": "flow",
@@ -1430,7 +1554,11 @@
                     ]
                   }
                 }
-              ]
+              ],
+              "label": {
+                "zh-CN": "操作",
+                "en-US": "Actions"
+              }
             }
           ],
           "pagination": {
@@ -1499,11 +1627,6 @@
       "type": "stack"
     },
     "blocks": [
-      {
-        "id": "toolbar",
-        "blockType": "toolbar",
-        "buttons": []
-      },
       {
         "id": "status-tabs",
         "blockType": "tabs",
@@ -1600,7 +1723,8 @@
           {
             "field": "status",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "member_status"
           },
           {
             "field": "join_date",
@@ -1621,7 +1745,10 @@
             "code": "approve",
             "variant": "primary",
             "visibleWhen": "row.status === 'pending'",
-            "label": "approve",
+            "label": {
+              "zh-CN": "同意",
+              "en-US": "Approve"
+            },
             "confirm": "approve.confirm",
             "action": {
               "type": "state_transition",
@@ -1632,7 +1759,10 @@
             "code": "reject",
             "variant": "danger",
             "visibleWhen": "row.status === 'pending'",
-            "label": "reject",
+            "label": {
+              "zh-CN": "拒绝",
+              "en-US": "Reject"
+            },
             "confirm": "reject.confirm",
             "action": {
               "type": "state_transition",
@@ -1643,7 +1773,10 @@
             "code": "suspend",
             "variant": "danger",
             "visibleWhen": "row.status === 'active'",
-            "label": "suspend",
+            "label": {
+              "zh-CN": "暂停",
+              "en-US": "Suspend"
+            },
             "confirm": "suspend.confirm",
             "action": {
               "type": "command",
@@ -1654,7 +1787,10 @@
             "code": "leave",
             "variant": "danger",
             "visibleWhen": "row.status === 'active'",
-            "label": "leave",
+            "label": {
+              "zh-CN": "离职",
+              "en-US": "Leave"
+            },
             "confirm": "leave.confirm",
             "action": {
               "type": "command",
@@ -1665,7 +1801,10 @@
             "code": "restore",
             "variant": "primary",
             "visibleWhen": "row.status === 'suspended' || row.status === 'rejected'",
-            "label": "restore",
+            "label": {
+              "zh-CN": "恢复",
+              "en-US": "Restore"
+            },
             "confirm": "restore.confirm",
             "action": {
               "type": "command",
@@ -1692,7 +1831,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -1738,7 +1880,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "scheduled_task_form",
@@ -1759,7 +1904,8 @@
           {
             "field": "task_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "scheduled_task_type"
           },
           {
             "field": "cron_expression",
@@ -1792,7 +1938,10 @@
         "rowActions": [
           {
             "code": "detail",
-            "label": "detail",
+            "label": {
+              "zh-CN": "详情",
+              "en-US": "Detail"
+            },
             "action": {
               "type": "navigate",
               "to": "scheduled_task_detail"
@@ -1800,7 +1949,10 @@
           },
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "scheduled_task_form",
@@ -1810,7 +1962,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -1848,7 +2003,8 @@
         "fields": [
           {
             "field": "name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "enabled",
@@ -1856,7 +2012,8 @@
           },
           {
             "field": "task_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "cron_expression",
@@ -1882,7 +2039,8 @@
         "fields": [
           {
             "field": "handler_bean",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "handler_method",
@@ -1909,7 +2067,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "state_transition",
               "command": "admin:update_scheduled_task"
@@ -1917,7 +2078,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -1942,7 +2106,10 @@
           {
             "code": "edit",
             "icon": "Edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "permissionCode": "system.scheduler.update",
             "action": {
               "type": "navigate",
@@ -1953,7 +2120,10 @@
             "code": "delete",
             "icon": "Trash",
             "danger": true,
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "permissionCode": "system.scheduler.delete",
             "confirm": "delete.confirm",
             "action": {
@@ -2045,7 +2215,8 @@
               "zh-CN": "状态",
               "en-US": "Status"
             },
-            "width": 100
+            "width": 100,
+            "dictCode": "member_status"
           },
           {
             "field": "triggerType",
@@ -2082,7 +2253,7 @@
             "width": 110
           },
           {
-            "field": "retryCount",
+            "field": "retry_count",
             "label": {
               "zh-CN": "重试次数",
               "en-US": "Retry Count"
@@ -2090,7 +2261,7 @@
             "width": 90
           },
           {
-            "field": "errorMessage",
+            "field": "error_message",
             "label": {
               "zh-CN": "错误信息",
               "en-US": "Error Message"

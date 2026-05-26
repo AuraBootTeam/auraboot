@@ -14,7 +14,10 @@
           "code": "create",
           "primary": true,
           "permissionCode": "crm.lead.manage",
-          "label": "create",
+          "label": {
+            "zh-CN": "新建",
+            "en-US": "Create"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_lead_form",
@@ -159,7 +162,10 @@
           "buttons": [
             {
               "code": "view",
-              "label": "detail",
+              "label": {
+                "zh-CN": "详情",
+                "en-US": "Detail"
+              },
               "action": {
                 "type": "navigate",
                 "to": "crm_lead_detail"
@@ -168,7 +174,10 @@
             {
               "code": "edit",
               "permissionCode": "crm.lead.manage",
-              "label": "edit",
+              "label": {
+                "zh-CN": "编辑",
+                "en-US": "Edit"
+              },
               "action": {
                 "type": "navigate",
                 "to": "crm_lead_form"
@@ -178,14 +187,21 @@
               "code": "delete",
               "danger": true,
               "permissionCode": "crm.lead.manage",
-              "label": "delete",
+              "label": {
+                "zh-CN": "删除",
+                "en-US": "Delete"
+              },
               "confirm": "delete.confirm",
               "action": {
                 "type": "command",
                 "command": "crm:delete_lead"
               }
             }
-          ]
+          ],
+          "label": {
+            "zh-CN": "操作",
+            "en-US": "Actions"
+          }
         }
       ],
       "searchFields": [

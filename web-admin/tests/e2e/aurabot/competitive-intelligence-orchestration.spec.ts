@@ -12,8 +12,8 @@
 
 import { expect, test, type Page } from '../../fixtures';
 import type { TestInfo } from '@playwright/test';
+import { BACKEND_URL } from '../../helpers/environments';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:6530';
 const TEST_ACCOUNT = { email: 'admin@auraboot.com', password: 'Test2026x' };
 const STUB_TOOL_USE_MARKER = '@@AURABOOT_STUB_TOOL_USE@@';
 

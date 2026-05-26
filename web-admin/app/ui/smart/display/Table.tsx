@@ -911,7 +911,7 @@ export const Table: React.FC<TableProps> = ({
                   <React.Fragment key={rowKey}>
                     <tr
                       className={clsx(
-                        'border-b border-gray-200 hover:bg-gray-50',
+                        'group border-b border-gray-200 hover:bg-gray-50',
                         isSelected && 'bg-blue-50',
                       )}
                     >

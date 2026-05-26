@@ -16,8 +16,27 @@ export interface ExpressionEditorProps {
 
 type EditorMode = 'builder' | 'text';
 
+function normalizeExpressionValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? '')).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    const expr = value as { content?: unknown; expression?: unknown };
+    if (typeof expr.content === 'string') return expr.content;
+    if (typeof expr.expression === 'string') return expr.expression;
+    try {
+      return JSON.stringify(value);
+    } catch (_err) {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
 export function ExpressionEditor({ adapter, name, label, helpText, modelFields }: ExpressionEditorProps) {
-  const currentExpr = (adapter.value as string) ?? '';
+  const currentExpr = normalizeExpressionValue(adapter.value);
 
   const initialGroup = useMemo(() => deserialize(currentExpr), []);
   const [mode, setMode] = useState<EditorMode>(

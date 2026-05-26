@@ -17,7 +17,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_definition_form",
@@ -43,17 +46,20 @@
           {
             "field": "agent_type",
             "width": 140,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_agent_type"
           },
           {
             "field": "model",
             "width": 160,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_ai_model"
           },
           {
             "field": "status",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_agent_status"
           },
           {
             "field": "created_at",
@@ -64,7 +70,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_definition_form",
@@ -75,7 +84,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -113,15 +125,18 @@
         "fields": [
           {
             "field": "agent_code",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "agent_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "model",
@@ -194,7 +209,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_agent_definition"
@@ -202,7 +220,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -331,7 +352,10 @@
         "buttons": [
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -355,7 +379,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "mission_form",
@@ -376,7 +403,8 @@
           {
             "field": "mission_status",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_mission_status"
           },
           {
             "field": "acp_priority",
@@ -397,7 +425,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "mission_form",
@@ -420,7 +451,10 @@
             "code": "resume",
             "variant": "primary",
             "visibleWhen": "row.mission_status === 'paused'",
-            "label": "resume",
+            "label": {
+              "zh-CN": "恢复",
+              "en-US": "Resume"
+            },
             "confirm": "resume.confirm",
             "action": {
               "type": "command",
@@ -443,7 +477,10 @@
           {
             "code": "archive",
             "visibleWhen": "row.mission_status !== 'archived'",
-            "label": "archive",
+            "label": {
+              "zh-CN": "归档",
+              "en-US": "Archive"
+            },
             "confirm": "archive.confirm",
             "action": {
               "type": "command",
@@ -454,7 +491,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -492,7 +532,8 @@
         "fields": [
           {
             "field": "title",
-            "colSpan": 8
+            "colSpan": 8,
+            "required": true
           },
           {
             "field": "mission_status",
@@ -531,7 +572,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_mission"
@@ -539,7 +583,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -563,7 +610,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_task_form",
@@ -584,17 +634,20 @@
           {
             "field": "task_status",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_task_status"
           },
           {
             "field": "task_priority",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_task_priority"
           },
           {
             "field": "assignee_type",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_assignee_type"
           },
           {
             "field": "assignee_id",
@@ -614,7 +667,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_task_form",
@@ -648,7 +704,10 @@
             "code": "start",
             "variant": "primary",
             "visibleWhen": "row.task_status === 'todo'",
-            "label": "start",
+            "label": {
+              "zh-CN": "开始",
+              "en-US": "Start"
+            },
             "confirm": "start.confirm",
             "action": {
               "type": "state_transition",
@@ -695,7 +754,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -766,11 +828,13 @@
         "fields": [
           {
             "field": "title",
-            "colSpan": 8
+            "colSpan": 8,
+            "required": true
           },
           {
             "field": "task_status",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "mission_id",
@@ -829,7 +893,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_agent_task"
@@ -837,7 +904,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -855,11 +925,6 @@
     },
     "blocks": [
       {
-        "id": "toolbar",
-        "blockType": "toolbar",
-        "buttons": []
-      },
-      {
         "id": "table",
         "blockType": "table",
         "columns": [
@@ -874,12 +939,14 @@
           {
             "field": "run_status",
             "width": 110,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_run_status"
           },
           {
             "field": "run_model",
             "width": 160,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_ai_model"
           },
           {
             "field": "duration_ms",
@@ -951,11 +1018,13 @@
         "fields": [
           {
             "field": "task_id",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "agent_id",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "run_status",
@@ -1013,7 +1082,10 @@
         "buttons": [
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -1037,7 +1109,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_artifact_form",
@@ -1058,7 +1133,8 @@
           {
             "field": "artifact_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_artifact_type"
           },
           {
             "field": "mime_type",
@@ -1085,7 +1161,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_artifact_form",
@@ -1096,7 +1175,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -1134,11 +1216,13 @@
         "fields": [
           {
             "field": "title",
-            "colSpan": 8
+            "colSpan": 8,
+            "required": true
           },
           {
             "field": "artifact_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "run_id",
@@ -1177,7 +1261,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_agent_artifact"
@@ -1185,7 +1272,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -1209,7 +1299,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_schedule_form",
@@ -1230,7 +1323,8 @@
           {
             "field": "schedule_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_schedule_type"
           },
           {
             "field": "cron_expression",
@@ -1239,7 +1333,8 @@
           {
             "field": "schedule_status",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_schedule_status"
           },
           {
             "field": "run_count",
@@ -1264,7 +1359,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_schedule_form",
@@ -1298,7 +1396,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "state_transition",
@@ -1336,7 +1437,8 @@
         "fields": [
           {
             "field": "title",
-            "colSpan": 8
+            "colSpan": 8,
+            "required": true
           },
           {
             "field": "schedule_status",
@@ -1344,7 +1446,8 @@
           },
           {
             "field": "schedule_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "cron_expression",
@@ -1376,7 +1479,8 @@
           },
           {
             "field": "task_template",
-            "colSpan": 12
+            "colSpan": 12,
+            "required": true
           }
         ]
       },
@@ -1387,7 +1491,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_agent_schedule"
@@ -1395,7 +1502,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -1419,7 +1529,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "approval_policy_form",
@@ -1452,12 +1565,14 @@
           {
             "field": "timeout_action",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_timeout_action"
           },
           {
             "field": "policy_status",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_agent_status"
           },
           {
             "field": "created_at",
@@ -1468,7 +1583,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "approval_policy_form",
@@ -1479,7 +1597,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -1517,7 +1638,8 @@
         "fields": [
           {
             "field": "policy_name",
-            "colSpan": 8
+            "colSpan": 8,
+            "required": true
           },
           {
             "field": "policy_status",
@@ -1541,11 +1663,13 @@
           },
           {
             "field": "trigger_rules",
-            "colSpan": 12
+            "colSpan": 12,
+            "required": true
           },
           {
             "field": "approver_rules",
-            "colSpan": 12
+            "colSpan": 12,
+            "required": true
           }
         ]
       },
@@ -1556,7 +1680,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_approval_policy"
@@ -1564,7 +1691,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -1582,11 +1712,6 @@
     },
     "blocks": [
       {
-        "id": "toolbar",
-        "blockType": "toolbar",
-        "buttons": []
-      },
-      {
         "id": "table",
         "blockType": "table",
         "columns": [
@@ -1598,12 +1723,14 @@
           {
             "field": "approval_type",
             "width": 140,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_approval_type"
           },
           {
             "field": "approval_status",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_approval_status"
           },
           {
             "field": "task_id",
@@ -1629,7 +1756,10 @@
             "code": "approve",
             "variant": "primary",
             "visibleWhen": "row.approval_status === 'pending'",
-            "label": "approve",
+            "label": {
+              "zh-CN": "同意",
+              "en-US": "Approve"
+            },
             "confirm": "approve.confirm",
             "action": {
               "type": "command",
@@ -1641,7 +1771,10 @@
             "code": "reject",
             "variant": "danger",
             "visibleWhen": "row.approval_status === 'pending'",
-            "label": "reject",
+            "label": {
+              "zh-CN": "拒绝",
+              "en-US": "Reject"
+            },
             "confirm": "reject.confirm",
             "action": {
               "type": "command",
@@ -1679,15 +1812,18 @@
         "fields": [
           {
             "field": "approval_title",
-            "colSpan": 8
+            "colSpan": 8,
+            "required": true
           },
           {
             "field": "approval_status",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "approval_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "run_id",
@@ -1737,7 +1873,10 @@
         "buttons": [
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -1761,7 +1900,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_memory_form",
@@ -1782,7 +1924,8 @@
           {
             "field": "memory_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_memory_type"
           },
           {
             "field": "category",
@@ -1810,7 +1953,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_memory_form",
@@ -1821,7 +1967,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -1895,7 +2044,8 @@
           },
           {
             "field": "memory_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "memory_agent_id",
@@ -1923,7 +2073,8 @@
           },
           {
             "field": "memory_content",
-            "colSpan": 12
+            "colSpan": 12,
+            "required": true
           },
           {
             "field": "metadata",
@@ -1938,7 +2089,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_agent_memory"
@@ -1946,7 +2100,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -1964,11 +2121,6 @@
     },
     "blocks": [
       {
-        "id": "toolbar",
-        "blockType": "toolbar",
-        "buttons": []
-      },
-      {
         "id": "table",
         "blockType": "table",
         "columns": [
@@ -1980,12 +2132,14 @@
           {
             "field": "observation_type",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_observation_type"
           },
           {
             "field": "severity",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_severity"
           },
           {
             "field": "source_type",
@@ -2035,7 +2189,8 @@
           },
           {
             "field": "observation_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "severity",
@@ -2065,7 +2220,10 @@
         "buttons": [
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -2089,7 +2247,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_tool_form",
@@ -2115,12 +2276,14 @@
           {
             "field": "tool_type",
             "width": 140,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_tool_type"
           },
           {
             "field": "risk_level",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_risk_level"
           },
           {
             "field": "requires_approval",
@@ -2129,7 +2292,8 @@
           {
             "field": "tool_status",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_agent_status"
           },
           {
             "field": "auto_generated",
@@ -2144,7 +2308,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_tool_form",
@@ -2155,7 +2322,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -2193,15 +2363,18 @@
         "fields": [
           {
             "field": "tool_code",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "tool_name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "tool_type",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "risk_level",
@@ -2233,7 +2406,8 @@
           },
           {
             "field": "tool_description",
-            "colSpan": 12
+            "colSpan": 12,
+            "required": true
           },
           {
             "field": "input_schema",
@@ -2252,7 +2426,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_agent_tool"
@@ -2260,7 +2437,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -2284,7 +2464,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_skill_form",
@@ -2310,12 +2493,14 @@
           {
             "field": "skill_level",
             "width": 140,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_skill_level"
           },
           {
             "field": "skill_category",
             "width": 120,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_skill_category"
           },
           {
             "field": "skill_icon",
@@ -2328,7 +2513,8 @@
           {
             "field": "skill_status",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_skill_status"
           },
           {
             "field": "is_builtin",
@@ -2343,7 +2529,10 @@
         "rowActions": [
           {
             "code": "edit",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "agent_skill_form",
@@ -2354,7 +2543,10 @@
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -2392,15 +2584,18 @@
         "fields": [
           {
             "field": "skill_code",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "skill_name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "skill_level",
-            "colSpan": 4
+            "colSpan": 4,
+            "required": true
           },
           {
             "field": "skill_category",
@@ -2457,7 +2652,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_agent_skill"
@@ -2465,7 +2663,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -2730,7 +2931,8 @@
               "label": {
                 "zh-CN": "类型",
                 "en": "Type"
-              }
+              },
+              "dictCode": "acp_approval_type"
             },
             {
               "field": "title",
@@ -2808,7 +3010,8 @@
               "label": {
                 "zh-CN": "状态",
                 "en": "Status"
-              }
+              },
+              "dictCode": "acp_run_status"
             },
             {
               "field": "run_model",
@@ -2816,7 +3019,8 @@
               "label": {
                 "zh-CN": "模型",
                 "en": "Model"
-              }
+              },
+              "dictCode": "acp_ai_model"
             },
             {
               "field": "started_at",
@@ -2885,7 +3089,8 @@
               "label": {
                 "zh-CN": "状态",
                 "en": "Status"
-              }
+              },
+              "dictCode": "acp_mission_status"
             },
             {
               "field": "acp_priority",
@@ -3005,7 +3210,8 @@
               "label": {
                 "zh-CN": "模型",
                 "en": "Model"
-              }
+              },
+              "dictCode": "acp_ai_model"
             },
             {
               "field": "started_at",
@@ -3058,11 +3264,6 @@
     },
     "blocks": [
       {
-        "id": "toolbar",
-        "blockType": "toolbar",
-        "buttons": []
-      },
-      {
         "id": "table",
         "blockType": "table",
         "columns": [
@@ -3087,7 +3288,8 @@
           {
             "field": "risk_level",
             "width": 100,
-            "renderType": "tag"
+            "renderType": "tag",
+            "dictCode": "acp_risk_level"
           },
           {
             "field": "action_status",
@@ -3130,7 +3332,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "object_alias_form",
@@ -3193,7 +3398,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "semantic_term_form",
@@ -3264,7 +3472,10 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en-US": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "mcp_server_form",
@@ -3296,7 +3507,8 @@
           },
           {
             "field": "status",
-            "width": 100
+            "width": 100,
+            "dictCode": "acp_agent_status"
           },
           {
             "field": "tool_count",
@@ -3339,11 +3551,13 @@
         "fields": [
           {
             "field": "model_code",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "alias",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "language",
@@ -3362,7 +3576,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_object_alias"
@@ -3370,7 +3587,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -3398,7 +3618,8 @@
         "fields": [
           {
             "field": "term",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "model_code",
@@ -3406,7 +3627,8 @@
           },
           {
             "field": "term_type",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "language",
@@ -3433,7 +3655,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_semantic_term"
@@ -3441,7 +3666,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
@@ -3469,11 +3697,13 @@
         "fields": [
           {
             "field": "server_name",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "server_url",
-            "colSpan": 6
+            "colSpan": 6,
+            "required": true
           },
           {
             "field": "transport_type",
@@ -3500,7 +3730,10 @@
           {
             "code": "submit",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "acp:update_mcp_server"
@@ -3508,7 +3741,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }

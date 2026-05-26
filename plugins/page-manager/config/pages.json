@@ -6,16 +6,58 @@
     "modelCode": "page_schema",
     "kind": "list",
     "schemaVersion": 2,
-    "layout": { "type": "stack" },
+    "layout": {
+      "type": "stack"
+    },
     "blocks": [
       {
         "id": "ps_tabs",
         "blockType": "tabs",
         "tabs": [
-          { "key": "all", "label": { "zh-CN": "全部", "en": "All" }, "filter": null },
-          { "key": "draft", "label": { "zh-CN": "草稿", "en": "Draft" }, "filter": { "field": "status", "value": "draft", "operator": "EQ" } },
-          { "key": "published", "label": { "zh-CN": "已发布", "en": "Published" }, "filter": { "field": "status", "value": "published", "operator": "EQ" } },
-          { "key": "archived", "label": { "zh-CN": "已归档", "en": "Archived" }, "filter": { "field": "status", "value": "archived", "operator": "EQ" } }
+          {
+            "key": "all",
+            "label": {
+              "zh-CN": "全部",
+              "en": "All"
+            },
+            "filter": null
+          },
+          {
+            "key": "draft",
+            "label": {
+              "zh-CN": "草稿",
+              "en": "Draft"
+            },
+            "filter": {
+              "field": "status",
+              "value": "draft",
+              "operator": "EQ"
+            }
+          },
+          {
+            "key": "published",
+            "label": {
+              "zh-CN": "已发布",
+              "en": "Published"
+            },
+            "filter": {
+              "field": "status",
+              "value": "published",
+              "operator": "EQ"
+            }
+          },
+          {
+            "key": "archived",
+            "label": {
+              "zh-CN": "已归档",
+              "en": "Archived"
+            },
+            "filter": {
+              "field": "status",
+              "value": "archived",
+              "operator": "EQ"
+            }
+          }
         ]
       },
       {
@@ -26,7 +68,10 @@
             "code": "create",
             "variant": "primary",
             "icon": "Plus",
-            "label": { "zh-CN": "新建页面", "en": "New Page" },
+            "label": {
+              "zh-CN": "新建页面",
+              "en": "New Page"
+            },
             "action": {
               "type": "navigate",
               "to": "page_schema_form",
@@ -41,76 +86,189 @@
         "onRowClick": "navigate",
         "detailUrl": "/unified-designer?pageId={pid}",
         "columns": [
-          { "field": "name", "width": 220, "sortable": true },
-          { "field": "page_key", "width": 220, "sortable": true },
-          { "field": "kind", "width": 110, "renderType": "tag", "dictCode": "pm_page_kind" },
-          { "field": "status", "width": 110, "renderType": "tag", "dictCode": "pm_page_status" },
-          { "field": "model_code", "width": 150 },
-          { "field": "semver", "width": 100 },
-          { "field": "updated_at", "width": 180, "sortable": true, "format": "YYYY-MM-DD HH:mm" }
+          {
+            "field": "name",
+            "width": 220,
+            "sortable": true
+          },
+          {
+            "field": "page_key",
+            "width": 220,
+            "sortable": true
+          },
+          {
+            "field": "kind",
+            "width": 110,
+            "renderType": "tag",
+            "dictCode": "pm_page_kind"
+          },
+          {
+            "field": "status",
+            "width": 110,
+            "renderType": "tag",
+            "dictCode": "pm_page_status"
+          },
+          {
+            "field": "model_code",
+            "width": 150
+          },
+          {
+            "field": "semver",
+            "width": 100
+          },
+          {
+            "field": "updated_at",
+            "width": 180,
+            "sortable": true,
+            "format": "YYYY-MM-DD HH:mm"
+          }
         ],
         "rowActions": [
           {
             "code": "edit_unified",
-            "label": { "zh-CN": "统一设计器", "en": "Unified Designer" },
-            "action": { "type": "navigate", "to": "/unified-designer?pageId={pid}" }
+            "label": {
+              "zh-CN": "统一设计器",
+              "en": "Unified Designer"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "/unified-designer?pageId={pid}"
+            }
           },
           {
             "code": "edit_legacy",
-            "label": { "zh-CN": "旧页面设计器", "en": "Legacy Page Designer" },
-            "action": { "type": "navigate", "to": "/page-designer/{pid}" }
+            "label": {
+              "zh-CN": "旧页面设计器",
+              "en": "Legacy Page Designer"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "/page-designer/{pid}"
+            }
           },
           {
             "code": "publish",
-            "label": { "zh-CN": "发布", "en": "Publish" },
-            "action": { "type": "command", "command": "pgm:publish_page_schema" },
-            "visibleWhen": { "field": "status", "operator": "EQ", "value": "draft" }
+            "label": {
+              "zh-CN": "发布",
+              "en": "Publish"
+            },
+            "action": {
+              "type": "command",
+              "command": "pgm:publish_page_schema"
+            },
+            "visibleWhen": {
+              "field": "status",
+              "operator": "EQ",
+              "value": "draft"
+            }
           },
           {
             "code": "archive",
-            "label": { "zh-CN": "归档", "en": "Archive" },
-            "action": { "type": "command", "command": "pgm:archive_page_schema" },
-            "visibleWhen": { "field": "status", "operator": "IN", "value": ["draft", "published"] }
+            "label": {
+              "zh-CN": "归档",
+              "en": "Archive"
+            },
+            "action": {
+              "type": "command",
+              "command": "pgm:archive_page_schema"
+            },
+            "visibleWhen": {
+              "field": "status",
+              "operator": "IN",
+              "value": [
+                "draft",
+                "published"
+              ]
+            }
           },
           {
             "code": "duplicate",
-            "label": { "zh-CN": "复制", "en": "Duplicate" },
-            "action": { "type": "command", "command": "pgm:duplicate_page_schema" }
+            "label": {
+              "zh-CN": "复制",
+              "en": "Duplicate"
+            },
+            "action": {
+              "type": "command",
+              "command": "pgm:duplicate_page_schema"
+            }
           },
           {
             "code": "delete",
             "variant": "danger",
-            "label": "delete",
-            "confirm": { "zh-CN": "确定要删除此页面吗？", "en": "Delete this page?" },
-            "action": { "type": "command", "command": "pgm:delete_page_schema" }
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
+            "confirm": {
+              "zh-CN": "确定要删除此页面吗？",
+              "en": "Delete this page?"
+            },
+            "action": {
+              "type": "command",
+              "command": "pgm:delete_page_schema"
+            }
           }
         ],
         "batchActions": [
           {
             "code": "batchPublish",
             "icon": "CheckCircle",
-            "label": { "zh-CN": "批量发布", "en": "Batch Publish" },
-            "confirm": { "zh-CN": "确定要发布选中的页面吗？", "en": "Publish selected pages?" },
-            "action": { "type": "command", "command": "pgm:publish_page_schema" }
+            "label": {
+              "zh-CN": "批量发布",
+              "en": "Batch Publish"
+            },
+            "confirm": {
+              "zh-CN": "确定要发布选中的页面吗？",
+              "en": "Publish selected pages?"
+            },
+            "action": {
+              "type": "command",
+              "command": "pgm:publish_page_schema"
+            }
           },
           {
             "code": "batchArchive",
             "icon": "Archive",
-            "label": { "zh-CN": "批量归档", "en": "Batch Archive" },
-            "confirm": { "zh-CN": "确定要归档选中的页面吗？", "en": "Archive selected pages?" },
-            "action": { "type": "command", "command": "pgm:archive_page_schema" }
+            "label": {
+              "zh-CN": "批量归档",
+              "en": "Batch Archive"
+            },
+            "confirm": {
+              "zh-CN": "确定要归档选中的页面吗？",
+              "en": "Archive selected pages?"
+            },
+            "action": {
+              "type": "command",
+              "command": "pgm:archive_page_schema"
+            }
           },
           {
             "code": "batchDelete",
             "icon": "Trash2",
             "variant": "danger",
-            "label": { "zh-CN": "批量删除", "en": "Batch Delete" },
-            "confirm": { "zh-CN": "确定要删除选中的页面吗？此操作不可恢复。", "en": "Delete selected pages? This cannot be undone." },
-            "action": { "type": "command", "command": "pgm:delete_page_schema" }
+            "label": {
+              "zh-CN": "批量删除",
+              "en": "Batch Delete"
+            },
+            "confirm": {
+              "zh-CN": "确定要删除选中的页面吗？此操作不可恢复。",
+              "en": "Delete selected pages? This cannot be undone."
+            },
+            "action": {
+              "type": "command",
+              "command": "pgm:delete_page_schema"
+            }
           }
         ],
-        "searchFields": ["name", "page_key", "model_code"],
-        "defaultSort": { "field": "updated_at", "order": "desc" }
+        "searchFields": [
+          "name",
+          "page_key",
+          "model_code"
+        ],
+        "defaultSort": {
+          "field": "updated_at",
+          "order": "desc"
+        }
       }
     ]
   },
@@ -121,7 +279,10 @@
     "modelCode": "page_schema",
     "kind": "form",
     "schemaVersion": 2,
-    "layout": { "type": "grid", "cols": 12 },
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
     "extension": {
       "afterSubmitRedirect": "/unified-designer?pageId={pid}"
     },
@@ -129,14 +290,39 @@
       {
         "id": "ps_form_basic",
         "blockType": "form-section",
-        "title": { "zh-CN": "基本信息", "en": "Basic Information" },
+        "title": {
+          "zh-CN": "基本信息",
+          "en": "Basic Information"
+        },
         "fields": [
-          { "field": "name", "colSpan": 6 },
-          { "field": "page_key", "colSpan": 6 },
-          { "field": "kind", "colSpan": 4 },
-          { "field": "profile", "colSpan": 4 },
-          { "field": "model_code", "colSpan": 4 },
-          { "field": "description", "colSpan": 12 }
+          {
+            "field": "name",
+            "colSpan": 6,
+            "required": true
+          },
+          {
+            "field": "page_key",
+            "colSpan": 6,
+            "required": true
+          },
+          {
+            "field": "kind",
+            "colSpan": 4,
+            "required": true
+          },
+          {
+            "field": "profile",
+            "colSpan": 4
+          },
+          {
+            "field": "model_code",
+            "colSpan": 4,
+            "required": true
+          },
+          {
+            "field": "description",
+            "colSpan": 12
+          }
         ]
       },
       {
@@ -146,7 +332,10 @@
           {
             "code": "submit",
             "variant": "primary",
-            "label": { "zh-CN": "创建并进入编辑器", "en": "Create & Open Editor" },
+            "label": {
+              "zh-CN": "创建并进入编辑器",
+              "en": "Create & Open Editor"
+            },
             "action": {
               "type": "command",
               "command": "pgm:create_page_schema"
@@ -154,8 +343,14 @@
           },
           {
             "code": "cancel",
-            "label": { "zh-CN": "取消", "en": "Cancel" },
-            "action": { "type": "navigate", "to": "page_schema_list" }
+            "label": {
+              "zh-CN": "取消",
+              "en": "Cancel"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "page_schema_list"
+            }
           }
         ]
       }

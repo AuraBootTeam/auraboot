@@ -189,9 +189,12 @@ async function navigateToDesignerViaMenu(
  */
 async function addBlockViaPalette(page: Page, blockType: string): Promise<void> {
   await page.getByTestId('designer-tab-blocks').click();
+  const blocks = page.locator(`[data-block-type="${blockType}"]`);
+  const before = await blocks.count();
   const item = page.getByTestId(`block-palette-item-${blockType}`);
   await expect(item).toBeVisible({ timeout: 5_000 });
   await item.click();
+  await expect(blocks).toHaveCount(before + 1, { timeout: 5_000 });
 }
 
 /**

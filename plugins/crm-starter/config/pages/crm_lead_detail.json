@@ -14,7 +14,10 @@
           "code": "edit",
           "icon": "Edit",
           "permissionCode": "crm.lead.manage",
-          "label": "edit",
+          "label": {
+            "zh-CN": "编辑",
+            "en-US": "Edit"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_lead_form"
@@ -22,7 +25,10 @@
         },
         {
           "code": "contact",
-          "label": "execute",
+          "label": {
+            "zh-CN": "执行",
+            "en-US": "Execute"
+          },
           "action": {
             "type": "command",
             "command": "crm:contact_lead"
@@ -30,7 +36,10 @@
         },
         {
           "code": "qualify",
-          "label": "execute",
+          "label": {
+            "zh-CN": "执行",
+            "en-US": "Execute"
+          },
           "action": {
             "type": "command",
             "command": "crm:qualify_lead"
@@ -39,7 +48,10 @@
         {
           "code": "convert",
           "primary": true,
-          "label": "execute",
+          "label": {
+            "zh-CN": "执行",
+            "en-US": "Execute"
+          },
           "action": {
             "type": "command",
             "command": "crm:convert_lead"
@@ -48,7 +60,10 @@
         {
           "code": "lose",
           "danger": true,
-          "label": "execute",
+          "label": {
+            "zh-CN": "执行",
+            "en-US": "Execute"
+          },
           "action": {
             "type": "command",
             "command": "crm:lose_lead"

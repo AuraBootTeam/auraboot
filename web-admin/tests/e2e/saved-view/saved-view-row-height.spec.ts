@@ -66,7 +66,8 @@ test.describe('Row Height Control (GAP-127)', () => {
   });
 
   test('RH-002: switching row height changes table row visual height', async ({ page }) => {
-    await page.goto('/p/e2et_order');
+    const viewPid = await createViewViaApi(page, 'e2et_order', uniqueId('rh_table'), 'medium');
+    await page.goto(viewPid ? `/p/e2et_order?view=${viewPid}` : '/p/e2et_order');
     const rowHeightBtn = page.getByTestId('row-height-btn');
     await expect(rowHeightBtn).toBeVisible({ timeout: 30000 });
 
@@ -107,6 +108,10 @@ test.describe('Row Height Control (GAP-127)', () => {
 
     const tallHeight = await firstRow.evaluate((el) => el.getBoundingClientRect().height);
     expect(tallHeight).toBeGreaterThan(shortHeight);
+
+    if (viewPid) {
+      await page.request.delete(`/api/views/${viewPid}`).catch(() => null);
+    }
   });
 
   test('RH-003: row height persists via API', async ({ page }) => {

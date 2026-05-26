@@ -33,6 +33,12 @@ async function gotoAndSelectCalendarView(page: import('@playwright/test').Page) 
   await panel.waitFor({ state: 'visible', timeout: 5000 });
   // Find and click the calendar view by name in the panel
   const viewOption = panel.getByText(VIEW_NAME, { exact: false }).first();
+  if (!(await viewOption.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('table, [role="table"], [data-testid="dynamic-list"]').first().waitFor({ state: 'visible', timeout: 15000 });
+    await page.locator('button[aria-haspopup="listbox"]').click();
+    await panel.waitFor({ state: 'visible', timeout: 5000 });
+  }
   await viewOption.waitFor({ state: 'visible', timeout: 5000 });
   await viewOption.click();
   // Close the panel after selecting the view (panel does not auto-close)
@@ -82,10 +88,19 @@ test.describe('SavedView — CALENDAR View', () => {
         },
       },
     });
-    if (viewResp.ok()) {
-      const body = await viewResp.json();
-      calendarViewPid = body.data?.pid ?? body.pid ?? '';
-    }
+    expect(viewResp.ok(), `Create calendar SavedView failed: ${viewResp.status()}`).toBeTruthy();
+    const body = await viewResp.json();
+    calendarViewPid = body.data?.pid ?? body.pid ?? '';
+    await expect
+      .poll(async () => {
+        const resp = await page.request.get(
+          `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
+        );
+        if (!resp.ok()) return false;
+        const accessibleBody = await resp.json().catch(() => ({}));
+        return (accessibleBody.data ?? []).some((v: any) => v.pid === calendarViewPid);
+      }, { timeout: 10_000 })
+      .toBe(true);
 
     // Create orders with dates for calendar display
     for (let i = -2; i <= 2; i++) {
