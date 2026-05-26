@@ -29,6 +29,7 @@ import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
+import { BlockErrorBoundary } from '~/framework/meta/rendering/BlockErrorBoundary';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
 import type { PageContentProps } from '~/framework/meta/profiles/types';
@@ -1403,6 +1404,24 @@ export function FormPageContent(props: PageContentProps) {
   // ruler, designer panels). Rendered above the form-section blocks so
   // operators see the visualization first.
   const customBlocks = allBlocks.filter((block: any) => block.blockType === 'custom');
+  // Stable runtime context for custom blocks. Memoized so the props
+  // reference passed to ComponentLoader is identity-stable across re-renders
+  // unless one of the source values changes; otherwise every keystroke in
+  // a form input would re-mount the custom block subtree and blow away
+  // local state (drag selection, cached fetches, etc.).
+  const customBlockRuntime = useMemo(
+    () => ({
+      record: formData,
+      initialRecord: initialFormData ?? formData,
+      recordId,
+      tableName,
+      token,
+      locale,
+      t,
+      getContext: () => ({ record: formData, pageContext }),
+    }),
+    [formData, initialFormData, recordId, tableName, token, locale, t, pageContext],
+  );
   // subTableBlocks computed via useMemo above (used for metadata fetching and rendering)
   const buttonBlock = allBlocks.find((block: any) => block.blockType === 'form-buttons');
   const effectiveButtonBlock = buttonBlock || null;
@@ -1488,43 +1507,34 @@ export function FormPageContent(props: PageContentProps) {
                 // BlockRenderer's pattern. Silent-null would hide DSL typos.
                 if (!block.component) {
                   return (
-                    <div
-                      key={block.id}
-                      className="mb-5 rounded border border-red-300 bg-red-50 p-4"
-                      data-block-id={block.id}
-                    >
-                      <p className="text-red-800">
-                        Custom block missing `component`: {block.id}
-                      </p>
-                    </div>
+                    <BlockErrorBoundary key={block.id} blockType="custom" blockId={block.id}>
+                      <div
+                        className="mb-5 rounded border border-red-300 bg-red-50 p-4"
+                        data-block-id={block.id}
+                      >
+                        <p className="text-red-800">
+                          Custom block missing `component`: {block.id}
+                        </p>
+                      </div>
+                    </BlockErrorBoundary>
                   );
                 }
                 return (
-                  <div
+                  <BlockErrorBoundary
                     key={block.id}
-                    data-block-id={block.id}
-                    className={`block-custom mb-5 ${block.className || ''}`}
+                    blockType="custom"
+                    blockId={block.id}
                   >
-                    <ComponentLoader
-                      componentName={block.component}
-                      props={{
-                        block,
-                        runtime: {
-                          record: formData,
-                          initialRecord: initialFormData ?? formData,
-                          recordId,
-                          tableName,
-                          token,
-                          locale,
-                          t,
-                          getContext: () => ({
-                            record: formData,
-                            pageContext,
-                          }),
-                        },
-                      }}
-                    />
-                  </div>
+                    <div
+                      data-block-id={block.id}
+                      className={`block-custom mb-5 ${block.className || ''}`}
+                    >
+                      <ComponentLoader
+                        componentName={block.component}
+                        props={{ block, runtime: customBlockRuntime }}
+                      />
+                    </div>
+                  </BlockErrorBoundary>
                 );
               })}
               {formBlocks &&
