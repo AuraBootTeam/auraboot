@@ -78,6 +78,25 @@ OSS E2E 走 `--edition=oss`,不需 host `buildAllPluginJars`。企业 E2E 用已
 - 收敛与 T4/G4 前端改动在同一 worktree,用独立 commit 分开,最终拆两个 PR(收敛 PR + G4 PR)。
 - 本会话已很长,全实施风险:上下文压缩 + 大量 docker 起停耗时 → 缓解:分阶段 + 频繁 commit + 先做能跑通 G4 E2E 的阶段①。
 
+## 实施蓝图 — 核验更新(2026-05-26)
+
+实地核验后,基础设施大量已预埋,复杂度低于初估:
+
+1. **`start-isolated` 已内置 ga-e2e slug 特判**:`compute_initial_offset()` 对 `SLUG=ga-e2e` 返回 `0` → 端口=BASE=GA 历史端口(PG 5433 / BE 6444 / VITE 5174 / BFF 3501)。`COMPOSE_PROJECT_NAME=auraboot-ga-e2e` 一致。
+2. **`isolated.yml` 已有 `playwright-runner` service**(profile `playwright-runner`;`PLAYWRIGHT_BASE_URL=http://isolated-frontend:5173`,`BACKEND_URL=http://backend:6443`)。
+3. `start-isolated` 容器内 build backend + 独立 `$AURA_CONTAINER_CACHE_ROOT/m2` → 消除 GA 的 host build/`~/.m2` 冲突。
+4. **隐藏依赖**:`docker-ga-showcase-e2e.sh` 直接用 `ga-e2e.override.yml` + `ga-e2e-runner` profile,需迁到 `isolated.yml` + `playwright-runner`。其余 5 脚本走 up/down/bootstrap 接口或 `bash -n`,wrapper 化安全。
+
+### 改动清单
+- `docker-ga-e2e-up.sh` → `exec scripts/dev/start-isolated.sh --slug=ga-e2e --wait "$@"`(容器 build;不带 `--e2e`,撒种由 bootstrap.sh 做避免重复)。丢弃 host wrapper-jar guard / host-jar build / host 企业 jar build(企业 E2E 改用 `ENTERPRISE_PLUGIN_JARS_DIR` 容器挂载)。
+- `docker-ga-e2e-down.sh` → `exec scripts/dev/stop-isolated.sh --slug=ga-e2e "$@"`(`--purge` 透传)。
+- `docker-ga-e2e-bootstrap.sh` → 不变(端口 6444/5433 = offset0 栈端口)。
+- `docker-ga-showcase-e2e.sh` → `compose_args` 改 `-f docker-compose.isolated.yml --profile isolated --profile cache --profile playwright-runner`;runner service `ga-e2e-runner`→`playwright-runner`;frontend `ga-e2e-frontend`→`isolated-frontend`(容器名仍 `auraboot-ga-e2e-frontend`)。
+- `ga-e2e.override.yml` 保留文件(减回归面;`check-oss-boundary` 白名单不动),仅脚本切栈。
+
+### 验证(收尾)
+停 canonical GA 栈 → GA up(wrapper) + bootstrap → admin 200 → showcase smoke 1 spec → 回归 p1-verify-in-docker / docker-ga-showcase-e2e / check-oss-boundary / check-reset-init-contracts / ga-showcase-e2e(cleanup-batch 独立) + CI `reset-init-contracts.yml`。
+
 ## 反向触发(何时重评)
 - 若 GA wrapper 固定端口与并发隔离语义冲突无法调和 → 退回"GA 独立薄栈 + start-isolated 各自演进"。
 - 若企业 E2E 在容器挂载 jar 路径出现 PF4J 加载问题 → 单独处理企业 jar 容器化 track。

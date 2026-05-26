@@ -1,30 +1,12 @@
 #!/usr/bin/env bash
-# Tear down the GA Follow-up E2E stack and (optionally) its volumes.
+# GA Follow-up E2E stack teardown — thin wrapper over stop-isolated.
+# (See DDR-2026-05-26 docker-stack-convergence.)
 #
 # Usage:
 #   ./scripts/docker-ga-e2e-down.sh           # stop + remove containers, KEEP volumes
-#   ./scripts/docker-ga-e2e-down.sh --purge   # also remove postgres/backend volumes (fresh DB next up)
-
+#   ./scripts/docker-ga-e2e-down.sh --purge   # also drop volumes (fresh DB next up)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-export COMPOSE_PROJECT_NAME=auraboot-ga-e2e
-
-if [ "${1:-}" = "--purge" ]; then
-  echo "[ga-e2e] tearing down stack + volumes..."
-  docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.ga-e2e.override.yml \
-    --profile ga-e2e-stack \
-    --profile ga-e2e-runner \
-    down -v
-else
-  echo "[ga-e2e] tearing down stack (volumes preserved)..."
-  docker compose \
-    -f docker-compose.yml \
-    -f docker-compose.ga-e2e.override.yml \
-    --profile ga-e2e-stack \
-    --profile ga-e2e-runner \
-    down
-fi
+exec scripts/dev/stop-isolated.sh --slug=ga-e2e "$@"
