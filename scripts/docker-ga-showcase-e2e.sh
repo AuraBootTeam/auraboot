@@ -38,11 +38,14 @@ cd "$REPO_ROOT"
 
 export COMPOSE_PROJECT_NAME=auraboot-ga-e2e
 
+# Converged stack (DDR-2026-05-26): the ga-e2e stack is now start-isolated under
+# the ga-e2e slug, so the Playwright runner is isolated.yml's `playwright-runner`.
 compose_args=(
   -f docker-compose.yml
-  -f docker-compose.ga-e2e.override.yml
-  --profile ga-e2e-stack
-  --profile ga-e2e-runner
+  -f docker-compose.isolated.yml
+  --profile isolated
+  --profile cache
+  --profile playwright-runner
 )
 
 find_competing_host_runners() {
@@ -172,7 +175,7 @@ run_in_runner() {
   command="$(runner_command "$phase")"
 
   set +e
-  docker compose "${compose_args[@]}" run --rm --quiet-pull --entrypoint bash ga-e2e-runner -lc "$command" \
+  docker compose "${compose_args[@]}" run --rm --quiet-pull --entrypoint bash playwright-runner -lc "$command" \
     2>&1 | tee "$log"
   local status="${PIPESTATUS[0]}"
   set -e
