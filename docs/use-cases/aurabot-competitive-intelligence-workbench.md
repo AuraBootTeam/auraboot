@@ -101,12 +101,41 @@ Deferred:
 
 - Real scenario template creation wizard.
 - One-click creation of mission, tasks, schedule, policy, and report artifact.
-- Seed data for a full competitive intelligence demo.
-- E2E coverage for create/run/approve/report once those commands exist.
+- Seed data for a full competitive intelligence demo outside the E2E-retained evidence records.
+- End-to-end create/run/approve/report automation for a real agent execution engine.
 
 ## Validation
+
+Validation is split into two layers:
+
+1. Workbench wiring: prove the product entry points, DSL pages, and static pages are reachable from the scenario dashboard.
+2. Agent scenario: prove an Agent run can execute the scenario path, invoke a real tool, persist a report artifact, and pass a deterministic quality rubric.
+3. Scenario orchestration: prove the full business chain can connect mission, tasks, multiple agents, approval policy, schedule, run, artifact, and memory.
 
 - Unit test the dashboard link map so `/p/...` paths stay aligned with imported DSL page schemas.
 - Browser-check `/aurabot/dashboard` in the bugfix environment.
 - Verify key entry buttons navigate to DSL and static pages without schema errors.
 - Keep the landing page usable when there are no runs or schedules.
+- Playwright E2E: `web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts`.
+  - Creates retained evidence data through real command APIs: mission, agent definition, agent task, agent run, artifact, schedule, approval policy, and memory.
+  - Drives the product chain from `/aurabot/dashboard` through the visible Dashboard entries instead of direct-linking to target pages.
+  - Verifies DSL and static destinations: `/p/mission/new`, `/p/mission`, `/p/agent_task`, `/aurabot/runs`, `/p/agent_approval`, `/p/agent_artifact`, `/p/agent_definition`, `/p/agent_schedule`, `/p/approval_policy`, `/p/agent_memory`, `/aurabot/traces`, `/aurabot/interrupts`, and `/aurabot/my-profile`.
+  - Attaches retained seed record ids, route evidence, dashboard screenshot, and Playwright trace for auditability.
+  - Targeted command used on 2026-05-22:
+    `CI=1 PW_SKIP_WEBSERVER=1 PLAYWRIGHT_BASE_URL=http://localhost:5260 BACKEND_URL=http://localhost:6530 BE_PORT=6530 BFF_PORT=3587 PW_ADMIN_STORAGE_STATE=/Users/ghj/work/auraboot/.aura/envs/bugfix-daily/auth/admin.json PW_ARTIFACT_DIR=./test-results/ciwb-artifacts PW_REPORT_DIR=./test-results/ciwb-html-report PW_RESULTS_JSON=./test-results/ciwb-results.json PW_WORKERS=1 npx playwright test tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts --project=chromium --trace on --no-deps`.
+- Playwright Agent scenario E2E: `web-admin/tests/e2e/aurabot/competitive-intelligence-agent-scenario.spec.ts`.
+  - Triggers `/api/ai/aurabot/chat/stream` with `explicitDurableRequest=true`, so the default AuraBot path enters the durable Agent runtime.
+  - Uses deterministic stub LLM only for the model response; the runtime, tool policy, confirmation, `ToolLoopService`, DSL command execution, database write, and UI verification remain real.
+  - Requires `confirm_required`, then confirms through `/api/ai/aurabot/execute` and expects `tool_start`, `result_contract`, `tool_result`, and `done` events.
+  - Persists a real `agent_artifact` report through `cmd_acp_create_agent_artifact`, then verifies it from the Dashboard artifact entry in the browser.
+  - Scores the report with a deterministic quality rubric: minimum length, required sections, source links, competitor specificity, GTM actionability, and no stub placeholder in the artifact body.
+  - Attaches runtime SSE events and `ciwb-agent-artifact-quality.json` as test evidence.
+- Playwright orchestration E2E: `web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts`.
+  - Creates "竞对调研：A/B/C 公司本周变化" through the AuraBot confirmed tool path.
+  - Creates Research Agent, Data Analyst, Sales Agent, and AuraBot supervisor definitions.
+  - Creates five sub-tasks: official-site collection, pricing collection, feature extraction/comparison table, sales interpretation, and final weekly report.
+  - Creates approval policy rules for external website access, budget overrun, email sending, and high-risk commands.
+  - Creates memory for enterprise preferences: pricing, features, customer stories, keywords, source links, and sales actions.
+  - Creates a Monday weekly schedule, triggers it through `/api/agent/schedule/{schedulePid}/trigger`, and verifies the resulting Agent run.
+  - Persists the final report artifact linked to the scheduled run and report task, then verifies the schedule and artifact from Dashboard entries.
+  - Attaches `ciwb-orchestration-evidence.json` with record ids, run id, task ids, tool events, and report quality score.
