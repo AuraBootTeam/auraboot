@@ -391,7 +391,7 @@ dependencies {
     implementation "org.pf4j:pf4j-spring:${pf4jSpringVersion}"
 
     // Google OAuth (for ID token verification) + Gmail API
-    implementation 'com.google.api-client:google-api-client:2.7.2'
+    implementation 'com.google.api-client:google-api-client:2.9.0'
     implementation 'com.google.apis:google-api-services-gmail:v1-rev20240520-2.0.0'
     implementation 'com.google.http-client:google-http-client-jackson2:1.44.1'
 
