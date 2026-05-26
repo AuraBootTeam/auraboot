@@ -119,8 +119,25 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     [parentRecordData, parentRecordId],
   );
 
+  // Resolve which parent value the child column compares against.
+  // Default 'pid' uses the URL :recordId (ULID). 'id' uses parent's bigint snowflake,
+  // required when parentField is a bigint column. Returns null when not yet available
+  // so the caller can defer the query (prevents type-mismatch 500 on initial render).
+  const effectiveParentKey = useMemo<string | null>(() => {
+    if (config.parentKeyField === 'id') {
+      const parentId = parentRecordData?.id;
+      if (parentId === undefined || parentId === null || parentId === '') return null;
+      return String(parentId);
+    }
+    return parentRecordId || null;
+  }, [config.parentKeyField, parentRecordData, parentRecordId]);
+
   useEffect(() => {
     if (!parentRecordId) return;
+    if (effectiveParentKey === null) {
+      // parentKeyField:'id' configured but parent record hasn't loaded yet — defer.
+      return;
+    }
 
     const loadData = async () => {
       setLoading(true);
@@ -175,7 +192,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           const rv = config.resolveVia;
           const intermediateModel = rv.model;
           const intermediateFilters: Array<{ fieldName: string; operator: string; value: string }> =
-            [{ fieldName: rv.parentField, operator: 'EQ', value: parentRecordId }];
+            [{ fieldName: rv.parentField, operator: 'EQ', value: effectiveParentKey }];
           if (rv.filterField && rv.filterValue) {
             intermediateFilters.push({
               fieldName: rv.filterField,
@@ -222,7 +239,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             pageNum: 1,
             pageSize: 200,
             filters: JSON.stringify([
-              { fieldName: config.parentField, operator: 'EQ', value: parentRecordId },
+              { fieldName: config.parentField, operator: 'EQ', value: effectiveParentKey },
             ]),
           };
         }
@@ -248,7 +265,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     };
 
     loadData();
-  }, [parentRecordId, parentRecordData, config, token, refreshCounter, interpolateRecordValue]);
+  }, [parentRecordId, parentRecordData, effectiveParentKey, config, token, refreshCounter, interpolateRecordValue]);
 
   // Resolve column label from i18n with model-qualified fallback
   const resolveColumnLabel = useCallback(
@@ -405,7 +422,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     setAddErrors({});
     try {
       const payload: Record<string, any> = {
-        [config.parentField]: parentRecordId,
+        [config.parentField]: effectiveParentKey ?? parentRecordId,
         ...newRowData,
       };
 

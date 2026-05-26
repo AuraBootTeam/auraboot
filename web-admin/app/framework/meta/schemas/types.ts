@@ -390,6 +390,15 @@ export interface SummaryFieldConfig {
 export interface SubTableConfig {
   childModel: string;
   parentField: string;
+  /**
+   * Which value of the parent record to compare `parentField` against.
+   * - 'pid' (default): URL :recordId segment = parent.pid (ULID string). Use when
+   *   parentField is a string column that stores the parent's ULID.
+   * - 'id': parent.id (bigint snowflake). Use when parentField is a bigint column
+   *   storing the parent's numeric id. Filter is sent as the numeric id; sub-table
+   *   waits for parentRecordData.id before querying to avoid a type-mismatch 500.
+   */
+  parentKeyField?: 'pid' | 'id';
   readOnly?: boolean;
   editableWhen?: string;
   columns: ColumnConfig[];
