@@ -2,6 +2,12 @@
 #
 # Start a per-worktree isolated docker dev stack.
 #
+# NOTE: By default this stack does NOT seed E2E fixtures — its backend (community
+#       profile) does not auto-bootstrap, so there is no admin/plugins/seed until
+#       you ask for them. For **Web E2E / Playwright**, pass --e2e (seeds
+#       admin@auraboot.com/Test2026x + the OSS e2e plugin profile). Without --e2e,
+#       Playwright login fails 401 and fixtures (models/pages) are missing.
+#
 # Implements P0 #2 of docs/plans/2026-05/2026-05-07-docker-per-worktree-isolation-design.md.
 #
 # Each invocation:
@@ -50,6 +56,7 @@ EXPLICIT_OFFSET=""
 COMPOSE_BUILD_FLAG=""
 QUIET_BUILD=0
 WAIT_FOR_HEALTH=0
+E2E_SEED=0
 SKIP_PULL=0
 DRY_RUN=0
 IMAGE_PULL_TIMEOUT_SECONDS="${AURA_IMAGE_PULL_TIMEOUT_SECONDS:-900}"
@@ -70,6 +77,8 @@ Options:
   --no-build         Deprecated alias for the default.
   --quiet-build      Rebuild backend with quieter Gradle output.
   --wait             Wait for backend and frontend health checks.
+  --e2e              After health, seed E2E fixtures (admin@auraboot.com + the OSS
+                     e2e plugin profile) so Web E2E / Playwright can run. Implies --wait.
   --skip-pull        Skip pre-pulling third-party images.
   --dry-run          Print the resolved plan without starting containers.
 
@@ -88,6 +97,7 @@ for arg in "$@"; do
         --no-build) COMPOSE_BUILD_FLAG="" ;;  # deprecated alias for default
         --quiet-build) QUIET_BUILD=1 ;;
         --wait) WAIT_FOR_HEALTH=1 ;;
+        --e2e) E2E_SEED=1; WAIT_FOR_HEALTH=1 ;;  # seed E2E fixtures after health (implies --wait)
         --skip-pull) SKIP_PULL=1 ;;
         --dry-run) DRY_RUN=1 ;;
         --help|-h) usage; exit 0 ;;
@@ -470,9 +480,35 @@ if [ "$WAIT_FOR_HEALTH" = "1" ]; then
     wait_for_http "frontend" "http://localhost:$VITE_PORT/" 120 5
 fi
 
+if [ "$E2E_SEED" = "1" ]; then
+    echo ""
+    echo "[start-isolated] --e2e: seeding E2E fixtures on http://localhost:$BE_PORT ..."
+    # Reuse the shared, port-parameterized bootstrap helper: explicit setup flow
+    # creates admin@auraboot.com + default/System tenant (community profile does
+    # NOT auto-bootstrap, so this is the first writer and wins the E2E creds).
+    # shellcheck source=../lib/reset-init-common.sh
+    source "$PROJECT_ROOT/scripts/lib/reset-init-common.sh"
+    aura_bootstrap_setup_if_needed \
+        "http://localhost:$BE_PORT" \
+        "AuraBoot Dev" "admin@auraboot.com" "Test2026x" "Admin User" "single" \
+        "[start-isolated --e2e]"
+    # Import the OSS E2E plugin profile (models/pages/bindings incl. test fixtures).
+    # plugin-root is the backend container path (/app/plugins, mounted ro); PG env
+    # points at this slug's mapped Postgres port.
+    PGHOST=localhost PGPORT="$PG_PORT" PGUSER=auraboot PGDATABASE=aura_boot PGPASSWORD=auraboot_dev \
+        "$PROJECT_ROOT/scripts/import-plugins.sh" \
+            --profile=e2e --edition=oss \
+            --backend-url="http://localhost:$BE_PORT" \
+            --plugin-root=/app/plugins
+    echo "[start-isolated] --e2e: E2E seeding done (admin@auraboot.com / Test2026x)."
+fi
+
 echo ""
 echo "Stack '$PROJECT_NAME' starting. Use these to interact:"
 echo "  logs:    docker compose -p $PROJECT_NAME logs -f"
 echo "  stop:    scripts/dev/stop-isolated.sh --slug=$SLUG"
 echo "  vite:    http://localhost:$VITE_PORT"
+if [ "$E2E_SEED" != "1" ]; then
+    echo "  note:    dev/backend-test stack (NOT E2E-seeded). For Web E2E re-run with --e2e."
+fi
 echo ""
