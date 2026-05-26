@@ -27,6 +27,8 @@ import { test, expect } from '../../fixtures';
 import {
   uniqueId,
   executeCommandViaApi,
+  expectCollectionViewVisible,
+  forceDefaultTableView,
   todayStr,
   waitForFormReady,
 } from '../helpers/index';
@@ -244,10 +246,9 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
 
     await page.goto('/p/crm_opportunity', { waitUntil: 'domcontentloaded' });
     await listResponsePromise;
+    await forceDefaultTableView(page, PAGE_KEY, MODEL_CODE);
 
-    await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
-      timeout: 10_000,
-    });
+    await expectCollectionViewVisible(page, 10_000);
   }
 
   // =========================================================================

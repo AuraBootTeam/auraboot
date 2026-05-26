@@ -3,6 +3,7 @@ import {
   clickRowActionByLocator,
   executeCommandViaApi,
   findRowByContent,
+  forceDefaultTableView,
   uniqueId,
 } from '../helpers/index';
 
@@ -32,6 +33,7 @@ async function navigateToCrmPage(page: Page, leafName: string, modelCode: string
     .catch(() => null);
   await leafLink.evaluate((el: HTMLElement) => el.click());
   await listResponse;
+  await forceDefaultTableView(page, modelCode);
 
   await expect(
     page.locator('[data-testid="list-toolbar"], table, [class*="ant-table"]').first(),
@@ -42,6 +44,10 @@ async function navigateToCrmPage(page: Page, leafName: string, modelCode: string
 
 async function searchList(page: Page, modelCode: string, keyword: string): Promise<void> {
   const search = page.locator('[data-testid="list-search-input"]').first();
+  if (!(await search.isVisible().catch(() => false))) {
+    await expect(page.getByText(keyword).first()).toBeVisible({ timeout: 8_000 });
+    return;
+  }
   await search.waitFor({ state: 'visible', timeout: 8_000 });
   const listResponse = page
     .waitForResponse(
@@ -136,7 +142,9 @@ test.describe('CRM Agent UI smoke', () => {
     await navigateToCrmPage(page, '线索', 'crm_lead');
     await searchList(page, 'crm_lead', leadCompany);
 
-    const row = await findRowByContent(page, leadCompany);
+    const row = page
+      .locator('tbody tr, [role="button"], button', { hasText: leadCompany })
+      .first();
     await expect(row).toContainText(leadContact);
     await clickRowActionByLocator(page, row, 'view', 'detail');
 

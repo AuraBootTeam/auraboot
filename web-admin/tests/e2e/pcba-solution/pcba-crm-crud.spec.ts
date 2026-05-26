@@ -20,6 +20,7 @@ import {
   clickTabAndWaitForLoad,
   todayStr,
   clickRowActionByLocator,
+  expectCollectionViewVisible,
 } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
@@ -170,9 +171,7 @@ test.describe('PCBA CRM CRUD', () => {
 
     test('PC-001: Lead list page loads @smoke', async ({ page }) => {
       await navigateToDynamicPage(page, PAGE_KEYS.lead);
-
-      const table = page.locator('table, [role="table"]');
-      await expect(table.first()).toBeVisible({ timeout: 15000 });
+      await expectCollectionViewVisible(page, 15000);
     });
 
     test('PC-002: Create lead via API, verify in list', async ({ page }) => {
@@ -434,9 +433,7 @@ test.describe('PCBA CRM CRUD', () => {
 
     test('PC-006: Opportunity list page loads @smoke', async ({ page }) => {
       await navigateToDynamicPage(page, PAGE_KEYS.opportunity);
-
-      const table = page.locator('table, [role="table"]');
-      await expect(table.first()).toBeVisible({ timeout: 15000 });
+      await expectCollectionViewVisible(page, 15000);
     });
 
     test('PC-007: Create opportunity via API, verify in list', async ({ page }) => {

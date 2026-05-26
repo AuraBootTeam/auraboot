@@ -122,7 +122,7 @@ test.describe('Sales — Order & Quotation Lifecycle', () => {
     await page.waitForResponse(() => true, { timeout: 3_000 }).catch(() => null);
 
     // Sales order link
-    const orderLink = nav.getByRole('link', { name: '销售订单' });
+    const orderLink = nav.locator('a[href="/p/sl_sales_order"]').first();
     await orderLink.scrollIntoViewIfNeeded();
     await orderLink.evaluate((el: HTMLElement) => el.click());
 
@@ -301,7 +301,7 @@ test.describe('Sales — Order & Quotation Lifecycle', () => {
     await page.waitForResponse(() => true, { timeout: 3_000 }).catch(() => null);
 
     // Sales quotation link
-    const quotationLink = nav.getByRole('link', { name: '销售报价' });
+    const quotationLink = nav.locator('a[href="/p/sl_sales_quotation"]').first();
     await quotationLink.scrollIntoViewIfNeeded();
     await quotationLink.evaluate((el: HTMLElement) => el.click());
 

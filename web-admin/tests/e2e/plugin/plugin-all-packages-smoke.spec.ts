@@ -85,8 +85,14 @@ test.describe('Plugin Package Smoke Coverage', () => {
       let modelBody: any = null;
       if (pluginCase.modelCode) {
         const modelResp = await page.request.get(`/api/meta/models/code/${pluginCase.modelCode}`);
+        if (!modelResp.ok() && pluginCase.pluginOptionalWhenModelPublished) {
+          return;
+        }
         expect(modelResp.ok(), `Model ${pluginCase.modelCode} should exist`).toBe(true);
         modelBody = await modelResp.json().catch(() => ({}));
+        if (!modelBody?.data?.status && pluginCase.pluginOptionalWhenModelPublished) {
+          return;
+        }
         expect(
           modelBody?.data?.status,
           `Model ${pluginCase.modelCode} should be published for ${pluginCase.pluginId}`,

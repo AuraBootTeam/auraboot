@@ -10,6 +10,7 @@
 
 import { test, expect, type APIRequestContext, type Page } from '../../fixtures';
 import type { Locator } from '@playwright/test';
+import path from 'node:path';
 import {
   ensureSidebarExpanded,
   expectCollectionViewVisible,
@@ -29,7 +30,8 @@ type PcbaEntry = {
 };
 
 const NAV_TIMEOUT = 15_000;
-const ENTERPRISE_PLUGIN_ROOT = process.env.ENTERPRISE_PLUGIN_ROOT ?? '/app/plugins-enterprise';
+const ENTERPRISE_PLUGIN_ROOT =
+  process.env.ENTERPRISE_PLUGIN_ROOT ?? path.resolve(process.cwd(), '../../plugins');
 
 const REQUIRED_PLUGINS = [
   'product-catalog',
@@ -51,9 +53,9 @@ const REQUIRED_PLUGINS = [
 
 const DASHBOARD_ENTRY: PcbaEntry = {
   id: 'executive-overview',
-  href: '/dashboards?code=pe_executive_dashboard',
+  href: '/dashboards/view/pe_executive_dashboard',
   label: /经营概览|Overview/i,
-  route: /\/dashboards\?code=pe_executive_dashboard(?:$|[&#])/,
+  route: /\/dashboards\/view\/pe_executive_dashboard(?:$|[?#])/,
   dashboardTitle: /经营概览仪表盘|Executive KPI|经营概览/i,
 };
 

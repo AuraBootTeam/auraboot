@@ -17,7 +17,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import { uniqueId, executeCommandViaApi } from '../helpers/index';
+import { uniqueId, executeCommandViaApi, forceDefaultTableView } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Navigation helper
@@ -45,6 +45,7 @@ async function navigateToDkPage(page: Page, leafName: string, modelCode: string)
     .catch(() => null);
   await leafLink.evaluate((el: HTMLElement) => el.click());
   await listResponsePromise;
+  await forceDefaultTableView(page, modelCode);
 
   await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
     timeout: 10_000,

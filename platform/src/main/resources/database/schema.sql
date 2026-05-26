@@ -8793,9 +8793,13 @@ CREATE TABLE IF NOT EXISTS mt_crm_complaint (
     crm_cp_priority VARCHAR(50),
     crm_cp_customer_email VARCHAR(255),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by BIGINT,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
     deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
 );
+ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS created_by BIGINT;
+ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS updated_by BIGINT;
 CREATE INDEX IF NOT EXISTS idx_crm_complaint_tenant_created ON mt_crm_complaint (tenant_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS mt_org_department (
@@ -8853,9 +8857,13 @@ CREATE TABLE IF NOT EXISTS mt_dk_document (
     dk_doc_content TEXT,
     dk_doc_status VARCHAR(50),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by BIGINT,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
     deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
 );
+ALTER TABLE mt_dk_document ADD COLUMN IF NOT EXISTS created_by BIGINT;
+ALTER TABLE mt_dk_document ADD COLUMN IF NOT EXISTS updated_by BIGINT;
 
 CREATE TABLE IF NOT EXISTS mt_dk_knowledge_article (
     id BIGSERIAL PRIMARY KEY,
@@ -8865,9 +8873,13 @@ CREATE TABLE IF NOT EXISTS mt_dk_knowledge_article (
     dk_ka_content TEXT,
     dk_ka_status VARCHAR(50),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_by BIGINT,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
     deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
 );
+ALTER TABLE mt_dk_knowledge_article ADD COLUMN IF NOT EXISTS created_by BIGINT;
+ALTER TABLE mt_dk_knowledge_article ADD COLUMN IF NOT EXISTS updated_by BIGINT;
 
 ALTER TABLE ab_mission ADD COLUMN IF NOT EXISTS acp_priority INTEGER DEFAULT 0;
 ALTER TABLE ab_object_alias ADD COLUMN IF NOT EXISTS acp_priority INTEGER DEFAULT 0;

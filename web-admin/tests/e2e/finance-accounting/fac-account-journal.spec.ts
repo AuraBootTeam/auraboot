@@ -22,6 +22,7 @@ import {
   todayStr,
   clickTabAndWaitForLoad,
   clickRowActionByLocator,
+  expectCollectionViewVisible,
 } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
@@ -853,9 +854,7 @@ test.describe('Finance Accounting — Account & Journal Entry', () => {
 
     test('FAC-020: Journal entry list page loads @smoke', async ({ page }) => {
       await navigateToDynamicPage(page, PAGE_KEYS.journalEntry);
-
-      const table = page.locator('table, [role="table"]');
-      await expect(table.first()).toBeVisible({ timeout: 15000 });
+      await expectCollectionViewVisible(page, 15000);
     });
 
     test('FAC-021: Create journal entry via API, verify code auto-generated @smoke', async ({

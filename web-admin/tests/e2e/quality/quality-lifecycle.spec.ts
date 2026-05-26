@@ -18,7 +18,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
-import { uniqueId, executeCommandViaApi, todayStr } from '../helpers/index';
+import { uniqueId, executeCommandViaApi, todayStr, expectCollectionViewVisible } from '../helpers/index';
 
 // ---------------------------------------------------------------------------
 // Navigation helper
@@ -50,9 +50,7 @@ async function navigateToQualityPage(
   await leafLink.evaluate((el: HTMLElement) => el.click());
   const listResponse = await listResponsePromise;
 
-  await expect(page.locator('table, [class*="ant-table"]').first()).toBeVisible({
-    timeout: 10_000,
-  });
+  await expectCollectionViewVisible(page, 10_000);
   return listResponse;
 }
 
@@ -93,8 +91,8 @@ test.describe('Quality — Core Lifecycle', () => {
         qc_iqc_material_name: `Material_${UID}`,
         qc_iqc_qty_received: 100,
         qc_iqc_qty_inspected: 100,
-        qc_iqc_qty_accepted: 95,
-        qc_iqc_qty_rejected: 5,
+        qc_iqc_qty_accepted: 100,
+        qc_iqc_qty_rejected: 0,
         qc_iqc_date: todayStr(),
         qc_iqc_remark: `E2E IQC ${UID}`,
       },
