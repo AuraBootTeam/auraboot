@@ -99,15 +99,26 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
      * whatever tenant (if any) was on the thread before. Always restores,
      * even if the supplier throws.
      */
+    /** Synthetic user id for background-context writes. ab_data_change_log
+     * requires non-null changed_by; this matches DigestService convention. */
+    private static final long SYSTEM_USER_ID = 0L;
+
     private <T> T withTenant(long tenantId, Supplier<T> work) {
         boolean hadPriorContext = MetaContext.exists();
-        Long previous = hadPriorContext ? MetaContext.getCurrentTenantId() : null;
-        MetaContext.setCurrentTenantId(tenantId);
+        Long priorTenant = hadPriorContext ? MetaContext.getCurrentTenantId() : null;
+        Long priorUser = hadPriorContext ? MetaContext.getCurrentUserId() : null;
+        String priorUserPid = hadPriorContext ? MetaContext.getCurrentUserPid() : null;
+        String priorUsername = hadPriorContext ? MetaContext.getCurrentUsername() : null;
+        java.util.Set<Long> priorRoles = hadPriorContext
+                ? MetaContext.getCurrentRoleIds() : java.util.Set.of();
+        // Bind full context (tenant + synthetic system user) so DynamicDataServiceImpl's
+        // populateSystemFields finds a non-null userId for changed_by / created_by.
+        MetaContext.setContext(tenantId, SYSTEM_USER_ID, null, "system");
         try {
             return work.get();
         } finally {
-            if (hadPriorContext && previous != null) {
-                MetaContext.setCurrentTenantId(previous);
+            if (hadPriorContext) {
+                MetaContext.setContext(priorTenant, priorUser, priorUserPid, priorUsername, priorRoles);
             } else {
                 MetaContext.clear();
             }
