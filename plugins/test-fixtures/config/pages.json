@@ -95,7 +95,10 @@
             "primary": true,
             "icon": "Plus",
             "permissionCode": "E2ET.order.manage",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "e2et_order_form",
@@ -154,7 +157,10 @@
             "code": "detail",
             "icon": "Eye",
             "permissionCode": "E2ET.order.read",
-            "label": "view",
+            "label": {
+              "zh-CN": "查看",
+              "en": "View"
+            },
             "action": {
               "type": "navigate",
               "to": "e2et_order_detail"
@@ -165,7 +171,10 @@
             "icon": "Edit",
             "visibleWhen": "['draft','rejected'].includes(row.e2et_order_status)",
             "permissionCode": "E2ET.order.manage",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "e2et_order_form",
@@ -177,7 +186,10 @@
             "icon": "Send",
             "visibleWhen": "['draft','rejected'].includes(row.e2et_order_status)",
             "permissionCode": "E2ET.order.manage",
-            "label": "submit",
+            "label": {
+              "zh-CN": "提交",
+              "en": "Submit"
+            },
             "confirm": "submit.confirm",
             "action": {
               "type": "command",
@@ -189,7 +201,10 @@
             "icon": "Check",
             "visibleWhen": "row.e2et_order_status === 'submitted'",
             "permissionCode": "E2ET.order.approve",
-            "label": "approve",
+            "label": {
+              "zh-CN": "通过",
+              "en": "Approve"
+            },
             "confirm": "approve.confirm",
             "action": {
               "type": "command",
@@ -201,7 +216,10 @@
             "icon": "X",
             "visibleWhen": "row.e2et_order_status === 'submitted'",
             "permissionCode": "E2ET.order.approve",
-            "label": "reject",
+            "label": {
+              "zh-CN": "拒绝",
+              "en": "Reject"
+            },
             "confirm": "reject.confirm",
             "action": {
               "type": "command",
@@ -213,7 +231,10 @@
             "icon": "CheckCircle",
             "visibleWhen": "row.e2et_order_status === 'approved'",
             "permissionCode": "E2ET.order.manage",
-            "label": "complete",
+            "label": {
+              "zh-CN": "完成",
+              "en": "Complete"
+            },
             "confirm": "complete.confirm",
             "action": {
               "type": "command",
@@ -225,7 +246,10 @@
             "icon": "XCircle",
             "visibleWhen": "['draft','submitted'].includes(row.e2et_order_status)",
             "permissionCode": "E2ET.order.manage",
-            "label": "cancel",
+            "label": {
+              "zh-CN": "取消",
+              "en": "Cancel"
+            },
             "confirm": "cancel.confirm",
             "action": {
               "type": "command",
@@ -238,7 +262,10 @@
             "danger": true,
             "visibleWhen": "row.e2et_order_status === 'draft'",
             "permissionCode": "E2ET.order.manage",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -310,7 +337,8 @@
           {
             "field": "e2et_order_title",
             "span": 1,
-            "readOnlyWhen": "!!form.e2et_order_status && !['draft','rejected'].includes(form.e2et_order_status)"
+            "readOnlyWhen": "!!form.e2et_order_status && !['draft','rejected'].includes(form.e2et_order_status)",
+            "required": true
           },
           {
             "field": "e2et_order_no",
@@ -435,7 +463,10 @@
           {
             "code": "save_draft",
             "visibleWhen": "!form.e2et_order_status || form.e2et_order_status === 'draft'",
-            "label": "saveDraft",
+            "label": {
+              "zh-CN": "保存草稿",
+              "en": "Save draft"
+            },
             "action": {
               "type": "command",
               "command": "e2et:update_order"
@@ -445,7 +476,10 @@
             "code": "submit",
             "primary": true,
             "visibleWhen": "!form.e2et_order_status || ['draft','rejected'].includes(form.e2et_order_status)",
-            "label": "submit",
+            "label": {
+              "zh-CN": "提交",
+              "en": "Submit"
+            },
             "confirm": "submit.confirm",
             "action": {
               "type": "command",
@@ -454,7 +488,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en": "Cancel"
+            }
           }
         ]
       }
@@ -655,7 +692,10 @@
             "icon": "Edit",
             "visibleWhen": "['draft','rejected'].includes(record.e2et_order_status)",
             "permissionCode": "E2ET.order.manage",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "e2et_order_form"
@@ -667,7 +707,10 @@
             "icon": "Send",
             "visibleWhen": "['draft','rejected'].includes(record.e2et_order_status)",
             "permissionCode": "E2ET.order.manage",
-            "label": "submit",
+            "label": {
+              "zh-CN": "提交",
+              "en": "Submit"
+            },
             "confirm": "submit.confirm",
             "action": {
               "type": "command",
@@ -680,7 +723,10 @@
             "icon": "Check",
             "visibleWhen": "record.e2et_order_status === 'submitted'",
             "permissionCode": "E2ET.order.approve",
-            "label": "approve",
+            "label": {
+              "zh-CN": "通过",
+              "en": "Approve"
+            },
             "confirm": "approve.confirm",
             "action": {
               "type": "command",
@@ -692,7 +738,10 @@
             "icon": "X",
             "visibleWhen": "record.e2et_order_status === 'submitted'",
             "permissionCode": "E2ET.order.approve",
-            "label": "reject",
+            "label": {
+              "zh-CN": "拒绝",
+              "en": "Reject"
+            },
             "confirm": "reject.confirm",
             "action": {
               "type": "command",
@@ -704,7 +753,10 @@
             "icon": "CheckCircle",
             "visibleWhen": "record.e2et_order_status === 'approved'",
             "permissionCode": "E2ET.order.manage",
-            "label": "complete",
+            "label": {
+              "zh-CN": "完成",
+              "en": "Complete"
+            },
             "confirm": "complete.confirm",
             "action": {
               "type": "command",
@@ -716,7 +768,10 @@
             "icon": "XCircle",
             "visibleWhen": "['draft','submitted'].includes(record.e2et_order_status)",
             "permissionCode": "E2ET.order.manage",
-            "label": "cancel",
+            "label": {
+              "zh-CN": "取消",
+              "en": "Cancel"
+            },
             "confirm": "cancel.confirm",
             "action": {
               "type": "command",
@@ -749,7 +804,10 @@
             "primary": true,
             "icon": "Plus",
             "permissionCode": "E2ET.customer.manage",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "e2et_customer_form",
@@ -793,7 +851,10 @@
             "code": "edit",
             "icon": "Edit",
             "permissionCode": "E2ET.customer.manage",
-            "label": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "e2et_customer_form",
@@ -805,7 +866,10 @@
             "icon": "Trash2",
             "danger": true,
             "permissionCode": "E2ET.customer.manage",
-            "label": "delete",
+            "label": {
+              "zh-CN": "删除",
+              "en": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
@@ -849,15 +913,18 @@
         "fields": [
           {
             "field": "e2et_cust_code",
-            "span": 1
+            "span": 1,
+            "required": true
           },
           {
             "field": "e2et_cust_name",
-            "span": 1
+            "span": 1,
+            "required": true
           },
           {
             "field": "e2et_cust_region",
-            "span": 1
+            "span": 1,
+            "required": true
           },
           {
             "field": "e2et_cust_active",
@@ -880,7 +947,10 @@
           {
             "code": "save",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en": "Save"
+            },
             "action": {
               "type": "command",
               "command": "e2et:create_customer"
@@ -888,7 +958,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en": "Cancel"
+            }
           }
         ]
       }
@@ -978,7 +1051,10 @@
             "primary": true,
             "icon": "Plus",
             "permissionCode": "E2ET.payment.manage",
-            "label": "create",
+            "label": {
+              "zh-CN": "新建",
+              "en": "Create"
+            },
             "action": {
               "type": "navigate",
               "to": "e2et_payment_form",
@@ -1027,7 +1103,10 @@
             "code": "detail",
             "icon": "Eye",
             "permissionCode": "E2ET.payment.manage",
-            "label": "view",
+            "label": {
+              "zh-CN": "查看",
+              "en": "View"
+            },
             "action": {
               "type": "navigate",
               "to": "e2et_payment_detail"
@@ -1038,7 +1117,10 @@
             "icon": "Send",
             "visibleWhen": "row.e2et_pay_status === 'draft'",
             "permissionCode": "E2ET.payment.manage",
-            "label": "submit",
+            "label": {
+              "zh-CN": "提交",
+              "en": "Submit"
+            },
             "confirm": "submit.confirm",
             "action": {
               "type": "command",
@@ -1050,7 +1132,10 @@
             "icon": "Check",
             "visibleWhen": "row.e2et_pay_status === 'pending'",
             "permissionCode": "E2ET.payment.approve",
-            "label": "approve",
+            "label": {
+              "zh-CN": "通过",
+              "en": "Approve"
+            },
             "confirm": "approve.confirm",
             "action": {
               "type": "command",
@@ -1062,7 +1147,10 @@
             "icon": "X",
             "visibleWhen": "row.e2et_pay_status === 'pending'",
             "permissionCode": "E2ET.payment.approve",
-            "label": "reject",
+            "label": {
+              "zh-CN": "拒绝",
+              "en": "Reject"
+            },
             "confirm": "reject.confirm",
             "action": {
               "type": "command",
@@ -1074,7 +1162,10 @@
             "icon": "CreditCard",
             "visibleWhen": "row.e2et_pay_status === 'approved'",
             "permissionCode": "E2ET.payment.manage",
-            "label": "pay",
+            "label": {
+              "zh-CN": "付款",
+              "en": "Pay"
+            },
             "confirm": "pay.confirm",
             "action": {
               "type": "command",
@@ -1122,11 +1213,13 @@
           },
           {
             "field": "e2et_pay_order_id",
-            "span": 1
+            "span": 1,
+            "required": true
           },
           {
             "field": "e2et_pay_amount",
-            "span": 1
+            "span": 1,
+            "required": true
           },
           {
             "field": "e2et_pay_method",
@@ -1150,7 +1243,10 @@
           {
             "code": "save",
             "primary": true,
-            "label": "save",
+            "label": {
+              "zh-CN": "保存",
+              "en": "Save"
+            },
             "action": {
               "type": "command",
               "command": "e2et:create_payment"
@@ -1158,7 +1254,10 @@
           },
           {
             "code": "cancel",
-            "label": "cancel"
+            "label": {
+              "zh-CN": "取消",
+              "en": "Cancel"
+            }
           }
         ]
       }
@@ -1226,7 +1325,10 @@
             "icon": "Send",
             "visibleWhen": "record.e2et_pay_status === 'draft'",
             "permissionCode": "E2ET.payment.manage",
-            "label": "submit",
+            "label": {
+              "zh-CN": "提交",
+              "en": "Submit"
+            },
             "confirm": "submit.confirm",
             "action": {
               "type": "command",
@@ -1239,7 +1341,10 @@
             "icon": "Check",
             "visibleWhen": "record.e2et_pay_status === 'pending'",
             "permissionCode": "E2ET.payment.approve",
-            "label": "approve",
+            "label": {
+              "zh-CN": "通过",
+              "en": "Approve"
+            },
             "confirm": "approve.confirm",
             "action": {
               "type": "command",
@@ -1251,7 +1356,10 @@
             "icon": "X",
             "visibleWhen": "record.e2et_pay_status === 'pending'",
             "permissionCode": "E2ET.payment.approve",
-            "label": "reject",
+            "label": {
+              "zh-CN": "拒绝",
+              "en": "Reject"
+            },
             "confirm": "reject.confirm",
             "action": {
               "type": "command",
@@ -1263,7 +1371,10 @@
             "icon": "CreditCard",
             "visibleWhen": "record.e2et_pay_status === 'approved'",
             "permissionCode": "E2ET.payment.manage",
-            "label": "pay",
+            "label": {
+              "zh-CN": "付款",
+              "en": "Pay"
+            },
             "confirm": "pay.confirm",
             "action": {
               "type": "command",
@@ -1286,11 +1397,6 @@
       "type": "stack"
     },
     "blocks": [
-      {
-        "id": "block_record_toolbar",
-        "blockType": "toolbar",
-        "buttons": []
-      },
       {
         "id": "block_record_table",
         "blockType": "table",

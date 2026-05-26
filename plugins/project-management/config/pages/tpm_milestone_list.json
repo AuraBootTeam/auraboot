@@ -20,7 +20,11 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "tpm.milestone.manage"
+          "permissionCode": "tpm.milestone.manage",
+          "label": {
+            "zh-CN": "新建",
+            "en": "Create"
+          }
         }
       ],
       "area": "toolbar"
@@ -112,13 +116,21 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "tpm_milestone_detail"
+              "navigateTo": "tpm_milestone_detail",
+              "label": {
+                "zh-CN": "查看",
+                "en": "View"
+              }
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "tpm_milestone_form",
-              "permissionCode": "tpm.milestone.manage"
+              "permissionCode": "tpm.milestone.manage",
+              "label": {
+                "zh-CN": "编辑",
+                "en": "Edit"
+              }
             },
             {
               "code": "delete",
@@ -126,9 +138,17 @@
               "danger": true,
               "commandCode": "tpm:delete_milestone",
               "permissionCode": "tpm.milestone.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": {
+                "zh-CN": "删除",
+                "en": "Delete"
+              }
             }
-          ]
+          ],
+          "label": {
+            "zh-CN": "操作",
+            "en": "Actions"
+          }
         }
       ],
       "searchFields": [

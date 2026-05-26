@@ -34,7 +34,11 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tpm.task.manage"
+          "permissionCode": "tpm.task.manage",
+          "label": {
+            "zh-CN": "编辑",
+            "en": "Edit"
+          }
         },
         {
           "code": "start_task",
@@ -49,7 +53,11 @@
         {
           "code": "complete_task",
           "commandCode": "tpm:complete_task",
-          "permissionCode": "tpm.task.manage"
+          "permissionCode": "tpm.task.manage",
+          "label": {
+            "zh-CN": "完成",
+            "en": "Complete"
+          }
         },
         {
           "code": "delete",
@@ -57,7 +65,11 @@
           "danger": true,
           "commandCode": "tpm:delete_task",
           "permissionCode": "tpm.task.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": {
+            "zh-CN": "删除",
+            "en": "Delete"
+          }
         }
       ],
       "area": "header"

@@ -30,7 +30,8 @@
           "layout": {
             "colSpan": 6,
             "rowSpan": 1
-          }
+          },
+          "required": true
         },
         {
           "field": "org_pos_code",
@@ -44,14 +45,16 @@
           "layout": {
             "colSpan": 6,
             "rowSpan": 1
-          }
+          },
+          "required": true
         },
         {
           "field": "org_pos_level",
           "layout": {
             "colSpan": 6,
             "rowSpan": 1
-          }
+          },
+          "required": true
         },
         {
           "field": "org_pos_status",
@@ -73,7 +76,10 @@
         {
           "code": "save",
           "primary": true,
-          "label": "save",
+          "label": {
+            "zh-CN": "保存",
+            "en": "Save"
+          },
           "action": {
             "type": "command",
             "command": "org:create_position"
@@ -81,7 +87,10 @@
         },
         {
           "code": "cancel",
-          "label": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          },
           "action": {
             "type": "builtin",
             "name": "back"

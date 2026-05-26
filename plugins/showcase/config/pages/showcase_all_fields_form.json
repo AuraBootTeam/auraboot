@@ -21,7 +21,8 @@
       "fields": [
         {
           "field": "sc_name",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "sc_code",
