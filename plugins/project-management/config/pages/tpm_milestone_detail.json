@@ -34,7 +34,11 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tpm.milestone.manage"
+          "permissionCode": "tpm.milestone.manage",
+          "label": {
+            "zh-CN": "编辑",
+            "en": "Edit"
+          }
         },
         {
           "code": "reach_milestone",
@@ -52,7 +56,11 @@
           "danger": true,
           "commandCode": "tpm:delete_milestone",
           "permissionCode": "tpm.milestone.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": {
+            "zh-CN": "删除",
+            "en": "Delete"
+          }
         }
       ],
       "area": "header"

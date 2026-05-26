@@ -30,7 +30,8 @@
           "layout": {
             "colSpan": 6,
             "rowSpan": 1
-          }
+          },
+          "required": true
         },
         {
           "field": "org_emp_code",
@@ -45,21 +46,24 @@
           "layout": {
             "colSpan": 6,
             "rowSpan": 1
-          }
+          },
+          "required": true
         },
         {
           "field": "org_emp_dept_id",
           "layout": {
             "colSpan": 6,
             "rowSpan": 1
-          }
+          },
+          "required": true
         },
         {
           "field": "org_emp_position_id",
           "layout": {
             "colSpan": 6,
             "rowSpan": 1
-          }
+          },
+          "required": true
         },
         {
           "field": "org_emp_report_to",
@@ -117,7 +121,10 @@
         {
           "code": "save",
           "primary": true,
-          "label": "save",
+          "label": {
+            "zh-CN": "保存",
+            "en": "Save"
+          },
           "action": {
             "type": "command",
             "command": "org:create_employee"
@@ -125,7 +132,10 @@
         },
         {
           "code": "cancel",
-          "label": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          },
           "action": {
             "type": "builtin",
             "name": "back"

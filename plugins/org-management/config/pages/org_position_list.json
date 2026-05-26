@@ -65,7 +65,10 @@
           "code": "create",
           "primary": true,
           "icon": "Plus",
-          "label": "create",
+          "label": {
+            "zh-CN": "新建",
+            "en": "Create"
+          },
           "action": {
             "type": "navigate",
             "to": "org_position_form",
@@ -123,7 +126,10 @@
             {
               "code": "edit",
               "icon": "Edit",
-              "label": "edit",
+              "label": {
+                "zh-CN": "编辑",
+                "en": "Edit"
+              },
               "action": {
                 "type": "navigate",
                 "to": "org_position_form",
@@ -134,14 +140,21 @@
               "code": "delete",
               "icon": "Trash2",
               "danger": true,
-              "label": "delete",
+              "label": {
+                "zh-CN": "删除",
+                "en": "Delete"
+              },
               "confirm": "delete.confirm",
               "action": {
                 "type": "command",
                 "command": "org:delete_position"
               }
             }
-          ]
+          ],
+          "label": {
+            "zh-CN": "操作",
+            "en": "Actions"
+          }
         }
       ]
     }

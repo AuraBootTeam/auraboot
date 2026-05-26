@@ -337,8 +337,21 @@ class PluginValidationPipelineTest {
         page.setPageKey("pe_order_list");
         page.setKind("list");
         page.setLayout(Map.of("type", "list"));
-        page.setBlocks(List.of(Map.of("blockType", "table")));
+        page.setBlocks(List.of(Map.of(
+                "id", "orders_table",
+                "blockType", "table",
+                "columns", List.of(Map.of(
+                        "field", "title",
+                        "label", Map.of("zh-CN", "标题", "en", "Title")
+                ))
+        )));
+        page.setModelCode("pe_order");
         manifest.setPages(List.of(page));
+
+        ModelFieldBindingDTO binding = new ModelFieldBindingDTO();
+        binding.setModelCode("pe_order");
+        binding.setFieldCode("title");
+        manifest.setModelFieldBindings(List.of(binding));
 
         PluginValidationContext ctx = PluginValidationContext.builder()
                 .pluginId("com.test.plugin")

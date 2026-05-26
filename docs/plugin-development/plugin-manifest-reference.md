@@ -550,6 +550,8 @@ Validate before publishing:
 aura plugin validate plugins/my-plugin
 ```
 
+Page schemas have a stricter DSL contract for block ids, table columns, business labels, field references, and form required projection. See [Pages & Layouts: Page DSL Validation Contract](../core-concepts/pages-and-layouts.md#page-dsl-validation-contract).
+
 ---
 
 ## Related Documentation
