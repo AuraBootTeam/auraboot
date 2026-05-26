@@ -108,12 +108,15 @@ public class ProcessInstanceController {
             @RequestParam(required = false) String processKey) {
         log.debug("Getting process instance status by businessKey={}, processKey={}", businessKey, processKey);
 
+        // Returns 200 with data=null when no process instance exists for this business
+        // key. "No workflow attached to this record" is a legitimate no-op, not a client
+        // error: every DSL detail page calls this for every record regardless of whether
+        // the model has a BPM binding, so throwing 400 here pollutes the console and
+        // hides real client errors. All existing callers (InlineApprovalPanel,
+        // ProcessStatusViewer, bpmWorkbenchService.getInstanceForRecord) already check
+        // `ResultHelper.isSuccess(result) && data?.processInstanceId` and render an empty
+        // state when data is null.
         ProcessInstanceStatusDTO status = processEngineService.getProcessInstanceStatusByBusinessKey(processKey, businessKey);
-
-        if (status == null) {
-            throw new RootUnCheckedException(BadParam, "Process instance not found for businessKey: " + businessKey);
-        }
-
         return ApiResponse.success(status);
     }
 
