@@ -1,5 +1,6 @@
 // web-admin/app/smart/automation/templates/automationTemplates.ts
 import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 /**
  * Automation Template
@@ -7,11 +8,15 @@ import type { FlowData } from '~/plugins/core-designer/components/flow-designer-
  * Pre-built workflow definitions that users can select to bootstrap
  * a new automation. Each template contains a complete FlowData (nodes + edges)
  * with sensible defaults and placeholder expressions.
+ *
+ * Display text (name, description, category label) is stored as LocalizedText
+ * so the framework renderer (useSmartText / I18nContext) resolves it per locale.
+ * Search is locale-aware and matches against both en-US and zh-CN.
  */
 export interface AutomationTemplate {
   id: string;
-  name: string;
-  description: string;
+  name: LocalizedText;
+  description: LocalizedText;
   category: 'sales' | 'operations' | 'notifications' | 'integrations';
   icon: string;
   flowData: FlowData;
@@ -31,6 +36,17 @@ function resetCounter() {
   _counter = 0;
 }
 
+// Pick a single locale value from a LocalizedText with fallback chain.
+// Used for search and for outbound payloads when a plain string is required.
+export function resolveLocalizedText(
+  text: LocalizedText | string | null | undefined,
+  locale: string,
+): string {
+  if (text == null) return '';
+  if (typeof text === 'string') return text;
+  return text[locale] || text['zh-CN'] || text['en-US'] || '';
+}
+
 // ---------------------------------------------------------------------------
 // Template definitions
 // ---------------------------------------------------------------------------
@@ -41,8 +57,11 @@ function buildNewLeadNotification(): AutomationTemplate {
   const actionId = nid('action');
   return {
     id: 'tpl-new-lead-notification',
-    name: 'New Lead Notification',
-    description: 'Send an email notification to the sales team whenever a new lead is created.',
+    name: { 'en-US': 'New Lead Notification', 'zh-CN': '新线索通知' },
+    description: {
+      'en-US': 'Send an email notification to the sales team whenever a new lead is created.',
+      'zh-CN': '当创建新线索时,向销售团队发送邮件通知。',
+    },
     category: 'sales',
     icon: 'UserPlus',
     tags: ['crm', 'lead', 'email', 'notification'],
@@ -89,9 +108,12 @@ function buildOverdueTaskAlert(): AutomationTemplate {
   const updateId = nid('update');
   return {
     id: 'tpl-overdue-task-alert',
-    name: 'Overdue Task Alert',
-    description:
-      'When a task stays in_progress for 24 hours, notify the assignee and escalate priority to HIGH.',
+    name: { 'en-US': 'Overdue Task Alert', 'zh-CN': '逾期任务预警' },
+    description: {
+      'en-US':
+        'When a task stays in_progress for 24 hours, notify the assignee and escalate priority to HIGH.',
+      'zh-CN': '任务处于"进行中"状态超过 24 小时时,通知负责人并将优先级升级为「高」。',
+    },
     category: 'operations',
     icon: 'AlertTriangle',
     tags: ['task', 'overdue', 'escalation', 'priority'],
@@ -157,9 +179,12 @@ function buildApprovalRequestRouter(): AutomationTemplate {
   const notifyDirectorId = nid('notify-dir');
   return {
     id: 'tpl-approval-request-router',
-    name: 'Approval Request Router',
-    description:
-      'Route approval notifications based on amount: >10,000 goes to director, otherwise to manager.',
+    name: { 'en-US': 'Approval Request Router', 'zh-CN': '审批请求路由' },
+    description: {
+      'en-US':
+        'Route approval notifications based on amount: >10,000 goes to director, otherwise to manager.',
+      'zh-CN': '根据金额路由审批通知:金额大于 10,000 通知总监,否则通知经理。',
+    },
     category: 'operations',
     icon: 'GitBranch',
     tags: ['approval', 'routing', 'condition', 'workflow'],
@@ -249,8 +274,11 @@ function buildWelcomeEmail(): AutomationTemplate {
   const actionId = nid('action');
   return {
     id: 'tpl-welcome-email',
-    name: 'Welcome Email',
-    description: 'Automatically send a welcome email when a new contact is created.',
+    name: { 'en-US': 'Welcome Email', 'zh-CN': '欢迎邮件' },
+    description: {
+      'en-US': 'Automatically send a welcome email when a new contact is created.',
+      'zh-CN': '当创建新联系人时,自动发送欢迎邮件。',
+    },
     category: 'sales',
     icon: 'Mail',
     tags: ['contact', 'welcome', 'email', 'onboarding'],
@@ -297,8 +325,11 @@ function buildDailyDigest(): AutomationTemplate {
   const notifyId = nid('notify');
   return {
     id: 'tpl-daily-digest',
-    name: 'Daily Digest',
-    description: 'Generate a daily report at 9 AM on weekdays and send it to the team.',
+    name: { 'en-US': 'Daily Digest', 'zh-CN': '每日报告' },
+    description: {
+      'en-US': 'Generate a daily report at 9 AM on weekdays and send it to the team.',
+      'zh-CN': '工作日每天上午 9 点生成日报并发送给团队。',
+    },
     category: 'operations',
     icon: 'FileText',
     tags: ['scheduled', 'report', 'digest', 'daily'],
@@ -362,9 +393,12 @@ function buildSlaBreachEscalation(): AutomationTemplate {
   const notifyId = nid('notify');
   return {
     id: 'tpl-sla-breach-escalation',
-    name: 'SLA Breach Escalation',
-    description:
-      'When a support ticket stays open for 4+ hours, escalate to CRITICAL and notify the supervisor.',
+    name: { 'en-US': 'SLA Breach Escalation', 'zh-CN': 'SLA 违约升级' },
+    description: {
+      'en-US':
+        'When a support ticket stays open for 4+ hours, escalate to CRITICAL and notify the supervisor.',
+      'zh-CN': '当支持工单未关闭超过 4 小时时,优先级升级为「紧急」并通知主管。',
+    },
     category: 'operations',
     icon: 'ShieldAlert',
     tags: ['sla', 'support', 'escalation', 'ticket'],
@@ -431,9 +465,12 @@ function buildDataQualityCheck(): AutomationTemplate {
   const createId = nid('create');
   return {
     id: 'tpl-data-quality-check',
-    name: 'Data Quality Check',
-    description:
-      'Run nightly data validation. If errors are found, create an issue and notify the data team.',
+    name: { 'en-US': 'Data Quality Check', 'zh-CN': '数据质量检查' },
+    description: {
+      'en-US':
+        'Run nightly data validation. If errors are found, create an issue and notify the data team.',
+      'zh-CN': '每夜运行数据验证。若发现错误,创建问题单并通知数据团队。',
+    },
     category: 'operations',
     icon: 'CheckSquare',
     tags: ['data', 'quality', 'validation', 'scheduled'],
@@ -538,9 +575,12 @@ function buildWebhookIntegration(): AutomationTemplate {
   const notifyId = nid('notify');
   return {
     id: 'tpl-webhook-integration',
-    name: 'Webhook Integration',
-    description:
-      'Receive external webhook, validate payload, create a record, and send a confirmation notification.',
+    name: { 'en-US': 'Webhook Integration', 'zh-CN': 'Webhook 集成' },
+    description: {
+      'en-US':
+        'Receive external webhook, validate payload, create a record, and send a confirmation notification.',
+      'zh-CN': '接收外部 webhook,校验负载,创建记录并发送确认通知。',
+    },
     category: 'integrations',
     icon: 'Link',
     tags: ['webhook', 'integration', 'api', 'external'],
@@ -636,18 +676,23 @@ export const automationTemplates: AutomationTemplate[] = [
   buildWebhookIntegration(),
 ];
 
+export interface TemplateCategoryEntry {
+  key: 'all' | 'sales' | 'operations' | 'notifications' | 'integrations';
+  label: LocalizedText;
+}
+
 /**
  * All available template categories
  */
-export const templateCategories = [
-  { key: 'all', label: 'All Templates' },
-  { key: 'sales', label: 'Sales' },
-  { key: 'operations', label: 'Operations' },
-  { key: 'notifications', label: 'Notifications' },
-  { key: 'integrations', label: 'Integrations' },
+export const templateCategories: readonly TemplateCategoryEntry[] = [
+  { key: 'all', label: { 'en-US': 'All Templates', 'zh-CN': '全部模板' } },
+  { key: 'sales', label: { 'en-US': 'Sales', 'zh-CN': '销售' } },
+  { key: 'operations', label: { 'en-US': 'Operations', 'zh-CN': '运营' } },
+  { key: 'notifications', label: { 'en-US': 'Notifications', 'zh-CN': '通知' } },
+  { key: 'integrations', label: { 'en-US': 'Integrations', 'zh-CN': '集成' } },
 ] as const;
 
-export type TemplateCategory = (typeof templateCategories)[number]['key'];
+export type TemplateCategory = TemplateCategoryEntry['key'];
 
 /**
  * Get a template by ID
@@ -665,15 +710,19 @@ export function filterTemplatesByCategory(category: TemplateCategory): Automatio
 }
 
 /**
- * Search templates by name, description, or tags
+ * Search templates by name, description (across both locales), or tags.
  */
 export function searchTemplates(query: string): AutomationTemplate[] {
   const q = query.toLowerCase().trim();
   if (!q) return automationTemplates;
-  return automationTemplates.filter(
-    (t) =>
-      t.name.toLowerCase().includes(q) ||
-      t.description.toLowerCase().includes(q) ||
-      t.tags.some((tag) => tag.includes(q)),
-  );
+  return automationTemplates.filter((t) => {
+    const nameMatches =
+      (t.name['en-US'] || '').toLowerCase().includes(q) ||
+      (t.name['zh-CN'] || '').toLowerCase().includes(q);
+    const descMatches =
+      (t.description['en-US'] || '').toLowerCase().includes(q) ||
+      (t.description['zh-CN'] || '').toLowerCase().includes(q);
+    const tagMatches = t.tags.some((tag) => tag.includes(q));
+    return nameMatches || descMatches || tagMatches;
+  });
 }
