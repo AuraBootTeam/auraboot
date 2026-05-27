@@ -129,11 +129,17 @@ class RagRetrievalServiceBranchTest {
     }
 
     @Test
-    @DisplayName("hasActiveKnowledgeBases swallows exception and returns false")
-    void hasActiveSwallowsException() {
+    @DisplayName("hasActiveKnowledgeBases propagates DB error (no silent swallow)")
+    void hasActiveBubblesExceptionUpToCaller() {
+        // Bugfix-0 (2026-05-27): line 309 catch(Exception){return false} was an A1
+        // anti-pattern that masked DB schema drift / connection errors as "no KB".
+        // Caller AuraBotChatService:619 already wraps RAG in outer try/catch returning
+        // empty, so propagation here gives operators an observable error in logs while
+        // still degrading the user-visible response gracefully via the outer boundary.
+        // See docs/plans/2026-05/2026-05-27-aurabot-memory-knowledge-assessment-and-plan.md §2.5 缺陷 2.
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(1L)))
                 .thenThrow(new RuntimeException("db"));
-        assertFalse(service.hasActiveKnowledgeBases(1L));
+        assertThrows(RuntimeException.class, () -> service.hasActiveKnowledgeBases(1L));
     }
 
     @Test
