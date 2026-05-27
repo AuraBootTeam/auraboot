@@ -2,8 +2,12 @@ package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.module.aps.dto.ScheduleRequest;
+import com.auraboot.module.aps.dto.ScheduleResult;
+import com.auraboot.module.aps.engine.SchedulingEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,6 +28,10 @@ import java.util.stream.Collectors;
 public class ApsSchedulingService {
 
     private final DynamicDataMapper dynamicDataMapper;
+
+    /** Optional engine for V2 multi-strategy scheduling. Wired in tests via @Autowired(required=false). */
+    @Autowired(required = false)
+    private SchedulingEngine schedulingEngine;
 
     private static final String TABLE_PLANNED_ORDER = "mt_pe_planned_order";
     private static final String TABLE_RESOURCE = "mt_pe_resource";
@@ -137,6 +145,88 @@ public class ApsSchedulingService {
                 "resourceCount", resources.size(),
                 "message", String.format("Scheduled %d/%d orders across %d resources",
                         scheduledCount, plannedOrders.size(), resources.size())
+        );
+    }
+
+    /**
+     * Run scheduling via the multi-strategy {@link SchedulingEngine} (V2).
+     *
+     * <p>Reads PCBA planned orders / resources / calendars the same way as
+     * {@link #runSchedule(Long, int)}, but delegates the algorithm to one of
+     * the platform's pluggable strategies (forwardFifo / forwardEdd / backward /
+     * bottleneckFirst / genetic). Writes results back to {@code mt_pe_schedule_result}
+     * with the same row shape so downstream consumers (Gantt view, apply
+     * handler) remain compatible.</p>
+     *
+     * @param tenantId tenant ID
+     * @param horizonDays scheduling horizon
+     * @param strategy strategy bean name (e.g. "forwardFifo")
+     */
+    public Map<String, Object> runScheduleV2(Long tenantId, int horizonDays, String strategy) {
+        if (schedulingEngine == null) {
+            log.warn("SchedulingEngine bean not available; falling back to V1 FIFO");
+            return runSchedule(tenantId, horizonDays);
+        }
+        if (!tableExists(TABLE_PLANNED_ORDER) || !tableExists(TABLE_RESOURCE)) {
+            log.info("APS tables not found (plugin not imported). Returning 0.");
+            return Map.of("scheduledCount", 0, "conflictCount", 0, "message", "Plugin tables not found");
+        }
+
+        List<Map<String, Object>> plannedOrders = fetchPlannedOrders(tenantId);
+        if (plannedOrders.isEmpty()) {
+            return Map.of("scheduledCount", 0, "conflictCount", 0,
+                    "strategy", strategy, "message", "No planned orders found");
+        }
+        List<Map<String, Object>> resources = fetchResources(tenantId);
+        if (resources.isEmpty()) {
+            return Map.of("scheduledCount", 0, "conflictCount", plannedOrders.size(),
+                    "strategy", strategy, "message", "No active resources available");
+        }
+
+        LocalDate startDate = LocalDate.now();
+        LocalDate endDate = startDate.plusDays(horizonDays);
+        Map<String, List<Map<String, Object>>> calendarByResource = fetchCalendars(tenantId, startDate, endDate);
+
+        PcbaApsAdapter adapter = new PcbaApsAdapter();
+        ScheduleRequest request = adapter.buildRequest(plannedOrders, resources, calendarByResource, horizonDays);
+
+        ScheduleResult result;
+        try {
+            result = schedulingEngine.schedule(request, strategy);
+        } catch (IllegalArgumentException e) {
+            log.warn("Unknown strategy '{}': {}", strategy, e.getMessage());
+            return Map.of("scheduledCount", 0, "conflictCount", 0,
+                    "strategy", strategy, "message", "Unknown strategy: " + strategy);
+        }
+
+        int scheduleVersion = generateScheduleVersion();
+        int scheduledCount = 0;
+        for (Map<String, Object> row : adapter.toScheduleResultRows(result)) {
+            writeScheduleResult(tenantId,
+                    (String) row.get("workOrderId"),
+                    (String) row.get("operationName"),
+                    (String) row.get("resourcePid"),
+                    (String) row.get("resourceName"),
+                    (LocalDateTime) row.get("startTime"),
+                    (LocalDateTime) row.get("endTime"),
+                    (int) row.getOrDefault("setupTimeMin", 0),
+                    (int) row.getOrDefault("processingTimeMin", 0),
+                    scheduleVersion);
+            scheduledCount++;
+        }
+        int conflictCount = result.getConflicts() != null ? result.getConflicts().size() : 0;
+
+        log.info("APS V2 scheduling complete: strategy={}, scheduled={}, conflicts={}, version={}",
+                strategy, scheduledCount, conflictCount, scheduleVersion);
+        return Map.of(
+                "scheduledCount", scheduledCount,
+                "conflictCount", conflictCount,
+                "scheduleVersion", scheduleVersion,
+                "strategy", strategy,
+                "totalOrders", plannedOrders.size(),
+                "resourceCount", resources.size(),
+                "message", String.format("Scheduled %d/%d orders across %d resources via %s",
+                        scheduledCount, plannedOrders.size(), resources.size(), strategy)
         );
     }
 
