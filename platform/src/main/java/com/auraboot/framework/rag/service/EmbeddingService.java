@@ -85,13 +85,31 @@ public class EmbeddingService {
         return allResults;
     }
 
+    /**
+     * Build the OpenAI-compatible /v1/embeddings request body.
+     *
+     * <p>Package-private + static so unit tests can verify body shape without
+     * spinning up an HTTP server. The {@code dimensions} field is omitted when
+     * {@code dimensions == 0} for backwards compatibility with providers that
+     * don't support the parameter (older OpenAI, MiniMax embo-01 native, etc).
+     *
+     * <p>When {@code dimensions > 0}, providers that support Matryoshka
+     * Representation Learning (Qwen text-embedding-v4, OpenAI
+     * text-embedding-3-small/large) return a vector of the requested length.
+     */
+    static Map<String, Object> buildRequestBody(String model, List<String> texts, int dimensions) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", model);
+        body.put("input", texts);
+        if (dimensions > 0) {
+            body.put("dimensions", dimensions);
+        }
+        return body;
+    }
+
     @SuppressWarnings("unchecked")
     private List<float[]> callEmbeddingApi(EmbeddingConfig config, List<String> texts) throws Exception {
-        // Build request body
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", config.model);
-        body.put("input", texts);
-
+        Map<String, Object> body = buildRequestBody(config.model, texts, config.dimensions);
         String jsonBody = objectMapper.writeValueAsString(body);
 
         String url = config.baseUrl.endsWith("/")
@@ -135,7 +153,7 @@ public class EmbeddingService {
     }
 
     @SuppressWarnings("unchecked")
-    private EmbeddingConfig resolveConfig(Long tenantId, String providerCode) {
+    EmbeddingConfig resolveConfig(Long tenantId, String providerCode) {
         if (providerCode == null || providerCode.isBlank()) {
             providerCode = "openai";
         }
@@ -150,7 +168,8 @@ public class EmbeddingService {
                             apiKey,
                             getStr(cfg, "baseUrl", "https://api.openai.com"),
                             getStr(cfg, "defaultModel", "text-embedding-3-small"),
-                            getInt(cfg, "maxBatchSize", 20)
+                            getInt(cfg, "maxBatchSize", 20),
+                            getInt(cfg, "dimensions", 0)
                     );
                 }
             }
@@ -170,5 +189,14 @@ public class EmbeddingService {
         return v instanceof Number n ? n.intValue() : fallback;
     }
 
-    private record EmbeddingConfig(String apiKey, String baseUrl, String model, int maxBatchSize) {}
+    /**
+     * Resolved embedding provider config. Package-private so unit tests can
+     * inspect it; production callers go through {@link #resolveConfig}.
+     *
+     * @param dimensions output vector dimensions to request; 0 = provider
+     *                   default (omit field from request body). Supported by
+     *                   providers with Matryoshka Representation Learning
+     *                   (Qwen text-embedding-v4, OpenAI text-embedding-3-*).
+     */
+    record EmbeddingConfig(String apiKey, String baseUrl, String model, int maxBatchSize, int dimensions) {}
 }
