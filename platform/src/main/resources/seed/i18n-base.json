@@ -1148,6 +1148,41 @@
     "en-US": "Saving..."
   },
   {
+    "key": "common.button.cancel",
+    "zh-CN": "取消",
+    "en-US": "Cancel"
+  },
+  {
+    "key": "common.button.create",
+    "zh-CN": "新建",
+    "en-US": "Create"
+  },
+  {
+    "key": "common.button.delete",
+    "zh-CN": "删除",
+    "en-US": "Delete"
+  },
+  {
+    "key": "common.button.edit",
+    "zh-CN": "编辑",
+    "en-US": "Edit"
+  },
+  {
+    "key": "common.button.save",
+    "zh-CN": "保存",
+    "en-US": "Save"
+  },
+  {
+    "key": "common.button.submit",
+    "zh-CN": "提交",
+    "en-US": "Submit"
+  },
+  {
+    "key": "common.button.view",
+    "zh-CN": "查看",
+    "en-US": "View"
+  },
+  {
     "key": "message.create.failed",
     "zh-CN": "创建失败",
     "en-US": "Create failed"
