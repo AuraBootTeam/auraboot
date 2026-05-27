@@ -1390,6 +1390,27 @@ export function FormPageContent(props: PageContentProps) {
     [formData, pageContext, fieldErrors, clearFieldError],
   );
 
+  // Stable runtime context for custom blocks. Memoized so the props
+  // reference passed to ComponentLoader is identity-stable across re-renders
+  // unless one of the source values changes; otherwise every keystroke in
+  // a form input would re-mount the custom block subtree and blow away
+  // local state (drag selection, cached fetches, etc.).
+  // Must be declared before the schema null-guard early return so hook order
+  // stays stable across renders (react-hooks/rules-of-hooks).
+  const customBlockRuntime = useMemo(
+    () => ({
+      record: formData,
+      initialRecord: initialFormData ?? formData,
+      recordId,
+      tableName,
+      token,
+      locale,
+      t,
+      getContext: () => ({ record: formData, pageContext }),
+    }),
+    [formData, initialFormData, recordId, tableName, token, locale, t, pageContext],
+  );
+
   // Null schema guard
   if (!schema) {
     return null;
@@ -1404,24 +1425,6 @@ export function FormPageContent(props: PageContentProps) {
   // ruler, designer panels). Rendered above the form-section blocks so
   // operators see the visualization first.
   const customBlocks = allBlocks.filter((block: any) => block.blockType === 'custom');
-  // Stable runtime context for custom blocks. Memoized so the props
-  // reference passed to ComponentLoader is identity-stable across re-renders
-  // unless one of the source values changes; otherwise every keystroke in
-  // a form input would re-mount the custom block subtree and blow away
-  // local state (drag selection, cached fetches, etc.).
-  const customBlockRuntime = useMemo(
-    () => ({
-      record: formData,
-      initialRecord: initialFormData ?? formData,
-      recordId,
-      tableName,
-      token,
-      locale,
-      t,
-      getContext: () => ({ record: formData, pageContext }),
-    }),
-    [formData, initialFormData, recordId, tableName, token, locale, t, pageContext],
-  );
   // subTableBlocks computed via useMemo above (used for metadata fetching and rendering)
   const buttonBlock = allBlocks.find((block: any) => block.blockType === 'form-buttons');
   const effectiveButtonBlock = buttonBlock || null;
