@@ -43,12 +43,20 @@
         {
           "code": "start_task",
           "commandCode": "tpm:start_task",
-          "permissionCode": "tpm.task.manage"
+          "permissionCode": "tpm.task.manage",
+          "label": {
+            "zh-CN": "开始任务",
+            "en": "Start Task"
+          }
         },
         {
           "code": "review_task",
           "commandCode": "tpm:review_task",
-          "permissionCode": "tpm.task.manage"
+          "permissionCode": "tpm.task.manage",
+          "label": {
+            "zh-CN": "提交审核",
+            "en": "Submit for Review"
+          }
         },
         {
           "code": "complete_task",

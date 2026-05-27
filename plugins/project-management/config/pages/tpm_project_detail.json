@@ -47,12 +47,20 @@
         {
           "code": "activate_project",
           "commandCode": "tpm:activate_project",
-          "permissionCode": "tpm.project.manage"
+          "permissionCode": "tpm.project.manage",
+          "label": {
+            "zh-CN": "启动项目",
+            "en": "Activate Project"
+          }
         },
         {
           "code": "hold_project",
           "commandCode": "tpm:hold_project",
-          "permissionCode": "tpm.project.manage"
+          "permissionCode": "tpm.project.manage",
+          "label": {
+            "zh-CN": "暂停项目",
+            "en": "Put On Hold"
+          }
         },
         {
           "code": "complete_project",
