@@ -1,6 +1,7 @@
 // web-admin/app/smart/automation/components/TemplatePreviewDialog.tsx
 import React from 'react';
 import { FlowDesigner } from '~/plugins/core-designer/components/flow-designer-sdk';
+import { useSmartText } from '~/utils/i18n';
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import type { AutomationTemplate } from '../templates/automationTemplates';
 
@@ -15,6 +16,9 @@ export function TemplatePreviewDialog({
   onClose,
   onUseTemplate,
 }: TemplatePreviewDialogProps) {
+  const st = useSmartText();
+  const name = st(template.name);
+  const description = st(template.description);
   const config = {
     nodeDefinitions: automationNodes,
     categoryOrder: automationCategoryOrder,
@@ -30,8 +34,8 @@ export function TemplatePreviewDialog({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{template.name}</h3>
-            <p className="mt-0.5 text-sm text-gray-500">{template.description}</p>
+            <h3 className="text-lg font-semibold text-gray-900">{name}</h3>
+            <p className="mt-0.5 text-sm text-gray-500">{description}</p>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -64,7 +68,7 @@ export function TemplatePreviewDialog({
           <FlowDesigner
             config={config}
             initialData={template.flowData}
-            title={`Preview: ${template.name}`}
+            title={`Preview: ${name}`}
             readOnly
           />
         </div>

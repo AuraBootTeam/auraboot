@@ -3,7 +3,9 @@ package com.auraboot.framework.automation.bpm;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationAction;
+import com.auraboot.framework.automation.entity.AutomationLog;
 import com.auraboot.framework.automation.executor.ActionExecutor;
+import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +71,9 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
 
     @Autowired
     private com.auraboot.framework.automation.trigger.AutomationTriggerService automationTriggerService;
+
+    @Autowired
+    private com.auraboot.framework.automation.mapper.AutomationLogMapper automationLogMapper;
 
     @BeforeEach
     void clearInvocations() {
@@ -210,5 +215,121 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
         Map<String, Object> firedConfig =
                 (Map<String, Object>) MARKER_INVOCATIONS.get(0).get("config");
         assertThat(firedConfig).containsEntry("branch", "high");
+    }
+
+    // ---- P0-5 follow-ups: execution-chain edge cases ----
+
+    @Test
+    void controlLoop_emptyCollection_doesNotInvokeBody_onSmartEngine() {
+        Automation automation = loopMarkerAutomation();
+        runtime.deploy(automation);
+
+        // Empty items collection — the delegate-internal for-each must elide the body
+        // entirely (no marker invocation), and the process must still complete normally.
+        runtime.run(automation, "rec-loop-empty",
+                Map.of("event", "create", "items", List.of()));
+
+        assertThat(MARKER_INVOCATIONS)
+                .as("loop body must not fire when collection is empty")
+                .isEmpty();
+    }
+
+    @Test
+    void controlLoop_missingCollectionVariable_doesNotInvokeBody_onSmartEngine() {
+        Automation automation = loopMarkerAutomation();
+        runtime.deploy(automation);
+
+        // "items" variable absent from payload entirely — must degrade gracefully.
+        runtime.run(automation, "rec-loop-missing", Map.of("event", "create"));
+
+        assertThat(MARKER_INVOCATIONS)
+                .as("loop body must not fire when the collection variable is absent")
+                .isEmpty();
+    }
+
+    /** Fails on every invocation — used to drive the error/state-log paths. */
+    @TestConfiguration
+    static class FailingMarkerConfig {
+        @Bean
+        ActionExecutor failingActionExecutor() {
+            return new ActionExecutor() {
+                @Override
+                public boolean supports(String actionType) {
+                    return "test_failure".equals(actionType);
+                }
+
+                @Override
+                public Object execute(AutomationAction action, Map<String, Object> context) {
+                    throw new RuntimeException("synthetic action failure for P0-5 test");
+                }
+            };
+        }
+    }
+
+    private Automation failingActionAutomation(String triggerType) {
+        Automation a = new Automation();
+        a.setPid("ITFAIL" + System.currentTimeMillis());
+        a.setName("E2E failing automation");
+        a.setTriggerType(triggerType);
+        a.setTenantId(MetaContext.getCurrentTenantId());
+        a.setFlowConfig(Map.of(
+                "nodes", List.of(
+                        Map.of("id", "t1", "type", "trigger-record-create",
+                                "data", Map.of("label", "On create", "config", Map.of())),
+                        Map.of("id", "a1", "type", "action-test-failure",
+                                "data", Map.of("label", "Failure",
+                                        "config", Map.of("actionType", "test_failure")))),
+                "edges", List.of(
+                        Map.of("id", "e1", "source", "t1", "target", "a1"))));
+        a.setEnabled(true);
+        return a;
+    }
+
+    @Test
+    void executeAutomation_actionThrows_recordsFailedLogWithErrorMessage() {
+        // Verify the error/state-log path: when an action raises inside SmartEngine,
+        // executeAutomation must catch it, stamp the AutomationLog status=FAILED and
+        // persist the error message — no silent loss, no rollback that wipes the log row.
+        Automation automation = failingActionAutomation("on_record_create");
+        runtime.deploy(automation);
+
+        AutomationLog logEntry = automationTriggerService.executeAutomation(
+                automation, "rec-fail", Map.of("event", "create"));
+
+        assertThat(logEntry.getStatus()).isEqualTo(StatusConstants.FAILED);
+        assertThat(logEntry.getErrorMessage())
+                .as("error message must surface the action failure")
+                .contains("synthetic action failure");
+        assertThat(logEntry.getCompletedAt())
+                .as("log must be marked completed even on failure")
+                .isNotNull();
+
+        // Persisted log row must reflect the same status (catches @Transactional rollback
+        // bugs that would silently drop the FAILED row).
+        AutomationLog persisted = automationLogMapper.selectById(logEntry.getId());
+        assertThat(persisted)
+                .as("log row must survive the failed run")
+                .isNotNull();
+        assertThat(persisted.getStatus()).isEqualTo(StatusConstants.FAILED);
+    }
+
+    @Test
+    void executeAutomation_manualTrigger_stampsTriggerTypeOnLog() {
+        // P0-5 coverage for the "manual" trigger entry: AutomationTriggerService.executeAutomation
+        // is the unified synchronous entry used by manual runs (UI run-now buttons) and by
+        // async fan-out from event/schedule triggers. Verify the trigger type is preserved
+        // on the log row exactly as configured.
+        Automation automation = markerAutomation();
+        automation.setTriggerType("manual");
+        runtime.deploy(automation);
+
+        AutomationLog logEntry = automationTriggerService.executeAutomation(
+                automation, "rec-manual", Map.of("event", "manual_run"));
+
+        assertThat(logEntry.getStatus()).isEqualTo("success");
+        assertThat(logEntry.getTriggerType()).isEqualTo("manual");
+        assertThat(MARKER_INVOCATIONS)
+                .as("manual trigger must still drive the SmartEngine flow")
+                .hasSize(1);
     }
 }

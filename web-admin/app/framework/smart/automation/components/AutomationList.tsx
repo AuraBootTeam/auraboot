@@ -6,7 +6,11 @@ import { cn } from '~/utils/cn';
 import { ExecutionLogDialog } from './ExecutionLogDialog';
 import { TemplateGallery } from './TemplateGallery';
 import type { Automation } from '../services/automationService';
-import type { AutomationTemplate } from '../templates/automationTemplates';
+import {
+  resolveLocalizedText,
+  type AutomationTemplate,
+} from '../templates/automationTemplates';
+import { useI18n } from '~/contexts/I18nContext';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useToastContext } from '~/contexts/ToastContext';
 
@@ -24,6 +28,7 @@ export function AutomationList({
   serverError,
 }: AutomationListProps) {
   const st = useSmartText();
+  const { locale } = useI18n();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const { showSuccessToast, showErrorToast } = useToastContext();
@@ -79,19 +84,21 @@ export function AutomationList({
   };
 
   const handleSelectTemplate = async (template: AutomationTemplate) => {
+    const resolvedName = resolveLocalizedText(template.name, locale);
+    const resolvedDescription = resolveLocalizedText(template.description, locale);
     try {
       const response = await fetch('/api/automations', {
         method: 'post',
         headers: authHeaders,
         body: JSON.stringify({
-          name: template.name,
-          description: template.description,
+          name: resolvedName,
+          description: resolvedDescription,
           flowConfig: template.flowData,
         }),
       });
       if (!response.ok) throw new Error('Failed to create automation from template');
       const result = await response.json();
-      showSuccessToast(`Created automation "${template.name}" from template`);
+      showSuccessToast(`Created automation "${resolvedName}" from template`);
       navigate(`/automation/${result.data.pid}`);
     } catch (err) {
       showErrorToast(err instanceof Error ? err.message : 'Failed to create from template');
