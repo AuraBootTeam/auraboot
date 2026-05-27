@@ -1,6 +1,7 @@
 // web-admin/app/smart/automation/components/TemplateGallery.tsx
 import React, { useState, useMemo, useCallback } from 'react';
 import { cn } from '~/utils/cn';
+import { useSmartText } from '~/utils/i18n';
 import {
   automationTemplates,
   templateCategories,
@@ -43,6 +44,7 @@ export function TemplateGallery({ open, onClose, onSelectTemplate }: TemplateGal
   const [activeCategory, setActiveCategory] = useState<TemplateCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [previewTemplate, setPreviewTemplate] = useState<AutomationTemplate | null>(null);
+  const st = useSmartText();
 
   const filteredTemplates = useMemo(() => {
     let results = automationTemplates;
@@ -50,15 +52,18 @@ export function TemplateGallery({ open, onClose, onSelectTemplate }: TemplateGal
     if (activeCategory !== 'all') {
       results = results.filter((t) => t.category === activeCategory);
     }
-    // filter by search
+    // filter by search (locale-aware: matches against both locales)
     const q = searchQuery.toLowerCase().trim();
     if (q) {
-      results = results.filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) ||
-          t.description.toLowerCase().includes(q) ||
-          t.tags.some((tag) => tag.includes(q)),
-      );
+      results = results.filter((t) => {
+        const nameMatches =
+          (t.name['en-US'] || '').toLowerCase().includes(q) ||
+          (t.name['zh-CN'] || '').toLowerCase().includes(q);
+        const descMatches =
+          (t.description['en-US'] || '').toLowerCase().includes(q) ||
+          (t.description['zh-CN'] || '').toLowerCase().includes(q);
+        return nameMatches || descMatches || t.tags.some((tag) => tag.includes(q));
+      });
     }
     return results;
   }, [activeCategory, searchQuery]);
@@ -145,7 +150,7 @@ export function TemplateGallery({ open, onClose, onSelectTemplate }: TemplateGal
                       : 'text-gray-600 hover:bg-gray-100',
                   )}
                 >
-                  {cat.label}
+                  {st(cat.label)}
                 </button>
               ))}
             </div>
@@ -170,7 +175,7 @@ export function TemplateGallery({ open, onClose, onSelectTemplate }: TemplateGal
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="truncate font-medium text-gray-900">{template.name}</h3>
+                          <h3 className="truncate font-medium text-gray-900">{st(template.name)}</h3>
                           <span
                             className={cn(
                               'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
@@ -181,7 +186,7 @@ export function TemplateGallery({ open, onClose, onSelectTemplate }: TemplateGal
                           </span>
                         </div>
                         <p className="mt-1 line-clamp-2 text-sm text-gray-500">
-                          {template.description}
+                          {st(template.description)}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-1">
                           {template.tags.slice(0, 4).map((tag) => (
