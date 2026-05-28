@@ -28,9 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>Schema convention (M1, multi-tenant single super-table model):</b>
  * <pre>
  *   CREATE STABLE iot_points (
- *     ts       TIMESTAMP,
- *     value    DOUBLE,
- *     quality  BINARY(32)
+ *     ts   TIMESTAMP,
+ *     val  DOUBLE,
+ *     qc   BINARY(32)
  *   ) TAGS (
  *     tenant_id   BIGINT,
  *     device_code BINARY(64),
@@ -89,9 +89,15 @@ public class TDengineTimeSeriesPort implements TimeSeriesPort {
      */
     public void ensureSuperTable() {
         try {
+            // TDengine 3.x treats `value` and `quality` as reserved words in
+            // unquoted DDL. We use the unambiguous `val` / `qc` (quality
+            // code) names instead of relying on cross-driver backtick
+            // quoting, which the taos-jdbc REST driver does not pass through
+            // reliably. The Java API still exposes `value` / `qualityCode`
+            // on the record — only the on-disk schema differs.
             jdbc.execute(
                     "CREATE STABLE IF NOT EXISTS iot_points ("
-                            + "ts TIMESTAMP, value DOUBLE, quality BINARY(32)) "
+                            + "ts TIMESTAMP, val DOUBLE, qc BINARY(32)) "
                             + "TAGS (tenant_id BIGINT, device_code BINARY(64), code BINARY(64))");
         } catch (DataAccessException ex) {
             // Surface as a platform-level failure: without the STable nothing
@@ -117,16 +123,22 @@ public class TDengineTimeSeriesPort implements TimeSeriesPort {
         // sub-table for maximum throughput. JdbcTemplate batchUpdate would
         // issue one stmt per row — acceptable for M1 throughput (10K pts/s
         // per tenant); M2 will switch to taos native pstmt batch API.
+        //
+        // The taos-jdbc REST driver does NOT correctly bind TAG `?` markers
+        // mixed with VALUES `?` markers ("(0xffff):stmt column count not
+        // match"), so we inline the TAG literals (they are typed-safe:
+        // tenantId is long; deviceCode + code go through escapeSqlString
+        // which rejects single-quotes / backslashes and caps length).
         for (TimeSeriesPoint p : points) {
             String subTable = subTableName(tenantId, p.deviceCode(), p.code());
+            String safeDevice = escapeSqlString(p.deviceCode(), "deviceCode");
+            String safeCode = escapeSqlString(p.code(), "code");
             String sql =
-                    "INSERT INTO " + subTable + " USING iot_points TAGS (?, ?, ?) "
+                    "INSERT INTO " + subTable + " USING iot_points TAGS ("
+                            + tenantId + ", '" + safeDevice + "', '" + safeCode + "') "
                             + "VALUES (?, ?, ?)";
             jdbc.update(
                     sql,
-                    tenantId,
-                    p.deviceCode(),
-                    p.code(),
                     Timestamp.from(p.ts()),
                     p.value().doubleValue(),
                     p.qualityCode());
@@ -153,12 +165,12 @@ public class TDengineTimeSeriesPort implements TimeSeriesPort {
             String sql;
             if (limit == 1) {
                 sql =
-                        "SELECT ts, value, quality FROM iot_points "
+                        "SELECT ts, val, qc FROM iot_points "
                                 + "WHERE tenant_id = ? AND device_code = ? AND code = ? "
                                 + "ORDER BY ts DESC LIMIT 1";
             } else {
                 sql =
-                        "SELECT ts, value, quality FROM iot_points "
+                        "SELECT ts, val, qc FROM iot_points "
                                 + "WHERE tenant_id = ? AND device_code = ? AND code = ? "
                                 + "ORDER BY ts DESC LIMIT " + limit;
             }
@@ -193,7 +205,7 @@ public class TDengineTimeSeriesPort implements TimeSeriesPort {
         List<TimeSeriesPoint> out = new ArrayList<>();
         for (String code : params.codes()) {
             String sql =
-                    "SELECT ts, value, quality FROM iot_points "
+                    "SELECT ts, val, qc FROM iot_points "
                             + "WHERE tenant_id = ? AND device_code = ? AND code = ? "
                             + "AND ts >= ? AND ts < ? ORDER BY ts ASC";
             final String codeRef = code;
@@ -214,7 +226,7 @@ public class TDengineTimeSeriesPort implements TimeSeriesPort {
         List<TimeSeriesPoint> out = new ArrayList<>();
         for (String code : params.codes()) {
             String sql =
-                    "SELECT _wstart, AVG(value), FIRST(quality) FROM iot_points "
+                    "SELECT _wstart, AVG(val), FIRST(qc) FROM iot_points "
                             + "WHERE tenant_id = ? AND device_code = ? AND code = ? "
                             + "AND ts >= ? AND ts < ? "
                             + "INTERVAL(" + intervalMs + "a) FILL(LINEAR)";
@@ -246,7 +258,7 @@ public class TDengineTimeSeriesPort implements TimeSeriesPort {
         List<AggregatedPoint> out = new ArrayList<>();
         for (String code : params.codes()) {
             String sql =
-                    "SELECT _wstart, " + aggFunc + "(value), COUNT(*) FROM iot_points "
+                    "SELECT _wstart, " + aggFunc + "(val), COUNT(*) FROM iot_points "
                             + "WHERE tenant_id = ? AND device_code = ? AND code = ? "
                             + "AND ts >= ? AND ts < ? "
                             + "INTERVAL(" + groupByMs + "a)";
@@ -320,6 +332,32 @@ public class TDengineTimeSeriesPort implements TimeSeriesPort {
      *   t_&lt;tenantId&gt;_&lt;base36 hash of (deviceCode|code)&gt;
      * </pre>
      */
+    /**
+     * Defensive escape for the inline TAG literal in {@code writeBatch}.
+     * Rejects strings that contain SQL-string termination characters or
+     * exceed the TAG's BINARY(64) bound so a malicious deviceCode / code
+     * cannot break out of the literal.
+     *
+     * <p>This is NOT a general SQL escaper — the only callers are the two
+     * TAG slots in the INSERT path. Reads stay parameterised everywhere.
+     */
+    static String escapeSqlString(String s, String field) {
+        if (s == null || s.isEmpty()) {
+            throw new IllegalArgumentException(field + " must not be empty");
+        }
+        if (s.length() > 64) {
+            throw new IllegalArgumentException(field + " exceeds 64-byte TAG limit");
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\'' || c == '\\' || c == '\0' || c < 0x20) {
+                throw new IllegalArgumentException(
+                        field + " contains an unsupported character at index " + i);
+            }
+        }
+        return s;
+    }
+
     static String subTableName(long tenantId, String deviceCode, String code) {
         int hash = (deviceCode + "|" + code).hashCode();
         return "t_" + tenantId + "_" + Integer.toUnsignedString(hash, 36);

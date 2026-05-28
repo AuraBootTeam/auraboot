@@ -472,6 +472,14 @@ test {
     testTmpDir.mkdirs()
     systemProperty 'java.io.tmpdir', testTmpDir.absolutePath
 
+    // Allow callers to override the Testcontainers hub mirror per-task.
+    // Used by IoT TSDB IT to bypass the daocloud mirror (403 today) and
+    // pull tdengine directly from Docker Hub. Set via:
+    //   -Dhub.image.name.prefix=""
+    if (project.hasProperty('hub.image.name.prefix')) {
+        systemProperty 'hub.image.name.prefix', project.property('hub.image.name.prefix')
+    }
+
     testLogging {
         events "passed", "skipped", "failed"
     }

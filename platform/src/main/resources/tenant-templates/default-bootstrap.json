@@ -1323,6 +1323,16 @@
       "resource": "sys:webhook",
       "action": "update",
       "resourceType": "function"
+    },
+    {
+      "code": "iot.data_point.read",
+      "name": "IoT data_point read",
+      "description": "IoT data_point — read (time-series query: latest / range / aggregate / batchQuery)",
+      "type": "function",
+      "module": "iot",
+      "resource": "iot:data-point",
+      "action": "read",
+      "resourceType": "function"
     }
   ],
   "roles": [
