@@ -5,7 +5,7 @@ import com.auraboot.framework.semantic.dto.*;
 import com.auraboot.framework.semantic.entity.*;
 import com.auraboot.framework.semantic.enums.SemanticModelStatus;
 import com.auraboot.framework.semantic.mapper.*;
-import com.auraboot.framework.semantic.parser.SemanticValidator;
+import com.auraboot.framework.semantic.parser.SemanticYamlValidator;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,7 +26,7 @@ import java.util.Map;
  * <pre>
  *   YAML bytes
  *     → SemanticYamlParser (schema validation)
- *     → SemanticValidator  (business rules + injection denylist)
+ *     → SemanticYamlValidator  (business rules + injection denylist)
  *     → upsert into ab_semantic_{model,dimension,metric}
  *     → rebuild ab_semantic_lineage_edge for this model
  *     → mark status = ACTIVE
@@ -44,7 +44,7 @@ import java.util.Map;
 public class SemanticPublishService {
 
     private final SemanticYamlParser parser;
-    private final SemanticValidator validator;
+    private final SemanticYamlValidator validator;
     private final AbSemanticModelMapper modelMapper;
     private final AbSemanticDimensionMapper dimensionMapper;
     private final AbSemanticMetricMapper metricMapper;

@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * SemanticYamlParser + SemanticValidator tests against the 9 fixtures in
+ * SemanticYamlParser + SemanticYamlValidator tests against the 9 fixtures in
  * {@code test/resources/semantic/}.
  *
  * <p>Layer split mirrors the fixture layout:
@@ -29,12 +29,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SemanticYamlParserTest {
 
     private static SemanticYamlParser parser;
-    private static SemanticValidator validator;
+    private static SemanticYamlValidator validator;
 
     @BeforeAll
     static void setup() {
         parser = new SemanticYamlParser();
-        validator = new SemanticValidator();
+        validator = new SemanticYamlValidator();
     }
 
     private static String loadFixture(String relativePath) throws IOException {

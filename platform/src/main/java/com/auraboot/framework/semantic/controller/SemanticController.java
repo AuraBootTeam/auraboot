@@ -7,7 +7,7 @@ import com.auraboot.framework.semantic.dto.SemanticLineageResponse;
 import com.auraboot.framework.semantic.dto.SemanticMetaResponse;
 import com.auraboot.framework.semantic.dto.SemanticModelDTO;
 import com.auraboot.framework.semantic.dto.SemanticQueryResponse;
-import com.auraboot.framework.semantic.parser.SemanticValidator;
+import com.auraboot.framework.semantic.parser.SemanticYamlValidator;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
 import com.auraboot.framework.semantic.service.SemanticCatalogService;
 import com.auraboot.framework.semantic.service.SemanticLineageService;
@@ -50,7 +50,7 @@ public class SemanticController {
     private final SemanticLineageService lineageService;
     private final SemanticPublishService publishService;
     private final SemanticYamlParser parser;
-    private final SemanticValidator validator;
+    private final SemanticYamlValidator validator;
 
     @PostMapping("/query")
     public SemanticQueryResponse query(@RequestBody SemanticQueryRequest request) {

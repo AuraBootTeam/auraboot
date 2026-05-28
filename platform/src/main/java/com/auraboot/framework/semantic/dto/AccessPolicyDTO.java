@@ -24,7 +24,7 @@ public class AccessPolicyDTO {
 
     /**
      * SQL WHERE fragment with {@code {user.<attr>}} placeholders only.
-     * SemanticValidator enforces denylist for {@code ;}, {@code --}, {@code UNION}, {@code DROP}, etc.
+     * SemanticYamlValidator enforces denylist for {@code ;}, {@code --}, {@code UNION}, {@code DROP}, etc.
      */
     @JsonProperty("sql_filter")
     private String sqlFilter;

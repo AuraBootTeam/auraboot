@@ -34,9 +34,9 @@ import java.util.stream.Collectors;
  * </ol>
  *
  * <p>Business rules (cross-field, security, references) are enforced by
- * {@link SemanticValidator} as a separate step after parsing.
+ * {@link SemanticYamlValidator} as a separate step after parsing.
  *
- * @see SemanticValidator
+ * @see SemanticYamlValidator
  */
 @Slf4j
 @Component

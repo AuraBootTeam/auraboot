@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Component
-public class SemanticValidator {
+public class SemanticYamlValidator {
 
     private static final Pattern SQL_DENYLIST_PATTERN = Pattern.compile(
             "(?i)(--|/\\*|\\*/|;\\s*(\\w|$)|\\bDROP\\b|\\bTRUNCATE\\b|\\bDELETE\\b|"

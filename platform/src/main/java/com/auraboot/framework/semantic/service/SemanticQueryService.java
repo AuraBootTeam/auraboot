@@ -14,7 +14,7 @@ import com.auraboot.framework.semantic.entity.AbSemanticQueryLog;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticQueryLogMapper;
-import com.auraboot.framework.semantic.parser.SemanticValidator;
+import com.auraboot.framework.semantic.parser.SemanticYamlValidator;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +54,7 @@ import java.util.stream.Collectors;
 public class SemanticQueryService {
 
     private final SemanticYamlParser parser;
-    private final SemanticValidator validator;
+    private final SemanticYamlValidator validator;
     private final MetricCompiler compiler;
     private final AbSemanticModelMapper modelMapper;
     private final AbSemanticMetricMapper metricMapper;

@@ -2,7 +2,7 @@ package com.auraboot.framework.semantic.service;
 
 import com.auraboot.framework.semantic.entity.AbSemanticModel;
 import com.auraboot.framework.semantic.mapper.*;
-import com.auraboot.framework.semantic.parser.SemanticValidator;
+import com.auraboot.framework.semantic.parser.SemanticYamlValidator;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
 class SemanticPublishServiceTest {
 
     private SemanticYamlParser parser;
-    private SemanticValidator validator;
+    private SemanticYamlValidator validator;
     private AbSemanticModelMapper modelMapper;
     private AbSemanticDimensionMapper dimensionMapper;
     private AbSemanticMetricMapper metricMapper;
@@ -37,7 +37,7 @@ class SemanticPublishServiceTest {
     @BeforeEach
     void setup() {
         parser = new SemanticYamlParser();
-        validator = new SemanticValidator();
+        validator = new SemanticYamlValidator();
         modelMapper = mock(AbSemanticModelMapper.class);
         dimensionMapper = mock(AbSemanticDimensionMapper.class);
         metricMapper = mock(AbSemanticMetricMapper.class);

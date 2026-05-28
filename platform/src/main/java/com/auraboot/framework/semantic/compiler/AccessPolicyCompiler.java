@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  *       its resolved value pushed into the params list. Multi-valued attributes
  *       (comma-separated string) inside {@code IN (...)} are expanded into
  *       {@code IN (?, ?, ...)}.</li>
- *   <li>Defence-in-depth: even though {@link com.auraboot.framework.semantic.parser.SemanticValidator}
+ *   <li>Defence-in-depth: even though {@link com.auraboot.framework.semantic.parser.SemanticYamlValidator}
  *       already enforces a SQL-injection denylist on {@code sql_filter} at
  *       publish time, this compiler re-checks before emitting any SQL —
  *       authors with DB write access could otherwise tamper with
@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
 @Component
 public class AccessPolicyCompiler {
 
-    /** Mirrors SemanticValidator denylist. Keep in sync. */
+    /** Mirrors SemanticYamlValidator denylist. Keep in sync. */
     private static final Pattern DENY = Pattern.compile(
             "(--|/\\*|\\*/|;|\\b(drop|delete|truncate|alter|create|grant|revoke|insert|update|union|exec|execute)\\b)",
             Pattern.CASE_INSENSITIVE);
