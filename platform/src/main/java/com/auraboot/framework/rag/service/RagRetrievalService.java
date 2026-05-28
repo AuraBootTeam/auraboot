@@ -132,6 +132,10 @@ public class RagRetrievalService {
 
     /**
      * BM25 keyword-only fallback when embedding is unavailable.
+     *
+     * <p><b>catch-pattern audit (Bugfix-0, 2026-05-27)</b>: same candidate
+     * A1 weak form as {@link #vectorOnlySearch} — see that Javadoc for
+     * owner-review context. Tracking via fact-baseline §2.5.
      */
     private List<RetrievalResult> keywordSearch(String query, List<String> targetKbs, int topK) {
         String tsQuery = buildTsQuery(query);
@@ -168,6 +172,20 @@ public class RagRetrievalService {
 
     /**
      * Pure vector fallback when hybrid SQL fails (e.g., tsv column missing).
+     *
+     * <p><b>catch-pattern audit (Bugfix-0, 2026-05-27)</b>: the {@code catch
+     * (Exception) -> return empty} at the bottom of this method is a
+     * candidate {@code A1} weak form by the
+     * {@code docs/standards/core/catch-exception-pattern.md} decision tree
+     * (no further fallback after this one — the chain is hybrid &rarr;
+     * vector-only &rarr; keyword-only, and keywordSearch has the same
+     * pattern at line 163). It is intentionally kept as-is pending RAG
+     * module owner review of design intent: returning empty lets the LLM
+     * proceed without RAG context (graceful degradation), but masks DB
+     * errors as "no results". Owner must either (a) document P2 weak form
+     * exception rationale in this Javadoc, or (b) replace with propagation
+     * so AuraBotChatService:619 outer boundary surfaces the failure.
+     * Tracking via fact-baseline §2.5 缺陷 3.
      */
     private List<RetrievalResult> vectorOnlySearch(float[] queryEmbedding,
                                                      List<String> targetKbs, int topK, double threshold) {
@@ -296,19 +314,21 @@ public class RagRetrievalService {
 
     /**
      * Check if a tenant has any active knowledge bases with embedded chunks.
+     *
+     * <p>DB errors propagate to caller (AuraBotChatService:619 wraps the entire
+     * RAG path in an outer try/catch returning empty context). Bugfix-0
+     * (2026-05-27) removed a {@code catch (Exception) -> return false} A1
+     * anti-pattern that silently masked schema drift / connection issues as
+     * "no KB present", leaving operators with no signal in logs.
      */
     public boolean hasActiveKnowledgeBases(Long tenantId) {
-        try {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM ab_knowledge_base "
-                    + "WHERE tenant_id = ? AND status = 'active' "
-                    + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                    + "AND chunk_count > 0",
-                    Integer.class, tenantId);
-            return count != null && count > 0;
-        } catch (Exception e) {
-            return false;
-        }
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_knowledge_base "
+                + "WHERE tenant_id = ? AND status = 'active' "
+                + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                + "AND chunk_count > 0",
+                Integer.class, tenantId);
+        return count != null && count > 0;
     }
 
     private List<String> resolveTargetKbs(Long tenantId, List<String> kbPids) {
