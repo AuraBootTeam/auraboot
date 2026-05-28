@@ -191,6 +191,14 @@ public class RagDocumentSyncListener {
 
     private Map<String, Object> readRecord(String modelCode, String recordId, Long tenantId) {
         String tableName = "mt_" + modelCode;
+        // P2 weak fallback: returns null on DB read failure so the caller
+        // (handleCreateOrUpdate / handleDelete) can short-circuit gracefully.
+        // log.error provides operator-visible signal; the null return is the
+        // substitute path. Not migrated to propagation because the sync
+        // listener is an event-driven background process where one bad
+        // record should not abort sibling event processing (see
+        // handleEvent's top-level P3 boundary at line 67).
+        // See Bugfix-0 audit docs/backlog/2026-05-27-rag-catch-exception-audit.md cluster 2.
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT * FROM " + tableName + " WHERE pid = ? AND tenant_id = ?",
@@ -226,6 +234,14 @@ public class RagDocumentSyncListener {
         return val instanceof String s ? s : (val != null ? val.toString() : null);
     }
 
+    /**
+     * Content hash for chunk-level dedup tracking. P2 weak fallback: when
+     * SHA-256 fails (extremely unlikely — SHA-256 is part of JRE), falls
+     * back to {@link Objects#hashCode} so the caller still gets a non-null
+     * string. {@code log.warn} surfaces the unexpected failure to operators
+     * without breaking the ingest path. See Bugfix-0 audit
+     * docs/backlog/2026-05-27-rag-catch-exception-audit.md cluster 3.
+     */
     private String sha256(String content) {
         if (content == null) {
             return "";
@@ -237,6 +253,8 @@ public class RagDocumentSyncListener {
             for (byte b : hash) hex.append(String.format("%02x", b));
             return hex.toString();
         } catch (Exception e) {
+            log.warn("sha256 hashing failed; falling back to Objects.hashCode "
+                    + "(degraded but non-blocking): {}", e.getMessage());
             return String.valueOf(Objects.hashCode(content));
         }
     }
