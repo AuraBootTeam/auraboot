@@ -2,6 +2,7 @@ package com.auraboot.framework.semantic.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -18,7 +19,7 @@ import java.time.Instant;
 @TableName("ab_semantic_lineage_edge")
 public class AbSemanticLineageEdge {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private String pid;

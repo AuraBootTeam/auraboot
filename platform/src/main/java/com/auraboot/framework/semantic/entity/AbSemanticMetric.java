@@ -2,6 +2,8 @@ package com.auraboot.framework.semantic.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import com.auraboot.framework.tenant.typehandler.JsonStringTypeHandler;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -17,7 +19,7 @@ import java.time.Instant;
 @TableName("ab_semantic_metric")
 public class AbSemanticMetric {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private String pid;
@@ -33,16 +35,19 @@ public class AbSemanticMetric {
     private String metricType;
 
     /** JSON, shape depends on metricType. See PRD 16 §3.3. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String typeParams;
 
     /** Optional SQL WHERE fragment using declared dimensions/measures only. */
     private String filterExpr;
 
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String labelI18n;
 
     private String description;
 
     /** JSON array of permission codes, e.g. {@code ["sales.read"]}. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String requiredPermissions;
 
     /** {@link com.auraboot.framework.semantic.enums.SemanticModelStatus} name. */

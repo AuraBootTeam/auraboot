@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import lombok.Data;
+import com.auraboot.framework.tenant.typehandler.JsonStringTypeHandler;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -26,7 +28,7 @@ import java.time.Instant;
 @TableName("ab_semantic_query_log")
 public class AbSemanticQueryLog {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private String queryId;
@@ -36,12 +38,15 @@ public class AbSemanticQueryLog {
     private Long userId;
 
     /** JSON array of metric pids. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String metricPids;
 
     /** JSON array of dimension pids/codes. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String dimensionPids;
 
     /** JSON dump of the filter clauses (after RLS injection). */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String filters;
 
     private Integer rowcount;

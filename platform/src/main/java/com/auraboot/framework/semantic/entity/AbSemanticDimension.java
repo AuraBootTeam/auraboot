@@ -2,6 +2,8 @@ package com.auraboot.framework.semantic.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import com.auraboot.framework.tenant.typehandler.JsonStringTypeHandler;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -14,7 +16,7 @@ import java.time.Instant;
 @TableName("ab_semantic_dimension")
 public class AbSemanticDimension {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private String pid;
@@ -33,11 +35,13 @@ public class AbSemanticDimension {
     /** {@link com.auraboot.framework.semantic.enums.DimensionType} name (lowercase serialized). */
     private String dimType;
 
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String labelI18n;
 
     private String description;
 
     /** JSON array, e.g. {@code ["day","week","month","quarter","year"]}. Required when dimType = TIME. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String timeGrains;
 
     /** Exactly one dimension per model may set true. */

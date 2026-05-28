@@ -2,6 +2,8 @@ package com.auraboot.framework.semantic.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import com.auraboot.framework.tenant.typehandler.JsonStringTypeHandler;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -15,7 +17,7 @@ import java.time.Instant;
 @TableName("ab_semantic_model")
 public class AbSemanticModel {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /** ULID, 32 chars. Stable identifier across versions. */
@@ -35,7 +37,8 @@ public class AbSemanticModel {
     /** {@code semantic_model.primary_entity}. */
     private String primaryEntity;
 
-    /** i18n map, e.g. {@code {"zh-CN":"销售","en-US":"Sales"}}. */
+    /** i18n map, e.g. {@code {"zh-CN":"销售","en-US":"Sales"}}. Stored as JSONB. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String labelI18n;
 
     private String description;

@@ -2,6 +2,8 @@ package com.auraboot.framework.semantic.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import com.auraboot.framework.tenant.typehandler.JsonStringTypeHandler;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -17,7 +19,7 @@ import java.time.Instant;
 @TableName("ab_semantic_exposure")
 public class AbSemanticExposure {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private String pid;
@@ -32,6 +34,7 @@ public class AbSemanticExposure {
     /** dashboard / notebook / analysis / ml / application */
     private String exposureType;
 
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String labelI18n;
 
     private String description;
@@ -46,6 +49,7 @@ public class AbSemanticExposure {
     private String maturity;
 
     /** JSON array, e.g. {@code [{"type":"metric","pid":"01HXY..."},{"type":"model","pid":"01ABC..."}]}. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String dependsOn;
 
     private String status;

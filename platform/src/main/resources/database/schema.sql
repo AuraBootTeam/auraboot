@@ -9004,10 +9004,10 @@ CREATE TABLE IF NOT EXISTS ab_semantic_lineage_edge (
     id              BIGINT PRIMARY KEY,
     pid             VARCHAR(32) NOT NULL,
     tenant_id       BIGINT NOT NULL,
-    src_node_pid    VARCHAR(32) NOT NULL,
+    src_node_pid    VARCHAR(128) NOT NULL,
     src_node_type   VARCHAR(32) NOT NULL,
     -- model / metric / exposure / source / dimension
-    dst_node_pid    VARCHAR(32) NOT NULL,
+    dst_node_pid    VARCHAR(128) NOT NULL,
     dst_node_type   VARCHAR(32) NOT NULL,
     ref_type        VARCHAR(16) NOT NULL,
     -- depends_on / input_metric / source / measure_ref
