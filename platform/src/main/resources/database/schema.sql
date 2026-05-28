@@ -8993,7 +8993,7 @@ CREATE TABLE IF NOT EXISTS ab_semantic_metric (
 CREATE UNIQUE INDEX IF NOT EXISTS uk_semantic_metric_pid
     ON ab_semantic_metric (pid) WHERE deleted_flag = FALSE;
 CREATE UNIQUE INDEX IF NOT EXISTS uk_semantic_metric_code
-    ON ab_semantic_metric (tenant_id, code, version) WHERE deleted_flag = FALSE;
+    ON ab_semantic_metric (tenant_id, semantic_model_pid, code, version) WHERE deleted_flag = FALSE;
 CREATE INDEX IF NOT EXISTS idx_semantic_metric_model
     ON ab_semantic_metric (semantic_model_pid, status) WHERE deleted_flag = FALSE;
 

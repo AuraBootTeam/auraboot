@@ -1,0 +1,80 @@
+version: "0.1"
+
+# Same as sales.semantic.yml but without access_policies, so the compiler can
+# run end-to-end without requiring a UserAttribute table lookup (still
+# backlog B.3.1). Used for B1.1.2 + B1.1.3 smoke validation.
+
+semantic_model:
+  code: sales_no_rls
+  label:
+    zh-CN: 销售(无RLS)
+    en-US: Sales (no RLS)
+  description: RLS-free variant used for runtime smoke until UserAttribute wiring lands.
+  model_ref: ord_sales_order
+  primary_entity: order_id
+
+entities:
+  - name: order_id
+    type: primary
+    field_ref: id
+  - name: customer_id
+    type: foreign
+    field_ref: customer_id
+
+dimensions:
+  - code: order_date
+    label:
+      zh-CN: 下单日期
+      en-US: Order Date
+    field_ref: order_date
+    type: time
+    time_grains: [day, week, month, quarter, year]
+    primary_time: true
+
+  - code: region
+    label:
+      zh-CN: 区域
+      en-US: Region
+    field_ref: region_code
+    type: categorical
+
+  - code: status
+    label:
+      zh-CN: 订单状态
+      en-US: Status
+    field_ref: status
+    type: categorical
+
+measures:
+  - code: order_amount
+    label:
+      zh-CN: 订单金额
+      en-US: Order Amount
+    agg: SUM
+    field_ref: amount
+
+  - code: order_count
+    label:
+      zh-CN: 订单数
+      en-US: Order Count
+    agg: COUNT
+    expr: "*"
+
+metrics:
+  - code: total_sales
+    label:
+      zh-CN: 销售总额
+      en-US: Total Sales
+    description: Total amount of all orders.
+    type: simple
+    type_params:
+      measure: order_amount
+
+  - code: avg_order_value
+    label:
+      zh-CN: 客单价
+      en-US: Average Order Value
+    description: Total sales divided by order count.
+    type: derived
+    type_params:
+      expr: "{total_sales} / {order_count}"
