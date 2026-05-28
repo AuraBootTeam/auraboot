@@ -18,6 +18,7 @@ export { DefaultFlowNode } from './core/DefaultFlowNode';
 
 // Store
 export { useFlowStore } from './store/useFlowStore';
+export type { SubFlowFrame } from './store/useFlowStore';
 
 // Node registry
 export { NodeRegistry, nodeRegistry } from './nodes/NodeRegistry';
