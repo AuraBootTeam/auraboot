@@ -95,3 +95,9 @@ export {
   registerBpmSdkBatch3,
   registerBpmSdkAll,
 } from './registerBpmSdkBatch3Nodes';
+
+// --- B2c Phase 2: BPMN store adapter atop the SDK ---
+//
+// Co-exists with the legacy useBPMNStore during double-write. Consumers can
+// migrate import-by-import; full cutover happens at B2d page-mount swap.
+export { useBpmFlowStore, type BpmFlowState } from './store/useBpmFlowStore';
