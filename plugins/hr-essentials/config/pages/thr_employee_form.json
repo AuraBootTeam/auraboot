@@ -37,12 +37,13 @@
       "fields": [
         {
           "field": "thr_em_name",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "thr_em_department",
           "colSpan": 6,
-          "required": false
+          "required": true
         },
         {
           "field": "thr_em_position",
@@ -59,7 +60,7 @@
         {
           "field": "thr_em_hire_date",
           "colSpan": 6,
-          "required": false
+          "required": true
         }
       ],
       "area": "main"
@@ -87,11 +88,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "thr:create_employee",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

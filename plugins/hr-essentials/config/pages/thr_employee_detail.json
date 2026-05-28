@@ -38,22 +38,35 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "thr.employee.manage"
+          "permissionCode": "thr.employee.manage",
+          "label": "$i18n:common.button.edit"
         },
         {
           "code": "on_leave",
           "commandCode": "thr:on_leave",
-          "permissionCode": "thr.employee.manage"
+          "permissionCode": "thr.employee.manage",
+          "label": {
+            "zh-CN": "休假",
+            "en-US": "On Leave"
+          }
         },
         {
           "code": "return_from_leave",
           "commandCode": "thr:return_from_leave",
-          "permissionCode": "thr.employee.manage"
+          "permissionCode": "thr.employee.manage",
+          "label": {
+            "zh-CN": "复职",
+            "en-US": "Return from Leave"
+          }
         },
         {
           "code": "resign",
           "commandCode": "thr:resign",
-          "permissionCode": "thr.employee.manage"
+          "permissionCode": "thr.employee.manage",
+          "label": {
+            "zh-CN": "离职",
+            "en-US": "Resign"
+          }
         },
         {
           "code": "delete",
@@ -61,7 +74,8 @@
           "danger": true,
           "commandCode": "thr:delete_employee",
           "permissionCode": "thr.employee.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": "$i18n:common.button.delete"
         }
       ],
       "area": "header"

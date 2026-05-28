@@ -37,7 +37,8 @@
       "fields": [
         {
           "field": "tcrm_ld_name",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "tcrm_ld_company",
@@ -85,11 +86,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "tcrm:create_lead",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

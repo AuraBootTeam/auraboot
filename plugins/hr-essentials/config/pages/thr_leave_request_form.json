@@ -37,23 +37,28 @@
       "fields": [
         {
           "field": "thr_lv_employee_id",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "thr_lv_leave_type",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "thr_lv_start_date",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "thr_lv_end_date",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "thr_lv_days",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         }
       ],
       "area": "main"
@@ -81,11 +86,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "thr:create_leave_request",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

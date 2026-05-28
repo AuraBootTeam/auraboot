@@ -34,17 +34,26 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tasset.maintenance.manage"
+          "permissionCode": "tasset.maintenance.manage",
+          "label": "$i18n:common.button.edit"
         },
         {
           "code": "start_maintenance",
           "commandCode": "tasset:start_maintenance",
-          "permissionCode": "tasset.maintenance.manage"
+          "permissionCode": "tasset.maintenance.manage",
+          "label": {
+            "zh-CN": "开始维护",
+            "en-US": "Start Maintenance"
+          }
         },
         {
           "code": "complete_maintenance",
           "commandCode": "tasset:complete_maintenance",
-          "permissionCode": "tasset.maintenance.manage"
+          "permissionCode": "tasset.maintenance.manage",
+          "label": {
+            "zh-CN": "完成维护",
+            "en-US": "Complete Maintenance"
+          }
         },
         {
           "code": "delete",
@@ -52,7 +61,8 @@
           "danger": true,
           "commandCode": "tasset:delete_maintenance",
           "permissionCode": "tasset.maintenance.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": "$i18n:common.button.delete"
         }
       ],
       "area": "header"
