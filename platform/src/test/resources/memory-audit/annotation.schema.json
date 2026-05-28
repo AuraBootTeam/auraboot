@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auraboot.com/schemas/memory-audit/annotation.schema.json",
+  "title": "Memory prompt 装配 conflict annotation",
+  "description": "Human-authored conflict tags for Spike-2 phase 2 sampled snippet bundles. See docs/backlog/2026-05-27-spike-2-memory-prompt-audit-design.md §2.2.",
+  "type": "object",
+  "required": ["version", "sample_run_at", "annotations"],
+  "properties": {
+    "version": { "type": "string" },
+    "sample_run_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the prompt-segments-<ts>.json this annotation refers to was generated"
+    },
+    "annotator": {
+      "type": "string",
+      "description": "GitHub handle or initials"
+    },
+    "annotations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Annotation" }
+    }
+  },
+  "$defs": {
+    "Annotation": {
+      "type": "object",
+      "required": ["sample_id", "tenant_id", "agent_code", "tag"],
+      "additionalProperties": false,
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "description": "Matches PromptSegmentSample.sampleId in prompt-segments-<ts>.json"
+        },
+        "tenant_id": { "type": "integer" },
+        "agent_code": { "type": "string" },
+        "snippet_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many snippets in the bundle this annotation covers"
+        },
+        "tag": {
+          "enum": [
+            "no-conflict",
+            "temporal-conflict",
+            "factual-conflict",
+            "granularity-conflict",
+            "unclear"
+          ],
+          "description": "See design doc §2.2 taxonomy"
+        },
+        "conflicting_pids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "When tag is *-conflict: the memory pids that conflict with each other. Empty for no-conflict."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Short human-readable explanation. Required for *-conflict and unclear."
+        },
+        "second_reviewer_tag": {
+          "enum": [
+            "no-conflict",
+            "temporal-conflict",
+            "factual-conflict",
+            "granularity-conflict",
+            "unclear"
+          ],
+          "description": "Optional — fill when first tag was 'unclear' and a second reviewer adjudicated"
+        }
+      }
+    }
+  }
+}
