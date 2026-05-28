@@ -1,28 +1,21 @@
 /**
- * StatsRowWidget — Renders a row of colored gradient stat cards
- * for the workbench home page.
+ * StatsRowWidget — Renders a row of neutral stat cards for the workbench.
+ *
+ * Visual contract (2026-05 redesign): white surfaces in a 4-column grid; each
+ * card delegates to the same internal renderer as StatsCardWidget for parity.
  */
 
 import React, { useMemo } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useWorkbenchStats } from './useWorkbenchStats';
+import { Sparkline } from './Sparkline';
 import type { StatsConfig, StatItem } from './workbench-types';
 
-const GRADIENT_MAP: Record<string, string> = {
-  blue: 'bg-gradient-to-br from-blue-500 to-blue-700',
-  amber: 'bg-gradient-to-br from-amber-500 to-amber-700',
-  emerald: 'bg-gradient-to-br from-emerald-500 to-emerald-700',
-  violet: 'bg-gradient-to-br from-violet-500 to-violet-700',
-  rose: 'bg-gradient-to-br from-rose-500 to-rose-700',
-  cyan: 'bg-gradient-to-br from-cyan-500 to-cyan-700',
-  indigo: 'bg-gradient-to-br from-indigo-500 to-indigo-700',
-  orange: 'bg-gradient-to-br from-orange-500 to-orange-700',
-};
-
-const TREND_ARROWS: Record<string, string> = {
-  up: '\u2191',
-  down: '\u2193',
-  flat: '\u2192',
+const TREND_ARROWS: Record<string, string> = { up: '↑', down: '↓', flat: '—' };
+const TREND_COLOR: Record<string, string> = {
+  up: 'text-emerald-700',
+  down: 'text-red-700',
+  flat: 'text-gray-500',
 };
 
 const DEFAULT_STATS: StatsConfig[] = [
@@ -34,29 +27,19 @@ const DEFAULT_STATS: StatsConfig[] = [
 
 function formatValue(item: StatItem): string {
   const raw = typeof item.value === 'string' ? parseFloat(item.value) : item.value;
-
   if (item.format === 'currency') {
     if (isNaN(raw as number)) return String(item.value);
     const num = raw as number;
-    if (num >= 10000) {
-      return `\u00a5${(num / 10000).toFixed(num % 10000 === 0 ? 0 : 1)}\u4e07`;
-    }
-    return `\u00a5${num.toLocaleString()}`;
+    if (num >= 10000) return `¥${(num / 10000).toFixed(num % 10000 === 0 ? 0 : 1)}万`;
+    return `¥${num.toLocaleString()}`;
   }
-
-  if (item.format === 'percent') {
-    return `${item.value}%`;
-  }
-
-  // Default number format
-  if (typeof raw === 'number' && !isNaN(raw)) {
-    return raw.toLocaleString();
-  }
+  if (item.format === 'percent') return `${item.value}%`;
+  if (typeof raw === 'number' && !isNaN(raw)) return raw.toLocaleString();
   return String(item.value);
 }
 
-function formatTrend(item: StatItem): string | null {
-  if (!item.trend) return null;
+function formatTrend(item: StatItem): string {
+  if (!item.trend) return '— no change';
   const arrow = TREND_ARROWS[item.trend.direction] ?? '';
   const suffix = item.trend.unit === 'percent' ? '%' : '';
   const periodLabel = item.trend.period === 'week' ? 'vs last week' : 'vs last month';
@@ -74,54 +57,31 @@ export function StatsRowWidget({ stats: statConfigs, className = '' }: StatsRowW
   const { stats, loading } = useWorkbenchStats({ keys });
   const { t } = useI18n();
 
-  if (loading) {
-    return (
-      <div className={`flex gap-4 ${className}`} data-testid="stats-row-skeleton">
-        {configs.map((cfg) => (
-          <div
-            key={cfg.key}
-            className="relative flex-1 overflow-hidden rounded-xl p-4 animate-pulse"
-          >
-            <div className={`absolute inset-0 ${GRADIENT_MAP[cfg.gradient] ?? GRADIENT_MAP.blue} opacity-40`} />
-            <div className="relative space-y-2">
-              <div className="h-3 w-16 rounded bg-white/30" />
-              <div className="h-7 w-20 rounded bg-white/30" />
-              <div className="h-2.5 w-24 rounded bg-white/20" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className={`flex gap-4 ${className}`} data-testid="stats-row">
+    <div
+      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 ${className}`}
+      data-testid="stats-row"
+    >
       {configs.map((cfg) => {
         const item = stats[cfg.key];
-        const gradientClass = GRADIENT_MAP[cfg.gradient] ?? GRADIENT_MAP.blue;
-        const trendText = item ? formatTrend(item) : null;
-
         return (
           <div
             key={cfg.key}
-            className={`relative flex-1 overflow-hidden rounded-xl p-4 text-white transition-transform hover:-translate-y-0.5 hover:shadow-lg ${gradientClass}`}
             data-testid={`stat-card-${cfg.key}`}
+            className="flex flex-col gap-3 rounded-[10px] bg-white border border-[#e3e8ee] p-5 min-h-[128px] dark:bg-gray-900 dark:border-gray-700"
           >
-            {/* Decorative circle */}
-            <div className="absolute -right-2 -top-2 h-14 w-14 rounded-full bg-white/10" />
-
-            {/* Label */}
-            <div className="text-xs opacity-85">{t(cfg.title)}</div>
-
-            {/* Value */}
-            <div className="mt-1 text-2xl font-extrabold leading-none">
-              {item ? formatValue(item) : '-'}
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {t(cfg.title)}
             </div>
-
-            {/* Trend */}
-            {trendText && (
-              <div className="mt-1.5 text-[10px] opacity-70">{trendText}</div>
-            )}
+            <div className="text-[28px] leading-none font-semibold text-gray-900 dark:text-gray-100">
+              {loading ? '—' : item ? formatValue(item) : '—'}
+            </div>
+            <div className="mt-auto flex items-center justify-between">
+              <span className={`text-[12px] ${TREND_COLOR[item?.trend?.direction ?? 'flat']}`}>
+                {item ? formatTrend(item) : ''}
+              </span>
+              <Sparkline points={item?.series?.points ?? []} />
+            </div>
           </div>
         );
       })}
