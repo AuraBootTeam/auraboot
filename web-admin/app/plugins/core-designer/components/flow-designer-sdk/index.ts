@@ -51,6 +51,16 @@ export type {
   DiffReport,
 } from './validation/diffGraphDocuments';
 
+// Hooks (G7 + G8) — neighbor traversal and monitor-mode status surface.
+export { useNodeNeighbors } from './hooks/useNodeNeighbors';
+export type { NodeNeighbors } from './hooks/useNodeNeighbors';
+export { useNodeMonitorStatus } from './hooks/useNodeMonitorStatus';
+export type {
+  FlowMonitorStatus,
+  NodeMonitorStatus,
+  FlowMonitorData,
+} from './store/monitorTypes';
+
 // Types
 export type {
   FlowNode,
