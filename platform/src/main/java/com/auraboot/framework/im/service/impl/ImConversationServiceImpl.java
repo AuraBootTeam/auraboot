@@ -2,6 +2,7 @@ package com.auraboot.framework.im.service.impl;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.im.dto.Announcement;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
@@ -18,6 +19,8 @@ import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.service.ImConversationService;
 import com.auraboot.framework.im.service.ImMessageService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +37,7 @@ public class ImConversationServiceImpl implements ImConversationService {
     private final ImMessageMapper messageMapper;
     private final ImMessageService imMessageService;
     private final AgentDefinitionMapper agentDefinitionMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     public ImConversationServiceImpl(ImConversationMapper conversationMapper,
                                       ImConversationMemberMapper memberMapper,
@@ -592,6 +596,69 @@ public class ImConversationServiceImpl implements ImConversationService {
     @Transactional
     public void hideConversation(Long conversationId, Long userId, Long tenantId) {
         memberMapper.hideConversation(conversationId, ImConstants.MEMBER_TYPE_HUMAN, userId, tenantId);
+    }
+
+    @Override
+    @Transactional
+    public Announcement setAnnouncement(Long conversationId, String content, Long userId, String userName, Long tenantId) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("Announcement content must not be blank");
+        }
+        if (content.length() > 2000) {
+            throw new IllegalArgumentException("Announcement content exceeds 2000 characters");
+        }
+        ImConversation conv = getById(conversationId, tenantId);
+        if (conv == null) {
+            throw new IllegalArgumentException("Conversation not found");
+        }
+        if (!userId.equals(conv.getOwnerId())) {
+            throw new IllegalArgumentException("Only the group owner can set the announcement");
+        }
+        try {
+            String metadata = conv.getMetadata();
+            ObjectNode root = metadata == null || metadata.isBlank()
+                    ? objectMapper.createObjectNode()
+                    : (ObjectNode) objectMapper.readTree(metadata);
+            Instant now = Instant.now();
+            ObjectNode ann = objectMapper.createObjectNode();
+            ann.put("content", content);
+            ann.put("updatedBy", userId);
+            ann.put("updatedByName", userName);
+            ann.put("updatedAt", now.toString());
+            root.set("announcement", ann);
+            conv.setMetadata(objectMapper.writeValueAsString(root));
+            conversationMapper.updateById(conv);
+            return new Announcement(content, userId, userName, now);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Failed to update conversation metadata", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void clearAnnouncement(Long conversationId, Long userId, Long tenantId) {
+        ImConversation conv = getById(conversationId, tenantId);
+        if (conv == null) {
+            throw new IllegalArgumentException("Conversation not found");
+        }
+        if (!userId.equals(conv.getOwnerId())) {
+            throw new IllegalArgumentException("Only the group owner can clear the announcement");
+        }
+        String metadata = conv.getMetadata();
+        if (metadata == null || metadata.isBlank()) {
+            return; // no-op: no metadata, nothing to clear
+        }
+        try {
+            ObjectNode root = (ObjectNode) objectMapper.readTree(metadata);
+            if (!root.has("announcement")) {
+                return; // no-op: announcement key not present
+            }
+            root.remove("announcement");
+            conv.setMetadata(objectMapper.writeValueAsString(root));
+            conversationMapper.updateById(conv);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Failed to update conversation metadata", e);
+        }
     }
 
     private ImConversation findPrivateConversation(Long userId1, Long userId2, Long tenantId) {
