@@ -31,6 +31,9 @@ dependencies {
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'
     compileOnly 'org.springframework:spring-context:6.2.18'
 
+    // Spring Boot Actuator (HealthIndicator SPI) — runtime optional
+    compileOnly 'org.springframework.boot:spring-boot-actuator:3.5.14'
+
     // SLF4J for @Slf4j
     compileOnly 'org.slf4j:slf4j-api:2.0.18'
 
@@ -40,10 +43,16 @@ dependencies {
     }
     testImplementation 'org.springframework:spring-beans:6.2.18'
     testImplementation 'org.springframework.boot:spring-boot:3.5.14'
+    testImplementation 'org.springframework.boot:spring-boot-actuator:3.5.14'
     testImplementation 'org.slf4j:slf4j-api:2.0.18'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testImplementation 'org.mockito:mockito-core:5.11.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+
+    // TestContainers Kafka — integration test (may be @Disabled when Docker not available)
+    testImplementation 'org.testcontainers:testcontainers:1.20.4'
+    testImplementation 'org.testcontainers:kafka:1.20.4'
+    testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
 }
 
 compileJava {

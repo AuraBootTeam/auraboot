@@ -52,6 +52,7 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
     private final String bootstrapServers;
     private final String defaultConsumerGroup;
     private final KafkaProducer<String, String> producer;
+    private final DeadLetterQueueHandler deadLetterQueueHandler;
     private final Map<String, ConsumerEntry> consumers = new ConcurrentHashMap<>();
 
     public KafkaMqProvider(MqProperties properties) {
@@ -59,18 +60,34 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
         this.bootstrapServers = kafkaConfig.getBootstrapServers();
         this.defaultConsumerGroup = kafkaConfig.getConsumerGroup();
         this.producer = createProducer(bootstrapServers);
+        MqProperties.Kafka.DeadLetter dl = kafkaConfig.getDeadLetter();
+        this.deadLetterQueueHandler = new DeadLetterQueueHandler(
+                this.producer, dl.getTopicSuffix(), dl.getMaxAttempts(), dl.isEnabled());
 
-        log.info("KafkaMqProvider initialized: bootstrapServers={}, defaultGroup={}",
-                bootstrapServers, defaultConsumerGroup);
+        log.info("KafkaMqProvider initialized: bootstrapServers={}, defaultGroup={}, dlqEnabled={}, dlqSuffix={}, maxAttempts={}",
+                bootstrapServers, defaultConsumerGroup,
+                dl.isEnabled(), dl.getTopicSuffix(), dl.getMaxAttempts());
     }
 
     /**
      * Package-private constructor for testing with a pre-built producer.
      */
     KafkaMqProvider(KafkaProducer<String, String> producer, String bootstrapServers, String defaultConsumerGroup) {
+        this(producer, bootstrapServers, defaultConsumerGroup,
+                new DeadLetterQueueHandler(producer, ".DLT", 3, true));
+    }
+
+    /**
+     * Package-private constructor for tests that need to inject a custom DLQ handler.
+     */
+    KafkaMqProvider(KafkaProducer<String, String> producer,
+                    String bootstrapServers,
+                    String defaultConsumerGroup,
+                    DeadLetterQueueHandler deadLetterQueueHandler) {
         this.producer = producer;
         this.bootstrapServers = bootstrapServers;
         this.defaultConsumerGroup = defaultConsumerGroup;
+        this.deadLetterQueueHandler = deadLetterQueueHandler;
     }
 
     @Override
@@ -122,8 +139,7 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
                             Map<String, String> headersMap = extractHeaders(record);
                             handler.handle(topic, record.value(), headersMap);
                         } catch (Exception e) {
-                            log.error("Kafka handler error: topic={}, group={}, offset={}",
-                                    topic, groupId, record.offset(), e);
+                            handleConsumerFailure(record, e, topic, groupId);
                         }
                     }
                 }
@@ -240,6 +256,61 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
         return new KafkaConsumer<>(props);
+    }
+
+    /**
+     * Visible for testing — the configured DLQ handler.
+     */
+    DeadLetterQueueHandler deadLetterQueueHandler() {
+        return deadLetterQueueHandler;
+    }
+
+    /**
+     * Handle a consumer-side processing failure.
+     * <p>
+     * Increment the {@code x-retry-count} header. If attempts have reached
+     * {@link DeadLetterQueueHandler#getMaxAttempts()} the record is routed to the DLT;
+     * otherwise it is re-produced to the original topic for another delivery attempt.
+     * When DLQ is disabled, the failure is just logged (legacy behaviour).
+     * </p>
+     */
+    private void handleConsumerFailure(ConsumerRecord<String, String> record,
+                                       Throwable error,
+                                       String topic,
+                                       String groupId) {
+        int previousAttempts = DeadLetterQueueHandler.currentRetryCount(record);
+        int newAttempts = previousAttempts + 1;
+
+        if (!deadLetterQueueHandler.isEnabled()) {
+            log.error("Kafka handler error (DLQ disabled): topic={}, group={}, offset={}",
+                    topic, groupId, record.offset(), error);
+            return;
+        }
+
+        if (deadLetterQueueHandler.shouldRouteToDlt(newAttempts)) {
+            log.error("Kafka handler exhausted retries ({}/{}): topic={}, group={}, offset={} -> DLT",
+                    newAttempts, deadLetterQueueHandler.getMaxAttempts(), topic, groupId, record.offset(), error);
+            deadLetterQueueHandler.routeToDeadLetter(record, error, newAttempts);
+            return;
+        }
+
+        log.warn("Kafka handler error (attempt {}/{}): topic={}, group={}, offset={} — requeueing",
+                newAttempts, deadLetterQueueHandler.getMaxAttempts(), topic, groupId, record.offset(), error);
+
+        ProducerRecord<String, String> retry = new ProducerRecord<>(record.topic(), record.key(), record.value());
+        for (Header h : record.headers()) {
+            if (!DeadLetterQueueHandler.RETRY_COUNT_HEADER.equals(h.key())) {
+                retry.headers().add(h.key(), h.value());
+            }
+        }
+        retry.headers().add(DeadLetterQueueHandler.RETRY_COUNT_HEADER,
+                Integer.toString(newAttempts).getBytes(StandardCharsets.UTF_8));
+        producer.send(retry, (md, ex) -> {
+            if (ex != null) {
+                log.error("Failed to requeue record after handler error: topic={}, offset={}",
+                        record.topic(), record.offset(), ex);
+            }
+        });
     }
 
     private Map<String, String> extractHeaders(ConsumerRecord<String, String> record) {
