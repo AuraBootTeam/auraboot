@@ -380,6 +380,74 @@ class AuraBotSkillControllerIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(firstData.path("echo").asText());
     }
 
+    // ─── Case 10 (security: undo cross-tenant) ───────────────────────────────
+    // Verifies the 2026-05-28 deep-review P1 fix: /skill/undo must enforce
+    // a tenant cross-check on the persisted row. A SkillRun row belonging to
+    // another tenant must surface as UNDO_EXPIRED (not "found in different
+    // tenant" — that would leak the row's existence).
+    @Test
+    @DisplayName("Case 10: POST /skill/undo where row belongs to another tenant → 410 UNDO_EXPIRED")
+    void case10_undoCrossTenant_410() throws Exception {
+        // Insert a SkillRun directly via the repository under a synthesized
+        // foreign tenant id. The caller's tenant (getTestTenant().getId()) is
+        // different — the undo controller must refuse and emit UNDO_EXPIRED.
+        long foreignTenant = getTestTenant().getId() + 9_999_999L;
+        String foreignUndoToken = "u-it-cross-tenant-" + UniqueIdGenerator.generate();
+        SkillRun foreignRow = SkillRun.builder()
+                .pid(UniqueIdGenerator.generate())
+                .tenantId(foreignTenant)
+                .skillName("echo")
+                .undoToken(foreignUndoToken)
+                .status(SkillRunStatus.SUCCESS.code())
+                .riskLevel(com.auraboot.framework.aurabot.skill.RiskLevel.LOW.code())
+                .createdAt(java.time.Instant.now())
+                .deletedFlag(Boolean.FALSE)
+                .build();
+        repository.insert(foreignRow);
+
+        ObjectNode req = body(Map.of("undoToken", foreignUndoToken));
+        mockMvc.perform(post("/api/aurabot/v2/skill/undo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(req.toString()))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("UNDO_EXPIRED"))
+                .andExpect(jsonPath("$.message").isNotEmpty());
+    }
+
+    // ─── Case 11 (security: undo permission re-check) ────────────────────────
+    // Verifies the 2026-05-28 deep-review P1 fix: /skill/undo must re-check
+    // skill.requiredPermissions() against current caller permissions. Echo
+    // skill has no required permissions, so we exercise model:query (which
+    // requires meta.model.read — same skill exercised by Case 6 on execute).
+    @Test
+    @DisplayName("Case 11: POST /skill/undo for model:query without meta.model.read → 403 PERMISSION_DENIED")
+    void case11_undoMissingPermission_403() throws Exception {
+        // Insert a model:query SkillRun for THIS tenant (so tenant check passes),
+        // then attempt undo with empty permission set (default test setup).
+        String undoToken = "u-it-no-perm-" + UniqueIdGenerator.generate();
+        SkillRun row = SkillRun.builder()
+                .pid(UniqueIdGenerator.generate())
+                .tenantId(getTestTenant().getId())
+                .skillName("model:query")
+                .undoToken(undoToken)
+                .status(SkillRunStatus.SUCCESS.code())
+                .riskLevel(com.auraboot.framework.aurabot.skill.RiskLevel.LOW.code())
+                .createdAt(java.time.Instant.now())
+                .deletedFlag(Boolean.FALSE)
+                .build();
+        repository.insert(row);
+        // currentPermissions is empty (BeforeEach defaults) — caller cannot
+        // meet model:query's requiredPermissions().
+
+        ObjectNode req = body(Map.of("undoToken", undoToken));
+        mockMvc.perform(post("/api/aurabot/v2/skill/undo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(req.toString()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"))
+                .andExpect(jsonPath("$.message").isNotEmpty());
+    }
+
     // ─── Case 9 (B8 follow-up — F-2 clean fix) ───────────────────────────────
     @Test
     @DisplayName("Case 9: POST /skill/dry-run on a skill with supportsDryRun=false → 422 DRY_RUN_NOT_SUPPORTED")

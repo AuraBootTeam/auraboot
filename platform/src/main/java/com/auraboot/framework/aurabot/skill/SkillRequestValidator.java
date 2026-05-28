@@ -10,7 +10,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.ValidationMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -203,10 +203,16 @@ public class SkillRequestValidator {
                     tenantId, req.getSkillName(), idemKey, prior.get());
             idempotencyStore.release(tenantId, req.getSkillName(), idemKey);
             return Optional.empty();
-        } catch (DataAccessResourceFailureException e) {
+        } catch (RedisConnectionFailureException e) {
             // P2 catch-exception-pattern: Redis unreachable → fail-open per
             // plan §R2. The DB unique index on (tenant, skill, idem) is the
             // ultimate safety net for actual duplicate inserts.
+            //
+            // Narrowed from DataAccessResourceFailureException (2026-05-28
+            // deep-review P2) to match the Javadoc above and avoid swallowing
+            // Postgres connection failures — those should propagate to the
+            // exception handler so the caller sees a real 500, not a silent
+            // "Redis fail-open" log followed by a confused execute path.
             log.warn("Redis unavailable, skipping idempotency check for skill={} tenant={}",
                     req.getSkillName(), tenantId, e);
             return Optional.empty();
