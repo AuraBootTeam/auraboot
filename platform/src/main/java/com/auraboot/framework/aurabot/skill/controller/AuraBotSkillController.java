@@ -246,6 +246,19 @@ public class AuraBotSkillController {
             throw new SkillSpiException(SkillErrorCode.PARAMS_INVALID,
                     "undoToken is required", "/undoToken");
         }
+        // Resolve caller context up front — undo is state-mutating (DROP TABLE /
+        // DROP COLUMN / DELETE etc), so it must enforce the same auth boundaries
+        // as /skill/execute: (a) tenant cross-check on the persisted row, and
+        // (b) permission re-check against the skill's requiredPermissions().
+        // Without these checks, a leaked undoToken (logs, error envelope,
+        // browser history, support ticket) would let any authenticated user
+        // destroy another tenant's data. See
+        // docs/backlog/2026-05-28-aurabot-deep-review.md P1 "Undo authorization
+        // gap" — verified cross-tenant exploit surface.
+        Long callerTenantBoxed = MetaContext.getCurrentTenantId();
+        long callerTenant = callerTenantBoxed == null ? 0L : callerTenantBoxed;
+        Set<String> callerPerms = resolveCurrentUserPermissions();
+
         SkillRun row = repository.findByUndoToken(body.getUndoToken())
                 .orElseThrow(() -> new SkillSpiException(SkillErrorCode.UNDO_EXPIRED,
                         "undo token not found"));
@@ -259,10 +272,33 @@ public class AuraBotSkillController {
             throw new SkillSpiException(SkillErrorCode.UNDO_EXPIRED,
                     "skill run already undone");
         }
+        // Tenant cross-check: refuse cross-tenant undo. Use UNDO_EXPIRED for the
+        // wire response (don't leak "the row exists in another tenant" via a
+        // distinguishable error). Internal log records the real reason for
+        // operator-side anomaly review.
+        if (row.getTenantId() == null || row.getTenantId() != callerTenant) {
+            log.warn("SECURITY skill-undo cross-tenant attempt rowTenant={} caller={} userId={} pid={}",
+                    row.getTenantId(), callerTenant, MetaContext.getCurrentUserId(), row.getPid());
+            throw new SkillSpiException(SkillErrorCode.UNDO_EXPIRED,
+                    "undo token not found");
+        }
 
         AuraBotSkill skill = registry.get(row.getSkillName())
                 .orElseThrow(() -> new SkillSpiException(SkillErrorCode.SKILL_NOT_FOUND,
                         "skill not found: " + row.getSkillName()));
+
+        // Permission re-check: caller must still hold ALL of the skill's
+        // requiredPermissions() at undo time. We don't reuse the permission set
+        // captured at execute time because a role can have been revoked between
+        // execute and undo; the SPI contract is "you can undo only what you
+        // could currently execute".
+        Set<String> required = skill.requiredPermissions();
+        if (required != null && !required.isEmpty() && !callerPerms.containsAll(required)) {
+            log.warn("SECURITY skill-undo permission-denied skill={} caller={} userId={} pid={}",
+                    skill.name(), callerTenant, MetaContext.getCurrentUserId(), row.getPid());
+            throw new SkillSpiException(SkillErrorCode.PERMISSION_DENIED,
+                    "caller lacks required permission to undo skill " + skill.name());
+        }
 
         SkillResult result;
         try {
@@ -299,6 +335,10 @@ public class AuraBotSkillController {
         }
         Long tenantIdBoxed = MetaContext.getCurrentTenantId();
         Long tenantId = tenantIdBoxed == null ? Long.valueOf(0L) : tenantIdBoxed;
+        // Permission set resolved once per batch — re-check per skill below.
+        // findByBatchId is tenant-scoped already, so no cross-tenant escape via
+        // the query path; permission gate is the remaining hardening.
+        Set<String> callerPerms = resolveCurrentUserPermissions();
 
         List<SkillRun> rows = repository.findByBatchId(tenantId, body.getBatchId());
         // Reverse so newest-first: undo in opposite order of original execution.
@@ -315,6 +355,17 @@ public class AuraBotSkillController {
                 AuraBotSkill skill = registry.get(row.getSkillName())
                         .orElseThrow(() -> new SkillSpiException(SkillErrorCode.SKILL_NOT_FOUND,
                                 "skill not found: " + row.getSkillName()));
+                // Permission re-check per skill in batch — same SPI contract as
+                // single undo. A batch may span skills with different
+                // requiredPermissions(); each one is gated independently.
+                Set<String> required = skill.requiredPermissions();
+                if (required != null && !required.isEmpty() && !callerPerms.containsAll(required)) {
+                    log.warn("SECURITY skill-batch-undo permission-denied skill={} caller={} userId={} pid={} batchId={}",
+                            skill.name(), tenantId, MetaContext.getCurrentUserId(),
+                            row.getPid(), body.getBatchId());
+                    throw new SkillSpiException(SkillErrorCode.PERMISSION_DENIED,
+                            "caller lacks required permission to undo skill " + skill.name());
+                }
                 if (row.getCreatedAt() == null
                         || row.getCreatedAt().plus(UNDO_WINDOW).isBefore(Instant.now())) {
                     throw new SkillSpiException(SkillErrorCode.UNDO_EXPIRED,
