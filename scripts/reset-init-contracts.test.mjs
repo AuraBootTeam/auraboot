@@ -23,8 +23,10 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/dev\/lib\/health\.sh/);
   assert.match(gate, /bash -n scripts\/dev\/run-agent-runtime-full-gate-docker\.sh/);
   assert.match(gate, /bash -n scripts\/env\/reset-and-init\.sh/);
+  assert.match(gate, /bash -n scripts\/oss-test\.sh/);
   assert.match(gate, /node --test scripts\/dev\/lib\/env-registry\.test\.mjs/);
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
+  assert.match(gate, /node --test scripts\/oss-test-fixture-gate\.test\.mjs/);
   assert.match(gate, /node web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
 });
 
