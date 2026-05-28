@@ -35,25 +35,35 @@
           "code": "edit",
           "action": "edit",
           "permissionCode": "thr.leave.manage",
-          "visibleWhen": "record.thr_lv_status === 'pending'"
+          "visibleWhen": "record.thr_lv_status === 'pending'",
+          "label": "$i18n:common.button.edit"
         },
         {
           "code": "approve",
           "commandCode": "thr:approve_leave",
           "permissionCode": "thr.leave.manage",
-          "visibleWhen": "record.thr_lv_status === 'pending'"
+          "visibleWhen": "record.thr_lv_status === 'pending'",
+          "label": {
+            "zh-CN": "批准请假",
+            "en-US": "Approve Leave"
+          }
         },
         {
           "code": "reject",
           "commandCode": "thr:reject_leave",
           "permissionCode": "thr.leave.manage",
-          "visibleWhen": "record.thr_lv_status === 'pending'"
+          "visibleWhen": "record.thr_lv_status === 'pending'",
+          "label": {
+            "zh-CN": "拒绝请假",
+            "en-US": "Reject Leave"
+          }
         },
         {
           "code": "cancel",
           "commandCode": "thr:cancel_leave",
           "permissionCode": "thr.leave.manage",
-          "visibleWhen": "record.thr_lv_status === 'pending' || record.thr_lv_status === 'approved'"
+          "visibleWhen": "record.thr_lv_status === 'pending' || record.thr_lv_status === 'approved'",
+          "label": "$i18n:common.button.cancel"
         },
         {
           "code": "delete",
@@ -61,7 +71,8 @@
           "danger": true,
           "commandCode": "thr:delete_leave_request",
           "permissionCode": "thr.leave.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": "$i18n:common.button.delete"
         }
       ],
       "area": "header"

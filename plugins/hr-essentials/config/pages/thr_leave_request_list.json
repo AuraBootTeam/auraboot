@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "thr.leave.manage"
+          "permissionCode": "thr.leave.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -134,13 +135,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "thr_leave_request_detail"
+              "navigateTo": "thr_leave_request_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "thr_leave_request_form",
-              "permissionCode": "thr.leave.manage"
+              "permissionCode": "thr.leave.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -148,9 +151,11 @@
               "danger": true,
               "commandCode": "thr:delete_leave_request",
               "permissionCode": "thr.leave.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [
