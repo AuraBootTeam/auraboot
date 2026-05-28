@@ -95,8 +95,12 @@ public class KnowledgeBaseService {
         KnowledgeBase kb = findKb(tenantId, kbPid);
         if (kb == null) return false;
 
-        // Cascade delete: chunks → docs → kb
-        jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE kb_id = ?", kbPid);
+        // Cascade delete: chunks → docs → kb.
+        // Defense-in-depth: include tenant_id predicate even though kbPid is
+        // already tenant-scoped via findKb(...) above. Same pattern as the
+        // other tenant-scoped tables — protects against future call paths
+        // that bypass findKb(). See deep-review P3-2.
+        jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE kb_id = ? AND tenant_id = ?", kbPid, tenantId);
         docMapper.delete(new LambdaQueryWrapper<KbDocument>().eq(KbDocument::getKbId, kbPid));
         kbMapper.deleteById(kb.getId());
         log.info("Deleted knowledge base: pid={}", kbPid);
