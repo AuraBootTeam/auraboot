@@ -52,3 +52,46 @@ export {
   buildBpmSdkBatch2NodeDefinitions,
   registerBpmSdkBatch2,
 } from './registerBpmSdkBatch2Nodes';
+
+// --- Batch3 (B2b third slice — pickers + shared.tsx + CallActivity + edge editor) ---
+export { CallActivityNode } from './nodes/BpmSdkBatch3Nodes';
+
+export {
+  CallActivityEditor,
+  BpmSequenceFlowEdgeEditor,
+} from './editors/BpmSdkBatch3Editors';
+
+// shared.tsx split sub-sections — composable from any node editor
+export {
+  MultiInstanceSection,
+  type MultiInstanceSectionProps,
+} from './editors/sections/MultiInstanceSection';
+export {
+  FormBindingSection,
+  type FormBindingSectionProps,
+} from './editors/sections/FormBindingSection';
+export {
+  HookConfigSection,
+  type HookConfigSectionProps,
+} from './editors/sections/HookConfigSection';
+
+// Remote-data pickers — usable from any editor that needs a user/role/dept
+// or a deployed-process selection control.
+export {
+  AssigneePicker,
+  type AssigneePickerProps,
+  __assigneeInternals,
+} from './editors/pickers/AssigneePicker';
+export {
+  ProcessPicker,
+  type ProcessPickerProps,
+  type ProcessDefinition,
+} from './editors/pickers/ProcessPicker';
+
+export {
+  BPM_SDK_BATCH3_NODE_TYPES,
+  type BpmSdkBatch3NodeType,
+  buildBpmSdkBatch3NodeDefinitions,
+  registerBpmSdkBatch3,
+  registerBpmSdkAll,
+} from './registerBpmSdkBatch3Nodes';
