@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
@@ -75,6 +76,13 @@ public class MemoryL1L2OrphanScanner {
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
+    /**
+     * Per-row REQUIRES_NEW transaction template — used inside
+     * {@link #scanLocked} to isolate each {@code promoter.promoteCandidate}
+     * call so a single poison row does not roll back the whole tick.
+     * See deep-review P1-3.
+     */
+    private final TransactionTemplate txPerRow;
     private final MemoryL1L2Promoter promoter;
     private final MemoryL1L2PromotionMetrics metrics;
     private final MemoryL1L2LeaderElection leaderElection;
@@ -89,6 +97,8 @@ public class MemoryL1L2OrphanScanner {
                                    MemoryL1L2LeaderElection leaderElection) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(txManager);
+        this.txPerRow = new TransactionTemplate(txManager);
+        this.txPerRow.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.promoter = promoter;
         this.metrics = metrics;
         this.leaderElection = leaderElection;
@@ -173,12 +183,25 @@ public class MemoryL1L2OrphanScanner {
         int skippedLowScore = 0;
 
         Instant now = Instant.now();
+        int rowFailures = 0;
         for (Map<String, Object> row : candidates) {
             Long tenantId = ((Number) row.get("tenant_id")).longValue();
             String sourceRunId = (String) row.get("source_run_id");
+            // Per-row REQUIRES_NEW so a single poison row does NOT roll back
+            // previously-promoted rows in this tick. The outer transaction
+            // still holds the session-scoped advisory lock (single-flight
+            // guarantee), so this isolation is safe to add. Failed rows are
+            // counted via metrics + log; the tick continues. See
+            // deep-review P1-3 — previous behavior threw, rolling back the
+            // entire tick.
             try {
-                MemoryL1L2Promoter.Outcome o = promoter.promoteCandidate(
-                        tenantId, sourceRunId, row, now);
+                MemoryL1L2Promoter.Outcome o = txPerRow.execute(status -> {
+                    return promoter.promoteCandidate(tenantId, sourceRunId, row, now);
+                });
+                if (o == null) {
+                    rowFailures++;
+                    continue;
+                }
                 switch (o) {
                     case PROMOTED -> promoted++;
                     case DEDUP_HIT -> skippedDup++;
@@ -188,12 +211,19 @@ public class MemoryL1L2OrphanScanner {
             } catch (RuntimeException e) {
                 metrics.recordPromotionOutcome(tenantId,
                         MemoryL1L2PromotionMetrics.OUTCOME_FAILED);
-                // Let the transaction roll back — same contract as the event
-                // listener. A single-tenant failure kills the tick; next
-                // tick retries (and presumably fails fast on the same row,
-                // surfacing via the failed counter).
-                throw e;
+                // Per-row REQUIRES_NEW already rolled back this row's writes
+                // before we get here — log + continue rather than aborting
+                // the whole tick. Repeat-failure scenarios surface via
+                // OUTCOME_FAILED counter for operator alerting.
+                String pid = String.valueOf(row.get("pid"));
+                log.warn("MemoryL1L2OrphanScanner: promoter failed for pid={} tenant={} — skipping row, continuing tick",
+                        pid, tenantId, e);
+                rowFailures++;
             }
+        }
+        if (rowFailures > 0) {
+            log.info("MemoryL1L2OrphanScanner: tick completed with {} row failures (isolated, did not abort tick)",
+                    rowFailures);
         }
 
         return new Integer[]{candidates.size(), promoted, skippedDup,
