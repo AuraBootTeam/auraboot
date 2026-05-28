@@ -1,0 +1,177 @@
+{
+  "version": "0.1.0-seed",
+  "description": "Spike-1 phase 1 seed queries. 15 entries covering 3 languages × 3 length classes × 4 expected_paths. Phase 2 expands to 50-100.",
+  "queries": [
+    {
+      "id": "zh-short-001",
+      "language": "zh",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "命令执行流程",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.playbook.command-delivery-workflow", "compiled.command.command-execution-contract"],
+      "tags": ["命令", "playbook"],
+      "notes": "短 zh query 的 baseline 例。Path A CJK 逐字 OR 应严重影响 precision;Path B HAN_SEQUENCE 应能整段匹配"
+    },
+    {
+      "id": "zh-medium-001",
+      "language": "zh",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "权限边界与租户隔离原则",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.decision.permission-boundary"],
+      "tags": ["权限", "decision"],
+      "notes": "中等长度 zh,主题在 D7 平台 SOP 中,Path A 应无命中"
+    },
+    {
+      "id": "zh-long-001",
+      "language": "zh",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "插件 config-only 导入失败时如何回滚,要不要走 SoD 命令门",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [
+        "compiled.playbook.plugin-config-only-import",
+        "compiled.decision.sod-command-gate"
+      ],
+      "tags": ["plugin", "import", "sod"],
+      "notes": "复合主题 long query,期望 D7 fusion 命中两个 page"
+    },
+    {
+      "id": "zh-short-002",
+      "language": "zh",
+      "length_class": "short",
+      "expected_path": "neither",
+      "query": "炒菜步骤",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["off-topic"],
+      "notes": "off-topic noise query — 应该 NoAnswer。验证 FalsePositive 率"
+    },
+    {
+      "id": "zh-medium-002",
+      "language": "zh",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "DSL 注册流程是怎样的",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.playbook.dsl-registry-workflow"],
+      "tags": ["dsl", "registry"],
+      "notes": "zh medium,单个 D7 page hit"
+    },
+    {
+      "id": "en-short-001",
+      "language": "en",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "command execution",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.playbook.command-delivery-workflow", "compiled.command.command-execution-contract"],
+      "tags": ["command", "playbook"],
+      "notes": "镜像 zh-short-001 — 同主题英文版,验证 Recall@5 zh vs en 差距"
+    },
+    {
+      "id": "en-medium-001",
+      "language": "en",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "tenant isolation and permission boundary",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.decision.permission-boundary"],
+      "tags": ["permission", "decision"],
+      "notes": "镜像 zh-medium-001 — 同主题英文版"
+    },
+    {
+      "id": "en-long-001",
+      "language": "en",
+      "length_class": "long",
+      "expected_path": "B",
+      "query": "How does config-only plugin import roll back on failure, and does it have to go through the SoD command gate",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [
+        "compiled.playbook.plugin-config-only-import",
+        "compiled.decision.sod-command-gate"
+      ],
+      "tags": ["plugin", "import", "sod"],
+      "notes": "镜像 zh-long-001 — 复合主题 long en query"
+    },
+    {
+      "id": "en-short-002",
+      "language": "en",
+      "length_class": "short",
+      "expected_path": "neither",
+      "query": "best pasta recipe",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["off-topic"],
+      "notes": "off-topic noise query — 镜像 zh-short-002"
+    },
+    {
+      "id": "en-medium-002",
+      "language": "en",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "operations readiness checklist",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.playbook.operations-readiness"],
+      "tags": ["operations", "playbook"],
+      "notes": "en medium,单个 D7 page hit"
+    },
+    {
+      "id": "mix-short-001",
+      "language": "mixed",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "BPM form 集成",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.subsystem.bpm-form-integration"],
+      "tags": ["bpm", "form", "subsystem"],
+      "notes": "中英混合短 query,常见的中文项目对话场景"
+    },
+    {
+      "id": "mix-medium-001",
+      "language": "mixed",
+      "length_class": "medium",
+      "expected_path": "B",
+      "query": "documentation subsystem 包含哪些",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.subsystem.documentation"],
+      "tags": ["docs", "subsystem"],
+      "notes": "中英混合 medium,英文术语 + 中文连接词"
+    },
+    {
+      "id": "mix-long-001",
+      "language": "mixed",
+      "length_class": "long",
+      "expected_path": "both",
+      "query": "aurabot D7 retrieval pipeline 在 enterprise overlay 中如何被 RagContextProviderImpl 调用",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.subsystem.aurabot-d7-retrieval"],
+      "tags": ["aurabot", "d7", "retrieval"],
+      "notes": "longest mixed query,fusion 场景候选(如果 phase 2 加入 KB 内容讨论 aurabot D7)"
+    },
+    {
+      "id": "mix-short-002",
+      "language": "mixed",
+      "length_class": "short",
+      "expected_path": "B",
+      "query": "page schema",
+      "expected_kb_pages": [],
+      "expected_d7_pages": ["compiled.model.page-schema"],
+      "tags": ["page", "model"],
+      "notes": "短英文 + 通用术语,容易在两路径混淆 — baseline 比较点"
+    },
+    {
+      "id": "mix-medium-002",
+      "language": "mixed",
+      "length_class": "medium",
+      "expected_path": "neither",
+      "query": "天气预报 API for tomorrow",
+      "expected_kb_pages": [],
+      "expected_d7_pages": [],
+      "tags": ["off-topic"],
+      "notes": "off-topic mixed,NoAnswer 第三例"
+    }
+  ]
+}
