@@ -1969,6 +1969,21 @@
     "en-US": "Alerts"
   },
   {
+    "key": "workbench.inbox.col.task",
+    "zh-CN": "任务",
+    "en-US": "Task"
+  },
+  {
+    "key": "workbench.inbox.col.type",
+    "zh-CN": "类型",
+    "en-US": "Type"
+  },
+  {
+    "key": "workbench.inbox.col.due",
+    "zh-CN": "截止",
+    "en-US": "Due"
+  },
+  {
     "key": "workbench.inbox.view_all",
     "zh-CN": "查看全部",
     "en-US": "View All"
