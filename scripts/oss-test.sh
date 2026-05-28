@@ -33,6 +33,11 @@ for arg in "$@"; do
       ;;
     --smoke)
       export PW_PROFILE=smoke
+      # Some @smoke-tagged specs reference e2et_* fixtures (e.g.
+      # tests/e2e/e2et-order/e2et-query-operators.spec.ts), so smoke runs
+      # need fixtures too. PW_PROFILE=smoke isn't in the setup project's
+      # gate list, so signal IMPORT_TEST_FIXTURES instead.
+      export IMPORT_TEST_FIXTURES=true
       SUITE_LABEL="smoke"
       ;;
     *)
@@ -77,30 +82,56 @@ done < <(jq -r '.test_paths[]' "$SCOPE_FILE")
 PW_CONFIG="${CONFIG_OVERRIDE:-playwright.oss.config.ts}"
 export PW_SKIP_WEBSERVER="${PW_SKIP_WEBSERVER:-1}"
 
+# Default PW_PROFILE=oss so the Playwright setup project
+# (tests/api/setup/03-import-test-fixtures.spec.ts) auto-imports the internal
+# `test-fixtures` plugin. Without this, 60+ specs that depend on e2et_* models
+# fail with `Command not found: e2et:create_order`. --smoke already exported
+# PW_PROFILE=smoke above; ${PW_PROFILE:-oss} preserves any caller override.
+export PW_PROFILE="${PW_PROFILE:-oss}"
+
 echo "=== AuraBoot OSS Test Runner ==="
 echo "Scope file:    $SCOPE_FILE"
 echo "Spec files:    $COUNT"
 echo "Playwright config: $PW_CONFIG"
+echo "PW_PROFILE:    $PW_PROFILE"
 echo "Reuse running web server: PW_SKIP_WEBSERVER=$PW_SKIP_WEBSERVER"
 if [[ -n "$SUITE_LABEL" ]]; then
   echo "Suite:         $SUITE_LABEL"
 fi
 echo ""
 
-# Preflight: many specs depend on the internal test-fixtures plugin (e2et_*
-# models / commands). It is not imported by default. Detect missing fixtures
-# and warn loudly so the operator can rerun reset-and-init with
-# IMPORT_TEST_FIXTURES=true (or AURA_ENV=test) before the suite drops dozens
-# of unrelated red regressions on the floor.
-FIXTURE_PROBE=$(curl -sS -o /dev/null -w "%{http_code}" \
-  "http://localhost:6443/api/meta/commands?modelCode=e2et_order" 2>/dev/null || echo "000")
-if [[ "$FIXTURE_PROBE" != "200" ]]; then
-  echo "WARNING: test-fixtures plugin not detected (probe HTTP $FIXTURE_PROBE)."
-  echo "         Many saved-view / list-ux / platform specs will fail with"
-  echo "         'Command not found: e2et:create_order'."
-  echo "         Fix:  IMPORT_TEST_FIXTURES=true ./scripts/oss-reset-and-init.sh"
-  echo "         Or import directly via /api/plugins/import/import-directory-sync."
+# Preflight (red line §4.1 — fail fast if env can't satisfy fixture import):
+# The Playwright setup project at tests/api/setup/03-import-test-fixtures.spec.ts
+# auto-imports the internal `test-fixtures` plugin when ANY of these gates are
+# set: AURA_ENV=test, IMPORT_TEST_FIXTURES=true, PW_PROFILE=oss, PW_PROFILE=full.
+# If a caller has explicitly cleared all four (e.g. PW_PROFILE=core override),
+# fixtures won't import and ~60 specs reference e2et_* models — refuse to run.
+FIXTURE_GATE=""
+if [[ "${AURA_ENV:-}" == "test" ]]; then FIXTURE_GATE="AURA_ENV=test"
+elif [[ "${IMPORT_TEST_FIXTURES:-}" == "true" || "${IMPORT_TEST_FIXTURES:-}" == "TRUE" ]]; then FIXTURE_GATE="IMPORT_TEST_FIXTURES=true"
+elif [[ "$PW_PROFILE" == "oss" || "$PW_PROFILE" == "full" ]]; then FIXTURE_GATE="PW_PROFILE=$PW_PROFILE"
+fi
+if [[ -n "$FIXTURE_GATE" ]]; then
+  echo "test-fixtures auto-import: enabled via $FIXTURE_GATE (setup project will import)"
   echo ""
+elif [[ "${ALLOW_MISSING_FIXTURES:-}" == "1" ]]; then
+  echo "WARNING: ALLOW_MISSING_FIXTURES=1 set — proceeding without test-fixtures."
+  echo "         Specs that reference e2et_* models will fail."
+  echo ""
+else
+  echo "ERROR: no test-fixtures auto-import gate is set." >&2
+  echo "       Caller has cleared all of AURA_ENV / IMPORT_TEST_FIXTURES /" >&2
+  echo "       PW_PROFILE=oss|full. ~60 specs reference e2et_* models and will" >&2
+  echo "       drop unrelated red regressions on the floor." >&2
+  echo "" >&2
+  echo "Fix one of:" >&2
+  echo "  - Drop your PW_PROFILE override (default is now 'oss')" >&2
+  echo "  - export IMPORT_TEST_FIXTURES=true" >&2
+  echo "  - export AURA_ENV=test" >&2
+  echo "" >&2
+  echo "Escape hatch (only if you know your scope excludes e2et_*):" >&2
+  echo "  ALLOW_MISSING_FIXTURES=1 ./scripts/oss-test.sh ..." >&2
+  exit 78  # EX_CONFIG
 fi
 
 LOG="/tmp/pw-oss-$(date +%Y%m%d-%H%M%S).log"
