@@ -4,6 +4,7 @@ import {
   FlowDesigner,
   useFlowValidation,
   type FlowData,
+  type NodeStatusMap,
 } from '~/plugins/core-designer/components/flow-designer-sdk';
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import { useSmartText } from '~/utils/i18n';
@@ -22,6 +23,13 @@ export interface AutomationEditorProps {
   readOnly?: boolean;
   /** Auto-enter debug mode on mount (triggered by ?debug=true URL param) */
   initialDebugMode?: boolean;
+  /**
+   * G5 — runtime status overlay. Pass a `Record<nodeId, status>` to highlight
+   * each node with its run state (pending/running/completed/failed/skipped).
+   * Typically supplied by `useAutomationNodeStatuses(logId)` from a run-history
+   * page. Omit for the standard design-time view.
+   */
+  nodeStatuses?: NodeStatusMap | null;
 }
 
 export function AutomationEditor({
@@ -30,6 +38,7 @@ export function AutomationEditor({
   onSave,
   readOnly = false,
   initialDebugMode = false,
+  nodeStatuses,
 }: AutomationEditorProps) {
   const st = useSmartText();
   const { showSuccessToast, showErrorToast } = useToastContext();
@@ -284,6 +293,7 @@ export function AutomationEditor({
           onSave={onSave ? handleSave : undefined}
           onChange={handleChange}
           readOnly={readOnly}
+          nodeStatuses={nodeStatuses}
         />
       </div>
     </div>
