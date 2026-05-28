@@ -174,8 +174,15 @@ public class ImConversationController {
         // Broadcast to other members
         List<Long> others = memberIds.stream().filter(uid -> !uid.equals(userId)).toList();
         if (!others.isEmpty()) {
+            // Legacy event for backward compatibility with older iOS clients
             webSocketHandler.broadcastEvent(others, ImConstants.WS_CONVERSATION_DELETED,
                     Map.of("conversationId", id));
+            // New event with actor context
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("byUserId", userId);
+            payload.put("byUserName", MetaContext.getCurrentUsername());
+            webSocketHandler.broadcastEvent(others, ImConstants.WS_CONVERSATION_DISSOLVED, payload);
         }
         return ApiResponse.success(null);
     }

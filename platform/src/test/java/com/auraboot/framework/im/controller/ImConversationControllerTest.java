@@ -183,4 +183,31 @@ class ImConversationControllerTest {
             )
         );
     }
+
+    @Test
+    void dissolveGroupBroadcastsBothLegacyAndNewEvents() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        org.mockito.Mockito.when(conversationService.dissolveGroup(88L, 11L, 7L))
+            .thenReturn(List.of(11L, 22L, 33L));
+
+        controller.dissolveGroup(88L);
+
+        // Legacy event for older clients
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(22L, 33L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_CONVERSATION_DELETED),
+            org.mockito.ArgumentMatchers.any()
+        );
+        // New event with byUserName
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(22L, 33L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_CONVERSATION_DISSOLVED),
+            org.mockito.ArgumentMatchers.argThat(p ->
+                p.get("conversationId").equals(88L) &&
+                p.get("byUserId").equals(11L) &&
+                "alice".equals(p.get("byUserName"))
+            )
+        );
+    }
 }
