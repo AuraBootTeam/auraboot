@@ -243,6 +243,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .pinned(membership != null ? membership.getPinned() : false)
                 .muted(membership != null ? membership.getMuted() : false)
                 .memberCount(members.size())
+                .announcement(parseAnnouncement(conv.getMetadata()))
                 .build();
     }
 
@@ -676,5 +677,33 @@ public class ImConversationServiceImpl implements ImConversationService {
             }
         }
         return null;
+    }
+
+    /**
+     * Parse the {@code announcement} sub-object from the conversation metadata JSONB.
+     * Returns null if metadata is missing, the announcement key is absent, or parsing fails.
+     */
+    Announcement parseAnnouncement(String metadataJson) {
+        if (metadataJson == null || metadataJson.isBlank()) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(metadataJson);
+            com.fasterxml.jackson.databind.JsonNode ann = root.get("announcement");
+            if (ann == null || ann.isNull()) {
+                return null;
+            }
+            String content = ann.has("content") ? ann.get("content").asText() : null;
+            Long updatedBy = ann.has("updatedBy") && !ann.get("updatedBy").isNull() ? ann.get("updatedBy").asLong() : null;
+            String updatedByName = ann.has("updatedByName") ? ann.get("updatedByName").asText() : null;
+            java.time.Instant updatedAt = ann.has("updatedAt") && !ann.get("updatedAt").isNull()
+                    ? java.time.Instant.parse(ann.get("updatedAt").asText()) : null;
+            return new Announcement(content, updatedBy, updatedByName, updatedAt);
+        } catch (Exception e) {
+            // Malformed metadata — fail safe by returning null
+            // setAnnouncement is the only writer; malformed data should never occur,
+            // but dropping the field on read is safer than 500ing the GET.
+            return null;
+        }
     }
 }

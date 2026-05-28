@@ -24,6 +24,7 @@ public class ConversationListItem {
     private Long conductorAgentId;
     private Integer aiContextWindow;
     private Boolean aiEnabled;
+    private Announcement announcement;
 
     @Data
     @Builder
