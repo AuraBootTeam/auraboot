@@ -2,6 +2,19 @@
 
 AuraBoot powers solutions across industries. Each use case below shows how a business application can be assembled through JSON DSL configuration, with custom code reserved for the parts that truly need it.
 
+**Concise versions on the docs site** — eight of the scenarios below have polished, bilingual (EN + zh-CN) summaries on the public documentation site, each anchored to AuraBoot's six concepts (Model / Page / Command / Permission / Process / Plugin):
+
+- [PCBA Manufacturing](https://docs.auraboot.com/en/use-cases/pcba) — [zh](https://docs.auraboot.com/zh-CN/use-cases/pcba)
+- [Manufacturing](https://docs.auraboot.com/en/use-cases/manufacturing) — [zh](https://docs.auraboot.com/zh-CN/use-cases/manufacturing)
+- [CRM](https://docs.auraboot.com/en/use-cases/crm) — [zh](https://docs.auraboot.com/zh-CN/use-cases/crm)
+- [Procurement](https://docs.auraboot.com/en/use-cases/procurement) — [zh](https://docs.auraboot.com/zh-CN/use-cases/procurement)
+- [Quality Management](https://docs.auraboot.com/en/use-cases/quality) — [zh](https://docs.auraboot.com/zh-CN/use-cases/quality)
+- [Compliance & Risk](https://docs.auraboot.com/en/use-cases/compliance) — [zh](https://docs.auraboot.com/zh-CN/use-cases/compliance)
+- [Asset Management](https://docs.auraboot.com/en/use-cases/asset) — [zh](https://docs.auraboot.com/zh-CN/use-cases/asset)
+- [Knowledge Base](https://docs.auraboot.com/en/use-cases/knowledge-base) — [zh](https://docs.auraboot.com/zh-CN/use-cases/knowledge-base)
+
+The pages below stay as the source-of-truth working notes — exhaustive, model-by-model, and intended for contributors building plugins. The docs-site versions are the concise public-facing summaries.
+
 ## Capability Matrix
 
 | Use Case | CRUD | State Machine | Dashboard | Multi-Model | Sub-Tables | BPM | Automation | Named Queries |
