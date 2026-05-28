@@ -134,4 +134,56 @@ class EmbeddingServiceBranchTest {
         assertNull(result.get(0));
         assertNull(result.get(1));
     }
+
+    // -------------------------------------------------------------------------
+    // dimensions support (2026-05-27) — enables Qwen text-embedding-v4 1536-dim
+    // mode and any other OpenAI-compatible provider with MRL dimensions.
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("buildRequestBody omits dimensions when value is 0 (backwards compat — OpenAI default)")
+    void buildRequestBodyOmitsDimensionsWhenZero() {
+        java.util.Map<String, Object> body = EmbeddingService.buildRequestBody(
+                "text-embedding-3-small", List.of("hello"), 0);
+        assertEquals("text-embedding-3-small", body.get("model"));
+        assertEquals(List.of("hello"), body.get("input"));
+        assertFalse(body.containsKey("dimensions"),
+                "dimensions=0 means provider default — must not send field");
+    }
+
+    @Test
+    @DisplayName("buildRequestBody includes dimensions when value is > 0 (Qwen text-embedding-v4 1536)")
+    void buildRequestBodyIncludesDimensionsWhenPositive() {
+        java.util.Map<String, Object> body = EmbeddingService.buildRequestBody(
+                "text-embedding-v4", List.of("你好"), 1536);
+        assertEquals("text-embedding-v4", body.get("model"));
+        assertEquals(List.of("你好"), body.get("input"));
+        assertEquals(1536, body.get("dimensions"));
+    }
+
+    @Test
+    @DisplayName("resolveConfig reads dimensions from CloudConfig JSON")
+    void resolveConfigReadsDimensions() {
+        CloudConfig cc = new CloudConfig();
+        cc.setConfig("{\"apiKey\":\"sk-x\",\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode\","
+                + "\"defaultModel\":\"text-embedding-v4\",\"maxBatchSize\":10,\"dimensions\":1536}");
+        when(cloudConfigService.getEffectiveConfig(anyLong(), anyString(), anyString())).thenReturn(cc);
+
+        EmbeddingService.EmbeddingConfig resolved = service.resolveConfig(1L, "qwen");
+        assertNotNull(resolved);
+        assertEquals(1536, resolved.dimensions());
+    }
+
+    @Test
+    @DisplayName("resolveConfig defaults dimensions to 0 when field absent (backwards compat)")
+    void resolveConfigDefaultsDimensionsToZero() {
+        CloudConfig cc = new CloudConfig();
+        cc.setConfig("{\"apiKey\":\"sk-x\",\"baseUrl\":\"https://api.openai.com\","
+                + "\"defaultModel\":\"text-embedding-3-small\"}");
+        when(cloudConfigService.getEffectiveConfig(anyLong(), anyString(), anyString())).thenReturn(cc);
+
+        EmbeddingService.EmbeddingConfig resolved = service.resolveConfig(1L, "openai");
+        assertNotNull(resolved);
+        assertEquals(0, resolved.dimensions(), "absent dimensions → 0 (no body field sent)");
+    }
 }
