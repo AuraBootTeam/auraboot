@@ -148,3 +148,91 @@ public void onTelemetry(TelemetryFrame frame) {
 - [ ] 单元测试覆盖"accessor 注入为 null"路径,断言不抛 NPE。
 - [ ] 集成测试用 Mockito 提供 stub 实现,跑通完整 telemetry → 规则 → 告警链路。
 - [ ] **禁止**在 plugin 内重新声明 `Background*Accessor` 接口或 view record;一律 `import com.auraboot.framework.plugin.extension.iot.*`。
+
+## 9. TimeSeriesPort(M1.A.3 补漏 SPI,`@since 2.6.1`)
+
+> M1.A 初次 drop(`b5927485`)只合了 4 个 `Background*Accessor`,**遗漏了 TimeSeriesPort**。
+> 这是「SPI 接口/impl 必须同 PR」反面教材:plan §2 + §5 都明确写了 TimeSeriesPort,
+> 但 SPI 接口和 platform impl 拆 PR 时漏补。M1.A.3 PR 把接口 + impl + IT 同一 PR 收口。
+
+### 9.1 接口签名
+
+```java
+public interface TimeSeriesPort {
+    void writeBatch(long tenantId, List<TimeSeriesPoint> points);
+
+    List<TimeSeriesPoint> queryLatest(
+            long tenantId, String deviceCode, List<String> codes, int limit);
+
+    List<TimeSeriesPoint> queryRange(long tenantId, QueryParams.Range params);
+
+    List<AggregatedPoint> queryAggregate(long tenantId, QueryParams.Aggregate params);
+}
+
+// DTO (records, package com.auraboot.framework.plugin.extension.iot)
+record TimeSeriesPoint(String deviceCode, String code, Instant ts, Number value, String qualityCode) {}
+record AggregatedPoint(String deviceCode, String code, Instant bucketStart, Number value, Long pointCount) {}
+
+final class QueryParams {
+    record Range(String deviceCode, List<String> codes,
+                 Instant from, Instant to, Duration downsample /* null = no downsample */) {}
+    record Aggregate(String deviceCode, List<String> codes,
+                     Instant from, Instant to,
+                     Aggregation aggregation, Duration groupBy) {}
+    enum Aggregation { AVG, MAX, MIN, SUM, COUNT, FIRST, LAST }
+}
+```
+
+### 9.2 契约要点(在通用 §2 之上)
+
+- **多租户严格**:每个方法都强制 `long tenantId` 入参,实现层 SQL `WHERE tenant_id = ?` 不可少 — M0 `iot/core/ts-port/` 没有 tenantId 字段(routing 在 wire time),platform SPI 不接受这种设计。
+- **聚合下推**:`queryRange(downsample!=null)` 和 `queryAggregate` 必须翻译成 vendor-native SQL(TDengine `INTERVAL(N) FILL(LINEAR)`、TimescaleDB `time_bucket_gapfill()`);**禁止** client-side aggregation。
+- **空 bucket 不补零**:`queryAggregate` 返回的列表只含非空 bucket,UI 决定如何渲染空隙。
+- **降级模式**:`iot.tdengine.enabled=false`(默认)时不注册 bean,plugin 字段为 null → 走 DLQ batch / skip telemetry / metric-only。
+
+### 9.3 配置开关(platform impl `TDengineTimeSeriesPort`)
+
+```yaml
+iot:
+  tdengine:
+    enabled: true                  # 不开启时不注册 bean,plugin 端字段为 null
+    url: jdbc:TAOS-RS://host:6041/?user=root&password=taosdata&batchfetch=true
+    username: root                 # 默认 root
+    password: taosdata             # 默认 taosdata
+    maxPoolSize: 10                # 默认 10
+```
+
+`iot.tdengine.enabled=true` 但 `iot.tdengine.url` 缺失会 fail-fast(`@Value` placeholder unresolved → context 启动失败)。这是有意设计:任何 deploy 开了 IoT 却忘配 TDengine 应该立刻崩,而不是默默吞掉每条设备样本。
+
+### 9.4 plugin 端用法
+
+```java
+@Component
+public class TelemetryConsumer {
+    @Autowired(required = false)
+    private TimeSeriesPort tsport;
+
+    @KafkaListener(topics = "iot.telemetry")
+    public void onTelemetry(TelemetryBatch batch) {
+        if (tsport == null) {
+            // documented degradation: send to DLQ + metric
+            dlq.send(batch);
+            meter.counter("iot.tsport.unavailable").increment();
+            return;
+        }
+        tsport.writeBatch(batch.tenantId(), batch.toPoints());
+    }
+}
+```
+
+### 9.5 与 M0 `iot/core/ts-port/` 的关系
+
+M0 `iot/core/ts-port/` 在独立 Java multi-module(`/Users/ghj/work/auraboot/iot/`)内有同名接口,签名是 single-tenant(routing 在 wire time)。
+**M1.A.3 不影响 M0**(grep 显示 M0 ts-port 不被 `iot/core/rule-worker` 或 `iot/data-plane` 引用,是 standalone 模块)。
+后续如 M0 模块要切到 canonical SPI,要做 import 路径迁移并补 `tenantId` 参数;**这属于 iot/ 仓的 deprecation PR,不在本 PR scope**。
+
+### 9.6 测试
+
+- `TimeSeriesPortContractTest`(plugin-api 16 用例)— 跑 `InMemoryTimeSeriesPort`,覆盖 writeBatch / queryLatest / queryRange(raw + downsampled) / queryAggregate(AVG/COUNT) + 跨租户隔离 + 所有 validation 边界。
+- `TDengineTimeSeriesPortUnitTest`(platform 8 用例,Mockito DataSource)— 子表名稳定性 + 输入校验。
+- `TDengineTimeSeriesPortIT`(platform 2 用例,**opt-in via `IOT_TDENGINE_IT_TESTCONTAINERS=true`**)— Testcontainers 启 `tdengine/tdengine:3.3.4.3`,跑 10K 样本 scale + 跨租户严格隔离。
