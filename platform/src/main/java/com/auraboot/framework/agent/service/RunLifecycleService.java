@@ -314,16 +314,34 @@ public class RunLifecycleService {
             if (jsonStr != null) {
                 List<Map<String, Object>> memories = objectMapper.readValue(jsonStr, new TypeReference<>() {});
                 int saved = 0;
+                int rejected = 0;
                 for (Map<String, Object> mem : memories) {
                     String type = (String) mem.get("type");
                     String title = (String) mem.get("title");
                     String memContent = (String) mem.get("content");
                     int importance = mem.containsKey("importance") ? ((Number) mem.get("importance")).intValue() : 5;
                     if (type == null || memContent == null) continue;
-                    saveMemoryEntry(tenantId, agentCode, type, title, memContent, importance, runPid);
+                    // Whitelist memory_type — LLM hallucinations like "NOTE" or
+                    // lowercase "fact" would otherwise corrupt ab_agent_memory
+                    // and break Tier evaluation. The extraction prompt above
+                    // enumerates {FACT, LESSON, PREFERENCE, DECISION} as the
+                    // contract; enforce it. See deep-review P1-1.
+                    String normalizedType = type.trim().toUpperCase(java.util.Locale.ROOT);
+                    if (!ALLOWED_MEMORY_TYPES.contains(normalizedType)) {
+                        log.warn("LLM extraction returned unsupported memory_type '{}' for run {}; rejecting entry",
+                                type, runPid);
+                        rejected++;
+                        continue;
+                    }
+                    // Clamp importance to the schema range. MemoryTierEvaluator
+                    // throws on importance outside 0-10; a poisoned row breaks
+                    // the Promoter / OrphanScanner tick. See deep-review P2-1.
+                    int clamped = Math.max(0, Math.min(10, importance));
+                    saveMemoryEntry(tenantId, agentCode, normalizedType, title, memContent, clamped, runPid);
                     saved++;
                 }
-                log.info("Extracted {} memories from run {} for agent {}", saved, runPid, agentCode);
+                log.info("Extracted {} memories from run {} for agent {} (rejected {} bad-type)",
+                        saved, runPid, agentCode, rejected);
                 return saved > 0;
             }
         } catch (Exception e) {
@@ -331,6 +349,15 @@ public class RunLifecycleService {
         }
         return false;
     }
+
+    /**
+     * Allowed memory_type values per the extraction prompt contract. The LLM
+     * is asked to emit one of these; any other value (including hallucinated
+     * "NOTE" / "Observation" or lowercase variants) is rejected by
+     * {@link #extractMemoriesViaLlm}. See deep-review P1-1.
+     */
+    private static final java.util.Set<String> ALLOWED_MEMORY_TYPES =
+            java.util.Set.of("FACT", "LESSON", "PREFERENCE", "DECISION");
 
     void saveMemoryEntry(Long tenantId, String agentCode, String type, String title, String content,
                          int importance, String sourceRunId) {
