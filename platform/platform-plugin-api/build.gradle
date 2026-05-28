@@ -29,11 +29,22 @@ dependencies {
     // Lombok for reducing boilerplate
     compileOnly 'org.projectlombok:lombok:1.18.32'
     annotationProcessor 'org.projectlombok:lombok:1.18.32'
+
+    // Unit-test deps for SPI contract tests (no Spring on the test classpath
+    // — these are pure interface-shape and in-memory-fake assertions).
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.assertj:assertj-core:3.25.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 compileJava {
     options.encoding = 'UTF-8'
     options.compilerArgs += ['-parameters']
+}
+
+test {
+    useJUnitPlatform()
 }
 
 javadoc {
