@@ -164,6 +164,18 @@ describe('useFlowStore', () => {
       expect(edge?.sourceHandle).toBe('output-1');
       expect(edge?.targetHandle).toBe('input-1');
     });
+
+    it('generates unique edge ids even when added in the same millisecond', () => {
+      // Regression: previously `edge_${Date.now()}` collided on same-ms batches
+      // (e.g. XML→FlowData import); addEdge now mirrors generateNodeId with a
+      // random suffix.
+      const store = useFlowStore.getState();
+      const ids = new Set<string>();
+      for (let i = 0; i < 50; i += 1) {
+        ids.add(store.addEdge({ source: 'a', target: 'b' }));
+      }
+      expect(ids.size).toBe(50);
+    });
   });
 
   describe('validation', () => {
