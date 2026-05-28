@@ -5,10 +5,12 @@
 -- All rows tagged via pe_plo_remark / pe_res_remark = 'APS_FIXTURE'
 -- (and pe_rc_remark for calendars) so clear.sql can wipe them cleanly.
 --
--- Usage: psql "$PGURL" -v tenant_id=1 -f scripts/aps-fixtures/seed.sql
--- (defaults to tenant_id=1 if -v not provided)
-
-\set tenant_id :{?tenant_id} :tenant_id 1
+-- Usage: psql "$PGURL" -f scripts/aps-fixtures/seed.sql
+--
+-- tenant_id is hardcoded to 1 (the default tenant in reset-and-init.sh).
+-- For multi-tenant fixtures, copy this file and substitute the `1` literals.
+-- Avoided psql `:tenant_id` because it does NOT substitute inside DO $$ ... $$
+-- dollar-quoted blocks, which would cause inconsistent rows.
 
 BEGIN;
 
@@ -18,11 +20,11 @@ INSERT INTO mt_pe_resource (pid, tenant_id, created_at, updated_at,
   pe_res_code, pe_res_name, pe_res_type, pe_res_subtype, pe_res_status,
   pe_res_capacity_per_hour, pe_res_remark)
 VALUES
-  ('APS_FIX_RES_SMT_1',  :tenant_id, NOW(), NOW(), 'SMT-01',  'SMT 贴片机 1', 'machine', 'smt',        'active', 50, 'APS_FIXTURE'),
-  ('APS_FIX_RES_SMT_2',  :tenant_id, NOW(), NOW(), 'SMT-02',  'SMT 贴片机 2', 'machine', 'smt',        'active', 45, 'APS_FIXTURE'),
-  ('APS_FIX_RES_WAVE_1', :tenant_id, NOW(), NOW(), 'WAVE-01', '波峰焊',       'machine', 'soldering',  'active', 30, 'APS_FIXTURE'),
-  ('APS_FIX_RES_AOI_1',  :tenant_id, NOW(), NOW(), 'AOI-01',  'AOI 检测',     'machine', 'inspection', 'active', 80, 'APS_FIXTURE'),
-  ('APS_FIX_RES_PKG_1',  :tenant_id, NOW(), NOW(), 'PKG-01',  '包装线',       'line',    'packaging',  'active', 100, 'APS_FIXTURE')
+  ('APS_FIX_RES_SMT_1',  1, NOW(), NOW(), 'SMT-01',  'SMT 贴片机 1', 'machine', 'smt',        'active', 50, 'APS_FIXTURE'),
+  ('APS_FIX_RES_SMT_2',  1, NOW(), NOW(), 'SMT-02',  'SMT 贴片机 2', 'machine', 'smt',        'active', 45, 'APS_FIXTURE'),
+  ('APS_FIX_RES_WAVE_1', 1, NOW(), NOW(), 'WAVE-01', '波峰焊',       'machine', 'soldering',  'active', 30, 'APS_FIXTURE'),
+  ('APS_FIX_RES_AOI_1',  1, NOW(), NOW(), 'AOI-01',  'AOI 检测',     'machine', 'inspection', 'active', 80, 'APS_FIXTURE'),
+  ('APS_FIX_RES_PKG_1',  1, NOW(), NOW(), 'PKG-01',  '包装线',       'line',    'packaging',  'active', 100, 'APS_FIXTURE')
 ON CONFLICT (pid) DO UPDATE SET updated_at = NOW();
 
 -- ---- calendars (5 resources × 30 days, Mon-Fri 08:00-16:00) ----

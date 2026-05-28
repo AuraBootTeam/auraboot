@@ -41,6 +41,19 @@ TENANT_ID="${TENANT_ID:-1}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Portable millisecond clock: GNU `date +%s%3N` works on Linux but not macOS BSD.
+# Use Python for cross-platform support; fall back to gdate if python3 absent.
+ms_now() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import time; print(int(time.time()*1000))'
+  elif command -v gdate >/dev/null 2>&1; then
+    gdate +%s%3N
+  else
+    # last-resort: seconds × 1000 (no sub-second precision)
+    echo "$(( $(date +%s) * 1000 ))"
+  fi
+}
+
 # ---- step 1: seed fixtures (unless skipped) ----
 
 if [[ $SKIP_SEED -eq 0 ]]; then
@@ -72,12 +85,12 @@ for strategy in "${STRATEGIES[@]}"; do
   fi
 
   # Call V2 endpoint and time it
-  t0=$(date +%s%3N)
+  t0=$(ms_now)
   response=$(curl -sS -X POST \
     -H "Authorization: Bearer $AUTH_TOKEN" \
     -H "Content-Type: application/json" \
     "$BACKEND_URL/api/manufacturing/aps/schedule/v2?horizon=$HORIZON&strategy=$strategy")
-  t1=$(date +%s%3N)
+  t1=$(ms_now)
   runtime_ms=$((t1 - t0))
 
   scheduled=$(echo "$response" | jq -r '.data.scheduledCount // 0')
