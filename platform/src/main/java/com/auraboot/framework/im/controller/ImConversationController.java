@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -80,11 +81,27 @@ public class ImConversationController {
 
     @PostMapping("/{id}/members")
     public ApiResponse<Void> addMembers(@PathVariable Long id, @RequestBody JsonNode body) {
+        Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> memberIds = readIdList(body, "memberIds", body.isArray());
         List<Long> agentIds = readIdList(body, "agentIds", false);
         conversationService.addMembers(id, memberIds, tenantId);
         conversationService.addAgentMembers(id, agentIds, tenantId);
+
+        // Broadcast member_added to all current human members (including newly added)
+        List<Long> recipientHumanIds = conversationService.getMembers(id, tenantId).stream()
+                .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
+                .map(ConversationMemberInfo::getMemberId).toList();
+        if (!recipientHumanIds.isEmpty() && (!memberIds.isEmpty() || !agentIds.isEmpty())) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("memberIds", memberIds);
+            payload.put("agentIds", agentIds);
+            payload.put("byUserId", userId);
+            payload.put("byUserName", userName);
+            webSocketHandler.broadcastEvent(recipientHumanIds, ImConstants.WS_MEMBER_ADDED, payload);
+        }
         return ApiResponse.success(null);
     }
 
