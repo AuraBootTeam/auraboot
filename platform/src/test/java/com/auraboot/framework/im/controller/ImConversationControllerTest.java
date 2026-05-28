@@ -58,6 +58,76 @@ class ImConversationControllerTest {
     }
 
     @Test
+    void removeMemberBroadcastsSelfKickedAndMemberRemoved() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+
+        // After remove, getMembers returns 3 remaining humans (11, 33, 44); 22 was removed
+        com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m3 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m3.setMemberId(33L); m3.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m4 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m4.setMemberId(44L); m4.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m1, m3, m4));
+
+        controller.removeMember(88L, "human", 22L);
+
+        verify(conversationService).removeMember(88L, "human", 22L, 7L);
+
+        // self_kicked to the removed member
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(22L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_SELF_KICKED),
+            org.mockito.ArgumentMatchers.argThat(p ->
+                p.get("conversationId").equals(88L) &&
+                p.get("byUserId").equals(11L) &&
+                "alice".equals(p.get("byUserName"))
+            )
+        );
+
+        // member_removed to remaining humans
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(11L, 33L, 44L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_MEMBER_REMOVED),
+            org.mockito.ArgumentMatchers.argThat(p ->
+                p.get("conversationId").equals(88L) &&
+                p.get("removedMemberId").equals(22L) &&
+                "human".equals(p.get("removedMemberType")) &&
+                p.get("byUserId").equals(11L) &&
+                "alice".equals(p.get("byUserName"))
+            )
+        );
+    }
+
+    @Test
+    void removeAgentMemberDoesNotBroadcastSelfKicked() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+
+        com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m1));
+
+        controller.removeMember(88L, "agent", 201L);
+
+        org.mockito.Mockito.verify(webSocketHandler, org.mockito.Mockito.never())
+            .broadcastEvent(org.mockito.ArgumentMatchers.any(),
+                            org.mockito.ArgumentMatchers.eq(ImConstants.WS_SELF_KICKED),
+                            org.mockito.ArgumentMatchers.any());
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(11L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_MEMBER_REMOVED),
+            org.mockito.ArgumentMatchers.argThat(p ->
+                p.get("removedMemberId").equals(201L) &&
+                "agent".equals(p.get("removedMemberType"))
+            )
+        );
+    }
+
+    @Test
     void addMembersBroadcastsMemberAddedToAllHumanMembers() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "tester");
         ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);

@@ -109,8 +109,33 @@ public class ImConversationController {
     public ApiResponse<Void> removeMember(@PathVariable Long id,
                                             @PathVariable String memberType,
                                             @PathVariable Long memberId) {
+        Long actorUserId = MetaContext.getCurrentUserId();
+        String actorUserName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
         conversationService.removeMember(id, memberType, memberId, tenantId);
+
+        // Send self_kicked to the removed human (agents don't receive WS events)
+        if (ImConstants.MEMBER_TYPE_HUMAN.equals(memberType)) {
+            Map<String, Object> selfPayload = new HashMap<>();
+            selfPayload.put("conversationId", id);
+            selfPayload.put("byUserId", actorUserId);
+            selfPayload.put("byUserName", actorUserName);
+            webSocketHandler.broadcastEvent(List.of(memberId), ImConstants.WS_SELF_KICKED, selfPayload);
+        }
+
+        // Send member_removed to all remaining human members
+        List<Long> remainingHumanIds = conversationService.getMembers(id, tenantId).stream()
+                .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
+                .map(ConversationMemberInfo::getMemberId).toList();
+        if (!remainingHumanIds.isEmpty()) {
+            Map<String, Object> othersPayload = new HashMap<>();
+            othersPayload.put("conversationId", id);
+            othersPayload.put("removedMemberId", memberId);
+            othersPayload.put("removedMemberType", memberType);
+            othersPayload.put("byUserId", actorUserId);
+            othersPayload.put("byUserName", actorUserName);
+            webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_REMOVED, othersPayload);
+        }
         return ApiResponse.success(null);
     }
 
