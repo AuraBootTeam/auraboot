@@ -37,15 +37,18 @@
       "fields": [
         {
           "field": "tinv_si_product_id",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "tinv_si_warehouse_id",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "tinv_si_quantity",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "tinv_si_unit_cost",
@@ -74,11 +77,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "tinv:create_stock_in",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "tinv.stockout.manage"
+          "permissionCode": "tinv.stockout.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -123,13 +124,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "tinv_stock_out_detail"
+              "navigateTo": "tinv_stock_out_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "tinv_stock_out_form",
-              "permissionCode": "tinv.stockout.manage"
+              "permissionCode": "tinv.stockout.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -137,9 +140,11 @@
               "danger": true,
               "commandCode": "tinv:delete_stock_out",
               "permissionCode": "tinv.stockout.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [

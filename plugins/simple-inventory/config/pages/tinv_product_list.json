@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "tinv.product.manage"
+          "permissionCode": "tinv.product.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -107,13 +108,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "tinv_product_detail"
+              "navigateTo": "tinv_product_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "tinv_product_form",
-              "permissionCode": "tinv.product.manage"
+              "permissionCode": "tinv.product.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -121,9 +124,11 @@
               "danger": true,
               "commandCode": "tinv:delete_product",
               "permissionCode": "tinv.product.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [

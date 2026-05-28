@@ -34,17 +34,26 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tinv.stockin.manage"
+          "permissionCode": "tinv.stockin.manage",
+          "label": "$i18n:common.button.edit"
         },
         {
           "code": "confirm",
           "commandCode": "tinv:confirm_stock_in",
-          "permissionCode": "tinv.stockin.manage"
+          "permissionCode": "tinv.stockin.manage",
+          "label": {
+            "zh-CN": "确认入库",
+            "en-US": "Confirm Stock In"
+          }
         },
         {
           "code": "cancel_doc",
           "commandCode": "tinv:cancel_stock_in",
-          "permissionCode": "tinv.stockin.manage"
+          "permissionCode": "tinv.stockin.manage",
+          "label": {
+            "zh-CN": "取消入库",
+            "en-US": "Cancel Stock In"
+          }
         },
         {
           "code": "delete",
@@ -52,7 +61,8 @@
           "danger": true,
           "commandCode": "tinv:delete_stock_in",
           "permissionCode": "tinv.stockin.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": "$i18n:common.button.delete"
         }
       ],
       "area": "header"
