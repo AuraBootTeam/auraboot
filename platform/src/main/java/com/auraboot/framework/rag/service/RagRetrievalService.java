@@ -133,9 +133,16 @@ public class RagRetrievalService {
     /**
      * BM25 keyword-only fallback when embedding is unavailable.
      *
-     * <p><b>catch-pattern audit (Bugfix-0, 2026-05-27)</b>: same candidate
-     * A1 weak form as {@link #vectorOnlySearch} — see that Javadoc for
-     * owner-review context. Tracking via fact-baseline §2.5.
+     * <p><b>catch-pattern P2 weak (Bugfix-0, owner decision 2026-05-28)</b>:
+     * the {@code catch (Exception) -> return empty} at the bottom of this
+     * method is the bottom of the fallback chain (hybrid → vector-only →
+     * keyword-only). Returning empty lets the LLM proceed with no RAG
+     * context (graceful degradation); {@code log.error} provides operator
+     * signal. Owner accepted as P2 weak rather than migrating to
+     * propagation — RAG is an optional augmentation, and an empty result
+     * is a valid degraded answer ("no relevant snippets found"). See
+     * Bugfix-0 audit docs/backlog/2026-05-27-rag-catch-exception-audit.md
+     * cluster 1.
      */
     private List<RetrievalResult> keywordSearch(String query, List<String> targetKbs, int topK) {
         String tsQuery = buildTsQuery(query);
@@ -173,19 +180,13 @@ public class RagRetrievalService {
     /**
      * Pure vector fallback when hybrid SQL fails (e.g., tsv column missing).
      *
-     * <p><b>catch-pattern audit (Bugfix-0, 2026-05-27)</b>: the {@code catch
-     * (Exception) -> return empty} at the bottom of this method is a
-     * candidate {@code A1} weak form by the
-     * {@code docs/standards/core/catch-exception-pattern.md} decision tree
-     * (no further fallback after this one — the chain is hybrid &rarr;
-     * vector-only &rarr; keyword-only, and keywordSearch has the same
-     * pattern at line 163). It is intentionally kept as-is pending RAG
-     * module owner review of design intent: returning empty lets the LLM
-     * proceed without RAG context (graceful degradation), but masks DB
-     * errors as "no results". Owner must either (a) document P2 weak form
-     * exception rationale in this Javadoc, or (b) replace with propagation
-     * so AuraBotChatService:619 outer boundary surfaces the failure.
-     * Tracking via fact-baseline §2.5 缺陷 3.
+     * <p><b>catch-pattern P2 weak (Bugfix-0, owner decision 2026-05-28)</b>:
+     * the {@code catch (Exception) -> return empty} at the bottom of this
+     * method is the second tier of the fallback chain hybrid → vector-only
+     * → keyword-only (called from hybrid via line 129 on exception). Same
+     * P2 weak rationale as {@link #keywordSearch}: empty result = degraded
+     * RAG answer; not a hard failure to propagate. See Bugfix-0 audit
+     * docs/backlog/2026-05-27-rag-catch-exception-audit.md cluster 1.
      */
     private List<RetrievalResult> vectorOnlySearch(float[] queryEmbedding,
                                                      List<String> targetKbs, int topK, double threshold) {

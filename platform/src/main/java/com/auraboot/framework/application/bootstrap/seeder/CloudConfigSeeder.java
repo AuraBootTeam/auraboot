@@ -1,15 +1,38 @@
 package com.auraboot.framework.application.bootstrap.seeder;
 
+import com.auraboot.framework.common.crypto.FieldEncryptionService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.Set;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CloudConfigSeeder {
     private final JdbcTemplate jdbcTemplate;
+    private final FieldEncryptionService fieldEncryptionService;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * Sensitive JSON field names that must be encrypted at rest before INSERT.
+     * Mirrors {@code CloudConfigServiceImpl.SENSITIVE_FIELDS}. When configs
+     * are saved through {@code CloudConfigService.saveConfig}, the auto-encrypt
+     * path runs. This seeder uses raw JDBC for bootstrap, so we replicate the
+     * encryption explicitly here — without it, hardcoded apiKey values would
+     * be stored in plaintext (which the previous version of this seeder did,
+     * a real CVE-grade leak).
+     */
+    private static final Set<String> SENSITIVE_CONFIG_FIELDS = Set.of(
+            "apiKey",
+            "secretId", "secretKey", "appSecret", "clientSecret",
+            "privateKey", "password", "accessKey", "accessToken", "refreshToken"
+    );
 
     public void seed() {
         // Check if already seeded by looking for any seed_ prefixed pid
@@ -95,8 +118,56 @@ public class CloudConfigSeeder {
 
         int count = 0;
         for (Object[] row : rows) {
-            count += jdbcTemplate.update(sql, row[0], row[1], row[2], row[3], row[4], row[5], row[6]);
+            String configJson = (String) row[4];
+            String encryptedConfigJson = encryptSensitiveFields(configJson);
+            count += jdbcTemplate.update(sql, row[0], row[1], row[2], row[3], encryptedConfigJson, row[5], row[6]);
         }
         log.info("CloudConfigSeeder: seeded {} cloud configs (skipped {} existing)", count, rows.length - count);
+    }
+
+    /**
+     * Encrypts {@link #SENSITIVE_CONFIG_FIELDS} string values inside the seed
+     * config JSON before INSERT. Returns the original JSON unchanged when:
+     * <ul>
+     *   <li>No encryption key is configured ({@link FieldEncryptionService}
+     *       in passthrough mode) — same effective behavior as before this fix
+     *       for dev environments lacking {@code FIELD_ENCRYPTION_KEY}.</li>
+     *   <li>The JSON has no sensitive fields (most seed rows).</li>
+     *   <li>Parsing fails (malformed JSON in the seed row itself — that's a
+     *       code bug, logged at warn).</li>
+     * </ul>
+     *
+     * <p>When the key IS configured, this method produces {@code ENC:<base64>}
+     * ciphertext for the apiKey/secret values so plaintext never reaches disk.
+     * Reads via {@code CloudConfigService.getEffectiveConfig} auto-decrypt.
+     */
+    String encryptSensitiveFields(String configJson) {
+        if (configJson == null || configJson.isBlank()) return configJson;
+        try {
+            JsonNode node = objectMapper.readTree(configJson);
+            if (!(node instanceof ObjectNode obj)) return configJson;
+            boolean changed = false;
+            for (String field : SENSITIVE_CONFIG_FIELDS) {
+                if (obj.has(field) && obj.get(field).isTextual()) {
+                    String plain = obj.get(field).asText();
+                    if (!plain.isBlank()) {
+                        String encrypted = fieldEncryptionService.encrypt(plain);
+                        if (!encrypted.equals(plain)) {
+                            obj.put(field, encrypted);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            return changed ? objectMapper.writeValueAsString(obj) : configJson;
+        } catch (Exception e) {
+            // Seed JSON is committed source — a parse failure indicates a
+            // code bug, not runtime data corruption. Log + fall through to
+            // raw insert so the seed still completes (and the bug is visible
+            // in tests rather than silently broken at boot).
+            log.warn("CloudConfigSeeder: failed to pre-encrypt config JSON; "
+                    + "inserting verbatim. error={}", e.getMessage());
+            return configJson;
+        }
     }
 }

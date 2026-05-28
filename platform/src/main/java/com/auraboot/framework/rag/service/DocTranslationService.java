@@ -175,6 +175,14 @@ public class DocTranslationService {
                 ))
                 .build();
 
+        // P2 weak fallback: returns null on LLM/provider failure so the
+        // caller can fall through to the untranslated source document
+        // rather than blocking ingest. log.error gives operator visibility.
+        // Not migrated to propagation because (a) translation is best-effort
+        // (English fallback always works), (b) the offline-ingest batch
+        // benefits from completing for the rows that DO work even when one
+        // locale's provider is down. See Bugfix-0 audit
+        // docs/backlog/2026-05-27-rag-catch-exception-audit.md cluster 2.
         try {
             String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(null, config);
             LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
@@ -278,6 +286,14 @@ public class DocTranslationService {
         }
     }
 
+    /**
+     * Short file-content hash used as part of the translation cache key.
+     * P2 weak fallback: on IO or hashing failure, returns the sentinel
+     * "unknown" so the cache miss + retranslation still works rather than
+     * crashing the whole batch. {@code log.warn} surfaces the unexpected
+     * failure to operators. See Bugfix-0 audit
+     * docs/backlog/2026-05-27-rag-catch-exception-audit.md cluster 3.
+     */
     private String hashFile(Path file) {
         try {
             byte[] content = Files.readAllBytes(file);
@@ -287,6 +303,8 @@ public class DocTranslationService {
             for (byte b : hash) hex.append(String.format("%02x", b));
             return hex.substring(0, 16); // short hash
         } catch (Exception e) {
+            log.warn("hashFile failed for {}; falling back to 'unknown' sentinel "
+                    + "(translation cache miss likely): {}", file, e.getMessage());
             return "unknown";
         }
     }
