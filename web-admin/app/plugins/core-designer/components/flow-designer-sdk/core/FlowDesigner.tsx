@@ -11,6 +11,10 @@ import { useFlowValidation } from '../validation/useFlowValidation';
 import type { FlowNodeDefinition } from '../nodes/types';
 import type { FlowData } from '../store/types';
 import type { FlowMonitorData } from '../store/monitorTypes';
+import {
+  NodeRuntimeStatusProvider,
+  type NodeStatusMap,
+} from '../runtime/NodeRuntimeStatusContext';
 import { cn } from '~/utils/cn';
 
 export interface FlowDesignerConfig {
@@ -39,6 +43,15 @@ export interface FlowDesignerProps {
   monitorMode?: boolean;
   /** G8 — runtime status keyed by node id. Ignored unless monitorMode=true. */
   monitorData?: FlowMonitorData;
+  /**
+   * G5 — external runtime status overlay (used by AutomationEditor with backend
+   * `/api/automation/executions/{instanceId}/node-statuses`). When provided,
+   * nodes whose id appears in the map render a coloured ring + badge.
+   * Vocabulary: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' —
+   * mirrors `ab_automation_node_execution.status`. Bridge to G8 monitor is
+   * a follow-up (see B2a report TODO).
+   */
+  nodeStatuses?: NodeStatusMap | null;
 }
 
 export function FlowDesigner({
@@ -54,6 +67,7 @@ export function FlowDesigner({
   autoSaveDelay,
   monitorMode = false,
   monitorData,
+  nodeStatuses,
 }: FlowDesignerProps) {
   const { importData, exportData, nodes, edges, setDirty, undo, redo, isDirty, bumpRegistryVersion, setMonitorMode, setMonitorData } = useFlowStore();
   const { validate } = useFlowValidation();
@@ -158,27 +172,29 @@ export function FlowDesigner({
   }, [readOnly, undo, redo, handleSave]);
 
   return (
-    <div ref={containerRef} className={cn('flex h-full flex-col bg-gray-50', className)}>
-      <FlowToolbar
-        title={title}
-        onSave={onSave ? handleSave : undefined}
-        onValidate={onValidate}
-        readOnly={readOnly}
-        saveStatus={autoSave ? saveStatus : undefined}
-      />
-
-      <div className="flex flex-1 overflow-hidden">
-        {!readOnly && <FlowPalette categoryOrder={config.categoryOrder} />}
-
-        <FlowCanvas
+    <NodeRuntimeStatusProvider statuses={nodeStatuses}>
+      <div ref={containerRef} className={cn('flex h-full flex-col bg-gray-50', className)}>
+        <FlowToolbar
+          title={title}
+          onSave={onSave ? handleSave : undefined}
+          onValidate={onValidate}
           readOnly={readOnly}
-          showMinimap={config.showMinimap}
-          showControls={config.showControls}
+          saveStatus={autoSave ? saveStatus : undefined}
         />
 
-        <FlowPropertyPanel readOnly={readOnly} />
+        <div className="flex flex-1 overflow-hidden">
+          {!readOnly && <FlowPalette categoryOrder={config.categoryOrder} />}
+
+          <FlowCanvas
+            readOnly={readOnly}
+            showMinimap={config.showMinimap}
+            showControls={config.showControls}
+          />
+
+          <FlowPropertyPanel readOnly={readOnly} />
+        </div>
       </div>
-    </div>
+    </NodeRuntimeStatusProvider>
   );
 }
 

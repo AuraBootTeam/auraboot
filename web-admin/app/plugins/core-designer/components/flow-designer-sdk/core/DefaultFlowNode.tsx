@@ -3,6 +3,10 @@ import React from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useSmartText } from '~/utils/i18n';
 import { nodeRegistry } from '../nodes/NodeRegistry';
+import {
+  useNodeRuntimeStatus,
+  type NodeRuntimeStatus,
+} from '../runtime/NodeRuntimeStatusContext';
 import { cn } from '~/utils/cn';
 
 const categoryColors: Record<string, string> = {
@@ -12,20 +16,61 @@ const categoryColors: Record<string, string> = {
   default: 'border-gray-500 bg-gray-50',
 };
 
+// G5 — runtime overlay styling. Kept entirely local to this renderer so SDK
+// consumers don't need to know about the status taxonomy at the node-definition
+// layer; the visual cue is added purely from the React context populated by
+// FlowDesigner.nodeStatuses.
+const runtimeStatusRing: Record<NodeRuntimeStatus, string> = {
+  pending: 'ring-2 ring-gray-300',
+  running: 'ring-2 ring-blue-500 animate-pulse',
+  completed: 'ring-2 ring-green-500',
+  failed: 'ring-2 ring-red-500',
+  skipped: 'ring-2 ring-gray-300 opacity-60',
+};
+
+const runtimeStatusBadge: Record<NodeRuntimeStatus, { label: string; cls: string }> = {
+  pending: { label: '…', cls: 'bg-gray-400 text-white' },
+  running: { label: '▶', cls: 'bg-blue-500 text-white' },
+  completed: { label: '✓', cls: 'bg-green-500 text-white' },
+  failed: { label: '✕', cls: 'bg-red-500 text-white' },
+  skipped: { label: '–', cls: 'bg-gray-400 text-white' },
+};
+
 export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
   const st = useSmartText();
   const definition = nodeRegistry.get(type || (data.type as string));
+  const runtimeStatus = useNodeRuntimeStatus(id);
 
   const categoryColor = categoryColors[definition?.category || 'default'] || categoryColors.default;
 
   return (
     <div
+      data-testid={`flow-node-${id}`}
+      data-runtime-status={runtimeStatus || undefined}
       className={cn(
-        'min-w-[150px] rounded-lg border-2 px-4 py-3 shadow-sm',
+        'relative min-w-[150px] rounded-lg border-2 px-4 py-3 shadow-sm',
         categoryColor,
+        // Selection ring takes priority visually (offset adds spacing); when not
+        // selected, the runtime overlay ring renders directly on the node.
         selected && 'ring-2 ring-blue-500 ring-offset-2',
+        !selected && runtimeStatus && runtimeStatusRing[runtimeStatus],
       )}
     >
+      {/* G5 — runtime status badge (top-right corner). Render only when an
+          overlay is active; otherwise the node looks identical to before. */}
+      {runtimeStatus && (
+        <span
+          data-testid={`flow-node-${id}-status-badge`}
+          aria-label={`runtime status: ${runtimeStatus}`}
+          className={cn(
+            'absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold',
+            runtimeStatusBadge[runtimeStatus].cls,
+          )}
+        >
+          {runtimeStatusBadge[runtimeStatus].label}
+        </span>
+      )}
+
       {/* Input handle - not for triggers */}
       {definition?.category !== 'trigger' && (
         <Handle

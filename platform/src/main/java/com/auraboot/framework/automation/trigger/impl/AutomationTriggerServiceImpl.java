@@ -291,7 +291,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         // from triggerType + actions[] when there is no visual flowConfig, so the flat
         // sequential executor has been removed.
         try {
-            automationProcessRuntime.run(automation, recordId, triggerPayload);
+            // Pass the log id through so AutomationActionServiceTaskDelegate can persist
+            // per-node execution rows linked to this run (G5 runtime overlay).
+            automationProcessRuntime.run(automation, recordId, triggerPayload, logEntry.getId());
             logEntry.setStatus("success");
         } catch (Exception e) {
             log.error("Automation run failed: pid={}, error={}",

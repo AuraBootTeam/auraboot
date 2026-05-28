@@ -1,14 +1,19 @@
 package com.auraboot.framework.automation.bpm;
 
 import com.auraboot.framework.automation.entity.AutomationAction;
+import com.auraboot.framework.automation.entity.AutomationNodeExecution;
 import com.auraboot.framework.automation.executor.ActionExecutor;
+import com.auraboot.framework.automation.mapper.AutomationNodeExecutionMapper;
+import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.delegation.JavaDelegation;
 import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +30,13 @@ import java.util.Map;
  * the {@link #ACTIONS_VAR} process variable, keyed by node id. This keeps
  * {@code JsonToBpmnConverter} unchanged and preserves full automation action semantics
  * (multi-recipient notification, multi-field / {@code ${var}} update, LLM, command, …).
+ *
+ * <p>G5 — runtime status recording: when {@link #LOG_ID_VAR} is present in the process
+ * variables, the delegate writes one {@link AutomationNodeExecution} row per node
+ * entry (status=running) and updates it on exit (status=completed / failed). On
+ * failure the row is updated <strong>before</strong> the original exception is rethrown
+ * — exception propagation drives SmartEngine's failure semantics; the row is a
+ * pure observability artefact (red line §8 — no swallow, no fallback).
  */
 @Slf4j
 @Component(AutomationActionServiceTaskDelegate.BEAN_NAME)
@@ -36,11 +48,36 @@ public class AutomationActionServiceTaskDelegate implements JavaDelegation {
     /** Process variable carrying per-node action specs: {@code nodeId -> {type, config}}. */
     public static final String ACTIONS_VAR = "_automation_actions";
 
+    /** Process variable carrying the parent {@code ab_automation_log.id} (Long). */
+    public static final String LOG_ID_VAR = "_automation_log_id";
+
+    /** Process variable carrying the {@code Automation.pid} (denormalised on rows). */
+    public static final String AUTOMATION_ID_VAR = "_automation_id";
+
+    /** Process variable carrying the {@code tenant_id} for row-level scoping. */
+    public static final String TENANT_ID_VAR = "_automation_tenant_id";
+
     private final ActionExecutor actionExecutor;
 
+    // Optional — null in slim contexts that don't load the mapper bean; in that case
+    // recording is silently disabled, the executor still runs.
+    private final AutomationNodeExecutionMapper nodeExecutionMapper;
+
+    @Autowired
     public AutomationActionServiceTaskDelegate(
-            @Qualifier("compositeActionExecutor") ActionExecutor actionExecutor) {
+            @Qualifier("compositeActionExecutor") ActionExecutor actionExecutor,
+            @Autowired(required = false) AutomationNodeExecutionMapper nodeExecutionMapper) {
         this.actionExecutor = actionExecutor;
+        this.nodeExecutionMapper = nodeExecutionMapper;
+    }
+
+    /**
+     * Back-compat ctor for unit tests that predate the G5 mapper dependency.
+     * Recording is disabled (mapper=null) — these tests only verify the executor
+     * delegation behaviour. Not used by Spring (no {@code @Autowired}).
+     */
+    public AutomationActionServiceTaskDelegate(ActionExecutor actionExecutor) {
+        this(actionExecutor, null);
     }
 
     @Override
@@ -75,6 +112,10 @@ public class AutomationActionServiceTaskDelegate implements JavaDelegation {
                 .config(config)
                 .build();
 
+        // G5: open a per-node execution row if a log id is in scope. null id ==
+        // recording disabled (no log id present, e.g. direct unit-test invocation).
+        Long executionRowId = beginNodeExecution(processVars, nodeId, executionContext);
+
         // control-loop: this SmartEngine fork only expands multi-instance for userTask
         // (会签), not collection-driven serviceTasks, so a loop body iterates here —
         // once per collection element, with the element bound under itemVariable in an
@@ -87,16 +128,101 @@ public class AutomationActionServiceTaskDelegate implements JavaDelegation {
             List<Object> items = resolveCollection(collectionVar, processVars);
             log.info("AutomationActionDelegate: node={}, actionType={}, loop '{}' -> {} item(s)",
                     nodeId, type, collectionVar, items.size());
-            for (Object element : items) {
-                Map<String, Object> iterationContext = new HashMap<>(processVars);
-                iterationContext.put(itemVariable, element);
-                actionExecutor.execute(action, iterationContext);
+            try {
+                for (Object element : items) {
+                    Map<String, Object> iterationContext = new HashMap<>(processVars);
+                    iterationContext.put(itemVariable, element);
+                    actionExecutor.execute(action, iterationContext);
+                }
+                completeNodeExecution(executionRowId, StatusConstants.COMPLETED, null);
+            } catch (RuntimeException e) {
+                // Record failure row first, then propagate. SmartEngine needs the
+                // exception for its failure semantics (red line §8: no swallow).
+                completeNodeExecution(executionRowId, StatusConstants.FAILED, e.getMessage());
+                throw e;
             }
             return;
         }
 
         log.info("AutomationActionDelegate: node={}, actionType={}", nodeId, type);
-        actionExecutor.execute(action, processVars);
+        try {
+            actionExecutor.execute(action, processVars);
+            completeNodeExecution(executionRowId, StatusConstants.COMPLETED, null);
+        } catch (RuntimeException e) {
+            completeNodeExecution(executionRowId, StatusConstants.FAILED, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Insert a {@code status='running'} row for this node entry and return its id, or
+     * {@code null} when recording is disabled (no log id in scope, no tenant id, or
+     * no mapper bean).
+     *
+     * <p>The recording branch must not impair the action — if the insert itself fails
+     * we log and continue. Losing observability is strictly better than losing the
+     * user-facing execution. This narrow {@code Exception} catch is deliberate
+     * (observability-only, not action error handling — red line §8 still holds).
+     */
+    private Long beginNodeExecution(Map<String, Object> processVars, String nodeId,
+                                    ExecutionContext executionContext) {
+        if (nodeExecutionMapper == null) {
+            return null;
+        }
+        Object logIdObj = processVars.get(LOG_ID_VAR);
+        if (!(logIdObj instanceof Number logIdNum)) {
+            return null;
+        }
+        Object tenantIdObj = processVars.get(TENANT_ID_VAR);
+        Long tenantId = tenantIdObj instanceof Number n ? n.longValue() : null;
+        if (tenantId == null) {
+            log.debug("G5 node-status recording skipped: no tenant id (node={})", nodeId);
+            return null;
+        }
+        String automationId = String.valueOf(processVars.getOrDefault(AUTOMATION_ID_VAR, ""));
+        String processInstanceId = null;
+        try {
+            if (executionContext.getProcessInstance() != null) {
+                processInstanceId = executionContext.getProcessInstance().getInstanceId();
+            }
+        } catch (Exception ignored) {
+            // Best-effort: process instance lookup quirks must not break execution.
+        }
+
+        AutomationNodeExecution row = new AutomationNodeExecution();
+        row.setTenantId(tenantId);
+        row.setAutomationLogId(logIdNum.longValue());
+        row.setAutomationId(automationId);
+        row.setProcessInstanceId(processInstanceId);
+        row.setNodeId(nodeId);
+        row.setStatus(StatusConstants.RUNNING);
+        row.setStartedAt(Instant.now());
+        row.setCreatedAt(Instant.now());
+        try {
+            nodeExecutionMapper.insert(row);
+            return row.getId();
+        } catch (Exception e) {
+            log.warn("G5 node-status recording failed (insert) for node={}: {}",
+                    nodeId, e.getMessage());
+            return null;
+        }
+    }
+
+    private void completeNodeExecution(Long rowId, String status, String errorMessage) {
+        if (rowId == null || nodeExecutionMapper == null) {
+            return;
+        }
+        try {
+            AutomationNodeExecution update = new AutomationNodeExecution();
+            update.setId(rowId);
+            update.setStatus(status);
+            update.setCompletedAt(Instant.now());
+            update.setErrorMessage(errorMessage);
+            nodeExecutionMapper.updateById(update);
+        } catch (Exception e) {
+            log.warn("G5 node-status recording failed (update) rowId={}: {}",
+                    rowId, e.getMessage());
+        }
     }
 
     /**
