@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "tasset.maintenance.manage"
+          "permissionCode": "tasset.maintenance.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -121,13 +122,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "tasset_maintenance_detail"
+              "navigateTo": "tasset_maintenance_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "tasset_maintenance_form",
-              "permissionCode": "tasset.maintenance.manage"
+              "permissionCode": "tasset.maintenance.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -135,9 +138,11 @@
               "danger": true,
               "commandCode": "tasset:delete_maintenance",
               "permissionCode": "tasset.maintenance.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [

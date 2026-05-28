@@ -37,7 +37,8 @@
       "fields": [
         {
           "field": "tasset_as_name",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "tasset_as_category",
@@ -74,11 +75,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "tasset:create_asset",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

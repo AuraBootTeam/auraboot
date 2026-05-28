@@ -38,32 +38,53 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tasset.asset.manage"
+          "permissionCode": "tasset.asset.manage",
+          "label": "$i18n:common.button.edit"
         },
         {
           "code": "assign_asset",
           "commandCode": "tasset:assign_asset",
-          "permissionCode": "tasset.asset.manage"
+          "permissionCode": "tasset.asset.manage",
+          "label": {
+            "zh-CN": "分配资产",
+            "en-US": "Assign Asset"
+          }
         },
         {
           "code": "return_asset",
           "commandCode": "tasset:return_asset",
-          "permissionCode": "tasset.asset.manage"
+          "permissionCode": "tasset.asset.manage",
+          "label": {
+            "zh-CN": "归还资产",
+            "en-US": "Return Asset"
+          }
         },
         {
           "code": "send_maintenance",
           "commandCode": "tasset:send_maintenance",
-          "permissionCode": "tasset.asset.manage"
+          "permissionCode": "tasset.asset.manage",
+          "label": {
+            "zh-CN": "送修",
+            "en-US": "Send for Maintenance"
+          }
         },
         {
           "code": "finish_maintenance",
           "commandCode": "tasset:finish_maintenance",
-          "permissionCode": "tasset.asset.manage"
+          "permissionCode": "tasset.asset.manage",
+          "label": {
+            "zh-CN": "完成维护",
+            "en-US": "Finish Maintenance"
+          }
         },
         {
           "code": "retire_asset",
           "commandCode": "tasset:retire_asset",
-          "permissionCode": "tasset.asset.manage"
+          "permissionCode": "tasset.asset.manage",
+          "label": {
+            "zh-CN": "报废",
+            "en-US": "Retire Asset"
+          }
         },
         {
           "code": "delete",
@@ -71,7 +92,8 @@
           "danger": true,
           "commandCode": "tasset:delete_asset",
           "permissionCode": "tasset.asset.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": "$i18n:common.button.delete"
         }
       ],
       "area": "header"

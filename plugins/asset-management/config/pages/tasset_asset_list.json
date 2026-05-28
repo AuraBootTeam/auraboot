@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "tasset.asset.manage"
+          "permissionCode": "tasset.asset.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -129,13 +130,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "tasset_asset_detail"
+              "navigateTo": "tasset_asset_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "tasset_asset_form",
-              "permissionCode": "tasset.asset.manage"
+              "permissionCode": "tasset.asset.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -143,9 +146,11 @@
               "danger": true,
               "commandCode": "tasset:delete_asset",
               "permissionCode": "tasset.asset.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [
