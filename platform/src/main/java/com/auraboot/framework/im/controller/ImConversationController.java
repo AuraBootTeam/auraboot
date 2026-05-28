@@ -134,6 +134,18 @@ public class ImConversationController {
         Long actorUserId = MetaContext.getCurrentUserId();
         String actorUserName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
+
+        // Capture removed member's name BEFORE deletion (humans only — agent removals skip sys msg)
+        String removedName = null;
+        if (ImConstants.MEMBER_TYPE_HUMAN.equals(memberType)) {
+            removedName = conversationService.getMembers(id, tenantId).stream()
+                    .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType())
+                                  && memberId.equals(m.getMemberId()))
+                    .findFirst()
+                    .map(m -> resolveName(m, memberId))
+                    .orElse("User#" + memberId);
+        }
+
         conversationService.removeMember(id, memberType, memberId, tenantId);
 
         // Send self_kicked to the removed human (agents don't receive WS events)
@@ -158,6 +170,14 @@ public class ImConversationController {
             othersPayload.put("byUserName", actorUserName);
             webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_REMOVED, othersPayload);
         }
+
+        // Write system message (humans only)
+        if (ImConstants.MEMBER_TYPE_HUMAN.equals(memberType) && removedName != null) {
+            String sysContent = ImSystemMessageBuilder.memberRemoved(
+                    memberId, removedName, actorUserId, actorUserName);
+            messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
+        }
+
         return ApiResponse.success(null);
     }
 

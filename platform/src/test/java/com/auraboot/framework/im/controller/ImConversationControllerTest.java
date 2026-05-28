@@ -128,6 +128,16 @@ class ImConversationControllerTest {
                 "agent".equals(p.get("removedMemberType"))
             )
         );
+        // No system message for agent removal
+        org.mockito.Mockito.verify(messageService, org.mockito.Mockito.never())
+            .sendSystemMessage(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+            );
     }
 
     @Test
@@ -224,6 +234,42 @@ class ImConversationControllerTest {
                 p.get("byUserId").equals(11L) &&
                 "alice".equals(p.get("byUserName"))
             )
+        );
+    }
+
+    @Test
+    void removeMemberAlsoWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+
+        com.auraboot.framework.im.dto.ConversationMemberInfo m11 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m11.setMemberId(11L); m11.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m11.setName("alice");
+        com.auraboot.framework.im.dto.ConversationMemberInfo m22 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m22.setMemberId(22L); m22.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m22.setName("Bob");
+        com.auraboot.framework.im.dto.ConversationMemberInfo m33 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m33.setMemberId(33L); m33.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m33.setName("Carol");
+        // Pre-removal getMembers returns Bob too; post-removal returns without Bob
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m11, m22, m33), List.of(m11, m33));
+
+        controller.removeMember(88L, "human", 22L);
+
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(content);
+                    return ImConstants.SYS_MEMBER_REMOVED.equals(root.get("subType").asText())
+                        && root.get("params").get("memberId").asLong() == 22L
+                        && "Bob".equals(root.get("params").get("memberName").asText())
+                        && root.get("params").get("byUserId").asLong() == 11L
+                        && "alice".equals(root.get("params").get("byUserName").asText());
+                } catch (Exception e) { return false; }
+            }),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
         );
     }
 
