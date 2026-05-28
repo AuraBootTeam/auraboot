@@ -248,6 +248,9 @@ public class ImConversationController {
             payload.put("byUserName", userName);
             webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_LEFT, payload);
         }
+        // Write system message for member leaving
+        String sysContent = ImSystemMessageBuilder.memberLeft(userId, userName);
+        messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
         return ApiResponse.success(null);
     }
 

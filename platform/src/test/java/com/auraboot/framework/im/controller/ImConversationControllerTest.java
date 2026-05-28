@@ -238,6 +238,34 @@ class ImConversationControllerTest {
     }
 
     @Test
+    void leaveGroupAlsoWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m3 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m3.setMemberId(33L); m3.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m3));
+
+        controller.leaveGroup(88L);
+
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(content);
+                    return ImConstants.SYS_MEMBER_LEFT.equals(root.get("subType").asText())
+                        && root.get("params").get("memberId").asLong() == 11L
+                        && "alice".equals(root.get("params").get("memberName").asText());
+                } catch (Exception e) { return false; }
+            }),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+    }
+
+    @Test
     void removeMemberAlsoWritesSystemMessage() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
         ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
