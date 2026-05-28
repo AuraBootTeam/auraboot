@@ -169,6 +169,7 @@ public class ImConversationController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> dissolveGroup(@PathVariable Long id) {
         Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> memberIds = conversationService.dissolveGroup(id, userId, tenantId);
         // Broadcast to other members
@@ -181,7 +182,7 @@ public class ImConversationController {
             Map<String, Object> payload = new HashMap<>();
             payload.put("conversationId", id);
             payload.put("byUserId", userId);
-            payload.put("byUserName", MetaContext.getCurrentUsername());
+            payload.put("byUserName", userName);
             webSocketHandler.broadcastEvent(others, ImConstants.WS_CONVERSATION_DISSOLVED, payload);
         }
         return ApiResponse.success(null);
@@ -190,6 +191,7 @@ public class ImConversationController {
     @PostMapping("/{id}/leave")
     public ApiResponse<Void> leaveGroup(@PathVariable Long id) {
         Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
         conversationService.leaveGroup(id, userId, tenantId);
         // Broadcast member_left to remaining human members (if group still exists)
@@ -200,8 +202,8 @@ public class ImConversationController {
                     .map(ConversationMemberInfo::getMemberId).toList();
             Map<String, Object> payload = new HashMap<>();
             payload.put("conversationId", id);
-            payload.put("userId", userId);
-            payload.put("userName", MetaContext.getCurrentUsername());
+            payload.put("byUserId", userId);
+            payload.put("byUserName", userName);
             webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_LEFT, payload);
         }
         return ApiResponse.success(null);

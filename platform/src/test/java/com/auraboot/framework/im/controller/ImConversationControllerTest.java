@@ -178,8 +178,8 @@ class ImConversationControllerTest {
             org.mockito.ArgumentMatchers.eq(ImConstants.WS_MEMBER_LEFT),
             org.mockito.ArgumentMatchers.argThat(p ->
                 p.get("conversationId").equals(88L) &&
-                p.get("userId").equals(11L) &&
-                "alice".equals(p.get("userName"))
+                p.get("byUserId").equals(11L) &&
+                "alice".equals(p.get("byUserName"))
             )
         );
     }
