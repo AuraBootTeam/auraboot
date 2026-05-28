@@ -59,9 +59,38 @@ public class RagRetrievalService {
             return List.of();
         }
 
-        // Get embedding provider from the first KB
+        // Get embedding provider from the first KB.
+        //
+        // Cross-provider safety check: if targetKbs span multiple KBs with
+        // different embedding providers (e.g. openai 1536-dim + qwen 1024-dim),
+        // the query is embedded with only the first KB's provider but the
+        // hybrid SQL mixes chunks from ALL targetKbs — pgvector silently
+        // fails the cosine `<=>` operator on dimension mismatch. Previous
+        // behavior was zero results or confusing SQL error. Per deep-review
+        // P3-1: drop incompatible KBs + log.
         KnowledgeBase firstKb = kbService.findKbByPid(targetKbs.get(0));
         if (firstKb == null) return List.of();
+        if (targetKbs.size() > 1) {
+            String firstProvider = firstKb.getEmbeddingProvider();
+            List<String> compatibleKbs = new ArrayList<>();
+            List<String> incompatibleKbs = new ArrayList<>();
+            for (String pid : targetKbs) {
+                KnowledgeBase kb = kbService.findKbByPid(pid);
+                if (kb == null) continue;
+                if (java.util.Objects.equals(kb.getEmbeddingProvider(), firstProvider)) {
+                    compatibleKbs.add(pid);
+                } else {
+                    incompatibleKbs.add(pid);
+                }
+            }
+            if (!incompatibleKbs.isEmpty()) {
+                log.warn("retrieve: dropping {} KB(s) with embedding provider != {} to avoid pgvector "
+                                + "dimension mismatch: kept={} dropped={}",
+                        incompatibleKbs.size(), firstProvider, compatibleKbs, incompatibleKbs);
+                targetKbs = compatibleKbs;
+                if (targetKbs.isEmpty()) return List.of();
+            }
+        }
 
         // Try to embed query
         float[] queryEmbedding = null;
