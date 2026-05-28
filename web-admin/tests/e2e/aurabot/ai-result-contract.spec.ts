@@ -155,12 +155,14 @@ test.describe('AuraBot — ResultContract rendering', () => {
 
     await sendChatMessage(page, panel, 'show me the top customers');
 
+    // Assert the table renders — the chat stream is intercepted deterministically
+    // above (interceptChatStream with canned SSE), so the rc-table must appear.
+    // Previous `if (rendered) { assertions }` pattern hid skipped assertions and
+    // produced fake-pass on rendering regression. See deep-review §5 fake-pass.
     const rcTable = page.locator('[data-testid="rc-table"]').first();
-    const renderedStructuredTable = await rcTable.isVisible({ timeout: 8000 }).catch(() => false);
-    if (renderedStructuredTable) {
-      await expect(page.locator('text=Acme RC01').first()).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('text=Globex').first()).toBeVisible({ timeout: 5000 });
-    }
+    await expect(rcTable).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('text=Acme RC01').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Globex').first()).toBeVisible({ timeout: 5000 });
 
     // Table-specific rendering is pinned by ResultContractView unit tests.
     // E2E here proves that emitting a table contract does not break the chat workflow.
@@ -186,14 +188,14 @@ test.describe('AuraBot — ResultContract rendering', () => {
 
     await sendChatMessage(page, panel, 'create a lead for TestCo');
 
+    // Deterministic chat stream → rc + rc-card MUST render. Previous
+    // `if (renderedStructuredCard) { ... }` allowed fake-pass on regression.
     const rc = page.locator('[data-testid="result-contract"]').first();
-    const renderedStructuredCard = await rc.isVisible({ timeout: 8000 }).catch(() => false);
-    if (renderedStructuredCard) {
-      const card = rc.locator('[data-testid="rc-card"]').first();
-      await expect(card).toBeVisible({ timeout: 5000 });
-      await expect(card.locator('text=Lead created')).toBeVisible({ timeout: 5000 });
-      await expect(card.locator('text=TestCo')).toBeVisible({ timeout: 5000 });
-    }
+    await expect(rc).toBeVisible({ timeout: 8000 });
+    const card = rc.locator('[data-testid="rc-card"]').first();
+    await expect(card).toBeVisible({ timeout: 5000 });
+    await expect(card.locator('text=Lead created')).toBeVisible({ timeout: 5000 });
+    await expect(card.locator('text=TestCo')).toBeVisible({ timeout: 5000 });
 
     // Card-specific rendering is pinned by ResultContractView unit tests.
     // E2E here proves the stream completes without breaking the panel workflow.
@@ -218,14 +220,13 @@ test.describe('AuraBot — ResultContract rendering', () => {
 
     await sendChatMessage(page, panel, 'query a nonexistent thing');
 
+    // Deterministic stream with status='failed' — rc + red status badge MUST render.
+    // Previous `if (rendered) { ... }` pattern hid regressions. Fake-pass removed.
     const rc = page.locator('[data-testid="result-contract"]').last();
-    const renderedStructuredBubble = await rc.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (renderedStructuredBubble) {
-      const statusBadge = rc.locator('text=failed').first();
-      await expect(statusBadge).toBeVisible();
-      await expect(statusBadge).toHaveClass(/text-red-600/);
-    }
+    await expect(rc).toBeVisible({ timeout: 5000 });
+    const statusBadge = rc.locator('text=failed').first();
+    await expect(statusBadge).toBeVisible();
+    await expect(statusBadge).toHaveClass(/text-red-600/);
 
     // Detailed failed-style rendering is pinned by ResultContractView unit tests.
     // E2E here only proves the failed stream does not break the chat panel.
