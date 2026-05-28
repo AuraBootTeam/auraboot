@@ -10,6 +10,7 @@ import { useFlowAutoSave } from './useFlowAutoSave';
 import { useFlowValidation } from '../validation/useFlowValidation';
 import type { FlowNodeDefinition } from '../nodes/types';
 import type { FlowData } from '../store/types';
+import type { FlowMonitorData } from '../store/monitorTypes';
 import { cn } from '~/utils/cn';
 
 export interface FlowDesignerConfig {
@@ -30,6 +31,14 @@ export interface FlowDesignerProps {
   className?: string;
   autoSave?: boolean;
   autoSaveDelay?: number;
+  /**
+   * G8 — when true, the designer enters monitor mode. Combine with
+   * `monitorData` to feed runtime per-node status (pending/running/...).
+   * Node renderers and editors read via `useNodeMonitorStatus(nodeId)`.
+   */
+  monitorMode?: boolean;
+  /** G8 — runtime status keyed by node id. Ignored unless monitorMode=true. */
+  monitorData?: FlowMonitorData;
 }
 
 export function FlowDesigner({
@@ -43,8 +52,10 @@ export function FlowDesigner({
   className,
   autoSave = false,
   autoSaveDelay,
+  monitorMode = false,
+  monitorData,
 }: FlowDesignerProps) {
-  const { importData, exportData, nodes, edges, setDirty, undo, redo, isDirty, bumpRegistryVersion } = useFlowStore();
+  const { importData, exportData, nodes, edges, setDirty, undo, redo, isDirty, bumpRegistryVersion, setMonitorMode, setMonitorData } = useFlowStore();
   const { validate } = useFlowValidation();
   const containerRef = useRef<HTMLDivElement>(null);
   // Track whether we are currently importing data so we can suppress the
@@ -52,6 +63,16 @@ export function FlowDesigner({
   // Without this guard, importing pre-populated node config triggers:
   //   onChange → parent updates initialData → importData → onChange → ...
   const isImportingRef = useRef(false);
+
+  // G8 — sync monitor props into the store so every node renderer /
+  // PropertyEditor that calls useNodeMonitorStatus sees the same data.
+  useEffect(() => {
+    setMonitorMode(monitorMode);
+  }, [monitorMode, setMonitorMode]);
+
+  useEffect(() => {
+    setMonitorData(monitorData ?? {});
+  }, [monitorData, setMonitorData]);
 
   // Register node definitions and bump registryVersion so FlowPalette/FlowCanvas re-render
   useEffect(() => {

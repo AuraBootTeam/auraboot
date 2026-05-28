@@ -1,6 +1,7 @@
 // web-admin/app/flow-designer-sdk/store/useFlowStore.ts
 import { create } from 'zustand';
 import type { FlowNode, FlowEdge, ValidationResult, FlowData } from './types';
+import type { FlowMonitorData } from './monitorTypes';
 
 const MAX_HISTORY = 50;
 
@@ -28,6 +29,13 @@ interface FlowStoreState {
   // Undo/Redo history
   history: FlowSnapshot[];
   historyIndex: number;
+
+  // Monitor mode (G8) — when monitorMode=true, monitorData maps nodeId →
+  // NodeMonitorStatus so node renderers and editors can adapt their UI.
+  monitorMode: boolean;
+  monitorData: FlowMonitorData;
+  setMonitorMode: (enabled: boolean) => void;
+  setMonitorData: (data: FlowMonitorData) => void;
 
   // Node operations
   addNode: (node: Omit<FlowNode, 'id'>) => string;
@@ -87,6 +95,10 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     bumpRegistryVersion: () => set((s) => ({ registryVersion: s.registryVersion + 1 })),
     history: [],
     historyIndex: -1,
+    monitorMode: false,
+    monitorData: {},
+    setMonitorMode: (enabled) => set({ monitorMode: enabled }),
+    setMonitorData: (data) => set({ monitorData: data }),
 
     addNode: (node) => {
       const id = generateNodeId();
@@ -246,6 +258,8 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
         validationResult: null,
         history: [],
         historyIndex: -1,
+        monitorMode: false,
+        monitorData: {},
       });
     },
 
