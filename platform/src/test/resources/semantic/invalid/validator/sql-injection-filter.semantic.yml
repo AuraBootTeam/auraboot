@@ -1,0 +1,18 @@
+version: "0.1"
+semantic_model:
+  code: bad
+  model_ref: foo
+  primary_entity: id
+entities: [{name: id, type: primary, field_ref: id}]
+dimensions: [{code: d, type: categorical, field_ref: d}]
+measures: [{code: m, agg: COUNT, expr: "*"}]
+metrics:
+  - code: x
+    type: simple
+    type_params:
+      measure: m
+    filter: "1=1; DROP TABLE ab_semantic_metric; --"
+access_policies:
+  - access_grant: g
+    user_attribute: a
+    sql_filter: "owner_user_id = {user.user_id} OR 1=1 UNION SELECT password FROM ab_user"

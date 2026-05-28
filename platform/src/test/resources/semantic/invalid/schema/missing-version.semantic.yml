@@ -1,0 +1,8 @@
+semantic_model:
+  code: bad
+  model_ref: foo
+  primary_entity: id
+entities: [{name: id, type: primary, field_ref: id}]
+dimensions: [{code: d, type: categorical, field_ref: d}]
+measures: [{code: m, agg: COUNT, expr: "*"}]
+metrics: [{code: x, type: simple, type_params: {measure: m}}]

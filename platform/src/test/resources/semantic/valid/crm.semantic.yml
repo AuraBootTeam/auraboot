@@ -1,0 +1,108 @@
+version: "0.1"
+
+semantic_model:
+  code: crm
+  label:
+    zh-CN: 客户关系
+    en-US: CRM
+  description: Customer lifecycle and opportunity pipeline.
+  model_ref: crm_customer
+  primary_entity: customer_id
+
+entities:
+  - name: customer_id
+    type: primary
+    field_ref: id
+  - name: owner_user_id
+    type: foreign
+    field_ref: owner_user_id
+    relation: user.id
+
+dimensions:
+  - code: created_at
+    label:
+      zh-CN: 创建时间
+    field_ref: created_at
+    type: time
+    time_grains: [day, week, month, quarter, year]
+    primary_time: true
+
+  - code: lifecycle_stage
+    label:
+      zh-CN: 客户阶段
+    field_ref: lifecycle_stage
+    type: categorical
+    description: LEAD / OPPORTUNITY / CUSTOMER / CHURNED
+
+  - code: industry
+    label:
+      zh-CN: 行业
+    field_ref: industry
+    type: categorical
+
+  - code: arr_band
+    label:
+      zh-CN: ARR 区间
+    field_ref: arr_band
+    type: categorical
+
+measures:
+  - code: customer_count
+    label:
+      zh-CN: 客户数
+    agg: COUNT
+    expr: "*"
+
+  - code: trial_count
+    label:
+      zh-CN: 试用客户数
+    agg: COUNT
+    expr: "CASE WHEN lifecycle_stage = 'TRIAL' THEN 1 END"
+
+  - code: paid_count
+    label:
+      zh-CN: 付费客户数
+    agg: COUNT
+    expr: "CASE WHEN lifecycle_stage = 'CUSTOMER' THEN 1 END"
+
+  - code: arr_amount
+    label:
+      zh-CN: 年度经常性收入
+    agg: SUM
+    field_ref: arr_amount
+
+metrics:
+  - code: total_customers
+    type: simple
+    type_params:
+      measure: customer_count
+
+  - code: trial_to_paid_conversion
+    label:
+      zh-CN: 试用转付费率
+      en-US: Trial-to-Paid Conversion
+    description: 30-day window conversion from trial to paid.
+    type: conversion
+    type_params:
+      base_measure: trial_count
+      conversion_measure: paid_count
+      entity: customer_id
+      window: 30d
+
+  - code: lead_to_customer_rate
+    type: ratio
+    type_params:
+      numerator: paid_count
+      denominator: customer_count
+
+  - code: ytd_arr
+    type: cumulative
+    type_params:
+      measure: arr_amount
+      window: ytd
+
+access_policies:
+  - access_grant: customer_owner_scope
+    user_attribute: user_id
+    target_dimensions: []
+    sql_filter: "owner_user_id = {user.user_id}"
