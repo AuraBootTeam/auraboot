@@ -1,6 +1,6 @@
 <p align="center">
   <h1 align="center">AuraBoot</h1>
-  <p align="center"><strong>Self-hosted low-code for business apps — source-available, beta</strong></p>
+  <p align="center"><strong>AI-native enterprise application runtime — model-driven, command-governed, plugin-delivered</strong></p>
 </p>
 
 <p align="center">
@@ -29,7 +29,26 @@
 
 ## What is AuraBoot?
 
-AuraBoot is a source-available, self-hosted platform for building business applications using a declarative DSL (Domain-Specific Language) instead of writing the same CRUD, permission, workflow, and audit plumbing again. Define your data models, pages, commands, and workflows in JSON — the platform generates the database schema, REST APIs, and UI automatically. AI-assisted features such as AuraBot, ChatBI, agents, and RAG run on the same application model when you need them.
+AuraBoot is a runtime layer for **complex, long-lived enterprise applications**. It is not a CRUD builder, and it is not a packaged ERP — it sits underneath both.
+
+You declare your business in six first-class concepts: **Model**, **Page**, **Command**, **Permission**, **Process**, **Plugin**. The platform turns those declarations into the database schema, the REST API, the rendered UI, the audit log, and — when the operation declares its risk and idempotency — a surface that AI agents can call safely.
+
+| You are choosing between... | Pick this if... | Limit |
+|---|---|---|
+| **A visual data-app builder** | You need a department tool by Friday and a database UI is the goal | Cross-module governance, AI-safe operations, long-lived industry verticals |
+| **A packaged business suite** | You want a working ERP/CRM out of the box and your processes fit its defaults | Deep non-standard processes, custom verticals, runtime-level AI execution |
+| **AuraBoot** | The business is complex, the lifecycle is years, and operations must be governed and AI-callable | Higher learning curve than a pure form builder; not a same-quarter accounting replacement |
+
+Full positioning rationale: [`docs/positioning.md`](docs/positioning.md). Architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+### The six concepts (one card each)
+
+- **Model** — entities, fields, relations; drives schema, APIs, default pages
+- **Page** — DSL composition of blocks; business CRUD is contract-rendered, never hand-coded
+- **Command** — the only write path; multi-stage pipeline applies authz, entitlement, validation, state guard, audit, events, side effects
+- **Permission** — five layers: RBAC + ReBAC + organizational scope + ABAC + field-level
+- **Process** — BPMN 2.0 long-running orchestration where each task resolves back to a Command
+- **Plugin** — declared manifest of contributions; industry verticals ship as plugin packages with isolated resources and declared dependencies
 
 ## Product Preview
 
