@@ -8,7 +8,7 @@ package com.auraboot.framework.permission.constants;
  *
  * Permission Code Format: {module}.{resource}.{action}
  *   module ∈ { meta, bpm, org, sys, data, audit, dashboard,
- *              automation, notification, aurabot, admin }
+ *              automation, notification, aurabot, admin, acp, iot }
  *
  * Actions:
  * - read:   Read-only access (query, list, view)
@@ -624,6 +624,24 @@ public final class MetaPermission {
      * ACP agent approval permission (review and act on agent approval requests).
      */
     public static final String ACP_AGENT_APPROVAL = "acp.agent.approval";
+
+    // ==================== IoT permissions ====================
+
+    /**
+     * Time-series read permission for the platform-side
+     * {@code TimeSeriesQueryController} (latest / range / aggregate /
+     * batchQuery). Registered as a minimal IoT capability in the OSS
+     * default bootstrap so OSS-only deploys can issue the time-series
+     * REST contract; the enterprise {@code ent-iot-control} plugin
+     * registers the full IoT permission catalogue (write, alarm, command,
+     * ...) on top of this baseline.
+     *
+     * <p><b>Permission-code reconciliation note:</b> the enterprise plugin
+     * registers the SAME literal {@code "iot.data_point.read"} so the two
+     * sources of truth converge. {@code module=iot} is officially added to
+     * the platform module enum in this drop (see MetaPermission javadoc).
+     */
+    public static final String IOT_DATA_POINT_READ = "iot.data_point.read";
 
     // ==================== Private Constructor ====================
 
