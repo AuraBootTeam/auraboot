@@ -858,9 +858,24 @@
     "en-US": "Invalid mobile number format"
   },
   {
+    "key": "auth.feature.aiAgent",
+    "zh-CN": "AI Agent",
+    "en-US": "AI Agent"
+  },
+  {
+    "key": "auth.feature.aiAgent.desc",
+    "zh-CN": "租户内运行,可调用全部业务能力",
+    "en-US": "Runs inside your tenant, calls every capability"
+  },
+  {
     "key": "auth.feature.dataModel",
     "zh-CN": "灵活数据模型",
     "en-US": "Flexible Data Model"
+  },
+  {
+    "key": "auth.feature.dataModel.desc",
+    "zh-CN": "动态建模,字段级权限与审计",
+    "en-US": "Dynamic schema with field-level audit"
   },
   {
     "key": "auth.feature.designer",
@@ -868,9 +883,39 @@
     "en-US": "Visual Page Designer"
   },
   {
+    "key": "auth.feature.designer.desc",
+    "zh-CN": "拖拽式可视化搭建,所见即所得",
+    "en-US": "Drag and drop, WYSIWYG"
+  },
+  {
+    "key": "auth.feature.multiPlatform",
+    "zh-CN": "多端交付",
+    "en-US": "Multi-Platform Delivery"
+  },
+  {
+    "key": "auth.feature.multiPlatform.desc",
+    "zh-CN": "Web / iOS / Android / 小程序 一套配置",
+    "en-US": "Web / iOS / Android / Mini-Program from one config"
+  },
+  {
+    "key": "auth.feature.plugin",
+    "zh-CN": "插件生态",
+    "en-US": "Plugin Ecosystem"
+  },
+  {
+    "key": "auth.feature.plugin.desc",
+    "zh-CN": "PF4J + 模块联邦,前后端热插拔",
+    "en-US": "PF4J + Module Federation, hot-swappable"
+  },
+  {
     "key": "auth.feature.workflow",
     "zh-CN": "工作流自动化",
     "en-US": "Workflow Automation"
+  },
+  {
+    "key": "auth.feature.workflow.desc",
+    "zh-CN": "BPMN 编排 + 自动化规则引擎",
+    "en-US": "BPMN orchestration + rules engine"
   },
   {
     "key": "auth.forgotPassword",
@@ -949,6 +994,26 @@
     "key": "auth.sending",
     "zh-CN": "发送中...",
     "en-US": "Sending..."
+  },
+  {
+    "key": "auth.social.apple",
+    "zh-CN": "Apple",
+    "en-US": "Apple"
+  },
+  {
+    "key": "auth.social.google",
+    "zh-CN": "Google",
+    "en-US": "Google"
+  },
+  {
+    "key": "auth.social.oidc",
+    "zh-CN": "企业 SSO",
+    "en-US": "Enterprise SSO"
+  },
+  {
+    "key": "auth.social.wechat",
+    "zh-CN": "微信",
+    "en-US": "WeChat"
   },
   {
     "key": "auth.socialLogin",
