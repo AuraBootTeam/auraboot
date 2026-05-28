@@ -947,8 +947,13 @@ public class TestFixtureController {
             // Create direct-message conversation.
             // Send 2 messages from the primary user, then 1 message from chatUserId (if distinct).
             // The 1 message from chatUserId will appear as "unread" for the test user.
+            // Include both users as participants so the mention picker has at least one
+            // selectable member (excluding self), unblocking ChatMessageFlowTests.testSelectMentionUserInsertsTag.
+            List<Long> dmParticipants = hasDistinctChatUser
+                    ? List.of(userId, chatUserId)
+                    : List.of(userId);
             Object dmConv = invokeCreateConversation(createConv, conversationService,
-                    tenantId, "direct", "dm_" + runId, userId, List.of(userId));
+                    tenantId, "direct", "dm_" + runId, userId, dmParticipants);
             String dmId = extractStringId(dmConv);
             int dmUnreadCount = 0;
             if (dmId != null) {
