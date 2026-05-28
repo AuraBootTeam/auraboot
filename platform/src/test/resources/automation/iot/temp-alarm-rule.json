@@ -1,0 +1,86 @@
+{
+  "_doc": "Spike sample — IoT rule expressed as an automation flow that compiles to SmartEngine. Reads telemetry, enriches device/product metadata (which promotes productId from the device record), filters by product scope, derives Celsius + isHigh, then on the high branch emits an alarm envelope to the iot.alarm.v1 topic. Used by IotRuleSmartEngineIntegrationTest.",
+  "nodes": [
+    {
+      "id": "t1",
+      "type": "trigger-iot-telemetry",
+      "data": { "label": "On telemetry", "config": {} }
+    },
+    {
+      "id": "enrich",
+      "type": "action-iot-enrichment",
+      "data": {
+        "label": "Enrich device/product",
+        "config": { "actionType": "iot_enrichment" }
+      }
+    },
+    {
+      "id": "filter",
+      "type": "action-iot-filter",
+      "data": {
+        "label": "Scope by product",
+        "config": {
+          "actionType": "iot_filter",
+          "productIds": ["prod-furnace"]
+        }
+      }
+    },
+    {
+      "id": "gwDrop",
+      "type": "control-condition",
+      "data": { "label": "Dropped?", "config": {} }
+    },
+    {
+      "id": "xform",
+      "type": "action-iot-transformation",
+      "data": {
+        "label": "Compute Celsius + threshold flag",
+        "config": {
+          "actionType": "iot_transformation",
+          "assignments": [
+            { "target": "tempC",      "expression": "(#temperatureF - 32) * 5 / 9" },
+            { "target": "isHighTemp", "expression": "#tempC > 80" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gwAlarm",
+      "type": "control-condition",
+      "data": { "label": "High temp?", "config": {} }
+    },
+    {
+      "id": "alarm",
+      "type": "action-iot-action",
+      "data": {
+        "label": "Emit alarm",
+        "config": {
+          "actionType": "iot_action",
+          "kind": "alarm",
+          "topic": "iot.alarm.v1",
+          "payload": {
+            "metric": "temperature",
+            "valueC": "${tempC}",
+            "valueF": "${temperatureF}",
+            "site": "#{#deviceMeta?.['site']}",
+            "severity": "MAJOR"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "t1",      "target": "enrich" },
+    { "id": "e2", "source": "enrich",  "target": "filter" },
+    { "id": "e3", "source": "filter",  "target": "gwDrop" },
+    { "id": "e4", "source": "gwDrop",  "target": "xform",
+      "data": { "condition": { "type": "expression", "content": "iotDropped == false" } } },
+    { "id": "e4b", "source": "gwDrop", "target": "_end",
+      "data": { "condition": { "type": "expression", "content": "iotDropped == true" } } },
+    { "id": "e5", "source": "xform",   "target": "gwAlarm" },
+    { "id": "e6", "source": "gwAlarm", "target": "alarm",
+      "data": { "condition": { "type": "expression", "content": "isHighTemp == true" } } },
+    { "id": "e6b", "source": "gwAlarm", "target": "_end",
+      "data": { "condition": { "type": "expression", "content": "isHighTemp != true" } } }
+  ]
+}
