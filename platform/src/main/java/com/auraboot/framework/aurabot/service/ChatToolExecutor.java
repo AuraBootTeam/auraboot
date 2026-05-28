@@ -106,11 +106,30 @@ public class ChatToolExecutor {
                     null);
             return ToolLoopResultNormalizer.normalize(objectMapper, raw, toolName, safeInput);
         } catch (Exception e) {
+            // Preserve thread-interrupt signal — if a downstream blocking op
+            // (HTTP / DB / lock) caught an InterruptedException and wrapped it
+            // in a RuntimeException, the current thread's interrupt flag has
+            // already been cleared. Re-set it here so cooperative-cancellation
+            // points further up (chat turn timeout, user abort) still see the
+            // signal. Cheap to do unconditionally. See deep-review P3
+            // ChatToolExecutor.
+            if (e instanceof InterruptedException
+                    || hasInterruptedCause(e)) {
+                Thread.currentThread().interrupt();
+            }
             String safeError = safeExceptionMessage(e);
             log.error("ToolLoopService execution failed for {}: errorType={}, message={}",
                     toolName, e.getClass().getSimpleName(), safeError);
             return errorResult(safeError);
         }
+    }
+
+    /** Walk the cause chain to detect a wrapped {@link InterruptedException}. */
+    private static boolean hasInterruptedCause(Throwable t) {
+        for (Throwable c = t.getCause(); c != null && c != t; c = c.getCause()) {
+            if (c instanceof InterruptedException) return true;
+        }
+        return false;
     }
 
     /**

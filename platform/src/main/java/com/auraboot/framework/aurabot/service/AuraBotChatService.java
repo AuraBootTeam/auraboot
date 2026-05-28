@@ -516,8 +516,27 @@ public class AuraBotChatService {
                     vars.put("recordDataJson",
                             "<user-data>\n" + objectMapper.writeValueAsString(ctx.getRecordData()) + "\n</user-data>");
                 } catch (Exception e) {
+                    // Per-key fallback: skip offending value rather than leak
+                    // Java Object#toString shape ({key=val, key2=val2}) into
+                    // the prompt. LLM gets partial JSON it can still parse,
+                    // with explicit marker for skipped keys. Previous behavior
+                    // emitted raw toString() which produced unparseable prompt
+                    // and led to LLM hallucinations on context shape. See
+                    // deep-review P3 AuraBotChatService:518.
+                    log.warn("recordData JSON serialization failed; per-key fallback: {}", e.getMessage());
+                    com.fasterxml.jackson.databind.node.ObjectNode safe = objectMapper.createObjectNode();
+                    for (java.util.Map.Entry<String, Object> en : ctx.getRecordData().entrySet()) {
+                        try {
+                            safe.set(en.getKey(), objectMapper.valueToTree(en.getValue()));
+                        } catch (Exception innerE) {
+                            safe.put(en.getKey(),
+                                    "<unserializable:" + (en.getValue() == null
+                                            ? "null"
+                                            : en.getValue().getClass().getSimpleName()) + ">");
+                        }
+                    }
                     vars.put("recordDataJson",
-                            "<user-data>\n" + ctx.getRecordData().toString() + "\n</user-data>");
+                            "<user-data>\n" + safe.toString() + "\n</user-data>");
                 }
             }
             if (ctx.getBreadcrumb() != null && !ctx.getBreadcrumb().isEmpty()) {
