@@ -1,7 +1,6 @@
 package com.auraboot.framework.tenant.dao.mapper;
 
 import com.auraboot.framework.tenant.dao.entity.Store;
-import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
@@ -35,23 +34,6 @@ public interface StoreMapper extends BaseMapper<Store> {
      */
     @Select("SELECT * FROM ns_store WHERE code = #{code} AND  deleted_flag = false")
     Store findByCodeAndTenantId(@Param("code") String code, @Param("tenantId") Long tenantId);
-
-    /**
-     * Resolve public storefront handle candidates without relying on an
-     * authenticated MetaContext. Public callers must fail closed unless the
-     * handle resolves to exactly one active store.
-     */
-    @InterceptorIgnore(tenantLine = "true")
-    @Select("""
-        SELECT *
-        FROM ns_store
-        WHERE code = #{code}
-          AND COALESCE(deleted_flag, false) = false
-          AND (status IS NULL OR UPPER(status) = 'ACTIVE')
-        ORDER BY updated_at DESC, id DESC
-        LIMIT 2
-        """)
-    List<Store> findPublicCandidatesByCode(@Param("code") String code);
 
     @Select("""
         SELECT *
