@@ -13,12 +13,14 @@ import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * NL Modeling Service — converts natural language descriptions into AuraBoot DSL
@@ -35,8 +37,22 @@ public class NlModelingService {
     private final PluginImportService pluginImportService;
     private final ObjectMapper objectMapper;
 
-    /** In-memory session store for conversational refinement (session-scoped, not persistent) */
-    private final Map<String, List<LlmChatRequest.Message>> sessionHistory = new ConcurrentHashMap<>();
+    /**
+     * In-memory session store for conversational refinement (session-scoped,
+     * not persistent).
+     *
+     * <p>LRU-bounded via Caffeine to prevent unbounded growth — every
+     * {@link #generate} call inserts a {@code UUID.randomUUID()} key and the
+     * previous {@link ConcurrentHashMap} had no eviction. See deep-review
+     * P1-2. Defaults: max 1000 sessions, 2-hour TTL after last access.
+     * Refinement of a session beyond that window starts a fresh history,
+     * which is the same behavior as if the JVM had restarted — acceptable
+     * given the comment above says "session-scoped, not persistent".
+     */
+    private final Cache<String, List<LlmChatRequest.Message>> sessionHistory = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .expireAfterAccess(Duration.ofHours(2))
+            .build();
 
     // =========================================================================
     // Public API
@@ -113,8 +129,9 @@ public class NlModelingService {
 
         String sessionId = request.getSessionId();
         List<LlmChatRequest.Message> history;
-        if (sessionId != null && sessionHistory.containsKey(sessionId)) {
-            history = new ArrayList<>(sessionHistory.get(sessionId));
+        List<LlmChatRequest.Message> existing = sessionId == null ? null : sessionHistory.getIfPresent(sessionId);
+        if (existing != null) {
+            history = new ArrayList<>(existing);
         } else {
             // Start new session with current resources as context
             sessionId = UUID.randomUUID().toString();
