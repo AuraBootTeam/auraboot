@@ -28,6 +28,5 @@ export interface StatsConfig {
   key: string;
   title: string;
   icon?: string;
-  gradient: string;
   linkTo?: string;
 }

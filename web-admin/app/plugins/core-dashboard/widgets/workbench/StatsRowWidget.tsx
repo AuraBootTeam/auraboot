@@ -19,10 +19,10 @@ const TREND_COLOR: Record<string, string> = {
 };
 
 const DEFAULT_STATS: StatsConfig[] = [
-  { key: 'inbox_pending', title: 'workbench.stats.inbox_pending', gradient: 'blue' },
-  { key: 'crm_opportunity_amount', title: 'workbench.stats.crm_opportunity_amount', gradient: 'amber' },
-  { key: 'bpm_running', title: 'workbench.stats.bpm_running', gradient: 'emerald' },
-  { key: 'crm_account_active', title: 'workbench.stats.crm_account_active', gradient: 'violet' },
+  { key: 'inbox_pending', title: 'workbench.stats.inbox_pending' },
+  { key: 'crm_opportunity_amount', title: 'workbench.stats.crm_opportunity_amount' },
+  { key: 'bpm_running', title: 'workbench.stats.bpm_running' },
+  { key: 'crm_account_active', title: 'workbench.stats.crm_account_active' },
 ];
 
 function formatValue(item: StatItem): string {
