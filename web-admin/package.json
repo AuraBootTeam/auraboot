@@ -113,7 +113,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@react-router/express": "7.15.0",
+    "@react-router/express": "7.15.1",
     "@react-router/node": "7.15.0",
     "@react-router/serve": "7.15.0",
     "@reduxjs/toolkit": "^2.0.1",
