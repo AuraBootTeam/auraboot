@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.Mockito.verify;
 
@@ -335,6 +336,69 @@ class ImConversationControllerTest {
             }),
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull()
+        );
+    }
+
+    @Test
+    void setAnnouncementBroadcastsAndWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+        java.time.Instant now = java.time.Instant.parse("2026-05-29T01:00:00Z");
+        com.auraboot.framework.im.dto.Announcement saved =
+                new com.auraboot.framework.im.dto.Announcement("Hello team", 11L, "alice", now);
+        org.mockito.Mockito.when(conversationService.setAnnouncement(88L, "Hello team", 11L, "alice", 7L))
+                .thenReturn(saved);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m2 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m2.setMemberId(22L); m2.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L)).thenReturn(List.of(m1, m2));
+
+        controller.setAnnouncement(88L, Map.of("content", "Hello team"));
+
+        verify(conversationService).setAnnouncement(88L, "Hello team", 11L, "alice", 7L);
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> content.contains(ImConstants.SYS_ANNOUNCEMENT_UPDATED)),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(11L, 22L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_ANNOUNCEMENT_UPDATED),
+            org.mockito.ArgumentMatchers.argThat(p -> {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> ann = (Map<String, Object>) p.get("announcement");
+                return ann != null && "Hello team".equals(ann.get("content"));
+            })
+        );
+    }
+
+    @Test
+    void clearAnnouncementBroadcastsAndWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L)).thenReturn(List.of(m1));
+
+        controller.clearAnnouncement(88L);
+
+        verify(conversationService).clearAnnouncement(88L, 11L, 7L);
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> content.contains(ImConstants.SYS_ANNOUNCEMENT_CLEARED)),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(11L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_ANNOUNCEMENT_CLEARED),
+            org.mockito.ArgumentMatchers.any()
         );
     }
 

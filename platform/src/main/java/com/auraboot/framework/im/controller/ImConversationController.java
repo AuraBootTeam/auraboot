@@ -290,6 +290,62 @@ public class ImConversationController {
         return ApiResponse.success(null);
     }
 
+    @PutMapping("/{id}/announcement")
+    public ApiResponse<Void> setAnnouncement(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String content = body == null ? null : body.get("content");
+
+        com.auraboot.framework.im.dto.Announcement saved =
+                conversationService.setAnnouncement(id, content, userId, userName, tenantId);
+
+        // Write system message
+        String sysContent = ImSystemMessageBuilder.announcementUpdated(userId, userName);
+        messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
+
+        // Broadcast WS event to all human members
+        List<Long> humanIds = conversationService.getMembers(id, tenantId).stream()
+                .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
+                .map(ConversationMemberInfo::getMemberId).toList();
+        if (!humanIds.isEmpty()) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("announcement", Map.of(
+                    "content", saved.content(),
+                    "updatedBy", saved.updatedBy(),
+                    "updatedByName", saved.updatedByName(),
+                    "updatedAt", saved.updatedAt().toString()
+            ));
+            webSocketHandler.broadcastEvent(humanIds, ImConstants.WS_ANNOUNCEMENT_UPDATED, payload);
+        }
+        return ApiResponse.success(null);
+    }
+
+    @DeleteMapping("/{id}/announcement")
+    public ApiResponse<Void> clearAnnouncement(@PathVariable Long id) {
+        Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
+        Long tenantId = MetaContext.getCurrentTenantId();
+
+        conversationService.clearAnnouncement(id, userId, tenantId);
+
+        String sysContent = ImSystemMessageBuilder.announcementCleared(userId, userName);
+        messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
+
+        List<Long> humanIds = conversationService.getMembers(id, tenantId).stream()
+                .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
+                .map(ConversationMemberInfo::getMemberId).toList();
+        if (!humanIds.isEmpty()) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("byUserId", userId);
+            payload.put("byUserName", userName);
+            webSocketHandler.broadcastEvent(humanIds, ImConstants.WS_ANNOUNCEMENT_CLEARED, payload);
+        }
+        return ApiResponse.success(null);
+    }
+
     /**
      * Resolve a human-readable name for a member info. Falls back to displayName, then "User#<id>".
      */
