@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "thr.attendance.manage"
+          "permissionCode": "thr.attendance.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -66,13 +67,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "thr_attendance_detail"
+              "navigateTo": "thr_attendance_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "thr_attendance_form",
-              "permissionCode": "thr.attendance.manage"
+              "permissionCode": "thr.attendance.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -80,9 +83,11 @@
               "danger": true,
               "commandCode": "thr:delete_attendance",
               "permissionCode": "thr.attendance.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [

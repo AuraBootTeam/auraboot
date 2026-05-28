@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "gp.task.manage"
+          "permissionCode": "gp.task.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -54,7 +55,8 @@
               "code": "edit",
               "action": "edit",
               "navigateTo": "gp_task_comment_form",
-              "permissionCode": "gp.task.manage"
+              "permissionCode": "gp.task.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -62,9 +64,11 @@
               "danger": true,
               "commandCode": "gp:delete_task_comment",
               "permissionCode": "gp.task.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "defaultSort": {

@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "tcrm.lead.manage"
+          "permissionCode": "tcrm.lead.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -136,13 +137,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "tcrm_lead_detail"
+              "navigateTo": "tcrm_lead_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "tcrm_lead_form",
-              "permissionCode": "tcrm.lead.manage"
+              "permissionCode": "tcrm.lead.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -150,9 +153,11 @@
               "danger": true,
               "commandCode": "tcrm:delete_lead",
               "permissionCode": "tcrm.lead.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [

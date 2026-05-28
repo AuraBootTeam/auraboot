@@ -34,22 +34,35 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tcrm.lead.manage"
+          "permissionCode": "tcrm.lead.manage",
+          "label": "$i18n:common.button.edit"
         },
         {
           "code": "contact_lead",
           "commandCode": "tcrm:contact_lead",
-          "permissionCode": "tcrm.lead.manage"
+          "permissionCode": "tcrm.lead.manage",
+          "label": {
+            "zh-CN": "标记已联系",
+            "en-US": "Mark Contacted"
+          }
         },
         {
           "code": "qualify_lead",
           "commandCode": "tcrm:qualify_lead",
-          "permissionCode": "tcrm.lead.manage"
+          "permissionCode": "tcrm.lead.manage",
+          "label": {
+            "zh-CN": "合格",
+            "en-US": "Qualify Lead"
+          }
         },
         {
           "code": "lose_lead",
           "commandCode": "tcrm:lose_lead",
-          "permissionCode": "tcrm.lead.manage"
+          "permissionCode": "tcrm.lead.manage",
+          "label": {
+            "zh-CN": "标记流失",
+            "en-US": "Mark Lost"
+          }
         },
         {
           "code": "delete",
@@ -57,7 +70,8 @@
           "danger": true,
           "commandCode": "tcrm:delete_lead",
           "permissionCode": "tcrm.lead.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": "$i18n:common.button.delete"
         }
       ],
       "area": "header"

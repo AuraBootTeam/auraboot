@@ -37,7 +37,8 @@
       "fields": [
         {
           "field": "tinv_wh_name",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "tinv_wh_manager",
@@ -62,11 +63,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "tinv:create_warehouse",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

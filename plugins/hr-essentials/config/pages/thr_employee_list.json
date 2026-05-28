@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "thr.employee.manage"
+          "permissionCode": "thr.employee.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -122,13 +123,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "thr_employee_detail"
+              "navigateTo": "thr_employee_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "thr_employee_form",
-              "permissionCode": "thr.employee.manage"
+              "permissionCode": "thr.employee.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -136,9 +139,11 @@
               "danger": true,
               "commandCode": "thr:delete_employee",
               "permissionCode": "thr.employee.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [

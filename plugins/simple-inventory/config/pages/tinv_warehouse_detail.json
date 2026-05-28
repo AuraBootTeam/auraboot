@@ -34,17 +34,26 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tinv.warehouse.manage"
+          "permissionCode": "tinv.warehouse.manage",
+          "label": "$i18n:common.button.edit"
         },
         {
           "code": "deactivate",
           "commandCode": "tinv:deactivate_warehouse",
-          "permissionCode": "tinv.warehouse.manage"
+          "permissionCode": "tinv.warehouse.manage",
+          "label": {
+            "zh-CN": "停用",
+            "en-US": "Deactivate"
+          }
         },
         {
           "code": "activate",
           "commandCode": "tinv:activate_warehouse",
-          "permissionCode": "tinv.warehouse.manage"
+          "permissionCode": "tinv.warehouse.manage",
+          "label": {
+            "zh-CN": "启用",
+            "en-US": "Activate"
+          }
         },
         {
           "code": "delete",
@@ -52,7 +61,8 @@
           "danger": true,
           "commandCode": "tinv:delete_warehouse",
           "permissionCode": "tinv.warehouse.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": "$i18n:common.button.delete"
         }
       ],
       "area": "header"

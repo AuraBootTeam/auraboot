@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "tcrm.opportunity.manage"
+          "permissionCode": "tcrm.opportunity.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -145,13 +146,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "tcrm_opportunity_detail"
+              "navigateTo": "tcrm_opportunity_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "tcrm_opportunity_form",
-              "permissionCode": "tcrm.opportunity.manage"
+              "permissionCode": "tcrm.opportunity.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -159,9 +162,11 @@
               "danger": true,
               "commandCode": "tcrm:delete_opportunity",
               "permissionCode": "tcrm.opportunity.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [

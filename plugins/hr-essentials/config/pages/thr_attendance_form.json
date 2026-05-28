@@ -37,11 +37,13 @@
       "fields": [
         {
           "field": "thr_at_employee_id",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "thr_at_date",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "thr_at_check_in",
@@ -81,11 +83,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "thr:create_attendance",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

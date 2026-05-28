@@ -37,7 +37,8 @@
       "fields": [
         {
           "field": "tcrm_ct_name",
-          "colSpan": 6
+          "colSpan": 6,
+          "required": true
         },
         {
           "field": "tcrm_ct_account_id",
@@ -70,11 +71,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "tcrm:create_contact",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

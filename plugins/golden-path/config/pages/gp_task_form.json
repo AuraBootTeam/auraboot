@@ -37,7 +37,8 @@
       "fields": [
         {
           "field": "gp_task_title",
-          "colSpan": 12
+          "colSpan": 12,
+          "required": true
         },
         {
           "field": "gp_task_priority",
@@ -77,11 +78,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "gp:create_task",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"

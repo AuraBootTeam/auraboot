@@ -37,7 +37,8 @@
       "fields": [
         {
           "field": "tinv_pd_name",
-          "colSpan": 12
+          "colSpan": 12,
+          "required": true
         },
         {
           "field": "tinv_pd_category",
@@ -66,11 +67,13 @@
           "code": "submit",
           "action": "save",
           "commandCode": "tinv:create_product",
-          "primary": true
+          "primary": true,
+          "label": "$i18n:common.button.submit"
         },
         {
           "code": "cancel",
-          "action": "cancel"
+          "action": "cancel",
+          "label": "$i18n:common.button.cancel"
         }
       ],
       "area": "footer"
