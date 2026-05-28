@@ -2502,5 +2502,25 @@
     "key": "workbench.calendar.today",
     "zh-CN": "今天",
     "en-US": "Today"
+  },
+  {
+    "key": "workbench.title",
+    "zh-CN": "工作台",
+    "en-US": "Workbench"
+  },
+  {
+    "key": "workbench.subline",
+    "zh-CN": "概览",
+    "en-US": "Overview"
+  },
+  {
+    "key": "workbench.export",
+    "zh-CN": "导出",
+    "en-US": "Export"
+  },
+  {
+    "key": "workbench.new",
+    "zh-CN": "新建",
+    "en-US": "New"
   }
 ]
