@@ -13,6 +13,7 @@ import com.auraboot.framework.semantic.service.SemanticCatalogService;
 import com.auraboot.framework.semantic.service.SemanticLineageService;
 import com.auraboot.framework.semantic.service.SemanticPublishService;
 import com.auraboot.framework.semantic.service.SemanticQueryService;
+import com.auraboot.framework.userattribute.service.UserAttributeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -51,6 +52,7 @@ public class SemanticController {
     private final SemanticPublishService publishService;
     private final SemanticYamlParser parser;
     private final SemanticYamlValidator validator;
+    private final UserAttributeService userAttributeService;
 
     @PostMapping("/query")
     public SemanticQueryResponse query(@RequestBody SemanticQueryRequest request) {
@@ -116,11 +118,10 @@ public class SemanticController {
 
     private UserContext currentUser() {
         MetaContext ctx = MetaContext.get();
-        // v0.1 user_attributes are not yet loaded from a persistent store; pass
-        // an empty map. RLS access policies that depend on user_attributes will
-        // throw USER_ATTRIBUTE_MISSING — which is correct behavior until W4
-        // wiring of attributes is completed.
+        // B.3.1 — load user attributes from ab_user_attribute for RLS evaluation.
+        // Empty map if user has no attributes; access policies depending on
+        // unresolved keys still throw USER_ATTRIBUTE_MISSING (correct per PRD).
         return new UserContext(ctx.getUserId(), ctx.getTenantId(),
-                Collections.emptyMap());
+                userAttributeService.getAttributes(ctx.getTenantId(), ctx.getUserId()));
     }
 }
