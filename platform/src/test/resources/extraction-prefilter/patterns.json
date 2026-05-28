@@ -1,0 +1,76 @@
+{
+  "version": "0.1.0",
+  "description": "Spike-4 phase 1 — deterministic patterns that rule-prefilter can catch without LLM. See docs/backlog/2026-05-28-spike-4-extraction-rule-prefilter-design.md §3.1.",
+  "patterns": [
+    {
+      "id": "p1-tool-record-user-preference",
+      "match": "tool_name_starts_with",
+      "match_value": "record_user_preference",
+      "memory_type": "PREFERENCE",
+      "title_template": "User preference: {field}",
+      "content_template": "{value}",
+      "importance": 5,
+      "rationale": "Explicit user-preference tool call — always extractable"
+    },
+    {
+      "id": "p2-tool-success-with-record-id",
+      "match": "response_field_present",
+      "match_value": "data.recordId",
+      "memory_type": "FACT",
+      "title_template": "Created {entity_type} {id}",
+      "content_template": "{tool_name} created {entity_type} record",
+      "importance": 3,
+      "rationale": "Recordable entity created — trivial FACT"
+    },
+    {
+      "id": "p3-tool-failure",
+      "match": "response_field_equals",
+      "match_value": "success=false",
+      "memory_type": "LESSON",
+      "title_template": "Failed: {tool_name}",
+      "content_template": "{error}",
+      "importance": 4,
+      "rationale": "Tool failure — LESSON for future avoidance"
+    },
+    {
+      "id": "p4-bpm-task-assigned",
+      "match": "event_type_equals",
+      "match_value": "task_assigned",
+      "memory_type": "FACT",
+      "title_template": "Assigned: {who} → {task}",
+      "content_template": "Task {task_title} assigned to {who}",
+      "importance": 3,
+      "rationale": "BPM assignment — FACT relationship"
+    },
+    {
+      "id": "p5-bpm-task-completed",
+      "match": "event_type_equals",
+      "match_value": "task_completed",
+      "memory_type": "LESSON",
+      "title_template": "Completed: {task}",
+      "content_template": "Outcome: {outcome}",
+      "importance": 4,
+      "rationale": "Task outcome — LESSON about flow"
+    },
+    {
+      "id": "p6-state-transition",
+      "match": "tool_name_starts_with",
+      "match_value": "update_status",
+      "memory_type": "FACT",
+      "title_template": "State: {entity} → {new_state}",
+      "content_template": "{entity} transitioned from {old_state} to {new_state}",
+      "importance": 2,
+      "rationale": "Status change — FACT about workflow"
+    },
+    {
+      "id": "p7-approval-decision",
+      "match": "tool_name_in",
+      "match_value": ["approve", "reject", "approve_request", "reject_request"],
+      "memory_type": "DECISION",
+      "title_template": "{tool_name} {entity}",
+      "content_template": "Reason: {reason}",
+      "importance": 6,
+      "rationale": "Approval/rejection — explicit DECISION"
+    }
+  ]
+}
