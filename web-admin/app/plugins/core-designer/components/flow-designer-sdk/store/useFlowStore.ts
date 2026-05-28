@@ -10,6 +10,27 @@ interface FlowSnapshot {
   edges: FlowEdge[];
 }
 
+/**
+ * B2c: Sub-flow drilldown frame.
+ *
+ * When a host (BPMN sub-process, CallActivity) navigates into a child
+ * graph, it pushes the OUTER (nodes, edges, selectedNodeId,
+ * selectedEdgeId) onto subFlowStack so the inner graph can use the
+ * primary `nodes`/`edges` slots. `popSubFlow` restores the outer frame.
+ *
+ * Frames also carry an opaque `parentNodeId` so callers can render
+ * breadcrumbs / annotate provenance.
+ */
+export interface SubFlowFrame {
+  parentNodeId: string;
+  /** Free-form label for breadcrumbs (e.g. sub-process name). */
+  label?: string;
+  outerNodes: FlowNode[];
+  outerEdges: FlowEdge[];
+  outerSelectedNodeId: string | null;
+  outerSelectedEdgeId: string | null;
+}
+
 interface FlowStoreState {
   // Data
   nodes: FlowNode[];
@@ -36,6 +57,28 @@ interface FlowStoreState {
   monitorData: FlowMonitorData;
   setMonitorMode: (enabled: boolean) => void;
   setMonitorData: (data: FlowMonitorData) => void;
+  /**
+   * B2c: derive the set of nodeIds currently in `running` status from
+   * monitorData. Used by BPMN UserTask monitor panel + canvas overlays
+   * to highlight active wait-states. Returns empty Set when monitorMode
+   * is off OR monitorData is empty.
+   */
+  getCurrentMonitorNodeIds: () => Set<string>;
+
+  // B2c: Sub-flow drilldown stack (BPMN sub-process / CallActivity).
+  // When non-empty, the visible (nodes, edges) belong to the innermost
+  // child frame; outer frames are stored top-to-bottom in subFlowStack.
+  subFlowStack: SubFlowFrame[];
+  pushSubFlow: (
+    parentNodeId: string,
+    innerNodes: FlowNode[],
+    innerEdges: FlowEdge[],
+    label?: string,
+  ) => void;
+  popSubFlow: () => void;
+  resetSubFlowStack: () => void;
+  /** Convenience selector — breadcrumb labels (oldest → newest). */
+  getSubFlowPath: () => Array<{ parentNodeId: string; label?: string }>;
 
   // Node operations
   addNode: (node: Omit<FlowNode, 'id'>) => string;
@@ -99,6 +142,75 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     monitorData: {},
     setMonitorMode: (enabled) => set({ monitorMode: enabled }),
     setMonitorData: (data) => set({ monitorData: data }),
+    getCurrentMonitorNodeIds: () => {
+      const { monitorMode, monitorData } = get();
+      if (!monitorMode) return new Set<string>();
+      const ids = new Set<string>();
+      for (const [nodeId, st] of Object.entries(monitorData)) {
+        if (st && st.status === 'running') ids.add(nodeId);
+      }
+      return ids;
+    },
+
+    subFlowStack: [],
+    pushSubFlow: (parentNodeId, innerNodes, innerEdges, label) => {
+      set((state) => {
+        const frame: SubFlowFrame = {
+          parentNodeId,
+          label,
+          outerNodes: state.nodes,
+          outerEdges: state.edges,
+          outerSelectedNodeId: state.selectedNodeId,
+          outerSelectedEdgeId: state.selectedEdgeId,
+        };
+        // Drilldown intentionally does NOT push a history snapshot — undo
+        // inside the inner graph should not pop the drilldown. Callers
+        // that want to track navigation separately can subscribe to
+        // subFlowStack.length.
+        return {
+          subFlowStack: [...state.subFlowStack, frame],
+          nodes: innerNodes,
+          edges: innerEdges,
+          selectedNodeId: null,
+          selectedEdgeId: null,
+          // history is per-frame: reset for the inner frame so undo
+          // stays scoped. We seed a single snapshot of the inner state
+          // so the first edit pushes onto a non-empty history.
+          history: [cloneSnapshot(innerNodes, innerEdges)],
+          historyIndex: 0,
+        };
+      });
+    },
+    popSubFlow: () => {
+      set((state) => {
+        if (state.subFlowStack.length === 0) return state;
+        const next = [...state.subFlowStack];
+        const frame = next.pop()!;
+        return {
+          subFlowStack: next,
+          nodes: frame.outerNodes,
+          edges: frame.outerEdges,
+          selectedNodeId: frame.outerSelectedNodeId,
+          selectedEdgeId: frame.outerSelectedEdgeId,
+          // Restore a fresh history for the outer frame. Outer-frame undo
+          // history is intentionally NOT preserved across drilldowns — the
+          // outer graph is treated as committed at drilldown time. Callers
+          // needing cross-frame undo should layer their own history above
+          // the SDK store.
+          history: [cloneSnapshot(frame.outerNodes, frame.outerEdges)],
+          historyIndex: 0,
+        };
+      });
+    },
+    resetSubFlowStack: () => {
+      set({ subFlowStack: [] });
+    },
+    getSubFlowPath: () => {
+      return get().subFlowStack.map((f) => ({
+        parentNodeId: f.parentNodeId,
+        label: f.label,
+      }));
+    },
 
     addNode: (node) => {
       const id = generateNodeId();
@@ -260,6 +372,7 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
         historyIndex: -1,
         monitorMode: false,
         monitorData: {},
+        subFlowStack: [],
       });
     },
 
