@@ -250,6 +250,12 @@ dependencies {
     // ULID
     implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
 
+    // TDengine JDBC driver for TimeSeriesPort SPI (M1.A.3).
+    // Pulled in transitively only when the iot-tdengine bean profile is
+    // active; HikariCP + spring-jdbc come from spring-boot-starter-jdbc
+    // already on the classpath.
+    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.3.3'
+
     // Micrometer Prometheus registry for metrics export
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
