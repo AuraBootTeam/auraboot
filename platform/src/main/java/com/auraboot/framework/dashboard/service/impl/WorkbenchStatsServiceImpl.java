@@ -10,6 +10,7 @@ import com.auraboot.framework.dashboard.dto.WorkbenchStatsDTO.StatItem;
 import com.auraboot.framework.dashboard.service.WorkbenchStatsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -91,11 +92,49 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
                 "SELECT COUNT(*) FROM ab_inbox_item WHERE status = ? AND user_id = ? AND tenant_id = ?",
                 StatusConstants.PENDING, userId, tenantId
         );
+        WorkbenchStatsDTO.Series series = computeInboxPendingSeries(tenantId, userId);
         return StatItem.builder()
                 .value(count)
                 .label("workbench.stats.inbox_pending")
                 .format(FORMAT_NUMBER)
+                .series(series)
                 .build();
+    }
+
+    /**
+     * Compute the last-7-day daily count of pending inbox items for the current user/tenant.
+     * Returns null on any query failure — the surrounding method is non-transactional and the
+     * sparkline data is optional, so we fail soft rather than break the whole stats response.
+     * <p>
+     * CATCH: non-transactional read-only query — sparkline data is optional and must not
+     * cause the stats endpoint to fail when the history query has issues.
+     */
+    private WorkbenchStatsDTO.Series computeInboxPendingSeries(Long tenantId, Long userId) {
+        try {
+            String sql = "SELECT COALESCE(c.cnt, 0) AS cnt " +
+                    "FROM generate_series(current_date - interval '6 day', current_date, interval '1 day') AS d " +
+                    "LEFT JOIN (" +
+                    "  SELECT DATE(created_at) AS day, COUNT(*) AS cnt " +
+                    "  FROM ab_inbox_item " +
+                    "  WHERE status = ? AND user_id = ? AND tenant_id = ? " +
+                    "    AND created_at >= current_date - interval '6 day' " +
+                    "  GROUP BY DATE(created_at)" +
+                    ") c ON c.day = d::date " +
+                    "ORDER BY d ASC";
+            List<Long> points = jdbcTemplate.queryForList(
+                    sql, Long.class, StatusConstants.PENDING, userId, tenantId
+            );
+            if (points == null || points.size() != 7) {
+                return null;
+            }
+            return WorkbenchStatsDTO.Series.builder()
+                    .period("day")
+                    .points(new ArrayList<>(points))
+                    .build();
+        } catch (DataAccessException e) {
+            log.debug("Failed to compute inbox_pending series: {}", e.getMessage());
+            return null;
+        }
     }
 
     private StatItem computeInboxUrgent(Long tenantId, Long userId) {
