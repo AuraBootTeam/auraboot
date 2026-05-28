@@ -386,6 +386,26 @@ public class ModelCreateSkill implements AuraBotSkill {
      * the exception silently elsewhere.
      */
     public SkillResult undoByModel(String modelPid, String modelCode) {
+        // Defensive input validation — the SQL emit sites below use string
+        // concatenation because DynamicDataMapper.alterTable accepts only
+        // raw SQL strings (no MyBatis `?` parameterization for DDL). Today
+        // the inputs are upstream-validated:
+        //   - modelCode passes paramsSchema regex ^[a-zA-Z][a-zA-Z0-9_]*$
+        //   - modelPid is sourced from a SkillRun row's beforeSnapshot (ULID)
+        // Both assumptions can drift if a future caller bypasses the validator
+        // (CLI tool, REST script, repair endpoint). Re-validate here so the
+        // concat sites stay safe regardless of caller. See deep-review
+        // 2026-05-28-aurabot-deep-review.md §1 P2 ModelCreateSkill SQL concat.
+        if (modelCode == null || !modelCode.matches("^[a-zA-Z][a-zA-Z0-9_]{0,62}$")) {
+            throw new SkillSpiException(SkillErrorCode.PARAMS_INVALID,
+                    "modelCode must match ^[a-zA-Z][a-zA-Z0-9_]{0,62}$ (defensive re-validation): " + modelCode,
+                    "/modelCode");
+        }
+        if (modelPid == null || !modelPid.matches("^[0-9A-HJKMNP-TV-Z]{26}$")) {
+            throw new SkillSpiException(SkillErrorCode.PARAMS_INVALID,
+                    "modelPid must be a 26-char ULID (defensive re-validation): " + modelPid,
+                    "/modelPid");
+        }
         String tableName = "mt_" + modelCode;
 
         // 1. Data-loss guard: refuse if any rows exist on the physical table.

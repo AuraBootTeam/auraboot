@@ -45,9 +45,24 @@ import java.util.stream.Collectors;
  * appear in the supplied user-permission set. Empty
  * {@code requiredPermissions()} → always visible.
  *
- * <p>The registry is intentionally <em>immutable</em> after bootstrap:
- * dynamic plugin add/remove is out of scope for SPI v1; PF4J-loaded skills
+ * <p>The registry has no <em>runtime mutation</em> API — there is no
+ * {@code register(skill)} / {@code unregister(name)} surface. Dynamic plugin
+ * add/remove at request time is out of scope for SPI v1; PF4J-loaded skills
  * still arrive as Spring beans before {@code ContextRefreshedEvent} fires.
+ *
+ * <p>The registry IS, however, <em>rebuilt</em> on every
+ * {@link ContextRefreshedEvent} — Spring may publish multiple refresh events
+ * (test context refresh, hierarchical contexts) and {@link #onContextRefreshed}
+ * is annotated with {@code @EventListener} to react to each. This is the
+ * intentional behavior documented in that method: the registry rebuilds from
+ * the (possibly different) bean set rather than memoising. So "immutable
+ * after bootstrap" is true for production runtime (no further refresh events
+ * fire there); in test contexts where refresh CAN re-fire, the registry is
+ * <em>idempotent</em> rather than literally immutable.
+ *
+ * <p>This Javadoc was corrected 2026-05-28 to match the
+ * {@code onContextRefreshed} comment after the
+ * {@code docs/backlog/2026-05-28-acp-agent-deep-review.md} P2 drift finding.
  */
 @Slf4j
 @Component
