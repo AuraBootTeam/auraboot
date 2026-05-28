@@ -33,7 +33,7 @@ dependencies {
     compileOnly 'org.springframework:spring-context:6.2.18'
 
     // SLF4J for @Slf4j
-    compileOnly 'org.slf4j:slf4j-api:2.0.17'
+    compileOnly 'org.slf4j:slf4j-api:2.0.18'
 
     // Test — platform core interfaces (MqProvider, MqMessageHandler) without transitive deps
     testImplementation(project(':')) { transitive = false }
