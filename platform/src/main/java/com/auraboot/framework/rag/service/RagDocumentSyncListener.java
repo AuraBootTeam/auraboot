@@ -13,8 +13,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.support.TransactionTemplate;
+import jakarta.annotation.PostConstruct;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -34,6 +38,36 @@ public class RagDocumentSyncListener {
     private final ChunkingService chunkingService;
     private final EmbeddingService embeddingService;
     private final JdbcTemplate jdbcTemplate;
+    private final PlatformTransactionManager txManager;
+    /**
+     * REQUIRES_NEW template for {@link #syncToRag} atomicity. The
+     * {@code @TransactionalEventListener AFTER_COMMIT} above does NOT open
+     * a tx for the listener body, and {@code syncToRag} is invoked via
+     * self-call (line 199) which bypasses Spring's @Transactional proxy.
+     * TransactionTemplate is the only correct way to wrap the 6-write
+     * sequence (delete chunks → delete doc → insert doc → insert N
+     * chunks → update embeddings → refresh counters) atomically. See
+     * deep-review P2-1.
+     */
+    private TransactionTemplate syncToRagTx;
+
+    @PostConstruct
+    void initTx() {
+        this.syncToRagTx = new TransactionTemplate(txManager);
+        // PROPAGATION_REQUIRED — join existing tx if present, otherwise
+        // open new one. The two callers:
+        //  (1) @Async @TransactionalEventListener AFTER_COMMIT → runs on a
+        //      different thread WITHOUT an existing tx → REQUIRED creates a
+        //      new tx, achieving atomicity for the 6 writes (the deep-review
+        //      P2-1 fix intent).
+        //  (2) Direct test invocation inside BaseIntegrationTest @Transactional
+        //      → joins the test tx, sees test's uncommitted seed rows, gets
+        //      rolled back as part of @Rollback(true) for clean test isolation.
+        // REQUIRES_NEW would break (2) because PG READ COMMITTED hides the
+        // test's uncommitted seeds from the nested tx → sync sees no source
+        // record and exits early.
+        this.syncToRagTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+    }
 
     private static final String RAG_KB_NAME = "Document Knowledge Base";
     private static final String SOURCE_TYPE = "entity";
@@ -72,13 +106,31 @@ public class RagDocumentSyncListener {
 
     /**
      * Sync document content to RAG. Public for direct invocation in tests.
+     *
+     * <p>Wrapped in {@link #syncToRagTx} (REQUIRED) — the
+     * {@code @TransactionalEventListener AFTER_COMMIT} above does NOT open
+     * a tx for the listener body, so without explicit wrapping the
+     * 6 writes (delete chunks → delete doc → insert doc → insert N
+     * chunks → update embeddings → refresh counters) had no atomicity.
+     * Partial failure left orphan / inconsistent rows. {@code @Transactional}
+     * cannot be used here because this method is self-invoked from
+     * {@link #handleCreateOrUpdate} which bypasses the Spring proxy. See
+     * deep-review P2-1. See {@link #initTx} for the REQUIRED vs
+     * REQUIRES_NEW choice (REQUIRED preserves test rollback semantics).
      */
     public void syncToRag(Long tenantId, String modelCode, String recordId) {
+        syncToRagTx.executeWithoutResult(status -> syncToRagInternal(tenantId, modelCode, recordId));
+    }
+
+    /** Actual sync logic — runs inside the {@link #syncToRagTx} boundary. */
+    private void syncToRagInternal(Long tenantId, String modelCode, String recordId) {
         String[] fieldMapping = SYNCABLE_MODELS.get(modelCode);
         if (fieldMapping == null) return;
 
         Map<String, Object> record = readRecord(modelCode, recordId, tenantId);
-        System.out.println("[RAG-SYNC-DEBUG] readRecord result for " + modelCode + ":" + recordId + " tenant=" + tenantId + " => " + (record != null ? "found(" + record.size() + " keys)" : "null"));
+        log.debug("RAG sync readRecord modelCode={} recordId={} tenant={} found={}",
+                modelCode, recordId, tenantId,
+                record == null ? "null" : (record.size() + " keys"));
         if (record == null) {
             log.debug("Record not found for RAG sync: {}:{}", modelCode, recordId);
             return;
