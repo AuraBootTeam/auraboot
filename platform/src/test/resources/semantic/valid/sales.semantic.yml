@@ -1,0 +1,129 @@
+version: "0.1"
+
+semantic_model:
+  code: sales
+  label:
+    zh-CN: 销售
+    en-US: Sales
+  description: Unified semantic model for sales orders and invoices.
+  model_ref: ord_sales_order
+  primary_entity: order_id
+
+entities:
+  - name: order_id
+    type: primary
+    field_ref: id
+  - name: customer_id
+    type: foreign
+    field_ref: customer_id
+    relation: customer.id
+  - name: product_id
+    type: foreign
+    field_ref: product_id
+    relation: product.id
+
+dimensions:
+  - code: order_date
+    label:
+      zh-CN: 下单日期
+      en-US: Order Date
+    field_ref: order_date
+    type: time
+    time_grains: [day, week, month, quarter, year]
+    primary_time: true
+
+  - code: region
+    label:
+      zh-CN: 区域
+      en-US: Region
+    field_ref: region_code
+    type: categorical
+
+  - code: status
+    label:
+      zh-CN: 订单状态
+      en-US: Status
+    field_ref: status
+    type: categorical
+
+  - code: channel
+    label:
+      zh-CN: 渠道
+      en-US: Channel
+    field_ref: channel_code
+    type: categorical
+
+measures:
+  - code: order_amount
+    label:
+      zh-CN: 订单金额
+      en-US: Order Amount
+    agg: SUM
+    field_ref: amount
+
+  - code: order_count
+    label:
+      zh-CN: 订单数
+      en-US: Order Count
+    agg: COUNT
+    expr: "*"
+
+  - code: paid_order_count
+    label:
+      zh-CN: 已付款订单数
+      en-US: Paid Order Count
+    agg: COUNT
+    expr: "CASE WHEN status = 'PAID' THEN 1 END"
+
+  - code: unique_customers
+    label:
+      zh-CN: 独立客户数
+      en-US: Unique Customers
+    agg: COUNT_DISTINCT
+    field_ref: customer_id
+
+metrics:
+  - code: total_sales
+    label:
+      zh-CN: 销售总额
+      en-US: Total Sales
+    description: Total amount of orders not cancelled.
+    type: simple
+    type_params:
+      measure: order_amount
+    filter: "status != 'CANCELLED'"
+    required_permissions: [sales.read]
+
+  - code: paid_conversion_rate
+    label:
+      zh-CN: 付款转化率
+      en-US: Paid Conversion Rate
+    description: Ratio of paid orders to total orders.
+    type: ratio
+    type_params:
+      numerator: paid_order_count
+      denominator: order_count
+
+  - code: ytd_sales
+    label:
+      zh-CN: 年累计销售
+      en-US: YTD Sales
+    type: cumulative
+    type_params:
+      measure: order_amount
+      window: ytd
+
+  - code: avg_order_value
+    label:
+      zh-CN: 客单价
+      en-US: Average Order Value
+    description: Total sales divided by order count.
+    type: derived
+    type_params:
+      expr: "{total_sales} / {order_count}"
+
+access_policies:
+  - access_grant: sales_regional
+    user_attribute: allowed_regions
+    target_dimensions: [region]
+    sql_filter: "region_code IN ({user.allowed_regions})"

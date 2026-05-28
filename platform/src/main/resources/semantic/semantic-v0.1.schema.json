@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auraboot.io/schema/semantic/v0.1.json",
+  "title": "AuraBoot Semantic Layer YAML v0.1",
+  "description": "Schema for *.semantic.yml files declaring metrics, dimensions, and access policies. See PRD 16 §3.",
+  "type": "object",
+  "required": ["version", "semantic_model", "entities", "dimensions", "measures", "metrics"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "0.1",
+      "description": "Schema version. Must be \"0.1\" in v0.1."
+    },
+    "semantic_model": {
+      "type": "object",
+      "required": ["code", "model_ref", "primary_entity"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Unique snake_case identifier within plugin"
+        },
+        "label": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "model_ref": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Reference to MetaModel.code"
+        },
+        "primary_entity": {
+          "type": "string",
+          "description": "Name of the primary entity (must appear in entities[])"
+        }
+      }
+    },
+    "entities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Entity" }
+    },
+    "dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Dimension" }
+    },
+    "measures": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Measure" }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Metric" }
+    },
+    "access_policies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/AccessPolicy" }
+    }
+  },
+  "$defs": {
+    "LocalizedText": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z]{2}(-[A-Z]{2})?$": { "type": "string", "minLength": 1, "maxLength": 256 }
+      },
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "i18n map. Keys are BCP-47 tags (zh-CN, en-US, etc.)"
+    },
+    "Entity": {
+      "type": "object",
+      "required": ["name", "type", "field_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["primary", "foreign", "natural"]
+        },
+        "field_ref": {
+          "type": "string",
+          "description": "MetaField.code in the referenced model"
+        },
+        "relation": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+          "description": "Cross-model relationship, format: <model_code>.<field_code>"
+        }
+      }
+    },
+    "Dimension": {
+      "type": "object",
+      "required": ["code", "type", "field_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "maxLength": 128
+        },
+        "label": { "$ref": "#/$defs/LocalizedText" },
+        "description": { "type": "string", "maxLength": 1000 },
+        "type": {
+          "type": "string",
+          "enum": ["time", "categorical", "numeric", "boolean"]
+        },
+        "field_ref": { "type": "string" },
+        "time_grains": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["day", "week", "month", "quarter", "year"] },
+          "uniqueItems": true
+        },
+        "primary_time": {
+          "type": "boolean",
+          "description": "Exactly one dimension per model may set primary_time=true"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "time" } }, "required": ["type"] },
+          "then": { "required": ["time_grains"] }
+        },
+        {
+          "if": { "properties": { "primary_time": { "const": true } }, "required": ["primary_time"] },
+          "then": { "properties": { "type": { "const": "time" } } }
+        }
+      ]
+    },
+    "Measure": {
+      "type": "object",
+      "required": ["code", "agg"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "maxLength": 128
+        },
+        "label": { "$ref": "#/$defs/LocalizedText" },
+        "agg": {
+          "type": "string",
+          "enum": ["SUM", "COUNT", "AVG", "MAX", "MIN", "COUNT_DISTINCT"]
+        },
+        "field_ref": { "type": "string" },
+        "expr": {
+          "type": "string",
+          "description": "SQL fragment, may be \"*\" for COUNT(*) or a column expression. NEVER may contain ;/--/UNION/DROP — validated by SemanticValidator."
+        }
+      },
+      "anyOf": [
+        { "required": ["field_ref"] },
+        { "required": ["expr"] }
+      ]
+    },
+    "Metric": {
+      "type": "object",
+      "required": ["code", "type", "type_params"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "maxLength": 128
+        },
+        "label": { "$ref": "#/$defs/LocalizedText" },
+        "description": { "type": "string", "maxLength": 2000 },
+        "type": {
+          "type": "string",
+          "enum": ["simple", "ratio", "cumulative", "derived", "conversion"]
+        },
+        "type_params": {
+          "type": "object",
+          "description": "Shape depends on type. See $defs.MetricTypeParams.*"
+        },
+        "filter": {
+          "type": "string",
+          "description": "Optional SQL WHERE fragment using only declared dimensions/measures. SemanticValidator enforces whitelist."
+        },
+        "required_permissions": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$" },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "simple" } }, "required": ["type"] },
+          "then": { "properties": { "type_params": { "$ref": "#/$defs/SimpleTypeParams" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "ratio" } }, "required": ["type"] },
+          "then": { "properties": { "type_params": { "$ref": "#/$defs/RatioTypeParams" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "cumulative" } }, "required": ["type"] },
+          "then": { "properties": { "type_params": { "$ref": "#/$defs/CumulativeTypeParams" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "derived" } }, "required": ["type"] },
+          "then": { "properties": { "type_params": { "$ref": "#/$defs/DerivedTypeParams" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "conversion" } }, "required": ["type"] },
+          "then": { "properties": { "type_params": { "$ref": "#/$defs/ConversionTypeParams" } } }
+        }
+      ]
+    },
+    "SimpleTypeParams": {
+      "type": "object",
+      "required": ["measure"],
+      "additionalProperties": false,
+      "properties": {
+        "measure": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+      }
+    },
+    "RatioTypeParams": {
+      "type": "object",
+      "required": ["numerator", "denominator"],
+      "additionalProperties": false,
+      "properties": {
+        "numerator": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "denominator": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+      }
+    },
+    "CumulativeTypeParams": {
+      "type": "object",
+      "required": ["measure", "window"],
+      "additionalProperties": false,
+      "properties": {
+        "measure": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "window": {
+          "type": "string",
+          "enum": ["ytd", "mtd", "qtd", "running"]
+        }
+      }
+    },
+    "DerivedTypeParams": {
+      "type": "object",
+      "required": ["expr"],
+      "additionalProperties": false,
+      "properties": {
+        "expr": {
+          "type": "string",
+          "pattern": "^[\\s\\w{}+\\-*/().,]+$",
+          "description": "Expression with {metric_code} placeholders. Allowed chars: word, whitespace, {}+-*/.,()."
+        }
+      }
+    },
+    "ConversionTypeParams": {
+      "type": "object",
+      "required": ["base_measure", "conversion_measure", "entity", "window"],
+      "additionalProperties": false,
+      "properties": {
+        "base_measure": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "conversion_measure": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "entity": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "window": {
+          "type": "string",
+          "pattern": "^\\d+[dhwmy]$",
+          "description": "Duration like 30d, 24h, 4w, 6m, 1y"
+        }
+      }
+    },
+    "AccessPolicy": {
+      "type": "object",
+      "required": ["access_grant", "user_attribute"],
+      "additionalProperties": false,
+      "properties": {
+        "access_grant": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "user_attribute": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Must match an existing UserAttribute code"
+        },
+        "allowed_values": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "target_dimensions": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "uniqueItems": true
+        },
+        "sql_filter": {
+          "type": "string",
+          "description": "SQL WHERE fragment. Only {user.<attr>} placeholders allowed. NEVER contains ;/--/UNION/DROP — validator enforces whitelist."
+        }
+      }
+    }
+  }
+}

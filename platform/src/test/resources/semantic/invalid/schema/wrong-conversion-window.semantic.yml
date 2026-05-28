@@ -1,0 +1,16 @@
+version: "0.1"
+semantic_model:
+  code: bad
+  model_ref: foo
+  primary_entity: id
+entities: [{name: id, type: primary, field_ref: id}]
+dimensions: [{code: d, type: categorical, field_ref: d}]
+measures: [{code: m, agg: COUNT, expr: "*"}]
+metrics:
+  - code: conv
+    type: conversion
+    type_params:
+      base_measure: m
+      conversion_measure: m
+      entity: id
+      window: thirty-days
