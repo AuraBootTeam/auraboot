@@ -1,0 +1,104 @@
+version: "0.1"
+
+semantic_model:
+  code: inventory
+  label:
+    zh-CN: 库存
+    en-US: Inventory
+  description: Stock level snapshots and movement transactions.
+  model_ref: inv_stock_movement
+  primary_entity: movement_id
+
+entities:
+  - name: movement_id
+    type: primary
+    field_ref: id
+  - name: product_id
+    type: foreign
+    field_ref: product_id
+    relation: product.id
+  - name: warehouse_id
+    type: foreign
+    field_ref: warehouse_id
+    relation: warehouse.id
+
+dimensions:
+  - code: movement_date
+    label:
+      zh-CN: 出入库日期
+    field_ref: movement_date
+    type: time
+    time_grains: [day, week, month, quarter, year]
+    primary_time: true
+
+  - code: warehouse_code
+    label:
+      zh-CN: 仓库
+    field_ref: warehouse_code
+    type: categorical
+
+  - code: movement_type
+    label:
+      zh-CN: 出入库类型
+    field_ref: movement_type
+    type: categorical
+    description: IN / OUT / TRANSFER / ADJUSTMENT
+
+  - code: product_category
+    label:
+      zh-CN: 产品类目
+    field_ref: product_category
+    type: categorical
+
+measures:
+  - code: quantity_in
+    label:
+      zh-CN: 入库数量
+    agg: SUM
+    expr: "CASE WHEN movement_type = 'IN' THEN quantity ELSE 0 END"
+
+  - code: quantity_out
+    label:
+      zh-CN: 出库数量
+    agg: SUM
+    expr: "CASE WHEN movement_type = 'OUT' THEN quantity ELSE 0 END"
+
+  - code: movement_count
+    agg: COUNT
+    expr: "*"
+
+metrics:
+  - code: net_inventory_change
+    label:
+      zh-CN: 净库存变动
+    type: derived
+    type_params:
+      expr: "{total_in} - {total_out}"
+
+  - code: total_in
+    label:
+      zh-CN: 入库总量
+    type: simple
+    type_params:
+      measure: quantity_in
+
+  - code: total_out
+    label:
+      zh-CN: 出库总量
+    type: simple
+    type_params:
+      measure: quantity_out
+
+  - code: ytd_net_change
+    label:
+      zh-CN: 年初至今净变动
+    type: cumulative
+    type_params:
+      measure: quantity_in
+      window: ytd
+
+access_policies:
+  - access_grant: warehouse_scope
+    user_attribute: warehouse_codes
+    target_dimensions: [warehouse_code]
+    sql_filter: "warehouse_code IN ({user.warehouse_codes})"
