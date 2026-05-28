@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -38,6 +39,9 @@ public class WorkbenchStatsDTO {
 
         /** Optional trend indicator */
         private Trend trend;
+
+        /** Optional time series (e.g. 7 daily snapshots) for sparkline rendering. Null when no history is available. */
+        private Series series;
     }
 
     @Data
@@ -56,5 +60,17 @@ public class WorkbenchStatsDTO {
 
         /** Unit of the trend value, e.g. "percent", "absolute" */
         private String unit;
+    }
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class Series {
+        /** Granularity: "day" | "week" | "month". This round only emits "day". */
+        private String period;
+
+        /** Oldest → newest. For "day"/7 this is 7 entries; numeric only. */
+        private List<Number> points;
     }
 }
