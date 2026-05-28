@@ -76,6 +76,20 @@ public class AutomationProcessRuntime {
      * variable consumed by {@link AutomationActionServiceTaskDelegate}.
      */
     public void run(Automation automation, String recordId, Map<String, Object> triggerPayload) {
+        run(automation, recordId, triggerPayload, null);
+    }
+
+    /**
+     * Run overload that also threads an {@code automationLogId} through as a process
+     * variable. The {@link AutomationActionServiceTaskDelegate} uses it to insert
+     * per-node execution rows into {@code ab_automation_node_execution} that link
+     * back to the parent {@code ab_automation_log} row (G5 runtime overlay).
+     *
+     * <p>Passing {@code null} disables per-node recording — useful for synthetic /
+     * test contexts that have no log row.
+     */
+    public void run(Automation automation, String recordId,
+                    Map<String, Object> triggerPayload, Long automationLogId) {
         AutomationFlowCompiler.CompiledFlow compiled = compiler.compile(automation);
 
         Map<String, Object> variables = new HashMap<>();
@@ -86,6 +100,13 @@ public class AutomationProcessRuntime {
             variables.put("recordId", recordId);
         }
         variables.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, compiled.actionsByNodeId());
+        if (automationLogId != null) {
+            variables.put(AutomationActionServiceTaskDelegate.LOG_ID_VAR, automationLogId);
+        }
+        variables.put(AutomationActionServiceTaskDelegate.AUTOMATION_ID_VAR, automation.getPid());
+        if (automation.getTenantId() != null) {
+            variables.put(AutomationActionServiceTaskDelegate.TENANT_ID_VAR, automation.getTenantId());
+        }
 
         // The trigger path runs on @Async("eventTaskExecutor") threads that may not carry
         // a MetaContext; startProcess needs the tenant. Set it from the automation when absent.

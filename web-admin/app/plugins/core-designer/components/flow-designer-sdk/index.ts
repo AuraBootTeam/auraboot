@@ -80,3 +80,14 @@ export type {
 } from './nodes/types';
 
 export type { FlowEdgeDefinition, EdgePropertyEditorProps } from './edges/types';
+
+// Runtime status overlay (G5)
+export {
+  NodeRuntimeStatusProvider,
+  useNodeRuntimeStatus,
+  useNodeRuntimeStatusMap,
+} from './runtime/NodeRuntimeStatusContext';
+export type {
+  NodeRuntimeStatus,
+  NodeStatusMap,
+} from './runtime/NodeRuntimeStatusContext';
