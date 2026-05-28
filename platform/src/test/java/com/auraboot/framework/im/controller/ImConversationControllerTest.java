@@ -185,6 +185,46 @@ class ImConversationControllerTest {
     }
 
     @Test
+    void renameConversationBroadcastsBothLegacyAndNewEvents() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+
+        // Mock: existing conversation with name "OldName"
+        com.auraboot.framework.im.model.ImConversation existing = new com.auraboot.framework.im.model.ImConversation();
+        existing.setName("OldName");
+        org.mockito.Mockito.when(conversationService.getById(88L, 7L)).thenReturn(existing);
+
+        com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m2 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m2.setMemberId(22L); m2.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L)).thenReturn(List.of(m1, m2));
+
+        com.auraboot.framework.im.dto.ConversationUpdateRequest req = new com.auraboot.framework.im.dto.ConversationUpdateRequest();
+        req.setName("NewName");
+        controller.updateConversation(88L, req);
+
+        // Legacy event still fires
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(11L, 22L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_CONVERSATION_UPDATED),
+            org.mockito.ArgumentMatchers.any()
+        );
+        // New rename event
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(11L, 22L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_CONVERSATION_RENAMED),
+            org.mockito.ArgumentMatchers.argThat(p ->
+                p.get("conversationId").equals(88L) &&
+                "OldName".equals(p.get("oldName")) &&
+                "NewName".equals(p.get("newName")) &&
+                p.get("byUserId").equals(11L) &&
+                "alice".equals(p.get("byUserName"))
+            )
+        );
+    }
+
+    @Test
     void dissolveGroupBroadcastsBothLegacyAndNewEvents() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
         ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);

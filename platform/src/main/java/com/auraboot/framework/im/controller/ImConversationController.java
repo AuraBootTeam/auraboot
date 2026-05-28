@@ -211,14 +211,34 @@ public class ImConversationController {
     public ApiResponse<Void> updateConversation(@PathVariable Long id,
                                                   @RequestBody ConversationUpdateRequest request) {
         Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
+
+        // Capture old name BEFORE the update (for rename event payload)
+        String oldName = null;
+        boolean isRename = request.getName() != null && !request.getName().isBlank();
+        if (isRename) {
+            oldName = conversationService.getById(id, tenantId).getName();
+        }
+
         conversationService.updateConversation(id, request, userId, tenantId);
+
         List<Long> humanMemberIds = conversationService.getMembers(id, tenantId).stream()
                 .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
                 .map(ConversationMemberInfo::getMemberId).toList();
-        if (request.getName() != null && !request.getName().isBlank()) {
+
+        if (isRename) {
+            // Legacy event for older iOS clients
             webSocketHandler.broadcastEvent(humanMemberIds, ImConstants.WS_CONVERSATION_UPDATED,
                     Map.of("conversationId", id, "name", request.getName()));
+            // New rename event with old/new name and actor context
+            Map<String, Object> renamePayload = new HashMap<>();
+            renamePayload.put("conversationId", id);
+            renamePayload.put("oldName", oldName);
+            renamePayload.put("newName", request.getName());
+            renamePayload.put("byUserId", userId);
+            renamePayload.put("byUserName", userName);
+            webSocketHandler.broadcastEvent(humanMemberIds, ImConstants.WS_CONVERSATION_RENAMED, renamePayload);
         }
         return ApiResponse.success(null);
     }
