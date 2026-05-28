@@ -28,6 +28,9 @@ class ImConversationControllerTest {
     @Mock
     private ImWebSocketHandler webSocketHandler;
 
+    @Mock
+    private com.auraboot.framework.im.service.ImMessageService messageService;
+
     @AfterEach
     void tearDown() {
         MetaContext.clear();
@@ -36,7 +39,7 @@ class ImConversationControllerTest {
     @Test
     void addMembersAcceptsLegacyHumanArrayBody() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "tester");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
         JsonNode body = OBJECT_MAPPER.readTree("[101,102]");
 
         controller.addMembers(88L, body);
@@ -48,7 +51,7 @@ class ImConversationControllerTest {
     @Test
     void addMembersAcceptsHumanAndAgentObjectBody() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "tester");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
         JsonNode body = OBJECT_MAPPER.readTree("{\"memberIds\":[101],\"agentIds\":[201,202]}");
 
         controller.addMembers(88L, body);
@@ -60,7 +63,7 @@ class ImConversationControllerTest {
     @Test
     void removeMemberBroadcastsSelfKickedAndMemberRemoved() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
 
         // After remove, getMembers returns 3 remaining humans (11, 33, 44); 22 was removed
         com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
@@ -104,7 +107,7 @@ class ImConversationControllerTest {
     @Test
     void removeAgentMemberDoesNotBroadcastSelfKicked() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
 
         com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
         m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
@@ -130,7 +133,7 @@ class ImConversationControllerTest {
     @Test
     void addMembersBroadcastsMemberAddedToAllHumanMembers() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "tester");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
         JsonNode body = OBJECT_MAPPER.readTree("{\"memberIds\":[101,102],\"agentIds\":[201]}");
 
         com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
@@ -164,7 +167,7 @@ class ImConversationControllerTest {
     @Test
     void leaveGroupBroadcastsMemberLeftWithUserName() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
 
         com.auraboot.framework.im.dto.ConversationMemberInfo m3 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
         m3.setMemberId(33L); m3.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
@@ -187,7 +190,7 @@ class ImConversationControllerTest {
     @Test
     void renameConversationBroadcastsBothLegacyAndNewEvents() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
 
         // Mock: existing conversation with name "OldName"
         com.auraboot.framework.im.model.ImConversation existing = new com.auraboot.framework.im.model.ImConversation();
@@ -227,7 +230,7 @@ class ImConversationControllerTest {
     @Test
     void dissolveGroupBroadcastsBothLegacyAndNewEvents() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
         org.mockito.Mockito.when(conversationService.dissolveGroup(88L, 11L, 7L))
             .thenReturn(List.of(11L, 22L, 33L));
 

@@ -9,7 +9,9 @@ import com.auraboot.framework.im.dto.ConversationMemberInfo;
 import com.auraboot.framework.im.dto.ConversationUpdateRequest;
 import com.auraboot.framework.im.model.ImConstants;
 import com.auraboot.framework.im.model.ImConversation;
+import com.auraboot.framework.im.message.ImSystemMessageBuilder;
 import com.auraboot.framework.im.service.ImConversationService;
+import com.auraboot.framework.im.service.ImMessageService;
 import com.auraboot.framework.im.websocket.ImWebSocketHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
@@ -26,11 +28,14 @@ public class ImConversationController {
 
     private final ImConversationService conversationService;
     private final ImWebSocketHandler webSocketHandler;
+    private final ImMessageService messageService;
 
     public ImConversationController(ImConversationService conversationService,
-                                     ImWebSocketHandler webSocketHandler) {
+                                     ImWebSocketHandler webSocketHandler,
+                                     ImMessageService messageService) {
         this.conversationService = conversationService;
         this.webSocketHandler = webSocketHandler;
+        this.messageService = messageService;
     }
 
     @GetMapping
