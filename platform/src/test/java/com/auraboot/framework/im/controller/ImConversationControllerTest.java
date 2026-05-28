@@ -160,4 +160,27 @@ class ImConversationControllerTest {
             )
         );
     }
+
+    @Test
+    void leaveGroupBroadcastsMemberLeftWithUserName() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+
+        com.auraboot.framework.im.dto.ConversationMemberInfo m3 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m3.setMemberId(33L); m3.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m3));
+
+        controller.leaveGroup(88L);
+
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(33L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_MEMBER_LEFT),
+            org.mockito.ArgumentMatchers.argThat(p ->
+                p.get("conversationId").equals(88L) &&
+                p.get("userId").equals(11L) &&
+                "alice".equals(p.get("userName"))
+            )
+        );
+    }
 }

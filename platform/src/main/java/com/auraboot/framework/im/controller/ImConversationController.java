@@ -191,8 +191,11 @@ public class ImConversationController {
             List<Long> remainingHumanIds = remaining.stream()
                     .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
                     .map(ConversationMemberInfo::getMemberId).toList();
-            webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_LEFT,
-                    Map.of("conversationId", id, "userId", userId));
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("userId", userId);
+            payload.put("userName", MetaContext.getCurrentUsername());
+            webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_LEFT, payload);
         }
         return ApiResponse.success(null);
     }
