@@ -228,6 +228,43 @@ class ImConversationControllerTest {
     }
 
     @Test
+    void addMembersAlsoWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+        JsonNode body = OBJECT_MAPPER.readTree("{\"memberIds\":[101,102]}");
+
+        com.auraboot.framework.im.dto.ConversationMemberInfo m11 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m11.setMemberId(11L); m11.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m11.setName("alice");
+        com.auraboot.framework.im.dto.ConversationMemberInfo m101 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m101.setMemberId(101L); m101.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m101.setName("Bob");
+        com.auraboot.framework.im.dto.ConversationMemberInfo m102 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m102.setMemberId(102L); m102.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m102.setName("Carol");
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m11, m101, m102));
+
+        controller.addMembers(88L, body);
+
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(content);
+                    return ImConstants.SYS_MEMBER_JOINED.equals(root.get("subType").asText())
+                        && root.get("params").get("memberIds").size() == 2
+                        && root.get("params").get("memberIds").get(0).asLong() == 101L
+                        && root.get("params").get("memberNames").get(0).asText().equals("Bob")
+                        && root.get("params").get("byUserId").asLong() == 11L
+                        && "alice".equals(root.get("params").get("byUserName").asText());
+                } catch (Exception e) { return false; }
+            }),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+    }
+
+    @Test
     void dissolveGroupBroadcastsBothLegacyAndNewEvents() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
         ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);

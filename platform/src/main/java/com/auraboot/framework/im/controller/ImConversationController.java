@@ -94,10 +94,13 @@ public class ImConversationController {
         conversationService.addMembers(id, memberIds, tenantId);
         conversationService.addAgentMembers(id, agentIds, tenantId);
 
-        // Broadcast member_added to all current human members (including newly added)
-        List<Long> recipientHumanIds = conversationService.getMembers(id, tenantId).stream()
+        // Single fetch — used for both broadcast and system message
+        List<ConversationMemberInfo> currentMembers = conversationService.getMembers(id, tenantId);
+        List<Long> recipientHumanIds = currentMembers.stream()
                 .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
                 .map(ConversationMemberInfo::getMemberId).toList();
+
+        // Broadcast member_added to all current human members (including newly added)
         if (!recipientHumanIds.isEmpty() && (!memberIds.isEmpty() || !agentIds.isEmpty())) {
             Map<String, Object> payload = new HashMap<>();
             payload.put("conversationId", id);
@@ -107,6 +110,20 @@ public class ImConversationController {
             payload.put("byUserName", userName);
             webSocketHandler.broadcastEvent(recipientHumanIds, ImConstants.WS_MEMBER_ADDED, payload);
         }
+
+        // Write system message for newly added human members (batch variant)
+        if (!memberIds.isEmpty()) {
+            List<Long> newHumanIds = memberIds;
+            List<String> newNames = currentMembers.stream()
+                    .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType())
+                                  && newHumanIds.contains(m.getMemberId()))
+                    .map(m -> resolveName(m, m.getMemberId()))
+                    .toList();
+            String sysContent = ImSystemMessageBuilder.memberJoinedBatch(
+                    newHumanIds, newNames, userId, userName);
+            messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
+        }
+
         return ApiResponse.success(null);
     }
 
@@ -248,6 +265,16 @@ public class ImConversationController {
             webSocketHandler.broadcastEvent(humanMemberIds, ImConstants.WS_CONVERSATION_RENAMED, renamePayload);
         }
         return ApiResponse.success(null);
+    }
+
+    /**
+     * Resolve a human-readable name for a member info. Falls back to displayName, then "User#<id>".
+     */
+    private static String resolveName(ConversationMemberInfo info, Long fallbackId) {
+        if (info == null) return "User#" + fallbackId;
+        if (info.getName() != null && !info.getName().isBlank()) return info.getName();
+        if (info.getDisplayName() != null && !info.getDisplayName().isBlank()) return info.getDisplayName();
+        return "User#" + fallbackId;
     }
 
     private List<Long> readIdList(JsonNode body, String fieldName, boolean readRootArray) {
