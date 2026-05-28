@@ -33,6 +33,24 @@ export { validateFlow } from './validation/validateFlow';
 export type { ValidateFlowOptions } from './validation/validateFlow';
 export { useFlowValidation } from './validation/useFlowValidation';
 
+// A1: unified GraphDocument grammar — JSON Schema, structural validator,
+// and divergence diff utility
+// (spec: docs/backlog/2026-05-23-unified-graph-grammar-spec.md).
+export {
+  graphDocumentSchema,
+  GRAPH_DOCUMENT_SCHEMA_VERSION,
+} from './validation/graphDocumentSchema';
+export { validateGraphDocument } from './validation/validateGraphDocument';
+export type {
+  GraphDocumentValidationError,
+  GraphDocumentValidationResult,
+} from './validation/validateGraphDocument';
+export { diffGraphDocuments } from './validation/diffGraphDocuments';
+export type {
+  GrammarDivergence,
+  DiffReport,
+} from './validation/diffGraphDocuments';
+
 // Types
 export type {
   FlowNode,
