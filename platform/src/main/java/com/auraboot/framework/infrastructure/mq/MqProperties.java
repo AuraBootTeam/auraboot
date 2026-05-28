@@ -27,6 +27,27 @@ public class MqProperties {
     public static class Kafka {
         private String bootstrapServers = "localhost:9092";
         private String consumerGroup = "aura-group";
+        private DeadLetter deadLetter = new DeadLetter();
+        private SchemaRegistry schemaRegistry = new SchemaRegistry();
+
+        @Data
+        public static class DeadLetter {
+            /** Enable DLQ routing for consumer handler failures. */
+            private boolean enabled = true;
+            /** Suffix appended to original topic to form the DLT topic. */
+            private String topicSuffix = ".DLT";
+            /** Number of delivery attempts (including the first) before routing to DLT. */
+            private int maxAttempts = 3;
+        }
+
+        @Data
+        public static class SchemaRegistry {
+            /**
+             * Schema registry URL (e.g. Apicurio). When blank, plain string mode is used (default).
+             * Concrete clients are wired via the {@code KafkaSchemaRegistryClient} SPI.
+             */
+            private String url = "";
+        }
     }
 
     @Data

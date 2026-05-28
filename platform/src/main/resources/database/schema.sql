@@ -9226,3 +9226,44 @@ CREATE INDEX IF NOT EXISTS idx_automation_node_exec_pi
 COMMENT ON TABLE ab_automation_node_execution IS
     'Per-node execution status for an automation run; powers the designer runtime overlay (G5).';
 
+-- ---------------------------------------------------------------------
+-- 2026-05-28 connector CDC SPI (PRD 18 §B.3.3)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ab_connector_sync_run (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(32) UNIQUE NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    connector_pid VARCHAR(32) NOT NULL,
+    trigger_type VARCHAR(16) NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMPTZ,
+    status VARCHAR(16) NOT NULL,
+    records_read INTEGER,
+    records_written INTEGER,
+    records_failed INTEGER,
+    error_message TEXT,
+    cursor_state JSONB,
+    duration_ms INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_sync_connector ON ab_connector_sync_run (connector_pid, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sync_status ON ab_connector_sync_run (status, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS ab_connector_cdc_engine (
+    id BIGSERIAL PRIMARY KEY,
+    pid VARCHAR(32) UNIQUE NOT NULL,
+    connector_pid VARCHAR(32) NOT NULL,
+    status VARCHAR(16),
+    last_position JSONB,
+    last_event_at TIMESTAMPTZ,
+    worker_node VARCHAR(64),
+    heartbeat_at TIMESTAMPTZ,
+    meta JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_cdc_engine_connector ON ab_connector_cdc_engine (connector_pid);
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ab_connector') THEN
+        EXECUTE 'ALTER TABLE ab_connector ADD COLUMN IF NOT EXISTS sync_strategy VARCHAR(32)';
+        EXECUTE 'ALTER TABLE ab_connector ADD COLUMN IF NOT EXISTS cdc_config_json JSONB';
+        EXECUTE 'ALTER TABLE ab_connector ADD COLUMN IF NOT EXISTS schedule_cron VARCHAR(64)';
