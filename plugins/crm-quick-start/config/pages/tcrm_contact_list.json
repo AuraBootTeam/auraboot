@@ -20,7 +20,8 @@
           "code": "create",
           "action": "create",
           "primary": true,
-          "permissionCode": "tcrm.contact.manage"
+          "permissionCode": "tcrm.contact.manage",
+          "label": "$i18n:common.button.create"
         }
       ],
       "area": "toolbar"
@@ -62,13 +63,15 @@
             {
               "code": "view",
               "action": "detail",
-              "navigateTo": "tcrm_contact_detail"
+              "navigateTo": "tcrm_contact_detail",
+              "label": "$i18n:common.button.view"
             },
             {
               "code": "edit",
               "action": "edit",
               "navigateTo": "tcrm_contact_form",
-              "permissionCode": "tcrm.contact.manage"
+              "permissionCode": "tcrm.contact.manage",
+              "label": "$i18n:common.button.edit"
             },
             {
               "code": "delete",
@@ -76,9 +79,11 @@
               "danger": true,
               "commandCode": "tcrm:delete_contact",
               "permissionCode": "tcrm.contact.manage",
-              "confirmMessageKey": "delete.confirm"
+              "confirmMessageKey": "delete.confirm",
+              "label": "$i18n:common.button.delete"
             }
-          ]
+          ],
+          "label": "$i18n:common.actions"
         }
       ],
       "searchFields": [

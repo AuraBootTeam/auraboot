@@ -34,27 +34,44 @@
         {
           "code": "edit",
           "action": "edit",
-          "permissionCode": "tcrm.opportunity.manage"
+          "permissionCode": "tcrm.opportunity.manage",
+          "label": "$i18n:common.button.edit"
         },
         {
           "code": "advance_to_proposal",
           "commandCode": "tcrm:advance_to_proposal",
-          "permissionCode": "tcrm.opportunity.manage"
+          "permissionCode": "tcrm.opportunity.manage",
+          "label": {
+            "zh-CN": "推进到报价",
+            "en-US": "Advance to Proposal"
+          }
         },
         {
           "code": "advance_to_negotiation",
           "commandCode": "tcrm:advance_to_negotiation",
-          "permissionCode": "tcrm.opportunity.manage"
+          "permissionCode": "tcrm.opportunity.manage",
+          "label": {
+            "zh-CN": "推进到谈判",
+            "en-US": "Advance to Negotiation"
+          }
         },
         {
           "code": "win_opportunity",
           "commandCode": "tcrm:win_opportunity",
-          "permissionCode": "tcrm.opportunity.manage"
+          "permissionCode": "tcrm.opportunity.manage",
+          "label": {
+            "zh-CN": "赢单",
+            "en-US": "Close Won"
+          }
         },
         {
           "code": "lose_opportunity",
           "commandCode": "tcrm:lose_opportunity",
-          "permissionCode": "tcrm.opportunity.manage"
+          "permissionCode": "tcrm.opportunity.manage",
+          "label": {
+            "zh-CN": "丢单",
+            "en-US": "Close Lost"
+          }
         },
         {
           "code": "delete",
@@ -62,7 +79,8 @@
           "danger": true,
           "commandCode": "tcrm:delete_opportunity",
           "permissionCode": "tcrm.opportunity.manage",
-          "confirmMessageKey": "delete.confirm"
+          "confirmMessageKey": "delete.confirm",
+          "label": "$i18n:common.button.delete"
         }
       ],
       "area": "header"
