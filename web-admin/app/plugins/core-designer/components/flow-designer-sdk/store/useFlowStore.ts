@@ -58,7 +58,8 @@ interface FlowStoreState {
   setDirty: (dirty: boolean) => void;
 }
 
-const generateId = () => `node_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+const generateNodeId = () => `node_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+const generateEdgeId = () => `edge_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
 function cloneSnapshot(nodes: FlowNode[], edges: FlowEdge[]): FlowSnapshot {
   return JSON.parse(JSON.stringify({ nodes, edges }));
@@ -88,7 +89,7 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     historyIndex: -1,
 
     addNode: (node) => {
-      const id = generateId();
+      const id = generateNodeId();
       set((state) => {
         const newNodes = [...state.nodes, { ...node, id }];
         const snapshot = pushSnapshot(newNodes, state.edges);
@@ -139,7 +140,7 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     },
 
     addEdge: (edge) => {
-      const id = `edge_${Date.now()}`;
+      const id = generateEdgeId();
       set((state) => {
         const newEdges = [...state.edges, { ...edge, id }];
         const snapshot = pushSnapshot(state.nodes, newEdges);
