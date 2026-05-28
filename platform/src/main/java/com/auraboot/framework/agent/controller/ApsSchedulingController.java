@@ -50,6 +50,33 @@ public class ApsSchedulingController {
     }
 
     /**
+     * Run scheduling via the multi-strategy {@link com.auraboot.module.aps.engine.SchedulingEngine} (V2).
+     *
+     * @param horizon scheduling horizon in days (default 30, range 1-365)
+     * @param strategy strategy bean name; one of: forwardFifo / forwardEdd / backward / bottleneckFirst / genetic
+     */
+    @PostMapping("/schedule/v2")
+    public ApiResponse<Map<String, Object>> runScheduleV2(
+            @RequestParam(value = "horizon", defaultValue = "30") int horizon,
+            @RequestParam(value = "strategy", defaultValue = "forwardFifo") String strategy) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            return ApiResponse.error("Tenant context not found");
+        }
+        if (horizon < 1 || horizon > 365) {
+            return ApiResponse.error("Horizon must be between 1 and 365 days");
+        }
+        try {
+            log.info("Running APS V2 scheduling: tenant={}, horizon={}, strategy={}", tenantId, horizon, strategy);
+            Map<String, Object> result = apsSchedulingService.runScheduleV2(tenantId, horizon, strategy);
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("APS V2 scheduling failed for tenant {}: {}", tenantId, e.getMessage(), e);
+            return ApiResponse.error("Scheduling failed: " + e.getMessage());
+        }
+    }
+
+    /**
      * Clear all SCHEDULED results for the current tenant (to allow re-scheduling).
      *
      * @return cleared count
