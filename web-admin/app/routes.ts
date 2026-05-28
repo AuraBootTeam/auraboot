@@ -36,38 +36,13 @@ export default [
     route('/admin/*', './routes/admin.$.tsx'),
   ]),
 
-  // Merchant runtime shell. Commerce plugins can later contribute concrete
-  // merchant routes without reusing the platform admin sidebar.
-  layout('./routes/MerchantLayout.tsx', [
-    route('/merchant', './commerce/merchant/MerchantHome.tsx'),
-    route('/merchant/*', './commerce/merchant/MerchantHome.tsx', { id: 'merchant-splat' }),
-  ]),
-
-  // Public storefront runtime shell.
-  layout('./routes/StorefrontLayout.tsx', [
-    route('/s/:storeHandle', './commerce/storefront/StorefrontPage.tsx', { id: 'storefront-home' }),
-    route('/s/:storeHandle/*', './commerce/storefront/StorefrontPage.tsx', {
-      id: 'storefront-splat',
-    }),
-  ]),
-
-  // Public checkout runtime shell.
-  layout('./routes/CheckoutLayout.tsx', [
-    route('/checkout/:checkoutId', './commerce/checkout/CheckoutFlow.tsx', { id: 'checkout-home' }),
-    route('/checkout/:checkoutId/*', './commerce/checkout/CheckoutFlow.tsx', {
-      id: 'checkout-splat',
-    }),
-  ]),
-
-  // Authenticated theme preview shell for Theme Designer integration.
-  layout('./routes/ThemePreviewLayout.tsx', [
-    route('/theme-preview/:themeId', './commerce/theme-preview/ThemePreviewPage.tsx', {
-      id: 'theme-preview-home',
-    }),
-    route('/theme-preview/:themeId/*', './commerce/theme-preview/ThemePreviewPage.tsx', {
-      id: 'theme-preview-splat',
-    }),
-  ]),
+  // Commerce runtime shells (Merchant / Storefront / Checkout / Theme Preview)
+  // were temporarily scaffolded here as part of an early commerce-on-platform
+  // experiment. They have been moved out to the standalone commerce/ product
+  // repo (AuraBootTeam/commerce). The multi-runtime kernel itself
+  // (~/framework/runtime, RuntimeProfile type, FederationManager profile
+  // gating, AdminLayout) stays in OSS because it serves any future product
+  // built on AuraBoot, not commerce specifically.
 
   // Legacy main app layout — core routes only in OSS; enterprise overlay injects more.
   layout('./routes/DefaultLayout.tsx', [index('./routes/_index.tsx'), ...coreRoutes()]),
