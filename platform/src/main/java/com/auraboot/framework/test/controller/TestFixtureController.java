@@ -895,14 +895,35 @@ public class TestFixtureController {
         Long tenantId = tenant.getId();
         Long userId   = user.getId();
 
-        // Create or resolve second chat member for group conversation
-        String chatMemberEmail = "e2e_chat_member_" + System.currentTimeMillis() + "@test.local";
-        var chatUser = userService.findByEmail(chatMemberEmail);
+        // Resolve or create a stable second "colleague" user so that user-search
+        // (which excludes self) returns at least one result. Using a deterministic
+        // email avoids recreating on every fixture call.
+        final String chatColleagueEmail = "e2e_chat_user@test.local";
+        var chatUser = userService.findByEmail(chatColleagueEmail);
         if (chatUser == null) {
-            // User doesn't exist, create a new one (simplified creation)
-            // This would need userService.createUser() or equivalent
-            // For now, try to reuse or skip if creation is not available
-            log.warn("Chat member user not found, using primary user for group members");
+            try {
+                chatUser = userService.signUp(chatColleagueEmail, "E2eChatUser2026!", "E2E Chat User");
+                log.info("Chat colleague user created: userId={}", chatUser.getId());
+            } catch (Exception ex) {
+                log.warn("Could not create chat colleague user: {} — will use primary user for members", ex.getMessage());
+            }
+        }
+        // Ensure colleague is a member of the test tenant
+        if (chatUser != null) {
+            try {
+                var memberService = applicationContext.getBean("tenantMemberService");
+                java.lang.reflect.Method findMember = memberService.getClass()
+                        .getMethod("findByTenantIdAndUserId", Long.class, Long.class);
+                Object existing = findMember.invoke(memberService, tenantId, chatUser.getId());
+                if (existing == null) {
+                    java.lang.reflect.Method addMember = memberService.getClass()
+                            .getMethod("addMember", Long.class, Long.class, String.class);
+                    addMember.invoke(memberService, chatUser.getId(), tenantId, "active");
+                    log.info("Chat colleague added as tenant member: tenantId={}, userId={}", tenantId, chatUser.getId());
+                }
+            } catch (Exception ex) {
+                log.warn("Could not add chat colleague to tenant: {}", ex.getMessage());
+            }
         }
         Long chatUserId = chatUser != null ? chatUser.getId() : userId;
 

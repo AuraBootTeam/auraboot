@@ -58,6 +58,13 @@ public class TestSeedController {
     private static final String TEST_USER_EMAIL = "e2e@test.local";
     private static final String TEST_USER_PASSWORD = "E2eTestPass2026!";
     private static final String TEST_USER_DISPLAY_NAME = "E2E Test Admin";
+
+    // Stable second member so user-search (which excludes self) returns at least one result.
+    // Required for iOS testCreateOneOnOneChat / testSelectMentionUserInsertsTag and
+    // Android ChatSearchAndContactsTest.contactsSearchReturnsResults.
+    private static final String TEST_CHAT_USER_EMAIL = "e2e_chat_user@test.local";
+    private static final String TEST_CHAT_USER_PASSWORD = "E2eChatUser2026!";
+    private static final String TEST_CHAT_USER_DISPLAY_NAME = "E2E Chat User";
     private static final List<String> KNOWN_E2E_FIXTURE_MODELS = List.of(
             "e2et_record",
             "e2et_order",
@@ -161,6 +168,10 @@ public class TestSeedController {
         ensureModelPermissionsExist(tenant, user);
         installE2eTestPlugin(tenant, user);
         repairDynamicTableIdentitySequences(tenant);
+
+        // 5.6 Ensure a second "colleague" user exists in the test tenant so that
+        // mobile user-search (which excludes self) returns at least one result.
+        ensureChatColleagueExists(tenant, user);
 
         // 6. Generate JWT
         String jwt = generateJwt(user, tenant.getId());
@@ -950,6 +961,37 @@ public class TestSeedController {
         long ts = Instant.now().getEpochSecond();
         String hex = String.format("%04x", new SecureRandom().nextInt(0xFFFF));
         return platform + "_" + ts + "_" + hex;
+    }
+
+    /**
+     * Ensure a stable "colleague" user exists in the test tenant so that mobile
+     * user-search (which excludes self) returns at least one result for the primary
+     * test user. Required for iOS testCreateOneOnOneChat /
+     * testSelectMentionUserInsertsTag and Android contactsSearchReturnsResults.
+     * <p>
+     * This is idempotent: if the colleague already exists and is already a member
+     * of the tenant, it returns immediately without making any writes.
+     */
+    private void ensureChatColleagueExists(Tenant tenant, User primaryUser) {
+        try {
+            User colleague = userService.findByEmail(TEST_CHAT_USER_EMAIL);
+            if (colleague == null) {
+                colleague = userService.signUp(
+                        TEST_CHAT_USER_EMAIL, TEST_CHAT_USER_PASSWORD, TEST_CHAT_USER_DISPLAY_NAME);
+                log.info("E2E chat colleague created: userId={}, email={}", colleague.getId(), TEST_CHAT_USER_EMAIL);
+            }
+            TenantMember existingMember = tenantMemberService.findByTenantIdAndUserId(
+                    tenant.getId(), colleague.getId());
+            if (existingMember == null) {
+                tenantMemberService.addMember(colleague.getId(), tenant.getId(), "active");
+                log.info("E2E chat colleague added to tenant: tenantId={}, userId={}",
+                        tenant.getId(), colleague.getId());
+            }
+        } catch (Exception e) {
+            // Non-fatal: log a warning. The primary flow must not be broken by
+            // a colleague-creation failure.
+            log.warn("Failed to ensure E2E chat colleague ({}): {}", TEST_CHAT_USER_EMAIL, e.getMessage());
+        }
     }
 
     /**
