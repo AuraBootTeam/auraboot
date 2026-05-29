@@ -72,6 +72,16 @@ jobs:
         working-directory: platform
         run: chmod +x ./gradlew
 
+      # Validate canonical schema.sql in a real Postgres container before
+      # anything else, so a syntax error (unterminated DO $$, etc.) fails
+      # the PR loudly instead of cascading silently into reset-db.sh,
+      # docker-compose isolated stacks, and dev onboarding.
+      #
+      # Rationale: scripts/check-schema-sql.sh + ida/docs/26-schema-sql-governance.md
+      - name: schema.sql syntax + apply gate
+        if: steps.changes.outputs.run == 'true'
+        run: scripts/check-schema-sql.sh
+
       - name: Compile (main + test sources)
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
