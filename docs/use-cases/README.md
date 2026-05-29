@@ -2,8 +2,9 @@
 
 AuraBoot powers solutions across industries. Each use case below shows how a business application can be assembled through JSON DSL configuration, with custom code reserved for the parts that truly need it.
 
-**Concise versions on the docs site** — eight of the scenarios below have polished, bilingual (EN + zh-CN) summaries on the public documentation site, each anchored to AuraBoot's six concepts (Model / Page / Command / Permission / Process / Plugin):
+**Concise versions on the docs site** — all sixteen scenarios below now have polished, bilingual (EN + zh-CN) summaries on the public documentation site, each anchored to AuraBoot's six concepts (Model / Page / Command / Permission / Process / Plugin):
 
+**Foundational**:
 - [PCBA Manufacturing](https://docs.auraboot.com/en/use-cases/pcba) — [zh](https://docs.auraboot.com/zh-CN/use-cases/pcba)
 - [Manufacturing](https://docs.auraboot.com/en/use-cases/manufacturing) — [zh](https://docs.auraboot.com/zh-CN/use-cases/manufacturing)
 - [CRM](https://docs.auraboot.com/en/use-cases/crm) — [zh](https://docs.auraboot.com/zh-CN/use-cases/crm)
@@ -12,6 +13,16 @@ AuraBoot powers solutions across industries. Each use case below shows how a bus
 - [Compliance & Risk](https://docs.auraboot.com/en/use-cases/compliance) — [zh](https://docs.auraboot.com/zh-CN/use-cases/compliance)
 - [Asset Management](https://docs.auraboot.com/en/use-cases/asset) — [zh](https://docs.auraboot.com/zh-CN/use-cases/asset)
 - [Knowledge Base](https://docs.auraboot.com/en/use-cases/knowledge-base) — [zh](https://docs.auraboot.com/zh-CN/use-cases/knowledge-base)
+
+**Extended**:
+- [AI Agent Platform](https://docs.auraboot.com/en/use-cases/ai-agent-platform) — [zh](https://docs.auraboot.com/zh-CN/use-cases/ai-agent-platform)
+- [AuraBot CI Workbench](https://docs.auraboot.com/en/use-cases/aurabot-ci-workbench) — [zh](https://docs.auraboot.com/zh-CN/use-cases/aurabot-ci-workbench)
+- [Finance](https://docs.auraboot.com/en/use-cases/finance) — [zh](https://docs.auraboot.com/zh-CN/use-cases/finance)
+- [HR Leave Management](https://docs.auraboot.com/en/use-cases/hr-leave) — [zh](https://docs.auraboot.com/zh-CN/use-cases/hr-leave)
+- [Logistics](https://docs.auraboot.com/en/use-cases/logistics) — [zh](https://docs.auraboot.com/zh-CN/use-cases/logistics)
+- [Project Management](https://docs.auraboot.com/en/use-cases/project-management) — [zh](https://docs.auraboot.com/zh-CN/use-cases/project-management)
+- [Sales](https://docs.auraboot.com/en/use-cases/sales) — [zh](https://docs.auraboot.com/zh-CN/use-cases/sales)
+- [Warehouse](https://docs.auraboot.com/en/use-cases/warehouse) — [zh](https://docs.auraboot.com/zh-CN/use-cases/warehouse)
 
 The pages below stay as the source-of-truth working notes — exhaustive, model-by-model, and intended for contributors building plugins. The docs-site versions are the concise public-facing summaries.
 
