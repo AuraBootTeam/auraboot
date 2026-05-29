@@ -52,4 +52,19 @@ public final class ImConstants {
     public static final String SYS_CONVERSATION_DISSOLVED = "conversation_dissolved";
     public static final String SYS_CONVERSATION_ARCHIVED = "conversation_archived";
     public static final String SYS_CONVERSATION_PINNED_MSG = "conversation_pinned_msg";
+
+    // WebSocket event types for AI streaming turns (G1)
+    public static final String WS_AI_TURN_STARTED = "ai_turn_started";
+    public static final String WS_STREAM_CHUNK = "stream_chunk";
+    public static final String WS_STREAM_END = "stream_end";
+    public static final String WS_AI_TURN_COMPLETED = "ai_turn_completed";
+    public static final String WS_AI_TURN_FAILED = "ai_turn_failed";
+    public static final String WS_AI_TURN_CANCELLED = "ai_turn_cancelled";
+
+    // AI turn error codes (G1)
+    public static final String AI_ERR_SAFETY_REFUSAL = "SAFETY_REFUSAL";
+    public static final String AI_ERR_RATE_LIMITED = "RATE_LIMITED";
+    public static final String AI_ERR_UPSTREAM_TIMEOUT = "UPSTREAM_TIMEOUT";
+    public static final String AI_ERR_INTERNAL = "INTERNAL_ERROR";
+    public static final String AI_ERR_CANCELLED = "CANCELLED";
 }
