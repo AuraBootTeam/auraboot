@@ -5,12 +5,12 @@
  * instanceStatus in the store, or null when not in monitor mode.
  */
 
-import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { useBpmFlowStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 import type { NodeMonitorStatus } from '~/plugins/core-designer/components/bpmn-designer/types';
 
 export function useNodeMonitorStatus(nodeId: string): NodeMonitorStatus | null {
-  const viewMode = useBPMNStore((s) => s.viewMode);
-  const instanceStatus = useBPMNStore((s) => s.instanceStatus);
+  const viewMode = useBpmFlowStore((s) => s.viewMode);
+  const instanceStatus = useBpmFlowStore((s) => s.instanceStatus);
 
   if (viewMode !== 'monitor' || !instanceStatus) {
     return null;

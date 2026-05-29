@@ -25,7 +25,7 @@ import {
   InclusiveGatewayNode,
   CallActivityNode,
 } from '~/plugins/core-designer/components/bpmn-designer/components/nodes';
-import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { useBpmFlowStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 import { BPMNNodeType, type BPMNNode, type BPMNEdge } from '~/plugins/core-designer/components/bpmn-designer/types';
 import {
   getProcessDefinitionByKey,
@@ -77,7 +77,7 @@ export function ProcessStatusViewer({
   const [instanceStatus, setInstanceStatus] = useState<ProcessInstanceNodeStatus | null>(null);
   const [selectedNodeDetail, setSelectedNodeDetail] = useState<NodeDetail | null>(null);
 
-  const store = useBPMNStore;
+  const store = useBpmFlowStore;
 
   // Load data on mount
   useEffect(() => {
