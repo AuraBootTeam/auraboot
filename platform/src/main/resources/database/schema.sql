@@ -9291,6 +9291,9 @@ BEGIN
         EXECUTE 'ALTER TABLE ab_connector ADD COLUMN IF NOT EXISTS sync_strategy VARCHAR(32)';
         EXECUTE 'ALTER TABLE ab_connector ADD COLUMN IF NOT EXISTS cdc_config_json JSONB';
         EXECUTE 'ALTER TABLE ab_connector ADD COLUMN IF NOT EXISTS schedule_cron VARCHAR(64)';
+    END IF;
+END $$;
+
 -- ============================================================================
 -- 2026-05-29 — User Attributes for Semantic Layer RLS (B.3.1)
 -- ============================================================================
