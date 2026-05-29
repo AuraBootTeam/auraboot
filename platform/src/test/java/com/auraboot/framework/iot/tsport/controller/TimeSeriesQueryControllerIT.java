@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -118,7 +119,7 @@ class TimeSeriesQueryControllerIT {
 
         port = new TDengineTimeSeriesPort(ds);
         port.ensureSuperTable();
-        service = new TimeSeriesQueryService(port);
+        service = new TimeSeriesQueryService(Optional.of(port));
     }
 
     @AfterAll
