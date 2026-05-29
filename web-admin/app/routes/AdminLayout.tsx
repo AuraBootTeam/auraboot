@@ -54,7 +54,7 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      <div className="flex h-screen pt-16">
+      <div className="flex h-screen pt-14">
         <LeftSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
         <div className="flex flex-1 flex-col overflow-hidden" data-print="content">

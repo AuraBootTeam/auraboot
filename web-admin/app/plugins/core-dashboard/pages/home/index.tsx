@@ -69,26 +69,29 @@ export default function WorkbenchPage() {
     );
   }
 
+  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
   return (
-    <div className="h-full w-full px-5 py-4">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">
-          {t('workbench.pageTitle')}
-        </h1>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={loadWorkbench}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M13.5 3v4h-4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {t('workbench.refresh')}
+    <div className="px-8 py-6 bg-[#fafbfc] dark:bg-gray-900 min-h-full">
+      <header className="flex items-end justify-between mb-6">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+            {t('workbench.title')}
+          </h1>
+          <div data-testid="workbench-subline" className="text-[13px] text-gray-500 mt-1">
+            {todayLabel} · {t('workbench.subline')}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" className="px-3.5 py-2 rounded-md border border-[#e3e8ee] bg-white text-[13px] font-medium text-gray-900 hover:border-[#cdd5df] dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100">
+            {t('workbench.export')}
+          </button>
+          <button type="button" className="px-3.5 py-2 rounded-md bg-[#635bff] text-[13px] font-medium text-white hover:bg-[#534eeb]">
+            + {t('workbench.new')}
           </button>
         </div>
-      </div>
+      </header>
+
       <DashboardViewer
         widgets={dashboard.widgets}
         layoutConfig={dashboard.layoutConfig}

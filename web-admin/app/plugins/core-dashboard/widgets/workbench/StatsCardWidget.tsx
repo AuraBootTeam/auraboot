@@ -1,63 +1,53 @@
 /**
- * StatsCardWidget — Single standalone stat card with gradient background.
+ * StatsCardWidget — Single neutral stat card with optional sparkline.
  *
- * Same visual as one cell in StatsRowWidget but usable independently.
- * Fetches from /api/workbench/stats?keys={statKey}.
+ * Visual contract (2026-05 redesign):
+ *   - White surface with 1px border, no gradient background.
+ *   - Label (uppercase, 11px) above large value.
+ *   - Sparkline + trend text in the footer row.
  *
- * Props (passed via widget config):
- *   statKey: string     — which stat to display
- *   gradient?: string   — color theme (blue, amber, emerald, violet, etc.)
- *   linkTo?: string     — optional URL to navigate on click
+ * The `gradient` prop is accepted for backward compatibility with existing
+ * Dashboard JSON but no longer has any visual effect.
  *
- * @since 6.5.0
+ * @since 6.5.0  introduced
+ * @since 6.6.0  redesigned (gradient removed, sparkline added)
  */
 
 import React from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useWorkbenchStats } from './useWorkbenchStats';
+import { Sparkline } from './Sparkline';
 import type { StatItem } from './workbench-types';
 
-const GRADIENT_MAP: Record<string, string> = {
-  blue: 'bg-gradient-to-br from-blue-500 to-blue-700',
-  amber: 'bg-gradient-to-br from-amber-500 to-amber-700',
-  emerald: 'bg-gradient-to-br from-emerald-500 to-emerald-700',
-  violet: 'bg-gradient-to-br from-violet-500 to-violet-700',
-  rose: 'bg-gradient-to-br from-rose-500 to-rose-700',
-  cyan: 'bg-gradient-to-br from-cyan-500 to-cyan-700',
-  indigo: 'bg-gradient-to-br from-indigo-500 to-indigo-700',
-  orange: 'bg-gradient-to-br from-orange-500 to-orange-700',
+const TREND_ARROWS: Record<string, string> = {
+  up: '↑',
+  down: '↓',
+  flat: '—',
 };
 
-const TREND_ARROWS: Record<string, string> = {
-  up: '\u2191',
-  down: '\u2193',
-  flat: '\u2192',
+const TREND_COLOR: Record<string, string> = {
+  up: 'text-emerald-700',
+  down: 'text-red-700',
+  flat: 'text-gray-500',
 };
 
 function formatValue(item: StatItem): string {
   const raw = typeof item.value === 'string' ? parseFloat(item.value) : item.value;
-
   if (item.format === 'currency') {
     if (isNaN(raw as number)) return String(item.value);
     const num = raw as number;
     if (num >= 10000) {
-      return `\u00a5${(num / 10000).toFixed(num % 10000 === 0 ? 0 : 1)}\u4e07`;
+      return `¥${(num / 10000).toFixed(num % 10000 === 0 ? 0 : 1)}万`;
     }
-    return `\u00a5${num.toLocaleString()}`;
+    return `¥${num.toLocaleString()}`;
   }
-
-  if (item.format === 'percent') {
-    return `${item.value}%`;
-  }
-
-  if (typeof raw === 'number' && !isNaN(raw)) {
-    return raw.toLocaleString();
-  }
+  if (item.format === 'percent') return `${item.value}%`;
+  if (typeof raw === 'number' && !isNaN(raw)) return raw.toLocaleString();
   return String(item.value);
 }
 
-function formatTrend(item: StatItem): string | null {
-  if (!item.trend) return null;
+function formatTrend(item: StatItem): string {
+  if (!item.trend) return '— no change';
   const arrow = TREND_ARROWS[item.trend.direction] ?? '';
   const suffix = item.trend.unit === 'percent' ? '%' : '';
   const periodLabel = item.trend.period === 'week' ? 'vs last week' : 'vs last month';
@@ -66,6 +56,7 @@ function formatTrend(item: StatItem): string | null {
 
 interface StatsCardWidgetProps {
   statKey?: string;
+  /** @deprecated kept for dashboard JSON compatibility; has no visual effect since 6.6.0 */
   gradient?: string;
   linkTo?: string;
   className?: string;
@@ -73,62 +64,49 @@ interface StatsCardWidgetProps {
 
 export function StatsCardWidget({
   statKey = 'inbox_pending',
-  gradient = 'blue',
   linkTo,
   className = '',
 }: StatsCardWidgetProps) {
   const { t } = useI18n();
-  const keys = [statKey];
-  const { stats, loading } = useWorkbenchStats({ keys });
+  const { stats, loading } = useWorkbenchStats({ keys: [statKey] });
   const item = stats[statKey];
-  const gradientClass = GRADIENT_MAP[gradient] ?? GRADIENT_MAP.blue;
 
-  const handleClick = () => {
-    if (linkTo) {
-      window.location.href = linkTo;
-    }
-  };
+  const cardBase =
+    'flex flex-col gap-3 rounded-[10px] bg-white border border-[#e3e8ee] p-5 min-h-[128px] ' +
+    'dark:bg-gray-900 dark:border-gray-700';
 
-  if (loading) {
-    return (
-      <div
-        className={`relative overflow-hidden rounded-xl p-5 animate-pulse ${className}`}
-        data-testid="stats-card-skeleton"
-      >
-        <div className={`absolute inset-0 ${gradientClass} opacity-40`} />
-        <div className="relative space-y-3">
-          <div className="h-3 w-20 rounded bg-white/30" />
-          <div className="h-8 w-24 rounded bg-white/30" />
-          <div className="h-2.5 w-28 rounded bg-white/20" />
-        </div>
+  const inner = (
+    <>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {item ? t(item.label) : t(`workbench.stats.${statKey}`)}
       </div>
+      <div className="text-[28px] leading-none font-semibold text-gray-900 dark:text-gray-100">
+        {loading ? '—' : item ? formatValue(item) : '—'}
+      </div>
+      <div className="mt-auto flex items-center justify-between">
+        <span className={`text-[12px] ${TREND_COLOR[item?.trend?.direction ?? 'flat']}`}>
+          {item ? formatTrend(item) : ''}
+        </span>
+        <Sparkline points={item?.series?.points ?? []} />
+      </div>
+    </>
+  );
+
+  const testId = `stat-card-${statKey}`;
+  if (linkTo) {
+    return (
+      <a
+        href={linkTo}
+        data-testid={testId}
+        className={`${cardBase} hover:border-[#cdd5df] transition-colors ${className}`}
+      >
+        {inner}
+      </a>
     );
   }
-
-  const label = item?.label
-    ? t(`workbench.stats.${statKey}`, {}, item.label)
-    : t(`workbench.stats.${statKey}`, {}, statKey);
-  const trendText = item ? formatTrend(item) : null;
-
   return (
-    <div
-      className={`relative overflow-hidden rounded-xl p-5 text-white transition-transform hover:-translate-y-0.5 hover:shadow-lg ${gradientClass} ${linkTo ? 'cursor-pointer' : ''} ${className}`}
-      onClick={handleClick}
-      data-testid={`stats-card-${statKey}`}
-    >
-      {/* Decorative circle */}
-      <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-white/10" />
-
-      {/* Label */}
-      <div className="text-xs opacity-85">{label}</div>
-
-      {/* Value */}
-      <div className="mt-2 text-3xl font-extrabold leading-none">
-        {item ? formatValue(item) : '-'}
-      </div>
-
-      {/* Trend */}
-      {trendText && <div className="mt-2 text-[11px] opacity-70">{trendText}</div>}
+    <div data-testid={testId} className={`${cardBase} ${className}`}>
+      {inner}
     </div>
   );
 }

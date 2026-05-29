@@ -155,37 +155,37 @@ export function ShortcutsWidget({
     setDropIndex(null);
   }, []);
 
+  const cardClass = `rounded-[10px] bg-white border border-[#e3e8ee] dark:bg-gray-900 dark:border-gray-700 flex h-full flex-col ${className}`;
+
   if (loading) {
     return (
-      <div className={`flex h-full flex-col ${className}`}>
-        <div className="mb-3 flex items-center justify-between px-3 pt-3">
-          <span className="text-sm font-medium text-gray-700">{displayTitle}</span>
+      <div className={cardClass}>
+        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <h2 className="text-sm font-medium text-gray-700 dark:text-gray-200">{displayTitle}</h2>
         </div>
-        <div
-          className="grid flex-1 gap-2 px-3 pb-3"
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}
-        >
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
+        <ul className="flex-1 px-2 pb-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <li
               key={i}
-              className="flex animate-pulse flex-col items-center justify-center gap-1.5 rounded-[10px] bg-gray-50 p-3"
+              className="flex animate-pulse items-center gap-3 rounded-md px-2 py-2"
             >
-              <div className="h-5 w-5 rounded-full bg-gray-200" />
-              <div className="h-3 w-10 rounded bg-gray-200" />
-            </div>
+              <div className="h-8 w-8 rounded-lg bg-gray-100 dark:bg-gray-800" />
+              <div className="h-3 w-24 rounded bg-gray-100 dark:bg-gray-800" />
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     );
   }
 
   return (
-    <div className={`flex h-full flex-col ${className}`}>
+    <div className={cardClass}>
       {/* Header */}
-      <div className="mb-3 flex items-center justify-between px-3 pt-3">
-        <span className="text-sm font-medium text-gray-700">{displayTitle}</span>
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <h2 className="text-sm font-medium text-gray-700 dark:text-gray-200">{displayTitle}</h2>
         {isFromFavorites && (
           <button
+            type="button"
             onClick={toggleEditing}
             className="text-xs text-gray-400 transition-colors hover:text-blue-500"
           >
@@ -194,64 +194,82 @@ export function ShortcutsWidget({
         )}
       </div>
 
-      {/* Grid */}
-      <div
-        className="grid flex-1 gap-2 px-3 pb-3"
-        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}
-      >
-        {items.map((item, index) => (
-          <a
-            key={item.engagementId || item.path}
-            href={item.path}
-            draggable={editing}
-            onDragStart={editing ? (e) => handleDragStart(index, e) : undefined}
-            onDragOver={editing ? (e) => handleDragOver(index, e) : undefined}
-            onDragLeave={editing ? handleDragLeave : undefined}
-            onDrop={editing ? (e) => handleDrop(index, e) : undefined}
-            onDragEnd={editing ? handleDragEnd : undefined}
-            className={`relative flex flex-col items-center justify-center gap-1.5 rounded-[10px] p-3 text-center transition-all hover:-translate-y-0.5 hover:shadow-sm ${item.color || 'bg-gray-50'} ${
-              editing ? (dragIndex !== null ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer'
-            } ${dragIndex === index ? 'opacity-50' : ''} ${
-              dropIndex === index && dragIndex !== null && dragIndex !== index
-                ? 'ring-2 ring-blue-400 ring-offset-1'
-                : ''
-            }`}
-          >
-            <span className="mb-1 text-xl">{item.icon}</span>
-            <span className="text-[11px] font-medium text-gray-600">{item.label}</span>
-
-            {/* Remove button in edit mode */}
-            {editing && item.engagementId && (
-              <button
-                onClick={(e) => handleRemove(item.engagementId!, e)}
-                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-400 text-[10px] leading-none text-white shadow-sm transition-colors hover:bg-red-500"
-                aria-label={`Remove ${item.label}`}
+      {/* Vertical list */}
+      <ul data-testid="shortcuts-list" className="flex-1 px-2 pb-2">
+        {items.map((item, index) => {
+          const isDragging = dragIndex === index;
+          const isDropTarget =
+            dropIndex === index && dragIndex !== null && dragIndex !== index;
+          return (
+            <li key={item.engagementId || item.path} className="list-none">
+              <a
+                data-testid="shortcut-row"
+                href={item.path}
+                draggable={editing}
+                onDragStart={editing ? (e) => handleDragStart(index, e) : undefined}
+                onDragOver={editing ? (e) => handleDragOver(index, e) : undefined}
+                onDragLeave={editing ? handleDragLeave : undefined}
+                onDrop={editing ? (e) => handleDrop(index, e) : undefined}
+                onDragEnd={editing ? handleDragEnd : undefined}
+                className={`group flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-[#f6f8fb] dark:hover:bg-gray-800 ${
+                  editing ? (dragIndex !== null ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer'
+                } ${isDragging ? 'opacity-50' : ''} ${
+                  isDropTarget ? 'ring-1 ring-[#635bff]' : ''
+                }`}
               >
-                &times;
-              </button>
-            )}
-          </a>
-        ))}
+                <span
+                  data-testid="shortcut-icon"
+                  className="w-8 h-8 rounded-lg bg-[#f0f3f7] dark:bg-gray-800 flex items-center justify-center text-[#635bff] text-[14px] font-semibold"
+                >
+                  {item.icon}
+                </span>
+                <span className="flex-1 truncate text-[13px] font-medium text-gray-700 dark:text-gray-200">
+                  {item.label}
+                </span>
+                {editing && item.engagementId != null ? (
+                  <button
+                    type="button"
+                    onClick={(e) => handleRemove(item.engagementId!, e)}
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                    aria-label={t(I18N_KEYS.edit)}
+                  >
+                    &times;
+                  </button>
+                ) : (
+                  <span className="text-gray-400" aria-hidden="true">
+                    {'›'}
+                  </span>
+                )}
+              </a>
+            </li>
+          );
+        })}
 
-        {/* Add button in edit mode */}
+        {/* Add row in edit mode */}
         {editing && (
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex flex-col items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed border-gray-200 p-3 text-center transition-all hover:border-blue-300 hover:bg-blue-50/50"
-            data-testid="shortcuts-add-button"
-          >
-            <span className="mb-1 text-xl text-gray-300">+</span>
-            <span className="text-[11px] font-medium text-gray-400">
-              {t(I18N_KEYS.addShortcut)}
-            </span>
-          </button>
+          <li className="list-none">
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-[#f6f8fb] dark:hover:bg-gray-800"
+              data-testid="shortcuts-add-button"
+            >
+              <span className="w-8 h-8 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-400 text-[14px]">
+                +
+              </span>
+              <span className="text-[13px] font-medium text-gray-400">
+                {t(I18N_KEYS.addShortcut)}
+              </span>
+            </button>
+          </li>
         )}
-      </div>
+      </ul>
 
       {/* Customize hint when showing defaults — clicking opens the modal */}
       {!isFromFavorites && !editing && (
-        <div className="px-3 pb-3 text-center">
+        <div className="px-4 pb-3 text-center">
           <button
+            type="button"
             onClick={() => setModalOpen(true)}
             className="text-[10px] text-gray-300 transition-colors hover:text-blue-400"
             data-testid="shortcuts-customize-button"
