@@ -11,6 +11,7 @@ import com.auraboot.framework.iot.tsport.controller.dto.BatchQueryResponse;
 import com.auraboot.framework.iot.tsport.controller.dto.LatestQueryResponse;
 import com.auraboot.framework.iot.tsport.controller.dto.RangeQueryResponse;
 import com.auraboot.framework.iot.tsport.impl.TDengineTimeSeriesPort;
+import com.auraboot.framework.plugin.extension.iot.TimeSeriesPort;
 import com.auraboot.framework.plugin.extension.iot.QueryParams;
 import com.auraboot.framework.plugin.extension.iot.TimeSeriesPoint;
 import com.zaxxer.hikari.HikariConfig;
@@ -119,7 +120,7 @@ class TimeSeriesQueryControllerIT {
 
         port = new TDengineTimeSeriesPort(ds);
         port.ensureSuperTable();
-        service = new TimeSeriesQueryService(Optional.of(port));
+        service = new TimeSeriesQueryService(Optional.<TimeSeriesPort>of(port));
     }
 
     @AfterAll
