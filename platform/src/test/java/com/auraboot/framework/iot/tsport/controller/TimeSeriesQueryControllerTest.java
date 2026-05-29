@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ class TimeSeriesQueryControllerTest {
     @BeforeEach
     void setUp() {
         port = mock(TimeSeriesPort.class);
-        TimeSeriesQueryService service = new TimeSeriesQueryService(port);
+        TimeSeriesQueryService service = new TimeSeriesQueryService(Optional.of(port));
         TimeSeriesQueryController controller = new TimeSeriesQueryController(service);
 
         ObjectMapper om = new ObjectMapper()
@@ -130,7 +131,7 @@ class TimeSeriesQueryControllerTest {
 
     @Test
     void unavailable_returns_503() throws Exception {
-        TimeSeriesQueryService s = new TimeSeriesQueryService(null);
+        TimeSeriesQueryService s = new TimeSeriesQueryService(Optional.empty());
         TimeSeriesQueryController c = new TimeSeriesQueryController(s);
         ObjectMapper om = new ObjectMapper()
                 .registerModule(new JavaTimeModule())

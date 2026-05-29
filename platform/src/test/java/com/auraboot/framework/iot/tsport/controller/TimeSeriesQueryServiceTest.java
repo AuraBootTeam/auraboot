@@ -26,6 +26,7 @@ import com.auraboot.framework.plugin.extension.iot.TimeSeriesPoint;
 import com.auraboot.framework.plugin.extension.iot.TimeSeriesPort;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class TimeSeriesQueryServiceTest {
     @BeforeEach
     void setUp() {
         port = mock(TimeSeriesPort.class);
-        service = new TimeSeriesQueryService(port);
+        service = new TimeSeriesQueryService(Optional.of(port));
         // Pin a deterministic tenant context for every test; per-test
         // overrides happen with MetaContext.setContext where needed.
         MetaContext.setContext(7L, 0L, null, "test");
@@ -53,7 +54,7 @@ class TimeSeriesQueryServiceTest {
 
     @Test
     void unavailable_when_port_null() {
-        TimeSeriesQueryService s = new TimeSeriesQueryService(null);
+        TimeSeriesQueryService s = new TimeSeriesQueryService(Optional.empty());
         assertTrue(!s.tsdbAvailable());
         MetaServiceException ex = assertThrows(
                 MetaServiceException.class,

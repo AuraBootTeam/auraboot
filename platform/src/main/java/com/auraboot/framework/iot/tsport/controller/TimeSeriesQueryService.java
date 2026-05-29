@@ -17,10 +17,10 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,14 +79,26 @@ public class TimeSeriesQueryService {
     private final TimeSeriesPort port;
 
     /**
-     * {@link TimeSeriesPort} is {@code @Autowired(required = false)} —
-     * when {@code iot.tdengine.enabled=false} (default) no bean is
-     * registered and we degrade fail-fast on every call with a stable
-     * "TSDB unavailable" error (HTTP 503 from the global handler).
+     * {@link TimeSeriesPort} is wrapped in {@link Optional} so Spring
+     * supplies {@code Optional.empty()} when {@code iot.tdengine.enabled=false}
+     * (default) and no bean is registered. We then degrade fail-fast on every
+     * call with a stable "TSDB unavailable" error (HTTP 503 from the global
+     * handler).
+     *
+     * <p><b>Why Optional, not {@code @Autowired(required = false)}:</b>
+     * Spring Boot 3 / Spring 6 explicitly warns when a single autowire-marked
+     * constructor is flagged optional ("single autowire-marked constructor
+     * flagged as optional — this constructor is effectively required since
+     * there is no default constructor to fall back to") and then fails to
+     * start with {@code UnsatisfiedDependencyException: No qualifying bean
+     * of type 'TimeSeriesPort' available}. {@link Optional} (and
+     * {@link org.springframework.beans.factory.ObjectProvider}) are the
+     * canonical Spring 6 patterns for optional collaborators on a sole
+     * constructor — both inject {@code empty()} cleanly when the bean is
+     * absent.
      */
-    @Autowired(required = false)
-    public TimeSeriesQueryService(TimeSeriesPort port) {
-        this.port = port;
+    public TimeSeriesQueryService(Optional<TimeSeriesPort> port) {
+        this.port = port.orElse(null);
     }
 
     public boolean tsdbAvailable() {
