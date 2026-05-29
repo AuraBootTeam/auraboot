@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 
 import { BPMNToolbar } from '~/plugins/core-designer/components/bpmn-designer/components/BPMNToolbar';
-import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { useBpmFlowStore as useBPMNStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 import {
   BPMNNodeType,
   type BPMNNode,
@@ -73,7 +73,7 @@ describe('BPMNToolbar deploy button', () => {
     expect(btn).toBeDisabled();
   });
 
-  it('enables after save writes pid back into the store', () => {
+  it('enables after save writes pid back into the store', async () => {
     renderToolbar();
     const btn = screen.getByTestId('bpmn-btn-deploy');
     expect(btn).toBeDisabled();
@@ -88,8 +88,14 @@ describe('BPMNToolbar deploy button', () => {
       nodes: [rfNode('start', BPMNNodeType.START_EVENT)],
       edges: [],
     };
-    act(() => {
+    await act(async () => {
       useBPMNStore.getState().setProcessDefinition(saved);
+      // The B2c adapter (useBpmFlowStore) defers store-subscriber notifications
+      // via queueMicrotask to dedupe cross-store fan-out. Tests that drive the
+      // store synchronously must flush the microtask queue before asserting
+      // re-rendered DOM. Legacy useBPMNStore (raw zustand) fired listeners
+      // synchronously so this was implicit.
+      await useBPMNStore.__flush();
     });
 
     // isDirty cleared + id present → button enabled.

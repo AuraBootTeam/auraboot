@@ -828,8 +828,14 @@ async function __flush(): Promise<void> {
 // ─── Final export — function + statics ──────────────────────────────────────
 
 interface UseBpmFlowStore {
-  <T>(selector?: (s: BpmFlowState) => T): T;
+  // No-arg call returns the full merged state (legacy useBPMNStore() shape).
+  // Declared FIRST so TS overload resolution picks this signature when the
+  // caller destructures without a selector — B2c phase3 batch2 consumers
+  // (BPMNDesigner / BPMNCanvas / BPMNPropertyPanel / BPMNToolbar) all rely
+  // on this shape. With the selector-first overload, TS infers `unknown`
+  // for the destructure and downstream property accesses fail TS2339.
   (): BpmFlowState;
+  <T>(selector: (s: BpmFlowState) => T): T;
   getState: typeof getState;
   setState: typeof setState;
   subscribe: typeof subscribe;

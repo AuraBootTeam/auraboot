@@ -4,7 +4,7 @@
 
 import { useMemo } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
-import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { useBpmFlowStore as useBPMNStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 import { BPMNNodeType } from '~/plugins/core-designer/components/bpmn-designer/types';
 import { confirmDialog } from '~/utils/confirmDialog';
 import type {

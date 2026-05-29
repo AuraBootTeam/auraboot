@@ -8,7 +8,7 @@
 import React from 'react';
 import { DesignerToolbar } from '~/shared/designer';
 import { ProcessStatusBadge } from '~/plugins/core-designer/components/bpmn-designer/components/ProcessStatusBadge';
-import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { useBpmFlowStore as useBPMNStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 import { useI18n } from '~/contexts/I18nContext';
 
 export interface BPMNToolbarProps {
