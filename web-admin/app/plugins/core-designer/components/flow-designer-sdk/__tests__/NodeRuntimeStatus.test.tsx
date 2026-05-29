@@ -47,6 +47,7 @@ describe('G5 — NodeRuntimeStatusContext + DefaultFlowNode overlay', () => {
     nodeRegistry.register({
       type: 'action-test',
       label: 'Test Action',
+      icon: 'icon-action-test',
       category: 'action',
       defaultConfig: {},
     });

@@ -22,7 +22,7 @@ describe('ShortcutsWidget — redesign', () => {
   it('rows do not have pastel tile backgrounds (bg-*-50)', async () => {
     const { findAllByTestId } = render(<ShortcutsWidget />);
     const rows = await findAllByTestId('shortcut-row');
-    rows.forEach(row => {
+    rows.forEach((row: HTMLElement) => {
       expect(row.className).not.toMatch(/bg-(blue|green|amber|violet|orange|indigo|rose)-50/);
     });
   });
@@ -31,7 +31,7 @@ describe('ShortcutsWidget — redesign', () => {
     const { findAllByTestId } = render(<ShortcutsWidget />);
     const rows = await findAllByTestId('shortcut-row');
     expect(rows.length).toBeGreaterThan(0);
-    rows.forEach(row => {
+    rows.forEach((row: HTMLElement) => {
       expect(row.querySelector('[data-testid="shortcut-icon"]')).not.toBeNull();
       expect(row.textContent).toContain('›');
     });
