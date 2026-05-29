@@ -10,7 +10,7 @@ import {
   useNodeMonitorStatus,
   getMonitorStatusClasses,
 } from '~/plugins/core-designer/components/bpmn-designer/hooks/useNodeMonitorStatus';
-import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { useBpmFlowStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 
 export const UserTaskNode = memo(({ id, data, selected }: NodeProps<BPMNNode>) => {
   const style = BPMN_NODE_STYLES[BPMNNodeType.USER_TASK];
@@ -18,7 +18,7 @@ export const UserTaskNode = memo(({ id, data, selected }: NodeProps<BPMNNode>) =
   const monitorClasses = getMonitorStatusClasses(monitorStatus);
 
   // Resolve the assignee label when the node is active in monitor mode
-  const instanceStatus = useBPMNStore((s) => s.instanceStatus);
+  const instanceStatus = useBpmFlowStore((s) => s.instanceStatus);
   const activeEntry =
     monitorStatus === 'active' ? instanceStatus?.currentNodes.find((n) => n.nodeId === id) : null;
 
