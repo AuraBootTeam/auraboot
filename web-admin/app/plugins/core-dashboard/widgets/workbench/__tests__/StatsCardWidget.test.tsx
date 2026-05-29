@@ -47,14 +47,14 @@ describe('StatsCardWidget — redesign', () => {
     expect(container.querySelector('polyline')).not.toBeNull();
   });
 
-  it('renders a flat baseline line when series is missing', () => {
+  it('renders no sparkline svg when series is missing (avoids dead-UI baseline)', () => {
     mocked.mockReturnValue({
       stats: { bpm_running: { value: 0, label: 'workbench.stats.bpm_running' } },
       loading: false,
     });
     const { container } = render(<StatsCardWidget statKey="bpm_running" />);
     expect(container.querySelector('polyline')).toBeNull();
-    expect(container.querySelector('line')).not.toBeNull();
+    expect(container.querySelector('svg')).toBeNull();
   });
 
   it('shows trend text with positive color class when direction is up', () => {

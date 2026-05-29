@@ -163,7 +163,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`overflow-auto rounded-[28px] bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_24%),linear-gradient(180deg,_#f8fbff_0%,_#f8fafc_48%,_#ffffff_100%)] p-5 md:p-6 ${className}`}
+      className={`overflow-auto ${className}`}
       data-testid={deriveTestId('dashboard', title.replace(/\s+/g, '_'), 'container')}
     >
       {showExport && widgets.length > 0 && (

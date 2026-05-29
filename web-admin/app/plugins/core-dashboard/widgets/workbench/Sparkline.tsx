@@ -16,18 +16,7 @@ export function Sparkline({
   className,
 }: SparklineProps) {
   if (!points || points.length < 2) {
-    return (
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className={className} aria-hidden="true">
-        <line
-          x1={0}
-          y1={height - 2}
-          x2={width}
-          y2={height - 2}
-          stroke="#e3e8ee"
-          strokeWidth={1.5}
-        />
-      </svg>
-    );
+    return null;
   }
 
   const min = Math.min(...points);
