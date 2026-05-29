@@ -26,6 +26,9 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     @Resource
     private CategoryMapper categoryMapper;
 
+    @Resource
+    private CategoryTreePolicy categoryTreePolicy;
+
     @Override
     @Transactional
     public Category createCategory(Category category) {
@@ -51,10 +54,9 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
             if (parent == null) {
                 throw new BusinessException("父类目不存在");
             }
-            if (parent.getLevel() >= 2) {
-                throw new BusinessException("不支持三级及以上类目，最多支持两级");
-            }
+            categoryTreePolicy.assertChildAllowed(parent, category.getCategoryType());
             category.setLevel(parent.getLevel() + 1);
+            category.setMaterializedPath(categoryTreePolicy.childPath(parent, category.getPid()));
 
             // 更新父节点的 is_leaf 状态
             if (parent.isLeaf()) {
@@ -64,6 +66,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         } else {
             category.setLevel(1);
             category.setParentId(null);
+            category.setMaterializedPath(categoryTreePolicy.rootPath(category.getPid()));
         }
 
         // 设置默认值
@@ -209,6 +212,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         if (category == null) {
             throw new BusinessException("类目不存在");
         }
+        Long oldParentId = category.getParentId();
 
         // 验证新父类目
         if (newParentId != null && newParentId > 0) {
@@ -222,19 +226,18 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
                 throw new BusinessException("不允许移动到其他租户的类目下");
             }
 
-            // 检查层级限制
-            if (newParent.getLevel() >= 2) {
-                throw new BusinessException("不支持三级及以上类目，无法移动");
-            }
-
             // 不能移动到自己的子类目下
             List<Long> childIds = getChildCategoryIds(categoryId);
             if (childIds.contains(newParentId)) {
                 throw new BusinessException("不能移动到自己的子类目下");
             }
 
+            // 检查层级限制
+            categoryTreePolicy.assertChildAllowed(newParent, category.getCategoryType());
+
             category.setParentId(newParentId);
             category.setLevel(newParent.getLevel() + 1);
+            category.setMaterializedPath(categoryTreePolicy.childPath(newParent, category.getPid()));
 
             // 更新新父节点的 is_leaf 状态
             if (newParent.isLeaf()) {
@@ -245,10 +248,10 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
             // 移动到根节点
             category.setParentId(null);
             category.setLevel(1);
+            category.setMaterializedPath(categoryTreePolicy.rootPath(category.getPid()));
         }
 
         // 检查旧父节点是否需要更新 is_leaf 状态
-        Long oldParentId = getById(categoryId).getParentId();
         if (oldParentId != null) {
             List<Category> siblings = findByParentId(oldParentId);
             if (siblings.size() == 1 && siblings.get(0).getId().equals(categoryId)) {
@@ -261,7 +264,11 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         }
 
         category.setUpdatedAt(Instant.now());
-        return updateById(category);
+        boolean moved = updateById(category);
+        if (moved) {
+            refreshDescendantMetadata(category);
+        }
+        return moved;
     }
 
     @Override
@@ -323,7 +330,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
     }
 
     /**
-     * 构建类目树（两级展开）
+     * Build the category tree for any configured depth.
      */
     private List<Map<String, Object>> buildCategoryTree(List<Category> categories, Long parentId) {
         List<Map<String, Object>> tree = new ArrayList<>();
@@ -345,13 +352,8 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
                 node.put("isLeaf", category.isLeaf());
                 node.put("description", category.getDescription());
 
-                // 递归构建子树（只支持两级）
-                if (category.getLevel() < 2) {
-                    List<Map<String, Object>> children = buildCategoryTree(categories, category.getId());
-                    node.put("children", children);
-                } else {
-                    node.put("children", new ArrayList<>());
-                }
+                List<Map<String, Object>> children = buildCategoryTree(categories, category.getId());
+                node.put("children", children);
 
                 tree.add(node);
             }
@@ -368,6 +370,17 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         for (Category child : children) {
             childIds.add(child.getId());
             collectChildCategoryIds(child.getId(), childIds);
+        }
+    }
+
+    private void refreshDescendantMetadata(Category parent) {
+        List<Category> children = findByParentId(parent.getId());
+        for (Category child : children) {
+            child.setLevel(parent.getLevel() + 1);
+            child.setMaterializedPath(categoryTreePolicy.childPath(parent, child.getPid()));
+            child.setUpdatedAt(Instant.now());
+            updateById(child);
+            refreshDescendantMetadata(child);
         }
     }
 }

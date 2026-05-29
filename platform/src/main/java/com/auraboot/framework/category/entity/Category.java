@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.Instant;
 
 /**
- * 类目实体 - 支持两级树形结构的通用类目
+ * General-purpose category tree node.
  */
 @Data
 @TableName("ab_category")
@@ -21,7 +21,7 @@ public class Category {
 
     private Long tenantId;              // 租户ID
     private Long parentId;              // 父类目ID
-    private Integer level;              // 层级(1或2)
+    private Integer level;              // 树层级
 
     private String name;                // 类目名称
     private String code;                // 类目编码(租户级唯一)
@@ -39,6 +39,10 @@ public class Category {
 
     private String description;         // 描述
     private String extra;               // JSON扩展字段
+    private String materializedPath;    // Cached path like /root/child
+    private Integer maxDescendantsDepth; // Cached descendant depth, maintained by future rebuild jobs
+    private String i18nName;            // JSON name translations
+    private String externalTaxonomy;    // JSON external taxonomy mappings
 
     @TableLogic
     private Boolean deletedFlag = false; // 逻辑删除标记

@@ -177,14 +177,14 @@ class CategoryServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(22)
-    @DisplayName("C3-03: creating level-3 category under level-2 parent throws exception")
+    @DisplayName("C3-03: default product category type keeps two-level compatibility")
     void createCategory_threeLevel_throwsException() {
         assertThat(childCategoryId).as("childCategoryId must be set by C2-01").isNotNull();
         Category grandChild = buildCategory("GRAND-" + runId, "Grand Child", childCategoryId, "product");
 
         assertThatThrownBy(() -> categoryService.createCategory(grandChild))
                 .isInstanceOf(Exception.class)
-                .hasMessageContaining("三级");
+                .hasMessageContaining("最多支持 2 级");
     }
 
     // ==================== C4: lifecycle (enable/disable/delete) ====================
