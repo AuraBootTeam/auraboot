@@ -5900,7 +5900,7 @@ CREATE INDEX IF NOT EXISTS idx_kb_chunk_kb ON ab_kb_chunk (kb_id);
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_embedding ON ab_kb_chunk USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_tsv ON ab_kb_chunk USING gin (tsv);
 
--- Category — two-level tree for product/asset categorization
+-- Category — configurable-depth tree for product/asset categorization
 CREATE TABLE IF NOT EXISTS ab_category (
     id           BIGINT       NOT NULL,
     pid          VARCHAR(26)  NOT NULL DEFAULT '',
@@ -5918,6 +5918,10 @@ CREATE TABLE IF NOT EXISTS ab_category (
     is_leaf      BOOLEAN      DEFAULT TRUE,
     description  TEXT,
     extra        JSONB,
+    materialized_path VARCHAR(512),
+    max_descendants_depth INTEGER DEFAULT 0,
+    i18n_name    JSONB,
+    external_taxonomy JSONB,
     deleted_flag BOOLEAN      DEFAULT FALSE,
     created_by   BIGINT,
     updated_by   BIGINT,
@@ -5929,6 +5933,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_category_pid ON ab_category (pid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_category_code_tenant ON ab_category (code, tenant_id) WHERE deleted_flag = FALSE;
 CREATE INDEX IF NOT EXISTS idx_ab_category_tenant ON ab_category (tenant_id) WHERE deleted_flag = FALSE;
 CREATE INDEX IF NOT EXISTS idx_ab_category_parent ON ab_category (parent_id) WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ab_category_path_trgm ON ab_category USING gin (materialized_path gin_trgm_ops) WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_ab_category_tenant_type_parent ON ab_category (tenant_id, category_type, parent_id) WHERE deleted_flag = FALSE;
+CREATE TABLE IF NOT EXISTS ab_category_attribute_schema (
+    id                   BIGINT       NOT NULL,
+    pid                  VARCHAR(26)  NOT NULL,
+    tenant_id            BIGINT       NOT NULL,
+    category_id          BIGINT       NOT NULL,
+    inherit_from_parent  BOOLEAN      DEFAULT TRUE,
+    attribute_key        VARCHAR(64)  NOT NULL,
+    attribute_def        JSONB        NOT NULL,
+    sort_order           INTEGER      DEFAULT 0,
+    created_at           TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_ab_category_attribute_schema_category
+        FOREIGN KEY (category_id) REFERENCES ab_category(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_category_attribute_schema_pid ON ab_category_attribute_schema (pid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ab_category_attribute_schema_key ON ab_category_attribute_schema (category_id, attribute_key);
+CREATE INDEX IF NOT EXISTS idx_ab_category_attribute_schema_tenant_cat ON ab_category_attribute_schema (tenant_id, category_id);
 COMMENT ON TABLE ab_kb_chunk IS 'RAG chunk — text fragment with pgvector embedding for similarity search';
 
 -- =====================================================================

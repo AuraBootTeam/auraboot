@@ -39,6 +39,8 @@ paths = [
   '''^platform/src/test/resources/application-integration-test\.yml$''',
 ]
 
+regexTarget = "line"
+
 regexes = [
   # Documented default credentials (intentionally weak, for local dev only)
   '''ChangeMeOnFirstLogin!''',
@@ -50,6 +52,10 @@ regexes = [
   '''sk-(your|placeholder|example|xxx).*''',
   '''YOUR_[A-Z_]+_KEY''',
   '''<your-[a-z-]+>''',
+
+  # Local Docker service URL; gitleaks default generic-api-key rule treats the
+  # ccompat path as a high-entropy token even though it is an in-cluster route.
+  '''KAFKA_SCHEMAREGISTRY_URLS:\s*http://apicurio:8080/apis/ccompat/v6''',
 
   # JWT example / test tokens (literal "test" suffix)
   '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.test''',

@@ -73,7 +73,7 @@ public interface CategoryService extends IService<Category> {
     boolean isCodeAvailable(String code, Long tenantId);
 
     /**
-     * 获取类目树结构(两级展开)
+     * 获取类目树结构
      */
     List<Map<String, Object>> getCategoryTree(Long tenantId);
 
