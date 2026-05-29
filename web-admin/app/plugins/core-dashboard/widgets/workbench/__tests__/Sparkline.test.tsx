@@ -14,15 +14,14 @@ describe('Sparkline', () => {
     expect(polyline!.getAttribute('stroke')).toBe('#635bff');
   });
 
-  it('renders a flat baseline line when points is empty', () => {
+  it('renders nothing when points is empty (avoids dead-UI baseline)', () => {
     const { container } = render(<Sparkline points={[]} width={60} height={20} />);
-    const line = container.querySelector('line');
-    expect(line).not.toBeNull();
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('line')).toBeNull();
   });
 
-  it('renders a flat baseline line for a single-value series', () => {
+  it('renders nothing for a single-value series', () => {
     const { container } = render(<Sparkline points={[5]} width={60} height={20} />);
-    const line = container.querySelector('line');
-    expect(line).not.toBeNull();
+    expect(container.querySelector('svg')).toBeNull();
   });
 });

@@ -155,13 +155,13 @@ export function InboxWidget({
         <thead className="bg-[#fafbfc] dark:bg-gray-800">
           <tr>
             <th className="text-left font-semibold text-[11px] uppercase tracking-wide text-gray-500 px-5 py-3">
-              {t('workbench.inbox.col.task')}
+              {t('workbench.inbox.col.task', undefined, '待办')}
             </th>
             <th className="text-left font-semibold text-[11px] uppercase tracking-wide text-gray-500 px-5 py-3">
-              {t('workbench.inbox.col.type')}
+              {t('workbench.inbox.col.type', undefined, '类型')}
             </th>
             <th className="text-left font-semibold text-[11px] uppercase tracking-wide text-gray-500 px-5 py-3">
-              {t('workbench.inbox.col.due')}
+              {t('workbench.inbox.col.due', undefined, '截止')}
             </th>
           </tr>
         </thead>

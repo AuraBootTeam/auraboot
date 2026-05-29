@@ -76,18 +76,18 @@ export default function WorkbenchPage() {
       <header className="flex items-end justify-between mb-6">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-            {t('workbench.title')}
+            {t('workbench.title', undefined, '工作台')}
           </h1>
           <div data-testid="workbench-subline" className="text-[13px] text-gray-500 mt-1">
-            {todayLabel} · {t('workbench.subline')}
+            {todayLabel} · {t('workbench.subline', undefined, '概览')}
           </div>
         </div>
         <div className="flex gap-2">
           <button type="button" className="px-3.5 py-2 rounded-md border border-[#e3e8ee] bg-white text-[13px] font-medium text-gray-900 hover:border-[#cdd5df] dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100">
-            {t('workbench.export')}
+            {t('workbench.export', undefined, '导出')}
           </button>
           <button type="button" className="px-3.5 py-2 rounded-md bg-[#635bff] text-[13px] font-medium text-white hover:bg-[#534eeb]">
-            + {t('workbench.new')}
+            + {t('workbench.new', undefined, '新建')}
           </button>
         </div>
       </header>
