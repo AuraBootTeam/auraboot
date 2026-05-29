@@ -54,7 +54,7 @@ class TimeSeriesQueryServiceTest {
 
     @Test
     void unavailable_when_port_null() {
-        TimeSeriesQueryService s = new TimeSeriesQueryService(Optional.empty());
+        TimeSeriesQueryService s = new TimeSeriesQueryService(Optional.<TimeSeriesPort>empty());
         assertTrue(!s.tsdbAvailable());
         MetaServiceException ex = assertThrows(
                 MetaServiceException.class,
