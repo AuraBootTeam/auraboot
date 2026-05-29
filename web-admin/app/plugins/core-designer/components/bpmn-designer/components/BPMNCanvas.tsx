@@ -33,7 +33,7 @@ import {
   CallActivityNode,
 } from '~/plugins/core-designer/components/bpmn-designer/components/nodes';
 import { ConditionalEdge } from '~/plugins/core-designer/components/bpmn-designer/components/edges/ConditionalEdge';
-import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { useBpmFlowStore as useBPMNStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 import {
   BPMNNodeType,
   type BPMNNode,

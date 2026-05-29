@@ -13,7 +13,7 @@ import { BPMNToolbar } from '~/plugins/core-designer/components/bpmn-designer/co
 import { SaveDialog, type ProcessMetadata } from '~/plugins/core-designer/components/bpmn-designer/components/SaveDialog';
 import { useVersioning, VersionHistoryPanel } from '~/shared/versioning';
 import { bpmnVersionService } from '~/shared/versioning/versionService';
-import { useBPMNStore } from '~/plugins/core-designer/components/bpmn-designer/store/useBPMNStore';
+import { useBpmFlowStore as useBPMNStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
 import { installDesignerTestHooks } from '~/plugins/core-designer/components/bpmn-designer/testHooks';
 import type {
   BPMNPaletteItem,
