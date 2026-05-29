@@ -5,6 +5,7 @@ import com.auraboot.framework.conversation.InboundMode;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.conversation.TurnRequest;
+import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;
 import com.auraboot.framework.im.model.ImMessage;
@@ -59,6 +60,7 @@ class ImAiServiceTest {
     @Mock private ImMessageBroadcaster broadcaster;
     @Mock private ImConversationMemberMapper memberMapper;
     @Mock private ConversationTurnService turnService;
+    private TurnRegistry turnRegistry = new TurnRegistry();
 
     private ImAiService service;
 
@@ -70,7 +72,7 @@ class ImAiServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ImAiService(messageService, broadcaster, memberMapper, turnService);
+        service = new ImAiService(messageService, broadcaster, memberMapper, turnService, turnRegistry);
     }
 
     private ImMessage triggeringMessage() {

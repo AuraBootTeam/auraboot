@@ -17,6 +17,7 @@ import com.auraboot.framework.conversation.InboundMode;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.conversation.TurnRequest;
+import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
@@ -86,6 +87,7 @@ public class AgentReplyTask {
     private final HandoffToolProvider handoffToolProvider;
     private final ConversationTurnService turnService;
     private final ImMessageService messageService;
+    private final TurnRegistry turnRegistry;
 
     public AgentReplyTask(AgentDefinitionMapper agentDefinitionMapper,
                           ObjectProvider<GroupChatMessagePort> messagePortProvider,
@@ -93,7 +95,8 @@ public class AgentReplyTask {
                           ImMessageBroadcaster broadcaster,
                           HandoffToolProvider handoffToolProvider,
                           ConversationTurnService turnService,
-                          ImMessageService messageService) {
+                          ImMessageService messageService,
+                          TurnRegistry turnRegistry) {
         this.agentDefinitionMapper = agentDefinitionMapper;
         this.messagePort = messagePortProvider.getIfAvailable(NoOpGroupChatMessagePort::new);
         this.contextAssembler = contextAssembler;
@@ -101,6 +104,7 @@ public class AgentReplyTask {
         this.handoffToolProvider = handoffToolProvider;
         this.turnService = turnService;
         this.messageService = messageService;
+        this.turnRegistry = turnRegistry;
     }
 
     /**
@@ -218,7 +222,14 @@ public class AgentReplyTask {
                 overrides,                            // server-only context bag (DC.3a)
                 /*legacyRequest=*/ buildLegacyChatRequest(agent.getAgentCode(), triggerContent, conversationId));
 
-        ResponseSink sink = new BroadcastResponseSink(broadcaster, humanMemberIds, conversationId);
+        // G1-T6 placeholder: turnId/agentName/initiatorUserId/replyToMessageId threaded properly in G1-T9
+        ResponseSink sink = new BroadcastResponseSink(broadcaster, humanMemberIds, conversationId,
+                java.util.UUID.randomUUID().toString(),  // turnId — G1-T9 will supply from runTurn
+                agent.getId(),                           // agentId
+                agent.getAgentCode(),                    // agentName placeholder (G1-T9: use displayName)
+                0L,                                      // initiatorUserId placeholder (G1-T9: from trigger msg)
+                null,                                    // replyToMessageId placeholder (G1-T9: from trigger msg)
+                turnRegistry);
         TurnOutcome outcome = turnService.runTurn(req, sink);
 
         // GAP-311: post-runTurn MESSAGE broadcast. After the chokepoint

@@ -9,6 +9,7 @@ import com.auraboot.framework.agentchat.handoff.HandoffToolProvider;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
 import com.auraboot.framework.conversation.ConversationTurnService;
+import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
@@ -79,6 +80,7 @@ class AgentReplyTaskChokepointTest {
     @Mock private HandoffToolProvider handoffToolProvider;
     @Mock private ConversationTurnService turnService;
     @Mock private ImMessageService messageService;
+    private TurnRegistry turnRegistry = new TurnRegistry();
 
     private AgentReplyTask service;
 
@@ -93,7 +95,7 @@ class AgentReplyTaskChokepointTest {
     void setUp() {
         when(messagePortProvider.getIfAvailable(any())).thenReturn(messagePort);
         service = new AgentReplyTask(agentDefinitionMapper, messagePortProvider,
-                contextAssembler, broadcaster, handoffToolProvider, turnService, messageService);
+                contextAssembler, broadcaster, handoffToolProvider, turnService, messageService, turnRegistry);
 
         AgentDefinition alpha = new AgentDefinition();
         alpha.setId(ALPHA_ID);
