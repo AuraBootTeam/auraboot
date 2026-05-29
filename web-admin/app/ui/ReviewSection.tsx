@@ -42,8 +42,13 @@ const RATING_CONFIG: Record<
   { ratingMode: 'required' | 'optional' | 'disabled'; maxDepth: number }
 > = {
   MARKETPLACE_PLUGIN: { ratingMode: 'required', maxDepth: 3 },
+  marketplace_plugin: { ratingMode: 'required', maxDepth: 3 },
+  MARKETPLACE_SOLUTION: { ratingMode: 'required', maxDepth: 3 },
+  marketplace_solution: { ratingMode: 'required', maxDepth: 3 },
   TOPIC: { ratingMode: 'disabled', maxDepth: 5 },
+  topic: { ratingMode: 'disabled', maxDepth: 5 },
   KNOWLEDGE_ARTICLE: { ratingMode: 'optional', maxDepth: 3 },
+  knowledge_article: { ratingMode: 'optional', maxDepth: 3 },
 };
 
 const DEFAULT_CONFIG = { ratingMode: 'optional' as const, maxDepth: 3 };
