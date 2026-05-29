@@ -1,8 +1,9 @@
 package com.auraboot.framework.smoke;
 
 import com.auraboot.framework.application.TestApplication;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
@@ -47,11 +48,6 @@ import static org.assertj.core.api.Assertions.assertThat;
         classes = TestApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE
 )
-@Disabled("Enabled when database/schema.sql bootstrap into TC postgres becomes "
-        + "reliable (PL/pgSQL DO $$ blocks need psql, not ScriptUtils; "
-        + "tracked as B.5.1.1 in ida/docs/23 backlog). The test class itself + "
-        + "the #339 ObjectProvider fix already validated by manual run "
-        + "(initial run RED on missing TimeSeriesPort, GREEN after fix).")
 class SpringContextLoadsSmokeTest {
 
     /**
@@ -71,6 +67,10 @@ class SpringContextLoadsSmokeTest {
             .withCopyFileToContainer(
                     MountableFile.forClasspathResource("database/schema-pg-test-bootstrap.sql"),
                     "/docker-entrypoint-initdb.d/00-schema.sql")
+            // The 9000-line canonical schema takes ~60-90s to apply via the
+            // entrypoint init script; bump TC's default 60s startup window so
+            // the wait strategy doesn't time out before psql finishes.
+            .withStartupTimeout(Duration.ofMinutes(3))
             .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*\\n", 2));
 
     @DynamicPropertySource
