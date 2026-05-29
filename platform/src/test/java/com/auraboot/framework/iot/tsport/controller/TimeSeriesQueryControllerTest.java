@@ -131,7 +131,7 @@ class TimeSeriesQueryControllerTest {
 
     @Test
     void unavailable_returns_503() throws Exception {
-        TimeSeriesQueryService s = new TimeSeriesQueryService(Optional.empty());
+        TimeSeriesQueryService s = new TimeSeriesQueryService(Optional.<TimeSeriesPort>empty());
         TimeSeriesQueryController c = new TimeSeriesQueryController(s);
         ObjectMapper om = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
