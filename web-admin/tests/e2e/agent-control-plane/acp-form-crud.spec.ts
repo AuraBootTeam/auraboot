@@ -13,6 +13,11 @@
  *   9. agent_artifact     — CRUD-25~27
  *  10. agent_observation  — CRUD-28 (create via API, verify list)
  *
+ * Required-field empty-submit (golden gate §2.2):
+ *  CRUD-29 ~ CRUD-37 — one empty-submit assertion per form-bearing entity.
+ *  Mirrors acp-exception-feedback EXC-01/02/03 pattern (form stays open,
+ *  no redirect, no success toast).
+ *
  * Every test uses real browser interactions:
  *   - Navigates via sidebar menu href (not page.goto in test body)
  *   - Fills form fields, clicks save, verifies toast
@@ -2141,5 +2146,131 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
       // Table should render without errors
       await expect(page.locator('table').first()).toBeVisible({ timeout: 5_000 });
     }
+  });
+
+  // ===========================================================================
+  // REQUIRED-FIELD EMPTY-SUBMIT — CRUD-29 ~ CRUD-37
+  //
+  // Per AGENTS.md §2.2 page-golden gate, every form-bearing entity must
+  // assert that submitting an empty form does NOT silently persist:
+  //   - The form stays on the /new URL (no redirect to list)
+  //   - The save button is still visible (form not unmounted)
+  //   - At least one of: aria-invalid input present, error text rendered,
+  //     ant-form-item-has-error present (field-level error surface)
+  //
+  // Mirrors the acp-exception-feedback EXC-01/02/03 pattern; consolidated
+  // here so the 9 form CRUD entities each get a paired empty-submit guard
+  // without inflating each Create test.
+  // ===========================================================================
+
+  /**
+   * Detect any field-level validation error on the current form.
+   * Returns true if at least one strategy fires. Multi-strategy because
+   * different field renderers (Ant Design, native, custom) surface errors
+   * differently; mirrors fieldHasError in acp-exception-feedback.spec.ts.
+   */
+  async function formHasFieldError(page: Page): Promise<boolean> {
+    const ariaInvalid = await page
+      .locator('input[aria-invalid="true"], textarea[aria-invalid="true"]')
+      .count();
+    if (ariaInvalid > 0) return true;
+
+    const antError = await page.locator('.ant-form-item-has-error').count();
+    if (antError > 0) return true;
+
+    const explicitError = await page
+      .locator(
+        '.field-error, .text-destructive, .text-red-500, .ant-form-item-explain-error, [role="alert"]',
+      )
+      .count();
+    return explicitError > 0;
+  }
+
+  /**
+   * Open the create form for the given dynamic-page path and click save
+   * without filling anything. Assert the form refuses to submit:
+   *   - URL still on /new (no list redirect)
+   *   - Save button still visible (form not closed)
+   *   - At least one field-level error surface fires
+   *
+   * Does NOT assert specific field names — required-field shapes vary per
+   * model and this guard is about "submit is blocked", not "exactly N fields
+   * are flagged". Per-field validation is the entity model's responsibility.
+   */
+  async function expectEmptySubmitBlocked(page: Page, dynamicPath: string): Promise<void> {
+    await navigateToAcpPage(page, dynamicPath);
+    await clickCreateButton(page);
+    await waitForFormReady(page);
+
+    // Capture initial URL so we can assert no /new → list redirect happened
+    const beforeUrl = new URL(page.url()).pathname;
+    expect(beforeUrl, `expected /new form URL for ${dynamicPath}`).toContain('/new');
+
+    await clickSaveButton(page);
+
+    // Give the form a beat to react (validation is synchronous in most
+    // renderers but may need one tick for the error surface to mount).
+    await page.waitForTimeout(500);
+
+    // (1) URL must not have changed away from /new
+    const afterUrl = new URL(page.url()).pathname;
+    expect(
+      afterUrl,
+      `${dynamicPath}: empty submit must not redirect away from /new (was ${beforeUrl}, now ${afterUrl})`,
+    ).toContain('/new');
+
+    // (2) Save button still visible (form did not unmount)
+    const saveBtn = page
+      .locator(
+        '[data-testid^="form-btn-"], button:has-text("提交"), button:has-text("保存"), button:has-text("Save"), button:has-text("Submit"), button[type="submit"]',
+      )
+      .first();
+    await expect(
+      saveBtn,
+      `${dynamicPath}: save button must remain visible after empty submit`,
+    ).toBeVisible({ timeout: 3_000 });
+
+    // (3) At least one field-level error surface present
+    const hasError = await formHasFieldError(page);
+    expect(
+      hasError,
+      `${dynamicPath}: empty submit must surface at least one field-level error (aria-invalid / .ant-form-item-has-error / error text)`,
+    ).toBe(true);
+  }
+
+  test('CRUD-29: Mission form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/mission');
+  });
+
+  test('CRUD-30: Agent definition form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/agent-definition');
+  });
+
+  test('CRUD-31: Agent task form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/agent-task');
+  });
+
+  test('CRUD-32: Agent tool form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/agent-tool');
+  });
+
+  test('CRUD-33: Agent memory form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/agent-memory');
+  });
+
+  test('CRUD-34: Agent skill form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/agent-skill');
+  });
+
+  test('CRUD-35: Agent schedule form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/agent-schedule');
+  });
+
+  test('CRUD-36: Approval policy form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/approval-policy');
+  });
+
+  test('CRUD-37: Agent artifact form — empty submit blocked, field error surfaced', async ({ page }) => {
+    await expectEmptySubmitBlocked(page, '/dynamic/agent-artifact');
   });
 });
