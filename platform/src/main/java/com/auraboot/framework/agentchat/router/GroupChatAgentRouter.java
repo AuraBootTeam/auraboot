@@ -66,9 +66,12 @@ public class GroupChatAgentRouter {
             return;
         }
 
-        // G1: single target — bypassed mentions are passed for context (T9 will thread to AgentReplyTask)
+        // G1: single target — initiatorUserId, replyToMessageId, and bypassed mentions threaded to AgentReplyTask
         agentReplyTask.executeReply(conversationId, tenantId, routing.targetAgentId(),
-                event.getContent(), event.getSeq());
+                event.getContent(), event.getSeq(),
+                event.getSenderId(),     // initiatorUserId
+                event.getMessageId(),    // replyToMessageId
+                routing.bypassedMentionedAgentIds());
     }
 
     /**
