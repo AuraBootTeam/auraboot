@@ -395,7 +395,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-200 sm:flex dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-400 dark:hover:bg-gray-700"
+        className="hidden w-[360px] h-[34px] items-center gap-2 rounded-md border border-[#e3e8ee] bg-white px-3 text-sm text-gray-500 transition-colors hover:bg-gray-50 sm:flex dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-400 dark:hover:bg-gray-700"
         data-testid="cmd-k-trigger"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

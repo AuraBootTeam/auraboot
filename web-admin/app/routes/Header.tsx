@@ -142,7 +142,7 @@ export default function Header({
       className="print-hide fixed top-0 right-0 left-0 z-50 border-b border-gray-200 bg-white/95 shadow-lg backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95"
       data-print="hide"
     >
-      <div className="flex h-16 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-4 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
+      <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-4 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
         {/* 左侧：Logo和菜单按钮 */}
         <div className="flex items-center">
           {showSidebar && (
@@ -158,6 +158,12 @@ export default function Header({
           <Link to="/" className="ms-4 flex items-center lg:ms-0">
             <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
             <span className="ms-3 text-xl font-bold text-gray-900 dark:text-white">AuraBoot</span>
+            <span
+              data-testid="header-env-chip"
+              className="ml-2 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 bg-[#f6f9fc] rounded"
+            >
+              Dev
+            </span>
           </Link>
 
           {/* Current tenant name — always visible context indicator */}
@@ -170,7 +176,7 @@ export default function Header({
         </div>
 
         {/* 右侧：工具栏 */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-1">
           {/* 全局搜索 Cmd+K */}
           {!simplified && <CommandPalette />}
 
@@ -179,7 +185,7 @@ export default function Header({
             <button
               onClick={toggleAI}
               data-testid="ai-panel-toggle"
-              className={`rounded-xl p-2.5 transition-all duration-200 hover:scale-105 hover:shadow-md ${
+              className={`flex w-8 h-8 items-center justify-center rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-md ${
                 aiState.panelState === 'expanded'
                   ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
                   : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
@@ -198,7 +204,7 @@ export default function Header({
             <div className="relative" ref={langDropdownRef} data-testid="lang-toggle">
               <button
                 onClick={() => setShowLangDropdown(!showLangDropdown)}
-                className="rounded-xl p-2.5 text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                className="flex w-8 h-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               >
                 <GlobeAltIcon className="h-5 w-5" />
               </button>
@@ -234,7 +240,7 @@ export default function Header({
           <div className="relative" ref={themeDropdownRef} data-testid="theme-toggle">
             <button
               onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-              className="rounded-xl p-2.5 text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              className="flex w-8 h-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             >
               {isHydrated && isDark ? (
                 <MoonIcon className="h-6 w-6" />
@@ -272,15 +278,23 @@ export default function Header({
             )}
           </div>
 
+          {/* 分隔线 */}
+          {user && (
+            <span
+              className="mx-1.5 w-px h-5 bg-[#e3e8ee] dark:bg-gray-700"
+              aria-hidden
+            />
+          )}
+
           {/* 用户菜单 */}
           {user ? (
             <div className="relative" ref={userDropdownRef} data-testid="user-menu">
               <button
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center rounded-full p-1.5 ring-2 ring-transparent transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:shadow-md hover:ring-gray-200 dark:hover:bg-gray-700 dark:hover:ring-gray-600"
+                className="flex items-center rounded-full ring-2 ring-transparent transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:shadow-md hover:ring-gray-200 dark:hover:bg-gray-700 dark:hover:ring-gray-600"
               >
                 <img
-                  className="h-8 w-8 rounded-full object-cover shadow-sm"
+                  className="w-[30px] h-[30px] rounded-full object-cover shadow-sm border border-[#e3e8ee] dark:border-gray-700"
                   src="/avatar.jpeg"
                   alt="User avatar"
                 />
