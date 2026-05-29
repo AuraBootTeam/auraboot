@@ -58,38 +58,40 @@ public class GroupChatAgentRouter {
             return;
         }
 
-        List<Long> targetAgentIds = resolveTargetAgents(
+        RoutingResult routing = resolveTargetAgents(
                 conversationId, tenantId, event.getContent(), event.getMentions());
 
-        if (targetAgentIds.isEmpty()) {
-            log.debug("No target agents resolved for conversation {} message {}", conversationId, event.getMessageId());
+        if (routing.targetAgentId() == null) {
+            log.debug("No target agent resolved for conversation {} message {}", conversationId, event.getMessageId());
             return;
         }
 
-        for (Long agentId : targetAgentIds) {
-            agentReplyTask.executeReply(conversationId, tenantId, agentId,
-                    event.getContent(), event.getSeq());
-        }
+        // G1: single target — bypassed mentions are passed for context (T9 will thread to AgentReplyTask)
+        agentReplyTask.executeReply(conversationId, tenantId, routing.targetAgentId(),
+                event.getContent(), event.getSeq());
     }
 
     /**
-     * Resolve which agents should reply based on priority:
-     * P0: Explicit @mentions with "agent:ID" format
-     * P1: Agents with autoReplyMode=ALWAYS
+     * Resolve which agent should reply based on priority:
+     * P0: Explicit @mentions — first mentioned is target, rest are bypassed
+     * P1: Agents with autoReplyMode=ALWAYS — first is target, rest bypassed
      * P2: Conductor agent of the conversation
-     * P3: Empty list (no AI response)
+     * P3: No response (RoutingResult.none())
      */
-    private List<Long> resolveTargetAgents(Long conversationId, Long tenantId,
-                                            String content, List<String> mentions) {
+    RoutingResult resolveTargetAgents(Long conversationId, Long tenantId,
+                                       String content, List<String> mentions) {
         List<AgentMemberDto> agentMembers = messagePort.getAgentMembers(conversationId, tenantId);
         if (agentMembers.isEmpty()) {
-            return List.of();
+            return RoutingResult.none();
         }
 
-        // P0: Parse explicit mentions for "agent:ID" format
-        Set<Long> mentionedAgentIds = parseMentionedAgentIds(mentions, agentMembers);
+        // P0: Parse explicit mentions for "agent:ID" format (preserve input order for deterministic target)
+        List<Long> mentionedAgentIds = parseMentionedAgentIds(mentions, agentMembers);
         if (!mentionedAgentIds.isEmpty()) {
-            return new ArrayList<>(mentionedAgentIds);
+            Long target = mentionedAgentIds.get(0);
+            List<Long> bypassed = mentionedAgentIds.size() > 1
+                    ? mentionedAgentIds.subList(1, mentionedAgentIds.size()) : List.of();
+            return new RoutingResult(target, bypassed, "P0");
         }
 
         // P1: Find agents with autoReplyMode=ALWAYS
@@ -98,25 +100,30 @@ public class GroupChatAgentRouter {
                 .map(AgentMemberDto::getAgentId)
                 .toList();
         if (!alwaysReplyAgents.isEmpty()) {
-            return alwaysReplyAgents;
+            Long target = alwaysReplyAgents.get(0);
+            List<Long> bypassed = alwaysReplyAgents.size() > 1
+                    ? alwaysReplyAgents.subList(1, alwaysReplyAgents.size()) : List.of();
+            return new RoutingResult(target, bypassed, "P1");
         }
 
         // P2: Conductor agent
         Long conductorId = messagePort.getConductorAgentId(conversationId, tenantId);
         if (conductorId != null) {
-            return List.of(conductorId);
+            return new RoutingResult(conductorId, List.of(), "P2");
         }
 
         // P3: No response
-        return List.of();
+        return RoutingResult.none();
     }
 
     /**
      * Parse "agent:ID" mentions and match them against available agent members.
+     * Returns a list in input order (deduped), so the first element is deterministically
+     * the first mentioned agent.
      */
-    private Set<Long> parseMentionedAgentIds(List<String> mentions, List<AgentMemberDto> agentMembers) {
+    private List<Long> parseMentionedAgentIds(List<String> mentions, List<AgentMemberDto> agentMembers) {
         if (mentions == null || mentions.isEmpty()) {
-            return Set.of();
+            return List.of();
         }
 
         Set<Long> availableIds = new HashSet<>();
@@ -124,7 +131,8 @@ public class GroupChatAgentRouter {
             availableIds.add(agent.getAgentId());
         }
 
-        Set<Long> result = new HashSet<>();
+        // LinkedHashSet preserves input order while deduplicating
+        Set<Long> result = new java.util.LinkedHashSet<>();
         for (String mention : mentions) {
             Matcher matcher = AGENT_MENTION_PATTERN.matcher(mention);
             if (matcher.matches()) {
@@ -134,6 +142,6 @@ public class GroupChatAgentRouter {
                 }
             }
         }
-        return result;
+        return new ArrayList<>(result);
     }
 }
