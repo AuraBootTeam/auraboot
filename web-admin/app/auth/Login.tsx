@@ -534,61 +534,62 @@ export default function LoginPage() {
     <div
       data-testid="login-page-root"
       data-hydrated={hydrated ? 'true' : 'false'}
-      className="relative min-h-screen overflow-hidden bg-[#F7F8FB] dark:bg-gray-900"
+      className="relative min-h-[calc(100vh-4rem)] bg-white dark:bg-gray-900"
     >
-      {/* Soft brand wash background */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_600px_at_85%_-10%,rgba(124,92,255,0.10),transparent_60%),radial-gradient(800px_500px_at_-10%_110%,rgba(79,107,255,0.10),transparent_55%)] dark:bg-[radial-gradient(900px_600px_at_85%_-10%,rgba(124,92,255,0.12),transparent_60%),radial-gradient(800px_500px_at_-10%_110%,rgba(79,107,255,0.10),transparent_55%)]"
-      />
-
-      <div className="relative z-10 flex min-h-screen flex-col">
-        {/* Page padding wraps both layouts */}
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-          {isMobile ? (
-            <div className="mx-auto flex w-full max-w-md flex-col items-center justify-center">
-              <div className="mb-6 flex items-center gap-2.5">
-                <img
-                  src="/android-chrome-192x192.png"
-                  alt="AuraBoot"
-                  className="h-8 w-8 rounded-lg shadow-sm"
-                />
-                <span className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-                  AuraBoot
-                </span>
-              </div>
-              <div className="w-full rounded-2xl border border-gray-200/80 bg-white p-6 shadow-[0_24px_60px_-20px_rgba(30,40,80,0.18),0_6px_16px_rgba(30,40,80,0.06)] dark:border-gray-700 dark:bg-gray-800">
-                {card}
-              </div>
-            </div>
-          ) : (
-            <div className="mx-auto grid w-full max-w-6xl items-stretch gap-6 lg:grid-cols-[1.05fr_1fr]">
-              {/* Left: brand + capability tiles */}
-              <section className="relative flex flex-col gap-5 overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-b from-[#F0F4FF] to-white p-8 shadow-sm lg:p-10 dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
-                <div
-                  aria-hidden="true"
-                  className="absolute -top-20 -right-16 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(124,92,255,0.18),transparent_70%)]"
-                />
-                <div className="relative flex items-center gap-2.5">
+      {isMobile ? (
+        // Mobile: single column with brand on top, card centered
+        <div className="relative flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center bg-[#F7F8FB] px-4 py-8 sm:px-6 dark:bg-gray-900">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(600px_400px_at_50%_0%,rgba(124,92,255,0.10),transparent_60%)]"
+          />
+          <div className="relative mb-6 flex items-center gap-2.5">
+            <img
+              src="/android-chrome-192x192.png"
+              alt="AuraBoot"
+              className="h-9 w-9 rounded-lg shadow-sm"
+            />
+            <span className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
+              AuraBoot
+            </span>
+          </div>
+          <div className="relative w-full max-w-md rounded-2xl border border-gray-200/80 bg-white p-6 shadow-[0_24px_60px_-20px_rgba(30,40,80,0.18),0_6px_16px_rgba(30,40,80,0.06)] dark:border-gray-700 dark:bg-gray-800">
+            {card}
+          </div>
+        </div>
+      ) : (
+        // Desktop: full-bleed 2-col, left brand region + right form region
+        <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[55fr_45fr] xl:grid-cols-[58fr_42fr]">
+          {/* Left: full-bleed brand region */}
+          <section className="relative overflow-hidden bg-gradient-to-br from-[#EEF2FF] via-[#F2EEFF] to-[#FAF5FF] dark:from-gray-800 dark:via-gray-800 dark:to-gray-900">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-40 -right-32 h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(124,92,255,0.22),transparent_70%)]"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-32 -left-24 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(34,211,183,0.12),transparent_70%)]"
+            />
+            <div className="relative flex h-full flex-col justify-center px-8 py-14 lg:px-14 xl:px-20 2xl:px-28">
+              <div className="flex max-w-[640px] flex-col gap-8">
+                <div className="flex items-center gap-3">
                   <img
                     src="/android-chrome-192x192.png"
                     alt="AuraBoot"
-                    className="h-9 w-9 rounded-lg shadow-sm"
+                    className="h-10 w-10 rounded-lg shadow-sm"
                   />
-                  <span className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                  <span className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
                     AuraBoot
                   </span>
                 </div>
-                <div className="relative">
-                  <h2 className="text-3xl leading-tight font-semibold tracking-tight text-gray-900 lg:text-[36px] dark:text-white">
-                    {t('auth.tagline') || '快速构建企业级应用的低代码平台'}
-                  </h2>
-                </div>
-                <div className="relative mt-2 grid grid-cols-2 gap-3">
+                <h1 className="text-balance text-3xl font-semibold leading-[1.15] tracking-tight text-gray-900 lg:text-[40px] xl:text-[44px] dark:text-white">
+                  {t('auth.tagline', undefined, '快速构建企业级应用的低代码平台')}
+                </h1>
+                <div className="grid grid-cols-2 gap-3 xl:gap-3.5">
                   {tiles.map((tile) => (
                     <div
                       key={tile.key}
-                      className={`relative flex min-h-[108px] flex-col gap-2 overflow-hidden rounded-xl bg-gradient-to-br p-4 text-white shadow-[0_8px_24px_-10px_rgba(30,40,80,0.18),0_2px_6px_rgba(30,40,80,0.06)] ${TONE_BG[tile.tone]}`}
+                      className={`relative flex min-h-[100px] flex-col gap-1.5 overflow-hidden rounded-xl bg-gradient-to-br p-4 text-white shadow-[0_8px_24px_-10px_rgba(30,40,80,0.18),0_2px_6px_rgba(30,40,80,0.06)] ${TONE_BG[tile.tone]}`}
                     >
                       <div className="flex h-7 w-7 items-center justify-center rounded-md bg-white/22 text-white">
                         {tile.icon}
@@ -602,16 +603,16 @@ export default function LoginPage() {
                     </div>
                   ))}
                 </div>
-              </section>
-
-              {/* Right: login card */}
-              <section className="flex items-center justify-center rounded-2xl border border-gray-200/80 bg-white p-8 shadow-[0_24px_60px_-20px_rgba(30,40,80,0.18),0_6px_16px_rgba(30,40,80,0.06)] lg:p-10 dark:border-gray-700 dark:bg-gray-800">
-                {card}
-              </section>
+              </div>
             </div>
-          )}
-        </main>
-      </div>
+          </section>
+
+          {/* Right: form region */}
+          <section className="flex items-center justify-center bg-white px-6 py-14 lg:px-12 xl:px-16 dark:bg-gray-800">
+            <div className="w-full max-w-md">{card}</div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
