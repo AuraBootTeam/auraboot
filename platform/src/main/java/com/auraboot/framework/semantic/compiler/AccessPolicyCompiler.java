@@ -115,18 +115,22 @@ public class AccessPolicyCompiler {
             }
             String surrounding = surroundingContext(filter, m.start(), m.end());
             if ("IN".equals(surrounding)) {
-                // Expand comma-separated value into IN (?, ?, ...)
+                // Expand comma-separated value into IN (?, ?, ...). Strip surrounding
+                // single quotes per value because admins typically store the raw value
+                // (CN,US) but some older paths stored quoted values ('CN','US') —
+                // both must work end-to-end. Verified 2026-05-29 by B1.1.5 RLS smoke
+                // (ida/docs/26 Bug 10).
                 String[] vals = value.split(",");
                 StringBuilder ph = new StringBuilder();
                 for (int i = 0; i < vals.length; i++) {
                     if (i > 0) ph.append(", ");
                     ph.append("?");
-                    params.add(vals[i].trim());
+                    params.add(stripQuotes(vals[i].trim()));
                 }
                 out.append(ph);
             } else {
                 out.append("?");
-                params.add(value);
+                params.add(stripQuotes(value));
             }
             last = m.end();
         }
@@ -138,6 +142,20 @@ public class AccessPolicyCompiler {
                     "unresolved placeholder in sql_filter: " + out);
         }
         return out.toString();
+    }
+
+    /**
+     * Strips a single layer of surrounding single quotes from an attribute value,
+     * so {@code 'CN','US'} (or just {@code 'CN'}) round-trips to {@code CN} when
+     * bound as a parameterised value. Inner quotes are preserved (avoids breaking
+     * a value that legitimately contains a quote).
+     */
+    static String stripQuotes(String v) {
+        if (v == null || v.length() < 2) return v;
+        if (v.charAt(0) == '\'' && v.charAt(v.length() - 1) == '\'') {
+            return v.substring(1, v.length() - 1);
+        }
+        return v;
     }
 
     /** Returns {@code "IN"} if the placeholder sits between {@code IN (} and {@code )}. */
