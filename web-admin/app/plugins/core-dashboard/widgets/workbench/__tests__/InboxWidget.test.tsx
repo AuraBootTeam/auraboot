@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { InboxWidget } from '../InboxWidget';
 
 vi.mock('~/shared/services/inboxService', () => ({
@@ -20,8 +20,10 @@ vi.mock('~/contexts/I18nContext', () => ({
 describe('InboxWidget — table redesign', () => {
   it('renders a <table> with new column headers', async () => {
     const { findByRole } = render(<InboxWidget />);
-    const table = await findByRole('table');
-    const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent?.trim());
+    const table = (await findByRole('table')) as HTMLElement;
+    const headers = Array.from(table.querySelectorAll<HTMLElement>('th')).map((h) =>
+      h.textContent?.trim(),
+    );
     expect(headers).toEqual(expect.arrayContaining(['workbench.inbox.col.task', 'workbench.inbox.col.type', 'workbench.inbox.col.due']));
   });
 

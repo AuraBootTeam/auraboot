@@ -23,9 +23,10 @@ describe('StatsRowWidget — redesign', () => {
     const { container } = render(<StatsRowWidget />);
     const cards = container.querySelectorAll('[data-testid^="stat-card-"]');
     expect(cards).toHaveLength(4);
-    cards.forEach((c) => {
-      expect(c.className).not.toMatch(/from-(blue|amber|emerald|violet|rose|cyan|indigo|orange)-/);
-      expect(c.className).toMatch(/bg-white|dark:bg-gray-900/);
+    cards.forEach((card: Element) => {
+      const className = card.getAttribute('class') ?? '';
+      expect(className).not.toMatch(/from-(blue|amber|emerald|violet|rose|cyan|indigo|orange)-/);
+      expect(className).toMatch(/bg-white|dark:bg-gray-900/);
     });
   });
 });
