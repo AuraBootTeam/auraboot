@@ -57,6 +57,25 @@ export default function Header({
   const workspaceLabel = locale.startsWith('zh') ? '工作空间' : 'Workspaces';
   const platformConsoleLabel = locale.startsWith('zh') ? '平台控制台' : 'Platform Console';
 
+  // Env chip — visible only when the build is non-production. Reads the Vite
+  // mode at build time so production bundles drop the chip entirely.
+  const envMode = import.meta.env.MODE;
+  const envChipLabel =
+    envMode === 'production'
+      ? null
+      : envMode === 'staging'
+        ? 'Staging'
+        : envMode === 'test'
+          ? 'Test'
+          : 'Dev';
+  // Hide the trailing "· {tenantName}" indicator when the tenant name already
+  // encodes the env (e.g. "AuraBoot Dev") — otherwise "AuraBoot [Dev] · AuraBoot Dev"
+  // double-renders the env signal.
+  const tenantDuplicatesChip =
+    !!envChipLabel &&
+    !!user?.tenantName &&
+    user.tenantName.toLowerCase().endsWith(envChipLabel.toLowerCase());
+
   // Lazy-load spaces for tenant switching in avatar menu
   useEffect(() => {
     if (!user || simplified) return;
@@ -158,16 +177,18 @@ export default function Header({
           <Link to="/" className="ms-4 flex items-center lg:ms-0">
             <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
             <span className="ms-3 text-xl font-bold text-gray-900 dark:text-white">AuraBoot</span>
-            <span
-              data-testid="header-env-chip"
-              className="ml-2 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 bg-[#f6f9fc] rounded"
-            >
-              Dev
-            </span>
+            {envChipLabel && (
+              <span
+                data-testid="header-env-chip"
+                className="ml-2 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 bg-[#f6f9fc] rounded dark:bg-gray-700 dark:text-gray-300"
+              >
+                {envChipLabel}
+              </span>
+            )}
           </Link>
 
-          {/* Current tenant name — always visible context indicator */}
-          {!simplified && user?.tenantName && (
+          {/* Current tenant name — hidden when env chip already encodes it (avoids "AuraBoot [Dev] · AuraBoot Dev") */}
+          {!simplified && user?.tenantName && !tenantDuplicatesChip && (
             <span className="ms-3 hidden items-center text-sm text-gray-400 sm:flex dark:text-gray-500">
               <span className="mx-2">·</span>
               <span data-testid="current-tenant-name">{user.tenantName}</span>

@@ -39,7 +39,7 @@ function formatValue(item: StatItem): string {
 }
 
 function formatTrend(item: StatItem): string {
-  if (!item.trend) return '— no change';
+  if (!item.trend) return '';
   const arrow = TREND_ARROWS[item.trend.direction] ?? '';
   const suffix = item.trend.unit === 'percent' ? '%' : '';
   const periodLabel = item.trend.period === 'week' ? 'vs last week' : 'vs last month';
