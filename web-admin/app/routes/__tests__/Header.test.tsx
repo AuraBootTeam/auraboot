@@ -21,7 +21,7 @@ vi.mock('~/ui/CommandPalette', () => ({
   CommandPalette: () => (
     <button
       data-testid="cmd-k-trigger"
-      className="hidden w-[360px] h-[34px] items-center gap-2 rounded-md border border-[#e3e8ee] bg-white px-3 text-sm text-gray-500 sm:flex"
+      className="hidden h-[34px] w-[360px] items-center gap-2 rounded-md border border-[#e3e8ee] bg-white px-3 text-sm text-gray-500 sm:flex"
     >
       Search...
     </button>
@@ -33,8 +33,7 @@ vi.mock('~/plugins/core-aurabot/components-shell/AuraBotProvider', () => ({
 
 // Stub fetch to keep useEffect for spaces quiet
 beforeEach(() => {
-  // @ts-expect-error test stub
-  global.fetch = vi.fn().mockResolvedValue({ ok: false, json: () => Promise.resolve({}) });
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: () => Promise.resolve({}) }));
 });
 
 describe('Header — polish', () => {
