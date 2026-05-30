@@ -165,6 +165,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                     .pinned(membership != null ? membership.getPinned() : false)
                     .muted(membership != null ? membership.getMuted() : false)
                     .memberCount(members.size())
+                    .announcement(parseAnnouncement(conv.getMetadata()))
                     .build());
         }
 
