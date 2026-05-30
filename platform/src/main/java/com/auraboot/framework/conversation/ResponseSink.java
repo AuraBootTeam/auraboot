@@ -109,4 +109,35 @@ public interface ResponseSink {
     default boolean isClientConnected() {
         return true;
     }
+
+    /**
+     * Called at the start of a turn by ConversationTurnService.runTurn.
+     * Default no-op; BroadcastResponseSink overrides to register with TurnRegistry
+     * and broadcast {@code ai_turn_started}.
+     *
+     * @param turnId server-generated UUID
+     * @param agentId resolved target agent id
+     * @param conversationId the IM conversation
+     * @param replyToMessageId the human message that triggered this turn (nullable)
+     * @param initiatorUserId the human user who sent the triggering message (used for cancel auth)
+     */
+    default void onTurnBegin(String turnId, Long agentId, Long conversationId,
+                              Long replyToMessageId, Long initiatorUserId) {
+    }
+
+    /**
+     * Called once the assistant message has been fully assembled and persisted.
+     * Default no-op; BroadcastResponseSink overrides to broadcast {@code stream_end}
+     * and {@code ai_turn_completed} and mark the registry handle COMPLETED.
+     */
+    default void onStreamEnd(String turnId, Long finalMessageId, Integer totalTokens) {
+    }
+
+    /**
+     * Called when the registry has been marked cancelled by the cancel API.
+     * BroadcastResponseSink default-noops in G1 — Controller broadcasts ai_turn_cancelled
+     * directly (sink override reserved for future internal-cancel scenarios e.g. tool timeout).
+     */
+    default void onTurnCancelled(String turnId) {
+    }
 }

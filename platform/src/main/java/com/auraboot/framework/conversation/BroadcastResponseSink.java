@@ -1,145 +1,193 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.dto.ResultContract;
+import com.auraboot.framework.conversation.sink.StreamErrorClassifier;
+import com.auraboot.framework.conversation.turn.TurnHandle;
+import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.im.dto.WsFrame;
+import com.auraboot.framework.im.model.ImConstants;
 import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Phase D.1 (Q-D.2=α) WebSocket-broadcast adapter for {@link ResponseSink}. Used
- * by IM-event-driven entry points (group-chat @mention #7, WebSocket @AI
- * panel #8 per design v3.3 §3.5) where a sync HTTP response stream does not
- * exist — output goes to all online conversation members via
- * {@link ImMessageBroadcaster}.
+ * Broadcasts AI turn lifecycle events (ai_turn_started / stream_chunk / stream_end /
+ * ai_turn_completed / ai_turn_failed) to all human members of a group conversation as
+ * the LLM streams. Per-turn instance (constructed in AgentReplyTask).
  *
- * <p>Semantic differences from {@link SseResponseSink}:
- * <ul>
- *   <li><b>Streaming vs terminal-only</b> — IM clients render full messages
- *       (no chunked typing animation in the row). The sink buffers
- *       {@link #onTextChunk} into an internal builder; on {@link #onDone}
- *       it publishes a single {@code MESSAGE} frame with the full text.
- *       {@code onTextChunk} additionally fires a {@code TYPING_INDICATOR}
- *       frame so the conversation members see "AI is typing…" while the
- *       LLM streams.</li>
- *   <li><b>No transport completion</b> — there is no {@code emitter.complete()}
- *       analogue; WebSocket sessions are long-lived and not tied to one turn.</li>
- *   <li><b>Persistence is orthogonal</b> — this sink does NOT write
- *       {@code ab_im_message} rows. The chokepoint's {@code Persistence.persistOutbound}
- *       in {@code finalizeTurn} writes the row through {@code ImMessageService.sendAgentMessage};
- *       the broadcaster's role is purely transport (push WS frame to listeners).
- *       This separation keeps "every turn produces exactly one outbound row"
- *       invariant identical across SSE and IM channels.</li>
- *   <li><b>onResultContract</b> — turned into a {@code MESSAGE} frame with
- *       {@code messageType="card"} so the IM card renderer picks it up. Same
- *       payload shape as the SSE {@code result_contract} event.</li>
- *   <li><b>onConfirmRequired</b> — published as a {@code MESSAGE} frame with
- *       a card payload carrying the resumption token. Frontend echoes it back
- *       via {@code POST /execute} (same contract as the SSE flow; the resume
- *       dispatcher in {@code ConversationTurnServiceImpl} handles both).</li>
- * </ul>
+ * <p>G1 design notes: replaces the prior TYPING_INDICATOR-based proxy stream with
+ * dedicated frame types (iOS group chat does not consume TYPING_INDICATOR — verified
+ * via grep, 2026-05-29 spike). Per-user-typing in ImWebSocketHandler is unaffected.
  *
- * <p>The list of {@code targetUserIds} (conversation members to deliver to)
- * is passed at construction time — the IM event handler resolves it from the
- * conversation membership before invoking {@code runTurn}.
+ * <p>Chunk batching: 50ms time window OR 30-char volume — whichever arrives first.
  *
- * <p>Threading: {@link #onTextChunk} accumulates text in a
- * {@link StringBuilder}; the chokepoint serializes calls within one turn
- * (chat impl is single-threaded per turn), so no synchronization is needed.
- * {@link #isClientConnected} returns true unconditionally — WebSocket
- * delivery is fire-and-forget; partially-disconnected clients are handled
- * by {@link ImMessageBroadcaster} (LocalBroadcaster drops, RedisBroadcaster
- * Pub/Sub) without surfacing back to this sink.
+ * <p>Cancel: cancellation is signaled via a flag flipped by {@link TurnRegistry#markCancelled};
+ * {@link #onTextChunk} checks the flag and throws {@link TurnCancelledException} so the
+ * upstream LLM call stack unwinds. AgentReplyTask catches this and does not record it
+ * as an error. {@code ai_turn_cancelled} is broadcast directly by ConversationTurnController
+ * (not by this sink) so users get immediate UI feedback.
  *
- * <p><b>DC.4 (2026-05-03) transport unification:</b> the parallel HTTP-SSE
- * transport ({@code SseEmitterManager} + {@code ImSseController} +
- * {@code GroupChatSseBridgingSink}) was deleted; this sink is now the sole
- * push surface for chokepoint output. Enterprise {@code ent-im-chat}
- * consumes the same {@code WS /api/im/ws} frames as the OSS web-admin IM
- * panel — see the matching DC.4 frontend commit replacing
- * {@code imSseClient.ts} with {@code imWsClient.ts}.
+ * <p>Tool/confirm/result-contract frames: retained from Phase D.1 — onToolStart emits
+ * a TYPING_INDICATOR with phase annotation; onConfirmRequired and onResultContract emit
+ * MESSAGE card frames. These are compatible with the new frame scheme.
+ *
+ * <p>Persistence is orthogonal: this sink does NOT write {@code ab_im_message} rows.
+ * The chokepoint's {@code Persistence.persistOutbound} in {@code finalizeTurn} writes
+ * the row through {@code ImMessageService.sendAgentMessage}; the broadcaster's role is
+ * purely transport.
  */
 public class BroadcastResponseSink implements ResponseSink {
+
+    private static final int CHUNK_VOLUME_THRESHOLD = 30;
+    private static final long CHUNK_TIME_THRESHOLD_MS = 50L;
 
     private final ImMessageBroadcaster broadcaster;
     private final List<Long> targetUserIds;
     private final Long conversationId;
-    private final StringBuilder textBuffer = new StringBuilder();
+    private final String turnId;
+    private final Long agentId;
+    private final String agentName;
+    private final Long initiatorUserId;
+    private final Long replyToMessageId;
+    private final TurnRegistry registry;
 
-    public BroadcastResponseSink(ImMessageBroadcaster broadcaster,
-                                  List<Long> targetUserIds,
-                                  Long conversationId) {
+    private final StringBuilder cumulativeBuf = new StringBuilder();
+    private final StringBuilder chunkBuf = new StringBuilder();
+    private long chunkLastFlush = System.currentTimeMillis();
+
+    private AtomicBoolean cancelled;  // captured from TurnHandle in onTurnBegin
+
+    public BroadcastResponseSink(ImMessageBroadcaster broadcaster, List<Long> targetUserIds,
+                                  Long conversationId, String turnId, Long agentId, String agentName,
+                                  Long initiatorUserId, Long replyToMessageId, TurnRegistry registry) {
         this.broadcaster = broadcaster;
         this.targetUserIds = targetUserIds;
         this.conversationId = conversationId;
-    }
-
-    /** Test-only accessor — exposes the buffered LLM output so tests can assert
-     *  that {@link #onTextChunk} actually accumulated content before
-     *  {@link #onDone} flushes. */
-    String bufferedText() {
-        return textBuffer.toString();
-    }
-
-    @Override
-    public void onTextChunk(String text) {
-        if (text == null || text.isEmpty()) return;
-        textBuffer.append(text);
-        // Light-weight typing indicator so members see "AI typing…" while the
-        // LLM streams. The IM frontend is expected to debounce these — we just
-        // forward what the chokepoint emits.
-        broadcaster.publish(targetUserIds, WsFrame.builder()
-                .type("TYPING_INDICATOR")
-                .data(Map.of(
-                        "conversationId", conversationId,
-                        "state", "typing"))
-                .build());
+        this.turnId = turnId;
+        this.agentId = agentId;
+        this.agentName = agentName;
+        this.initiatorUserId = initiatorUserId;
+        this.replyToMessageId = replyToMessageId;
+        this.registry = registry;
     }
 
     @Override
-    public void onDone(String fullContent, String traceId) {
-        // Phase D.2 contract refinement: the sink does NOT emit a MESSAGE frame
-        // on onDone. The persisted ab_im_message row is written later by
-        // {@code Persistence.persistOutbound} in the chokepoint's finalizeTurn,
-        // and only THEN does the caller broadcast a MESSAGE frame carrying the
-        // proper {messageId, seq, senderId, ...} metadata (see
-        // {@code ImAiService.generateResponse}). Emitting a content-only
-        // MESSAGE frame here without {messageId, seq} would force IM clients to
-        // either render duplicate rows or invent fallback ids — both worse than
-        // a brief "AI thinking…" → "AI typed:" transition.
-        //
-        // We DO publish a TYPING_INDICATOR(state=stopped) so the typing dots
-        // disappear promptly even before persistOutbound fires, and we keep
-        // the buffered text reachable via {@link #bufferedText} for tests /
-        // diagnostics that want to assert what the LLM produced.
-        broadcaster.publish(targetUserIds, WsFrame.builder()
-                .type("TYPING_INDICATOR")
-                .data(Map.of(
-                        "conversationId", conversationId,
-                        "state", "stopped"))
-                .build());
-    }
+    public void onTurnBegin(String turnIdParam, Long agentIdParam, Long conversationIdParam,
+                             Long replyToMessageIdParam, Long initiatorUserIdParam) {
+        TurnHandle handle = registry.register(turnId, conversationId, agentId, agentName,
+                                               initiatorUserId, replyToMessageId);
+        this.cancelled = handle.getCancelled();
 
-    @Override
-    public void onError(String message, String traceId) {
-        Map<String, Object> data = new LinkedHashMap<>();
+        Map<String, Object> data = new HashMap<>();
+        data.put("turnId", turnId);
+        data.put("agentId", agentId);
+        data.put("agentName", agentName);
         data.put("conversationId", conversationId);
-        data.put("error", message != null ? message : "Unknown error");
-        if (traceId != null) data.put("traceId", traceId);
+        data.put("replyToMessageId", replyToMessageId);
+        data.put("initiatorUserId", initiatorUserId);
+        data.put("startedAt", handle.getStartedAt().toString());
+
         broadcaster.publish(targetUserIds, WsFrame.builder()
-                .type("ERROR")
+                .type(ImConstants.WS_AI_TURN_STARTED)
                 .data(data)
                 .build());
     }
 
     @Override
+    public void onTextChunk(String text) {
+        if (cancelled != null && cancelled.get()) {
+            throw new TurnCancelledException(turnId);
+        }
+        if (text == null || text.isEmpty()) return;
+        chunkBuf.append(text);
+        cumulativeBuf.append(text);
+
+        long now = System.currentTimeMillis();
+        if (chunkBuf.length() >= CHUNK_VOLUME_THRESHOLD || now - chunkLastFlush >= CHUNK_TIME_THRESHOLD_MS) {
+            flushChunkBuf(now);
+        }
+    }
+
+    private void flushChunkBuf(long now) {
+        if (chunkBuf.length() == 0) return;
+        String delta = chunkBuf.toString();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("turnId", turnId);
+        data.put("agentId", agentId);
+        data.put("conversationId", conversationId);
+        data.put("delta", delta);
+        data.put("cumulative", cumulativeBuf.toString());
+
+        broadcaster.publish(targetUserIds, WsFrame.builder()
+                .type(ImConstants.WS_STREAM_CHUNK)
+                .data(data)
+                .build());
+
+        // also append to registry handle's cumulative for offline resume
+        registry.get(turnId).ifPresent(h -> h.appendCumulative(delta));
+
+        chunkBuf.setLength(0);
+        chunkLastFlush = now;
+    }
+
+    @Override
+    public void onDone(String finalResponse, String traceId) {
+        if (chunkBuf.length() > 0) {
+            flushChunkBuf(System.currentTimeMillis());
+        }
+
+        Map<String, Object> endData = new HashMap<>();
+        endData.put("turnId", turnId);
+        endData.put("agentId", agentId);
+        endData.put("conversationId", conversationId);
+        endData.put("finalMessageId", null);
+        endData.put("totalTokens", null);
+
+        broadcaster.publish(targetUserIds, WsFrame.builder()
+                .type(ImConstants.WS_STREAM_END)
+                .data(endData)
+                .build());
+
+        Map<String, Object> completeData = new HashMap<>();
+        completeData.put("turnId", turnId);
+        completeData.put("conversationId", conversationId);
+        completeData.put("agentId", agentId);
+
+        broadcaster.publish(targetUserIds, WsFrame.builder()
+                .type(ImConstants.WS_AI_TURN_COMPLETED)
+                .data(completeData)
+                .build());
+
+        registry.markCompleted(turnId);
+    }
+
+    @Override
+    public void onError(String message, String traceId) {
+        String errorCode = StreamErrorClassifier.classify(message, traceId);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("turnId", turnId);
+        data.put("agentId", agentId);
+        data.put("conversationId", conversationId);
+        data.put("errorCode", errorCode);
+        data.put("errorMessage", message);
+
+        broadcaster.publish(targetUserIds, WsFrame.builder()
+                .type(ImConstants.WS_AI_TURN_FAILED)
+                .data(data)
+                .build());
+
+        registry.markFailed(turnId);
+    }
+
+    @Override
     public void onToolStart(String toolId, String toolName, Map<String, Object> input) {
-        // IM channels do not show per-tool spinners (the conversation member
-        // list does not benefit from tool-level granularity). We keep the
-        // typing indicator alive to signal "still working" but do not push a
-        // dedicated frame.
+        // Keep typing-phase annotation for tool execution phases — compatible with G1 frame scheme.
         broadcaster.publish(targetUserIds, WsFrame.builder()
                 .type("TYPING_INDICATOR")
                 .data(Map.of(
@@ -151,11 +199,8 @@ public class BroadcastResponseSink implements ResponseSink {
 
     @Override
     public void onToolResult(String toolId, Map<String, Object> result, boolean success) {
-        // No-op at the IM transport — the structured tool result is rendered
-        // by the result_contract pipeline (onResultContract) when the agent
-        // emits one, or absorbed into the final answer for plain tool_use
-        // rounds. Surfacing every tool_result as a MESSAGE frame would flood
-        // the conversation.
+        // No-op at the IM transport — structured tool result is rendered by the
+        // result_contract pipeline (onResultContract) when the agent emits one.
     }
 
     @Override
@@ -194,9 +239,9 @@ public class BroadcastResponseSink implements ResponseSink {
 
     @Override
     public boolean isClientConnected() {
-        // WebSocket delivery is fire-and-forget through the broadcaster;
-        // there is no per-turn liveness to report up. The LocalBroadcaster /
-        // RedisBroadcaster impl handles drop semantics internally.
         return true;
     }
+
+    // onTurnCancelled inherits the default no-op from ResponseSink (G1 design;
+    // Controller broadcasts ai_turn_cancelled directly).
 }

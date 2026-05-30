@@ -70,7 +70,7 @@ class GroupChatAgentRouterTest {
 
         router.onMessageSent(event);
 
-        verify(agentReplyTask, never()).executeReply(any(), any(), any(), any(), any());
+        verify(agentReplyTask, never()).executeReply(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -82,7 +82,7 @@ class GroupChatAgentRouterTest {
 
         router.onMessageSent(event);
 
-        verify(agentReplyTask, never()).executeReply(any(), any(), any(), any(), any());
+        verify(agentReplyTask, never()).executeReply(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -92,7 +92,7 @@ class GroupChatAgentRouterTest {
 
         router.onMessageSent(humanGroupEvent("hello", List.of()));
 
-        verify(agentReplyTask, never()).executeReply(any(), any(), any(), any(), any());
+        verify(agentReplyTask, never()).executeReply(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -106,9 +106,10 @@ class GroupChatAgentRouterTest {
         router.onMessageSent(humanGroupEvent("@alpha hi", List.of("agent:" + ALPHA_ID)));
 
         verify(agentReplyTask, times(1))
-                .executeReply(eq(CONV_ID), eq(TENANT_ID), eq(ALPHA_ID), eq("@alpha hi"), eq(SEQ));
+                .executeReply(eq(CONV_ID), eq(TENANT_ID), eq(ALPHA_ID), eq("@alpha hi"), eq(SEQ),
+                        eq(100L), eq(MESSAGE_ID), any());
         verify(agentReplyTask, never())
-                .executeReply(eq(CONV_ID), eq(TENANT_ID), eq(BETA_ID), any(), any());
+                .executeReply(eq(CONV_ID), eq(TENANT_ID), eq(BETA_ID), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -122,6 +123,7 @@ class GroupChatAgentRouterTest {
         router.onMessageSent(humanGroupEvent("hi everyone", List.of()));
 
         verify(agentReplyTask, times(1))
-                .executeReply(eq(CONV_ID), eq(TENANT_ID), eq(ALPHA_ID), eq("hi everyone"), eq(SEQ));
+                .executeReply(eq(CONV_ID), eq(TENANT_ID), eq(ALPHA_ID), eq("hi everyone"), eq(SEQ),
+                        eq(100L), eq(MESSAGE_ID), any());
     }
 }
