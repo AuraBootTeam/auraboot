@@ -57,11 +57,18 @@ echo ""
 echo "Step 0: Ensuring database role 'auraboot' exists..."
 psql_run postgres -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'auraboot') THEN CREATE ROLE auraboot WITH LOGIN SUPERUSER; RAISE NOTICE 'Role auraboot created'; ELSE RAISE NOTICE 'Role auraboot already exists'; END IF; END \$\$;" 2>/dev/null || true
 
-echo "Step 1: Terminating existing connections to '$PG_DB'..."
+echo "Step 1: Blocking new connections + terminating existing to '$PG_DB'..."
+# Block NEW connections first so a reconnecting backend connection pool cannot
+# re-grab a session between terminate and drop (otherwise DROP fails with
+# "database is being accessed by other users").
+psql_run postgres -v dbname="$PG_DB" -c "UPDATE pg_database SET datallowconn = false WHERE datname = :'dbname';" 2>/dev/null || true
 psql_run postgres -v dbname="$PG_DB" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :'dbname' AND pid <> pg_backend_pid();" 2>/dev/null || true
 
-echo "Step 2: Dropping database '$PG_DB'..."
-psql_run postgres -c "DROP DATABASE IF EXISTS $DB_IDENT;"
+echo "Step 2: Dropping database '$PG_DB' (forced)..."
+# WITH (FORCE) (PG 13+) terminates any stragglers and drops in one shot; the
+# datallowconn=false above prevents pool reconnection racing the drop. The new
+# database created in Step 3 defaults to datallowconn=true.
+psql_run postgres -c "DROP DATABASE IF EXISTS $DB_IDENT WITH (FORCE);"
 
 echo "Step 3: Creating database '$PG_DB'..."
 psql_run postgres -c "CREATE DATABASE $DB_IDENT;"
