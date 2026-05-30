@@ -121,45 +121,49 @@ export function RecordListView({
   // Toolbar state
   const [keywordInput, setKeywordInput] = useState('');
   const debouncedKeyword = useDebouncedValue(keywordInput, 300);
-  const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>([]);
+  const [localChips, setLocalChips] = useState<ViewFilterConfig[]>([]);
   const [sorts, setSorts] = useState<SortConfig[]>([]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
 
   // URL `filter_<field>=<value>` params drive drill-down filters (e.g. a summary
-  // chip click sets filter_bom_std_reason_code). The URL is authoritative for
-  // its own fields; user-added chips on other fields are preserved. Removing a
-  // URL-backed chip from the bar clears its URL param (handleChipFiltersChange).
-  const urlFilterKey = useMemo(() => {
-    const entries: Array<[string, string]> = [];
+  // chip click sets filter_bom_std_reason_code). These are derived — never stored
+  // in state — so clearing the URL param removes the chip cleanly. User-added
+  // chips (localChips) cover other fields; URL wins on field collisions.
+  const urlChips = useMemo<ViewFilterConfig[]>(() => {
+    const out: ViewFilterConfig[] = [];
     searchParams.forEach((value, key) => {
-      if (key.startsWith('filter_') && value) entries.push([key.slice('filter_'.length), value]);
+      if (key.startsWith('filter_') && value) {
+        out.push({ fieldCode: key.slice('filter_'.length), operator: 'eq', value });
+      }
     });
-    return JSON.stringify(entries.sort((a, b) => a[0].localeCompare(b[0])));
+    return out;
   }, [searchParams]);
-
-  useEffect(() => {
-    const urlChips: ViewFilterConfig[] = (JSON.parse(urlFilterKey) as Array<[string, string]>).map(
-      ([fieldCode, value]) => ({ fieldCode, operator: 'eq', value }),
-    );
-    const urlFields = new Set(urlChips.map((c) => c.fieldCode));
-    setChipFilters((prev) => [...urlChips, ...prev.filter((c) => !urlFields.has(c.fieldCode))]);
-  }, [urlFilterKey]);
+  const urlFields = useMemo(() => new Set(urlChips.map((c) => c.fieldCode)), [urlChips]);
+  const chipFilters = useMemo(
+    () => [...urlChips, ...localChips.filter((c) => !urlFields.has(c.fieldCode))],
+    [urlChips, urlFields, localChips],
+  );
 
   const handleChipFiltersChange = useCallback(
     (next: ViewFilterConfig[]) => {
-      const nextFields = new Set(next.map((c) => c.fieldCode));
+      // URL-managed fields: a removed chip clears its param; a changed value rewrites it.
+      const nextByField = new Map(next.map((c) => [c.fieldCode, c]));
       const sp = new URLSearchParams(searchParams);
-      let changed = false;
-      searchParams.forEach((_value, key) => {
-        if (key.startsWith('filter_') && !nextFields.has(key.slice('filter_'.length))) {
-          sp.delete(key);
-          changed = true;
+      let spChanged = false;
+      for (const c of urlChips) {
+        const n = nextByField.get(c.fieldCode);
+        if (!n) {
+          sp.delete('filter_' + c.fieldCode);
+          spChanged = true;
+        } else if (String(n.value) !== String(c.value)) {
+          sp.set('filter_' + c.fieldCode, String(n.value));
+          spChanged = true;
         }
-      });
-      if (changed) setSearchParams(sp, { replace: true });
-      setChipFilters(next);
+      }
+      if (spChanged) setSearchParams(sp, { replace: true });
+      setLocalChips(next.filter((c) => !urlFields.has(c.fieldCode)));
     },
-    [searchParams, setSearchParams],
+    [searchParams, setSearchParams, urlChips, urlFields],
   );
 
   // Filter popovers
@@ -282,6 +286,19 @@ export function RecordListView({
   const columnOrder = useMemo(() => columns.map((c) => c.field), [columns]);
   const noop = useCallback(() => {}, []);
 
+  // Resolve dict-backed filter values to their localized label so enum chips
+  // (e.g. the reason drill-down) show "缺关键字段" instead of the raw code.
+  const resolveChipValueLabel = useCallback(
+    (filter: ViewFilterConfig): string | undefined => {
+      const col = columns.find((c) => c.field === filter.fieldCode) as any;
+      const dictCode = col?.dictCode as string | undefined;
+      if (!dictCode) return undefined;
+      const item = getDictItems(dictCode).find((i) => String(i.value) === String(filter.value));
+      return item?.label;
+    },
+    [columns, getDictItems],
+  );
+
   return (
     <div className="record-list-view" data-testid={testIdPrefix}>
       {(searchable || filterable) && (
@@ -317,6 +334,7 @@ export function RecordListView({
                 handleChipFiltersChange([]);
                 setSorts([]);
               }}
+              resolveValueLabel={resolveChipValueLabel}
               locale={effectiveLocale}
               t={t}
             />
@@ -387,7 +405,7 @@ export function RecordListView({
                 value: '',
               };
               const nextIdx = chipFilters.length;
-              setChipFilters((prev) => [...prev, newChip]);
+              setLocalChips((prev) => [...prev, newChip]);
               // Immediately open the value editor for the new chip.
               setValuePopoverAnchor(fieldPickerAnchor);
               setEditingChipIdx(nextIdx);
@@ -411,8 +429,10 @@ export function RecordListView({
               operator={chipFilters[editingChipIdx].operator}
               value={chipFilters[editingChipIdx].value}
               onApply={(operator, value) => {
-                setChipFilters((prev) =>
-                  prev.map((c, i) =>
+                // Route through handleChipFiltersChange so URL-backed chips write
+                // to searchParams and local chips update localChips.
+                handleChipFiltersChange(
+                  chipFilters.map((c, i) =>
                     i === editingChipIdx ? { ...c, operator: operator as ViewFilterConfig['operator'], value } : c,
                   ),
                 );
@@ -420,8 +440,8 @@ export function RecordListView({
               }}
               onCancel={() => {
                 // Drop an empty chip that was never given a value.
-                setChipFilters((prev) =>
-                  prev.filter((c, i) => !(i === editingChipIdx && (c.value == null || c.value === ''))),
+                handleChipFiltersChange(
+                  chipFilters.filter((c, i) => !(i === editingChipIdx && (c.value == null || c.value === ''))),
                 );
                 setEditingChipIdx(null);
               }}
