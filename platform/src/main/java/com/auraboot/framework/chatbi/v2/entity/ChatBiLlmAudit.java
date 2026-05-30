@@ -21,7 +21,8 @@ import java.time.Instant;
 @TableName("chatbi_llm_audit")
 public class ChatBiLlmAudit {
 
-    @TableId(type = IdType.AUTO)
+    /** {@code id BIGINT PRIMARY KEY} (not BIGSERIAL) → snowflake. */
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private Long tenantId;
