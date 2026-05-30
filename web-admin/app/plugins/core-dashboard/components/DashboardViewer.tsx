@@ -31,6 +31,13 @@ interface DashboardViewerProps {
   title?: string;
   /** Show export toolbar */
   showExport?: boolean;
+  /**
+   * When true, suppress the per-widget action menu (kebab) that
+   * ChartWidgetWrapper renders. Used by informational pages like the
+   * workbench /home where raw CSV/JSON export per widget adds clutter
+   * without value. Business dashboards leave this false.
+   */
+  hideWidgetActions?: boolean;
 }
 
 export const DashboardViewer: React.FC<DashboardViewerProps> = ({
@@ -39,6 +46,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
   className = '',
   title = 'dashboard',
   showExport = false,
+  hideWidgetActions = false,
 }) => {
   const { locale, t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,6 +143,7 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
         linkageFilters={
           widgetLinkageFilters as unknown as import('~/framework/smart/types/chart').FilterConfig[]
         }
+        enableExport={!hideWidgetActions}
       >
         {chartElement}
       </ChartWidgetWrapper>
