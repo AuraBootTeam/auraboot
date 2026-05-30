@@ -14,7 +14,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import type { ColumnConfig, ButtonConfig, UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { ViewFilterConfig, SortConfig } from '~/framework/smart/types/savedView';
@@ -97,6 +97,7 @@ export function RecordListView({
   const { t, locale: ctxLocale } = useI18n();
   const effectiveLocale = locale ?? ctxLocale;
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Minimal synthetic schema so useListData treats this as a standard dynamic
   // table and applies the DSL pageSize.
@@ -123,6 +124,43 @@ export function RecordListView({
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>([]);
   const [sorts, setSorts] = useState<SortConfig[]>([]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+
+  // URL `filter_<field>=<value>` params drive drill-down filters (e.g. a summary
+  // chip click sets filter_bom_std_reason_code). The URL is authoritative for
+  // its own fields; user-added chips on other fields are preserved. Removing a
+  // URL-backed chip from the bar clears its URL param (handleChipFiltersChange).
+  const urlFilterKey = useMemo(() => {
+    const entries: Array<[string, string]> = [];
+    searchParams.forEach((value, key) => {
+      if (key.startsWith('filter_') && value) entries.push([key.slice('filter_'.length), value]);
+    });
+    return JSON.stringify(entries.sort((a, b) => a[0].localeCompare(b[0])));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const urlChips: ViewFilterConfig[] = (JSON.parse(urlFilterKey) as Array<[string, string]>).map(
+      ([fieldCode, value]) => ({ fieldCode, operator: 'eq', value }),
+    );
+    const urlFields = new Set(urlChips.map((c) => c.fieldCode));
+    setChipFilters((prev) => [...urlChips, ...prev.filter((c) => !urlFields.has(c.fieldCode))]);
+  }, [urlFilterKey]);
+
+  const handleChipFiltersChange = useCallback(
+    (next: ViewFilterConfig[]) => {
+      const nextFields = new Set(next.map((c) => c.fieldCode));
+      const sp = new URLSearchParams(searchParams);
+      let changed = false;
+      searchParams.forEach((_value, key) => {
+        if (key.startsWith('filter_') && !nextFields.has(key.slice('filter_'.length))) {
+          sp.delete(key);
+          changed = true;
+        }
+      });
+      if (changed) setSearchParams(sp, { replace: true });
+      setChipFilters(next);
+    },
+    [searchParams, setSearchParams],
+  );
 
   // Filter popovers
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
@@ -263,7 +301,7 @@ export function RecordListView({
               filters={chipFilters}
               sorts={sorts}
               fieldMetadata={fieldMetadata}
-              onFiltersChange={setChipFilters}
+              onFiltersChange={handleChipFiltersChange}
               onSortsChange={setSorts}
               onAddFilter={(e?: React.MouseEvent) => {
                 const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
@@ -276,7 +314,7 @@ export function RecordListView({
                 setEditingChipIdx(idx);
               }}
               onClearAll={() => {
-                setChipFilters([]);
+                handleChipFiltersChange([]);
                 setSorts([]);
               }}
               locale={effectiveLocale}

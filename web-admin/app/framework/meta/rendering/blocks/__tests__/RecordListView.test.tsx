@@ -9,7 +9,12 @@ vi.mock('~/shared/services/http-client', () => ({
   fetchResult: (...args: unknown[]) => fetchResultMock(...args),
 }));
 
-vi.mock('react-router', () => ({ useNavigate: () => vi.fn() }));
+let mockSearchParams = new URLSearchParams();
+const setSearchParamsMock = vi.fn();
+vi.mock('react-router', () => ({
+  useNavigate: () => vi.fn(),
+  useSearchParams: () => [mockSearchParams, setSearchParamsMock] as const,
+}));
 
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({ t: (k: string) => k, locale: 'en' }),
@@ -66,7 +71,11 @@ function lastFilters(): Array<{ fieldName: string; operator: string; value: stri
   return params.filters ? JSON.parse(params.filters) : [];
 }
 
-afterEach(() => fetchResultMock.mockReset());
+afterEach(() => {
+  fetchResultMock.mockReset();
+  mockSearchParams = new URLSearchParams();
+  setSearchParamsMock.mockReset();
+});
 
 describe('RecordListView', () => {
   it('fetches with fixedFilters scope and renders rows', async () => {
@@ -109,6 +118,24 @@ describe('RecordListView', () => {
       const call = fetchResultMock.mock.calls.at(-1);
       const params = (call?.[1] as { params?: Record<string, any> })?.params ?? {};
       expect(params.keyword).toBe('cap');
+    });
+  });
+
+  it('applies a filter_<field> URL param as a chip filter on the request', async () => {
+    mockSearchParams = new URLSearchParams('filter_bom_std_reason_code=missing_critical_field');
+    fetchResultMock.mockResolvedValue({ code: 0, data: { records: [], total: 0, page: 1 } });
+
+    render(<RecordListView modelCode="bom_standard_item" columns={columns} fixedFilters={{ bom_std_task_id: 'T-1' }} />);
+
+    await waitFor(() => {
+      const conditions = lastFilters();
+      expect(conditions).toContainEqual({
+        fieldName: 'bom_std_reason_code',
+        operator: 'EQ',
+        value: 'missing_critical_field',
+      });
+      // parent scope still enforced
+      expect(conditions).toContainEqual({ fieldName: 'bom_std_task_id', operator: 'EQ', value: 'T-1' });
     });
   });
 

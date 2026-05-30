@@ -454,6 +454,11 @@ export function DetailPageContent(props: PageContentProps) {
     [allBlocks],
   );
 
+  const directEmbeddedListBlocks = useMemo(
+    () => allBlocks.filter((b: BlockConfig) => b.blockType === 'embedded-list'),
+    [allBlocks],
+  );
+
   // G7 dispatch — blocks not handled by the hardcoded switch above still need
   // to render. Collect anything that is NOT a known detail-page block type and
   // delegate to BlockRenderer (unified block dispatcher). This lets chart,
@@ -597,7 +602,9 @@ export function DetailPageContent(props: PageContentProps) {
                   recordPid={recordData.pid}
                 />
               )}
-              <PrintButton title={getLocalizedText(schema.title, locale, t)} />
+              {schema.extension?.showPrint !== false && (
+                <PrintButton title={getLocalizedText(schema.title, locale, t)} />
+              )}
               {effectiveHeaderToolbar?.buttons && effectiveHeaderToolbar.buttons.length > 0 && (
                 <>
                   {effectiveHeaderToolbar.buttons
@@ -796,6 +803,25 @@ export function DetailPageContent(props: PageContentProps) {
                 dataSourceManager={dataSourceManager}
               />
             ))}
+            {directEmbeddedListBlocks.map((block: BlockConfig, blockIndex: number) => (
+              <DetailBlockRenderer
+                key={block.id || `embedded-${blockIndex}`}
+                block={block}
+                recordData={recordData}
+                recordId={recordId!}
+                token={token || undefined}
+                locale={locale}
+                t={t}
+                modelCode={schema?.modelCode || tableName}
+                evaluateEditableWhen={evaluateVisibleWhen}
+                onDataChange={reloadRecord}
+                getDictItems={getDictItems}
+                enrichField={enrichField}
+                runtime={runtime as SchemaRuntime}
+                schemaDataSources={schema?.dataSources}
+                dataSourceManager={dataSourceManager}
+              />
+            ))}
 
             {/* G7 — unified fallback dispatch for blocks not handled by the
                 hardcoded detail switch (chart / description / rich-text /
@@ -818,6 +844,7 @@ export function DetailPageContent(props: PageContentProps) {
             {effectiveDirectFormBlocks.length === 0 &&
               directSubTableBlocks.length === 0 &&
               directMonthlyGridBlocks.length === 0 &&
+              directEmbeddedListBlocks.length === 0 &&
               directMiscBlocks.length === 0 &&
               tabs.length === 0 && (
                 <FallbackDetailView schema={schema} recordData={recordData} locale={locale} />
