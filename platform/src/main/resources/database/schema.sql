@@ -9544,3 +9544,54 @@ CREATE INDEX IF NOT EXISTS idx_connector_webhook_secret_lookup
     ON connector_webhook_secret (connection_name, active);
 CREATE INDEX IF NOT EXISTS idx_connector_webhook_secret_tenant
     ON connector_webhook_secret (tenant_id);
+
+-- ============================================================================
+-- 2026-05-30 — Data Quality: Great Expectations (TRUST layer J)
+-- ============================================================================
+--
+-- Two tables supporting the GE integration:
+--   1. ab_dataquality_expectation_suite  — stores expectations JSON + target dataset
+--   2. ab_dataquality_validation_run     — stores per-run pass/fail results
+--
+-- References:
+--   ida/docs/03-auraboot自家底盘点.md §矩阵 #12 (Quality P0 gap)
+--   ida/docs/15-数据平台战略决策补丁.md §四 hybrid L5
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ab_dataquality_expectation_suite (
+  id                  BIGINT PRIMARY KEY,            -- snowflake (IdType.ASSIGN_ID)
+  pid                 VARCHAR(32) NOT NULL,
+  tenant_id           BIGINT NOT NULL,
+  suite_name          VARCHAR(128) NOT NULL,
+  dataset_name        VARCHAR(128) NOT NULL,          -- target table / view name
+  expectations_json   JSONB NOT NULL,                 -- GE expectations array
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_flag        BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ge_suite_pid
+    ON ab_dataquality_expectation_suite (pid);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ge_suite_name
+    ON ab_dataquality_expectation_suite (tenant_id, suite_name)
+    WHERE deleted_flag = FALSE;
+
+CREATE TABLE IF NOT EXISTS ab_dataquality_validation_run (
+  id                  BIGINT PRIMARY KEY,            -- snowflake (IdType.ASSIGN_ID)
+  pid                 VARCHAR(32) NOT NULL,
+  tenant_id           BIGINT NOT NULL,
+  suite_pid           VARCHAR(32) NOT NULL,
+  dataset_name        VARCHAR(128) NOT NULL,
+  total_expectations  INTEGER NOT NULL,
+  passed              INTEGER NOT NULL,
+  failed              INTEGER NOT NULL,
+  results_json        JSONB NOT NULL,                 -- per-expectation pass/fail + actual value
+  started_at          TIMESTAMPTZ NOT NULL,
+  finished_at         TIMESTAMPTZ,
+  deleted_flag        BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ge_run_pid
+    ON ab_dataquality_validation_run (pid);
+CREATE INDEX IF NOT EXISTS idx_ge_run_suite_time
+    ON ab_dataquality_validation_run (suite_pid, started_at DESC);
