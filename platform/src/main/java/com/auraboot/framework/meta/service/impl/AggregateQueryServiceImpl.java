@@ -43,6 +43,16 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private final com.auraboot.framework.meta.service.MetaModelService metaModelService;
 
     /**
+     * Optional — when present and the request carries a {@code semanticModelCode},
+     * delegate to the semantic layer (PRD 16 §6 W4 D4). Wired via field injection
+     * with {@code required=false} so environments without the semantic stack still
+     * boot cleanly (canonical Spring 6 single-ctor rule from
+     * engineering-gotchas — use field injection, not ctor, for the optional dep).
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SemanticAggregateAdapter semanticAggregateAdapter;
+
+    /**
      * Valid identifier pattern for SQL identifiers (table names, column names, aliases).
      */
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
@@ -70,6 +80,16 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     )
     public AggregateQueryResponse execute(AggregateQueryRequest request) {
         validateRequest(request);
+
+        // Semantic-routed path: if the caller declared a semanticModelCode AND the
+        // adapter is available, delegate the entire request through the governed
+        // semantic layer (PRD 16 §6 W4 D4). Bit-identical legacy behaviour
+        // preserved when either is absent — existing widgets do not regress.
+        if (request.getSemanticModelCode() != null
+                && !request.getSemanticModelCode().isBlank()
+                && semanticAggregateAdapter != null) {
+            return semanticAggregateAdapter.execute(request);
+        }
 
         if ("namedQuery".equals(request.getType())) {
             return executeNamedQuery(request);

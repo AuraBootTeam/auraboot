@@ -28,6 +28,22 @@ public class AggregateQueryRequest {
     private String modelCode;
 
     /**
+     * Optional semantic-model code (PRD 16 §3) used to route the request through the
+     * semantic layer rather than the raw model + SQL builder path.
+     *
+     * <p>When non-null the impl delegates to {@code SemanticQueryService.executeQuery}
+     * and translates {@link #metrics} / {@link #dimensions} / {@link #filters} /
+     * {@code drillFilters} into {@code SemanticQueryRequest} fields. Metric entries
+     * must reference declared {@code semantic_model.metrics[].code} values
+     * (qualified as {@code <semanticModelCode>.<metric_code>} accepted; bare codes
+     * also accepted and qualified at the boundary).
+     *
+     * <p>When null the legacy path is preserved bit-identical for backward
+     * compatibility with all existing dashboard / chart components.
+     */
+    private String semanticModelCode;
+
+    /**
      * The named query code to execute.
      * Required for namedQuery type queries.
      */
