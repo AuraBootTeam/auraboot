@@ -14,6 +14,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
+import type { ViewFilterConfig, SortConfig } from '~/framework/smart/types/savedView';
 
 interface DynamicEntity {
   [key: string]: any;
@@ -47,6 +48,13 @@ export interface UseListDataOptions {
   token?: string;
   /** Initial page size (can be overridden by DSL) */
   initialPageSize?: number;
+  /**
+   * Parent-scope filters AND-merged into every request and not user-clearable
+   * (e.g. `{ bom_std_task_id: <currentTaskId> }` for an embedded list bound to
+   * the surrounding detail record). These always win over user/tab filters of
+   * the same field so the embedded scope can never be widened from the toolbar.
+   */
+  fixedFilters?: Record<string, any>;
 }
 
 export interface UseListDataResult {
@@ -62,6 +70,9 @@ export interface UseListDataResult {
     size?: number;
     filters?: Record<string, any>;
     tabFilter?: TabFilter | null;
+    chipFilters?: ViewFilterConfig[];
+    keyword?: string;
+    sorts?: SortConfig[];
   }) => Promise<void>;
   handlePageChange: (page: number) => void;
 }
@@ -71,6 +82,7 @@ export function useListData({
   tableName,
   token,
   initialPageSize = 20,
+  fixedFilters,
 }: UseListDataOptions): UseListDataResult {
   const [data, setData] = useState<DynamicEntity[]>([]);
   const [loading, setLoading] = useState(false);
@@ -107,7 +119,11 @@ export function useListData({
 
   // Build filters JSON array
   const buildFiltersParam = useCallback(
-    (tabCondition: TabFilter | null, userFilters?: Record<string, any>) => {
+    (
+      tabCondition: TabFilter | null,
+      userFilters?: Record<string, any>,
+      chipFilters?: ViewFilterConfig[],
+    ) => {
       const conditions: Array<{ fieldName: string; operator: string; value: string }> = [];
       if (tabCondition) conditions.push(tabCondition);
       if (userFilters) {
@@ -123,6 +139,25 @@ export function useListData({
           }
         }
       }
+      // Chip filters carry an explicit operator (eq/like/gt/.../isNull). LIKE
+      // wraps the value with % wildcards; unary null operators need no value.
+      if (chipFilters) {
+        for (const cf of chipFilters) {
+          if (!cf.fieldCode) continue;
+          const op = (cf.operator || 'eq').toUpperCase();
+          if (op === 'ISNULL' || op === 'ISNOTNULL') {
+            conditions.push({ fieldName: cf.fieldCode, operator: op, value: '' });
+            continue;
+          }
+          if (cf.value == null || cf.value === '') continue;
+          const val = String(cf.value);
+          conditions.push({
+            fieldName: cf.fieldCode,
+            operator: op,
+            value: op === 'LIKE' ? `%${val}%` : val,
+          });
+        }
+      }
       return conditions.length > 0 ? JSON.stringify(conditions) : undefined;
     },
     [],
@@ -134,6 +169,9 @@ export function useListData({
       size?: number;
       filters?: Record<string, any>;
       tabFilter?: TabFilter | null;
+      chipFilters?: ViewFilterConfig[];
+      keyword?: string;
+      sorts?: SortConfig[];
     }) => {
       if (!schema) return;
 
@@ -162,9 +200,12 @@ export function useListData({
           queryParams.pageSize = requestedPageSize;
         }
 
+        // Parent-scope filters always win over user/tab filters of the same field.
+        const effectiveFilters = { ...(params?.filters ?? filters), ...(fixedFilters ?? {}) };
+
         if (isApiDatasource) {
           // API datasource: pass filter params individually (not JSON array)
-          const userFilters = params?.filters ?? filters;
+          const userFilters = effectiveFilters;
           for (const [key, value] of Object.entries(userFilters)) {
             if (value == null || value === '') continue;
             if (typeof value === 'object' && ('start' in value || 'end' in value)) {
@@ -178,9 +219,22 @@ export function useListData({
           // Standard dynamic table: pass filters as JSON array
           const filtersParam = buildFiltersParam(
             params?.tabFilter ?? null,
-            params?.filters ?? filters,
+            effectiveFilters,
+            params?.chipFilters,
           );
           if (filtersParam) queryParams.filters = filtersParam;
+
+          // Free-text search + sort use the dynamic list contract param names
+          // (keyword / sortField / sortOrder — see DynamicController).
+          const keyword = params?.keyword?.trim();
+          if (keyword) queryParams.keyword = keyword;
+          const primarySort = (params?.sorts ?? [])
+            .slice()
+            .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))[0];
+          if (primarySort?.fieldCode) {
+            queryParams.sortField = primarySort.fieldCode;
+            queryParams.sortOrder = primarySort.direction;
+          }
         }
 
         if (namedQueryCode) queryParams.queryCode = namedQueryCode;
@@ -233,6 +287,7 @@ export function useListData({
       pagination.current,
       pagination.pageSize,
       filters,
+      fixedFilters,
       buildFiltersParam,
       namedQueryCode,
     ],
