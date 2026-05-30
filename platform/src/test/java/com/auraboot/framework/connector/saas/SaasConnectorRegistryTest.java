@@ -5,18 +5,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.auraboot.framework.connector.saas.dingtalk.DingTalkConnectorAdapter;
 import com.auraboot.framework.connector.saas.hubspot.HubspotConnectorAdapter;
+import com.auraboot.framework.connector.saas.http.SaasHttpClient;
+import com.auraboot.framework.connector.saas.oauth.OAuth2TokenStore;
 import com.auraboot.framework.connector.saas.salesforce.SalesforceConnectorAdapter;
 import com.auraboot.framework.connector.saas.shopify.ShopifyConnectorAdapter;
 import com.auraboot.framework.connector.saas.stripe.StripeConnectorAdapter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+
+import static org.mockito.Mockito.mock;
 
 class SaasConnectorRegistryTest {
 
     private SaasConnectorRegistry newRegistry() {
         return new SaasConnectorRegistry(List.of(
                 new SalesforceConnectorAdapter(),
-                new HubspotConnectorAdapter(),
+                new HubspotConnectorAdapter(
+                        mock(SaasHttpClient.class),
+                        mock(OAuth2TokenStore.class),
+                        new ObjectMapper()),
                 new StripeConnectorAdapter(),
                 new ShopifyConnectorAdapter(),
                 new DingTalkConnectorAdapter()));

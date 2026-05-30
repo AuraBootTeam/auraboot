@@ -5,10 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.auraboot.framework.connector.saas.dingtalk.DingTalkConnectorAdapter;
 import com.auraboot.framework.connector.saas.hubspot.HubspotConnectorAdapter;
+import com.auraboot.framework.connector.saas.http.SaasHttpClient;
+import com.auraboot.framework.connector.saas.oauth.OAuth2TokenStore;
 import com.auraboot.framework.connector.saas.salesforce.SalesforceConnectorAdapter;
 import com.auraboot.framework.connector.saas.shopify.ShopifyConnectorAdapter;
 import com.auraboot.framework.connector.saas.stripe.StripeConnectorAdapter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+
+import static org.mockito.Mockito.mock;
 
 /**
  * Per-vendor descriptor + scaffold assertion tests.
@@ -38,14 +43,13 @@ class SaasConnectorDescriptorTest {
 
     @Test
     void hubspotDescriptor() {
-        HubspotConnectorAdapter a = new HubspotConnectorAdapter();
+        // HubSpot has graduated from scaffold to real implementation (W5-M2.1).
+        // Inject mocked deps; behavioural coverage lives in HubspotConnectorAdapterTest.
+        HubspotConnectorAdapter a = new HubspotConnectorAdapter(
+                mock(SaasHttpClient.class), mock(OAuth2TokenStore.class), new ObjectMapper());
         assertThat(a.descriptor().protocolType()).isEqualTo("saas-hubspot");
         assertThat(a.descriptor().supportedEndpointCodes())
                 .containsExactly("companies", "contacts", "deals", "tickets", "line_items", "products");
-        assertThatThrownBy(() -> a.discover(null))
-                .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> a.read(null, "contacts", null))
-                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
@@ -94,7 +98,8 @@ class SaasConnectorDescriptorTest {
 
     @Test
     void supportedStreamsMatchesDescriptor() {
-        HubspotConnectorAdapter a = new HubspotConnectorAdapter();
+        HubspotConnectorAdapter a = new HubspotConnectorAdapter(
+                mock(SaasHttpClient.class), mock(OAuth2TokenStore.class), new ObjectMapper());
         assertThat(a.supportedStreams())
                 .isEqualTo(a.descriptor().supportedEndpointCodes());
     }
