@@ -17,6 +17,7 @@ import com.auraboot.framework.conversation.InboundMode;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.conversation.TurnRequest;
+import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
@@ -86,6 +87,7 @@ public class AgentReplyTask {
     private final HandoffToolProvider handoffToolProvider;
     private final ConversationTurnService turnService;
     private final ImMessageService messageService;
+    private final TurnRegistry turnRegistry;
 
     public AgentReplyTask(AgentDefinitionMapper agentDefinitionMapper,
                           ObjectProvider<GroupChatMessagePort> messagePortProvider,
@@ -93,7 +95,8 @@ public class AgentReplyTask {
                           ImMessageBroadcaster broadcaster,
                           HandoffToolProvider handoffToolProvider,
                           ConversationTurnService turnService,
-                          ImMessageService messageService) {
+                          ImMessageService messageService,
+                          TurnRegistry turnRegistry) {
         this.agentDefinitionMapper = agentDefinitionMapper;
         this.messagePort = messagePortProvider.getIfAvailable(NoOpGroupChatMessagePort::new);
         this.contextAssembler = contextAssembler;
@@ -101,6 +104,7 @@ public class AgentReplyTask {
         this.handoffToolProvider = handoffToolProvider;
         this.turnService = turnService;
         this.messageService = messageService;
+        this.turnRegistry = turnRegistry;
     }
 
     /**
@@ -116,9 +120,12 @@ public class AgentReplyTask {
      */
     @Async
     public void executeReply(Long conversationId, Long tenantId, Long agentId,
-                              String triggerContent, Long triggeringSeq) {
+                              String triggerContent, Long triggeringSeq,
+                              Long initiatorUserId, Long replyToMessageId,
+                              List<Long> bypassedMentionedAgentIds) {
         executeReplyWithDepth(conversationId, tenantId, agentId, triggerContent, 0,
-                /*parentTaskPid=*/ null, triggeringSeq, null);
+                /*parentTaskPid=*/ null, triggeringSeq, null,
+                initiatorUserId, replyToMessageId, bypassedMentionedAgentIds);
     }
 
     /**
@@ -131,7 +138,9 @@ public class AgentReplyTask {
      */
     private void executeReplyWithDepth(Long conversationId, Long tenantId, Long agentId,
                                         String triggerContent, int depth, String parentTaskPid,
-                                        Long triggeringSeq, Set<String> inheritedPermissions) {
+                                        Long triggeringSeq, Set<String> inheritedPermissions,
+                                        Long initiatorUserId, Long replyToMessageId,
+                                        List<Long> bypassedMentionedAgentIds) {
         if (depth >= MAX_HANDOFF_DEPTH) {
             log.warn("Max handoff depth {} reached for conversation {}, agent {}",
                     MAX_HANDOFF_DEPTH, conversationId, agentId);
@@ -146,19 +155,7 @@ public class AgentReplyTask {
 
         List<Long> humanMemberIds = new ArrayList<>(messagePort.getHumanMemberIds(conversationId, tenantId));
 
-        // DC.4: emit an explicit TYPING_INDICATOR(state=typing) before runTurn
-        // so members see "AI is thinking…" even before the LLM emits its first
-        // token. BroadcastResponseSink will keep firing TYPING_INDICATOR on
-        // every onTextChunk and a final TYPING_INDICATOR(state=stopped) on
-        // onDone — this preamble just makes the start-of-turn signal immediate.
-        broadcaster.publish(humanMemberIds, WsFrame.builder()
-                .type("TYPING_INDICATOR")
-                .data(Map.of(
-                        "conversationId", conversationId,
-                        "state", "typing",
-                        "agentId", agentId,
-                        "agentName", agent.getName() != null ? agent.getName() : "AI"))
-                .build());
+        // G1-T9: TYPING_INDICATOR preamble removed — BroadcastResponseSink.onTurnBegin emits ai_turn_started immediately
 
         List<AgentMemberDto> roster = messagePort.getAgentMembers(conversationId, tenantId);
         AgentMemberDto currentMember = resolveAgentById(roster, agentId);
@@ -181,6 +178,9 @@ public class AgentReplyTask {
                 .tools(agent.getTools())
                 .build();
         String systemPrompt = contextAssembler.buildSystemPrompt(agentDto, conversationId, tenantId);
+        if (bypassedMentionedAgentIds != null && !bypassedMentionedAgentIds.isEmpty()) {
+            systemPrompt = systemPrompt + "\n\n[Routing note] Other agents were also @-mentioned in this message but defer to you for the primary reply: agentIds=" + bypassedMentionedAgentIds;
+        }
         List<LlmChatRequest.Message> history = contextAssembler.buildHistory(conversationId, tenantId, contextWindow);
 
         // Build the handoff extra-tool (only when there are other agents to
@@ -218,8 +218,18 @@ public class AgentReplyTask {
                 overrides,                            // server-only context bag (DC.3a)
                 /*legacyRequest=*/ buildLegacyChatRequest(agent.getAgentCode(), triggerContent, conversationId));
 
-        ResponseSink sink = new BroadcastResponseSink(broadcaster, humanMemberIds, conversationId);
-        TurnOutcome outcome = turnService.runTurn(req, sink);
+        String turnId = java.util.UUID.randomUUID().toString();
+        String agentName = agent.getName() != null ? agent.getName() : agent.getAgentCode();
+        ResponseSink sink = new BroadcastResponseSink(broadcaster, humanMemberIds, conversationId,
+                turnId, agent.getId(), agentName, initiatorUserId, replyToMessageId, turnRegistry);
+        TurnOutcome outcome;
+        try {
+            outcome = turnService.runTurn(req, sink);
+        } catch (com.auraboot.framework.conversation.TurnCancelledException ce) {
+            log.info("Turn {} cancelled mid-execution for conversation {} agent {}: {}",
+                    turnId, conversationId, agent.getName(), ce.getMessage());
+            return;  // sink.onTurnCancelled already broadcast ai_turn_cancelled; no further action
+        }
 
         // GAP-311: post-runTurn MESSAGE broadcast. After the chokepoint
         // persists the agent (or system-error) reply row via finalizeTurn ->
@@ -230,7 +240,7 @@ public class AgentReplyTask {
                 humanMemberIds, triggeringSeq, outcome);
 
         handleOutcome(outcome, conversationId, tenantId, agent, humanMemberIds, depth, persistedSeq, triggeringSeq,
-                roster, effectivePermissions);
+                roster, effectivePermissions, initiatorUserId);
     }
 
     /**
@@ -336,7 +346,8 @@ public class AgentReplyTask {
     private void handleOutcome(TurnOutcome outcome, Long conversationId, Long tenantId,
                                 AgentDefinition agent, List<Long> humanMemberIds, int depth,
                                 Long persistedSeq, Long triggeringSeq,
-                                List<AgentMemberDto> roster, Set<String> effectivePermissions) {
+                                List<AgentMemberDto> roster, Set<String> effectivePermissions,
+                                Long initiatorUserId) {
         if (outcome instanceof TurnOutcome.Success success && success.meta() != null) {
             Object handoffTo = success.meta().get("_handoff_to");
             if (handoffTo != null) {
@@ -367,7 +378,8 @@ public class AgentReplyTask {
                 Long childTriggeringSeq = persistedSeq != null ? persistedSeq : triggeringSeq;
                 Set<String> childPermissions = decision.effectivePermissions();
                 executeReplyWithDepth(conversationId, tenantId, targetAgentId, childTrigger,
-                        depth + 1, parentTaskPidForChild, childTriggeringSeq, childPermissions);
+                        depth + 1, parentTaskPidForChild, childTriggeringSeq, childPermissions,
+                        initiatorUserId, null, List.of());
                 return;
             }
         }

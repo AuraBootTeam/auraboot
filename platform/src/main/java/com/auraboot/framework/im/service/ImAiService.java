@@ -7,6 +7,7 @@ import com.auraboot.framework.conversation.ConversationTurnService;
 import com.auraboot.framework.conversation.InboundMode;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.conversation.TurnRequest;
+import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;
 import com.auraboot.framework.im.model.ImMessage;
@@ -61,6 +62,7 @@ public class ImAiService {
     private final ImMessageBroadcaster broadcaster;
     private final ImConversationMemberMapper memberMapper;
     private final ConversationTurnService turnService;
+    private final TurnRegistry turnRegistry;
 
     /**
      * Check if a message mentions AI.
@@ -81,8 +83,15 @@ public class ImAiService {
             Long conversationId = userMessage.getConversationId();
             List<Long> memberUserIds = memberMapper.findHumanMemberIds(conversationId, tenantId);
 
+            // G1-T6 placeholder: agentId/agentName/initiatorUserId/replyToMessageId threaded properly in G1-T9
             BroadcastResponseSink sink = new BroadcastResponseSink(
-                    broadcaster, memberUserIds, conversationId);
+                    broadcaster, memberUserIds, conversationId,
+                    java.util.UUID.randomUUID().toString(),  // turnId — G1-T9 will supply from runTurn
+                    0L,                                      // agentId placeholder (G1-T9: resolve from agentCode)
+                    "aurabot",                               // agentName placeholder
+                    userId,                                  // initiatorUserId — message sender
+                    userMessage.getId(),                     // replyToMessageId
+                    turnRegistry);
 
             ChatRequest legacy = new ChatRequest();
             legacy.setMessage(userMessage.getContent());

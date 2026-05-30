@@ -1,6 +1,7 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.dto.ResultContract;
+import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,28 +18,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
- * Phase D.1 unit tests for {@link BroadcastResponseSink}. Verifies the
- * sink-to-WebSocket-frame contract for IM-driven entry points (Q-D.2=α
- * "BroadcastResponseSink — buffer onTextChunk into onDone for one-shot IM
- * write + broadcast"):
+ * G1 unit tests for {@link BroadcastResponseSink}. Tests the retained D.1 behaviors
+ * (onToolStart TYPING_INDICATOR, onConfirmRequired, onResultContract, onToolResult no-op,
+ * isClientConnected) with the updated 9-arg constructor.
  *
- * <ol>
- *     <li>onTextChunk buffers text + emits TYPING_INDICATOR(state=typing) frames</li>
- *     <li>onDone emits ONE MESSAGE frame with the full text + a stop typing frame</li>
- *     <li>onError emits ERROR frame; null message falls back to "Unknown error"</li>
- *     <li>onToolStart emits TYPING_INDICATOR with phase="tool:..." (no MESSAGE flood)</li>
- *     <li>onToolResult is a no-op at this transport (no MESSAGE frame)</li>
- *     <li>onConfirmRequired emits MESSAGE frame with cardType=confirm_required + pendingTurnId</li>
- *     <li>onResultContract emits MESSAGE frame with cardType=result_contract + contract object</li>
- *     <li>onTextChunk(null/"") is a no-op (no broadcast, no buffer growth)</li>
- *     <li>isClientConnected returns true unconditionally (fire-and-forget transport)</li>
- * </ol>
+ * <p>The stream-lifecycle tests (onTextChunk buffering, onTurnBegin, onDone stream frames,
+ * onError ai_turn_failed) live in {@link BroadcastResponseSinkStreamTest}.
  */
-@DisplayName("BroadcastResponseSink — IM WebSocket frame shape")
+@DisplayName("BroadcastResponseSink — retained D.1 behaviors (tool / card frames)")
 class BroadcastResponseSinkTest {
 
     private ImMessageBroadcaster broadcaster;
@@ -50,19 +40,15 @@ class BroadcastResponseSinkTest {
     @BeforeEach
     void setUp() {
         broadcaster = mock(ImMessageBroadcaster.class);
-        sink = new BroadcastResponseSink(broadcaster, TARGETS, CONV_ID);
+        TurnRegistry registry = new TurnRegistry();
+        sink = new BroadcastResponseSink(broadcaster, TARGETS, CONV_ID,
+                "turn-test", 55L, "aurabot", 100L, null, registry);
     }
 
-    private WsFrame captureSingleFrame() {
-        ArgumentCaptor<WsFrame> captor = ArgumentCaptor.forClass(WsFrame.class);
-        verify(broadcaster, times(1)).publish(eq(TARGETS), captor.capture());
-        return captor.getValue();
-    }
-
-    private List<WsFrame> captureAllFrames() {
+    private WsFrame captureFirstFrame() {
         ArgumentCaptor<WsFrame> captor = ArgumentCaptor.forClass(WsFrame.class);
         verify(broadcaster, atLeastOnce()).publish(eq(TARGETS), captor.capture());
-        return captor.getAllValues();
+        return captor.getAllValues().get(0);
     }
 
     // =========================================================================
@@ -70,83 +56,11 @@ class BroadcastResponseSinkTest {
     // =========================================================================
 
     @Test
-    @DisplayName("1) onTextChunk buffers text and emits TYPING_INDICATOR(state=typing)")
-    void onTextChunk_buffersAndTypes() {
-        sink.onTextChunk("Hello, ");
-        sink.onTextChunk("world!");
-
-        assertThat(sink.bufferedText()).isEqualTo("Hello, world!");
-        List<WsFrame> frames = captureAllFrames();
-        assertThat(frames).hasSize(2);
-        for (WsFrame f : frames) {
-            assertThat(f.getType()).isEqualTo("TYPING_INDICATOR");
-            @SuppressWarnings("unchecked")
-            Map<String, Object> data = (Map<String, Object>) f.getData();
-            assertThat(data).containsEntry("conversationId", CONV_ID).containsEntry("state", "typing");
-        }
-    }
-
-    @Test
-    @DisplayName("2) onDone emits ONLY TYPING_INDICATOR(state=stopped); MESSAGE frame deferred to caller post-persist")
-    void onDone_emitsOnlyStopTyping() {
-        // Phase D.2 contract refinement: BroadcastResponseSink does NOT emit a
-        // MESSAGE frame on onDone — that responsibility moved to the IM-event
-        // caller (e.g. ImAiService) which broadcasts AFTER persistOutbound has
-        // written the row, so the WS frame can carry {messageId, seq, ...}.
-        sink.onDone("The full answer.", "trace-abc");
-
-        WsFrame f = captureSingleFrame();
-        assertThat(f.getType()).isEqualTo("TYPING_INDICATOR");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) f.getData();
-        assertThat(data)
-                .containsEntry("conversationId", CONV_ID)
-                .containsEntry("state", "stopped");
-    }
-
-    @Test
-    @DisplayName("2b) onDone preserves bufferedText for diagnostics; only stop-typing emitted")
-    void onDone_preservesBufferForDiagnostics() {
-        sink.onTextChunk("buffered ");
-        sink.onTextChunk("answer");
-        assertThat(sink.bufferedText()).isEqualTo("buffered answer");
-
-        sink.onDone(null, null);
-
-        // 2 chunk-typing frames + 1 stop-typing frame = 3 total.
-        List<WsFrame> frames = captureAllFrames();
-        assertThat(frames).hasSize(3);
-        assertThat(frames.get(2).getType()).isEqualTo("TYPING_INDICATOR");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) frames.get(2).getData();
-        assertThat(data).containsEntry("state", "stopped");
-        // The buffered text is still accessible for callers that need it as
-        // a fallback (e.g. persistOutbound returned null and we want to log
-        // what the LLM actually produced).
-        assertThat(sink.bufferedText()).isEqualTo("buffered answer");
-    }
-
-    @Test
-    @DisplayName("3) onError emits ERROR frame; null message becomes 'Unknown error'")
-    void onError_emitsErrorFrame() {
-        sink.onError(null, "trace-x");
-
-        WsFrame f = captureSingleFrame();
-        assertThat(f.getType()).isEqualTo("ERROR");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) f.getData();
-        assertThat(data)
-                .containsEntry("conversationId", CONV_ID)
-                .containsEntry("error", "Unknown error")
-                .containsEntry("traceId", "trace-x");
-    }
-
-    @Test
     @DisplayName("4) onToolStart emits TYPING_INDICATOR with phase=tool:<name>")
     void onToolStart_emitsTypingWithPhase() {
         sink.onToolStart("t1", "search_records", Map.of("q", "x"));
 
-        WsFrame f = captureSingleFrame();
+        WsFrame f = captureFirstFrame();
         assertThat(f.getType()).isEqualTo("TYPING_INDICATOR");
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) f.getData();
@@ -159,7 +73,6 @@ class BroadcastResponseSinkTest {
     @DisplayName("5) onToolResult is a no-op (no broadcast frame)")
     void onToolResult_isNoOp() {
         sink.onToolResult("t1", Map.of("rows", 3), true);
-
         verify(broadcaster, never()).publish(any(), any());
     }
 
@@ -169,7 +82,7 @@ class BroadcastResponseSinkTest {
         sink.onConfirmRequired("t-9", "delete_record", "Confirm deletion?",
                 Map.of("id", 42), "APPROVAL_PID_123");
 
-        WsFrame f = captureSingleFrame();
+        WsFrame f = captureFirstFrame();
         assertThat(f.getType()).isEqualTo("MESSAGE");
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) f.getData();
@@ -190,7 +103,7 @@ class BroadcastResponseSinkTest {
     void onConfirmRequired_nullsHandled() {
         sink.onConfirmRequired("t-1", "x", null, Map.of(), null);
 
-        WsFrame f = captureSingleFrame();
+        WsFrame f = captureFirstFrame();
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) f.getData();
         assertThat(data).containsEntry("description", "");
@@ -209,7 +122,7 @@ class BroadcastResponseSinkTest {
                 .build();
         sink.onResultContract(rc);
 
-        WsFrame f = captureSingleFrame();
+        WsFrame f = captureFirstFrame();
         assertThat(f.getType()).isEqualTo("MESSAGE");
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) f.getData();
@@ -223,16 +136,6 @@ class BroadcastResponseSinkTest {
     @DisplayName("7b) onResultContract(null) is a no-op")
     void onResultContract_nullIsNoOp() {
         sink.onResultContract(null);
-        verify(broadcaster, never()).publish(any(), any());
-    }
-
-    @Test
-    @DisplayName("8) onTextChunk(null) and onTextChunk(\"\") are silent no-ops")
-    void onTextChunk_nullOrEmpty_noOp() {
-        sink.onTextChunk(null);
-        sink.onTextChunk("");
-
-        assertThat(sink.bufferedText()).isEmpty();
         verify(broadcaster, never()).publish(any(), any());
     }
 

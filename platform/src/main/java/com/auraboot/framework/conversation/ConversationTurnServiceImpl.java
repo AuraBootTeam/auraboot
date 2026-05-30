@@ -143,6 +143,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     public TurnOutcome runTurn(TurnRequest request, ResponseSink sink) {
         TurnContext ctx = beginTurn(request);
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
+        sink.onTurnBegin(ctx.turnId(), null, request.conversationId(),
+                          request.inboundMessageId(), request.userId());
 
         // D.1: wrap the sink so Anthropic Extended Thinking blocks emitted via
         // {@code onThinking} are captured for persistence at finalizeTurn time
