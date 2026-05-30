@@ -36,6 +36,7 @@ import { ReportGenerateButton } from '~/framework/smart/components/report/Report
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { InlineApprovalPanel } from '~/framework/smart/components/approval/InlineApprovalPanel';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
+import { EmbeddedListBlockRenderer } from '~/framework/meta/rendering/blocks/EmbeddedListBlockRenderer';
 import { MonthlyGridViewer } from '~/framework/meta/rendering/blocks/MonthlyGridViewer';
 import { FieldHistoryViewer } from '~/framework/meta/rendering/blocks/FieldHistoryViewer';
 import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTimeline';
@@ -464,6 +465,7 @@ export function DetailPageContent(props: PageContentProps) {
     'form-section',
     'detail-section',
     'sub-table',
+    'embedded-list',
     'monthly-grid',
     'activity-timeline',
     'record-comments',
@@ -1005,6 +1007,18 @@ function DetailBlockRenderer({
         </div>
       );
     }
+  }
+
+  if (block.blockType === 'embedded-list') {
+    return (
+      <EmbeddedListBlockRenderer
+        block={block}
+        runtime={runtime}
+        parentRecordId={recordId}
+        parentRecordData={recordData}
+        token={token}
+      />
+    );
   }
 
   if (block.blockType === 'activity-timeline') {
