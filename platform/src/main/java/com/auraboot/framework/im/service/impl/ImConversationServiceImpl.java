@@ -2,6 +2,7 @@ package com.auraboot.framework.im.service.impl;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.im.dto.Announcement;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
@@ -18,6 +19,8 @@ import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.service.ImConversationService;
 import com.auraboot.framework.im.service.ImMessageService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +37,7 @@ public class ImConversationServiceImpl implements ImConversationService {
     private final ImMessageMapper messageMapper;
     private final ImMessageService imMessageService;
     private final AgentDefinitionMapper agentDefinitionMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     public ImConversationServiceImpl(ImConversationMapper conversationMapper,
                                       ImConversationMemberMapper memberMapper,
@@ -239,6 +243,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .pinned(membership != null ? membership.getPinned() : false)
                 .muted(membership != null ? membership.getMuted() : false)
                 .memberCount(members.size())
+                .announcement(parseAnnouncement(conv.getMetadata()))
                 .build();
     }
 
@@ -594,6 +599,69 @@ public class ImConversationServiceImpl implements ImConversationService {
         memberMapper.hideConversation(conversationId, ImConstants.MEMBER_TYPE_HUMAN, userId, tenantId);
     }
 
+    @Override
+    @Transactional
+    public Announcement setAnnouncement(Long conversationId, String content, Long userId, String userName, Long tenantId) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("Announcement content must not be blank");
+        }
+        if (content.length() > 2000) {
+            throw new IllegalArgumentException("Announcement content exceeds 2000 characters");
+        }
+        ImConversation conv = getById(conversationId, tenantId);
+        if (conv == null) {
+            throw new IllegalArgumentException("Conversation not found");
+        }
+        if (!userId.equals(conv.getOwnerId())) {
+            throw new IllegalArgumentException("Only the group owner can set the announcement");
+        }
+        try {
+            String metadata = conv.getMetadata();
+            ObjectNode root = metadata == null || metadata.isBlank()
+                    ? objectMapper.createObjectNode()
+                    : (ObjectNode) objectMapper.readTree(metadata);
+            Instant now = Instant.now();
+            ObjectNode ann = objectMapper.createObjectNode();
+            ann.put("content", content);
+            ann.put("updatedBy", userId);
+            ann.put("updatedByName", userName);
+            ann.put("updatedAt", now.toString());
+            root.set("announcement", ann);
+            conv.setMetadata(objectMapper.writeValueAsString(root));
+            conversationMapper.updateById(conv);
+            return new Announcement(content, userId, userName, now);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Failed to update conversation metadata", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void clearAnnouncement(Long conversationId, Long userId, Long tenantId) {
+        ImConversation conv = getById(conversationId, tenantId);
+        if (conv == null) {
+            throw new IllegalArgumentException("Conversation not found");
+        }
+        if (!userId.equals(conv.getOwnerId())) {
+            throw new IllegalArgumentException("Only the group owner can clear the announcement");
+        }
+        String metadata = conv.getMetadata();
+        if (metadata == null || metadata.isBlank()) {
+            return; // no-op: no metadata, nothing to clear
+        }
+        try {
+            ObjectNode root = (ObjectNode) objectMapper.readTree(metadata);
+            if (!root.has("announcement")) {
+                return; // no-op: announcement key not present
+            }
+            root.remove("announcement");
+            conv.setMetadata(objectMapper.writeValueAsString(root));
+            conversationMapper.updateById(conv);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Failed to update conversation metadata", e);
+        }
+    }
+
     private ImConversation findPrivateConversation(Long userId1, Long userId2, Long tenantId) {
         List<Long> user1Convs = memberMapper.findConversationIdsByMember(
                 tenantId, ImConstants.MEMBER_TYPE_HUMAN, userId1);
@@ -609,5 +677,33 @@ public class ImConversationServiceImpl implements ImConversationService {
             }
         }
         return null;
+    }
+
+    /**
+     * Parse the {@code announcement} sub-object from the conversation metadata JSONB.
+     * Returns null if metadata is missing, the announcement key is absent, or parsing fails.
+     */
+    Announcement parseAnnouncement(String metadataJson) {
+        if (metadataJson == null || metadataJson.isBlank()) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(metadataJson);
+            com.fasterxml.jackson.databind.JsonNode ann = root.get("announcement");
+            if (ann == null || ann.isNull()) {
+                return null;
+            }
+            String content = ann.has("content") ? ann.get("content").asText() : null;
+            Long updatedBy = ann.has("updatedBy") && !ann.get("updatedBy").isNull() ? ann.get("updatedBy").asLong() : null;
+            String updatedByName = ann.has("updatedByName") ? ann.get("updatedByName").asText() : null;
+            java.time.Instant updatedAt = ann.has("updatedAt") && !ann.get("updatedAt").isNull()
+                    ? java.time.Instant.parse(ann.get("updatedAt").asText()) : null;
+            return new Announcement(content, updatedBy, updatedByName, updatedAt);
+        } catch (Exception e) {
+            // Malformed metadata — fail safe by returning null
+            // setAnnouncement is the only writer; malformed data should never occur,
+            // but dropping the field on read is safer than 500ing the GET.
+            return null;
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.auraboot.framework.im.service;
 
+import com.auraboot.framework.im.dto.Announcement;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
@@ -95,4 +96,17 @@ public interface ImConversationService {
      * Hide a conversation from the user's list. Unhides automatically on new message.
      */
     void hideConversation(Long conversationId, Long userId, Long tenantId);
+
+    /**
+     * Set or update the group announcement. Only the group owner can modify.
+     * Stored in {@code ab_im_conversation.metadata} JSONB under the {@code announcement} key.
+     * @param content non-blank, max 2000 chars
+     * @return the Announcement record just persisted, populated with updatedBy / updatedByName / updatedAt
+     */
+    Announcement setAnnouncement(Long conversationId, String content, Long userId, String userName, Long tenantId);
+
+    /**
+     * Clear the group announcement. Only the group owner can clear.
+     */
+    void clearAnnouncement(Long conversationId, Long userId, Long tenantId);
 }
