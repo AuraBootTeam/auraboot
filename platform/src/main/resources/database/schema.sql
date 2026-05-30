@@ -9455,3 +9455,47 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_connector_oauth_token_tenant_vendor
     ON connector_oauth_token (tenant_id, vendor);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_connector_oauth_token_pid
     ON connector_oauth_token (pid);
+
+-- ============================================================================
+-- 2026-05-30 — Airflow Webhook Log (W5-FU-4)
+-- ============================================================================
+--
+-- Observability table for every inbound Airflow webhook call.
+-- ACCEPTED rows carry the full payload_json; REJECTED rows deliberately omit
+-- it (the body may be from a hostile sender — storing it would let an
+-- attacker pollute the audit trail with arbitrary data).
+--
+-- id is a snowflake (IdType.ASSIGN_ID), not BIGSERIAL, consistent with every
+-- other AuraBoot entity. pid is a ULID for external reference.
+--
+-- PRD reference: ida/docs/30-airflow-provider-design.md §2.4 + §6
+--                ida/docs/31-w5-followup-and-next-direction-alignment.md §一 #4
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS airflow_webhook_log (
+  id              BIGINT PRIMARY KEY,            -- snowflake, set by IdType.ASSIGN_ID
+  pid             VARCHAR(32) NOT NULL,
+  tenant_id       BIGINT,                        -- nullable (single-tenant transition period)
+  webhook_id      VARCHAR(64) NOT NULL,          -- X-AuraBoot-Webhook-Id
+  dag_id          VARCHAR(128),                  -- ACCEPTED only
+  task_id         VARCHAR(128),                  -- ACCEPTED only
+  event           VARCHAR(64),                   -- ACCEPTED only
+  status          VARCHAR(16) NOT NULL,          -- ACCEPTED | REJECTED
+  http_status     INTEGER NOT NULL,
+  error_code      VARCHAR(32),                   -- REJECTED: BAD_SIGNATURE/STALE_TIMESTAMP/...
+  -- |now_epoch - t_epoch| in seconds; available even for REJECTED rows so ops
+  -- can diagnose clock-skew attacks without replaying the full body.
+  signature_drift_seconds BIGINT,
+  -- Full webhook body; ACCEPTED only. REJECTED rows store NULL to avoid
+  -- persisting potentially malicious content from hostile senders.
+  payload_json    JSONB,
+  received_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_airflow_webhook_log_pid
+  ON airflow_webhook_log (pid);
+CREATE INDEX IF NOT EXISTS idx_airflow_webhook_log_received
+  ON airflow_webhook_log (received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_airflow_webhook_log_status
+  ON airflow_webhook_log (status, received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_airflow_webhook_log_webhook_id
+  ON airflow_webhook_log (webhook_id);
