@@ -54,14 +54,13 @@ class SaasConnectorDescriptorTest {
 
     @Test
     void stripeDescriptor() {
-        StripeConnectorAdapter a = new StripeConnectorAdapter();
+        // Stripe has graduated from scaffold to real impl (W5-M2.2).
+        StripeConnectorAdapter a = new StripeConnectorAdapter(
+                mock(SaasHttpClient.class), new ObjectMapper());
         assertThat(a.descriptor().protocolType()).isEqualTo("saas-stripe");
         assertThat(a.descriptor().supportedEndpointCodes())
-                .containsExactly("customers", "charges", "invoices", "subscriptions", "events");
-        assertThatThrownBy(() -> a.discover(null))
-                .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> a.read(null, "charges", null))
-                .isInstanceOf(UnsupportedOperationException.class);
+                .containsExactly("customers", "charges", "invoices", "subscriptions",
+                                 "products", "prices", "payment_intents", "events");
     }
 
     @Test

@@ -25,7 +25,8 @@ class SaasConnectorRegistryTest {
                         mock(SaasHttpClient.class),
                         mock(OAuth2TokenStore.class),
                         new ObjectMapper()),
-                new StripeConnectorAdapter(),
+                new StripeConnectorAdapter(
+                        mock(SaasHttpClient.class), new ObjectMapper()),
                 new ShopifyConnectorAdapter(),
                 new DingTalkConnectorAdapter()));
     }
