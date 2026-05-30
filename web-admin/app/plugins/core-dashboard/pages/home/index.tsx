@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
@@ -46,6 +47,13 @@ export default function WorkbenchPage() {
         </div>
       </div>
       <div className="flex gap-2">
+        <Link
+          to="/home/settings"
+          data-testid="workbench-open-in-dashboard"
+          className="px-3.5 py-2 rounded-md border border-[#e3e8ee] bg-white text-[13px] font-medium text-gray-900 hover:border-[#cdd5df] dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100"
+        >
+          {t('workbench.openInDashboard', undefined, '在仪表盘中打开')}
+        </Link>
         <button type="button" className="px-3.5 py-2 rounded-md border border-[#e3e8ee] bg-white text-[13px] font-medium text-gray-900 hover:border-[#cdd5df] dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100">
           {t('workbench.export', undefined, '导出')}
         </button>
@@ -93,6 +101,7 @@ export default function WorkbenchPage() {
         widgets={dashboard.widgets}
         layoutConfig={dashboard.layoutConfig}
         title="workbench"
+        hideWidgetActions
       />
     );
   }
