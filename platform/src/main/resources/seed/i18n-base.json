@@ -859,33 +859,33 @@
   },
   {
     "key": "auth.feature.aiAgent",
-    "zh-CN": "AI Agent",
-    "en-US": "AI Agent"
+    "zh-CN": "配置即 AI",
+    "en-US": "Config is AI"
   },
   {
     "key": "auth.feature.aiAgent.desc",
-    "zh-CN": "租户内运行,可调用全部业务能力",
-    "en-US": "Runs inside your tenant, calls every capability"
+    "zh-CN": "Agent 在租户内调用全部业务命令",
+    "en-US": "Agents call every business command in your tenant"
   },
   {
     "key": "auth.feature.dataModel",
-    "zh-CN": "灵活数据模型",
-    "en-US": "Flexible Data Model"
+    "zh-CN": "建模即数据",
+    "en-US": "Models are data"
   },
   {
     "key": "auth.feature.dataModel.desc",
-    "zh-CN": "动态建模,字段级权限与审计",
-    "en-US": "Dynamic schema with field-level audit"
+    "zh-CN": "动态模型 + 字段级权限审计",
+    "en-US": "Dynamic models + field-level permission audit"
   },
   {
     "key": "auth.feature.designer",
-    "zh-CN": "可视化页面设计器",
-    "en-US": "Visual Page Designer"
+    "zh-CN": "拖拽即页面",
+    "en-US": "Pages by drag"
   },
   {
     "key": "auth.feature.designer.desc",
-    "zh-CN": "拖拽式可视化搭建,所见即所得",
-    "en-US": "Drag and drop, WYSIWYG"
+    "zh-CN": "可视化设计器,零代码上线",
+    "en-US": "Visual designer, ship with zero code"
   },
   {
     "key": "auth.feature.multiPlatform",
@@ -909,13 +909,13 @@
   },
   {
     "key": "auth.feature.workflow",
-    "zh-CN": "工作流自动化",
-    "en-US": "Workflow Automation"
+    "zh-CN": "画布即流程",
+    "en-US": "Canvas is flow"
   },
   {
     "key": "auth.feature.workflow.desc",
-    "zh-CN": "BPMN 编排 + 自动化规则引擎",
-    "en-US": "BPMN orchestration + rules engine"
+    "zh-CN": "BPMN 编排 + 规则引擎自动执行",
+    "en-US": "BPMN orchestration + rules engine auto-run"
   },
   {
     "key": "auth.forgotPassword",
@@ -1047,23 +1047,23 @@
   },
   {
     "key": "auth.headline.pre",
-    "zh-CN": "把企业系统,建成",
-    "en-US": "Build enterprise systems your"
+    "zh-CN": "配置即应用,",
+    "en-US": "Configuration ships the app."
   },
   {
     "key": "auth.headline.em",
-    "zh-CN": "AI 能直接操作",
+    "zh-CN": "AI 即战力",
     "en-US": "AI"
   },
   {
     "key": "auth.headline.post",
-    "zh-CN": "的样子",
-    "en-US": "can actually operate"
+    "zh-CN": "",
+    "en-US": "is the workforce."
   },
   {
     "key": "auth.lead",
-    "zh-CN": "可视化建模、页面与流程编排,统一沉淀为命令能力——人来点、AI 也能调;一次配置,Web、移动端与小程序全端交付。",
-    "en-US": "Model data, design pages, orchestrate flows — all distilled into governed commands that people click and AI agents call. Configure once, deliver to web, mobile and mini-program."
+    "zh-CN": "把每个业务能力沉淀为命令——人能点、AI 能调、全端可交付。",
+    "en-US": "Every business capability becomes a command — clicked by people, called by AI, delivered to every device."
   },
   {
     "key": "auth.pillar.model",
@@ -1077,8 +1077,8 @@
   },
   {
     "key": "auth.pillar.plugin",
-    "zh-CN": "插件交付",
-    "en-US": "Plugin-delivered"
+    "zh-CN": "全端交付",
+    "en-US": "Omni-channel delivery"
   },
   {
     "key": "auth.ssoLogin",

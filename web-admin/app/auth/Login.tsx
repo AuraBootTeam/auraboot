@@ -326,8 +326,8 @@ export default function LoginPage() {
   const tiles: CapabilityRow[] = [
     {
       key: 'designer',
-      title: t('auth.feature.designer', undefined, '可视化页面设计器'),
-      desc: t('auth.feature.designer.desc', undefined, '拖拽式可视化搭建,所见即所得'),
+      title: t('auth.feature.designer', undefined, '拖拽即页面'),
+      desc: t('auth.feature.designer.desc', undefined, '可视化设计器,零代码上线'),
       icon: (
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
@@ -339,8 +339,8 @@ export default function LoginPage() {
     },
     {
       key: 'dataModel',
-      title: t('auth.feature.dataModel', undefined, '灵活数据模型'),
-      desc: t('auth.feature.dataModel.desc', undefined, '动态建模,字段级权限与审计'),
+      title: t('auth.feature.dataModel', undefined, '建模即数据'),
+      desc: t('auth.feature.dataModel.desc', undefined, '动态模型 + 字段级权限审计'),
       icon: (
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" strokeWidth="1.8" />
@@ -350,8 +350,8 @@ export default function LoginPage() {
     },
     {
       key: 'workflow',
-      title: t('auth.feature.workflow', undefined, '工作流自动化'),
-      desc: t('auth.feature.workflow.desc', undefined, 'BPMN 编排 + 自动化规则引擎'),
+      title: t('auth.feature.workflow', undefined, '画布即流程'),
+      desc: t('auth.feature.workflow.desc', undefined, 'BPMN 编排 + 规则引擎自动执行'),
       icon: (
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <circle cx="6" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.8" />
@@ -363,8 +363,8 @@ export default function LoginPage() {
     },
     {
       key: 'aiAgent',
-      title: t('auth.feature.aiAgent', undefined, 'AI Agent'),
-      desc: t('auth.feature.aiAgent.desc', undefined, '租户内运行,可调用全部业务能力'),
+      title: t('auth.feature.aiAgent', undefined, '配置即 AI'),
+      desc: t('auth.feature.aiAgent.desc', undefined, 'Agent 在租户内调用全部业务命令'),
       icon: (
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <path d="M12 3l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1 2-4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
@@ -540,11 +540,11 @@ export default function LoginPage() {
 
               {/* Headline with brand-colored highlight word */}
               <h1 className="mt-8 max-w-[580px] text-balance text-[34px] font-extrabold leading-[1.16] tracking-tight text-[#15131C] lg:text-[44px] xl:text-[50px] dark:text-white">
-                {t('auth.headline.pre', undefined, '把企业系统,建成')}
-                <span className="mx-2 text-[#4B3FE4] dark:text-[#8d7fff]">
-                  {t('auth.headline.em', undefined, 'AI 能直接操作')}
+                {t('auth.headline.pre', undefined, '配置即应用,')}
+                <span className="mx-1.5 text-[#4B3FE4] dark:text-[#8d7fff]">
+                  {t('auth.headline.em', undefined, 'AI 即战力')}
                 </span>
-                {t('auth.headline.post', undefined, '的样子')}
+                {t('auth.headline.post', undefined, '')}
               </h1>
 
               {/* Lead */}
@@ -552,7 +552,7 @@ export default function LoginPage() {
                 {t(
                   'auth.lead',
                   undefined,
-                  '可视化建模、页面与流程编排,统一沉淀为命令能力——人来点、AI 也能调;一次配置,Web、移动端与小程序全端交付。',
+                  '把每个业务能力沉淀为命令——人能点、AI 能调、全端可交付。',
                 )}
               </p>
 
@@ -584,7 +584,7 @@ export default function LoginPage() {
                 <span className="h-1 w-1 rounded-full bg-[#D6D3E0] dark:bg-gray-600" />
                 <span>{t('auth.pillar.command', undefined, '命令治理')}</span>
                 <span className="h-1 w-1 rounded-full bg-[#D6D3E0] dark:bg-gray-600" />
-                <span>{t('auth.pillar.plugin', undefined, '插件交付')}</span>
+                <span>{t('auth.pillar.plugin', undefined, '全端交付')}</span>
               </div>
             </div>
           </section>
