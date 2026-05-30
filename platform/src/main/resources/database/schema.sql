@@ -9418,3 +9418,40 @@ CREATE INDEX IF NOT EXISTS idx_chatbi_disambiguation_term
 -- Time-bounded scan for the prompt-quality dashboard.
 CREATE INDEX IF NOT EXISTS idx_chatbi_disambiguation_created
     ON chatbi_disambiguation_log (tenant_id, created_at DESC);
+
+-- ============================================================================
+-- 2026-05-30 — SaaS Connector OAuth2 Token Store (W5-M1.2)
+-- ============================================================================
+--
+-- Per (tenant, vendor) OAuth2 token store. access_token + refresh_token are
+-- encrypted by FieldEncryptionService before insert; expires_at drives the
+-- refresh-on-near-expiry path in OAuth2TokenStore. Single row per
+-- (tenant_id, vendor) — UPSERT on refresh so we never accumulate stale
+-- access tokens for the same connector.
+--
+-- Refresh tokens may be long-lived (HubSpot: 6 months) — that's why this is
+-- a persistent table rather than an in-memory cache. Restarting the backend
+-- must not force re-OAuth.
+CREATE TABLE IF NOT EXISTS connector_oauth_token (
+    id              BIGINT PRIMARY KEY,
+    pid             VARCHAR(32) NOT NULL,
+    tenant_id       BIGINT NOT NULL,
+    vendor          VARCHAR(64) NOT NULL,
+    -- Encrypted ciphertext (ENC: prefix). Up to 2048 chars because some
+    -- providers return JWT-shaped access tokens close to that ceiling.
+    access_token    VARCHAR(2048) NOT NULL,
+    -- Nullable: API-key flows skip refresh entirely.
+    refresh_token   VARCHAR(2048),
+    -- When the access token expires; the store refreshes within
+    -- REFRESH_LEAD_SECONDS of this instant.
+    expires_at      TIMESTAMPTZ NOT NULL,
+    -- Comma-separated scopes; informational, used by the audit dashboard.
+    scopes          VARCHAR(1024),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_connector_oauth_token_tenant_vendor
+    ON connector_oauth_token (tenant_id, vendor);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_connector_oauth_token_pid
+    ON connector_oauth_token (pid);
