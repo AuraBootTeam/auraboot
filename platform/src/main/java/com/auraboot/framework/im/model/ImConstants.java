@@ -35,4 +35,21 @@ public final class ImConstants {
     public static final String WS_SELF_KICKED = "self_kicked";
     public static final String WS_CONVERSATION_RENAMED = "conversation_renamed";
     public static final String WS_CONVERSATION_DISSOLVED = "conversation_dissolved";
+
+    // WebSocket event types for group announcement
+    public static final String WS_ANNOUNCEMENT_UPDATED = "announcement_updated";
+    public static final String WS_ANNOUNCEMENT_CLEARED = "announcement_cleared";
+
+    // System message subType identifiers (stored as JSON in ab_im_message.content)
+    public static final String SYS_MEMBER_JOINED = "member_joined";
+    public static final String SYS_MEMBER_LEFT = "member_left";
+    public static final String SYS_MEMBER_REMOVED = "member_removed";
+    public static final String SYS_CONVERSATION_CREATED = "conversation_created";
+    public static final String SYS_CONVERSATION_RENAMED = "conversation_renamed";
+    public static final String SYS_ANNOUNCEMENT_UPDATED = "announcement_updated";
+    public static final String SYS_ANNOUNCEMENT_CLEARED = "announcement_cleared";
+    public static final String SYS_AGENT_SETTINGS_CHANGED = "agent_settings_changed";
+    public static final String SYS_CONVERSATION_DISSOLVED = "conversation_dissolved";
+    public static final String SYS_CONVERSATION_ARCHIVED = "conversation_archived";
+    public static final String SYS_CONVERSATION_PINNED_MSG = "conversation_pinned_msg";
 }

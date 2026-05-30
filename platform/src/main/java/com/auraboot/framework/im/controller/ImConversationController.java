@@ -9,7 +9,9 @@ import com.auraboot.framework.im.dto.ConversationMemberInfo;
 import com.auraboot.framework.im.dto.ConversationUpdateRequest;
 import com.auraboot.framework.im.model.ImConstants;
 import com.auraboot.framework.im.model.ImConversation;
+import com.auraboot.framework.im.message.ImSystemMessageBuilder;
 import com.auraboot.framework.im.service.ImConversationService;
+import com.auraboot.framework.im.service.ImMessageService;
 import com.auraboot.framework.im.websocket.ImWebSocketHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
@@ -26,11 +28,14 @@ public class ImConversationController {
 
     private final ImConversationService conversationService;
     private final ImWebSocketHandler webSocketHandler;
+    private final ImMessageService messageService;
 
     public ImConversationController(ImConversationService conversationService,
-                                     ImWebSocketHandler webSocketHandler) {
+                                     ImWebSocketHandler webSocketHandler,
+                                     ImMessageService messageService) {
         this.conversationService = conversationService;
         this.webSocketHandler = webSocketHandler;
+        this.messageService = messageService;
     }
 
     @GetMapping
@@ -89,10 +94,13 @@ public class ImConversationController {
         conversationService.addMembers(id, memberIds, tenantId);
         conversationService.addAgentMembers(id, agentIds, tenantId);
 
-        // Broadcast member_added to all current human members (including newly added)
-        List<Long> recipientHumanIds = conversationService.getMembers(id, tenantId).stream()
+        // Single fetch — used for both broadcast and system message
+        List<ConversationMemberInfo> currentMembers = conversationService.getMembers(id, tenantId);
+        List<Long> recipientHumanIds = currentMembers.stream()
                 .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
                 .map(ConversationMemberInfo::getMemberId).toList();
+
+        // Broadcast member_added to all current human members (including newly added)
         if (!recipientHumanIds.isEmpty() && (!memberIds.isEmpty() || !agentIds.isEmpty())) {
             Map<String, Object> payload = new HashMap<>();
             payload.put("conversationId", id);
@@ -102,6 +110,20 @@ public class ImConversationController {
             payload.put("byUserName", userName);
             webSocketHandler.broadcastEvent(recipientHumanIds, ImConstants.WS_MEMBER_ADDED, payload);
         }
+
+        // Write system message for newly added human members (batch variant)
+        if (!memberIds.isEmpty()) {
+            List<Long> newHumanIds = memberIds;
+            List<String> newNames = currentMembers.stream()
+                    .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType())
+                                  && newHumanIds.contains(m.getMemberId()))
+                    .map(m -> resolveName(m, m.getMemberId()))
+                    .toList();
+            String sysContent = ImSystemMessageBuilder.memberJoinedBatch(
+                    newHumanIds, newNames, userId, userName);
+            messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
+        }
+
         return ApiResponse.success(null);
     }
 
@@ -112,6 +134,18 @@ public class ImConversationController {
         Long actorUserId = MetaContext.getCurrentUserId();
         String actorUserName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
+
+        // Capture removed member's name BEFORE deletion (humans only — agent removals skip sys msg)
+        String removedName = null;
+        if (ImConstants.MEMBER_TYPE_HUMAN.equals(memberType)) {
+            removedName = conversationService.getMembers(id, tenantId).stream()
+                    .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType())
+                                  && memberId.equals(m.getMemberId()))
+                    .findFirst()
+                    .map(m -> resolveName(m, memberId))
+                    .orElse("User#" + memberId);
+        }
+
         conversationService.removeMember(id, memberType, memberId, tenantId);
 
         // Send self_kicked to the removed human (agents don't receive WS events)
@@ -136,6 +170,14 @@ public class ImConversationController {
             othersPayload.put("byUserName", actorUserName);
             webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_REMOVED, othersPayload);
         }
+
+        // Write system message (humans only)
+        if (ImConstants.MEMBER_TYPE_HUMAN.equals(memberType) && removedName != null) {
+            String sysContent = ImSystemMessageBuilder.memberRemoved(
+                    memberId, removedName, actorUserId, actorUserName);
+            messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
+        }
+
         return ApiResponse.success(null);
     }
 
@@ -206,6 +248,9 @@ public class ImConversationController {
             payload.put("byUserName", userName);
             webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_LEFT, payload);
         }
+        // Write system message for member leaving
+        String sysContent = ImSystemMessageBuilder.memberLeft(userId, userName);
+        messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
         return ApiResponse.success(null);
     }
 
@@ -243,6 +288,72 @@ public class ImConversationController {
             webSocketHandler.broadcastEvent(humanMemberIds, ImConstants.WS_CONVERSATION_RENAMED, renamePayload);
         }
         return ApiResponse.success(null);
+    }
+
+    @PutMapping("/{id}/announcement")
+    public ApiResponse<Void> setAnnouncement(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String content = body == null ? null : body.get("content");
+
+        com.auraboot.framework.im.dto.Announcement saved =
+                conversationService.setAnnouncement(id, content, userId, userName, tenantId);
+
+        // Write system message
+        String sysContent = ImSystemMessageBuilder.announcementUpdated(userId, userName);
+        messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
+
+        // Broadcast WS event to all human members
+        List<Long> humanIds = conversationService.getMembers(id, tenantId).stream()
+                .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
+                .map(ConversationMemberInfo::getMemberId).toList();
+        if (!humanIds.isEmpty()) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("announcement", Map.of(
+                    "content", saved.content(),
+                    "updatedBy", saved.updatedBy(),
+                    "updatedByName", saved.updatedByName(),
+                    "updatedAt", saved.updatedAt().toString()
+            ));
+            webSocketHandler.broadcastEvent(humanIds, ImConstants.WS_ANNOUNCEMENT_UPDATED, payload);
+        }
+        return ApiResponse.success(null);
+    }
+
+    @DeleteMapping("/{id}/announcement")
+    public ApiResponse<Void> clearAnnouncement(@PathVariable Long id) {
+        Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
+        Long tenantId = MetaContext.getCurrentTenantId();
+
+        conversationService.clearAnnouncement(id, userId, tenantId);
+
+        String sysContent = ImSystemMessageBuilder.announcementCleared(userId, userName);
+        messageService.sendSystemMessage(id, tenantId, "system", sysContent, null, null);
+
+        List<Long> humanIds = conversationService.getMembers(id, tenantId).stream()
+                .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
+                .map(ConversationMemberInfo::getMemberId).toList();
+        if (!humanIds.isEmpty()) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("byUserId", userId);
+            payload.put("byUserName", userName);
+            webSocketHandler.broadcastEvent(humanIds, ImConstants.WS_ANNOUNCEMENT_CLEARED, payload);
+        }
+        return ApiResponse.success(null);
+    }
+
+    /**
+     * Resolve a human-readable name for a member info. Falls back to displayName, then "User#<id>".
+     */
+    private static String resolveName(ConversationMemberInfo info, Long fallbackId) {
+        if (info == null) return "User#" + fallbackId;
+        if (info.getName() != null && !info.getName().isBlank()) return info.getName();
+        if (info.getDisplayName() != null && !info.getDisplayName().isBlank()) return info.getDisplayName();
+        return "User#" + fallbackId;
     }
 
     private List<Long> readIdList(JsonNode body, String fieldName, boolean readRootArray) {

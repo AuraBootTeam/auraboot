@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.Mockito.verify;
 
@@ -28,6 +29,9 @@ class ImConversationControllerTest {
     @Mock
     private ImWebSocketHandler webSocketHandler;
 
+    @Mock
+    private com.auraboot.framework.im.service.ImMessageService messageService;
+
     @AfterEach
     void tearDown() {
         MetaContext.clear();
@@ -36,7 +40,7 @@ class ImConversationControllerTest {
     @Test
     void addMembersAcceptsLegacyHumanArrayBody() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "tester");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
         JsonNode body = OBJECT_MAPPER.readTree("[101,102]");
 
         controller.addMembers(88L, body);
@@ -48,7 +52,7 @@ class ImConversationControllerTest {
     @Test
     void addMembersAcceptsHumanAndAgentObjectBody() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "tester");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
         JsonNode body = OBJECT_MAPPER.readTree("{\"memberIds\":[101],\"agentIds\":[201,202]}");
 
         controller.addMembers(88L, body);
@@ -60,7 +64,7 @@ class ImConversationControllerTest {
     @Test
     void removeMemberBroadcastsSelfKickedAndMemberRemoved() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
 
         // After remove, getMembers returns 3 remaining humans (11, 33, 44); 22 was removed
         com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
@@ -104,7 +108,7 @@ class ImConversationControllerTest {
     @Test
     void removeAgentMemberDoesNotBroadcastSelfKicked() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
 
         com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
         m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
@@ -125,12 +129,22 @@ class ImConversationControllerTest {
                 "agent".equals(p.get("removedMemberType"))
             )
         );
+        // No system message for agent removal
+        org.mockito.Mockito.verify(messageService, org.mockito.Mockito.never())
+            .sendSystemMessage(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+            );
     }
 
     @Test
     void addMembersBroadcastsMemberAddedToAllHumanMembers() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "tester");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
         JsonNode body = OBJECT_MAPPER.readTree("{\"memberIds\":[101,102],\"agentIds\":[201]}");
 
         com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
@@ -164,7 +178,7 @@ class ImConversationControllerTest {
     @Test
     void leaveGroupBroadcastsMemberLeftWithUserName() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
 
         com.auraboot.framework.im.dto.ConversationMemberInfo m3 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
         m3.setMemberId(33L); m3.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
@@ -187,7 +201,7 @@ class ImConversationControllerTest {
     @Test
     void renameConversationBroadcastsBothLegacyAndNewEvents() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
 
         // Mock: existing conversation with name "OldName"
         com.auraboot.framework.im.model.ImConversation existing = new com.auraboot.framework.im.model.ImConversation();
@@ -225,9 +239,173 @@ class ImConversationControllerTest {
     }
 
     @Test
+    void leaveGroupAlsoWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m3 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m3.setMemberId(33L); m3.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m3));
+
+        controller.leaveGroup(88L);
+
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(content);
+                    return ImConstants.SYS_MEMBER_LEFT.equals(root.get("subType").asText())
+                        && root.get("params").get("memberId").asLong() == 11L
+                        && "alice".equals(root.get("params").get("memberName").asText());
+                } catch (Exception e) { return false; }
+            }),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+    }
+
+    @Test
+    void removeMemberAlsoWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+
+        com.auraboot.framework.im.dto.ConversationMemberInfo m11 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m11.setMemberId(11L); m11.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m11.setName("alice");
+        com.auraboot.framework.im.dto.ConversationMemberInfo m22 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m22.setMemberId(22L); m22.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m22.setName("Bob");
+        com.auraboot.framework.im.dto.ConversationMemberInfo m33 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m33.setMemberId(33L); m33.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m33.setName("Carol");
+        // Pre-removal getMembers returns Bob too; post-removal returns without Bob
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m11, m22, m33), List.of(m11, m33));
+
+        controller.removeMember(88L, "human", 22L);
+
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(content);
+                    return ImConstants.SYS_MEMBER_REMOVED.equals(root.get("subType").asText())
+                        && root.get("params").get("memberId").asLong() == 22L
+                        && "Bob".equals(root.get("params").get("memberName").asText())
+                        && root.get("params").get("byUserId").asLong() == 11L
+                        && "alice".equals(root.get("params").get("byUserName").asText());
+                } catch (Exception e) { return false; }
+            }),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+    }
+
+    @Test
+    void addMembersAlsoWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+        JsonNode body = OBJECT_MAPPER.readTree("{\"memberIds\":[101,102]}");
+
+        com.auraboot.framework.im.dto.ConversationMemberInfo m11 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m11.setMemberId(11L); m11.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m11.setName("alice");
+        com.auraboot.framework.im.dto.ConversationMemberInfo m101 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m101.setMemberId(101L); m101.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m101.setName("Bob");
+        com.auraboot.framework.im.dto.ConversationMemberInfo m102 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m102.setMemberId(102L); m102.setMemberType(ImConstants.MEMBER_TYPE_HUMAN); m102.setName("Carol");
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L))
+            .thenReturn(List.of(m11, m101, m102));
+
+        controller.addMembers(88L, body);
+
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(content);
+                    return ImConstants.SYS_MEMBER_JOINED.equals(root.get("subType").asText())
+                        && root.get("params").get("memberIds").size() == 2
+                        && root.get("params").get("memberIds").get(0).asLong() == 101L
+                        && root.get("params").get("memberNames").get(0).asText().equals("Bob")
+                        && root.get("params").get("byUserId").asLong() == 11L
+                        && "alice".equals(root.get("params").get("byUserName").asText());
+                } catch (Exception e) { return false; }
+            }),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+    }
+
+    @Test
+    void setAnnouncementBroadcastsAndWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+        java.time.Instant now = java.time.Instant.parse("2026-05-29T01:00:00Z");
+        com.auraboot.framework.im.dto.Announcement saved =
+                new com.auraboot.framework.im.dto.Announcement("Hello team", 11L, "alice", now);
+        org.mockito.Mockito.when(conversationService.setAnnouncement(88L, "Hello team", 11L, "alice", 7L))
+                .thenReturn(saved);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m2 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m2.setMemberId(22L); m2.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L)).thenReturn(List.of(m1, m2));
+
+        controller.setAnnouncement(88L, Map.of("content", "Hello team"));
+
+        verify(conversationService).setAnnouncement(88L, "Hello team", 11L, "alice", 7L);
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> content.contains(ImConstants.SYS_ANNOUNCEMENT_UPDATED)),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(11L, 22L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_ANNOUNCEMENT_UPDATED),
+            org.mockito.ArgumentMatchers.argThat(p -> {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> ann = (Map<String, Object>) p.get("announcement");
+                return ann != null && "Hello team".equals(ann.get("content"));
+            })
+        );
+    }
+
+    @Test
+    void clearAnnouncementBroadcastsAndWritesSystemMessage() throws Exception {
+        MetaContext.setContext(7L, 11L, "user-pid", "alice");
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
+        com.auraboot.framework.im.dto.ConversationMemberInfo m1 = new com.auraboot.framework.im.dto.ConversationMemberInfo();
+        m1.setMemberId(11L); m1.setMemberType(ImConstants.MEMBER_TYPE_HUMAN);
+        org.mockito.Mockito.when(conversationService.getMembers(88L, 7L)).thenReturn(List.of(m1));
+
+        controller.clearAnnouncement(88L);
+
+        verify(conversationService).clearAnnouncement(88L, 11L, 7L);
+        verify(messageService).sendSystemMessage(
+            org.mockito.ArgumentMatchers.eq(88L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq("system"),
+            org.mockito.ArgumentMatchers.argThat(content -> content.contains(ImConstants.SYS_ANNOUNCEMENT_CLEARED)),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.isNull()
+        );
+        verify(webSocketHandler).broadcastEvent(
+            org.mockito.ArgumentMatchers.eq(List.of(11L)),
+            org.mockito.ArgumentMatchers.eq(ImConstants.WS_ANNOUNCEMENT_CLEARED),
+            org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
     void dissolveGroupBroadcastsBothLegacyAndNewEvents() throws Exception {
         MetaContext.setContext(7L, 11L, "user-pid", "alice");
-        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler);
+        ImConversationController controller = new ImConversationController(conversationService, webSocketHandler, messageService);
         org.mockito.Mockito.when(conversationService.dissolveGroup(88L, 11L, 7L))
             .thenReturn(List.of(11L, 22L, 33L));
 
