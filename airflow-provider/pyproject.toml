@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "airflow-provider-auraboot"
+version = "0.1.0"
+description = "Apache Airflow provider for AuraBoot — operators, sensors, hooks"
+authors = ["AuraBoot Team <ops@auraboot.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [{include = "airflow_provider_auraboot", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+apache-airflow = ">=2.7,<3.0"
+requests = "^2.31"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-mock = "^3.12"
+responses = "^0.25"             # for HTTP cassette
+pendulum = ">=2.1.2,<4.0"       # transitive dep of apache-airflow; pin explicitly for test env
+importlib_metadata = ">=6.5"    # required by airflow 2.x on Python < 3.12
+
+[tool.poetry.plugins."apache_airflow_provider"]
+provider_info = "airflow_provider_auraboot.__init__:get_provider_info"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
