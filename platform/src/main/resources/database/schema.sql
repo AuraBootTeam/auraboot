@@ -9499,3 +9499,48 @@ CREATE INDEX IF NOT EXISTS idx_airflow_webhook_log_status
   ON airflow_webhook_log (status, received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_airflow_webhook_log_webhook_id
   ON airflow_webhook_log (webhook_id);
+
+-- ============================================================================
+-- 2026-05-30 — Multi-tenant Airflow Webhook Shared Secret (W5-FU-5 / G)
+-- ============================================================================
+--
+-- Replaces the single application-property `auraboot.airflow.webhook.shared-secret`
+-- with a per-(tenant, connection) row so SaaS deployments can isolate Airflow
+-- secrets per customer + support rotation. Encrypted by FieldEncryptionService
+-- before insert; the bare bytes never live at rest.
+--
+-- Rotation window: when `active=true` the row participates in HMAC verification.
+-- During a rotation operators may flag the previous row `active=false` AND
+-- `rotated_at=NOW()`; AirflowWebhookService accepts both for up to 5 minutes
+-- after rotated_at so in-flight Airflow tasks signed by the old secret still
+-- land cleanly. After the window the inactive row is ignored.
+CREATE TABLE IF NOT EXISTS connector_webhook_secret (
+    id              BIGINT PRIMARY KEY,
+    pid             VARCHAR(32) NOT NULL,
+    tenant_id       BIGINT NOT NULL,
+    connection_name VARCHAR(64) NOT NULL,
+    -- ENC: ciphertext (FieldEncryptionService). 2048 chars handles 64-byte
+    -- secrets after AES-GCM + base64 + ENC: prefix with generous headroom.
+    shared_secret   VARCHAR(2048) NOT NULL,
+    algorithm       VARCHAR(16)   NOT NULL DEFAULT 'HMAC-SHA256',
+    active          BOOLEAN       NOT NULL DEFAULT TRUE,
+    rotated_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_connector_webhook_secret_pid
+    ON connector_webhook_secret (pid);
+-- One ACTIVE row per connection_name globally — each Airflow connection belongs
+-- to a single tenant, and the tenant_id is read off the matched row at verify
+-- time (the webhook URL only carries connection_name, not tenant_id, so the
+-- secret table must be the source of truth for "which tenant owns this conn").
+-- Inactive rows are not constrained so a rotation can preserve the previous
+-- secret for the grace window.
+CREATE UNIQUE INDEX IF NOT EXISTS uk_connector_webhook_secret_active
+    ON connector_webhook_secret (connection_name)
+    WHERE active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_connector_webhook_secret_lookup
+    ON connector_webhook_secret (connection_name, active);
+CREATE INDEX IF NOT EXISTS idx_connector_webhook_secret_tenant
+    ON connector_webhook_secret (tenant_id);

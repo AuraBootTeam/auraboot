@@ -1,8 +1,11 @@
 package com.auraboot.framework.connector.airflow;
 
 import com.auraboot.framework.connector.airflow.mapper.AirflowWebhookLogMapper;
+import com.auraboot.framework.connector.airflow.secret.WebhookSecretService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -61,11 +64,23 @@ public class AirflowWebhookService {
     private final ObjectMapper jsonMapper;
     private final Clock clock;
 
-    /** Per-connection secret. Single-tenant placeholder; replace with table-backed store in W5-M3.1. */
-    private final String sharedSecret;
+    /**
+     * Legacy single-tenant application-property secret. Kept as a fallback only
+     * — production deployments should configure
+     * {@code connector_webhook_secret} rows via {@link WebhookSecretService}
+     * (W5-FU-5 / G). When both are configured, the per-connection table wins;
+     * the yml secret is only consulted when the table returns no candidates.
+     */
+    private final String legacyYmlSecret;
 
     /** Observability mapper — nullable in unit tests that do not need it. */
     private final AirflowWebhookLogMapper logMapper;
+
+    /**
+     * Optional secret store — when wired (production), per-(connection_name)
+     * rows are consulted before falling back to {@link #legacyYmlSecret}.
+     */
+    private final ObjectProvider<WebhookSecretService> secretServiceProvider;
 
     /**
      * In-memory replay cache: {@code webhookId → expiryEpochMs}. Bounded by a
@@ -76,30 +91,55 @@ public class AirflowWebhookService {
     @org.springframework.beans.factory.annotation.Autowired
     public AirflowWebhookService(ApplicationEventPublisher publisher,
                                  ObjectMapper jsonMapper,
-                                 @Value("${auraboot.airflow.webhook.shared-secret:}") String sharedSecret,
-                                 AirflowWebhookLogMapper logMapper) {
-        this(publisher, jsonMapper, sharedSecret, Clock.systemUTC(), logMapper);
+                                 @Value("${auraboot.airflow.webhook.shared-secret:}") String legacyYmlSecret,
+                                 AirflowWebhookLogMapper logMapper,
+                                 ObjectProvider<WebhookSecretService> secretServiceProvider) {
+        this(publisher, jsonMapper, legacyYmlSecret, Clock.systemUTC(), logMapper, secretServiceProvider);
     }
 
-    /** Test seam — logMapper may be null for tests that do not need observability assertions. */
+    /** Test seam — logMapper + secret service nullable. */
     AirflowWebhookService(ApplicationEventPublisher publisher,
                           ObjectMapper jsonMapper,
-                          String sharedSecret,
+                          String legacyYmlSecret,
                           Clock clock) {
-        this(publisher, jsonMapper, sharedSecret, clock, null);
+        this(publisher, jsonMapper, legacyYmlSecret, clock, null, nullProvider());
     }
 
     /** Full test seam. */
     AirflowWebhookService(ApplicationEventPublisher publisher,
                           ObjectMapper jsonMapper,
-                          String sharedSecret,
+                          String legacyYmlSecret,
                           Clock clock,
                           AirflowWebhookLogMapper logMapper) {
+        this(publisher, jsonMapper, legacyYmlSecret, clock, logMapper, nullProvider());
+    }
+
+    /** Full test seam with secret service. */
+    AirflowWebhookService(ApplicationEventPublisher publisher,
+                          ObjectMapper jsonMapper,
+                          String legacyYmlSecret,
+                          Clock clock,
+                          AirflowWebhookLogMapper logMapper,
+                          ObjectProvider<WebhookSecretService> secretServiceProvider) {
         this.publisher = publisher;
         this.jsonMapper = jsonMapper;
-        this.sharedSecret = sharedSecret == null ? "" : sharedSecret;
+        this.legacyYmlSecret = legacyYmlSecret == null ? "" : legacyYmlSecret;
         this.clock = clock;
         this.logMapper = logMapper;
+        this.secretServiceProvider = secretServiceProvider == null
+                ? nullProvider() : secretServiceProvider;
+    }
+
+    private static ObjectProvider<WebhookSecretService> nullProvider() {
+        return new NoopWebhookSecretProvider();
+    }
+
+    /** Static no-op {@link ObjectProvider} for test ctors that don't need the table-backed store. */
+    private static final class NoopWebhookSecretProvider implements ObjectProvider<WebhookSecretService> {
+        @Override public WebhookSecretService getObject() { throw new IllegalStateException("no service"); }
+        @Override public WebhookSecretService getObject(Object... args) { throw new IllegalStateException("no service"); }
+        @Override public WebhookSecretService getIfAvailable() { return null; }
+        @Override public WebhookSecretService getIfUnique() { return null; }
     }
 
     /**
@@ -111,12 +151,30 @@ public class AirflowWebhookService {
      * {@code airflow_webhook_log} before the exception is re-thrown so the
      * audit log is always complete regardless of the caller's error handling.
      */
+    /** Backward-compatible single-tenant entry — no connection name carried in URL. */
     public AirflowWebhookEvent verifyAndDispatch(String signatureHeader,
                                                  String webhookIdHeader,
                                                  byte[] rawBody) {
-        if (sharedSecret.isBlank()) {
-            AirflowWebhookException ex = new AirflowWebhookException(404, "UNKNOWN_CONNECTION",
-                    "No shared_secret configured (auraboot.airflow.webhook.shared-secret unset)");
+        return verifyAndDispatch(null, signatureHeader, webhookIdHeader, rawBody);
+    }
+
+    /**
+     * Multi-tenant entry — {@code connectionName} pulls from the URL path
+     * (e.g. {@code POST /api/webhooks/airflow/trigger/{connectionName}}).
+     * When non-null, the table-backed {@link WebhookSecretService} is consulted
+     * first; the legacy yml secret is used only when the table returns no
+     * candidates (transition mode).
+     */
+    public AirflowWebhookEvent verifyAndDispatch(String connectionName,
+                                                 String signatureHeader,
+                                                 String webhookIdHeader,
+                                                 byte[] rawBody) {
+        ResolvedSecrets resolved = resolveSecrets(connectionName);
+        if (!resolved.hasAnySecret()) {
+            String detail = connectionName != null
+                    ? "No shared_secret configured for connection '" + connectionName + "'"
+                    : "No shared_secret configured (auraboot.airflow.webhook.shared-secret unset)";
+            AirflowWebhookException ex = new AirflowWebhookException(404, "UNKNOWN_CONNECTION", detail);
             persistRejected(webhookIdHeader, null, 404, "UNKNOWN_CONNECTION", null);
             throw ex;
         }
@@ -154,10 +212,20 @@ public class AirflowWebhookService {
             throw ex;
         }
 
-        byte[] hmac = computeHmac(parts.timestamp + "." + new String(rawBody, StandardCharsets.UTF_8),
-                sharedSecret);
+        String input = parts.timestamp + "." + new String(rawBody, StandardCharsets.UTF_8);
         byte[] expected = HexFormat.of().parseHex(parts.signature.toLowerCase());
-        if (expected.length != hmac.length || !MessageDigest.isEqual(hmac, expected)) {
+        boolean matched = false;
+        for (String candidate : resolved.candidateSecrets()) {
+            byte[] hmac = computeHmac(input, candidate);
+            // Timing-safe compare per candidate. The verifier tries every secret
+            // (active + grace-window) so a rotation in progress never drops in-flight
+            // Airflow webhooks signed by either side.
+            if (expected.length == hmac.length && MessageDigest.isEqual(hmac, expected)) {
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
             AirflowWebhookException ex = new AirflowWebhookException(401, "BAD_SIGNATURE",
                     "HMAC verification failed");
             persistRejected(webhookIdHeader, drift, 401, "BAD_SIGNATURE", null);
@@ -407,4 +475,31 @@ public class AirflowWebhookService {
     }
 
     private record SignatureParts(long timestamp, String signature) {}
+
+    /**
+     * Resolved secrets for one verify call: candidate plaintexts to try, and
+     * the tenant_id the matched row is owned by (null when only legacy yml is
+     * available).
+     */
+    private record ResolvedSecrets(Long tenantId, List<String> candidateSecrets) {
+        boolean hasAnySecret() { return !candidateSecrets.isEmpty(); }
+        static ResolvedSecrets empty() { return new ResolvedSecrets(null, List.of()); }
+    }
+
+    private ResolvedSecrets resolveSecrets(String connectionName) {
+        if (connectionName != null && !connectionName.isBlank()) {
+            WebhookSecretService service = secretServiceProvider.getIfAvailable();
+            if (service != null) {
+                WebhookSecretService.Resolution res = service.candidateSecrets(connectionName);
+                if (res.hasMatch()) {
+                    return new ResolvedSecrets(res.tenantId(), res.secrets());
+                }
+                // No table row → fall through to legacy yml (transition mode).
+            }
+        }
+        if (legacyYmlSecret.isBlank()) {
+            return ResolvedSecrets.empty();
+        }
+        return new ResolvedSecrets(null, List.of(legacyYmlSecret));
+    }
 }
