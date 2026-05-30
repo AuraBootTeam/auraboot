@@ -723,6 +723,20 @@ export function DetailPageContent(props: PageContentProps) {
         ) : (
           /* Direct mode: render form-sections and sub-tables without tabs */
           <div className="space-y-6 p-6">
+            {/* Opt-in: misc blocks with detailPlacement === 'header' render at the
+                top (before form-sections / sub-tables). Default placement is
+                unchanged (rendered last), so existing pages are unaffected. */}
+            {runtime &&
+              directMiscBlocks
+                .filter((b: BlockConfig) => (b as { detailPlacement?: string }).detailPlacement === 'header')
+                .map((block: BlockConfig, blockIndex: number) => (
+                  <BlockRenderer
+                    key={block.id || `misc-header-${blockIndex}`}
+                    block={block}
+                    runtime={runtime}
+                    areaId="detail-direct"
+                  />
+                ))}
             {effectiveDirectFormBlocks.map((block: BlockConfig, blockIndex: number) => (
               <DetailBlockRenderer
                 key={block.id || `block-${blockIndex}`}
@@ -787,14 +801,16 @@ export function DetailPageContent(props: PageContentProps) {
                 the fallback renderer registry. Unknown blockTypes surface as
                 a visible placeholder + console.warn (not silently dropped). */}
             {runtime &&
-              directMiscBlocks.map((block: BlockConfig, blockIndex: number) => (
-                <BlockRenderer
-                  key={block.id || `misc-${blockIndex}`}
-                  block={block}
-                  runtime={runtime}
-                  areaId="detail-direct"
-                />
-              ))}
+              directMiscBlocks
+                .filter((b: BlockConfig) => (b as { detailPlacement?: string }).detailPlacement !== 'header')
+                .map((block: BlockConfig, blockIndex: number) => (
+                  <BlockRenderer
+                    key={block.id || `misc-${blockIndex}`}
+                    block={block}
+                    runtime={runtime}
+                    areaId="detail-direct"
+                  />
+                ))}
 
             {/* Fallback: no structured blocks found, show all fields */}
             {effectiveDirectFormBlocks.length === 0 &&
