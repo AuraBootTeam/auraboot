@@ -2652,5 +2652,60 @@
     "key": "workbench.new",
     "zh-CN": "新建",
     "en-US": "New"
+  },
+  {
+    "key": "semantic.lineage.title",
+    "zh-CN": "数据血缘",
+    "en-US": "Data Lineage"
+  },
+  {
+    "key": "semantic.lineage.empty",
+    "zh-CN": "请选择节点以查看血缘关系",
+    "en-US": "Select a node to view its lineage"
+  },
+  {
+    "key": "semantic.lineage.loading",
+    "zh-CN": "加载中…",
+    "en-US": "Loading…"
+  },
+  {
+    "key": "semantic.lineage.error",
+    "zh-CN": "加载失败",
+    "en-US": "Failed to load lineage"
+  },
+  {
+    "key": "semantic.lineage.nodeType.model",
+    "zh-CN": "模型",
+    "en-US": "Models"
+  },
+  {
+    "key": "semantic.lineage.nodeType.metric",
+    "zh-CN": "指标",
+    "en-US": "Metrics"
+  },
+  {
+    "key": "semantic.lineage.nodeType.dimension",
+    "zh-CN": "维度",
+    "en-US": "Dimensions"
+  },
+  {
+    "key": "semantic.lineage.nodeType.exposure",
+    "zh-CN": "暴露层",
+    "en-US": "Exposures"
+  },
+  {
+    "key": "semantic.lineage.picker.label",
+    "zh-CN": "语义节点",
+    "en-US": "Semantic Node"
+  },
+  {
+    "key": "semantic.lineage.picker.search",
+    "zh-CN": "搜索…",
+    "en-US": "Search…"
+  },
+  {
+    "key": "semantic.lineage.picker.empty",
+    "zh-CN": "无匹配结果",
+    "en-US": "No items found"
   }
 ]
