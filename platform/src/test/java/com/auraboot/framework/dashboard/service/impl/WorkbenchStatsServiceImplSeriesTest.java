@@ -48,4 +48,25 @@ class WorkbenchStatsServiceImplSeriesTest extends BaseIntegrationTest {
             assertThat(item.getSeries().getPoints()).hasSize(7);
         }
     }
+
+    @Test
+    @DisplayName("crm_opportunity_amount, crm_account_active, bpm_running all carry 7-day series or null (plugin-absent fallback)")
+    void getStats_threeAdditionalStats_carrySeriesOrNull() {
+        WorkbenchStatsDTO dto = service.getStats(
+                List.of("crm_opportunity_amount", "crm_account_active", "bpm_running")
+        );
+        for (String key : List.of("crm_opportunity_amount", "crm_account_active", "bpm_running")) {
+            StatItem item = dto.getStats().get(key);
+            assertThat(item).as(key + " must be present").isNotNull();
+            if (item.getSeries() != null) {
+                assertThat(item.getSeries().getPeriod()).isEqualTo("day");
+                assertThat(item.getSeries().getPoints())
+                        .as(key + " series must have 7 points when present")
+                        .hasSize(7);
+                item.getSeries().getPoints().forEach(p ->
+                        assertThat(p.doubleValue()).isGreaterThanOrEqualTo(0.0)
+                );
+            }
+        }
+    }
 }

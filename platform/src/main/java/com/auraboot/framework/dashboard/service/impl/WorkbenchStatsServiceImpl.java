@@ -157,10 +157,12 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
                             "WHERE tenant_id = ? AND crm_opp_stage NOT IN ('closed_lost', 'closed_won')",
                     Double.class, tenantId
             );
+            WorkbenchStatsDTO.Series series = computeCrmOpportunityAmountSeries(tenantId);
             return StatItem.builder()
                     .value(amount != null ? amount : 0.0)
                     .label("workbench.stats.crm_opportunity_amount")
                     .format(FORMAT_CURRENCY)
+                    .series(series)
                     .build();
         }, "crm_opportunity_amount");
     }
@@ -172,10 +174,12 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
                     "SELECT COUNT(*) FROM mt_crm_account WHERE tenant_id = ?",
                     Long.class, tenantId
             );
+            WorkbenchStatsDTO.Series series = computeCrmAccountActiveSeries(tenantId);
             return StatItem.builder()
                     .value(count != null ? count : 0L)
                     .label("workbench.stats.crm_account_active")
                     .format(FORMAT_NUMBER)
+                    .series(series)
                     .build();
         }, "crm_account_active");
     }
@@ -192,12 +196,105 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
                             ")",
                     Long.class, tenantId, tenantId
             );
+            WorkbenchStatsDTO.Series series = computeBpmRunningSeries(tenantId);
             return StatItem.builder()
                     .value(count != null ? count : 0L)
                     .label("workbench.stats.bpm_running")
                     .format(FORMAT_NUMBER)
+                    .series(series)
                     .build();
         }, "bpm_running");
+    }
+
+    /**
+     * 7-day daily series: total open opportunity amount created per day.
+     * Mirrors the inbox_pending series pattern (generate_series LEFT JOIN).
+     * CATCH: non-transactional optional query — null on failure to avoid breaking the stats response.
+     */
+    private WorkbenchStatsDTO.Series computeCrmOpportunityAmountSeries(Long tenantId) {
+        try {
+            String sql = "SELECT COALESCE(c.amount, 0) AS amount " +
+                    "FROM generate_series(current_date - interval '6 day', current_date, interval '1 day') AS d " +
+                    "LEFT JOIN (" +
+                    "  SELECT DATE(created_at) AS day, SUM(CAST(crm_opp_amount AS NUMERIC)) AS amount " +
+                    "  FROM mt_crm_opportunity " +
+                    "  WHERE tenant_id = ? AND crm_opp_stage NOT IN ('closed_lost', 'closed_won') " +
+                    "    AND created_at >= current_date - interval '6 day' " +
+                    "  GROUP BY DATE(created_at)" +
+                    ") c ON c.day = d::date " +
+                    "ORDER BY d ASC";
+            List<Double> points = jdbcTemplate.queryForList(sql, Double.class, tenantId);
+            if (points == null || points.size() != 7) {
+                return null;
+            }
+            return WorkbenchStatsDTO.Series.builder()
+                    .period("day")
+                    .points(new ArrayList<>(points))
+                    .build();
+        } catch (DataAccessException e) {
+            log.debug("Failed to compute crm_opportunity_amount series: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 7-day daily series: new active accounts created per day.
+     * CATCH: non-transactional optional query — null on failure.
+     */
+    private WorkbenchStatsDTO.Series computeCrmAccountActiveSeries(Long tenantId) {
+        try {
+            String sql = "SELECT COALESCE(c.cnt, 0) AS cnt " +
+                    "FROM generate_series(current_date - interval '6 day', current_date, interval '1 day') AS d " +
+                    "LEFT JOIN (" +
+                    "  SELECT DATE(created_at) AS day, COUNT(*) AS cnt " +
+                    "  FROM mt_crm_account " +
+                    "  WHERE tenant_id = ? " +
+                    "    AND created_at >= current_date - interval '6 day' " +
+                    "  GROUP BY DATE(created_at)" +
+                    ") c ON c.day = d::date " +
+                    "ORDER BY d ASC";
+            List<Long> points = jdbcTemplate.queryForList(sql, Long.class, tenantId);
+            if (points == null || points.size() != 7) {
+                return null;
+            }
+            return WorkbenchStatsDTO.Series.builder()
+                    .period("day")
+                    .points(new ArrayList<>(points))
+                    .build();
+        } catch (DataAccessException e) {
+            log.debug("Failed to compute crm_account_active series: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 7-day daily series: process executions started per day.
+     * CATCH: non-transactional optional query — null on failure.
+     */
+    private WorkbenchStatsDTO.Series computeBpmRunningSeries(Long tenantId) {
+        try {
+            String sql = "SELECT COALESCE(c.cnt, 0) AS cnt " +
+                    "FROM generate_series(current_date - interval '6 day', current_date, interval '1 day') AS d " +
+                    "LEFT JOIN (" +
+                    "  SELECT DATE(created_at) AS day, COUNT(DISTINCT execution_id) AS cnt " +
+                    "  FROM ab_bpm_execution_log " +
+                    "  WHERE tenant_id = ? AND event_type = 'PROCESS_STARTED' " +
+                    "    AND created_at >= current_date - interval '6 day' " +
+                    "  GROUP BY DATE(created_at)" +
+                    ") c ON c.day = d::date " +
+                    "ORDER BY d ASC";
+            List<Long> points = jdbcTemplate.queryForList(sql, Long.class, tenantId);
+            if (points == null || points.size() != 7) {
+                return null;
+            }
+            return WorkbenchStatsDTO.Series.builder()
+                    .period("day")
+                    .points(new ArrayList<>(points))
+                    .build();
+        } catch (DataAccessException e) {
+            log.debug("Failed to compute bpm_running series: {}", e.getMessage());
+            return null;
+        }
     }
 
     private StatItem computeBpmCompletedWeek(Long tenantId) {
