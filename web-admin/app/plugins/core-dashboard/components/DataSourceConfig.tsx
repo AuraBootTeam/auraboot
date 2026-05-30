@@ -16,7 +16,10 @@ import {
   FieldSelector,
   FilterBuilder,
   MetricEditor,
+  SemanticMetricPicker,
+  SemanticDimensionPicker,
   useModelFields,
+  useSemanticModels,
   type FilterCondition,
   type MetricConfig,
 } from '~/shared/designer/datasource';
@@ -28,6 +31,12 @@ interface DataSourceConfigProps {
 
 export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onChange }) => {
   const { fields } = useModelFields(value.type === 'aggregate' ? value.modelCode : undefined);
+  const { models: semanticModels } = useSemanticModels();
+
+  // Semantic mode is engaged when the config carries a semanticModelCode key
+  // (even an empty string — "semantic mode, model not yet chosen"). Raw mode
+  // and semantic mode are mutually exclusive (switch-style, PRD 16 W4 D4).
+  const isSemantic = value.semanticModelCode !== undefined;
 
   const handleTypeChange = useCallback(
     (type: 'aggregate' | 'namedQuery' | 'static') => {
@@ -78,6 +87,57 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
     [value, onChange],
   );
 
+  // -- semantic mode handlers ------------------------------------------------
+
+  const handleModeChange = useCallback(
+    (mode: 'raw' | 'semantic') => {
+      if (mode === 'semantic') {
+        // Enter semantic mode: drop the raw model selection, start with an
+        // empty semanticModelCode so the picker prompts for a model.
+        onChange({
+          ...value,
+          modelCode: undefined,
+          semanticModelCode: '',
+          dimensions: [],
+          metrics: [],
+        });
+      } else {
+        // Back to raw mode: remove semanticModelCode entirely.
+        const { semanticModelCode: _omit, ...rest } = value;
+        onChange({ ...rest, dimensions: [], metrics: [{ field: 'id', aggregation: 'count' }] });
+      }
+    },
+    [value, onChange],
+  );
+
+  const handleSemanticModelChange = useCallback(
+    (semanticModelCode: string) => {
+      // Switching model invalidates previously picked metrics/dimensions.
+      onChange({ ...value, semanticModelCode, dimensions: [], metrics: [] });
+    },
+    [value, onChange],
+  );
+
+  const handleSemanticMetricsChange = useCallback(
+    (codes: string[]) => {
+      // The semantic compiler resolves the code; aggregation is baked into the
+      // metric definition, so a placeholder keeps the {field, aggregation} shape.
+      onChange({
+        ...value,
+        // Semantic metrics carry no raw aggregation (it lives in the *.semantic.yml
+        // definition); the backend ignores it on the semantic path. The placeholder
+        // keeps the {field, aggregation} shape, hence the cast through unknown.
+        metrics: codes.map((code) => ({
+          field: code,
+          aggregation: 'none',
+        })) as unknown as ChartMetricConfig[],
+      });
+    },
+    [value, onChange],
+  );
+
+  const semanticMetricCodes = (value.metrics || []).map((m) => m.field);
+
   return (
     <div className="space-y-4">
       {/* Data Source Type */}
@@ -101,33 +161,105 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
       {/* Aggregate Query Config */}
       {value.type === 'aggregate' && (
         <>
-          <ModelPicker
-            value={value.modelCode}
-            onChange={handleModelChange}
-            label="数据模型"
-            required
-            placeholder="请选择模型"
-          />
+          {/* Raw model vs. governed semantic layer (switch-style) */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">数据源模式</label>
+            <div className="inline-flex rounded-md border border-gray-300 p-0.5 text-sm">
+              <button
+                type="button"
+                data-testid="datasource-mode-raw"
+                onClick={() => handleModeChange('raw')}
+                className={`rounded px-3 py-1 ${
+                  !isSemantic ? 'bg-blue-600 text-white' : 'text-gray-600'
+                }`}
+              >
+                原始模型
+              </button>
+              <button
+                type="button"
+                data-testid="datasource-mode-semantic"
+                onClick={() => handleModeChange('semantic')}
+                className={`rounded px-3 py-1 ${
+                  isSemantic ? 'bg-blue-600 text-white' : 'text-gray-600'
+                }`}
+              >
+                语义模型
+              </button>
+            </div>
+          </div>
 
-          {value.modelCode && (
-            <FieldSelector
-              modelCode={value.modelCode}
-              value={value.dimensions || []}
-              onChange={handleDimensionsChange}
-              label="分组维度"
-              placeholder="选择分组字段"
-            />
+          {!isSemantic && (
+            <>
+              <ModelPicker
+                value={value.modelCode}
+                onChange={handleModelChange}
+                label="数据模型"
+                required
+                placeholder="请选择模型"
+              />
+
+              {value.modelCode && (
+                <FieldSelector
+                  modelCode={value.modelCode}
+                  value={value.dimensions || []}
+                  onChange={handleDimensionsChange}
+                  label="分组维度"
+                  placeholder="选择分组字段"
+                />
+              )}
+
+              {value.modelCode && (
+                <MetricEditor
+                  metrics={value.metrics || []}
+                  onChange={handleMetricsChange}
+                  modelCode={value.modelCode}
+                  label="聚合指标"
+                  required
+                />
+              )}
+            </>
           )}
 
-          {/* Metrics */}
-          {value.modelCode && (
-            <MetricEditor
-              metrics={value.metrics || []}
-              onChange={handleMetricsChange}
-              modelCode={value.modelCode}
-              label="聚合指标"
-              required
-            />
+          {isSemantic && (
+            <>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  语义模型 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  data-testid="semantic-model-select"
+                  value={value.semanticModelCode || ''}
+                  onChange={(e) => handleSemanticModelChange(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="">请选择语义模型</option>
+                  {semanticModels.map((m) => (
+                    <option key={m.code} value={m.code}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {value.semanticModelCode && (
+                <SemanticDimensionPicker
+                  semanticModelCode={value.semanticModelCode}
+                  value={value.dimensions || []}
+                  onChange={handleDimensionsChange}
+                  label="语义维度"
+                />
+              )}
+
+              {value.semanticModelCode && (
+                <SemanticMetricPicker
+                  semanticModelCode={value.semanticModelCode}
+                  value={semanticMetricCodes}
+                  onChange={handleSemanticMetricsChange}
+                  label="语义指标"
+                  required
+                />
+              )}
+            </>
           )}
         </>
       )}
