@@ -20,6 +20,32 @@ export interface NamedQueryOption {
   title: string;
 }
 
+/**
+ * A governed metric declared in a semantic model (PRD 16). Unlike a raw
+ * aggregate ({field, aggregation}), a semantic metric is a single named code
+ * whose aggregation formula lives in the {@code *.semantic.yml} definition.
+ */
+export interface SemanticMetricOption {
+  code: string;
+  name: string;
+  /** simple | derived | cumulative — informational only for the picker */
+  type?: string;
+  description?: string;
+}
+
+/**
+ * A dimension declared in a semantic model. Time dimensions expose
+ * {@code timeGrains} (e.g. day/month/year) that map to the {@code code__grain}
+ * suffix the semantic compiler understands.
+ */
+export interface SemanticDimensionOption {
+  code: string;
+  name: string;
+  type?: string;
+  timeGrains?: string[];
+  primaryTime?: boolean;
+}
+
 export interface FilterCondition {
   field: string;
   operator: string;

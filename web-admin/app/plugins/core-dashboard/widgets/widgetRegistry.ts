@@ -10,9 +10,11 @@ import { resolveWidgetTier } from '../registry/widgetManifest';
 /**
  * Common property schemas for data source configuration.
  *
- * Includes an optional `semanticModelCode` field that, when set, routes the
- * aggregate request through SemanticQueryService on the backend (PR #377).
- * Users can leave it blank to keep the existing raw SQL / namedQuery path.
+ * Semantic-layer routing (PR #377) is configured in the richer DataSourceConfig
+ * panel via the "数据源模式: 原始模型 / 语义模型" switch — the single source of
+ * truth for picking a semantic model and its governed metrics/dimensions. The
+ * earlier standalone `semantic-model-select` schema field was removed to avoid
+ * a second, conflicting model dropdown (PRD 16 W4 D4 switch-style consolidation).
  */
 const dataSourcePropertySchemas: PropertySchema[] = [
   {
@@ -37,13 +39,6 @@ const dataSourcePropertySchemas: PropertySchema[] = [
     label: '命名查询',
     type: 'namedQuery',
     dependsOn: { field: 'dataSource.type', value: 'namedQuery' },
-  },
-  {
-    key: 'dataSource.semanticModelCode',
-    label: '语义模型（可选）',
-    type: 'semantic-model-select',
-    description: '选择后将通过语义层查询，指标可用 code 或 <model>.<metric> 格式',
-    dependsOn: { field: 'dataSource.type', value: 'aggregate' },
   },
 ];
 

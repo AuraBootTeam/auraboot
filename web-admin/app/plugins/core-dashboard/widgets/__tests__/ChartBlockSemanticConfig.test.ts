@@ -2,9 +2,11 @@
  * Tests for the semantic model config integration in dashboard chart widgets.
  *
  * Covers:
- *  1. semanticModelCode defaults to undefined in widget schemas
+ *  1. semanticModelCode is NOT a standalone configSchema field — it is
+ *     configured in the DataSourceConfig panel switch (PRD 16 W4 D4
+ *     switch-style consolidation; the old #378 dropdown was removed).
  *  2. DataSourceConfig type accepts semanticModelCode
- *  3. widgetRegistry chart schemas include the semanticModelCode field
+ *  3. ChartDataSource type accepts semanticModelCode
  *  4. useChartData serialises semanticModelCode into the request payload
  *  5. useChartData omits semanticModelCode from the request when not set
  */
@@ -15,7 +17,8 @@ import type { DataSourceConfig } from '../../types';
 import type { ChartDataSource } from '~/framework/smart/types/chart';
 
 // ---------------------------------------------------------------------------
-// Case 1 – semanticModelCode defaults to undefined in chart widget schemas
+// Case 1 – semanticModelCode is configured via the DataSourceConfig panel
+//          switch, NOT a standalone configSchema dropdown.
 // ---------------------------------------------------------------------------
 describe('chart widget configSchema – semanticModelCode field', () => {
   const CHART_TYPES = [
@@ -27,29 +30,21 @@ describe('chart widget configSchema – semanticModelCode field', () => {
   ] as const;
 
   it.each(CHART_TYPES)(
-    '%s has a semanticModelCode property schema entry',
+    '%s does NOT carry a standalone semantic-model-select configSchema field',
     (widgetType) => {
       const def = widgetRegistry.get(widgetType);
       expect(def, `${widgetType} must be registered`).toBeDefined();
 
       const schema = def!.configSchema ?? [];
-      const semanticField = schema.find(
-        (s) => s.key === 'dataSource.semanticModelCode',
-      );
+      const semanticField = schema.find((s) => s.key === 'dataSource.semanticModelCode');
       expect(
         semanticField,
-        `${widgetType} configSchema must include dataSource.semanticModelCode`,
-      ).toBeDefined();
-      expect(semanticField!.type).toBe('semantic-model-select');
+        `${widgetType} must configure semantic mode via DataSourceConfig, not a duplicate dropdown`,
+      ).toBeUndefined();
+      // The semantic-model-select PropertyType must no longer be used here.
+      expect(schema.some((s) => s.type === 'semantic-model-select')).toBe(false);
     },
   );
-
-  it('semanticModelCode schema has no defaultValue (opt-in, not set by default)', () => {
-    const def = widgetRegistry.get('smart-bar-chart');
-    const schema = def!.configSchema ?? [];
-    const semanticField = schema.find((s) => s.key === 'dataSource.semanticModelCode');
-    expect(semanticField!.defaultValue).toBeUndefined();
-  });
 });
 
 // ---------------------------------------------------------------------------
