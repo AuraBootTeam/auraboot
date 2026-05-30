@@ -1,0 +1,25 @@
+name: hubspot-deal-normalize
+version: 0.1
+fields:
+  - source: hs_lastmodifieddate
+    target: updated_at
+    type: TIMESTAMP
+    params:
+      from_format: iso8601
+      to_format: epoch_millis
+  - source: amount
+    target: amount_cents
+    type: NUMERIC_UNIT
+    params:
+      from: dollars
+      to: cents
+  - source: dealstage
+    target: stage
+    type: ENUM_MAP
+    params:
+      mapping:
+        closedwon: WON
+        closedlost: LOST
+  - source: hubspot_owner_id
+    target: owner_id
+    type: RENAME
