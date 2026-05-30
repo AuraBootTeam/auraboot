@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -80,11 +81,27 @@ public class ImConversationController {
 
     @PostMapping("/{id}/members")
     public ApiResponse<Void> addMembers(@PathVariable Long id, @RequestBody JsonNode body) {
+        Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> memberIds = readIdList(body, "memberIds", body.isArray());
         List<Long> agentIds = readIdList(body, "agentIds", false);
         conversationService.addMembers(id, memberIds, tenantId);
         conversationService.addAgentMembers(id, agentIds, tenantId);
+
+        // Broadcast member_added to all current human members (including newly added)
+        List<Long> recipientHumanIds = conversationService.getMembers(id, tenantId).stream()
+                .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
+                .map(ConversationMemberInfo::getMemberId).toList();
+        if (!recipientHumanIds.isEmpty() && (!memberIds.isEmpty() || !agentIds.isEmpty())) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("memberIds", memberIds);
+            payload.put("agentIds", agentIds);
+            payload.put("byUserId", userId);
+            payload.put("byUserName", userName);
+            webSocketHandler.broadcastEvent(recipientHumanIds, ImConstants.WS_MEMBER_ADDED, payload);
+        }
         return ApiResponse.success(null);
     }
 
@@ -92,8 +109,33 @@ public class ImConversationController {
     public ApiResponse<Void> removeMember(@PathVariable Long id,
                                             @PathVariable String memberType,
                                             @PathVariable Long memberId) {
+        Long actorUserId = MetaContext.getCurrentUserId();
+        String actorUserName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
         conversationService.removeMember(id, memberType, memberId, tenantId);
+
+        // Send self_kicked to the removed human (agents don't receive WS events)
+        if (ImConstants.MEMBER_TYPE_HUMAN.equals(memberType)) {
+            Map<String, Object> selfPayload = new HashMap<>();
+            selfPayload.put("conversationId", id);
+            selfPayload.put("byUserId", actorUserId);
+            selfPayload.put("byUserName", actorUserName);
+            webSocketHandler.broadcastEvent(List.of(memberId), ImConstants.WS_SELF_KICKED, selfPayload);
+        }
+
+        // Send member_removed to all remaining human members
+        List<Long> remainingHumanIds = conversationService.getMembers(id, tenantId).stream()
+                .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
+                .map(ConversationMemberInfo::getMemberId).toList();
+        if (!remainingHumanIds.isEmpty()) {
+            Map<String, Object> othersPayload = new HashMap<>();
+            othersPayload.put("conversationId", id);
+            othersPayload.put("removedMemberId", memberId);
+            othersPayload.put("removedMemberType", memberType);
+            othersPayload.put("byUserId", actorUserId);
+            othersPayload.put("byUserName", actorUserName);
+            webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_REMOVED, othersPayload);
+        }
         return ApiResponse.success(null);
     }
 
@@ -127,13 +169,21 @@ public class ImConversationController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> dissolveGroup(@PathVariable Long id) {
         Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> memberIds = conversationService.dissolveGroup(id, userId, tenantId);
         // Broadcast to other members
         List<Long> others = memberIds.stream().filter(uid -> !uid.equals(userId)).toList();
         if (!others.isEmpty()) {
+            // Legacy event for backward compatibility with older iOS clients
             webSocketHandler.broadcastEvent(others, ImConstants.WS_CONVERSATION_DELETED,
                     Map.of("conversationId", id));
+            // New event with actor context
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("byUserId", userId);
+            payload.put("byUserName", userName);
+            webSocketHandler.broadcastEvent(others, ImConstants.WS_CONVERSATION_DISSOLVED, payload);
         }
         return ApiResponse.success(null);
     }
@@ -141,6 +191,7 @@ public class ImConversationController {
     @PostMapping("/{id}/leave")
     public ApiResponse<Void> leaveGroup(@PathVariable Long id) {
         Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
         conversationService.leaveGroup(id, userId, tenantId);
         // Broadcast member_left to remaining human members (if group still exists)
@@ -149,8 +200,11 @@ public class ImConversationController {
             List<Long> remainingHumanIds = remaining.stream()
                     .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
                     .map(ConversationMemberInfo::getMemberId).toList();
-            webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_LEFT,
-                    Map.of("conversationId", id, "userId", userId));
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("conversationId", id);
+            payload.put("byUserId", userId);
+            payload.put("byUserName", userName);
+            webSocketHandler.broadcastEvent(remainingHumanIds, ImConstants.WS_MEMBER_LEFT, payload);
         }
         return ApiResponse.success(null);
     }
@@ -159,14 +213,34 @@ public class ImConversationController {
     public ApiResponse<Void> updateConversation(@PathVariable Long id,
                                                   @RequestBody ConversationUpdateRequest request) {
         Long userId = MetaContext.getCurrentUserId();
+        String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
+
+        // Capture old name BEFORE the update (for rename event payload)
+        String oldName = null;
+        boolean isRename = request.getName() != null && !request.getName().isBlank();
+        if (isRename) {
+            oldName = conversationService.getById(id, tenantId).getName();
+        }
+
         conversationService.updateConversation(id, request, userId, tenantId);
+
         List<Long> humanMemberIds = conversationService.getMembers(id, tenantId).stream()
                 .filter(m -> ImConstants.MEMBER_TYPE_HUMAN.equals(m.getMemberType()))
                 .map(ConversationMemberInfo::getMemberId).toList();
-        if (request.getName() != null && !request.getName().isBlank()) {
+
+        if (isRename) {
+            // Legacy event for older iOS clients
             webSocketHandler.broadcastEvent(humanMemberIds, ImConstants.WS_CONVERSATION_UPDATED,
                     Map.of("conversationId", id, "name", request.getName()));
+            // New rename event with old/new name and actor context
+            Map<String, Object> renamePayload = new HashMap<>();
+            renamePayload.put("conversationId", id);
+            renamePayload.put("oldName", oldName);
+            renamePayload.put("newName", request.getName());
+            renamePayload.put("byUserId", userId);
+            renamePayload.put("byUserName", userName);
+            webSocketHandler.broadcastEvent(humanMemberIds, ImConstants.WS_CONVERSATION_RENAMED, renamePayload);
         }
         return ApiResponse.success(null);
     }

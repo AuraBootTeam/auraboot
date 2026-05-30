@@ -28,4 +28,11 @@ public final class ImConstants {
 
     // WebSocket event types for read receipts
     public static final String WS_READ_RECEIPT = "read_receipt";
+
+    // WebSocket event types for group member events
+    public static final String WS_MEMBER_ADDED = "member_added";
+    public static final String WS_MEMBER_REMOVED = "member_removed";
+    public static final String WS_SELF_KICKED = "self_kicked";
+    public static final String WS_CONVERSATION_RENAMED = "conversation_renamed";
+    public static final String WS_CONVERSATION_DISSOLVED = "conversation_dissolved";
 }
