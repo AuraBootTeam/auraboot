@@ -27,4 +27,13 @@ public interface AbSemanticModelMapper extends BaseMapper<AbSemanticModel> {
           + "WHERE tenant_id = #{tenantId} AND status = 'ACTIVE' AND deleted_flag = FALSE "
           + "ORDER BY plugin_code, code")
     List<AbSemanticModel> listActiveByTenant(@Param("tenantId") Long tenantId);
+
+    /**
+     * Find the first ACTIVE semantic model whose {@code model_ref} matches the given name.
+     * Used by dbt lineage ingest to emit cross-link edges from DBT_MODEL → SEMANTIC_MODEL.
+     */
+    @Select("SELECT * FROM ab_semantic_model "
+          + "WHERE tenant_id = #{tenantId} AND model_ref = #{modelRef} "
+          + "AND status = 'ACTIVE' AND deleted_flag = FALSE LIMIT 1")
+    AbSemanticModel findByModelRef(@Param("tenantId") Long tenantId, @Param("modelRef") String modelRef);
 }
