@@ -490,6 +490,12 @@ public final class MetaPermission {
      */
     public static final String META_FILTER_MANAGE = "meta.filter.update";
 
+    /**
+     * ChatBI v2 conversational analytics — ask questions, manage conversations,
+     * disambiguate. PRD 17.
+     */
+    public static final String META_CHATBI_USE = "meta.chatbi.use";
+
     // ==================== SYS permissions ====================
 
     /**

@@ -7,6 +7,8 @@ import com.auraboot.framework.chatbi.v2.mapper.ChatBiConversationMapper;
 import com.auraboot.framework.chatbi.v2.service.ChatBiAnswerService;
 import com.auraboot.framework.chatbi.v2.service.ConversationService;
 import com.auraboot.framework.chatbi.v2.service.DisambiguationService;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,9 +38,10 @@ import java.util.Map;
  * </ul>
  *
  * <p>Tenant + user scoping is read from {@link MetaContext} (set by the
- * {@code JwtAuthenticationFilter}). No explicit {@code @RequirePermission}
- * is applied yet — matching v1 behaviour; W4 follow-up will register
- * {@code meta.chatbi.use} in bootstrap and annotate this controller.
+ * {@code JwtAuthenticationFilter}). All endpoints require
+ * {@link MetaPermission#META_CHATBI_USE} ({@code meta.chatbi.use}), registered
+ * in {@code default-bootstrap.json} and granted to {@code tenant_admin}
+ * (via {@code *}), {@code operator}, and {@code viewer} roles by default.
  */
 @RestController
 @RequestMapping("/api/chatbi/v2")
@@ -53,6 +56,7 @@ public class ChatBiV2Controller {
     // -- conversation lifecycle -----------------------------------------
 
     @PostMapping("/conversations")
+    @RequirePermission(MetaPermission.META_CHATBI_USE)
     public ResponseEntity<Map<String, String>> createConversation(
             @RequestBody(required = false) CreateConversationRequest body) {
         String modelPid = body != null ? body.getSemanticModelPid() : null;
@@ -64,6 +68,7 @@ public class ChatBiV2Controller {
     }
 
     @GetMapping("/conversations")
+    @RequirePermission(MetaPermission.META_CHATBI_USE)
     public ResponseEntity<List<ChatBiConversation>> listConversations(
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(conversationMapper.listActiveByUser(
@@ -73,6 +78,7 @@ public class ChatBiV2Controller {
     }
 
     @DeleteMapping("/conversations/{pid}")
+    @RequirePermission(MetaPermission.META_CHATBI_USE)
     public ResponseEntity<Map<String, Boolean>> closeConversation(@PathVariable String pid) {
         boolean closed = conversationService.close(MetaContext.getCurrentTenantId(), pid);
         return ResponseEntity.ok(Map.of("closed", closed));
@@ -81,6 +87,7 @@ public class ChatBiV2Controller {
     // -- ask / reset / disambiguate -------------------------------------
 
     @PostMapping("/conversations/{pid}/ask")
+    @RequirePermission(MetaPermission.META_CHATBI_USE)
     public ResponseEntity<ChatBiAnswerResponse> ask(@PathVariable String pid,
                                                     @RequestBody AskRequest body) {
         ChatBiAnswerResponse r = answerService.ask(
@@ -91,6 +98,7 @@ public class ChatBiV2Controller {
     }
 
     @PostMapping("/conversations/{pid}/reset")
+    @RequirePermission(MetaPermission.META_CHATBI_USE)
     public ResponseEntity<Map<String, Boolean>> resetContext(@PathVariable String pid) {
         boolean ok = conversationService.resetContext(
                 MetaContext.getCurrentTenantId(), pid);
@@ -98,6 +106,7 @@ public class ChatBiV2Controller {
     }
 
     @PostMapping("/conversations/{pid}/disambiguate")
+    @RequirePermission(MetaPermission.META_CHATBI_USE)
     public ResponseEntity<Map<String, Boolean>> recordDisambiguationChoice(
             @PathVariable String pid,
             @RequestBody DisambiguateRequest body) {

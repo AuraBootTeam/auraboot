@@ -285,6 +285,16 @@
       "resourceType": "function"
     },
     {
+      "code": "meta.chatbi.use",
+      "name": "ChatBI 对话式分析",
+      "description": "使用 ChatBI v2 对话式分析（创建会话、提问、消歧）",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:chatbi",
+      "action": "use",
+      "resourceType": "function"
+    },
+    {
       "code": "meta.filter.manage",
       "name": "筛选预设管理",
       "description": "管理筛选预设（创建、编辑、删除、设为默认）",
@@ -1398,7 +1408,8 @@
         "notification_rule_manage",
         "sys.file.upload",
         "meta.changelog.read",
-        "meta.filter.manage"
+        "meta.filter.manage",
+        "meta.chatbi.use"
       ]
     },
     {
@@ -1411,7 +1422,8 @@
         "org_management",
         "org.team.read",
         "notification.view",
-        "meta.changelog.read"
+        "meta.changelog.read",
+        "meta.chatbi.use"
       ]
     }
   ]
