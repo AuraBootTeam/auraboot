@@ -241,25 +241,14 @@ function completeLogin(user: User, request: Request, redirectTo: string, remembe
 }
 
 // ============================================================
-// Capability tiles shown on the left brand panel (desktop only)
+// Capability rows shown on the left brand panel (desktop only)
 // ============================================================
-type TileTone = 'blue' | 'orange' | 'green' | 'purple' | 'teal' | 'rose';
-interface CapabilityTile {
+interface CapabilityRow {
   key: string;
-  tone: TileTone;
   title: string;
   desc: string;
   icon: React.ReactNode;
 }
-
-const TONE_BG: Record<TileTone, string> = {
-  blue: 'from-[#3B6FF6] to-[#5B8DEF]',
-  orange: 'from-[#F08A3E] to-[#F2A95C]',
-  green: 'from-[#1FA980] to-[#2BC79A]',
-  purple: 'from-[#7B4DE6] to-[#9F7BF0]',
-  teal: 'from-[#0EA5C0] to-[#22C7D9]',
-  rose: 'from-[#E04E8B] to-[#F472A8]',
-};
 
 export default function LoginPage() {
   const { t } = useI18n();
@@ -334,14 +323,13 @@ export default function LoginPage() {
     else if (errors?.password) passwordRef.current?.focus();
   }, [actionData]);
 
-  const tiles: CapabilityTile[] = [
+  const tiles: CapabilityRow[] = [
     {
       key: 'designer',
-      tone: 'blue',
       title: t('auth.feature.designer', undefined, '可视化页面设计器'),
       desc: t('auth.feature.designer.desc', undefined, '拖拽式可视化搭建,所见即所得'),
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
           <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
           <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
@@ -351,11 +339,10 @@ export default function LoginPage() {
     },
     {
       key: 'dataModel',
-      tone: 'orange',
       title: t('auth.feature.dataModel', undefined, '灵活数据模型'),
       desc: t('auth.feature.dataModel.desc', undefined, '动态建模,字段级权限与审计'),
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" strokeWidth="1.8" />
           <path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" stroke="currentColor" strokeWidth="1.8" />
         </svg>
@@ -363,11 +350,10 @@ export default function LoginPage() {
     },
     {
       key: 'workflow',
-      tone: 'green',
       title: t('auth.feature.workflow', undefined, '工作流自动化'),
       desc: t('auth.feature.workflow.desc', undefined, 'BPMN 编排 + 自动化规则引擎'),
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <circle cx="6" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.8" />
           <circle cx="18" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.8" />
           <circle cx="12" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" />
@@ -377,49 +363,27 @@ export default function LoginPage() {
     },
     {
       key: 'aiAgent',
-      tone: 'purple',
       title: t('auth.feature.aiAgent', undefined, 'AI Agent'),
       desc: t('auth.feature.aiAgent.desc', undefined, '租户内运行,可调用全部业务能力'),
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <path d="M12 3l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1 2-4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        </svg>
-      ),
-    },
-    {
-      key: 'plugin',
-      tone: 'teal',
-      title: t('auth.feature.plugin', undefined, '插件生态'),
-      desc: t('auth.feature.plugin.desc', undefined, 'PF4J + 模块联邦,前后端热插拔'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-          <path d="M4 7l8-4 8 4-8 4-8-4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-          <path d="M4 12l8 4 8-4M4 17l8 4 8-4" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        </svg>
-      ),
-    },
-    {
-      key: 'multiPlatform',
-      tone: 'rose',
-      title: t('auth.feature.multiPlatform', undefined, '多端交付'),
-      desc: t('auth.feature.multiPlatform.desc', undefined, 'Web / iOS / Android / 小程序 一套配置'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-          <rect x="6" y="2" width="12" height="20" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M10 18h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
       ),
     },
   ];
 
+  const oidcChannel = socialChannels.find((c: string) => c === 'oidc');
+  const iconSocialChannels = socialChannels.filter((c: string) => c !== 'oidc');
+
   const card = (
-    <div className="w-full max-w-md">
-      <div className="mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+    <div className="w-full max-w-[404px]">
+      <div className="mb-8">
+        <h1 className="text-[28px] font-extrabold tracking-tight text-[#15131C] lg:text-[30px] dark:text-white">
           {t('auth.welcome') || '欢迎回来'}
         </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {t('auth.selectMethod') || '请选择登录方式'}
+        <p className="mt-2 text-[15px] text-[#8A8694] dark:text-gray-400">
+          {t('auth.welcomeSub', undefined, '登录以继续使用 AuraBoot 工作台')}
         </p>
       </div>
 
@@ -429,7 +393,7 @@ export default function LoginPage() {
           role="tablist"
           aria-label="login channels"
           data-testid="login-channel-tabs"
-          className="mb-5 flex rounded-lg bg-gray-100 p-1 dark:bg-gray-700/60"
+          className="mb-6 flex rounded-xl bg-[#EEEDF2] p-1 dark:bg-gray-700/60"
         >
           {tabChannels.map((ch: string) => (
             <button
@@ -439,10 +403,10 @@ export default function LoginPage() {
               aria-selected={activeTab === ch}
               data-testid={`login-tab-${ch.toLowerCase()}`}
               onClick={() => setActiveTab(ch)}
-              className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-all duration-150 ${
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all duration-150 ${
                 activeTab === ch
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-600 dark:text-blue-400'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                  ? 'bg-white text-[#4B3FE4] shadow-sm dark:bg-gray-600 dark:text-[#a99dff]'
+                  : 'text-[#8A8694] hover:text-[#54505E] dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
               {t(CHANNEL_I18N_KEYS[ch] || ch)}
@@ -488,43 +452,48 @@ export default function LoginPage() {
         />
       )}
 
-      {/* Social Login (conditional, alt methods row) */}
+      {/* Social / SSO login (conditional) */}
       {socialChannels.length > 0 && (
-        <div className="mt-5">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-3 font-medium tracking-wide text-gray-400 uppercase dark:bg-gray-800 dark:text-gray-500">
-                {t('auth.socialLogin') || 'Or sign in with'}
-              </span>
-            </div>
+        <div className="mt-6">
+          <div className="flex items-center gap-3.5 text-[12.5px] text-[#B4B0BE] dark:text-gray-500">
+            <span className="h-px flex-1 bg-[#E8E6EF] dark:bg-gray-700" />
+            {t('auth.or', undefined, '或')}
+            <span className="h-px flex-1 bg-[#E8E6EF] dark:bg-gray-700" />
           </div>
-          <div className="mt-3 flex justify-center gap-2">
-            {socialChannels.map((ch: string) => (
-              <SocialLoginButton key={ch} provider={ch} />
-            ))}
-          </div>
+
+          {oidcChannel && (
+            <button
+              type="button"
+              data-testid="login-sso-oidc"
+              onClick={() => startSocialLogin('oidc')}
+              className="mt-5 flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[13px] border-[1.5px] border-[#E4E2EC] bg-white text-[14.5px] font-semibold text-[#54505E] transition hover:border-[#CFCCDA] hover:bg-[#FAFAFD] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                <path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z" strokeLinejoin="round" />
+                <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {t('auth.ssoLogin', undefined, '使用企业 SSO 登录')}
+            </button>
+          )}
+
+          {iconSocialChannels.length > 0 && (
+            <div className="mt-3 flex justify-center gap-2.5">
+              {iconSocialChannels.map((ch: string) => (
+                <SocialLoginButton key={ch} provider={ch} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Sign up link */}
-      <div className="mt-5 flex items-center justify-between text-sm">
-        <span className="text-gray-500 dark:text-gray-400">
-          {t('auth.noAccount') || 'No account yet?'}{' '}
-          <Link
-            className="font-medium text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-            to={{ pathname: '/signup', search: searchParams.toString() }}
-          >
-            {t('auth.registerNow') || 'Sign Up'}
-          </Link>
-        </span>
+      <div className="mt-7 text-center text-[14px] text-[#8A8694] dark:text-gray-400">
+        {t('auth.noAccount') || 'No account yet?'}{' '}
         <Link
-          to="/forgot-password"
-          className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+          className="font-semibold text-[#4B3FE4] transition-colors hover:text-[#3B33C9] dark:text-[#a99dff] dark:hover:text-[#c4baff]"
+          to={{ pathname: '/signup', search: searchParams.toString() }}
         >
-          {t('auth.forgotPassword') || 'Forgot?'}
+          {t('auth.registerNow') || 'Sign Up'}
         </Link>
       </div>
     </div>
@@ -559,57 +528,70 @@ export default function LoginPage() {
         </div>
       ) : (
         // Desktop: full-bleed 2-col, left brand region + right form region
-        <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[55fr_45fr] xl:grid-cols-[58fr_42fr]">
-          {/* Left: full-bleed brand region */}
-          <section className="relative overflow-hidden bg-gradient-to-br from-[#EEF2FF] via-[#F2EEFF] to-[#FAF5FF] dark:from-gray-800 dark:via-gray-800 dark:to-gray-900">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -top-40 -right-32 h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(124,92,255,0.22),transparent_70%)]"
-            />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-32 -left-24 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(34,211,183,0.12),transparent_70%)]"
-            />
-            <div className="relative flex h-full flex-col justify-center px-8 py-14 lg:px-14 xl:px-20 2xl:px-28">
-              <div className="flex max-w-[640px] flex-col gap-8">
-                <div className="flex items-center gap-3">
-                  <img
-                    src="/android-chrome-192x192.png"
-                    alt="AuraBoot"
-                    className="h-10 w-10 rounded-lg shadow-sm"
-                  />
-                  <span className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
-                    AuraBoot
-                  </span>
-                </div>
-                <h1 className="text-balance text-3xl font-semibold leading-[1.15] tracking-tight text-gray-900 lg:text-[40px] xl:text-[44px] dark:text-white">
-                  {t('auth.tagline', undefined, '快速构建企业级应用的低代码平台')}
-                </h1>
-                <div className="grid grid-cols-2 gap-3 xl:gap-3.5">
-                  {tiles.map((tile) => (
-                    <div
-                      key={tile.key}
-                      className={`relative flex min-h-[100px] flex-col gap-1.5 overflow-hidden rounded-xl bg-gradient-to-br p-4 text-white shadow-[0_8px_24px_-10px_rgba(30,40,80,0.18),0_2px_6px_rgba(30,40,80,0.06)] ${TONE_BG[tile.tone]}`}
-                    >
-                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-white/22 text-white">
-                        {tile.icon}
-                      </div>
-                      <div className="text-sm font-semibold tracking-tight">{tile.title}</div>
-                      <div className="text-[11.5px] leading-snug opacity-90">{tile.desc}</div>
-                      <div
-                        aria-hidden="true"
-                        className="absolute -right-6 -bottom-6 h-[88px] w-[88px] rounded-full bg-white/12"
-                      />
+        <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[1.15fr_1fr]">
+          {/* Left: brand / positioning region */}
+          <section className="flex flex-col justify-center bg-white px-8 py-12 lg:px-14 xl:px-20 2xl:px-24 dark:bg-gray-900">
+            <div className="flex w-full max-w-[600px] flex-col">
+              {/* Badge */}
+              <span className="inline-flex items-center gap-2 self-start rounded-full bg-[#F3F2FE] px-3.5 py-1.5 text-[13px] font-semibold text-[#4B3FE4] dark:bg-[#4B3FE4]/15 dark:text-[#a99dff]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#4B3FE4]" />
+                {t('auth.badge', undefined, 'AI 原生 · 企业应用运行时')}
+              </span>
+
+              {/* Headline with brand-colored highlight word */}
+              <h1 className="mt-8 max-w-[580px] text-balance text-[34px] font-extrabold leading-[1.16] tracking-tight text-[#15131C] lg:text-[44px] xl:text-[50px] dark:text-white">
+                {t('auth.headline.pre', undefined, '把企业系统,建成')}
+                <span className="mx-2 text-[#4B3FE4] dark:text-[#8d7fff]">
+                  {t('auth.headline.em', undefined, 'AI 能直接操作')}
+                </span>
+                {t('auth.headline.post', undefined, '的样子')}
+              </h1>
+
+              {/* Lead */}
+              <p className="mt-5 max-w-[480px] text-[15px] leading-[1.7] text-[#54505E] xl:text-[17px] dark:text-gray-400">
+                {t(
+                  'auth.lead',
+                  undefined,
+                  '可视化建模、页面与流程编排,统一沉淀为命令能力——人来点、AI 也能调;一次配置,Web、移动端与小程序全端交付。',
+                )}
+              </p>
+
+              {/* Feature list */}
+              <div className="mt-10 max-w-[540px]">
+                {tiles.map((tile) => (
+                  <div
+                    key={tile.key}
+                    className="flex items-start gap-4 border-t border-[#EEEDF2] py-5 last:border-b dark:border-gray-800"
+                  >
+                    <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-[#F3F2FE] text-[#4B3FE4] dark:bg-[#4B3FE4]/15 dark:text-[#a99dff]">
+                      {tile.icon}
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <div className="text-base font-bold text-[#15131C] dark:text-white">
+                        {tile.title}
+                      </div>
+                      <div className="mt-1 text-[13.5px] text-[#8A8694] dark:text-gray-500">
+                        {tile.desc}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Trust pillars */}
+              <div className="mt-9 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px] font-medium text-[#54505E] dark:text-gray-400">
+                <span>{t('auth.pillar.model', undefined, '模型驱动')}</span>
+                <span className="h-1 w-1 rounded-full bg-[#D6D3E0] dark:bg-gray-600" />
+                <span>{t('auth.pillar.command', undefined, '命令治理')}</span>
+                <span className="h-1 w-1 rounded-full bg-[#D6D3E0] dark:bg-gray-600" />
+                <span>{t('auth.pillar.plugin', undefined, '插件交付')}</span>
               </div>
             </div>
           </section>
 
           {/* Right: form region */}
-          <section className="flex items-center justify-center bg-white px-6 py-14 lg:px-12 xl:px-16 dark:bg-gray-800">
-            <div className="w-full max-w-md">{card}</div>
+          <section className="flex items-center justify-center border-l border-[#EEEDF2] bg-[#F7F7FB] px-6 py-14 lg:px-12 xl:px-16 dark:border-gray-800 dark:bg-gray-800">
+            <div className="w-full max-w-[404px]">{card}</div>
           </section>
         </div>
       )}
@@ -622,12 +604,31 @@ export default function LoginPage() {
 // ============================================================
 
 const INPUT_CLS =
-  'w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700/60 dark:text-white dark:placeholder-gray-500 dark:focus:ring-blue-800';
+  'h-[52px] w-full rounded-[13px] border-[1.5px] border-[#E4E2EC] bg-white px-4 text-[15px] text-[#15131C] placeholder-[#B4B0BE] outline-none transition focus:border-[#4B3FE4] focus:ring-4 focus:ring-[#4B3FE4]/15 dark:border-gray-600 dark:bg-gray-700/60 dark:text-white dark:placeholder-gray-500';
 
 const SUBMIT_CLS =
-  'w-full rounded-lg bg-gradient-to-r from-[#4F6BFF] to-[#6B5BFF] py-2.5 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgba(79,107,255,0.45)] transition-all duration-150 hover:from-[#3F5BEF] hover:to-[#5B4BEF] hover:shadow-[0_10px_22px_-6px_rgba(79,107,255,0.55)] focus:outline-none focus:ring-4 focus:ring-blue-200 dark:focus:ring-blue-800';
+  'h-[52px] w-full rounded-[13px] bg-[#4B3FE4] text-[15.5px] font-bold text-white shadow-[0_8px_22px_-8px_rgba(75,63,228,0.6)] transition-all duration-150 hover:-translate-y-px hover:bg-[#3B33C9] hover:shadow-[0_12px_26px_-8px_rgba(75,63,228,0.65)] focus:outline-none focus:ring-4 focus:ring-[#4B3FE4]/30';
 
-const LABEL_CLS = 'mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300';
+const LABEL_CLS = 'mb-2 block text-[13px] font-semibold text-[#54505E] dark:text-gray-300';
+
+const SECONDARY_BTN_CLS =
+  'flex-shrink-0 rounded-[11px] border px-3.5 text-xs font-semibold transition-colors';
+
+// Start an OAuth/SSO social login by resolving the provider authorize URL.
+async function startSocialLogin(provider: string) {
+  try {
+    const redirectUri = `${window.location.origin}/login/social/${provider.toLowerCase()}/callback`;
+    const result = await fetchResult<{ authorizeUrl: string }>(
+      `/api/auth/login/social/${provider.toLowerCase()}`,
+      { method: 'get', params: { redirectUri } },
+    );
+    if (ResultHelper.isSuccess(result) && result.data?.authorizeUrl) {
+      window.location.href = result.data.authorizeUrl;
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 function ErrorBanner({ message, t }: { message: string; t: (key: string) => string }) {
   return (
@@ -676,8 +677,9 @@ function EmailPasswordForm({
   setPassword: (v: string) => void;
   remember: boolean;
   setRemember: (v: boolean) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, any>, fallback?: string) => string;
 }) {
+  const [showPwd, setShowPwd] = useState(false);
   return (
     <Form
       method="post"
@@ -700,7 +702,7 @@ function EmailPasswordForm({
           window.localStorage.removeItem(REMEMBER_PWD_KEY);
         }
       }}
-      className="space-y-3.5"
+      className="space-y-5"
     >
       <input type="hidden" name="channelCode" value="email_password" />
       <input type="hidden" name="redirectTo" value={redirectTo} />
@@ -736,18 +738,39 @@ function EmailPasswordForm({
         <label htmlFor="password" className={LABEL_CLS}>
           {t('auth.password') || 'Password'}
         </label>
-        <input
-          ref={passwordRef}
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder={t('auth.passwordPlaceholder') || '••••••••'}
-          aria-invalid={actionData?.errors?.password ? true : undefined}
-          className={INPUT_CLS}
-        />
+        <div className="relative">
+          <input
+            ref={passwordRef}
+            id="password"
+            name="password"
+            type={showPwd ? 'text' : 'password'}
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('auth.passwordPlaceholder') || '••••••••'}
+            aria-invalid={actionData?.errors?.password ? true : undefined}
+            className={`${INPUT_CLS} pr-12`}
+          />
+          <button
+            type="button"
+            data-testid="login-toggle-password"
+            onClick={() => setShowPwd((v) => !v)}
+            aria-label={t(showPwd ? 'auth.hidePassword' : 'auth.showPassword', undefined, showPwd ? '隐藏密码' : '显示密码')}
+            className="absolute top-1/2 right-2.5 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#9A96A4] transition-colors hover:bg-[#F1F0F8] hover:text-[#4B3FE4] dark:hover:bg-gray-600"
+          >
+            {showPwd ? (
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                <path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7a12 12 0 01-2.2 3M6.3 6.3A12.4 12.4 0 003 12c0 2.5 4 7 9 7a9.6 9.6 0 004.2-1" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="2.8" />
+              </svg>
+            )}
+          </button>
+        </div>
         {actionData?.errors?.password && (
           <div className="mt-1.5 text-xs text-red-600 dark:text-red-400">
             {actionData.errors.password}
@@ -755,18 +778,24 @@ function EmailPasswordForm({
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-1">
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex items-center justify-between">
+        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#54505E] select-none dark:text-gray-400">
           <input
             id="remember"
             name="remember"
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600"
+            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#4B3FE4] focus:ring-[#4B3FE4] dark:border-gray-600"
           />
           {t('auth.rememberMe') || 'Remember me'}
         </label>
+        <Link
+          to="/forgot-password"
+          className="text-[14px] font-medium text-[#4B3FE4] hover:underline dark:text-[#a99dff]"
+        >
+          {t('auth.forgotPassword') || 'Forgot?'}
+        </Link>
       </div>
 
       <button type="submit" className={SUBMIT_CLS}>
@@ -787,7 +816,7 @@ function SmsLoginForm({
   redirectTo: string;
   remember: boolean;
   setRemember: (v: boolean) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, any>, fallback?: string) => string;
 }) {
   const [mobile, setMobile] = useState('');
   const [code, setCode] = useState('');
@@ -818,7 +847,7 @@ function SmsLoginForm({
   }, [mobile]);
 
   return (
-    <Form method="post" action="/login" reloadDocument className="space-y-3.5">
+    <Form method="post" action="/login" reloadDocument className="space-y-5">
       <input type="hidden" name="channelCode" value="sms" />
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
@@ -867,10 +896,10 @@ function SmsLoginForm({
             data-testid="email-code-send"
             onClick={sendCode}
             disabled={countdown > 0 || sending || mobile.trim().length < 10}
-            className={`flex-shrink-0 rounded-lg border px-3 text-xs font-medium transition-colors ${
+            className={`${SECONDARY_BTN_CLS} h-[52px] ${
               countdown > 0 || sending || mobile.trim().length < 10
-                ? 'cursor-not-allowed border-gray-200 text-gray-400 dark:border-gray-700 dark:text-gray-500'
-                : 'border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                ? 'cursor-not-allowed border-[#E4E2EC] text-[#B4B0BE] dark:border-gray-700 dark:text-gray-500'
+                : 'border-[#4B3FE4] text-[#4B3FE4] hover:bg-[#F3F2FE] dark:hover:bg-[#4B3FE4]/15'
             }`}
           >
             {countdown > 0
@@ -887,15 +916,15 @@ function SmsLoginForm({
         )}
       </div>
 
-      <div className="flex items-center pt-1">
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex items-center">
+        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#54505E] select-none dark:text-gray-400">
           <input
             id="sms-remember"
             name="remember"
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600"
+            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#4B3FE4] focus:ring-[#4B3FE4] dark:border-gray-600"
           />
           {t('auth.rememberMe') || 'Remember me'}
         </label>
@@ -923,7 +952,7 @@ function EmailCodeLoginForm({
   setEmail: (v: string) => void;
   remember: boolean;
   setRemember: (v: boolean) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, any>, fallback?: string) => string;
 }) {
   const [code, setCode] = useState('');
   const [countdown, setCountdown] = useState(0);
@@ -953,7 +982,7 @@ function EmailCodeLoginForm({
   }, [email]);
 
   return (
-    <Form method="post" action="/login" reloadDocument className="space-y-3.5">
+    <Form method="post" action="/login" reloadDocument className="space-y-5">
       <input type="hidden" name="channelCode" value="email_code" />
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
@@ -1001,10 +1030,10 @@ function EmailCodeLoginForm({
             type="button"
             onClick={sendCode}
             disabled={countdown > 0 || sending || !validateEmail(email)}
-            className={`flex-shrink-0 rounded-lg border px-3 text-xs font-medium transition-colors ${
+            className={`${SECONDARY_BTN_CLS} h-[52px] ${
               countdown > 0 || sending || !validateEmail(email)
-                ? 'cursor-not-allowed border-gray-200 text-gray-400 dark:border-gray-700 dark:text-gray-500'
-                : 'border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                ? 'cursor-not-allowed border-[#E4E2EC] text-[#B4B0BE] dark:border-gray-700 dark:text-gray-500'
+                : 'border-[#4B3FE4] text-[#4B3FE4] hover:bg-[#F3F2FE] dark:hover:bg-[#4B3FE4]/15'
             }`}
           >
             {countdown > 0
@@ -1021,15 +1050,15 @@ function EmailCodeLoginForm({
         )}
       </div>
 
-      <div className="flex items-center pt-1">
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex items-center">
+        <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#54505E] select-none dark:text-gray-400">
           <input
             id="ec-remember"
             name="remember"
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600"
+            className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#4B3FE4] focus:ring-[#4B3FE4] dark:border-gray-600"
           />
           {t('auth.rememberMe') || 'Remember me'}
         </label>
@@ -1044,23 +1073,7 @@ function EmailCodeLoginForm({
 
 function SocialLoginButton({ provider }: { provider: string }) {
   const { t } = useI18n();
-  const handleClick = useCallback(async () => {
-    try {
-      const redirectUri = `${window.location.origin}/login/social/${provider.toLowerCase()}/callback`;
-      const result = await fetchResult<{ authorizeUrl: string }>(
-        `/api/auth/login/social/${provider.toLowerCase()}`,
-        {
-          method: 'get',
-          params: { redirectUri },
-        },
-      );
-      if (ResultHelper.isSuccess(result) && result.data?.authorizeUrl) {
-        window.location.href = result.data.authorizeUrl;
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [provider]);
+  const handleClick = useCallback(() => startSocialLogin(provider), [provider]);
 
   const icons: Record<string, React.ReactNode> = {
     wechat: (
@@ -1113,7 +1126,7 @@ function SocialLoginButton({ provider }: { provider: string }) {
     <button
       type="button"
       onClick={handleClick}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border-[1.5px] border-[#E4E2EC] bg-white text-[#54505E] transition-colors hover:border-[#CFCCDA] hover:bg-[#FAFAFD] hover:text-[#15131C] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
       title={title || provider}
       aria-label={title || provider}
     >
