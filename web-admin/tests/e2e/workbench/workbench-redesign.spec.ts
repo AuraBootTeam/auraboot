@@ -19,43 +19,40 @@ test.describe('Workbench redesign smoke', () => {
   test('home page renders with new KPI cards, table tasks, list shortcuts', async ({ page }) => {
     await page.goto('/home');
 
-    // Verify top-level workbench heading visible
-    await expect(page.getByRole('heading', { name: /workbench|dashboard/i }).first()).toBeVisible({
-      timeout: 10_000,
-    });
+    // Verify the workbench header band (subline carries a stable testid so we
+    // do not depend on which locale resolves the title text).
+    await expect(page.getByTestId('workbench-subline')).toBeVisible({ timeout: 10_000 });
 
-    // KPI cards with sparkline series
-    // StatItem components render as [data-testid="stat-item-<metricKey>"]
-    const statItems = page.locator('[data-testid^="stat-item-"]');
-    await expect(statItems.first()).toBeVisible({ timeout: 10_000 });
-    const cardCount = await statItems.count();
+    // KPI cards — redesigned StatsRow / StatsCard widgets emit stat-card-<key>.
+    const statCards = page.locator('[data-testid^="stat-card-"]');
+    await expect(statCards.first()).toBeVisible({ timeout: 10_000 });
+    const cardCount = await statCards.count();
     expect(cardCount).toBeGreaterThanOrEqual(1);
 
-    // Verify no gradient color classes leaked (Plan 11: drop gradient overrides)
-    for (const card of await statItems.all()) {
+    // No vibrant gradient backgrounds may leak into the new neutral cards.
+    for (const card of await statCards.all()) {
       const cls = (await card.getAttribute('class')) ?? '';
       expect(cls).not.toMatch(
         /from-(blue|amber|emerald|violet|rose|cyan|indigo|orange)-(50|100|200|300|400|500)/,
       );
     }
 
-    // Inbox widget with task table
-    // SmartTableChart renders as <table> with [data-testid="smart-table-<blockKey>"]
-    const taskHeader = page.getByRole('columnheader', { name: /task|title|name/i });
-    await expect(taskHeader).toBeVisible({ timeout: 8000 });
+    // Inbox widget table is present; rely on table role rather than the
+    // localized column-header text (en-US "Task" vs zh-CN "待办" / "任务").
+    await expect(page.getByRole('table').first()).toBeVisible({ timeout: 8000 });
 
     // Shortcuts widget list
-    // ShortcutsWidget renders as [data-testid="shortcuts-list"]
     await expect(page.locator('[data-testid="shortcuts-list"]')).toBeVisible({ timeout: 8000 });
 
-    // Top bar polish (Plan 10: header height = h-14 / 56px)
+    // Top bar polish: inner header row uses h-14 / 56px
     const header = page.locator('header').first();
     await expect(header).toBeVisible();
-    const headerClass = (await header.getAttribute('class')) ?? '';
-    expect(headerClass).toMatch(/h-14|h-\[56px\]|h-16/);
+    const headerRowClass =
+      (await header.locator('div').first().getAttribute('class')) ?? '';
+    expect(headerRowClass).toMatch(/h-14|h-\[56px\]|h-16/);
 
-    // Environment chip in top bar (Plan 10)
-    await expect(page.locator('[data-testid*="env"]').first()).toBeVisible({ timeout: 5000 });
+    // Environment chip in top bar — only present in non-production builds.
+    await expect(page.getByTestId('header-env-chip')).toBeVisible({ timeout: 5000 });
   });
 
   test('/home is routed via dashboard code (not catch-all)', async ({ page }) => {
