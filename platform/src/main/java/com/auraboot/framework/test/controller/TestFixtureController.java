@@ -868,7 +868,7 @@ public class TestFixtureController {
         Object conversationService;
         try {
             conversationService = requireRuntimeBean(
-                    new String[]{"conversationService", "imConversationService", "imConversationServiceImpl"},
+                    new String[]{"imConversationService", "imConversationServiceImpl", "conversationService"},
                     new String[]{
                             "com.auraboot.framework.im.service.ImConversationService",
                             "com.auraboot.framework.im.service.impl.ImConversationServiceImpl"
@@ -1026,7 +1026,7 @@ public class TestFixtureController {
         Object conversationService;
         try {
             conversationService = requireRuntimeBean(
-                    new String[]{"conversationService", "imConversationService", "imConversationServiceImpl"},
+                    new String[]{"imConversationService", "imConversationServiceImpl", "conversationService"},
                     new String[]{
                             "com.auraboot.framework.im.service.ImConversationService",
                             "com.auraboot.framework.im.service.impl.ImConversationServiceImpl"
@@ -1243,28 +1243,42 @@ public class TestFixtureController {
     }
 
     private Method findMethod(Class<?> beanClass, String methodName) {
-        // Skip synthetic/bridge methods (CGLIB proxies inject these and they can have
-        // erased parameter types like Long where the real method takes a DTO).
-        // Prefer concrete declared methods; among matches, prefer those whose first
-        // param is not a primitive wrapper (DTO methods come first in our fixtures).
-        Method fallback = null;
-        for (Method method : beanClass.getMethods()) {
-            if (!methodName.equals(method.getName())) continue;
-            if (method.isSynthetic() || method.isBridge()) continue;
-            Class<?>[] params = method.getParameterTypes();
-            if (params.length > 0) {
+        // CGLIB proxies: walk superclass chain. JDK Dynamic proxies: walk
+        // interfaces. Either way, only accept a method whose first parameter
+        // is a DTO with a public no-arg constructor — our fixture helpers
+        // always pass a request DTO first, and we rely on newInstance() to
+        // build it via reflection.
+        java.util.Set<Class<?>> seen = new java.util.HashSet<>();
+        java.util.Deque<Class<?>> stack = new java.util.ArrayDeque<>();
+        stack.push(beanClass);
+        while (!stack.isEmpty()) {
+            Class<?> c = stack.pop();
+            if (c == null || c == Object.class || !seen.add(c)) continue;
+            for (Method method : c.getDeclaredMethods()) {
+                if (!methodName.equals(method.getName())) continue;
+                if (method.isSynthetic() || method.isBridge()) continue;
+                if (!java.lang.reflect.Modifier.isPublic(method.getModifiers())) continue;
+                Class<?>[] params = method.getParameterTypes();
+                if (params.length == 0) continue;
                 Class<?> first = params[0];
-                // Skip overloads where the first parameter is a primitive wrapper —
-                // our fixture helpers always pass a request DTO first.
-                if (first == Long.class || first == Integer.class || first == String.class
-                        || first.isPrimitive()) {
-                    if (fallback == null) fallback = method;
+                if (first.isPrimitive()) continue;
+                if (first == String.class || Number.class.isAssignableFrom(first)
+                        || first == Boolean.class || first == Character.class) continue;
+                try {
+                    first.getDeclaredConstructor();
+                } catch (NoSuchMethodException ignored) {
                     continue;
                 }
+                return method;
             }
-            return method;
+            // enqueue superclass + all interfaces (handles CGLIB extends and JDK Proxy implements)
+            Class<?> sup = c.getSuperclass();
+            if (sup != null) stack.push(sup);
+            for (Class<?> iface : c.getInterfaces()) {
+                if (iface != null) stack.push(iface);
+            }
         }
-        return fallback;
+        return null;
     }
 
     private void setBeanProperty(Object target, String propertyName, Object value) throws Exception {
