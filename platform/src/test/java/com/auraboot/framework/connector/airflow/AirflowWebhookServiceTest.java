@@ -1,5 +1,6 @@
 package com.auraboot.framework.connector.airflow;
 
+import com.auraboot.framework.connector.airflow.mapper.AirflowWebhookLogMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,17 +14,20 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 /**
  * Covers PRD 18-C §C.3.3 attack matrix — every reject path is asserted
  * with the precise httpStatus + errorCode pair.
+ *
+ * <p>W5-FU-4: also covers the observability layer — every call path writes
+ * a log row to {@link AirflowWebhookLogMapper}. The mapper is mocked so
+ * these are pure unit tests with no DB dependency.
  */
 class AirflowWebhookServiceTest {
 
@@ -32,14 +36,16 @@ class AirflowWebhookServiceTest {
     private static final long NOW_EPOCH = NOW.getEpochSecond();
 
     private ApplicationEventPublisher publisher;
+    private AirflowWebhookLogMapper logMapper;
     private final ObjectMapper json = new ObjectMapper();
     private AirflowWebhookService service;
 
     @BeforeEach
     void setup() {
         publisher = mock(ApplicationEventPublisher.class);
+        logMapper = mock(AirflowWebhookLogMapper.class);
         service = new AirflowWebhookService(publisher, json, SECRET,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC), logMapper);
     }
 
     private static byte[] body(String json) { return json.getBytes(StandardCharsets.UTF_8); }
@@ -70,7 +76,9 @@ class AirflowWebhookServiceTest {
          "payload":{"rowsSynced":1248}}
         """);
 
-    // -- 1. happy path ---------------------------------------------------
+    // ======================================================================
+    // 1. happy path
+    // ======================================================================
 
     @Test
     void case1_validSignatureValidBodyReturnsEvent() {
@@ -88,7 +96,9 @@ class AirflowWebhookServiceTest {
         assertThat(cap.getValue().event.getWebhookId()).isEqualTo("wid-1");
     }
 
-    // -- 2-3. missing headers -------------------------------------------
+    // ======================================================================
+    // 2-3. missing headers
+    // ======================================================================
 
     @Test
     void case2_missingSignatureHeader() {
@@ -109,7 +119,9 @@ class AirflowWebhookServiceTest {
         assertThat(e.errorCode()).isEqualTo("MISSING_SIGNATURE");
     }
 
-    // -- 4-5. malformed signature header --------------------------------
+    // ======================================================================
+    // 4-5. malformed signature header
+    // ======================================================================
 
     @Test
     void case4_signatureMissingTPart() {
@@ -166,7 +178,9 @@ class AirflowWebhookServiceTest {
         assertThat(e.errorCode()).isEqualTo("BAD_SIGNATURE");
     }
 
-    // -- 9-14. timestamp window -----------------------------------------
+    // ======================================================================
+    // 9-14. timestamp window
+    // ======================================================================
 
     @Test
     void case9_timestampTooOldStale() {
@@ -224,7 +238,9 @@ class AirflowWebhookServiceTest {
         assertThat(ev).isNotNull();
     }
 
-    // -- 15. replay -----------------------------------------------------
+    // ======================================================================
+    // 15. replay
+    // ======================================================================
 
     @Test
     void case15_replayedWebhookIdRejected() {
@@ -237,7 +253,9 @@ class AirflowWebhookServiceTest {
         verify(publisher, times(1)).publishEvent(any());
     }
 
-    // -- 16-19. body shape ----------------------------------------------
+    // ======================================================================
+    // 16-19. body shape
+    // ======================================================================
 
     @Test
     void case16_bodyIsNotJson() {
@@ -290,7 +308,9 @@ class AirflowWebhookServiceTest {
         assertThat(e.getMessage()).contains("taskId");
     }
 
-    // -- 20. uppercase hex accepted -------------------------------------
+    // ======================================================================
+    // 20. uppercase hex accepted
+    // ======================================================================
 
     @Test
     void case20_uppercaseHexSignatureAccepted() {
@@ -300,7 +320,9 @@ class AirflowWebhookServiceTest {
         assertThat(ev).isNotNull();
     }
 
-    // -- 21. raw-bytes signature is not JSON-reformatting agnostic -----
+    // ======================================================================
+    // 21. raw-bytes signature is not JSON-reformatting agnostic
+    // ======================================================================
 
     @Test
     void case21_reformattedBodyFailsBecauseSignatureCoversRawBytes() {
@@ -316,12 +338,14 @@ class AirflowWebhookServiceTest {
         assertThat(e.errorCode()).isEqualTo("BAD_SIGNATURE");
     }
 
-    // -- bonus: missing shared secret -----------------------------------
+    // ======================================================================
+    // bonus: missing shared secret
+    // ======================================================================
 
     @Test
     void unconfiguredSharedSecretReturns404UnknownConnection() {
         AirflowWebhookService unconfigured = new AirflowWebhookService(
-                publisher, json, "", Clock.fixed(NOW, ZoneOffset.UTC));
+                publisher, json, "", Clock.fixed(NOW, ZoneOffset.UTC), logMapper);
         AirflowWebhookException e = assertReject(
                 () -> unconfigured.verifyAndDispatch(
                         validSignatureHeader(NOW_EPOCH, HAPPY_BODY, SECRET),
@@ -331,20 +355,18 @@ class AirflowWebhookServiceTest {
     }
 
     @Test
-    void replayCacheSweepRemovesExpiredEntries() throws Exception {
-        // Insert one entry, advance the clock past TTL, then a fresh successful
-        // dispatch should observe a sweeper-empty cache.
-        java.time.Clock movable = mock(Clock.class);
-        org.mockito.Mockito.when(movable.instant())
+    void replayCacheSweepRemovesExpiredEntries() {
+        Clock movable = mock(Clock.class);
+        when(movable.instant())
                 .thenReturn(NOW)
                 .thenReturn(NOW.plusSeconds(600))
                 .thenReturn(NOW.plusSeconds(600));
-        org.mockito.Mockito.when(movable.millis())
+        when(movable.millis())
                 .thenReturn(NOW.toEpochMilli())
                 .thenReturn(NOW.plusSeconds(600).toEpochMilli())
                 .thenReturn(NOW.plusSeconds(600).toEpochMilli());
         AirflowWebhookService moving = new AirflowWebhookService(
-                publisher, json, SECRET, movable);
+                publisher, json, SECRET, movable, logMapper);
         moving.verifyAndDispatch(
                 validSignatureHeader(NOW_EPOCH, HAPPY_BODY, SECRET),
                 "wid-first", HAPPY_BODY);
@@ -357,17 +379,171 @@ class AirflowWebhookServiceTest {
         assertThat(moving.replayCacheSize()).isEqualTo(1);
     }
 
-    // -- helpers --------------------------------------------------------
+    // ======================================================================
+    // W5-FU-4 — observability layer (new cases)
+    // ======================================================================
+
+    /**
+     * ACCEPTED path: mapper.insert called once with status=ACCEPTED, all
+     * fields populated, and payloadJson is the raw body string.
+     */
+    @Test
+    void obs1_acceptedPathWritesLogRowWithPayloadAndStatus() {
+        service.verifyAndDispatch(
+                validSignatureHeader(NOW_EPOCH, HAPPY_BODY, SECRET),
+                "wid-obs1",
+                HAPPY_BODY);
+
+        ArgumentCaptor<AirflowWebhookLog> cap = ArgumentCaptor.forClass(AirflowWebhookLog.class);
+        verify(logMapper, times(1)).insert(cap.capture());
+
+        AirflowWebhookLog row = cap.getValue();
+        assertThat(row.getStatus()).isEqualTo("ACCEPTED");
+        assertThat(row.getHttpStatus()).isEqualTo(202);
+        assertThat(row.getWebhookId()).isEqualTo("wid-obs1");
+        assertThat(row.getDagId()).isEqualTo("salesforce_daily_to_auraboot");
+        assertThat(row.getTaskId()).isEqualTo("sync_salesforce");
+        assertThat(row.getEvent()).isEqualTo("airflow.task.completed");
+        assertThat(row.getErrorCode()).isNull();
+        assertThat(row.getPayloadJson()).isNotNull();
+        // drift for exact-match timestamp is 0
+        assertThat(row.getSignatureDriftSeconds()).isEqualTo(0L);
+        assertThat(row.getPid()).isNotBlank();
+    }
+
+    /**
+     * ACCEPTED path: signature drift seconds correct for a timestamp 30s before now.
+     */
+    @Test
+    void obs2_acceptedPathDriftSecondsCalculatedCorrectly() {
+        long ts = NOW_EPOCH - 30;
+        service.verifyAndDispatch(
+                validSignatureHeader(ts, HAPPY_BODY, SECRET),
+                "wid-obs2",
+                HAPPY_BODY);
+
+        ArgumentCaptor<AirflowWebhookLog> cap = ArgumentCaptor.forClass(AirflowWebhookLog.class);
+        verify(logMapper).insert(cap.capture());
+        assertThat(cap.getValue().getSignatureDriftSeconds()).isEqualTo(30L);
+    }
+
+    /**
+     * BAD_SIGNATURE REJECTED: status=REJECTED, error_code=BAD_SIGNATURE,
+     * http_status=401, payloadJson must be null (hostile body not stored).
+     */
+    @Test
+    void obs3_badSignatureRejectedPathWritesLogRowWithNullPayload() {
+        assertReject(() -> service.verifyAndDispatch(
+                validSignatureHeader(NOW_EPOCH, HAPPY_BODY, "WRONG-secret"),
+                "wid-obs3", HAPPY_BODY));
+
+        ArgumentCaptor<AirflowWebhookLog> cap = ArgumentCaptor.forClass(AirflowWebhookLog.class);
+        verify(logMapper).insert(cap.capture());
+
+        AirflowWebhookLog row = cap.getValue();
+        assertThat(row.getStatus()).isEqualTo("REJECTED");
+        assertThat(row.getHttpStatus()).isEqualTo(401);
+        assertThat(row.getErrorCode()).isEqualTo("BAD_SIGNATURE");
+        assertThat(row.getPayloadJson()).isNull();
+        assertThat(row.getWebhookId()).isEqualTo("wid-obs3");
+        // publisher must not have been called
+        verify(publisher, never()).publishEvent(any());
+    }
+
+    /**
+     * STALE_TIMESTAMP REJECTED: drift seconds stored so ops can diagnose
+     * clock-skew attacks without replaying the body.
+     */
+    @Test
+    void obs4_staleTimestampRejectedPathStoresDrift() {
+        long ts = NOW_EPOCH - 400; // drift = 400s
+        assertReject(() -> service.verifyAndDispatch(
+                validSignatureHeader(ts, HAPPY_BODY, SECRET),
+                "wid-obs4", HAPPY_BODY));
+
+        ArgumentCaptor<AirflowWebhookLog> cap = ArgumentCaptor.forClass(AirflowWebhookLog.class);
+        verify(logMapper).insert(cap.capture());
+
+        AirflowWebhookLog row = cap.getValue();
+        assertThat(row.getStatus()).isEqualTo("REJECTED");
+        assertThat(row.getErrorCode()).isEqualTo("STALE_TIMESTAMP");
+        assertThat(row.getSignatureDriftSeconds()).isEqualTo(400L);
+        assertThat(row.getPayloadJson()).isNull();
+    }
+
+    /**
+     * mapper.insert throwing must NOT prevent verifyAndDispatch from
+     * completing normally — observability is fire-and-forget.
+     */
+    @Test
+    void obs5_mapperInsertExceptionDoesNotBlockAcceptedDispatch() {
+        doThrow(new RuntimeException("DB down")).when(logMapper).insert(any(AirflowWebhookLog.class));
+
+        // Must not throw — the DB failure is swallowed by the observability layer.
+        AirflowWebhookEvent ev = service.verifyAndDispatch(
+                validSignatureHeader(NOW_EPOCH, HAPPY_BODY, SECRET),
+                "wid-obs5",
+                HAPPY_BODY);
+
+        assertThat(ev).isNotNull();
+        assertThat(ev.getWebhookId()).isEqualTo("wid-obs5");
+        // Spring event still published despite insert failure.
+        verify(publisher, times(1)).publishEvent(any());
+    }
+
+    /**
+     * Replay (DUPLICATE_WEBHOOK) also logs a REJECTED row — useful for
+     * "attacked N times" statistics. First call ACCEPTED + second call REJECTED.
+     */
+    @Test
+    void obs6_replayAttemptAlsoLogsRejectedRow() {
+        String sig = validSignatureHeader(NOW_EPOCH, HAPPY_BODY, SECRET);
+
+        // First call — ACCEPTED
+        service.verifyAndDispatch(sig, "wid-obs6", HAPPY_BODY);
+
+        // Second call — DUPLICATE_WEBHOOK
+        assertReject(() -> service.verifyAndDispatch(sig, "wid-obs6", HAPPY_BODY));
+
+        // Two inserts: first ACCEPTED, second REJECTED
+        ArgumentCaptor<AirflowWebhookLog> cap = ArgumentCaptor.forClass(AirflowWebhookLog.class);
+        verify(logMapper, times(2)).insert(cap.capture());
+        List<AirflowWebhookLog> rows = cap.getAllValues();
+        assertThat(rows).extracting(AirflowWebhookLog::getStatus)
+                .containsExactly("ACCEPTED", "REJECTED");
+        assertThat(rows.get(1).getErrorCode()).isEqualTo("DUPLICATE_WEBHOOK");
+        assertThat(rows.get(1).getHttpStatus()).isEqualTo(409);
+    }
+
+    /**
+     * UNKNOWN_CONNECTION (missing secret → 404) also logs a REJECTED row.
+     */
+    @Test
+    void obs7_unknownConnectionAlsoLogsRejectedRow() {
+        AirflowWebhookService unconfigured = new AirflowWebhookService(
+                publisher, json, "", Clock.fixed(NOW, ZoneOffset.UTC), logMapper);
+
+        assertReject(() -> unconfigured.verifyAndDispatch(
+                validSignatureHeader(NOW_EPOCH, HAPPY_BODY, SECRET),
+                "wid-obs7", HAPPY_BODY));
+
+        ArgumentCaptor<AirflowWebhookLog> cap = ArgumentCaptor.forClass(AirflowWebhookLog.class);
+        verify(logMapper).insert(cap.capture());
+        AirflowWebhookLog row = cap.getValue();
+        assertThat(row.getStatus()).isEqualTo("REJECTED");
+        assertThat(row.getHttpStatus()).isEqualTo(404);
+        assertThat(row.getErrorCode()).isEqualTo("UNKNOWN_CONNECTION");
+        assertThat(row.getPayloadJson()).isNull();
+    }
+
+    // ======================================================================
+    // helpers
+    // ======================================================================
 
     private static AirflowWebhookException assertReject(Runnable r) {
         try { r.run(); }
         catch (AirflowWebhookException e) { return e; }
         catch (Throwable t) { throw new AssertionError("Expected AirflowWebhookException", t); }
         throw new AssertionError("Expected AirflowWebhookException, none thrown");
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> T any() {
-        return (T) org.mockito.ArgumentMatchers.any();
     }
 }
