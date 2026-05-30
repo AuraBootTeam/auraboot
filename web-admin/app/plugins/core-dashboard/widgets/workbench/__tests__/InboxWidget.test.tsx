@@ -1,16 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { InboxWidget } from '../InboxWidget';
 
+const submitApprovalAction = vi.fn();
+const listInboxItems = vi.fn(async () => ({
+  total: 2,
+  records: [
+    { id: 1, title: 'Close Capa', itemType: 'approval', createdAt: new Date().toISOString() },
+    { id: 2, title: 'Verify Capa', itemType: 'task', createdAt: new Date().toISOString() },
+  ],
+}));
+
 vi.mock('~/shared/services/inboxService', () => ({
-  listInboxItems: vi.fn(async () => ({
-    total: 2,
-    records: [
-      { id: 1, title: 'Close Capa', itemType: 'approval', createdAt: new Date().toISOString() },
-      { id: 2, title: 'Verify Capa', itemType: 'task', createdAt: new Date().toISOString() },
-    ],
-  })),
-  submitApprovalAction: vi.fn(),
+  listInboxItems: (...args: unknown[]) => listInboxItems(...(args as [])),
+  submitApprovalAction: (...args: unknown[]) => submitApprovalAction(...(args as [])),
 }));
 
 vi.mock('~/contexts/I18nContext', () => ({
@@ -37,5 +40,22 @@ describe('InboxWidget — table redesign', () => {
   it('does not render an avatar column', () => {
     render(<InboxWidget />);
     expect(screen.queryByTestId('inbox-avatar')).toBeNull();
+  });
+
+  it('renders a quick-approve button only for approval-type rows', async () => {
+    const { findByTestId } = render(<InboxWidget />);
+    await findByTestId('inbox-approve-1');
+    expect(screen.queryByTestId('inbox-approve-2')).toBeNull();
+  });
+
+  it('invokes submitApprovalAction("approve") and refreshes when quick-approve is clicked', async () => {
+    submitApprovalAction.mockClear();
+    listInboxItems.mockClear();
+    const { findByTestId } = render(<InboxWidget />);
+    const btn = await findByTestId('inbox-approve-1');
+    fireEvent.click(btn);
+    await waitFor(() => expect(submitApprovalAction).toHaveBeenCalledWith(1, 'approve'));
+    // Initial load + reload after approve
+    await waitFor(() => expect(listInboxItems).toHaveBeenCalledTimes(2));
   });
 });

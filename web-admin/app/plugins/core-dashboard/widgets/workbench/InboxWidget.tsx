@@ -64,7 +64,7 @@ export function InboxWidget({
   const [loading, setLoading] = useState(true);
   const [, setTotal] = useState(0);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [, setApprovingId] = useState<number | null>(null);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
 
   const resolvedTitle = title ? t(title) : t('workbench.inbox.title');
 
@@ -106,9 +106,7 @@ export function InboxWidget({
     }
   };
 
-  // Retained for compatibility with external callers; quick-approve button
-  // dropped from the compact table layout (tracked as follow-up).
-  const _handleApprove = async (e: React.MouseEvent, item: InboxItem) => {
+  const handleApprove = async (e: React.MouseEvent, item: InboxItem) => {
     e.stopPropagation();
     setApprovingId(item.id);
     try {
@@ -118,7 +116,6 @@ export function InboxWidget({
       setApprovingId(null);
     }
   };
-  void _handleApprove;
 
   return (
     <div
@@ -187,28 +184,49 @@ export function InboxWidget({
             </tr>
           )}
           {!loading &&
-            items.map((item) => (
-              <tr
-                key={item.id}
-                onClick={() => handleItemClick(item)}
-                className="border-t border-[#f0f3f7] dark:border-gray-700 hover:bg-[#fafbfc] dark:hover:bg-gray-800 cursor-pointer"
-              >
-                <td className="px-5 py-3 font-medium text-gray-900 dark:text-gray-100">
-                  {item.title}
-                </td>
-                <td className="px-5 py-3">
-                  <span
-                    data-testid="inbox-type-badge"
-                    className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${
-                      TYPE_BADGE[item.itemType] ?? 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {t(`workbench.inbox.${item.itemType}`)}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-gray-500">{formatDue(item)}</td>
-              </tr>
-            ))}
+            items.map((item) => {
+              const isApproval = item.itemType === 'approval';
+              const isApproving = approvingId === item.id;
+              return (
+                <tr
+                  key={item.id}
+                  onClick={() => handleItemClick(item)}
+                  className="group border-t border-[#f0f3f7] dark:border-gray-700 hover:bg-[#fafbfc] dark:hover:bg-gray-800 cursor-pointer"
+                >
+                  <td className="px-5 py-3 font-medium text-gray-900 dark:text-gray-100">
+                    {item.title}
+                  </td>
+                  <td className="px-5 py-3">
+                    <span
+                      data-testid="inbox-type-badge"
+                      className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${
+                        TYPE_BADGE[item.itemType] ?? 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {t(`workbench.inbox.${item.itemType}`)}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-gray-500">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>{formatDue(item)}</span>
+                      {isApproval && (
+                        <button
+                          type="button"
+                          data-testid={`inbox-approve-${item.id}`}
+                          onClick={(e) => handleApprove(e, item)}
+                          disabled={isApproving}
+                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded border border-[#e3e8ee] bg-white px-2 py-1 text-[12px] font-medium text-[#635bff] hover:bg-[#f4f3ff] hover:border-[#635bff] disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-900 dark:border-gray-700"
+                        >
+                          {isApproving
+                            ? t('workbench.inbox.approving', undefined, '处理中…')
+                            : `✓ ${t('workbench.inbox.approve', undefined, '通过')}`}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
         </tbody>
       </table>
     </div>
