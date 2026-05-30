@@ -35,7 +35,8 @@ export type PropertyType =
   | 'localizedText'
   | 'icon'
   | 'array'
-  | 'dict-select';
+  | 'dict-select'
+  | 'semantic-model-select';
 
 /**
  * Property schema definition for designer configuration panels.

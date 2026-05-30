@@ -8,7 +8,11 @@ import { DesignerRegistry } from '~/shared/designer';
 import { resolveWidgetTier } from '../registry/widgetManifest';
 
 /**
- * Common property schemas for data source configuration
+ * Common property schemas for data source configuration.
+ *
+ * Includes an optional `semanticModelCode` field that, when set, routes the
+ * aggregate request through SemanticQueryService on the backend (PR #377).
+ * Users can leave it blank to keep the existing raw SQL / namedQuery path.
  */
 const dataSourcePropertySchemas: PropertySchema[] = [
   {
@@ -33,6 +37,13 @@ const dataSourcePropertySchemas: PropertySchema[] = [
     label: '命名查询',
     type: 'namedQuery',
     dependsOn: { field: 'dataSource.type', value: 'namedQuery' },
+  },
+  {
+    key: 'dataSource.semanticModelCode',
+    label: '语义模型（可选）',
+    type: 'semantic-model-select',
+    description: '选择后将通过语义层查询，指标可用 code 或 <model>.<metric> 格式',
+    dependsOn: { field: 'dataSource.type', value: 'aggregate' },
   },
 ];
 
