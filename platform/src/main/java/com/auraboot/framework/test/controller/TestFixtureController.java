@@ -1243,12 +1243,28 @@ public class TestFixtureController {
     }
 
     private Method findMethod(Class<?> beanClass, String methodName) {
+        // Skip synthetic/bridge methods (CGLIB proxies inject these and they can have
+        // erased parameter types like Long where the real method takes a DTO).
+        // Prefer concrete declared methods; among matches, prefer those whose first
+        // param is not a primitive wrapper (DTO methods come first in our fixtures).
+        Method fallback = null;
         for (Method method : beanClass.getMethods()) {
-            if (methodName.equals(method.getName())) {
-                return method;
+            if (!methodName.equals(method.getName())) continue;
+            if (method.isSynthetic() || method.isBridge()) continue;
+            Class<?>[] params = method.getParameterTypes();
+            if (params.length > 0) {
+                Class<?> first = params[0];
+                // Skip overloads where the first parameter is a primitive wrapper —
+                // our fixture helpers always pass a request DTO first.
+                if (first == Long.class || first == Integer.class || first == String.class
+                        || first.isPrimitive()) {
+                    if (fallback == null) fallback = method;
+                    continue;
+                }
             }
+            return method;
         }
-        return null;
+        return fallback;
     }
 
     private void setBeanProperty(Object target, String propertyName, Object value) throws Exception {
