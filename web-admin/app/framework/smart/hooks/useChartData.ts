@@ -162,6 +162,11 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
         parameters: dataSource.parameters,
         limit: dataSource.limit,
         drillFilters,
+        // When a semantic model is configured, pass it through so the backend
+        // delegates to SemanticQueryService instead of the raw SQL path.
+        ...(dataSource.semanticModelCode
+          ? { semanticModelCode: dataSource.semanticModelCode }
+          : {}),
       };
 
       const response = await chartDataService.fetchChartData(request);

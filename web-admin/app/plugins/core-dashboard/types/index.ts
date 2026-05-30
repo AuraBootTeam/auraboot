@@ -114,6 +114,12 @@ export interface DataSourceConfig {
   parameters?: Record<string, unknown>;
   // For static type (inline data, no API fetch)
   staticData?: Record<string, unknown>[];
+  /**
+   * When set, routes the aggregate request through SemanticQueryService
+   * (backend PR #377). Metric codes may be bare or qualified as
+   * `<semanticModelCode>.<metric_code>`. Leave blank for the raw SQL path.
+   */
+  semanticModelCode?: string;
 }
 
 /**

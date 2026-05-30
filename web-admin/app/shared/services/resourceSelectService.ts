@@ -198,3 +198,28 @@ export async function fetchDictOptions(dictCode: string): Promise<ResourceOption
     return [];
   }
 }
+
+interface SemanticMetaRecord {
+  models: Array<{
+    code: string;
+    label?: Record<string, string>;
+    description?: string;
+  }>;
+}
+
+/**
+ * Fetch semantic model list from GET /api/semantic/meta.
+ * Returns options suitable for BaseResourceSelect.
+ */
+export async function fetchSemanticModelOptions(): Promise<ResourceOption[]> {
+  try {
+    const result = await fetchResult<SemanticMetaRecord>('/api/semantic/meta');
+    return (result?.data?.models || []).map((m) => ({
+      label: m.label?.['zh-CN'] || m.label?.['en'] || m.code,
+      value: m.code,
+      description: m.description,
+    }));
+  } catch {
+    return [];
+  }
+}
