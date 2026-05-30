@@ -60,6 +60,7 @@ import { ResultHelper } from '~/utils/type';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { normalizeAction, normalizeButtonProps } from '~/framework/meta/utils/normalizeAction';
+import { pickFile, uploadCommandFile, resolvePromptUploadKey } from '~/framework/meta/utils/promptUpload';
 
 // Navigate function type (compatible with react-router v7)
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
@@ -299,7 +300,17 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               if (!confirmed) return;
             }
             const targetRecordId = record?.pid || (context.data?.pid as string | undefined);
-            const payload = record || context.data || {};
+            let payload = record || context.data || {};
+            // `promptUpload`: collect a file from the user, upload it, and inject the
+            // resulting file id into the payload before the command runs. Strictly
+            // guarded by the flag, so non-upload buttons are unaffected.
+            const promptUpload = (normalizedButton as any).promptUpload;
+            if (promptUpload) {
+              const file = await pickFile();
+              if (!file) return; // user dismissed the picker — nothing to do
+              const fileId = await uploadCommandFile(file, token);
+              payload = { ...payload, [resolvePromptUploadKey(promptUpload)]: fileId };
+            }
             const btnLabel = normalizedButton.label;
             const btnCode = normalizedButton.code;
             const operationType =
