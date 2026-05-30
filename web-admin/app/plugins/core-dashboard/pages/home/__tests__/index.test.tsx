@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import WorkbenchPage from '../index';
 
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
@@ -8,25 +9,48 @@ vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
   },
 }));
 
+const dashboardViewerSpy = vi.fn();
 vi.mock('~/plugins/core-dashboard/components/DashboardViewer', () => ({
-  DashboardViewer: () => <div data-testid="dashboard-viewer" />,
+  DashboardViewer: (props: Record<string, unknown>) => {
+    dashboardViewerSpy(props);
+    return <div data-testid="dashboard-viewer" />;
+  },
 }));
 
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({ t: (k: string) => k }),
 }));
 
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <WorkbenchPage />
+    </MemoryRouter>,
+  );
+}
+
 describe('WorkbenchPage header', () => {
   it('renders a page title and dated subline', async () => {
-    render(<WorkbenchPage />);
+    renderPage();
     expect(await screen.findByRole('heading', { name: 'workbench.title' })).toBeInTheDocument();
     expect(screen.getByTestId('workbench-subline').textContent).toMatch(/\d/);
   });
 
-  it('renders Export and New buttons', async () => {
-    render(<WorkbenchPage />);
+  it('renders Open-in-Dashboard / Export / New actions', async () => {
+    renderPage();
     await screen.findByRole('heading', { name: 'workbench.title' });
+    const openLink = screen.getByTestId('workbench-open-in-dashboard');
+    expect(openLink).toBeInTheDocument();
+    expect(openLink.getAttribute('href')).toBe('/home/settings');
     expect(screen.getByRole('button', { name: /workbench\.export/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /workbench\.new/ })).toBeInTheDocument();
+  });
+
+  it('passes hideWidgetActions to DashboardViewer so per-widget kebab is suppressed', async () => {
+    dashboardViewerSpy.mockClear();
+    renderPage();
+    await screen.findByTestId('dashboard-viewer');
+    const lastCall = dashboardViewerSpy.mock.calls.at(-1)?.[0];
+    expect(lastCall?.hideWidgetActions).toBe(true);
   });
 });
