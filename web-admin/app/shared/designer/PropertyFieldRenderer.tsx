@@ -22,6 +22,7 @@ import {
   fetchAutomationOptions,
   fetchCommandOptions,
   fetchModelOptions,
+  fetchSemanticModelOptions,
 } from '~/shared/services/resourceSelectService';
 import { ExpressionEditor } from './expression';
 import { DependentFieldSelect } from './DependentFieldSelect';
@@ -304,6 +305,17 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           placeholder={placeholder || 'Select command...'}
           helpText={helpText}
           fetchOptions={fetchCommandOptions}
+        />
+      );
+
+    case 'semantic-model-select':
+      return (
+        <ResourceSelectField
+          adapter={adapter}
+          label={label}
+          placeholder={placeholder || 'Select semantic model...'}
+          helpText={helpText}
+          fetchOptions={fetchSemanticModelOptions}
         />
       );
 

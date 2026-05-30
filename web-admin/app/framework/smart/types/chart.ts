@@ -67,6 +67,12 @@ export interface AggregateQueryRequest {
   drillFilters?: FilterConfig[];
   /** Additional parameters for named queries */
   parameters?: Record<string, unknown>;
+  /**
+   * When set, the backend delegates this request to SemanticQueryService
+   * instead of the dynamic aggregate SQL path. Metric codes may be bare
+   * or qualified as `<semanticModelCode>.<metric_code>`.
+   */
+  semanticModelCode?: string;
 }
 
 /**
@@ -119,6 +125,11 @@ export interface ChartDataSource {
   limit?: number;
   /** Static data (when type is 'static') */
   staticData?: Record<string, unknown>[];
+  /**
+   * When set, the backend routes this request through SemanticQueryService.
+   * Metric codes may be bare or qualified as `<semanticModelCode>.<metric_code>`.
+   */
+  semanticModelCode?: string;
 }
 
 /**
