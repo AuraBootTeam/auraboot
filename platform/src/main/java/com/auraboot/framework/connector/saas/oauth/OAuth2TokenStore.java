@@ -3,6 +3,7 @@ package com.auraboot.framework.connector.saas.oauth;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.connector.saas.SaasConnectorConfig;
+import com.auraboot.framework.connector.saas.oauth.mapper.ConnectorOAuthTokenMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
