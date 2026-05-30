@@ -1036,6 +1036,71 @@
     "en-US": "Welcome Back"
   },
   {
+    "key": "auth.welcomeSub",
+    "zh-CN": "登录以继续使用 AuraBoot 工作台",
+    "en-US": "Sign in to continue to your AuraBoot workspace"
+  },
+  {
+    "key": "auth.badge",
+    "zh-CN": "AI 原生 · 企业应用运行时",
+    "en-US": "AI-native application runtime"
+  },
+  {
+    "key": "auth.headline.pre",
+    "zh-CN": "把企业系统,建成",
+    "en-US": "Build enterprise systems your"
+  },
+  {
+    "key": "auth.headline.em",
+    "zh-CN": "AI 能直接操作",
+    "en-US": "AI"
+  },
+  {
+    "key": "auth.headline.post",
+    "zh-CN": "的样子",
+    "en-US": "can actually operate"
+  },
+  {
+    "key": "auth.lead",
+    "zh-CN": "可视化建模、页面与流程编排,统一沉淀为命令能力——人来点、AI 也能调;一次配置,Web、移动端与小程序全端交付。",
+    "en-US": "Model data, design pages, orchestrate flows — all distilled into governed commands that people click and AI agents call. Configure once, deliver to web, mobile and mini-program."
+  },
+  {
+    "key": "auth.pillar.model",
+    "zh-CN": "模型驱动",
+    "en-US": "Model-driven"
+  },
+  {
+    "key": "auth.pillar.command",
+    "zh-CN": "命令治理",
+    "en-US": "Command-governed"
+  },
+  {
+    "key": "auth.pillar.plugin",
+    "zh-CN": "插件交付",
+    "en-US": "Plugin-delivered"
+  },
+  {
+    "key": "auth.ssoLogin",
+    "zh-CN": "使用企业 SSO 登录",
+    "en-US": "Sign in with Enterprise SSO"
+  },
+  {
+    "key": "auth.or",
+    "zh-CN": "或",
+    "en-US": "Or"
+  },
+  {
+    "key": "auth.showPassword",
+    "zh-CN": "显示密码",
+    "en-US": "Show password"
+  },
+  {
+    "key": "auth.hidePassword",
+    "zh-CN": "隐藏密码",
+    "en-US": "Hide password"
+  },
+  {
     "key": "common.actions",
     "zh-CN": "操作",
     "en-US": "Actions",
