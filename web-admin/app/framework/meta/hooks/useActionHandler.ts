@@ -61,6 +61,8 @@ import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { normalizeAction, normalizeButtonProps } from '~/framework/meta/utils/normalizeAction';
 import { pickFile, uploadCommandFile, resolvePromptUploadKey } from '~/framework/meta/utils/promptUpload';
+import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
+import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 
 // Navigate function type (compatible with react-router v7)
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
@@ -126,6 +128,15 @@ export interface UseActionHandlerResult {
   loading: boolean;
   error: string | null;
   setError: (error: string | null) => void;
+  /**
+   * The live async task driving the progress modal. Non-null from the moment an
+   * async command is dispatched until the host dismisses the modal. The host
+   * (e.g. ListPageContent) renders `<AsyncTaskProgressModal task={activeTask}/>`
+   * and disables the triggering button while this is non-null & non-terminal.
+   */
+  activeTask: AsyncTask | null;
+  /** Dismiss the progress modal (clears `activeTask`). */
+  clearActiveTask: () => void;
 }
 
 /**
@@ -147,6 +158,16 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Live async task backing the progress modal (running → terminal). Kept after
+  // terminal so the modal can show the final summary until the host dismisses.
+  // Shared via context when a provider is present (so a command dispatched from
+  // a ToolbarBlockRenderer's own hook instance surfaces in the page's single
+  // modal); falls back to local state otherwise.
+  const modalSink = useAsyncTaskModalSink();
+  const [localTask, setLocalTask] = useState<AsyncTask | null>(null);
+  const activeTask = modalSink ? modalSink.activeTask : localTask;
+  const setActiveTask = modalSink ? modalSink.setActiveTask : setLocalTask;
+  const clearActiveTask = useCallback(() => setActiveTask(null), [setActiveTask]);
 
   /**
    * Poll an async task to completion. A command declaring handlerParams.async
@@ -169,6 +190,15 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         }
         const task = (res as any).data || {};
         const status = String(task.status || '').toLowerCase();
+        // Feed the live task into the progress modal each tick. Toast is kept as
+        // a fallback for hosts that don't render the modal.
+        setActiveTask({
+          status,
+          progress: typeof task.progress === 'number' ? task.progress : undefined,
+          progressMessage: task.progressMessage,
+          resultData: task.resultData,
+          errorMessage: task.errorMessage,
+        });
         if (status === 'running' && typeof task.progress === 'number' && task.progress !== lastProgress) {
           lastProgress = task.progress;
           showToast?.(`${task.progressMessage || '处理中'} ${task.progress}%`, 'info');
@@ -176,7 +206,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         if (TERMINAL.has(status)) {
           if (status === 'completed') return task.resultData ?? {};
           if (status === 'cancelled') throw new Error('Task cancelled');
-          throw new Error(task.errorMessage || 'Async task failed');
+          // Failed: the modal is already showing the failed state (set above);
+          // return a sentinel instead of throwing so the error surfaces in the
+          // modal rather than the page-level error boundary.
+          return { __asyncFailed: true, errorMessage: task.errorMessage };
         }
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
@@ -227,10 +260,17 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       // Async dispatch: handlerParams.async commands return immediately with a
       // taskCode; poll the task to completion so the UI reflects the real result
       // without a single long request (which would hit the BFF 30s timeout).
-      const data = result.data as any;
-      if (data && data.async === true && data.taskCode) {
+      // The command engine wraps the handler result one level deep:
+      // result.data = { commandCode, phaseReached, data: { async, taskCode } },
+      // so the async marker lives on result.data.data (fall back to result.data).
+      const envelope = result.data as any;
+      const dispatch = envelope?.data && typeof envelope.data === 'object' ? envelope.data : envelope;
+      if (dispatch && dispatch.async === true && dispatch.taskCode) {
         showToast?.('已提交,后台处理中…', 'info');
-        return await pollAsyncTask(data.taskCode);
+        // Open the progress modal immediately in a running state; pollAsyncTask
+        // then refreshes it each tick until terminal.
+        setActiveTask({ status: 'running', progress: 0 });
+        return await pollAsyncTask(dispatch.taskCode);
       }
 
       return result.data;
@@ -615,5 +655,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     loading,
     error,
     setError,
+    activeTask,
+    clearActiveTask,
   };
 }
