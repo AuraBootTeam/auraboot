@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -95,6 +97,40 @@ class CommandHandlerAsyncTaskExecutorTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getErrorMessage()).contains("source_file_id is required");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void injectsProgressReporterThatForwardsToTaskCallback() throws Exception {
+        AtomicReference<BiConsumer<Integer, String>> captured = new AtomicReference<>();
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            CommandHandlerExtension.CommandContext ctx = inv.getArgument(0);
+            Object reporter = ctx.settings().get("__progressReporter");
+            captured.set((BiConsumer<Integer, String>) reporter);
+            return Map.of("success", true);
+        });
+        when(extensionRegistry.getCommandHandler(eq("bom:import_material_library")))
+                .thenReturn(Optional.of(handler));
+
+        AtomicReference<Integer> reportedPct = new AtomicReference<>();
+        AtomicReference<String> reportedMsg = new AtomicReference<>();
+        ProgressCallback recording = (pct, msg) -> {
+            reportedPct.set(pct);
+            reportedMsg.set(msg);
+        };
+
+        AsyncTaskResult result = executor.execute(params("bom:import_material_library"), recording);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(captured.get())
+                .as("plugin settings must carry a __progressReporter BiConsumer")
+                .isInstanceOf(BiConsumer.class);
+
+        // Invoking the injected reporter forwards to the task ProgressCallback.
+        captured.get().accept(42, "halfway");
+        assertThat(reportedPct.get()).isEqualTo(42);
+        assertThat(reportedMsg.get()).isEqualTo("halfway");
     }
 
     @Test

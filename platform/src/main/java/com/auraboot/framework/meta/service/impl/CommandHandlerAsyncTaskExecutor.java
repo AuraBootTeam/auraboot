@@ -106,6 +106,10 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             pluginSettings.put("__commandCode", commandCode != null ? commandCode : handlerCode);
             pluginSettings.put("__handlerCode", handlerCode);
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
+            final ProgressCallback cb = callback;
+            pluginSettings.put("__progressReporter",
+                    (java.util.function.BiConsumer<Integer, String>)
+                            (pct, msg) -> cb.report(pct == null ? 0 : pct, msg));
             if (biTemporalService != null) {
                 pluginSettings.put("__biTemporalAccessor",
                         new BiTemporalAccessorImpl(biTemporalService, objectMapper));
