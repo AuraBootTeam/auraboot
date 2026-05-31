@@ -28,6 +28,7 @@ import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry'
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import { AsyncTaskProgressModal } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
@@ -870,7 +871,7 @@ export function ListPageContent(props: PageContentProps) {
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction
   // to avoid temporal dead zone ("Cannot access 'handleAction' before initialization").
-  const { handleAction } = useActionHandler({
+  const { handleAction, activeTask, clearActiveTask } = useActionHandler({
     runtime,
     navigate,
     tableName,
@@ -3134,6 +3135,13 @@ export function ListPageContent(props: PageContentProps) {
           />
         </div>
       </div>
+      {activeTask && (
+        <AsyncTaskProgressModal
+          task={activeTask}
+          onClose={clearActiveTask}
+          onBackground={clearActiveTask}
+        />
+      )}
     </DataSourceProvider>
   );
 }

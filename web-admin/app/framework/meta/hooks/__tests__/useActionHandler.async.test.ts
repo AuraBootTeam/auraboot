@@ -69,6 +69,15 @@ describe('useActionHandler - handlerParams.async polling', () => {
     // Success path reloaded the list.
     expect(loadData).toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('后台处理'), 'info');
+    // Modal state was populated and polled through to the terminal task, so the
+    // host can render <AsyncTaskProgressModal task={activeTask}/> with the final
+    // summary (not just a fire-and-forget toast).
+    expect(result.current.activeTask).not.toBeNull();
+    expect(result.current.activeTask?.status).toBe('completed');
+    expect(result.current.activeTask?.resultData).toEqual({ importedRows: 35924 });
+    // Dismissing clears the modal.
+    act(() => result.current.clearActiveTask());
+    expect(result.current.activeTask).toBeNull();
   });
 
   it('throws when the async task ends in failed status', async () => {
@@ -104,5 +113,8 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(loadData).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalled();
     expect(String((onError.mock.calls[0]?.[0] as Error)?.message)).toContain('source_file_id is required');
+    // Modal state reflects the failed task so the host can show the error state.
+    expect(result.current.activeTask?.status).toBe('failed');
+    expect(result.current.activeTask?.errorMessage).toContain('source_file_id is required');
   });
 });
