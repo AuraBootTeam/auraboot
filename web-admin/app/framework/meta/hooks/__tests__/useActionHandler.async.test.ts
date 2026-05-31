@@ -81,7 +81,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(result.current.activeTask).toBeNull();
   });
 
-  it('throws when the async task ends in failed status', async () => {
+  it('surfaces a failed async task in the modal instead of throwing to the page', async () => {
     fetchResultMock
       .mockResolvedValueOnce({ code: '0', data: { commandCode: 'c', phaseReached: 'completed', data: { async: true, taskCode: 'T2' } } })
       .mockResolvedValueOnce({ code: '0', data: { status: 'failed', errorMessage: 'source_file_id is required' } });
@@ -110,11 +110,9 @@ describe('useActionHandler - handlerParams.async polling', () => {
       await result.current.handleAction(button);
     });
 
-    // Failed task → surfaced via onError; list NOT reloaded.
-    expect(loadData).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalled();
-    expect(String((onError.mock.calls[0]?.[0] as Error)?.message)).toContain('source_file_id is required');
-    // Modal state reflects the failed task so the host can show the error state.
+    // Failed task → modal shows the failed state; NOT thrown to onError/page
+    // error boundary (which would replace the page with a generic error).
+    expect(onError).not.toHaveBeenCalled();
     expect(result.current.activeTask?.status).toBe('failed');
     expect(result.current.activeTask?.errorMessage).toContain('source_file_id is required');
   });

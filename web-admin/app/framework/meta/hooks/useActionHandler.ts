@@ -206,7 +206,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         if (TERMINAL.has(status)) {
           if (status === 'completed') return task.resultData ?? {};
           if (status === 'cancelled') throw new Error('Task cancelled');
-          throw new Error(task.errorMessage || 'Async task failed');
+          // Failed: the modal is already showing the failed state (set above);
+          // return a sentinel instead of throwing so the error surfaces in the
+          // modal rather than the page-level error boundary.
+          return { __asyncFailed: true, errorMessage: task.errorMessage };
         }
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
