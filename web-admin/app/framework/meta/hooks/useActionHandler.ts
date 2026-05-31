@@ -178,7 +178,6 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
   const pollAsyncTask = useCallback(
     async (taskCode: string): Promise<any> => {
       const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
-      let lastProgress = -1;
       // ~15 min cap at 1.5s intervals — generous for bulk imports.
       for (let attempt = 0; attempt < 600; attempt++) {
         const res = await fetchResult(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
@@ -199,10 +198,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           resultData: task.resultData,
           errorMessage: task.errorMessage,
         });
-        if (status === 'running' && typeof task.progress === 'number' && task.progress !== lastProgress) {
-          lastProgress = task.progress;
-          showToast?.(`${task.progressMessage || '处理中'} ${task.progress}%`, 'info');
-        }
+        // No per-tick toast — the progress modal (or background chip) is the live
+        // UI. A toast here would spam raw progress text (incl. the JSON message).
         if (TERMINAL.has(status)) {
           if (status === 'completed') return task.resultData ?? {};
           if (status === 'cancelled') throw new Error('Task cancelled');
@@ -420,6 +417,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
           case 'navigate': {
             const path = resolveNavigateTo(actionDef.to, record);
+            // Absolute backend/external URLs (e.g. a file-download endpoint) are
+            // real browser navigations, not client-side routes — open them so the
+            // browser handles the Content-Disposition download.
+            if (/^(https?:)?\/\//.test(path) || path.startsWith('/api/')) {
+              window.open(path, '_blank', 'noopener');
+              return;
+            }
             if (actionDef.command) {
               const isEditAction =
                 normalizedButton.label === 'edit' ||
