@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { BffProxyService } from '../BffProxyService';
+import { BffProxyService, isBinaryDownloadPath } from '../BffProxyService';
+
+describe('isBinaryDownloadPath', () => {
+  it('detects /download/{id} as a mid-path segment (the file-download endpoint)', () => {
+    // Regression: /api/file/download/{fileId} was missed by the old
+    // `/download$|/download?` regex and fell through to the JSON proxy, which
+    // re-serialized the xlsx bytes as a JSON string ("PK…").
+    expect(isBinaryDownloadPath('/api/file/download/01KSW25R5V19GS99XE77PAG0HW')).toBe(true);
+  });
+
+  it('still detects /download at end of path and with a query', () => {
+    expect(isBinaryDownloadPath('/api/pages/page_1/download')).toBe(true);
+    expect(isBinaryDownloadPath('/api/export-tasks/abc/download?fmt=xlsx')).toBe(true);
+    expect(isBinaryDownloadPath('/api/templates/t1/download')).toBe(true);
+  });
+
+  it('does not over-match paths that merely contain "download"', () => {
+    expect(isBinaryDownloadPath('/api/downloads/list')).toBe(false);
+    expect(isBinaryDownloadPath('/api/file/downloaded')).toBe(false);
+    expect(isBinaryDownloadPath('/api/pages/page_1')).toBe(false);
+  });
+});
 
 describe('BffProxyService', () => {
   it('does not forward browser CORS headers to the Spring backend', async () => {

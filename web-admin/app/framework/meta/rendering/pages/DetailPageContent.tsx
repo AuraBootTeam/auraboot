@@ -36,6 +36,7 @@ import { ReportGenerateButton } from '~/framework/smart/components/report/Report
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { InlineApprovalPanel } from '~/framework/smart/components/approval/InlineApprovalPanel';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
+import { EmbeddedListBlockRenderer } from '~/framework/meta/rendering/blocks/EmbeddedListBlockRenderer';
 import { MonthlyGridViewer } from '~/framework/meta/rendering/blocks/MonthlyGridViewer';
 import { FieldHistoryViewer } from '~/framework/meta/rendering/blocks/FieldHistoryViewer';
 import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTimeline';
@@ -453,6 +454,11 @@ export function DetailPageContent(props: PageContentProps) {
     [allBlocks],
   );
 
+  const directEmbeddedListBlocks = useMemo(
+    () => allBlocks.filter((b: BlockConfig) => b.blockType === 'embedded-list'),
+    [allBlocks],
+  );
+
   // G7 dispatch — blocks not handled by the hardcoded switch above still need
   // to render. Collect anything that is NOT a known detail-page block type and
   // delegate to BlockRenderer (unified block dispatcher). This lets chart,
@@ -464,6 +470,7 @@ export function DetailPageContent(props: PageContentProps) {
     'form-section',
     'detail-section',
     'sub-table',
+    'embedded-list',
     'monthly-grid',
     'activity-timeline',
     'record-comments',
@@ -595,7 +602,9 @@ export function DetailPageContent(props: PageContentProps) {
                   recordPid={recordData.pid}
                 />
               )}
-              <PrintButton title={getLocalizedText(schema.title, locale, t)} />
+              {schema.extension?.showPrint !== false && (
+                <PrintButton title={getLocalizedText(schema.title, locale, t)} />
+              )}
               {effectiveHeaderToolbar?.buttons && effectiveHeaderToolbar.buttons.length > 0 && (
                 <>
                   {effectiveHeaderToolbar.buttons
@@ -723,6 +732,20 @@ export function DetailPageContent(props: PageContentProps) {
         ) : (
           /* Direct mode: render form-sections and sub-tables without tabs */
           <div className="space-y-6 p-6">
+            {/* Opt-in: misc blocks with detailPlacement === 'header' render at the
+                top (before form-sections / sub-tables). Default placement is
+                unchanged (rendered last), so existing pages are unaffected. */}
+            {runtime &&
+              directMiscBlocks
+                .filter((b: BlockConfig) => (b as { detailPlacement?: string }).detailPlacement === 'header')
+                .map((block: BlockConfig, blockIndex: number) => (
+                  <BlockRenderer
+                    key={block.id || `misc-header-${blockIndex}`}
+                    block={block}
+                    runtime={runtime}
+                    areaId="detail-direct"
+                  />
+                ))}
             {effectiveDirectFormBlocks.map((block: BlockConfig, blockIndex: number) => (
               <DetailBlockRenderer
                 key={block.id || `block-${blockIndex}`}
@@ -780,6 +803,25 @@ export function DetailPageContent(props: PageContentProps) {
                 dataSourceManager={dataSourceManager}
               />
             ))}
+            {directEmbeddedListBlocks.map((block: BlockConfig, blockIndex: number) => (
+              <DetailBlockRenderer
+                key={block.id || `embedded-${blockIndex}`}
+                block={block}
+                recordData={recordData}
+                recordId={recordId!}
+                token={token || undefined}
+                locale={locale}
+                t={t}
+                modelCode={schema?.modelCode || tableName}
+                evaluateEditableWhen={evaluateVisibleWhen}
+                onDataChange={reloadRecord}
+                getDictItems={getDictItems}
+                enrichField={enrichField}
+                runtime={runtime as SchemaRuntime}
+                schemaDataSources={schema?.dataSources}
+                dataSourceManager={dataSourceManager}
+              />
+            ))}
 
             {/* G7 — unified fallback dispatch for blocks not handled by the
                 hardcoded detail switch (chart / description / rich-text /
@@ -787,19 +829,22 @@ export function DetailPageContent(props: PageContentProps) {
                 the fallback renderer registry. Unknown blockTypes surface as
                 a visible placeholder + console.warn (not silently dropped). */}
             {runtime &&
-              directMiscBlocks.map((block: BlockConfig, blockIndex: number) => (
-                <BlockRenderer
-                  key={block.id || `misc-${blockIndex}`}
-                  block={block}
-                  runtime={runtime}
-                  areaId="detail-direct"
-                />
-              ))}
+              directMiscBlocks
+                .filter((b: BlockConfig) => (b as { detailPlacement?: string }).detailPlacement !== 'header')
+                .map((block: BlockConfig, blockIndex: number) => (
+                  <BlockRenderer
+                    key={block.id || `misc-${blockIndex}`}
+                    block={block}
+                    runtime={runtime}
+                    areaId="detail-direct"
+                  />
+                ))}
 
             {/* Fallback: no structured blocks found, show all fields */}
             {effectiveDirectFormBlocks.length === 0 &&
               directSubTableBlocks.length === 0 &&
               directMonthlyGridBlocks.length === 0 &&
+              directEmbeddedListBlocks.length === 0 &&
               directMiscBlocks.length === 0 &&
               tabs.length === 0 && (
                 <FallbackDetailView schema={schema} recordData={recordData} locale={locale} />
@@ -989,6 +1034,18 @@ function DetailBlockRenderer({
         </div>
       );
     }
+  }
+
+  if (block.blockType === 'embedded-list') {
+    return (
+      <EmbeddedListBlockRenderer
+        block={block}
+        runtime={runtime}
+        parentRecordId={recordId}
+        parentRecordData={recordData}
+        token={token}
+      />
+    );
   }
 
   if (block.blockType === 'activity-timeline') {

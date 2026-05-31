@@ -155,6 +155,14 @@ public class PageSchemaValidator implements PluginValidator {
             return;
         }
 
+        if ("embedded-list".equals(blockType)) {
+            // Embedded list carries a flat table contract (columns at block root,
+            // bound to its own modelCode/childModel). Validate columns and dict
+            // projection exactly like a table block so cells never leak raw values.
+            validateTableBlock(pageKey, blockPath, block, effectiveModelCode, modelIndex, messages);
+            return;
+        }
+
         if (FORM_FIELD_BLOCK_TYPES.contains(blockType)) {
             validateFormSectionBlock(pageKey, blockPath, block, page.getKind(), effectiveModelCode, modelIndex, messages);
             return;

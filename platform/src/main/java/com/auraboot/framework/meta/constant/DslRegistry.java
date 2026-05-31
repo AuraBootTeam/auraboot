@@ -271,6 +271,7 @@ public final class DslRegistry {
         MONTHLY_GRID("monthly-grid", "Monthly grid", "1.0"),
         STAT_CARD("stat-card", "Statistics card", "1.1"),
         AI_FILL_BANNER("ai-fill-banner", "AI fill banner", "1.1"),
+        EMBEDDED_LIST("embedded-list", "Embedded record-list block (in-page filterable list)", "1.2"),
         CUSTOM("custom", "Custom block", "1.0");
 
         private final String code, label, since;

@@ -60,6 +60,7 @@ import { ResultHelper } from '~/utils/type';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { normalizeAction, normalizeButtonProps } from '~/framework/meta/utils/normalizeAction';
+import { pickFile, uploadCommandFile, resolvePromptUploadKey } from '~/framework/meta/utils/promptUpload';
 
 // Navigate function type (compatible with react-router v7)
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
@@ -148,6 +149,43 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
   const [error, setError] = useState<string | null>(null);
 
   /**
+   * Poll an async task to completion. A command declaring handlerParams.async
+   * returns immediately with { async:true, taskCode }; we then poll the task
+   * status endpoint (each poll is a fast GET, so no single long request trips
+   * the BFF proxy timeout). Resolves with the task result data on success.
+   */
+  const pollAsyncTask = useCallback(
+    async (taskCode: string): Promise<any> => {
+      const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
+      let lastProgress = -1;
+      // ~15 min cap at 1.5s intervals — generous for bulk imports.
+      for (let attempt = 0; attempt < 600; attempt++) {
+        const res = await fetchResult(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
+          method: 'get',
+          token,
+        });
+        if (!ResultHelper.isSuccess(res)) {
+          throw new Error((res as any).desc || (res as any).message || 'Async task status unavailable');
+        }
+        const task = (res as any).data || {};
+        const status = String(task.status || '').toLowerCase();
+        if (status === 'running' && typeof task.progress === 'number' && task.progress !== lastProgress) {
+          lastProgress = task.progress;
+          showToast?.(`${task.progressMessage || '处理中'} ${task.progress}%`, 'info');
+        }
+        if (TERMINAL.has(status)) {
+          if (status === 'completed') return task.resultData ?? {};
+          if (status === 'cancelled') throw new Error('Task cancelled');
+          throw new Error(task.errorMessage || 'Async task failed');
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      throw new Error('Async task timed out');
+    },
+    [token, showToast],
+  );
+
+  /**
    * Execute a command via the Command Engine API
    */
   const executeCommand = useCallback(
@@ -186,9 +224,18 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         throw new Error(result.desc || result.message || `Command ${commandCode} failed`);
       }
 
+      // Async dispatch: handlerParams.async commands return immediately with a
+      // taskCode; poll the task to completion so the UI reflects the real result
+      // without a single long request (which would hit the BFF 30s timeout).
+      const data = result.data as any;
+      if (data && data.async === true && data.taskCode) {
+        showToast?.('已提交,后台处理中…', 'info');
+        return await pollAsyncTask(data.taskCode);
+      }
+
       return result.data;
     },
-    [token],
+    [token, showToast, pollAsyncTask],
   );
 
   /**
@@ -299,7 +346,17 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               if (!confirmed) return;
             }
             const targetRecordId = record?.pid || (context.data?.pid as string | undefined);
-            const payload = record || context.data || {};
+            let payload = record || context.data || {};
+            // `promptUpload`: collect a file from the user, upload it, and inject the
+            // resulting file id into the payload before the command runs. Strictly
+            // guarded by the flag, so non-upload buttons are unaffected.
+            const promptUpload = (normalizedButton as any).promptUpload;
+            if (promptUpload) {
+              const file = await pickFile();
+              if (!file) return; // user dismissed the picker — nothing to do
+              const fileId = await uploadCommandFile(file, token);
+              payload = { ...payload, [resolvePromptUploadKey(promptUpload)]: fileId };
+            }
             const btnLabel = normalizedButton.label;
             const btnCode = normalizedButton.code;
             const operationType =

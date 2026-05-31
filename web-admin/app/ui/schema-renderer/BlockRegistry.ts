@@ -96,6 +96,12 @@ export function initBlockRegistry(): void {
   BlockRegistry.register('sub-table', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/SubTableViewer'), 'SubTableViewer'),
   });
+  BlockRegistry.register('embedded-list', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/EmbeddedListBlockRenderer'),
+      'EmbeddedListBlockRenderer',
+    ),
+  });
   BlockRegistry.register('stat-card', {
     component: lazy(() => import('~/framework/meta/rendering/blocks/StatCardBlockRenderer'), 'StatCardBlockRenderer'),
   });

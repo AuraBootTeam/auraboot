@@ -2816,6 +2816,15 @@ export function ListPageContent(props: PageContentProps) {
                     fieldType: c.valueType || c.sorter || 'text',
                     dictCode: c.dictCode,
                   }))}
+                resolveChipValueLabel={(filter) => {
+                  const col = tableColumns.find((c: ColumnConfig) => c.field === filter.fieldCode);
+                  const dc = (col as any)?.dictCode as string | undefined;
+                  if (!dc) return undefined;
+                  const item = dictDataCache.current
+                    .get(dc)
+                    ?.find((i) => String(i.value) === String(filter.value));
+                  return item?.label;
+                }}
                 onAddFilter={(e?: React.MouseEvent) => {
                   const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
                   setFieldPickerAnchor(

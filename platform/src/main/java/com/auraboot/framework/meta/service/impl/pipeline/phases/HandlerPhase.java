@@ -16,6 +16,10 @@ import com.auraboot.framework.meta.service.CommandHandlerContext;
 import com.auraboot.framework.meta.service.DryRunSafe;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.dto.AsyncTaskDTO;
+import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
+import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
+import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -63,6 +67,9 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private FileService fileService;
+
+    @Autowired(required = false)
+    private AsyncTaskServiceImpl asyncTaskService;
 
     @Autowired(required = false)
     private StorageProvider storageProvider;
@@ -264,6 +271,25 @@ public class HandlerPhase implements CommandPhase {
             return;
         }
 
+        Map<String, Object> asyncHandlerParams = resolveHandlerParams(execConfig);
+
+        // Opt-in async dispatch: commands declaring handlerParams.async run off the
+        // request thread via AsyncTaskService, so long-running handlers (e.g. bulk
+        // Excel imports) finish in the background instead of blocking the HTTP
+        // request and tripping the BFF proxy 30s timeout (502). Dry-run stays
+        // synchronous — its side effects must roll back inside the JDBC envelope.
+        if (!request.isDryRun() && isAsyncHandler(asyncHandlerParams) && asyncTaskService != null) {
+            String taskCode = submitAsyncHandlerTask(handlerCode, commandCode, modelCode,
+                    resolveEffectiveRecordId(request, fieldMapResults), payload, asyncHandlerParams,
+                    tenantId, userId);
+            handlerResults.put("async", true);
+            handlerResults.put("taskCode", taskCode);
+            handlerResults.put("taskType", CommandHandlerAsyncTaskExecutor.TASK_TYPE);
+            log.info("Command {} dispatched asynchronously (handler={}): taskCode={}",
+                    commandCode, handlerCode, taskCode);
+            return;
+        }
+
         log.info("Executing plugin command handler for: {} (command={}, handler={})",
                 handlerCode, commandCode, handler.getClass().getName());
 
@@ -324,6 +350,33 @@ public class HandlerPhase implements CommandPhase {
             }
         }
         return commandCode;
+    }
+
+    private boolean isAsyncHandler(Map<String, Object> handlerParams) {
+        Object v = handlerParams.get("async");
+        return Boolean.TRUE.equals(v) || "true".equalsIgnoreCase(String.valueOf(v));
+    }
+
+    private String submitAsyncHandlerTask(String handlerCode, String commandCode, String modelCode,
+                                          String recordId, Map<String, Object> payload,
+                                          Map<String, Object> handlerParams, Long tenantId, Long userId) {
+        Map<String, Object> input = new HashMap<>();
+        input.put("handlerCode", handlerCode);
+        input.put("commandCode", commandCode);
+        input.put("tenantId", tenantId);
+        input.put("userId", userId);
+        input.put("modelCode", modelCode);
+        input.put("recordId", recordId);
+        input.put("payload", payload != null ? payload : Collections.emptyMap());
+        input.put("handlerParams", handlerParams);
+
+        AsyncTaskSubmitRequest taskRequest = new AsyncTaskSubmitRequest();
+        taskRequest.setTaskType(CommandHandlerAsyncTaskExecutor.TASK_TYPE);
+        taskRequest.setTaskName(commandCode != null ? commandCode : handlerCode);
+        taskRequest.setInputParams(objectMapper.valueToTree(input));
+
+        AsyncTaskDTO dto = asyncTaskService.submitTask(taskRequest, tenantId, userId);
+        return dto.getTaskCode();
     }
 
     private Map<String, Object> resolveHandlerParams(Map<String, Object> execConfig) {
