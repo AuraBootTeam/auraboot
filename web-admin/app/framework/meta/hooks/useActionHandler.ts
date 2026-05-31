@@ -62,6 +62,7 @@ import { confirmDialog } from '~/utils/confirmDialog';
 import { normalizeAction, normalizeButtonProps } from '~/framework/meta/utils/normalizeAction';
 import { pickFile, uploadCommandFile, resolvePromptUploadKey } from '~/framework/meta/utils/promptUpload';
 import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
+import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 
 // Navigate function type (compatible with react-router v7)
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
@@ -159,8 +160,14 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
   const [error, setError] = useState<string | null>(null);
   // Live async task backing the progress modal (running → terminal). Kept after
   // terminal so the modal can show the final summary until the host dismisses.
-  const [activeTask, setActiveTask] = useState<AsyncTask | null>(null);
-  const clearActiveTask = useCallback(() => setActiveTask(null), []);
+  // Shared via context when a provider is present (so a command dispatched from
+  // a ToolbarBlockRenderer's own hook instance surfaces in the page's single
+  // modal); falls back to local state otherwise.
+  const modalSink = useAsyncTaskModalSink();
+  const [localTask, setLocalTask] = useState<AsyncTask | null>(null);
+  const activeTask = modalSink ? modalSink.activeTask : localTask;
+  const setActiveTask = modalSink ? modalSink.setActiveTask : setLocalTask;
+  const clearActiveTask = useCallback(() => setActiveTask(null), [setActiveTask]);
 
   /**
    * Poll an async task to completion. A command declaring handlerParams.async

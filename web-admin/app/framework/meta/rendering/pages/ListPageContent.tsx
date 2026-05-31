@@ -28,7 +28,10 @@ import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry'
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
-import { AsyncTaskProgressModal } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
+import {
+  AsyncTaskModalProvider,
+  AsyncTaskModalHost,
+} from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
@@ -138,7 +141,7 @@ interface TenantMemberImportResult {
 type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
 
 // List Page Content Component
-export function ListPageContent(props: PageContentProps) {
+function ListPageContentInner(props: PageContentProps) {
   const { schema, tableName, token, listExtensions } = props;
   const { user } = useAuth();
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
@@ -871,7 +874,7 @@ export function ListPageContent(props: PageContentProps) {
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction
   // to avoid temporal dead zone ("Cannot access 'handleAction' before initialization").
-  const { handleAction, activeTask, clearActiveTask } = useActionHandler({
+  const { handleAction } = useActionHandler({
     runtime,
     navigate,
     tableName,
@@ -3135,13 +3138,21 @@ export function ListPageContent(props: PageContentProps) {
           />
         </div>
       </div>
-      {activeTask && (
-        <AsyncTaskProgressModal
-          task={activeTask}
-          onClose={clearActiveTask}
-          onBackground={clearActiveTask}
-        />
-      )}
+      <AsyncTaskModalHost />
     </DataSourceProvider>
+  );
+}
+
+/**
+ * Public wrapper: provides the shared async-task-modal context so that commands
+ * dispatched from any nested `useActionHandler` (the page's own, and each
+ * ToolbarBlockRenderer's) surface in the single page-level progress modal
+ * rendered by {@link AsyncTaskModalHost}.
+ */
+export function ListPageContent(props: PageContentProps) {
+  return (
+    <AsyncTaskModalProvider>
+      <ListPageContentInner {...props} />
+    </AsyncTaskModalProvider>
   );
 }
