@@ -726,6 +726,11 @@ common:
   filter: Filter
   search: Search
   add_filter: Add Filter
+  clear_all: Clear All
+  search_fields: Search fields...
+  no_fields_found: No fields found
+  common_fields: Common Fields
+  other_fields: Other Fields
   my_records: My Records
   created_today: Created Today
   modified_this_week: Modified This Week

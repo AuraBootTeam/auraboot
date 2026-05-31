@@ -253,7 +253,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
           onClick={onClearAll}
           className="ml-1 text-sm text-gray-400 transition-colors hover:text-red-500"
         >
-          Clear All
+          {t('common.clear_all', undefined, 'Clear All')}
         </button>
       )}
     </div>

@@ -35,6 +35,11 @@ common:
   filter: 筛选
   search: 搜索
   add_filter: 添加筛选
+  clear_all: 清除全部
+  search_fields: 搜索字段...
+  no_fields_found: 未找到字段
+  common_fields: 常用字段
+  other_fields: 其他字段
   my_records: 我的记录
   created_today: 今日新建
   modified_this_week: 本周修改
