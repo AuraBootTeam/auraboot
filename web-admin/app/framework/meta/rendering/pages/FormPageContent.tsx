@@ -458,6 +458,24 @@ export function FormPageContent(props: PageContentProps) {
     return defaults;
   }, [isEditMode, searchParams, schemaFieldNames]);
 
+  // Field-config `defaultValue` for create mode (e.g. a select that should
+  // pre-select an option). Lower precedence than URL defaults and user input.
+  const schemaDefaultValues = useMemo(() => {
+    if (isEditMode) return {} as Record<string, any>;
+    const defaults: Record<string, any> = {};
+    const blocks = (schema as any)?.blocks ?? [];
+    for (const b of blocks) {
+      if (b?.blockType === 'form-section' && Array.isArray(b.fields)) {
+        for (const f of b.fields) {
+          if (f?.field && f.defaultValue !== undefined && f.defaultValue !== null) {
+            defaults[String(f.field)] = f.defaultValue;
+          }
+        }
+      }
+    }
+    return defaults;
+  }, [isEditMode, schema]);
+
   // Track whether modelCode was seeded from URL so we can show a hint.
   const urlSeededModelCode = useMemo(() => {
     if (isEditMode) return null;
@@ -1189,11 +1207,14 @@ export function FormPageContent(props: PageContentProps) {
     ],
   );
 
-  // Create mode: apply URL default values (dv.fieldCode=value) to form
+  // Create mode: apply field-config defaults then URL default values
+  // (dv.fieldCode=value) to form. Precedence: user input > URL > field default.
   useEffect(() => {
-    if (isEditMode || Object.keys(urlDefaultValues).length === 0) return;
-    setFormData((prev) => ({ ...urlDefaultValues, ...prev }));
-  }, [isEditMode, urlDefaultValues]);
+    if (isEditMode) return;
+    const base = { ...schemaDefaultValues, ...urlDefaultValues };
+    if (Object.keys(base).length === 0) return;
+    setFormData((prev) => ({ ...base, ...prev }));
+  }, [isEditMode, schemaDefaultValues, urlDefaultValues]);
 
   // Edit mode: fetch existing record data to populate form
   const [mainRecordLoaded, setMainRecordLoaded] = useState(!isEditMode);
