@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
 describe('BlockRegistry bootstrap', () => {
-  it('initBlockRegistry registers all 15 runtime block types', () => {
+  it('initBlockRegistry registers all 16 runtime block types', () => {
     initBlockRegistry();
 
-    expect(BlockRegistry.size()).toBe(15);
+    expect(BlockRegistry.size()).toBe(16);
 
     // Must mirror the dispatch table in
     // web-admin/app/framework/meta/rendering/BlockRenderer.tsx — every
@@ -26,6 +26,7 @@ describe('BlockRegistry bootstrap', () => {
       'chart',
       'tabs',
       'sub-table',
+      'embedded-list',
       'stat-card',
       'rich-text',
       'divider',

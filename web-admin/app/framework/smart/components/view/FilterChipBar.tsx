@@ -21,6 +21,12 @@ interface FilterChipBarProps {
   onClearAll: () => void;
   locale?: string;
   t?: (key: string) => string;
+  /**
+   * Optional resolver turning a filter's raw value into a human-readable label
+   * (e.g. a dict code → localized label) so enum chips don't leak raw codes.
+   * Returns undefined to fall back to the raw formatted value.
+   */
+  resolveValueLabel?: (filter: ViewFilterConfig) => string | undefined;
 }
 
 /** Map filter operators to concise symbols */
@@ -56,12 +62,13 @@ function formatDisplayValue(value: unknown): string {
 interface FilterChipProps {
   filter: ViewFilterConfig;
   label: string;
+  valueLabel?: string;
   onRemove: () => void;
 }
 
-const FilterChip = React.memo<FilterChipProps>(function FilterChip({ filter, label, onRemove }) {
+const FilterChip = React.memo<FilterChipProps>(function FilterChip({ filter, label, valueLabel, onRemove }) {
   const operatorSymbol = OPERATOR_SYMBOLS[filter.operator] ?? filter.operator;
-  const displayValue = formatDisplayValue(filter.value);
+  const displayValue = valueLabel ?? formatDisplayValue(filter.value);
   const hasValue =
     filter.value !== null &&
     filter.value !== undefined &&
@@ -150,6 +157,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
   onAddFilter,
   onChipClick,
   onClearAll,
+  resolveValueLabel,
 }) {
   const { t } = useI18n();
   // Build a lookup map: fieldCode → label
@@ -206,6 +214,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
           <FilterChip
             filter={f}
             label={resolveLabel(f.fieldCode)}
+            valueLabel={resolveValueLabel?.(f)}
             onRemove={() => handleRemoveFilter(idx)}
           />
         </span>
@@ -244,7 +253,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
           onClick={onClearAll}
           className="ml-1 text-sm text-gray-400 transition-colors hover:text-red-500"
         >
-          Clear All
+          {t('common.clear_all', undefined, 'Clear All')}
         </button>
       )}
     </div>

@@ -126,13 +126,14 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has15Values() {
-        assertEquals(15, DslRegistry.BlockType.values().length);
+    void blockType_has16Values() {
+        assertEquals(16, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
                 "table", "filters", "toolbar", "description", "chart",
-                "tabs", "sub-table", "monthly-grid", "stat-card", "ai-fill-banner", "custom")));
+                "tabs", "sub-table", "monthly-grid", "stat-card", "ai-fill-banner",
+                "embedded-list", "custom")));
     }
 
     @Test

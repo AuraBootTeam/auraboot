@@ -246,6 +246,46 @@ class PageSchemaValidatorTest {
     }
 
     @Test
+    void embeddedListBlockIsRecognizedBlockType() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_detail", "detail", "pe_order", List.of(Map.of(
+                "id", "order_lines",
+                "blockType", "embedded-list",
+                "modelCode", "pe_order",
+                "columns", List.of(column("pe_order_no", localized("Order No")))
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-BLOCK-TYPE".equals(m.getCode())),
+                () -> "embedded-list should be a recognized block type, got: " + messages);
+    }
+
+    @Test
+    void embeddedListColumnWithoutFieldIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_detail", "detail", "pe_order", List.of(Map.of(
+                "id", "order_lines",
+                "blockType", "embedded-list",
+                "modelCode", "pe_order",
+                "columns", List.of(Map.of("label", localized("Order No")))
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-FIELD-REF", "pages[0].blocks[0].columns[0].field");
+    }
+
+    @Test
+    void embeddedListWithoutColumnsIsRejected() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.setPages(List.of(page("pe_order_detail", "detail", "pe_order", List.of(Map.of(
+                "id", "order_lines",
+                "blockType", "embedded-list",
+                "modelCode", "pe_order"
+        )))));
+
+        assertHasError(validate(manifest), "S-PAGE-TABLE-COLUMNS", "pages[0].blocks[0].columns");
+    }
+
+    @Test
     void formSectionWithoutFieldsIsRejected() {
         PluginManifestExtended manifest = manifestWithOrderModel();
         manifest.setPages(List.of(page("pe_order_form", "form", "pe_order", List.of(Map.of(

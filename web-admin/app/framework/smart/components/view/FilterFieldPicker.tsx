@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n } from '~/contexts/I18nContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +73,7 @@ export function FilterFieldPicker({
   onSelect,
   onClose,
 }: FilterFieldPickerProps) {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -136,7 +138,7 @@ export function FilterFieldPicker({
         <input
           type="text"
           className="w-full rounded border border-gray-200 px-2 py-1 text-sm outline-none placeholder:text-gray-400 focus:border-blue-400"
-          placeholder="Search fields..."
+          placeholder={t('common.search_fields', undefined, 'Search fields...')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           autoFocus
@@ -146,13 +148,15 @@ export function FilterFieldPicker({
       {/* Scrollable field list */}
       <div className="flex-1 overflow-y-auto p-1">
         {filtered.length === 0 && (
-          <p className="px-2 py-3 text-center text-sm text-gray-400">No fields found</p>
+          <p className="px-2 py-3 text-center text-sm text-gray-400">
+            {t('common.no_fields_found', undefined, 'No fields found')}
+          </p>
         )}
 
         {commonFields.length > 0 && (
           <>
             <p className="px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
-              Common Fields
+              {t('common.common_fields', undefined, 'Common Fields')}
             </p>
             {commonFields.map(renderItem)}
           </>
@@ -161,7 +165,7 @@ export function FilterFieldPicker({
         {otherFields.length > 0 && (
           <>
             <p className="mt-1 px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
-              Other Fields
+              {t('common.other_fields', undefined, 'Other Fields')}
             </p>
             {otherFields.map(renderItem)}
           </>

@@ -18,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -100,8 +102,9 @@ public class AsyncTaskServiceImpl {
         log.info("Async task submitted: code={}, type={}, name={}",
                 task.getTaskCode(), task.getTaskType(), task.getTaskName());
 
-        // Kick off async execution via self-proxy (required for @Async to work)
-        self.executeTaskAsync(task.getId(), tenantId);
+        // Kick off async execution via self-proxy (required for @Async to work).
+        // Deferred to after-commit when inside a transaction: see triggerExecution.
+        triggerExecution(task.getId(), tenantId);
 
         return toDTO(task);
     }
@@ -181,6 +184,30 @@ public class AsyncTaskServiceImpl {
     }
 
     // ==================== Async Execution ====================
+
+    /**
+     * Trigger async execution of a persisted task.
+     *
+     * <p>When called inside an active transaction (e.g. the command pipeline's
+     * HandlerPhase), the task row is not yet committed. Kicking off the @Async
+     * executor immediately would make its {@code selectById} — running on a
+     * separate connection — read null ("Task not found"), leaving the task stuck
+     * in {@code pending}. We therefore defer the kickoff to after-commit so the
+     * row is visible. Outside a transaction (e.g. retry from the @Async thread,
+     * or a direct REST submit with no surrounding tx) we trigger immediately.</p>
+     */
+    private void triggerExecution(Long taskId, Long tenantId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    self.executeTaskAsync(taskId, tenantId);
+                }
+            });
+        } else {
+            self.executeTaskAsync(taskId, tenantId);
+        }
+    }
 
     /**
      * Execute a task asynchronously in the thread pool.
@@ -298,7 +325,7 @@ public class AsyncTaskServiceImpl {
             asyncTaskMapper.updateById(task);
 
             // Re-submit for execution via self-proxy
-            self.executeTaskAsync(task.getId(), task.getTenantId());
+            triggerExecution(task.getId(), task.getTenantId());
         } else {
             failTask(task, errorMessage);
         }

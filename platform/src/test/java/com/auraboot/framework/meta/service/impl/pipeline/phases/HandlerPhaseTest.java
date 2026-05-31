@@ -1,8 +1,10 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
+import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -29,6 +31,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,6 +70,9 @@ class HandlerPhaseTest {
     @Mock
     private StorageProvider storageProvider;
 
+    @Mock
+    private AsyncTaskServiceImpl asyncTaskService;
+
     @InjectMocks
     private HandlerPhase phase;
 
@@ -73,6 +80,7 @@ class HandlerPhaseTest {
     void setUp() {
         ReflectionTestUtils.setField(phase, "fileService", fileService);
         ReflectionTestUtils.setField(phase, "storageProvider", storageProvider);
+        ReflectionTestUtils.setField(phase, "asyncTaskService", asyncTaskService);
     }
 
     @Test
@@ -126,6 +134,49 @@ class HandlerPhaseTest {
         assertThat(handler.capturedContext.get().settings())
                 .containsEntry("__commandCode", BUSINESS_COMMAND_CODE)
                 .containsEntry("__handlerCode", BUSINESS_COMMAND_CODE);
+    }
+
+    @Test
+    void execute_dispatchesAsyncWhenHandlerParamsAsyncTrue() throws Exception {
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        AsyncTaskDTO dto = new AsyncTaskDTO();
+        dto.setTaskCode("TASK-ASYNC-1");
+        when(asyncTaskService.submitTask(any(), eq(1L), eq(2L))).thenReturn(dto);
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom",
+                "handler", PLUGIN_HANDLER_CODE,
+                "handlerParams", Map.of("async", true)
+        ));
+
+        phase.execute(ctx);
+
+        // Handler must NOT run inline on the request thread.
+        assertThat(handler.capturedContext.get()).isNull();
+        assertThat(ctx.getHandlerResults())
+                .containsEntry("async", true)
+                .containsEntry("taskCode", "TASK-ASYNC-1")
+                .containsEntry("taskType", "command-handler");
+        verify(asyncTaskService).submitTask(any(), eq(1L), eq(2L));
+    }
+
+    @Test
+    void execute_runsInlineUnderDryRunEvenWhenAsyncDeclared() throws Exception {
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom",
+                "handler", PLUGIN_HANDLER_CODE,
+                "handlerParams", Map.of("async", true)
+        ));
+        ctx.getRequest().setDryRun(true);
+
+        phase.execute(ctx);
+
+        // Dry-run never goes async — it must stay inside the JDBC rollback envelope.
+        verify(asyncTaskService, never()).submitTask(any(), any(), any());
     }
 
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {

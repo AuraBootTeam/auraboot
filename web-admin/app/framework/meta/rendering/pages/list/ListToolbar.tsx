@@ -53,6 +53,8 @@ export interface ListToolbarProps {
   onFilterFormToggle?: () => void;
   /** Whether a filter block exists in DSL */
   hasFilterBlock?: boolean;
+  /** Resolve a filter's value to a localized label (e.g. dict code → label). */
+  resolveChipValueLabel?: (filter: ViewFilterConfig) => string | undefined;
 }
 
 export function ListToolbar({
@@ -76,6 +78,7 @@ export function ListToolbar({
   filterFormVisible,
   onFilterFormToggle,
   hasFilterBlock,
+  resolveChipValueLabel,
 }: ListToolbarProps) {
   const { t } = useI18n();
   const handleKeyDown = useCallback(
@@ -256,6 +259,7 @@ export function ListToolbar({
         onAddFilter={onAddFilter}
         onChipClick={onChipClick}
         onClearAll={onClearAll}
+        resolveValueLabel={resolveChipValueLabel}
       />
     </>
   );
