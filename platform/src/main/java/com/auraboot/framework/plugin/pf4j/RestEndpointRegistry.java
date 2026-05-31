@@ -3,7 +3,6 @@ package com.auraboot.framework.plugin.pf4j;
 import com.auraboot.framework.plugin.extension.RestEndpointExtension;
 import com.auraboot.framework.plugin.extension.RestRoute;
 import com.auraboot.framework.plugin.rest.RestRouteMatcher;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -13,18 +12,18 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Registry + dispatch index for {@link RestEndpointExtension}s. Mirrors {@link ExtensionRegistry}:
- * merges PF4J plugin extensions with core Spring-bean extensions, caches lazily, and clears the
- * cache on plugin lifecycle changes via {@link #refresh()}.
+ * Registry + dispatch index for {@link RestEndpointExtension}s. Mirrors {@link ExtensionRegistry}
+ * but recomputes the extension list on each lookup, so runtime plugin enable / disable / reload
+ * (PF4J hot-load/unload) is reflected immediately without a separate cache-invalidation hook.
+ *
+ * <p>gamma-1 favours correctness over micro-perf here; a cached + lifecycle-event-invalidated
+ * variant (like ExtensionRegistry) is a perf follow-up.
  */
-@Slf4j
 @Service
 public class RestEndpointRegistry {
 
     private final AuraPluginManager pluginManager;
     private final ObjectProvider<RestEndpointExtension> coreProvider;
-
-    private volatile List<RestEndpointExtension> all;
 
     public RestEndpointRegistry(AuraPluginManager pluginManager,
                                 ObjectProvider<RestEndpointExtension> coreProvider) {
@@ -36,19 +35,16 @@ public class RestEndpointRegistry {
     public record Match(RestEndpointExtension extension, RestRoute route, Map<String, String> pathVars) {
     }
 
-    /** All REST endpoint extensions (plugin + core), cached after first call. */
+    /** All REST endpoint extensions (plugin + core), recomputed each call (hot-reload safe). */
     public List<RestEndpointExtension> getAll() {
-        if (all == null) {
-            List<RestEndpointExtension> plugin = pluginManager.getExtensionsOfType(RestEndpointExtension.class);
-            List<RestEndpointExtension> core = coreProvider.stream().toList();
-            all = Stream.concat(plugin.stream(), core.stream()).toList();
-        }
-        return all;
+        List<RestEndpointExtension> plugin = pluginManager.getExtensionsOfType(RestEndpointExtension.class);
+        List<RestEndpointExtension> core = coreProvider.stream().toList();
+        return Stream.concat(plugin.stream(), core.stream()).toList();
     }
 
     /**
      * Resolve the highest-priority extension+route matching {@code (namespace, method, subPath)}.
-     * {@code subPath} is the request path with the {@code /api/plugins/{namespace}} prefix removed.
+     * {@code subPath} is the request path with the {@code /api/ext/{namespace}} prefix removed.
      */
     public Optional<Match> match(String namespace, String method, String subPath) {
         Match best = null;
@@ -66,11 +62,5 @@ public class RestEndpointRegistry {
             }
         }
         return Optional.ofNullable(best);
-    }
-
-    /** Invalidate the cache; call from plugin install/enable/disable/reload hooks. */
-    public void refresh() {
-        all = null;
-        log.info("RestEndpointRegistry cache cleared; routes reload on demand");
     }
 }

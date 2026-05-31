@@ -1,5 +1,6 @@
 package com.auraboot.plugins.gamma;
 
+import com.auraboot.framework.plugin.extension.DataAccessor;
 import com.auraboot.framework.plugin.extension.PluginHttpResponse;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ class WhoamiEndpointTest {
             @Override public ZoneId zoneId() { return ZoneId.of("Asia/Shanghai"); }
             @Override public String generateId() { return "01J0TESTID"; }
             @Override public boolean isPublic() { return false; }
+            @Override public DataAccessor dataAccessor() { return null; }
         };
     }
 

@@ -6,16 +6,21 @@
   "pluginType": "hybrid",
   "displayName:en": "Gamma Conformance",
   "displayName:zh-CN": "Gamma 一致性探针",
-  "description": "Dogfood plugin exercising the RestEndpointExtension SPI (auth + tenant injection conformance).",
+  "description": "Dogfood plugin exercising the RestEndpointExtension SPI (auth + tenant injection + governed CRUD conformance).",
   "author": "AuraBoot Team",
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
-  "provides": [],
+  "provides": [
+    {"type": "model", "code": "probe_note"}
+  ],
   "backend": {
     "jarPath": "backend/build/libs/gamma-conformance-plugin-0.1.0.jar",
     "entryClass": "com.auraboot.plugins.gamma.GammaConformancePlugin"
   },
   "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields.json",
+    "modelFieldBindings": "config/bindings.json",
     "permissions": "config/permissions.json",
     "defaultBootstrap": "config/default-bootstrap.json"
   },

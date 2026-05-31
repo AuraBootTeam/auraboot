@@ -23,4 +23,11 @@ public interface PluginRequestContext {
 
     /** True when this request was served via a PUBLIC route with a bound public context. */
     boolean isPublic();
+
+    /**
+     * Governed, tenant-scoped data access — the same surface command handlers get via
+     * {@code CommandContext.dataAccessor()}. Lets a plugin REST endpoint do model-driven CRUD
+     * without touching host internals. Backed by the platform DynamicDataService.
+     */
+    DataAccessor dataAccessor();
 }

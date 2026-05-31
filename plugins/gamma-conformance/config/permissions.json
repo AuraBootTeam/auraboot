@@ -1,3 +1,5 @@
 [
-  {"code":"probe.whoami.read","name":"Probe Whoami","description":"Invoke the gamma-conformance whoami probe endpoint.","type":"API"}
+  {"code":"probe.whoami.read","name":"Probe Whoami","description":"Invoke the gamma-conformance whoami probe endpoint.","type":"API"},
+  {"code":"probe.note.read","name":"Probe Note Read","description":"List gamma-conformance probe notes.","type":"API"},
+  {"code":"probe.note.write","name":"Probe Note Write","description":"Create gamma-conformance probe notes.","type":"API"}
 ]

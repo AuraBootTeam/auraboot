@@ -33,7 +33,8 @@ class RestEndpointRegistryTest {
         AuraPluginManager pm = mock(AuraPluginManager.class);
         when(pm.getExtensionsOfType(RestEndpointExtension.class)).thenReturn(List.of(exts));
         ObjectProvider<RestEndpointExtension> core = mock(ObjectProvider.class);
-        when(core.stream()).thenReturn(Stream.empty());
+        // getAll() recomputes each call now (hot-reload safe) -> hand back a fresh stream each time.
+        when(core.stream()).thenAnswer(inv -> Stream.empty());
         return new RestEndpointRegistry(pm, core);
     }
 
