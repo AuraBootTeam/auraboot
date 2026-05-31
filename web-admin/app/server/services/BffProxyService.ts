@@ -24,6 +24,20 @@ const noProxyHttpsAgent = new https.Agent({
   keepAliveMsecs: 30000,
 });
 
+/**
+ * Whether a request path should be proxied as a raw binary download rather than
+ * parsed/re-serialized through the JSON proxy.
+ *
+ * Matches `/download` when it is a complete path segment — at end of path,
+ * before a query string, OR followed by another segment (e.g. the file endpoint
+ * `/api/file/download/{fileId}`). The trailing-segment case was previously
+ * missed, so xlsx bytes fell through to the JSON proxy and were re-serialized as
+ * a JSON string (`"PK…`), corrupting every downloaded file.
+ */
+export function isBinaryDownloadPath(path: string): boolean {
+  return /\/download(?:\/|\?|$)/.test(path);
+}
+
 type ResponseHeaderValue = string | number | readonly string[];
 
 const BROWSER_ONLY_PROXY_HEADERS = new Set([
@@ -148,8 +162,9 @@ export class BffProxyService {
         return;
       }
 
-      // Check if this is a file download request (path segment ends with /download or /download?)
-      if (/\/download(?:\?|$)/.test(originalPath)) {
+      // Check if this is a file download request (/download as a complete path
+      // segment — including the trailing-id form /download/{fileId}).
+      if (isBinaryDownloadPath(originalPath)) {
         await this.handleBinaryDownload(req, res, backendUrl, requestId);
         return;
       }
