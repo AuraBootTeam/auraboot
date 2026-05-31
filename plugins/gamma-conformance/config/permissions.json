@@ -1,0 +1,3 @@
+[
+  {"code":"probe.whoami.read","name":"Probe Whoami","description":"Invoke the gamma-conformance whoami probe endpoint.","type":"API"}
+]

@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "name": "gamma-conformance-bootstrap",
+  "description": "Permission + role registration for the gamma-conformance dogfood plugin.",
+  "permissions": [
+    {"code":"probe.whoami.read","name":"Probe Whoami","description":"Invoke the gamma-conformance whoami probe endpoint.","type":"API"}
+  ],
+  "roles": [
+    {"code":"probe_user","name:en":"Probe User","name:zh-CN":"探针用户","description":"Can invoke gamma-conformance probe endpoints.","permissions":["probe.whoami.read"]}
+  ],
+  "rolePermissionBindings": [
+    {"roleCode":"probe_user","permissionCodes":["probe.whoami.read"]}
+  ]
+}

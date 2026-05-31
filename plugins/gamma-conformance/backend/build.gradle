@@ -1,0 +1,52 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.auraboot.plugins'
+version = '0.1.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenLocal()
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+    mavenCentral()
+}
+
+dependencies {
+    // All host-provided at runtime (PF4J parent classloader) -> compileOnly, thin jar.
+    compileOnly 'com.auraboot:platform-plugin-api:1.0.0-SNAPSHOT'
+    compileOnly 'org.pf4j:pf4j:3.15.0'
+    annotationProcessor 'org.pf4j:pf4j:3.15.0'
+    compileOnly 'org.slf4j:slf4j-api:2.0.18'
+
+    testImplementation 'com.auraboot:platform-plugin-api:1.0.0-SNAPSHOT'
+    testImplementation 'org.pf4j:pf4j:3.15.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.assertj:assertj-core:3.25.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    archiveBaseName = 'gamma-conformance-plugin'
+    manifest {
+        attributes(
+            'Plugin-Id': 'com.auraboot.gamma-conformance',
+            'Plugin-Version': version,
+            'Plugin-Class': 'com.auraboot.plugins.gamma.GammaConformancePlugin',
+            'Plugin-Provider': 'AuraBoot Team',
+            'Plugin-Description': 'Gamma RestEndpointExtension conformance dogfood plugin'
+        )
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+}
+
+build.dependsOn jar
