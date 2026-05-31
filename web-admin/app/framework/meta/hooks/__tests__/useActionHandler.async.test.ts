@@ -35,7 +35,8 @@ describe('useActionHandler - handlerParams.async polling', () => {
   it('polls the async task to completion and reloads, instead of treating the immediate ack as the result', async () => {
     // 1) command execute → immediate async ack; 2) task poll → completed.
     fetchResultMock
-      .mockResolvedValueOnce({ code: '0', data: { async: true, taskCode: 'T1', taskType: 'command-handler' } })
+      // Command engine wraps the handler ack one level deep (result.data.data).
+      .mockResolvedValueOnce({ code: '0', data: { commandCode: 'c', phaseReached: 'completed', data: { async: true, taskCode: 'T1', taskType: 'command-handler' } } })
       .mockResolvedValueOnce({ code: '0', data: { status: 'completed', resultData: { importedRows: 35924 } } });
 
     const loadData = vi.fn().mockResolvedValue(undefined);
@@ -82,7 +83,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
 
   it('throws when the async task ends in failed status', async () => {
     fetchResultMock
-      .mockResolvedValueOnce({ code: '0', data: { async: true, taskCode: 'T2' } })
+      .mockResolvedValueOnce({ code: '0', data: { commandCode: 'c', phaseReached: 'completed', data: { async: true, taskCode: 'T2' } } })
       .mockResolvedValueOnce({ code: '0', data: { status: 'failed', errorMessage: 'source_file_id is required' } });
 
     const loadData = vi.fn();

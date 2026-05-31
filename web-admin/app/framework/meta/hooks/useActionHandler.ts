@@ -257,13 +257,17 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       // Async dispatch: handlerParams.async commands return immediately with a
       // taskCode; poll the task to completion so the UI reflects the real result
       // without a single long request (which would hit the BFF 30s timeout).
-      const data = result.data as any;
-      if (data && data.async === true && data.taskCode) {
+      // The command engine wraps the handler result one level deep:
+      // result.data = { commandCode, phaseReached, data: { async, taskCode } },
+      // so the async marker lives on result.data.data (fall back to result.data).
+      const envelope = result.data as any;
+      const dispatch = envelope?.data && typeof envelope.data === 'object' ? envelope.data : envelope;
+      if (dispatch && dispatch.async === true && dispatch.taskCode) {
         showToast?.('已提交,后台处理中…', 'info');
         // Open the progress modal immediately in a running state; pollAsyncTask
         // then refreshes it each tick until terminal.
         setActiveTask({ status: 'running', progress: 0 });
-        return await pollAsyncTask(data.taskCode);
+        return await pollAsyncTask(dispatch.taskCode);
       }
 
       return result.data;
