@@ -17,6 +17,7 @@ import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-rou
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import type {
   BlockConfig,
   ColumnConfig,
@@ -27,6 +28,10 @@ import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry'
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import {
+  AsyncTaskModalProvider,
+  AsyncTaskModalHost,
+} from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
@@ -96,6 +101,19 @@ export function getSystemFieldI18nKey(fieldCode: string): string | undefined {
   return SYSTEM_FIELD_I18N_KEYS[fieldCode];
 }
 
+/**
+ * Build the expression context exposed to toolbar `visibleWhen` conditions.
+ * Adds the loaded list's `recordCount` (length of currently loaded rows) and
+ * `total` (server total), so conditions like `visibleWhen: "recordCount == 0"`
+ * (e.g. a singleton "新建" button that hides once a record exists) evaluate.
+ */
+export function buildToolbarConditionContext(
+  list: { total: number; records: unknown[] },
+  base: Record<string, any>,
+): Record<string, any> {
+  return { ...base, recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
+}
+
 interface InviteCodeData {
   code: string;
   expiredAt?: string;
@@ -123,7 +141,7 @@ interface TenantMemberImportResult {
 type QuickFilterKey = 'my_records' | 'created_today' | 'modified_this_week';
 
 // List Page Content Component
-export function ListPageContent(props: PageContentProps) {
+function ListPageContentInner(props: PageContentProps) {
   const { schema, tableName, token, listExtensions } = props;
   const { user } = useAuth();
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
@@ -1937,14 +1955,21 @@ export function ListPageContent(props: PageContentProps) {
     [autoSave],
   );
 
-  // Evaluate button visibility (visibleWhen expression)
-  const evaluateButtonVisible = useCallback((button: ButtonConfig): boolean => {
-    // If no visibleWhen expression, always visible
-    if (!button.visibleWhen) return true;
-    // Simple expression evaluation: treat as always visible for now
-    // (full expression evaluation would use createExpressionContext)
-    return true;
-  }, []);
+  // Evaluate toolbar button visibility (visibleWhen expression).
+  // Exposes the loaded list's recordCount/total so conditions like
+  // `recordCount == 0` (singleton "新建" button) work.
+  const evaluateButtonVisible = useCallback(
+    (button: ButtonConfig): boolean => {
+      // If no visibleWhen expression, always visible
+      if (!button.visibleWhen) return true;
+      const conditionContext = buildToolbarConditionContext(
+        { total: pagination.total, records: data },
+        createExpressionContext({ state: { filters } }),
+      );
+      return evaluateCondition(button.visibleWhen, conditionContext as any);
+    },
+    [pagination.total, data, filters],
+  );
 
   // Build export filter conditions for toolbar
   const exportFilterConditions = useMemo(() => {
@@ -3113,6 +3138,21 @@ export function ListPageContent(props: PageContentProps) {
           />
         </div>
       </div>
+      <AsyncTaskModalHost />
     </DataSourceProvider>
+  );
+}
+
+/**
+ * Public wrapper: provides the shared async-task-modal context so that commands
+ * dispatched from any nested `useActionHandler` (the page's own, and each
+ * ToolbarBlockRenderer's) surface in the single page-level progress modal
+ * rendered by {@link AsyncTaskModalHost}.
+ */
+export function ListPageContent(props: PageContentProps) {
+  return (
+    <AsyncTaskModalProvider>
+      <ListPageContentInner {...props} />
+    </AsyncTaskModalProvider>
   );
 }

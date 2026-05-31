@@ -35,7 +35,8 @@ describe('useActionHandler - handlerParams.async polling', () => {
   it('polls the async task to completion and reloads, instead of treating the immediate ack as the result', async () => {
     // 1) command execute → immediate async ack; 2) task poll → completed.
     fetchResultMock
-      .mockResolvedValueOnce({ code: '0', data: { async: true, taskCode: 'T1', taskType: 'command-handler' } })
+      // Command engine wraps the handler ack one level deep (result.data.data).
+      .mockResolvedValueOnce({ code: '0', data: { commandCode: 'c', phaseReached: 'completed', data: { async: true, taskCode: 'T1', taskType: 'command-handler' } } })
       .mockResolvedValueOnce({ code: '0', data: { status: 'completed', resultData: { importedRows: 35924 } } });
 
     const loadData = vi.fn().mockResolvedValue(undefined);
@@ -69,11 +70,20 @@ describe('useActionHandler - handlerParams.async polling', () => {
     // Success path reloaded the list.
     expect(loadData).toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('后台处理'), 'info');
+    // Modal state was populated and polled through to the terminal task, so the
+    // host can render <AsyncTaskProgressModal task={activeTask}/> with the final
+    // summary (not just a fire-and-forget toast).
+    expect(result.current.activeTask).not.toBeNull();
+    expect(result.current.activeTask?.status).toBe('completed');
+    expect(result.current.activeTask?.resultData).toEqual({ importedRows: 35924 });
+    // Dismissing clears the modal.
+    act(() => result.current.clearActiveTask());
+    expect(result.current.activeTask).toBeNull();
   });
 
-  it('throws when the async task ends in failed status', async () => {
+  it('surfaces a failed async task in the modal instead of throwing to the page', async () => {
     fetchResultMock
-      .mockResolvedValueOnce({ code: '0', data: { async: true, taskCode: 'T2' } })
+      .mockResolvedValueOnce({ code: '0', data: { commandCode: 'c', phaseReached: 'completed', data: { async: true, taskCode: 'T2' } } })
       .mockResolvedValueOnce({ code: '0', data: { status: 'failed', errorMessage: 'source_file_id is required' } });
 
     const loadData = vi.fn();
@@ -100,9 +110,10 @@ describe('useActionHandler - handlerParams.async polling', () => {
       await result.current.handleAction(button);
     });
 
-    // Failed task → surfaced via onError; list NOT reloaded.
-    expect(loadData).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalled();
-    expect(String((onError.mock.calls[0]?.[0] as Error)?.message)).toContain('source_file_id is required');
+    // Failed task → modal shows the failed state; NOT thrown to onError/page
+    // error boundary (which would replace the page with a generic error).
+    expect(onError).not.toHaveBeenCalled();
+    expect(result.current.activeTask?.status).toBe('failed');
+    expect(result.current.activeTask?.errorMessage).toContain('source_file_id is required');
   });
 });
