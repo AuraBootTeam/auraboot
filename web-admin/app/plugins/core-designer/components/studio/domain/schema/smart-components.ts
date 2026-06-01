@@ -114,6 +114,8 @@ export interface TextareaProps extends FormFieldProps {
 export interface SelectProps extends FormFieldProps {
   options?: OptionItem[];
   dataSource?: DataSourceConfig;
+  /** Rendered as disabled (a <select> has no native read-only state). */
+  readOnly?: boolean;
   multiple?: boolean;
   searchable?: boolean;
   clearable?: boolean;
