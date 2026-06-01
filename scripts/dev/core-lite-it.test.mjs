@@ -16,7 +16,8 @@ test('harness delegates stack start to OSS start-isolated.sh (core-lite, not ent
 test('harness accepts --slug / --plugin / --jars-dir', () => {
   const s = readFileSync(SH, 'utf8');
   for (const flag of ['--slug', '--plugin', '--jars-dir']) {
-    assert.match(s, new RegExp(flag.replace(/-/g, '\\-')), `${flag} parsed`);
+    // Plain substring check — these flags are literals; avoid building a RegExp from them.
+    assert.ok(s.includes(flag), `${flag} parsed`);
   }
 });
 

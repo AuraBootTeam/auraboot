@@ -9,8 +9,9 @@
 #
 # Usage:
 #   scripts/dev/core-lite-it.sh --slug=core-lite --jars-dir=/tmp/core-lite-jars \
-#       --plugin=/abs/path/to/auraboot-enterprise/plugins/bom-standardization
+#       --plugin=/abs/path/to/<plugin-root>   # the dir containing plugin.json
 # Prints BE_PORT (read from .aura-stack/<slug>.env) on success.
+# (Harness is plugin-agnostic: --plugin / --jars-dir point at any plugin's root + jar.)
 set -euo pipefail
 
 SLUG=""
