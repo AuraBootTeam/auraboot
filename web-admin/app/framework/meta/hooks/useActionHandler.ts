@@ -389,8 +389,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // guarded by the flag, so non-upload buttons are unaffected.
             const promptUpload = (normalizedButton as any).promptUpload;
             if (promptUpload) {
+              // Don't keep the button disabled while the OS file picker is open:
+              // some browsers don't fire a 'cancel' event, so awaiting pickFile()
+              // would otherwise hang the loading state and leave the button stuck.
+              setLoading(false);
               const file = await pickFile();
               if (!file) return; // user dismissed the picker — nothing to do
+              setLoading(true);
               const fileId = await uploadCommandFile(file, token);
               payload = { ...payload, [resolvePromptUploadKey(promptUpload)]: fileId };
             }
