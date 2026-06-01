@@ -77,8 +77,26 @@ class RestEndpointRegistryTest {
         assertThat(reg.match("probe", "GET", "/leaky")).isEmpty();
     }
 
-    /** A PUBLIC route legitimately has no permissionCode — it must still match (gamma-3 serves it). */
+    /** A PUBLIC route legitimately has no permissionCode and (gamma-3 convention) sits under the
+     *  /public/ subpath that the security WhiteList exposes — it must match. */
     static final class PublicExt implements RestEndpointExtension {
+        @Override public String namespace() { return "probe"; }
+        @Override public List<RestRoute> routes() {
+            return List.of(new RestRoute("GET", "/public/open", null, AuthPolicy.PUBLIC, false, false, null));
+        }
+        @Override public void handle(PluginHttpRequest req, PluginHttpResponse res, PluginRequestContext ctx) { }
+    }
+
+    @Test
+    void match_allowsPublicRouteUnderPublicSubpath() {
+        RestEndpointRegistry reg = registryWith(new PublicExt());
+        assertThat(reg.match("probe", "GET", "/public/open")).isPresent();
+    }
+
+    /** gamma-3 fail-closed: a PUBLIC route NOT under /public/ would never be whitelisted by the
+     *  security layer (so it would confusingly 401) and risks exposing a non-public path. The
+     *  registry refuses to match it. */
+    static final class PublicOutsideSubpathExt implements RestEndpointExtension {
         @Override public String namespace() { return "probe"; }
         @Override public List<RestRoute> routes() {
             return List.of(new RestRoute("GET", "/open", null, AuthPolicy.PUBLIC, false, false, null));
@@ -87,8 +105,8 @@ class RestEndpointRegistryTest {
     }
 
     @Test
-    void match_allowsPublicRouteWithoutPermission() {
-        RestEndpointRegistry reg = registryWith(new PublicExt());
-        assertThat(reg.match("probe", "GET", "/open")).isPresent();
+    void match_failsClosedOnPublicRouteOutsidePublicSubpath() {
+        RestEndpointRegistry reg = registryWith(new PublicOutsideSubpathExt());
+        assertThat(reg.match("probe", "GET", "/open")).isEmpty();
     }
 }

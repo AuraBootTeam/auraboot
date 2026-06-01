@@ -146,4 +146,35 @@ class GammaConformanceIT {
                 .as("the probe_note write inside the failed handler was rolled back by the pipeline tx")
                 .isEqualTo(before);
     }
+
+    // ── gamma-3: binary/streaming response + public endpoints ───────────────────────────────
+
+    @Test
+    void reportCsv_returnsBinaryCsvBody() throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(BASE + "/api/ext/probe/report.csv"))
+                .header("Authorization", "Bearer " + login()).GET().build();
+        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        assertThat(resp.statusCode()).as("authenticated CSV download").isEqualTo(200);
+        assertThat(resp.headers().firstValue("Content-Type")).get().asString().contains("text/csv");
+        assertThat(resp.body()).contains("id,text").contains("alpha");
+        assertThat(resp.headers().firstValue("X-Gamma-Probe")).contains("report");
+    }
+
+    @Test
+    void publicCheckin_servedWithoutAnyToken() throws Exception {
+        // No Authorization header at all — the WhiteList exposes /api/ext/*/public/** and the
+        // dispatcher binds a default-tenant public context.
+        HttpResponse<String> resp = post("/api/ext/probe/public/checkin", null, "{}", null);
+        assertThat(resp.statusCode()).as("PUBLIC route served unauthenticated").isEqualTo(200);
+        assertThat(resp.body()).contains("\"public\":true");
+        assertThat(resp.headers().firstValue("X-Gamma-Probe")).contains("public-checkin");
+    }
+
+    @Test
+    void authenticatedRoute_stillRejectsMissingToken() throws Exception {
+        // Regression: only /public/ is whitelisted — a non-public plugin route still needs auth.
+        HttpResponse<String> resp = post("/api/ext/probe/echo", null, "{\"text\":\"x\"}", null);
+        assertThat(resp.statusCode())
+                .as("non-public plugin route without a token is still rejected").isEqualTo(401);
+    }
 }

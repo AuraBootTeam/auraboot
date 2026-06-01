@@ -57,14 +57,13 @@ public class RestEndpointRegistry {
                 continue;
             }
             for (RestRoute route : ext.routes()) {
-                // gamma-2 fail-closed: an AUTHENTICATED route with no permissionCode can never be
-                // satisfied (the dispatcher would 403 every caller). Treat it as a registration
-                // error — refuse to match it (effectively 404) and log loudly so the misconfigured
-                // plugin is caught at the first request rather than silently shadow-banning a route.
-                if (isMisconfiguredAuthenticatedRoute(route)) {
-                    log.error("Refusing plugin REST route {} {} from namespace '{}': AUTHENTICATED "
-                                    + "routes require a non-blank permissionCode (fail-closed).",
-                            route.method(), route.pathPattern(), ext.namespace());
+                // Fail-closed: refuse to match a misconfigured route (effectively 404) and log
+                // loudly so the plugin author is caught at the first request rather than silently
+                // shadow-banning the route.
+                String reject = misconfigurationReason(route);
+                if (reject != null) {
+                    log.error("Refusing plugin REST route {} {} from namespace '{}': {}",
+                            route.method(), route.pathPattern(), ext.namespace(), reject);
                     continue;
                 }
                 Optional<Map<String, String>> vars = RestRouteMatcher.match(route, method, subPath);
@@ -77,8 +76,20 @@ public class RestEndpointRegistry {
         return Optional.ofNullable(best);
     }
 
-    private static boolean isMisconfiguredAuthenticatedRoute(RestRoute route) {
-        return route.authPolicy() == AuthPolicy.AUTHENTICATED
-                && (route.permissionCode() == null || route.permissionCode().isBlank());
+    /** Public routes are exposed unauthenticated only under this subpath (matches the security WhiteList). */
+    public static final String PUBLIC_SUBPATH_PREFIX = "/public/";
+
+    /** @return a human-readable reason this route must not be served, or {@code null} if it is well-formed. */
+    private static String misconfigurationReason(RestRoute route) {
+        if (route.authPolicy() == AuthPolicy.AUTHENTICATED
+                && (route.permissionCode() == null || route.permissionCode().isBlank())) {
+            return "AUTHENTICATED routes require a non-blank permissionCode (fail-closed)";
+        }
+        if (route.authPolicy() == AuthPolicy.PUBLIC
+                && !route.pathPattern().startsWith(PUBLIC_SUBPATH_PREFIX)) {
+            return "PUBLIC routes must live under the " + PUBLIC_SUBPATH_PREFIX
+                    + " subpath so the security WhiteList exposes them (fail-closed)";
+        }
+        return null;
     }
 }
