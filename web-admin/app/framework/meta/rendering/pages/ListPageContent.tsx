@@ -2327,9 +2327,21 @@ function ListPageContentInner(props: PageContentProps) {
               setMemberImportDialogOpen(true);
             }}
             hideSavedViews={listExtensions?.hideSavedViews}
-            hideBuiltInImport={listExtensions?.hideBuiltInImport}
-            hideBuiltInExport={listExtensions?.hideBuiltInExport}
-            hideBuiltInPrint={listExtensions?.hideBuiltInPrint}
+            hideBuiltInImport={
+              listExtensions?.hideBuiltInImport ??
+              (schema as any)?.extension?.hideBuiltInImport ??
+              (schema as any)?.extension?.hideToolbarMore
+            }
+            hideBuiltInExport={
+              listExtensions?.hideBuiltInExport ??
+              (schema as any)?.extension?.hideBuiltInExport ??
+              (schema as any)?.extension?.hideToolbarMore
+            }
+            hideBuiltInPrint={
+              listExtensions?.hideBuiltInPrint ??
+              (schema as any)?.extension?.hideBuiltInPrint ??
+              (schema as any)?.extension?.hideToolbarMore
+            }
           />
 
           {isTenantMemberPage && memberImportDialogOpen && (
