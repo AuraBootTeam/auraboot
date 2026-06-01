@@ -42,6 +42,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       label: propLabel,
       placeholder: propPlaceholder,
       disabled: propDisabled,
+      // A <select> has no native read-only state, so readOnly is rendered as
+      // disabled (value shown, not changeable). The controlled value still
+      // submits from form state.
+      readOnly: propReadOnly,
       required: propRequired,
       size = 'medium',
       variant = 'default',
@@ -79,7 +83,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       placeholder: propPlaceholder,
       helpText: expressions.helpText,
       required: propRequired,
-      disabled: propDisabled,
+      disabled: propDisabled || propReadOnly,
       expressions,
       context,
       visible,
