@@ -14,6 +14,8 @@ import { config } from '~/server/utils/config';
 import { parseDevAllowedPorts } from '~/server/utils/dev-cors-ports';
 import { requestLogger, errorLogger } from '~/server/middlewares/RequestLogger';
 import { register, proxyDurationHistogram } from './metrics.server';
+import { sessionStorage } from '~/shared/services/session';
+import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 
 // ============================================================
 // CRITICAL: Bypass system proxy for ALL axios requests in BFF.
@@ -47,11 +49,12 @@ const proxyService = new BffProxyService({ target: SPRING_BOOT_URL });
 app.use(cookieParser());
 app.use(requestLogger);
 
-// ✅ 修复: 跳过 multipart/form-data 请求的 body 解析
-// multipart 请求需要直接透传到后端或由专门的上传路由处理
+// React Router actions (for example POST /login) must receive the original
+// request body. Express body parsers consume it before the RR adapter can call
+// request.formData(), so only parse BFF-owned /api requests here.
 const skipBodyParsing = (req: express.Request) => {
   const contentType = req.headers['content-type'] || '';
-  return contentType.includes('multipart/form-data');
+  return !req.path.startsWith('/api') || contentType.includes('multipart/form-data');
 };
 
 app.use((req, res, next) => {
@@ -68,7 +71,12 @@ app.use((req, res, next) => {
   express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
 });
 
-app.use(express.raw({ type: 'application/octet-stream', limit: '50mb' }));
+app.use((req, res, next) => {
+  if (skipBodyParsing(req)) {
+    return next();
+  }
+  express.raw({ type: 'application/octet-stream', limit: '50mb' })(req, res, next);
+});
 
 // Gzip/deflate compression for responses
 app.use(compression({
@@ -128,6 +136,111 @@ app.use((req, res, next) => {
   }
 
   next();
+});
+
+function safeLoginRedirect(value: unknown): string {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
+    return '/';
+  }
+  return value;
+}
+
+function isMobileDevice(userAgent: string): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+}
+
+function resolvePostLoginRedirect(loginData: any, req: express.Request, redirectTo: string): string {
+  const mustChangePassword = loginData?.mustChangePassword;
+  if (!loginData?.tenantId) {
+    return mustChangePassword ? '/personal/profile?forceChangePassword=true' : '/tenant-selection';
+  }
+
+  let finalRedirectTo =
+    isMobileDevice(req.headers['user-agent'] || '') && redirectTo === '/' ? '/h5-scan' : redirectTo;
+  if (mustChangePassword) {
+    finalRedirectTo = '/personal/profile?forceChangePassword=true';
+  }
+  return finalRedirectTo;
+}
+
+async function commitLoginSession(
+  req: express.Request,
+  res: express.Response,
+  token: string,
+  remember: boolean,
+) {
+  const session = await sessionStorage.getSession(req.headers.cookie);
+  session.set(JWT_TOKEN_KEY, token);
+  res.setHeader(
+    'Set-Cookie',
+    await sessionStorage.commitSession(session, {
+      maxAge: remember ? 60 * 60 * 24 * 7 : undefined,
+    }),
+  );
+}
+
+app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async (req, res, next) => {
+  try {
+    const redirectTo = safeLoginRedirect(req.body?.redirectTo);
+    const remember = req.body?.remember === 'on';
+    const intent = String(req.body?.intent || '');
+
+    if (intent === 'social-callback') {
+      const token = String(req.body?.token || '');
+      if (!token) {
+        return res.status(400).send('Missing token');
+      }
+      await commitLoginSession(req, res, token, true);
+      return res.redirect(302, redirectTo);
+    }
+
+    const channelCode = String(req.body?.channelCode || 'email_password');
+    let authPath: string;
+    let authPayload: Record<string, string>;
+    if (channelCode === 'email_password') {
+      authPath = '/api/auth/login';
+      authPayload = {
+        email: String(req.body?.email || ''),
+        password: String(req.body?.password || ''),
+      };
+    } else if (channelCode === 'sms') {
+      authPath = '/api/auth/login/sms';
+      authPayload = {
+        mobile: String(req.body?.mobile || ''),
+        code: String(req.body?.code || ''),
+      };
+    } else if (channelCode === 'email_code') {
+      authPath = '/api/auth/login/email-code';
+      authPayload = {
+        email: String(req.body?.email || ''),
+        code: String(req.body?.code || ''),
+      };
+    } else {
+      return res.status(400).send('Unsupported login method');
+    }
+
+    const loginResponse = await fetch(`${SPRING_BOOT_URL}${authPath}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(authPayload),
+    });
+
+    if (!loginResponse.ok) {
+      return res.status(400).send('Invalid credentials');
+    }
+
+    const loginPayload = await loginResponse.json();
+    const loginData = loginPayload?.data;
+    const token = loginData?.jwt;
+    if (!token) {
+      return res.status(400).send('Invalid credentials');
+    }
+
+    await commitLoginSession(req, res, token, remember);
+    return res.redirect(302, resolvePostLoginRedirect(loginData, req, redirectTo));
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Prometheus metrics endpoint
