@@ -9,7 +9,7 @@
 #
 # Usage:
 #   scripts/dev/core-lite-it.sh --slug=core-lite --jars-dir=/tmp/core-lite-jars \
-#       --plugin=/abs/path/to/auraboot-enterprise/plugins/bom-standardization/config
+#       --plugin=/abs/path/to/auraboot-enterprise/plugins/bom-standardization
 # Prints BE_PORT (read from .aura-stack/<slug>.env) on success.
 set -euo pipefail
 
@@ -49,14 +49,26 @@ HEALTH="$(NO_PROXY=localhost curl -s -o /dev/null -w '%{http_code}' \
   "http://localhost:${BE_PORT}/actuator/health" || echo 000)"
 [ "$HEALTH" = "200" ] || { echo "ERROR: backend not healthy (http=$HEALTH) on $BE_PORT" >&2; exit 1; }
 
-# 3. Import the plugin config (model-driven DDL builds tables here) — real import API.
-# NOTE: --enterprise-plugin-root flag semantics (host path vs. container path) are
-# calibrated live in Task 3 when the full import pipeline is exercised end-to-end.
+# 3. Import the plugin config (model-driven DDL builds tables here) via docker cp + real import API.
+#    The OSS-core container does not mount enterprise plugin config, so copy it in, then import.
 if [ -n "$PLUGIN_DIR" ]; then
-  echo ">> importing plugin config: $PLUGIN_DIR (slug=$SLUG)"
-  "$CORE_ROOT/scripts/import-plugins.sh" --slug="$SLUG" \
-    --enterprise-plugin-root="$(dirname "$PLUGIN_DIR")" "$(basename "$PLUGIN_DIR")" \
-    || { echo "ERROR: plugin import failed for $PLUGIN_DIR" >&2; exit 1; }
+  [ -f "$PLUGIN_DIR/plugin.json" ] || { echo "ERROR: --plugin must point at a plugin root containing plugin.json: $PLUGIN_DIR" >&2; exit 1; }
+  local_name="$(basename "$PLUGIN_DIR")"
+  container="auraboot-${SLUG}-backend"
+  echo ">> docker cp $PLUGIN_DIR -> ${container}:/tmp/${local_name}"
+  docker cp "$PLUGIN_DIR" "${container}:/tmp/${local_name}" || { echo "ERROR: docker cp failed" >&2; exit 1; }
+  jwt="$(NO_PROXY=localhost curl -s -X POST "http://localhost:${BE_PORT}/api/auth/login" \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
+    | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["jwt"])')"
+  [ -n "$jwt" ] || { echo "ERROR: admin login returned no jwt" >&2; exit 1; }
+  echo ">> import-directory-sync /tmp/${local_name}"
+  resp="$(NO_PROXY=localhost curl -s -X POST "http://localhost:${BE_PORT}/api/plugins/import/import-directory-sync" \
+    -H "Authorization: Bearer ${jwt}" -H 'Content-Type: application/json' \
+    -d "{\"path\":\"/tmp/${local_name}\",\"overwrite\":true}")"
+  echo "$resp" | python3 -c 'import sys,json;d=json.load(sys.stdin);sys.exit(0 if d.get("success") else 1)' \
+    || { echo "ERROR: import failed: ${resp:0:200}" >&2; exit 1; }
+  echo ">> imported ${local_name} (success:true)"
 fi
 
 echo "BE_PORT=$BE_PORT"

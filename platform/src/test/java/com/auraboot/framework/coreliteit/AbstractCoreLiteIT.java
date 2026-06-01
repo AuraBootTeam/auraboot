@@ -94,21 +94,12 @@ public abstract class AbstractCoreLiteIT {
         return http.send(req, HttpResponse.BodyHandlers.ofString());
     }
 
-    /**
-     * Call DynamicController list for a given pageKey.
-     *
-     * <p>NOTE: verify GET vs POST + exact param names in Task 3 live run (red line #5).
-     * Default is POST with JSON body until calibrated.
-     */
-    protected HttpResponse<String> dynamicList(String bearer, String pageKey, String filtersJson)
-            throws Exception {
-        String bodyStr = filtersJson != null
-                ? filtersJson
-                : "{\"pageNum\":1,\"pageSize\":20}";
-        HttpRequest req = HttpRequest.newBuilder(URI.create(base() + dynamicListPath(pageKey)))
-                .header("Content-Type", "application/json")
+    /** DynamicController list is GET /api/dynamic/{pageKey}/list?pageNum&pageSize (verified live). */
+    protected HttpResponse<String> dynamicList(String bearer, String pageKey, int pageNum, int pageSize) throws Exception {
+        String url = base() + dynamicListPath(pageKey) + "?pageNum=" + pageNum + "&pageSize=" + pageSize;
+        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                 .header("Authorization", "Bearer " + bearer)
-                .POST(HttpRequest.BodyPublishers.ofString(bodyStr))
+                .GET()
                 .build();
         return http.send(req, HttpResponse.BodyHandlers.ofString());
     }
