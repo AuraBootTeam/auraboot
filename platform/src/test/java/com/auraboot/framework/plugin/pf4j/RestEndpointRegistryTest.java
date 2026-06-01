@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.pf4j;
 import com.auraboot.framework.plugin.extension.PluginHttpRequest;
 import com.auraboot.framework.plugin.extension.PluginHttpResponse;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
+import com.auraboot.framework.plugin.extension.AuthPolicy;
 import com.auraboot.framework.plugin.extension.RestEndpointExtension;
 import com.auraboot.framework.plugin.extension.RestRoute;
 import org.junit.jupiter.api.Test;
@@ -57,5 +58,37 @@ class RestEndpointRegistryTest {
     void match_missesWrongNamespace() {
         RestEndpointRegistry reg = registryWith(new ProbeExt());
         assertThat(reg.match("other", "GET", "/whoami")).isEmpty();
+    }
+
+    /** gamma-2 fail-closed: AUTHENTICATED route declaring a blank permissionCode is a
+     *  misconfiguration. The registry must refuse to match it (effectively 404 + logged)
+     *  rather than letting it reach the dispatcher's runtime permission check. */
+    static final class MisconfiguredExt implements RestEndpointExtension {
+        @Override public String namespace() { return "probe"; }
+        @Override public List<RestRoute> routes() {
+            return List.of(new RestRoute("GET", "/leaky", "  ", AuthPolicy.AUTHENTICATED, false, false, null));
+        }
+        @Override public void handle(PluginHttpRequest req, PluginHttpResponse res, PluginRequestContext ctx) { }
+    }
+
+    @Test
+    void match_failsClosedOnAuthenticatedRouteWithBlankPermission() {
+        RestEndpointRegistry reg = registryWith(new MisconfiguredExt());
+        assertThat(reg.match("probe", "GET", "/leaky")).isEmpty();
+    }
+
+    /** A PUBLIC route legitimately has no permissionCode — it must still match (gamma-3 serves it). */
+    static final class PublicExt implements RestEndpointExtension {
+        @Override public String namespace() { return "probe"; }
+        @Override public List<RestRoute> routes() {
+            return List.of(new RestRoute("GET", "/open", null, AuthPolicy.PUBLIC, false, false, null));
+        }
+        @Override public void handle(PluginHttpRequest req, PluginHttpResponse res, PluginRequestContext ctx) { }
+    }
+
+    @Test
+    void match_allowsPublicRouteWithoutPermission() {
+        RestEndpointRegistry reg = registryWith(new PublicExt());
+        assertThat(reg.match("probe", "GET", "/open")).isPresent();
     }
 }

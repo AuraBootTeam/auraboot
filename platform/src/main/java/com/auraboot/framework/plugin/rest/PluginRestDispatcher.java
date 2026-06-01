@@ -1,6 +1,8 @@
 package com.auraboot.framework.plugin.rest;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.plugin.pf4j.RestEndpointRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +14,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -36,6 +40,7 @@ public class PluginRestDispatcher {
     private final RestEndpointRegistry registry;
     private final UserPermissionService userPermissionService;
     private final PluginRequestContextFactory contextFactory;
+    private final RestEndpointPipeline pipeline;
 
     @RequestMapping("/{namespace}/**")
     public void dispatch(@PathVariable String namespace,
@@ -60,9 +65,31 @@ public class PluginRestDispatcher {
             throw new AccessDeniedException("Missing permission for plugin route: " + permission);
         }
 
+        // gamma-2: run the handler through the governed pipeline (tx + audit + idempotency +
+        // schema). The handler writes into an in-memory buffer; we flush it to the servlet only
+        // after the pipeline (and its transaction) succeeds, so a rollback never leaks a partial
+        // response and we can still emit a clean error status.
         ServletPluginHttpRequest req = new ServletPluginHttpRequest(httpReq, m.pathVars());
-        ServletPluginHttpResponse res = new ServletPluginHttpResponse(httpRes);
-        m.extension().handle(req, res, contextFactory.current(false));
+        try {
+            BufferingPluginHttpResponse buffered = pipeline.execute(m, req, contextFactory.current(false));
+            buffered.flushTo(httpRes);
+        } catch (AccessDeniedException e) {
+            throw e; // let the security layer render 403
+        } catch (ValidationException e) {
+            writeError(httpRes, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+        } catch (BusinessException e) {
+            writeError(httpRes, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("Plugin REST endpoint {} {} failed", httpReq.getMethod(), httpReq.getRequestURI(), e);
+            writeError(httpRes, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal error");
+        }
+    }
+
+    private void writeError(HttpServletResponse res, int status, String message) throws IOException {
+        res.setStatus(status);
+        res.setContentType("application/json");
+        String safe = message == null ? "" : message.replace("\\", "\\\\").replace("\"", "\\\"");
+        res.getOutputStream().write(("{\"error\":\"" + safe + "\"}").getBytes(StandardCharsets.UTF_8));
     }
 
     private String subPath(HttpServletRequest req, String namespace) {

@@ -54,6 +54,31 @@ class GammaConformanceIT {
         return http.send(b.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    private HttpResponse<String> post(String path, String bearer, String body, String idempotencyKey) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(BASE + path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
+        if (bearer != null) {
+            b.header("Authorization", "Bearer " + bearer);
+        }
+        if (idempotencyKey != null) {
+            b.header("Idempotency-Key", idempotencyKey);
+        }
+        return http.send(b.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private int noteCount(String bearer) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(BASE + "/api/ext/probe/notes"))
+                .header("Authorization", "Bearer " + bearer).GET().build();
+        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        assertThat(resp.statusCode()).as("list notes").isEqualTo(200);
+        String body = resp.body();
+        int i = body.indexOf("\"count\":") + "\"count\":".length();
+        int j = i;
+        while (j < body.length() && (Character.isDigit(body.charAt(j)))) j++;
+        return Integer.parseInt(body.substring(i, j));
+    }
+
     @Test
     void noToken_returns401() throws Exception {
         assertThat(whoami(null).statusCode())
@@ -72,5 +97,53 @@ class GammaConformanceIT {
         assertThat(resp.headers().firstValue("X-Gamma-Probe"))
                 .as("request was delegated to the plugin handler (not a platform fallback)")
                 .contains("whoami");
+    }
+
+    // ── gamma-2: governed pipeline (schema + idempotency + transaction/audit) ───────────────
+
+    @Test
+    void echo_validBody_returns200WithEchoedPayload() throws Exception {
+        HttpResponse<String> resp = post("/api/ext/probe/echo", login(), "{\"text\":\"hello\"}", null);
+        assertThat(resp.statusCode()).as("schema-valid echo").isEqualTo(200);
+        assertThat(resp.body()).contains("hello");
+        assertThat(resp.headers().firstValue("X-Gamma-Probe")).contains("echo");
+    }
+
+    @Test
+    void echo_schemaViolation_returns400_beforeHandlerRuns() throws Exception {
+        // Missing required "text" → governed pipeline rejects with 400 (JSON-schema pre-validation).
+        HttpResponse<String> resp = post("/api/ext/probe/echo", login(), "{}", null);
+        assertThat(resp.statusCode()).as("schema-invalid echo is rejected pre-handler").isEqualTo(400);
+        assertThat(resp.body()).contains("text");
+    }
+
+    @Test
+    void echo_sameIdempotencyKey_replaysWithoutReexecuting() throws Exception {
+        String token = login();
+        String key = "gamma2-idem-" + System.nanoTime();
+        HttpResponse<String> first = post("/api/ext/probe/echo", token, "{\"text\":\"once\"}", key);
+        assertThat(first.statusCode()).isEqualTo(200);
+        assertThat(first.headers().firstValue("X-Idempotent-Replay")).isEmpty();
+
+        HttpResponse<String> replay = post("/api/ext/probe/echo", token, "{\"text\":\"once\"}", key);
+        assertThat(replay.statusCode()).as("idempotent replay still 200").isEqualTo(200);
+        assertThat(replay.body()).isEqualTo(first.body());
+        assertThat(replay.headers().firstValue("X-Idempotent-Replay"))
+                .as("second call with same key is served from the idempotency ledger").contains("true");
+    }
+
+    @Test
+    void boom_rollsBackTheWrite_andReturns500_withoutSwallowing() throws Exception {
+        String token = login();
+        int before = noteCount(token);
+
+        HttpResponse<String> resp = post("/api/ext/probe/boom", token, "", null);
+        assertThat(resp.statusCode())
+                .as("handler threw → not swallowed → mapped to 500").isEqualTo(500);
+
+        int after = noteCount(token);
+        assertThat(after)
+                .as("the probe_note write inside the failed handler was rolled back by the pipeline tx")
+                .isEqualTo(before);
     }
 }

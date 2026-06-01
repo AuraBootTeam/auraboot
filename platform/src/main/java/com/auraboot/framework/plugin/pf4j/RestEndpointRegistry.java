@@ -1,8 +1,10 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.plugin.extension.AuthPolicy;
 import com.auraboot.framework.plugin.extension.RestEndpointExtension;
 import com.auraboot.framework.plugin.extension.RestRoute;
 import com.auraboot.framework.plugin.rest.RestRouteMatcher;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +21,7 @@ import java.util.stream.Stream;
  * <p>gamma-1 favours correctness over micro-perf here; a cached + lifecycle-event-invalidated
  * variant (like ExtensionRegistry) is a perf follow-up.
  */
+@Slf4j
 @Service
 public class RestEndpointRegistry {
 
@@ -54,6 +57,16 @@ public class RestEndpointRegistry {
                 continue;
             }
             for (RestRoute route : ext.routes()) {
+                // gamma-2 fail-closed: an AUTHENTICATED route with no permissionCode can never be
+                // satisfied (the dispatcher would 403 every caller). Treat it as a registration
+                // error — refuse to match it (effectively 404) and log loudly so the misconfigured
+                // plugin is caught at the first request rather than silently shadow-banning a route.
+                if (isMisconfiguredAuthenticatedRoute(route)) {
+                    log.error("Refusing plugin REST route {} {} from namespace '{}': AUTHENTICATED "
+                                    + "routes require a non-blank permissionCode (fail-closed).",
+                            route.method(), route.pathPattern(), ext.namespace());
+                    continue;
+                }
                 Optional<Map<String, String>> vars = RestRouteMatcher.match(route, method, subPath);
                 if (vars.isPresent() && ext.getPriority() > bestPriority) {
                     best = new Match(ext, route, vars.get());
@@ -62,5 +75,10 @@ public class RestEndpointRegistry {
             }
         }
         return Optional.ofNullable(best);
+    }
+
+    private static boolean isMisconfiguredAuthenticatedRoute(RestRoute route) {
+        return route.authPolicy() == AuthPolicy.AUTHENTICATED
+                && (route.permissionCode() == null || route.permissionCode().isBlank());
     }
 }
