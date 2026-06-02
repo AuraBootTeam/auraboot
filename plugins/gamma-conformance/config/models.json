@@ -1,0 +1,16 @@
+[
+  {
+    "code": "probe_note",
+    "displayName:en": "Probe Note",
+    "displayName:zh-CN": "探针便签",
+    "description": "gamma-conformance CRUD probe model (proves plugin REST endpoints can do governed, tenant-scoped data access).",
+    "modelType": "entity",
+    "modelCategory": "business",
+    "extension": {
+      "titleField": "probe_note_text"
+    },
+    "features": {
+      "enableAuditFields": true
+    }
+  }
+]

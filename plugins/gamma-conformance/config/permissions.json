@@ -1,0 +1,8 @@
+[
+  {"code":"probe.whoami.read","name":"Probe Whoami","description":"Invoke the gamma-conformance whoami probe endpoint.","type":"API"},
+  {"code":"probe.note.read","name":"Probe Note Read","description":"List gamma-conformance probe notes.","type":"API"},
+  {"code":"probe.note.write","name":"Probe Note Write","description":"Create gamma-conformance probe notes.","type":"API"},
+  {"code":"probe.echo.write","name":"Probe Echo","description":"Invoke the gamma-conformance echo endpoint (schema + idempotency probe).","type":"API"},
+  {"code":"probe.boom.write","name":"Probe Boom","description":"Invoke the gamma-conformance boom endpoint (rollback + no-swallow probe).","type":"API"},
+  {"code":"probe.report.read","name":"Probe Report","description":"Download the gamma-conformance CSV report (binary response probe).","type":"API"}
+]
