@@ -1,0 +1,12 @@
+[
+  {
+    "code": "probe_note_text",
+    "displayName:en": "Note Text",
+    "displayName:zh-CN": "便签内容",
+    "dataType": "text",
+    "constraints": {
+      "required": true,
+      "maxLength": 500
+    }
+  }
+]

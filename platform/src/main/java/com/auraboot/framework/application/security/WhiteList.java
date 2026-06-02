@@ -20,6 +20,11 @@ public class WhiteList {
             "/api/public/**",
             "/api/i18n/**",
 
+            // Plugin-contributed PUBLIC REST endpoints (gamma-3). The single unique prefix exposes
+            // ONLY the /public/ subpath of any plugin namespace; the dispatcher binds a default-tenant
+            // public context and rate-limits. Non-/public plugin routes stay authenticated.
+            "/api/ext/*/public/**",
+
             // Mobile config — no auth required (app needs config before login)
             "/api/mobile/config",
             "/api/mobile/capabilities",

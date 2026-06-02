@@ -23,6 +23,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -31,6 +32,8 @@ import java.util.Arrays;
 @Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final AntPathMatcher ANT_PATH_MATCHER = new AntPathMatcher();
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
@@ -202,8 +205,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         java.util.function.Predicate<String> matchesPath = path -> {
             if (path.endsWith("/**")) {
                 String base = path.substring(0, path.length() - 3); // strip "/**"
-                return requestPath.equals(base) ||
-                       requestPath.startsWith(base + "/");
+                if (requestPath.equals(base) || requestPath.startsWith(base + "/")) {
+                    return true;
+                }
+                // Mid-segment wildcard patterns (e.g. "/api/ext/*/public/**", gamma-3 plugin public
+                // endpoints) can't be expressed by the literal-prefix check above. Fall back to
+                // AntPathMatcher ONLY for these — it is segment-boundary safe, so it matches the
+                // existing literal patterns identically and merely enables the wildcard case.
+                if (base.indexOf('*') >= 0) {
+                    return ANT_PATH_MATCHER.match(path, requestPath);
+                }
+                return false;
             }
             return path.equals(requestPath);
         };

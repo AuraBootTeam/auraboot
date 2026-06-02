@@ -236,6 +236,22 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void shouldNotFilter_pluginPublicSubpathSkipsJwtAuth_butNonPublicDoesNot() throws Exception {
+        // gamma-3: "/api/ext/*/public/**" uses a mid-segment wildcard the literal matcher can't
+        // express; shouldNotFilter must still skip JWT for it (else PUBLIC endpoints 401).
+        MockHttpServletRequest publicReq = new MockHttpServletRequest("POST", "/api/ext/probe/public/checkin");
+        publicReq.setServletPath("/api/ext/probe/public/checkin");
+        assertTrue((Boolean) ReflectionTestUtils.invokeMethod(filter, "shouldNotFilter", publicReq),
+                "PUBLIC plugin subpath must skip JWT auth");
+
+        // A non-public plugin route is NOT whitelisted — JWT auth still applies.
+        MockHttpServletRequest authedReq = new MockHttpServletRequest("POST", "/api/ext/probe/echo");
+        authedReq.setServletPath("/api/ext/probe/echo");
+        assertFalse((Boolean) ReflectionTestUtils.invokeMethod(filter, "shouldNotFilter", authedReq),
+                "non-public plugin route must still require JWT auth");
+    }
+
+    @Test
     void rbacLookupFailure_doesNotPropagate() throws Exception {
         MockHttpServletRequest req = req();
         req.addHeader("Authorization", "Bearer t.token");
