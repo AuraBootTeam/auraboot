@@ -4,6 +4,6 @@ package com.auraboot.framework.plugin.extension;
 public enum AuthPolicy {
     /** Default: requires an authenticated user (JWT) + permission. */
     AUTHENTICATED,
-    /** Public: no authentication. Must sit under /api/plugins/{ns}/public/**. (gamma-3) */
+    /** Public: no authentication. Must sit under /api/ext/{ns}/public/**. (gamma-3) */
     PUBLIC
 }

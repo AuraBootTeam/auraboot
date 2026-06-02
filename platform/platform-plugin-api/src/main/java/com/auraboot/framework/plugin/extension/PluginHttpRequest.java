@@ -12,7 +12,7 @@ public interface PluginHttpRequest {
     /** HTTP method, upper-case (e.g. "GET"). */
     String method();
 
-    /** Full request path as received (e.g. "/api/plugins/probe/whoami"). */
+    /** Full request path as received (e.g. "/api/ext/probe/whoami"). */
     String path();
 
     /** Path variables resolved from the matched route's pathPattern. */

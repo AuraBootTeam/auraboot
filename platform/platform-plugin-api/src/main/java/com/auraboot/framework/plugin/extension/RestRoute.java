@@ -3,7 +3,7 @@ package com.auraboot.framework.plugin.extension;
 /**
  * Declares one plugin REST route plus its governance metadata.
  *
- * <p>{@code pathPattern} is relative to {@code /api/plugins/{namespace}} (the namespace
+ * <p>{@code pathPattern} is relative to {@code /api/ext/{namespace}} (the namespace
  * comes from the plugin manifest). {@code permissionCode} is REQUIRED for AUTHENTICATED
  * routes (enforced fail-closed at registry bind time in gamma-2); it must follow the
  * platform convention {@code <module>.<resource>.<action>}.

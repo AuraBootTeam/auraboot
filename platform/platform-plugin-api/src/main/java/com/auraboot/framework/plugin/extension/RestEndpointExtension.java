@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Extension point: a plugin contributes custom HTTP routes served by the platform
- * dispatcher at {@code /api/plugins/{namespace}/**}.
+ * dispatcher at {@code /api/ext/{namespace}/**}.
  *
  * <p>The platform applies authentication, tenant context, permission, transaction and
  * audit BEFORE delegating to {@link #handle}. Plugins never register Spring controllers,
