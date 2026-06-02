@@ -13,6 +13,7 @@ import com.auraboot.framework.i18n.service.AiTranslationService;
 import com.auraboot.framework.i18n.service.I18nCoverageService;
 import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.i18n.service.I18nOverrideAuditor;
 import com.auraboot.framework.i18n.service.OrphanKeyDetector;
 import com.auraboot.framework.i18n.sync.I18nSyncService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -41,6 +42,7 @@ public class I18nAdminController {
     private final I18nSyncService i18nSyncService;
     private final I18nCoverageService i18nCoverageService;
     private final OrphanKeyDetector orphanKeyDetector;
+    private final I18nOverrideAuditor i18nOverrideAuditor;
     private final AiTranslationService aiTranslationService;
 
     // ==================== CRUD Operations ====================
@@ -432,5 +434,45 @@ public class I18nAdminController {
 
         log.info("Deleted {} orphan i18n key rows for tenant={}", deleted, tenantId);
         return ResponseEntity.ok(Map.of("deletedRows", deleted));
+    }
+
+    // ==================== Override Audit ====================
+
+    /**
+     * Audit the i18n multi-layer override chain (YAML → JSON → DB) plus the seed
+     * file, for observability into "I edited it but nothing changed".
+     *
+     * <p>Reports, per key, which layers hold a value, which one wins, and whether
+     * the DB has drifted from {@code seed/i18n-base.json} for platform-owned
+     * ({@code source='system'}) keys. Read-only — never mutates data.
+     *
+     * @param lang              locale code, default {@code zh-CN}
+     * @param onlyDrift         when true, only {@code SEED_DRIFT} entries are returned
+     * @param includeConsistent when false (default), drop the noisy all-equal entries
+     * @return the override audit report
+     */
+    @GetMapping("/override-audit")
+    public ResponseEntity<I18nOverrideAuditor.OverrideAuditReport> overrideAudit(
+        @RequestParam(defaultValue = "zh-CN") String lang,
+        @RequestParam(defaultValue = "false") boolean onlyDrift,
+        @RequestParam(defaultValue = "false") boolean includeConsistent
+    ) {
+        I18nOverrideAuditor.OverrideAuditReport full = i18nOverrideAuditor.audit(lang);
+
+        List<I18nOverrideAuditor.OverrideAuditEntry> filtered = full.entries().stream()
+            .filter(e -> {
+                if (onlyDrift) {
+                    return I18nOverrideAuditor.CLASS_SEED_DRIFT.equals(e.classification());
+                }
+                if (!includeConsistent && I18nOverrideAuditor.CLASS_CONSISTENT.equals(e.classification())) {
+                    return false;
+                }
+                // Drop single-layer (null classification) entries from the default view
+                return e.classification() != null;
+            })
+            .toList();
+
+        return ResponseEntity.ok(new I18nOverrideAuditor.OverrideAuditReport(
+            full.lang(), full.totalKeys(), full.overriddenCount(), full.driftCount(), filtered));
     }
 }
