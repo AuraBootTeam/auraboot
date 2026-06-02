@@ -179,9 +179,10 @@ public class I18nService {
     }
 
     /**
-     * Load i18n data from compiled JSON file
+     * Load i18n data from compiled JSON file.
+     * Package-private so {@link I18nOverrideAuditor} can reuse the same flatten logic.
      */
-    private Map<String, Object> loadFromJson(String locale) {
+    Map<String, Object> loadFromJson(String locale) {
         String resourcePath = "i18n/i18n." + locale + ".json";
         Resource resource = new ClassPathResource(resourcePath);
 
@@ -206,9 +207,10 @@ public class I18nService {
     }
 
     /**
-     * Load i18n data from legacy YAML file
+     * Load i18n data from legacy YAML file.
+     * Package-private so {@link I18nOverrideAuditor} can reuse the same flatten logic.
      */
-    private Map<String, Object> loadFromYaml(String locale) {
+    Map<String, Object> loadFromYaml(String locale) {
         String resourcePath = "i18n." + locale + ".yaml";
         Resource resource = new ClassPathResource(resourcePath);
 
