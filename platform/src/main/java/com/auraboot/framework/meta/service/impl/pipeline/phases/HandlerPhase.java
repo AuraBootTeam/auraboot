@@ -279,12 +279,22 @@ public class HandlerPhase implements CommandPhase {
         // request and tripping the BFF proxy 30s timeout (502). Dry-run stays
         // synchronous — its side effects must roll back inside the JDBC envelope.
         if (!request.isDryRun() && isAsyncHandler(asyncHandlerParams) && asyncTaskService != null) {
+            String effectiveRecordId = resolveEffectiveRecordId(request, fieldMapResults);
             String taskCode = submitAsyncHandlerTask(handlerCode, commandCode, modelCode,
-                    resolveEffectiveRecordId(request, fieldMapResults), payload, asyncHandlerParams,
+                    effectiveRecordId, payload, asyncHandlerParams,
                     tenantId, userId);
             handlerResults.put("async", true);
             handlerResults.put("taskCode", taskCode);
             handlerResults.put("taskType", CommandHandlerAsyncTaskExecutor.TASK_TYPE);
+            // Surface the target record id so callers (e.g. a form submitting a
+            // model-bound async command) can redirect to the just-created record's
+            // detail page. The synchronous handler return carries this id naturally;
+            // the async envelope otherwise only had {async, taskCode}, leaving the UI
+            // with no record to navigate to. Purely additive — existing consumers
+            // ignore the extra key.
+            if (StringUtils.hasText(effectiveRecordId)) {
+                handlerResults.put("recordId", effectiveRecordId);
+            }
             log.info("Command {} dispatched asynchronously (handler={}): taskCode={}",
                     commandCode, handlerCode, taskCode);
             return;

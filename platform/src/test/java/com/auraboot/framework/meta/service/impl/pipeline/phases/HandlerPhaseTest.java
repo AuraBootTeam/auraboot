@@ -157,7 +157,11 @@ class HandlerPhaseTest {
         assertThat(ctx.getHandlerResults())
                 .containsEntry("async", true)
                 .containsEntry("taskCode", "TASK-ASYNC-1")
-                .containsEntry("taskType", "command-handler");
+                .containsEntry("taskType", "command-handler")
+                // The async envelope surfaces the target record id so a form that
+                // submits a model-bound async command can redirect to the new
+                // record's detail page instead of falling back to the list route.
+                .containsEntry("recordId", "po-1");
         verify(asyncTaskService).submitTask(any(), eq(1L), eq(2L));
     }
 
