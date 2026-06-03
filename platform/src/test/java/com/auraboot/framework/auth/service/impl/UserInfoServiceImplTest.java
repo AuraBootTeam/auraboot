@@ -28,6 +28,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -99,7 +100,26 @@ class UserInfoServiceImplTest {
         assertEquals("Nick", resp.getUser().getName());
         assertEquals("Acme", resp.getUser().getTenantName());
         assertEquals(2, resp.getPermissions().getPermissionCodes().size());
-        assertEquals(UserInfoResponse.PreferencesDTO.DEFAULT_TIMEZONE, resp.getPreferences().getTimezone());
+        // No user/tenant timezone set -> the API must NOT impose a "UTC" default;
+        // it returns null so the client falls back to its own (browser) timezone.
+        assertNull(resp.getPreferences().getTimezone());
+    }
+
+    @Test
+    @DisplayName("unset timezone returns null (client decides via browser); formats keep defaults")
+    void unsetTimezoneReturnsNull() {
+        when(userService.findByUserId(1L)).thenReturn(user());
+        when(tenantMemberService.getTenantNameById(10L)).thenReturn("Acme");
+        when(roleMapper.findByMemberIdAndTenantId(99L, 10L)).thenReturn(List.of(role("tenant_admin")));
+        when(permissionMapper.selectList(any())).thenReturn(List.of(perm("p.read")));
+        when(userPreferenceService.getPreferencesByPrefix(1L, "ui.")).thenReturn(Map.of());
+        when(tenantPreferenceService.getPreferencesByPrefix(10L, "ui.")).thenReturn(Map.of());
+
+        UserInfoResponse resp = service.buildCurrentUserInfo(1L, "u-1", 10L);
+        assertNull(resp.getPreferences().getTimezone());
+        // Format defaults are unaffected — only the timezone default is dropped.
+        assertEquals(UserInfoResponse.PreferencesDTO.DEFAULT_DATETIME_FORMAT,
+                resp.getPreferences().getDatetimeFormat());
     }
 
     @Test

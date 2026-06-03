@@ -16,8 +16,8 @@
 
 import React from 'react';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
-import dayjs from 'dayjs';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 
 /**
  * 单元格渲染上下文
@@ -167,11 +167,11 @@ function formatTemporalValue(
   column?: Record<string, any>,
 ): string {
   const format = resolveTemporalFormat(type, column);
-  const input = dayjs(value);
-  if (input.isValid()) {
-    return input.format(format);
-  }
-  return String(value);
+  // Backend emits UTC; convert to the effective display timezone carried on the
+  // column (injected by the page renderer from TimezoneContext). Falls back to
+  // UTC when no timezone is provided.
+  const timeZone = typeof column?.timezone === 'string' ? column.timezone : undefined;
+  return formatInTimezone(value, format, timeZone);
 }
 
 // ============================================

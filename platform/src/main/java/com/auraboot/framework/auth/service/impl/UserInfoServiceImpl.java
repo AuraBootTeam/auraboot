@@ -115,8 +115,11 @@ public class UserInfoServiceImpl implements UserInfoService {
                 : Map.of();
 
         UserInfoResponse.PreferencesDTO dto = new UserInfoResponse.PreferencesDTO();
-        dto.setTimezone(resolvePreference(userPrefs, tenantPrefs, "ui.timezone",
-                UserInfoResponse.PreferencesDTO.DEFAULT_TIMEZONE));
+        // Timezone has NO server-imposed default: when neither the user nor the
+        // tenant has set one, return null so the client falls back to its own
+        // (browser/device) timezone. Forcing "UTC" here made every datetime
+        // render in UTC regardless of where the user is (2026-06-03 incident).
+        dto.setTimezone(resolvePreference(userPrefs, tenantPrefs, "ui.timezone", null));
         dto.setDateFormat(resolvePreference(userPrefs, tenantPrefs, "ui.date.format",
                 UserInfoResponse.PreferencesDTO.DEFAULT_DATE_FORMAT));
         dto.setDatetimeFormat(resolvePreference(userPrefs, tenantPrefs, "ui.datetime.format",

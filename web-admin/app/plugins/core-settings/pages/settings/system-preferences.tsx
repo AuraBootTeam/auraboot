@@ -15,8 +15,13 @@ export function meta({}: MetaArgs) {
 
 export default function SystemPreferencesPage() {
   const { showErrorToast, showSuccessToast } = useToastContext();
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [datetimeFormat, setDatetimeFormat] = useState('YYYY-MM-DD HH:mm:ss');
-  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [timezone, setTimezone] = useState(() => browserTimezone);
+  // Whether a tenant-level timezone is actually persisted. When false the select
+  // shows the browser timezone only as a starting point — it is NOT the active
+  // tenant policy yet (users fall back to their own browser timezone until saved).
+  const [timezoneConfigured, setTimezoneConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [timezoneSaving, setTimezoneSaving] = useState(false);
@@ -27,7 +32,10 @@ export default function SystemPreferencesPage() {
         if (value && value.trim()) setDatetimeFormat(value);
       }),
       tenantPreferenceService.get<string>('ui.timezone').then((value) => {
-        if (value && value.trim()) setTimezone(value);
+        if (value && value.trim()) {
+          setTimezone(value);
+          setTimezoneConfigured(true);
+        }
       }),
     ])
       .catch((err) => {
@@ -52,6 +60,7 @@ export default function SystemPreferencesPage() {
     try {
       setTimezoneSaving(true);
       await tenantPreferenceService.set('ui.timezone', timezone);
+      setTimezoneConfigured(true);
       showSuccessToast('System timezone saved');
     } catch (err: any) {
       showErrorToast(`Failed to save system timezone: ${err?.message || 'Unknown error'}`);
@@ -121,6 +130,11 @@ export default function SystemPreferencesPage() {
                 onChange={setTimezone}
                 data-testid="system-timezone-select"
               />
+              <p className="mt-2 text-xs text-gray-500" data-testid="system-timezone-status">
+                {timezoneConfigured
+                  ? `Tenant timezone is set to ${timezone}.`
+                  : `Not configured yet — users currently fall back to their own browser timezone (yours is ${browserTimezone}). Click Save to apply this as the tenant default.`}
+              </p>
             </div>
             <button
               type="button"
