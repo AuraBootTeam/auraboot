@@ -64,7 +64,8 @@ public class UserInfoResponse {
         private String datetimeFormat;
         private String timeFormat;
 
-        public static final String DEFAULT_TIMEZONE = "UTC";
+        // No DEFAULT_TIMEZONE: timezone is intentionally null when unset so the
+        // client falls back to its own (browser/device) timezone rather than UTC.
         public static final String DEFAULT_DATE_FORMAT = "YYYY-MM-DD";
         public static final String DEFAULT_DATETIME_FORMAT = "YYYY-MM-DD HH:mm:ss";
         public static final String DEFAULT_TIME_FORMAT = "HH:mm:ss";

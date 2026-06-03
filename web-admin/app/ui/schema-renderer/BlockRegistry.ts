@@ -45,10 +45,12 @@ export function initBlockRegistry(): void {
   if (initialized) return;
   initialized = true;
 
-  const lazy = (loader: () => Promise<{ [k: string]: React.ComponentType<any> }>, exportName: string) =>
+  // Loader may expose non-component named exports too (e.g. helper functions);
+  // we only pick `exportName`, so the module shape is intentionally loose.
+  const lazy = (loader: () => Promise<Record<string, unknown>>, exportName: string) =>
     React.lazy(async () => {
       const mod = await loader();
-      return { default: mod[exportName] };
+      return { default: mod[exportName] as React.ComponentType<any> };
     });
 
   // Data / list blocks

@@ -4,6 +4,12 @@ import {
   DEFAULT_DATE_TIME_FORMATS,
   type DateTimeFormatPreferences,
 } from '~/shared/services/dateTimeFormatService';
+import { tenantPreferenceService } from '~/shared/services/tenantPreferenceService';
+
+interface TenantDisplayPrefs {
+  timezone?: string;
+  datetimeFormat?: string;
+}
 
 const EFFECTIVE_TIMEZONE_KEY = 'effective-timezone';
 
@@ -37,23 +43,47 @@ export function TimezoneProvider({
 
   const [formats, setFormats] = useState<DateTimeFormatPreferences>(DEFAULT_DATE_TIME_FORMATS);
 
-  useEffect(() => {
-    if (preferences) {
-      const tz = preferences.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setTimezone(tz);
-      persistTimezone(tz);
+  // Tenant-level display policy (System Preferences). Lower priority than the
+  // user's personal preferences, higher than the browser default. Fetched once.
+  const [tenantPrefs, setTenantPrefs] = useState<TenantDisplayPrefs | null>(null);
 
-      setFormats({
-        date: preferences.dateFormat || DEFAULT_DATE_TIME_FORMATS.date,
-        datetime: preferences.datetimeFormat || DEFAULT_DATE_TIME_FORMATS.datetime,
-        time: preferences.timeFormat || DEFAULT_DATE_TIME_FORMATS.time,
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      tenantPreferenceService.get<string>('ui.timezone'),
+      tenantPreferenceService.get<string>('ui.datetime.format'),
+    ])
+      .then(([timezone, datetimeFormat]) => {
+        if (cancelled) return;
+        setTenantPrefs({
+          timezone: timezone || undefined,
+          datetimeFormat: datetimeFormat || undefined,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setTenantPrefs({});
       });
-    } else {
-      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setTimezone(browserTz);
-      persistTimezone(browserTz);
-    }
-  }, [preferences]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Resolution chain: user personal preference → tenant policy → browser.
+    const tz = preferences?.timezone || tenantPrefs?.timezone || browserTz;
+    setTimezone(tz);
+    persistTimezone(tz);
+
+    setFormats({
+      date: preferences?.dateFormat || DEFAULT_DATE_TIME_FORMATS.date,
+      datetime:
+        preferences?.datetimeFormat ||
+        tenantPrefs?.datetimeFormat ||
+        DEFAULT_DATE_TIME_FORMATS.datetime,
+      time: preferences?.timeFormat || DEFAULT_DATE_TIME_FORMATS.time,
+    });
+  }, [preferences, tenantPrefs]);
 
   return (
     <TimezoneContext.Provider value={{ timezone, formats }}>{children}</TimezoneContext.Provider>
