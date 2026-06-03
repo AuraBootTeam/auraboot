@@ -237,8 +237,45 @@ public class HandlerPhase implements CommandPhase {
             conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
         }
 
-        dynamicDataMapper.update(tableName, persistable, conditions);
+        // JSONB-awareness: a handler may return a full record map (e.g. lifecycle
+        // status-transition handlers return the whole updated row via getById), so
+        // `persistable` can include jsonb host columns (e.g. cr_cj_seed_urls). The
+        // plain update provider binds those as varchar → "column is of type jsonb but
+        // expression is of type character varying". Mirror DynamicDataServiceImpl /
+        // CommandFieldMapExecutor and add the ::jsonb cast for jsonb columns present
+        // in the data map. (Distinct from OSS #398, which only covered the
+        // CommandSideEffectExecutor UPDATE_RECORD + partial-CRUD paths.)
+        Set<String> jsonbColumns = resolveJsonbColumns(modelDef, tableName);
+        if (jsonbColumns.isEmpty()) {
+            dynamicDataMapper.update(tableName, persistable, conditions);
+        } else {
+            dynamicDataMapper.updateWithJsonb(tableName, persistable, conditions, jsonbColumns);
+        }
         log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
+    }
+
+    /**
+     * Resolve the set of JSONB host columns for a model, combining the model
+     * definition's declared jsonb fields with the physical jsonb columns reported
+     * by the database. Same approach as
+     * {@code CommandFieldMapExecutor#resolveJsonbColumns}.
+     */
+    private Set<String> resolveJsonbColumns(ModelDefinition modelDef, String tableName) {
+        Set<String> jsonbColumns = new LinkedHashSet<>();
+        if (modelDef != null) {
+            jsonbColumns.addAll(com.auraboot.framework.meta.util.JsonbFieldHelper.getJsonbHostColumns(modelDef));
+        }
+        if (StringUtils.hasText(tableName)) {
+            try {
+                Set<String> physicalColumns = dynamicDataMapper.findJsonbColumns(tableName);
+                if (physicalColumns != null) {
+                    jsonbColumns.addAll(physicalColumns);
+                }
+            } catch (Exception e) {
+                log.debug("Could not resolve physical JSONB columns for {}: {}", tableName, e.getMessage());
+            }
+        }
+        return jsonbColumns;
     }
 
     // ==================== Helper methods ====================
