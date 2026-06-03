@@ -55,13 +55,17 @@ public class OeeCalculationEngine {
         // setupHours this period = planned downtime (dictionary has no changeover split, see grounding note 5);
         // when pe_downtime_type adds "changeover", split it out here.
 
-        // quality / OEE -> filled in Task 5
+        BigDecimal good = actual.subtract(nz(in.getDefectQty())).max(BigDecimal.ZERO);
+        BigDecimal quality = safeDiv(good, actual);
+        BigDecimal oee = availability.multiply(performance).multiply(quality).setScale(SCALE, RoundingMode.HALF_UP);
+        BigDecimal teep = oee.multiply(safeDiv(loading, calendar)).setScale(SCALE, RoundingMode.HALF_UP);
+
         return OeeResult.builder()
             .availability(availability)
-            .performance(performance).quality(BigDecimal.ZERO).oee(BigDecimal.ZERO).teep(BigDecimal.ZERO)
+            .performance(performance).quality(quality).oee(oee).teep(teep)
             .losses(OeeResult.SixBigLosses.builder()
                 .breakdownHours(breakdown).setupHours(planned).minorStopHours(BigDecimal.ZERO)
-                .speedLossUnits(speedLoss).startupDefectUnits(BigDecimal.ZERO).processDefectUnits(BigDecimal.ZERO).build())
+                .speedLossUnits(speedLoss).startupDefectUnits(BigDecimal.ZERO).processDefectUnits(nz(in.getDefectQty())).build())
             .build();
     }
 }

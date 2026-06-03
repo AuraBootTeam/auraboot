@@ -67,4 +67,20 @@ class OeeCalculationEngineTest {
         OeeResult r = engine.calculate(in);
         assertEquals(0, BigDecimal.ONE.compareTo(r.getPerformance()));
     }
+
+    @Test
+    void quality_and_overallOee_compose() {
+        // loading 8, loss 2, operating 6; theoretical 600, actual 600 (performance 1.0);
+        // defect 30 -> quality = (600-30)/600 = 0.95
+        OeeInputs in = OeeInputs.builder()
+            .calendarHours(new BigDecimal("8"))
+            .downtimes(List.of(OeeInputs.Downtime.builder().type("breakdown").hours(new BigDecimal("2")).build()))
+            .actualQty(new BigDecimal("600")).defectQty(new BigDecimal("30")).capacityPerHour(new BigDecimal("100"))
+            .build();
+        OeeResult r = engine.calculate(in);
+        assertEquals(0, new BigDecimal("0.7500").compareTo(r.getAvailability().setScale(4, RoundingMode.HALF_UP))); // 6/8
+        assertEquals(0, new BigDecimal("0.9500").compareTo(r.getQuality().setScale(4, RoundingMode.HALF_UP)));
+        // OEE = 0.75 x 1.0 x 0.95 = 0.7125
+        assertEquals(0, new BigDecimal("0.7125").compareTo(r.getOee().setScale(4, RoundingMode.HALF_UP)));
+    }
 }
