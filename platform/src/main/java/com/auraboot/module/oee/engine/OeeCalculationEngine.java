@@ -47,13 +47,21 @@ public class OeeCalculationEngine {
         BigDecimal operating = loading.subtract(availLoss).max(BigDecimal.ZERO);  // operating time
         BigDecimal availability = safeDiv(operating, loading);
 
-        // performance / quality / OEE -> filled in Task 4 / 5
+        BigDecimal theoretical = operating.multiply(nz(in.getCapacityPerHour()));   // theoretical output
+        BigDecimal actual = nz(in.getActualQty());
+        BigDecimal performance = safeDiv(actual, theoretical).min(ONE);             // cap 1.0
+        BigDecimal speedLoss = theoretical.subtract(actual).max(BigDecimal.ZERO);   // speed loss (pieces)
+
+        // setupHours this period = planned downtime (dictionary has no changeover split, see grounding note 5);
+        // when pe_downtime_type adds "changeover", split it out here.
+
+        // quality / OEE -> filled in Task 5
         return OeeResult.builder()
             .availability(availability)
-            .performance(BigDecimal.ZERO).quality(BigDecimal.ZERO).oee(BigDecimal.ZERO).teep(BigDecimal.ZERO)
+            .performance(performance).quality(BigDecimal.ZERO).oee(BigDecimal.ZERO).teep(BigDecimal.ZERO)
             .losses(OeeResult.SixBigLosses.builder()
                 .breakdownHours(breakdown).setupHours(planned).minorStopHours(BigDecimal.ZERO)
-                .speedLossUnits(BigDecimal.ZERO).startupDefectUnits(BigDecimal.ZERO).processDefectUnits(BigDecimal.ZERO).build())
+                .speedLossUnits(speedLoss).startupDefectUnits(BigDecimal.ZERO).processDefectUnits(BigDecimal.ZERO).build())
             .build();
     }
 }

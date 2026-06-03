@@ -42,4 +42,29 @@ class OeeCalculationEngineTest {
         OeeResult r = engine.calculate(in);
         assertEquals(0, BigDecimal.ZERO.compareTo(r.getAvailability()));  // not NaN / no throw
     }
+
+    @Test
+    void performance_actualOverTheoretical_cappedAtOne() {
+        // operating 6h x capacity 100 = theoretical 600; actual 600 -> performance = 1.0
+        OeeInputs in = OeeInputs.builder()
+            .calendarHours(new BigDecimal("8"))
+            .downtimes(List.of(OeeInputs.Downtime.builder().type("breakdown").hours(new BigDecimal("2")).build()))
+            .actualQty(new BigDecimal("600")).defectQty(BigDecimal.ZERO).capacityPerHour(new BigDecimal("100"))
+            .build();
+        // loading 8, loss 2, operating 6, theoretical = 6x100 = 600, actual 600
+        OeeResult r = engine.calculate(in);
+        assertEquals(0, new BigDecimal("1.000000").compareTo(r.getPerformance()));
+    }
+
+    @Test
+    void performance_overproduction_capsAtOne_notAboveOne() {
+        // actual 700 > theoretical 600 -> performance capped at 1.0 (OEE convention: never exceeds 100%)
+        OeeInputs in = OeeInputs.builder()
+            .calendarHours(new BigDecimal("8"))
+            .downtimes(List.of(OeeInputs.Downtime.builder().type("breakdown").hours(new BigDecimal("2")).build()))
+            .actualQty(new BigDecimal("700")).defectQty(BigDecimal.ZERO).capacityPerHour(new BigDecimal("100"))
+            .build();
+        OeeResult r = engine.calculate(in);
+        assertEquals(0, BigDecimal.ONE.compareTo(r.getPerformance()));
+    }
 }
