@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.DocumentFlowService;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -18,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -816,6 +820,169 @@ class CommandSideEffectBatchTest {
 
             // Both updates should be attempted
             verify(dynamicDataMapper, times(2)).update(eq("mt_inventory"), anyMap(), anyMap());
+        }
+    }
+
+    // ── JSONB routing tests (BUG-2 regression guard) ─────────────────────────
+
+    /**
+     * Verifies that {@code UPDATE_RECORD} side effects route through
+     * {@code DynamicDataMapper.updateWithJsonb} (adds {@code ::jsonb} cast)
+     * when the target model has JSONB columns, preventing the
+     * {@code PSQLException: column is of type jsonb but expression is of type
+     * character varying} that was triggered before this fix.
+     */
+    @Nested
+    @DisplayName("JSONB routing — UPDATE_RECORD side effect (BUG-2 regression guard)")
+    class JsonbRoutingUpdateRecordTests {
+
+        /**
+         * Build a minimal {@link ModelDefinition} with one JSONB host column.
+         * Mirrors the shape of {@code cr_crawl_site_profile.cr_csp_default_parser_config}.
+         */
+        private ModelDefinition modelWithJsonbColumn(String columnName) {
+            FieldDefinition jsonbField = FieldDefinition.builder()
+                    .code(columnName)
+                    .columnName(columnName)
+                    .dataType("jsonb")
+                    .build();
+            FieldDefinition nameField = FieldDefinition.builder()
+                    .code("name")
+                    .columnName("name")
+                    .dataType("string")
+                    .build();
+            return ModelDefinition.builder()
+                    .code("target_model")
+                    .tableName("mt_target_model")
+                    .fields(List.of(nameField, jsonbField))
+                    .build();
+        }
+
+        @Test
+        @DisplayName("UPDATE_RECORD routes to updateWithJsonb when model has jsonb column")
+        void updateRecord_routesToUpdateWithJsonb_whenModelHasJsonbColumn() {
+            // Arrange: model with a jsonb column
+            ModelDefinition modelDef = modelWithJsonbColumn("config");
+            when(metaModelService.getModelDefinition("target_model"))
+                    .thenReturn(Optional.of(modelDef));
+            when(metaModelService.getTableName("target_model")).thenReturn("mt_target_model");
+            // Physical schema fallback returns empty (model metadata is the source of truth here)
+            when(dynamicDataMapper.findJsonbColumns("mt_target_model")).thenReturn(Set.of());
+            when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of());
+            when(dynamicDataMapper.updateWithJsonb(anyString(), anyMap(), anyMap(), anySet())).thenReturn(1);
+
+            Map<String, Object> currentRecord = Map.of("related_id", "pid-001");
+            Map<String, Object> fieldMapping = Map.of(
+                    "config", Map.of("qps", 2, "concurrency", 4)
+            );
+            Map<String, Object> effect = Map.of(
+                    "action", "update_record",
+                    "targetModel", "target_model",
+                    "targetIdField", "related_id",
+                    "fieldMapping", fieldMapping
+            );
+            Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
+
+            // Act
+            executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID,
+                    null, null, null);
+
+            // Assert: must call updateWithJsonb, NOT plain update
+            verify(dynamicDataMapper).updateWithJsonb(
+                    eq("mt_target_model"), anyMap(), anyMap(), eq(Set.of("config")));
+            verify(dynamicDataMapper, never()).update(eq("mt_target_model"), anyMap(), anyMap());
+        }
+
+        @Test
+        @DisplayName("UPDATE_RECORD routes to plain update when model has no jsonb column")
+        void updateRecord_routesToPlainUpdate_whenModelHasNoJsonbColumn() {
+            // Arrange: model with no jsonb column
+            FieldDefinition nameField = FieldDefinition.builder()
+                    .code("status").columnName("status").dataType("string").build();
+            ModelDefinition modelDef = ModelDefinition.builder()
+                    .code("target_model").tableName("mt_target_model")
+                    .fields(List.of(nameField)).build();
+            when(metaModelService.getModelDefinition("target_model"))
+                    .thenReturn(Optional.of(modelDef));
+            when(metaModelService.getTableName("target_model")).thenReturn("mt_target_model");
+            when(dynamicDataMapper.findJsonbColumns("mt_target_model")).thenReturn(Set.of());
+            when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of());
+            when(dynamicDataMapper.update(anyString(), anyMap(), anyMap())).thenReturn(1);
+
+            Map<String, Object> currentRecord = Map.of("related_id", "pid-001");
+            Map<String, Object> effect = Map.of(
+                    "action", "update_record",
+                    "targetModel", "target_model",
+                    "targetIdField", "related_id",
+                    "fieldMapping", Map.of("status", "ACTIVE")
+            );
+            Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
+
+            executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID,
+                    null, null, null);
+
+            verify(dynamicDataMapper).update(eq("mt_target_model"), anyMap(), anyMap());
+            verify(dynamicDataMapper, never()).updateWithJsonb(anyString(), anyMap(), anyMap(), anySet());
+        }
+
+        @Test
+        @DisplayName("UPDATE_RECORD detects jsonb via physical schema when model metadata unavailable")
+        void updateRecord_detectsJsonbViaPhysicalSchema_whenModelMetadataUnavailable() {
+            // Arrange: model definition lookup fails, but physical schema reports jsonb column
+            when(metaModelService.getModelDefinition("target_model")).thenReturn(Optional.empty());
+            when(metaModelService.getTableName("target_model")).thenReturn("mt_target_model");
+            when(dynamicDataMapper.findJsonbColumns("mt_target_model")).thenReturn(Set.of("config"));
+            when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of());
+            when(dynamicDataMapper.updateWithJsonb(anyString(), anyMap(), anyMap(), anySet())).thenReturn(1);
+
+            Map<String, Object> currentRecord = Map.of("related_id", "pid-001");
+            Map<String, Object> effect = Map.of(
+                    "action", "update_record",
+                    "targetModel", "target_model",
+                    "targetIdField", "related_id",
+                    "fieldMapping", Map.of("config", Map.of("key", "value"))
+            );
+            Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
+
+            executor.executeSideEffectPhase(execConfig, currentRecord, TENANT_ID, USER_ID,
+                    null, null, null);
+
+            verify(dynamicDataMapper).updateWithJsonb(
+                    eq("mt_target_model"), anyMap(), anyMap(), eq(Set.of("config")));
+            verify(dynamicDataMapper, never()).update(eq("mt_target_model"), anyMap(), anyMap());
+        }
+
+        @Test
+        @DisplayName("BATCH_UPDATE_RECORD routes to updateWithJsonb when model has jsonb column")
+        void batchUpdateRecord_routesToUpdateWithJsonb_whenModelHasJsonbColumn() {
+            ModelDefinition modelDef = modelWithJsonbColumn("parser_config");
+            when(metaModelService.getModelDefinition("site_profile"))
+                    .thenReturn(Optional.of(modelDef));
+            when(metaModelService.getTableName("site_profile")).thenReturn("mt_site_profile");
+            when(dynamicDataMapper.findJsonbColumns("mt_site_profile")).thenReturn(Set.of());
+            when(dynamicDataMapper.updateWithJsonb(anyString(), anyMap(), anyMap(), anySet())).thenReturn(1);
+
+            List<Map<String, Object>> items = List.of(
+                    Map.of("site_pid", "s-001", "parser_config", Map.of("type", "css")),
+                    Map.of("site_pid", "s-002", "parser_config", Map.of("type", "xpath"))
+            );
+            Map<String, Object> payload = Map.of("id", "job-001", "sites", items);
+
+            Map<String, Object> effect = Map.of(
+                    "action", "batch_update_record",
+                    "targetModel", "site_profile",
+                    "sourceField", "sites",
+                    "targetIdField", "site_pid",
+                    "fieldMapping", Map.of("parser_config", "${item.parser_config}")
+            );
+            Map<String, Object> execConfig = Map.of("sideEffects", List.of(effect));
+
+            executor.executeSideEffectPhase(execConfig, payload, TENANT_ID, USER_ID,
+                    null, null, null);
+
+            verify(dynamicDataMapper, times(2)).updateWithJsonb(
+                    eq("mt_site_profile"), anyMap(), anyMap(), eq(Set.of("parser_config")));
+            verify(dynamicDataMapper, never()).update(eq("mt_site_profile"), anyMap(), anyMap());
         }
     }
 }

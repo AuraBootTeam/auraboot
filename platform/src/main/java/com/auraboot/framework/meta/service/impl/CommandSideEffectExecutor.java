@@ -3,12 +3,14 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.entity.payload.DocumentFlowConfig;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.DocumentFlowService;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -276,7 +279,13 @@ public class CommandSideEffectExecutor {
             }
             Map<String, Object> data = resolveFieldMapping(fieldMapping, evaluationContext);
             Map<String, Object> conditions = Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue());
-            int updated = dynamicDataMapper.update(tableName, data, conditions);
+            // Route through jsonb-aware update to prevent PSQLException when any updated
+            // column is of PostgreSQL type jsonb (BUG-2: side-effect path was the only
+            // command-pipeline path that still called plain update without ::jsonb cast).
+            Set<String> jsonbCols = resolveJsonbColumns(targetModel, tableName);
+            int updated = jsonbCols.isEmpty()
+                    ? dynamicDataMapper.update(tableName, data, conditions)
+                    : dynamicDataMapper.updateWithJsonb(tableName, data, conditions, jsonbCols);
             if (updated == 0) {
                 log.warn("SIDE_EFFECT UPDATE_RECORD: no record found to update in {} with {}={}", targetModel, idEntry.getKey(), recordIdVal);
             }
@@ -532,6 +541,8 @@ public class CommandSideEffectExecutor {
         }
 
         String tableName = metaModelService.getTableName(targetModel);
+        // Resolve jsonb columns once per batch — same model/table for every row.
+        Set<String> jsonbCols = resolveJsonbColumns(targetModel, tableName);
         int totalUpdated = 0;
 
         for (int i = 0; i < items.size(); i++) {
@@ -550,7 +561,9 @@ public class CommandSideEffectExecutor {
                 String recordIdVal = targetRecordIdObj.toString();
                 var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdVal);
                 Map<String, Object> conditions = Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue());
-                int count = dynamicDataMapper.update(tableName, data, conditions);
+                int count = jsonbCols.isEmpty()
+                        ? dynamicDataMapper.update(tableName, data, conditions)
+                        : dynamicDataMapper.updateWithJsonb(tableName, data, conditions, jsonbCols);
                 if (count == 0) {
                     log.warn("BATCH_UPDATE_RECORD: no record found in {} with {}={} at index {}",
                             targetModel, idEntry.getKey(), recordIdVal, i);
@@ -700,6 +713,41 @@ public class CommandSideEffectExecutor {
             log.debug("Failed to read record snapshot: {}", e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Resolve the set of JSONB host column names for a given model/table.
+     *
+     * <p>Combines two sources of truth — the registered {@link ModelDefinition} (which
+     * knows field {@code dataType = "jsonb"}) and the physical PostgreSQL schema
+     * (defensive fallback via {@code information_schema.columns}) — mirroring the
+     * approach used by {@link CommandFieldMapExecutor#resolveJsonbColumns}.
+     *
+     * @param modelCode logical model code (for metadata lookup)
+     * @param tableName physical table name (for information_schema fallback)
+     * @return set of column names whose DB type is {@code jsonb}; empty if none
+     */
+    private Set<String> resolveJsonbColumns(String modelCode, String tableName) {
+        Set<String> cols = new LinkedHashSet<>();
+        try {
+            ModelDefinition modelDef = metaModelService.getModelDefinition(modelCode).orElse(null);
+            if (modelDef != null) {
+                cols.addAll(JsonbFieldHelper.getJsonbHostColumns(modelDef));
+            }
+        } catch (Exception e) {
+            log.debug("[side-effect] model metadata unavailable for {} ({}): using physical schema only", modelCode, e.getMessage());
+        }
+        if (StringUtils.hasText(tableName)) {
+            try {
+                Set<String> physical = dynamicDataMapper.findJsonbColumns(tableName);
+                if (physical != null) {
+                    cols.addAll(physical);
+                }
+            } catch (Exception e) {
+                log.debug("[side-effect] physical jsonb column query failed for {}: {}", tableName, e.getMessage());
+            }
+        }
+        return cols;
     }
 
 }
