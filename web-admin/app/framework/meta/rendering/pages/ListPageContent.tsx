@@ -416,7 +416,7 @@ function ListPageContentInner(props: PageContentProps) {
   const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(
     null,
   );
-  const { formats: dateTimeFormats } = useTimezone();
+  const { formats: dateTimeFormats, timezone: effectiveTimezone } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
   const loadDataRef = useRef<
     | ((params?: { page?: number; size?: number; filters?: Record<string, any> }) => Promise<void>)
@@ -1439,6 +1439,7 @@ function ListPageContentInner(props: PageContentProps) {
           cellRenderer: (column as any).cellRenderer,
           format: column.format,
           dateTimeFormats,
+          timezone: effectiveTimezone,
           render: column.render,
           tagMap: (column as any).tagMap,
         },
@@ -1448,7 +1449,7 @@ function ListPageContentInner(props: PageContentProps) {
         rowIndex,
       });
     },
-    [runtime, pageContext, locale, t, inferValueType, dateTimeFormats],
+    [runtime, pageContext, locale, t, inferValueType, dateTimeFormats, effectiveTimezone],
   );
 
   // Inline edit: save a single field value via dynamic data PUT API

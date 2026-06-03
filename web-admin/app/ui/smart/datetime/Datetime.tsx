@@ -1,6 +1,7 @@
 import React from 'react';
-import dayjs from 'dayjs';
 import { Calendar, Clock } from 'lucide-react';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 
 interface DatetimeProps {
   name: string;
@@ -33,6 +34,8 @@ export const Datetime: React.FC<DatetimeProps> = ({
   allowClear = true,
   className = '',
 }) => {
+  const { timezone } = useTimezone();
+
   const handleDateTimeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = event.target.value;
     onChange?.(newValue || undefined);
@@ -45,11 +48,10 @@ export const Datetime: React.FC<DatetimeProps> = ({
 
   const formatDisplayValue = (dateValue?: string) => {
     if (!dateValue) return '';
-
-    const d = dayjs(dateValue);
-    if (!d.isValid()) return dateValue;
-
-    return showTime ? d.format('YYYY-MM-DD HH:mm:ss') : d.format('YYYY-MM-DD');
+    // Backend emits UTC; convert to the effective display timezone for the
+    // read-only view via the canonical formatter.
+    const fmt = showTime ? 'YYYY-MM-DD HH:mm:ss' : 'YYYY-MM-DD';
+    return formatInTimezone(dateValue, fmt, timezone) || dateValue;
   };
 
   const getInputType = () => {

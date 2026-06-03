@@ -29,6 +29,13 @@ import { SortableSubTableRow } from '~/framework/meta/components/subtable/Sortab
 import { InlineEditableCell } from '~/framework/meta/components/subtable/InlineEditableCell';
 import { SubTableSummaryRow } from '~/framework/meta/components/subtable/SubTableSummaryRow';
 import { isDescendant } from '~/framework/meta/components/subtable/dndUtils';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import {
+  formatInTimezone,
+  resolveTemporalType,
+  resolveTemporalFormat,
+  type DateTimeFormatPreferences,
+} from '~/shared/services/dateTimeFormatService';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -51,6 +58,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   isEditable = false,
   onDataChange,
 }) => {
+  const { timezone, formats } = useTimezone();
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -817,7 +825,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                             <InlineEditableCell
                               col={col}
                               value={editable ? editingValues[col.field] : row[col.field]}
-                              displayValue={formatCellValue(row[col.field], col, getDictLabel)}
+                              displayValue={formatCellValue(row[col.field], col, getDictLabel, timezone, formats)}
                               isEditing={editable}
                               error={editErrors[col.field]}
                               onChange={(val) => {
@@ -848,7 +856,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                           }`}
                           onDoubleClick={canInlineEdit ? () => handleStartEdit(row) : undefined}
                         >
-                          {formatCellValue(row[col.field], col, getDictLabel)}
+                          {formatCellValue(row[col.field], col, getDictLabel, timezone, formats)}
                         </td>
                       );
                     })}
@@ -1074,10 +1082,12 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
 // ------- Utility Functions -------
 
-function formatCellValue(
+export function formatCellValue(
   value: any,
   col: ColumnConfig,
   getDictLabel?: (code: string, value: string) => string | undefined,
+  timeZone?: string,
+  formats?: Partial<DateTimeFormatPreferences>,
 ): string {
   if (value == null) return '-';
 
@@ -1085,6 +1095,14 @@ function formatCellValue(
   if (col.dictCode && getDictLabel) {
     const label = getDictLabel(col.dictCode, String(value));
     if (label) return label;
+  }
+
+  // Temporal values: backend emits UTC, convert to the effective display
+  // timezone via the canonical formatter (never slice the raw ISO string).
+  const temporalType = resolveTemporalType(col.field, col.valueType as string | undefined, value);
+  if (temporalType) {
+    const fmt = resolveTemporalFormat(temporalType, formats, col.format);
+    return formatInTimezone(value, fmt, timeZone);
   }
 
   if (col.format === 'currency' || col.valueType === 'currency') {
