@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -183,6 +184,51 @@ class HandlerPhaseTest {
         verify(asyncTaskService, never()).submitTask(any(), any(), any());
     }
 
+    /**
+     * Regression for PB-2: a custom handler that returns a full record map (lifecycle
+     * status-transition handlers do exactly this — they return the whole updated row)
+     * must persist jsonb host columns via {@code updateWithJsonb}, NOT the plain
+     * {@code update} provider. Before the fix, a jsonb column in the handler result
+     * (e.g. cr_cj_seed_urls) was bound as varchar → "column is of type jsonb but
+     * expression is of type character varying".
+     */
+    @Test
+    void persistHandlerResults_usesJsonbAwareUpdateWhenResultIncludesJsonbColumn() throws Exception {
+        RecordingFullRowHandler handler = new RecordingFullRowHandler(BUSINESS_COMMAND_CODE);
+        when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
+
+        String modelCode = "cr_crawl_job";
+        String tableName = "mt_cr_crawl_job";
+
+        com.auraboot.framework.meta.dto.FieldDefinition statusField =
+                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                        .code("cr_cj_status").columnName("cr_cj_status").dataType("string").build();
+        com.auraboot.framework.meta.dto.FieldDefinition seedUrlsField =
+                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                        .code("cr_cj_seed_urls").columnName("cr_cj_seed_urls").dataType("array").build(); // jsonb host
+        com.auraboot.framework.meta.dto.ModelDefinition model =
+                com.auraboot.framework.meta.dto.ModelDefinition.builder()
+                        .code(modelCode).tableName(tableName)
+                        .fields(java.util.List.of(statusField, seedUrlsField)).build();
+
+        when(metaModelService.getModelDefinition(modelCode)).thenReturn(Optional.of(model));
+        when(metaModelService.getTableName(modelCode)).thenReturn(tableName);
+        when(dynamicDataMapper.findJsonbColumns(tableName)).thenReturn(java.util.Set.of("cr_cj_seed_urls"));
+        // pid → db id lookup
+        when(dynamicDataMapper.selectByQuery(any(), any()))
+                .thenReturn(java.util.List.of(Map.of("id", 42L)));
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, modelCode, Map.of("type", "custom"));
+        phase.execute(ctx);
+
+        // jsonb-aware path must be taken (cr_cj_seed_urls is jsonb)
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Set<String>> jsonbCaptor = ArgumentCaptor.forClass(java.util.Set.class);
+        verify(dynamicDataMapper).updateWithJsonb(eq(tableName), any(), any(), jsonbCaptor.capture());
+        assertThat(jsonbCaptor.getValue()).contains("cr_cj_seed_urls");
+        verify(dynamicDataMapper, never()).update(eq(tableName), any(), any());
+    }
+
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {
         CommandDefinition command = new CommandDefinition();
         command.setCode(commandCode);
@@ -206,6 +252,33 @@ class HandlerPhaseTest {
                 .fieldMapResults(new HashMap<>())
                 .handlerResults(new HashMap<>())
                 .build();
+    }
+
+    /**
+     * Returns a full record map including a jsonb host column, mirroring what
+     * lifecycle status-transition handlers return (the whole updated row).
+     */
+    private static class RecordingFullRowHandler implements CommandHandlerExtension {
+
+        private final String commandType;
+
+        private RecordingFullRowHandler(String commandType) {
+            this.commandType = commandType;
+        }
+
+        @Override
+        public String getCommandType() {
+            return commandType;
+        }
+
+        @Override
+        public Object execute(CommandContext context) {
+            Map<String, Object> fullRow = new HashMap<>();
+            fullRow.put("cr_cj_status", "PAUSED");
+            // jsonb host column round-tripped from getById comes back as a JSON String
+            fullRow.put("cr_cj_seed_urls", "[\"https://example.com/\"]");
+            return fullRow;
+        }
     }
 
     private static class RecordingPluginHandler implements CommandHandlerExtension {
