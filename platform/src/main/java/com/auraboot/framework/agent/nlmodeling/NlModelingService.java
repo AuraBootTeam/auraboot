@@ -391,7 +391,7 @@ public class NlModelingService {
                   "name:en": "<English name>",
                   "kind": "LIST|FORM|DETAIL",
                   "modelCode": "<model_code>",
-                  "blocks": {
+                  "blocks": [{
                     "kind": "List",
                     "version": "1.0.0",
                     "id": "list.<model_code>",
@@ -434,9 +434,10 @@ public class NlModelingService {
                         }]
                       }
                     }
-                  }
+                  }]
                 }
                 ```
+                - IMPORTANT: `blocks` is always a JSON array (e.g., `"blocks": [{ ... }]`), never a bare object.
                 - List page: toolbar (create button) + table with columns and row actions
                 - Form page: kind=form, layout with form-section blocks
 
@@ -448,7 +449,7 @@ public class NlModelingService {
                   "name:en": "<English form name>",
                   "kind": "form",
                   "modelCode": "<model_code>",
-                  "blocks": {
+                  "blocks": [{
                     "kind": "Form",
                     "version": "1.0.0",
                     "id": "form.<model_code>",
@@ -472,7 +473,7 @@ public class NlModelingService {
                         }]
                       }
                     }
-                  }
+                  }]
                 }
                 ```
 
@@ -784,7 +785,7 @@ public class NlModelingService {
                     "name:en": "Book List",
                     "kind": "list",
                     "modelCode": "book",
-                    "blocks": {
+                    "blocks": [{
                       "kind": "List",
                       "version": "1.0.0",
                       "id": "list.book",
@@ -794,7 +795,7 @@ public class NlModelingService {
                         "toolbar": { "blocks": [{ "id": "toolbar", "blockType": "toolbar", "buttons": [{ "code": "create", "variant": "primary", "label": "create", "action": { "type": "navigate", "to": "book_form", "command": "book_mgmt:create_book" } }] }] },
                         "content": { "blocks": [{ "id": "table", "blockType": "table", "columns": [ { "field": "title", "width": 200, "sortable": true }, { "field": "author", "width": 150 }, { "field": "isbn", "width": 150 }, { "field": "price", "width": 100 }, { "field": "published_date", "width": 120 } ], "rowActions": [ { "code": "edit", "label": "edit", "action": { "type": "navigate", "to": "book_form", "command": "book_mgmt:update_book" } }, { "code": "delete", "label": "delete", "variant": "danger", "action": { "type": "command", "command": "book_mgmt:delete_book" } } ] }] }
                       }
-                    }
+                    }]
                   },
                   {
                     "pageKey": "book_form",
@@ -802,14 +803,14 @@ public class NlModelingService {
                     "name:en": "Book Form",
                     "kind": "form",
                     "modelCode": "book",
-                    "blocks": {
+                    "blocks": [{
                       "kind": "Form",
                       "version": "1.0.0",
                       "id": "form.book",
                       "modelCode": "book",
                       "layout": { "areas": ["content"], "areasConfig": { "content": { "type": "flex", "direction": "column" } } },
                       "areas": { "content": { "blocks": [{ "id": "basic_info", "blockType": "form-section", "title": "basic_info", "columns": 2, "fields": [ { "field": "title" }, { "field": "author" }, { "field": "isbn" }, { "field": "price" }, { "field": "published_date" } ] }] } }
-                    }
+                    }]
                   }
                 ],
                 "menus": [
