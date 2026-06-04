@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Introduction to AuraBoot
 
 AuraBoot is a source-available, self-hosted platform for building business applications using declarative JSON instead of rewriting the same CRUD, permission, workflow, and audit plumbing for every project. You define your data models, pages, commands, and workflows in JSON DSL -- the platform generates the database schema, REST APIs, and UI automatically. AI-assisted features such as AuraBot, ChatBI, agents, and RAG run on the same application model when they are useful.

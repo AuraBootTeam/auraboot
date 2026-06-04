@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Open-Source Scope
 
 This document defines what is and is not part of AuraBoot's open-source distribution. It complements the source-of-truth manifest at the repo root: [`oss-scope.json`](../../oss-scope.json).

@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # The Command System
 
 Commands are the **verbs** of the AuraBoot platform. Every data mutation -- create, update, delete, status transition, and custom business operation -- flows through the command system. Rather than writing raw SQL or bespoke API endpoints, you declare commands as JSON configurations, and the platform executes them through a multi-stage pipeline that handles validation, permissions, state machines, side effects, audit trails, and more.

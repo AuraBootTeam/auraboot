@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Command API Reference
 
 The Command system is AuraBoot's unified data operation pipeline. Every create, update, delete, and state transition flows through a configurable 20+ stage pipeline. Commands are defined in DSL JSON and executed via the Command API.

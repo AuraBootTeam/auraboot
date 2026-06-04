@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Webhook API Reference
 
 Webhooks allow external systems to receive real-time notifications when events occur in AuraBoot. When a record is created, updated, deleted, or transitions state, AuraBoot sends an HTTP POST to your configured endpoint.

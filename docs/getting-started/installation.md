@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Detailed Installation
 
 This guide covers all installation methods: Docker Compose for deployment and building from source for development.

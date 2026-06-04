@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Configuration Reference
 
 AuraBoot is configured through environment variables and `application.yml` settings. Environment variables take precedence over file-based configuration.

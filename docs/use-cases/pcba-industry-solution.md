@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # PCBA Industry Solution
 
 > Complete printed circuit board assembly management: from customer inquiry to finished goods shipment. A cross-plugin industry solution demonstrating how AuraBoot plugins compose into a full ERP system.

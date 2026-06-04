@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Page Designer
 
 Build dynamic list, form, and detail pages without writing code. Page Designer

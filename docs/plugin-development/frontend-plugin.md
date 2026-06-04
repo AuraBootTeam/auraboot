@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Frontend Plugin Guide
 
 This guide covers building frontend plugins for AuraBoot using React and Module Federation. Frontend plugins let you add custom UI components -- block renderers, dashboard widgets, and field renderers -- that get loaded dynamically at runtime.

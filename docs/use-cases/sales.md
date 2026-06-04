@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Sales Management
 
 > Sales pipeline, quoting, orders, shipments, returns, credit memos, RMA, pricing, and revenue tracking -- mostly driven by declarative DSL configuration.

@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # README Screenshots — Capture Specification
 
 This document is the source of truth for the README product preview images.

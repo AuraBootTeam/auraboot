@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # AI Features (AuraBot & ChatBI)
 
 AuraBoot integrates AI capabilities throughout the platform under the **AuraBot** brand. From conversational data analysis to autonomous AI workers, every AI feature shares a unified LLM provider infrastructure.

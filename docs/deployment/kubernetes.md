@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Kubernetes Deployment
 
 This guide describes how to deploy AuraBoot on Kubernetes. AuraBoot does not currently ship a Helm chart, but the architecture maps cleanly to standard Kubernetes resources. This document provides the conceptual structure and example manifests.

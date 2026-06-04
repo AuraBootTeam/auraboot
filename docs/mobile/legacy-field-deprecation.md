@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Mobile BFF Legacy Field Deprecation Plan
 
 > M-090 OPS-003 — track legacy fields on mobile BFF DTOs that are kept for

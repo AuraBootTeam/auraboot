@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Learning Loop & Shadow Mode
 
 The Learning Loop turns every successful agent action into raw material for

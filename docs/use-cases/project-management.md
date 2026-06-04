@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Project Management
 
 > End-to-end project management: portfolios, projects, tasks, team members, time tracking, labels, dependencies, activity feeds, and executive dashboards -- all built through JSON DSL configuration.

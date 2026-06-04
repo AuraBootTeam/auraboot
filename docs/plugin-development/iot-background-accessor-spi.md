@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # IoT Background Accessor SPI
 
 > 受众:在 AuraBoot 上开发 IoT 控制平面/数据面 plugin(如企业版 `ent-iot-control`)的开发者。

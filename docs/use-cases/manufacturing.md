@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Manufacturing Management
 
 > Production planning, BOM management, work orders, MRP, APS scheduling, MES execution, equipment maintenance, and shop floor control -- built entirely from DSL configuration.

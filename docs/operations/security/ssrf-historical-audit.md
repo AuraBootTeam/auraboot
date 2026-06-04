@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # GAP-266 — SSRF Historical Audit: Pinned-IP Call Sites vs IPv6 / Multi-A Bypass
 
 **Date:** 2026-04-18

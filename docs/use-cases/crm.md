@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Customer Relationship Management (CRM)
 
 > Complete CRM solution: leads, opportunities, accounts, contacts, activities, quotes, campaigns, complaints, SLA tracking, and email management -- all built through JSON DSL configuration.

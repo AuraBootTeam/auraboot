@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Brand Assets — Capture Specification
 
 > Companion to [`readme-screenshots-spec.md`](./readme-screenshots-spec.md). This

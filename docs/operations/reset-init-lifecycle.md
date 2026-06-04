@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Reset / Init Lifecycle
 
 本页定义本地与 Docker 环境重置脚本的职责边界，避免把“重置 DB、启动服务、导入插件、同步 marketplace、跑 E2E”混在一起理解。

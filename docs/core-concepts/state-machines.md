@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # State Machines
 
 Most business entities have a lifecycle: an order goes from draft to confirmed to shipped to delivered. A support ticket moves from open to in-progress to resolved. AuraBoot models these lifecycles as state machines -- a status field combined with transition commands that enforce valid state changes and trigger side effects.

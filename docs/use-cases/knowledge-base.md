@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Knowledge Base & Document Management
 
 > Document management, categorization, version history, knowledge articles, and project-document association -- built entirely on AuraBoot's DSL configuration system.

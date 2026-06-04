@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Memory Promotion Subsystem
 
 The Memory Promotion pipeline lifts agent memories up the scope lattice —

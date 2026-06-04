@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Docker Deployment
 
 AuraBoot ships with a Docker Compose configuration that starts the full platform with a single command. Only PostgreSQL is required -- Redis, MinIO, and monitoring are optional profiles.

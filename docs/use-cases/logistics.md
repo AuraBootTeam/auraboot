@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Logistics & Shipping Management
 
 > Shipment tracking, carrier management, delivery scheduling, and route optimization -- built entirely through AuraBoot's JSON DSL configuration.

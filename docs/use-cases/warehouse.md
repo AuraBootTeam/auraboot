@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # Warehouse & Inventory Management
 
 > Inventory tracking, receiving, shipping, stock transfers, stock counts, lot/serial number traceability, pick order management, inventory holds/allocations, and a real-time analytics dashboard -- mostly built from DSL configuration.

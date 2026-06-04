@@ -1,3 +1,8 @@
+---
+type: product-doc
+status: active
+---
+
 # BPMN 2.0 Workflows
 
 Design, deploy, and manage business process workflows with AuraBoot's built-in BPM engine. Based on SmartEngine 3.7.0, the workflow system supports both human approval flows and automated orchestration pipelines.
