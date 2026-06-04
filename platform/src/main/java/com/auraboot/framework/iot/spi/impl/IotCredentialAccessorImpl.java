@@ -6,6 +6,9 @@ import com.auraboot.framework.iot.security.IotCredentialEncryptionService;
 import com.auraboot.framework.iot.security.IotJwtService;
 import com.auraboot.framework.iot.security.IotJwtService.AclEntry;
 import com.auraboot.framework.iot.security.IotJwtService.IotDeviceJwtClaims;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.iot.BackgroundDeviceAccessor;
@@ -168,17 +171,40 @@ public class IotCredentialAccessorImpl implements BackgroundIotCredentialAccesso
     }
 
     @Override
-    public void syncAclToBroker(long tenantId) {
+    public int syncAclToBroker(long tenantId) {
         if (tenantId <= 0) {
             throw new IllegalArgumentException("tenantId must be > 0");
         }
-        // The tenant-scope sweep is intentionally minimal here: the platform
-        // surface for "list all devices" lives in the device accessor's
-        // higher-level query, which is out of scope for the SPI surface. We
-        // delegate to the broker layer's tenant-scope sync with an empty
-        // principal list — concrete callers should fan out per device via
-        // {@link #issueCredentials} or pre-resolve the list.
-        emqxSync.syncTenantAcl(tenantId, List.of());
+        // Enumerate active (non-DISABLE) devices for this tenant and push
+        // ACL-only authz rules to the broker. §15: do NOT decrypt passwords —
+        // this path uses DeviceAclRule (username + patterns only).
+        DynamicQueryRequest req = DynamicQueryRequest.builder()
+                .pageNum(1)
+                .pageSize(500)
+                .conditions(List.of(QueryCondition.builder()
+                        .fieldName(IotDeviceAccessorImpl.COL_STATUS)
+                        .operator(QueryCondition.Operator.NE)
+                        .value("DISABLE")
+                        .build()))
+                .build();
+
+        PaginationResult<Map<String, Object>> page = withTenant(tenantId,
+                () -> dynamicDataService.list(IotDeviceAccessorImpl.MODEL_CODE, req));
+
+        List<Map<String, Object>> rows = page != null ? page.getRecords() : null;
+        if (rows == null || rows.isEmpty()) {
+            return 0;
+        }
+
+        List<EmqxAclSyncService.DeviceAclRule> rules = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            DeviceView view = IotDeviceAccessorImpl.toViewFromRow(row);
+            List<String> patterns = resolveAclPatterns(view);
+            rules.add(new EmqxAclSyncService.DeviceAclRule(view.deviceCode(), patterns));
+        }
+
+        emqxSync.syncTenantAclRules(tenantId, rules);
+        return rules.size();
     }
 
     static List<String> resolveAclPatterns(DeviceView device) {

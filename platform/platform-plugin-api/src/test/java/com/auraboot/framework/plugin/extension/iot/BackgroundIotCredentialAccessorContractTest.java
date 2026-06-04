@@ -135,7 +135,7 @@ class BackgroundIotCredentialAccessorContractTest {
         }
 
         @Override
-        public void syncAclToBroker(long tenantId) {
+        public int syncAclToBroker(long tenantId) {
             syncCounter.merge(tenantId, 1, Integer::sum);
             Set<String> snapshot = new HashSet<>();
             String prefix = tenantId + ":";
@@ -145,6 +145,7 @@ class BackgroundIotCredentialAccessorContractTest {
                 }
             }
             lastSnapshot.put(tenantId, snapshot);
+            return snapshot.size();
         }
     }
 }

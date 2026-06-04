@@ -109,6 +109,35 @@ public class IotDeviceAccessorImpl implements BackgroundDeviceAccessor {
     }
 
     private DeviceView toView(Map<String, Object> row) {
+        return toViewFromRow(row);
+    }
+
+    /**
+     * Maps a raw dynamic-data row (as returned by
+     * {@link DynamicDataService#list}) to a {@link DeviceView}.
+     * Exposed as package-scope static so sibling impls (e.g.
+     * {@link IotCredentialAccessorImpl}) can reuse the mapping without
+     * requiring an injected {@link IotDeviceAccessorImpl} instance.
+     *
+     * <p><b>Note:</b> tags are mapped as an empty map when the column value
+     * is not a {@link Map} or JSON string (ObjectMapper is not available
+     * statically; callers needing tag parsing should use the instance method).
+     */
+    static DeviceView toViewFromRow(Map<String, Object> row) {
+        // Tags: best-effort — accept pre-parsed Map, treat everything else as empty.
+        Map<String, String> tags;
+        Object tagVal = row.get(COL_TAGS);
+        if (tagVal instanceof Map<?, ?> m) {
+            tags = m.entrySet().stream()
+                    .filter(e -> e.getKey() != null && e.getValue() != null)
+                    .collect(java.util.stream.Collectors.toMap(
+                            e -> e.getKey().toString(),
+                            e -> e.getValue().toString(),
+                            (a, b) -> a,
+                            java.util.LinkedHashMap::new));
+        } else {
+            tags = Collections.emptyMap();
+        }
         return new DeviceView(
                 asString(row.get("pid")),
                 asString(row.get(COL_IOT_ID)),
@@ -117,7 +146,7 @@ public class IotDeviceAccessorImpl implements BackgroundDeviceAccessor {
                 asLong(row.get("tenant_id")),
                 asString(row.get(COL_STATUS)),
                 asString(row.get(COL_ACL_PATTERN)),
-                parseTags(row.get(COL_TAGS)),
+                tags,
                 asInstant(row.get(COL_LAST_SEEN_AT)));
     }
 
